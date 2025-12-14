@@ -23,17 +23,16 @@ import {
   insertDealSchema, 
   platformOptions, 
   contentTypeOptions, 
-  frequencyOptions,
-  type InsertDeal 
+  frequencyOptions
 } from "@shared/schema";
 
-const formSchema = insertDealSchema.extend({
+const formSchema = insertDealSchema.omit({ userId: true }).extend({
   brandName: z.string().min(1, "Brand name is required"),
   dealTitle: z.string().min(1, "Deal title is required"),
   dealAmount: z.coerce.number().min(1, "Deal amount must be positive"),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
-  brandUserId: z.string().optional(),
+  brandUserId: z.string().optional().nullable(),
   deliverables: z.array(z.object({
     id: z.string(),
     platform: z.enum(platformOptions),
@@ -83,7 +82,7 @@ export default function CreateDealPage() {
   });
 
   const createDeal = useMutation({
-    mutationFn: async (data: InsertDeal) => {
+    mutationFn: async (data: FormData) => {
       const res = await apiRequest("POST", "/api/deals", data);
       return res.json();
     },
