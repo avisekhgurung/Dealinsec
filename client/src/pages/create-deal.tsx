@@ -1,7 +1,6 @@
-import { useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { z } from "zod";
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,6 +33,7 @@ const formSchema = insertDealSchema.extend({
   dealAmount: z.coerce.number().min(1, "Deal amount must be positive"),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
+  brandUserId: z.string().optional(),
   deliverables: z.array(z.object({
     id: z.string(),
     platform: z.enum(platformOptions),
@@ -44,11 +44,17 @@ const formSchema = insertDealSchema.extend({
   })).min(1, "At least one deliverable is required"),
 });
 
+type BrandOption = { id: string; name: string };
+
 type FormData = z.infer<typeof formSchema>;
 
 export default function CreateDealPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  const { data: brands = [] } = useQuery<BrandOption[]>({
+    queryKey: ["/api/brands"],
+  });
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -151,6 +157,31 @@ export default function CreateDealPage() {
                 </p>
               )}
             </div>
+
+            {brands.length > 0 && (
+              <div className="space-y-2">
+                <Label>Assign to Brand Account (Optional)</Label>
+                <Select
+                  value={form.watch("brandUserId") || ""}
+                  onValueChange={(value) => form.setValue("brandUserId", value === "none" ? undefined : value)}
+                >
+                  <SelectTrigger className="h-12" data-testid="select-brand-user">
+                    <SelectValue placeholder="Select a brand account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No brand account</SelectItem>
+                    {brands.map((brand) => (
+                      <SelectItem key={brand.id} value={brand.id}>
+                        {brand.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Assigning a brand account lets them view this deal
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="dealTitle">Deal Title</Label>

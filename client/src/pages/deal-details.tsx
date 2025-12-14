@@ -6,22 +6,30 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { PlatformIcon } from "@/components/platform-icon";
 import { BottomNav } from "@/components/bottom-nav";
+import { BrandBottomNav } from "@/components/brand-bottom-nav";
+import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle } from "lucide-react";
 import type { Deal, Contract } from "@shared/schema";
 
 export default function DealDetailsPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const isBrand = user?.role === "brand";
 
   const { data: deal, isLoading } = useQuery<Deal>({
     queryKey: ["/api/deals", params.id],
   });
 
   const { data: contracts = [] } = useQuery<Contract[]>({
-    queryKey: ["/api/contracts"],
+    queryKey: isBrand ? ["/api/brand/contracts"] : ["/api/contracts"],
   });
 
-  const hasContract = contracts.some(c => c.dealId === params.id);
+  const dealId = parseInt(params.id || "0");
+  const hasContract = contracts.some(c => c.dealId === dealId);
+  
+  const backPath = isBrand ? "/brand/deals" : "/deals";
+  const Nav = isBrand ? BrandBottomNav : BottomNav;
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("en-IN", {
@@ -36,7 +44,7 @@ export default function DealDetailsPage() {
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
           <div className="flex items-center gap-3 px-4 py-4">
-            <Button variant="ghost" size="icon" onClick={() => setLocation("/deals")}>
+            <Button variant="ghost" size="icon" onClick={() => setLocation(backPath)}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <Skeleton className="h-6 w-32" />
@@ -54,7 +62,7 @@ export default function DealDetailsPage() {
             </CardContent>
           </Card>
         </main>
-        <BottomNav />
+        <Nav />
       </div>
     );
   }
@@ -64,7 +72,7 @@ export default function DealDetailsPage() {
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
           <div className="flex items-center gap-3 px-4 py-4">
-            <Button variant="ghost" size="icon" onClick={() => setLocation("/deals")}>
+            <Button variant="ghost" size="icon" onClick={() => setLocation(backPath)}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className="text-xl font-bold">Deal Details</h1>
@@ -72,13 +80,13 @@ export default function DealDetailsPage() {
         </header>
         <main className="px-4 py-12 text-center">
           <p className="text-muted-foreground">Deal not found</p>
-          <Link href="/deals">
+          <Link href={backPath}>
             <Button variant="outline" className="mt-4">
               Back to Deals
             </Button>
           </Link>
         </main>
-        <BottomNav />
+        <Nav />
       </div>
     );
   }
@@ -90,7 +98,7 @@ export default function DealDetailsPage() {
           <Button 
             variant="ghost" 
             size="icon" 
-            onClick={() => setLocation("/deals")}
+            onClick={() => setLocation(backPath)}
             data-testid="button-back-deals"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -141,7 +149,7 @@ export default function DealDetailsPage() {
                 <span className="font-medium text-sm">Contract Created</span>
               </div>
             ) : (
-              deal.status === "Pending" && (
+              !isBrand && deal.status === "Pending" && (
                 <div className="mt-4">
                   <Link href={`/deals/${deal.id}/contract`}>
                     <Button 
@@ -197,7 +205,7 @@ export default function DealDetailsPage() {
         </section>
       </main>
 
-      <BottomNav />
+      <Nav />
     </div>
   );
 }

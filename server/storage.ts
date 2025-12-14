@@ -11,16 +11,19 @@ import {
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  getBrandUsers(): Promise<User[]>;
 
   getDeals(userId: string): Promise<Deal[]>;
   getDeal(id: number): Promise<Deal | undefined>;
   createDeal(deal: InsertDeal): Promise<Deal>;
   updateDeal(id: number, updates: Partial<Deal>): Promise<Deal | undefined>;
+  getDealsForBrand(brandUserId: string): Promise<Deal[]>;
 
   getContracts(userId: string): Promise<Contract[]>;
   getContract(id: number): Promise<Contract | undefined>;
   createContract(contract: InsertContract): Promise<Contract>;
   updateContract(id: number, updates: Partial<Contract>): Promise<Contract | undefined>;
+  getContractsForBrand(brandUserId: string): Promise<Contract[]>;
 
   getInvoices(userId: string): Promise<Invoice[]>;
   getInvoice(id: number): Promise<Invoice | undefined>;
@@ -53,6 +56,10 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getBrandUsers(): Promise<User[]> {
+    return db.select().from(users).where(eq(users.role, "brand"));
+  }
+
   async getDeals(userId: string): Promise<Deal[]> {
     return db.select().from(deals).where(eq(deals.userId, userId));
   }
@@ -72,6 +79,10 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async getDealsForBrand(brandUserId: string): Promise<Deal[]> {
+    return db.select().from(deals).where(eq(deals.brandUserId, brandUserId));
+  }
+
   async getContracts(userId: string): Promise<Contract[]> {
     return db.select().from(contracts).where(eq(contracts.userId, userId));
   }
@@ -89,6 +100,14 @@ export class DatabaseStorage implements IStorage {
   async updateContract(id: number, updates: Partial<Contract>): Promise<Contract | undefined> {
     const [updated] = await db.update(contracts).set(updates).where(eq(contracts.id, id)).returning();
     return updated;
+  }
+
+  async getContractsForBrand(brandUserId: string): Promise<Contract[]> {
+    const brandDeals = await this.getDealsForBrand(brandUserId);
+    const dealIds = brandDeals.map(d => d.id);
+    if (dealIds.length === 0) return [];
+    const result = await db.select().from(contracts);
+    return result.filter(c => dealIds.includes(c.dealId));
   }
 
   async getInvoices(userId: string): Promise<Invoice[]> {

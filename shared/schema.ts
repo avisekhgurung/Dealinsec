@@ -50,6 +50,7 @@ export type User = typeof users.$inferSelect;
 export const deals = pgTable("deals", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
+  brandUserId: varchar("brand_user_id").references(() => users.id),
   brandName: text("brand_name").notNull(),
   dealTitle: text("deal_title").notNull(),
   dealAmount: integer("deal_amount").notNull(),

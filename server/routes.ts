@@ -59,11 +59,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/deals/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const deal = await storage.getDeal(parseInt(req.params.id));
       if (!deal) {
         return res.status(404).json({ error: "Deal not found" });
       }
-      if (deal.userId !== req.user.claims.sub) {
+      const isOwner = deal.userId === userId;
+      const isBrandUser = deal.brandUserId === userId;
+      if (!isOwner && !isBrandUser) {
         return res.status(403).json({ error: "Access denied" });
       }
       res.json(deal);
@@ -302,6 +305,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Payment confirmation error:", error);
       res.status(500).json({ error: "Failed to confirm payment" });
+    }
+  });
+
+  // Brand-specific routes
+  app.get("/api/brand/deals", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== "brand") {
+        return res.status(403).json({ error: "Brand access required" });
+      }
+      const deals = await storage.getDealsForBrand(userId);
+      res.json(deals);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch brand deals" });
+    }
+  });
+
+  app.get("/api/brand/contracts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== "brand") {
+        return res.status(403).json({ error: "Brand access required" });
+      }
+      const contracts = await storage.getContractsForBrand(userId);
+      res.json(contracts);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch brand contracts" });
+    }
+  });
+
+  app.get("/api/brands", isAuthenticated, async (req: any, res) => {
+    try {
+      const brands = await storage.getBrandUsers();
+      res.json(brands.map(b => ({ id: b.id, name: `${b.firstName || ''} ${b.lastName || ''}`.trim() || b.email || 'Brand' })));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch brands" });
     }
   });
 

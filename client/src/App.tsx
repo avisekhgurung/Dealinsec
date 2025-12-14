@@ -15,10 +15,13 @@ import ContractDetailsPage from "@/pages/contract-details";
 import BillingPage from "@/pages/billing";
 import InvoiceDetailsPage from "@/pages/invoice-details";
 import PaymentSuccessPage from "@/pages/payment-success";
+import BrandDashboardPage from "@/pages/brand-dashboard";
+import BrandDealsPage from "@/pages/brand-deals";
+import BrandContractsPage from "@/pages/brand-contracts";
 import NotFound from "@/pages/not-found";
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -28,24 +31,41 @@ function Router() {
     );
   }
 
+  const isBrand = user?.role === "brand";
+
+  if (!isAuthenticated) {
+    return (
+      <Switch>
+        <Route path="/" component={LandingPage} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
+
+  if (isBrand) {
+    return (
+      <Switch>
+        <Route path="/" component={BrandDashboardPage} />
+        <Route path="/brand/deals" component={BrandDealsPage} />
+        <Route path="/brand/deals/:id" component={DealDetailsPage} />
+        <Route path="/brand/contracts" component={BrandContractsPage} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
+
   return (
     <Switch>
-      {!isAuthenticated ? (
-        <Route path="/" component={LandingPage} />
-      ) : (
-        <>
-          <Route path="/" component={DashboardPage} />
-          <Route path="/deals" component={DealsPage} />
-          <Route path="/deals/new" component={CreateDealPage} />
-          <Route path="/deals/:id" component={DealDetailsPage} />
-          <Route path="/deals/:id/contract" component={ContractConfirmationPage} />
-          <Route path="/contracts" component={ContractsPage} />
-          <Route path="/contracts/:id" component={ContractDetailsPage} />
-          <Route path="/billing" component={BillingPage} />
-          <Route path="/billing/success" component={PaymentSuccessPage} />
-          <Route path="/billing/invoice/:id" component={InvoiceDetailsPage} />
-        </>
-      )}
+      <Route path="/" component={DashboardPage} />
+      <Route path="/deals" component={DealsPage} />
+      <Route path="/deals/new" component={CreateDealPage} />
+      <Route path="/deals/:id" component={DealDetailsPage} />
+      <Route path="/deals/:id/contract" component={ContractConfirmationPage} />
+      <Route path="/contracts" component={ContractsPage} />
+      <Route path="/contracts/:id" component={ContractDetailsPage} />
+      <Route path="/billing" component={BillingPage} />
+      <Route path="/billing/success" component={PaymentSuccessPage} />
+      <Route path="/billing/invoice/:id" component={InvoiceDetailsPage} />
       <Route component={NotFound} />
     </Switch>
   );
