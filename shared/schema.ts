@@ -69,10 +69,12 @@ export const contracts = pgTable("contracts", {
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),
   contractValue: integer("contract_value").notNull(),
-  status: text("status").notNull().default("Signed"),
+  status: text("status").notNull().default("Pending"),
   exclusive: boolean("exclusive").notNull().default(true),
   proofFileName: text("proof_file_name"),
   proofFilePath: text("proof_file_path"),
+  signedByBrand: boolean("signed_by_brand").notNull().default(false),
+  signedDate: text("signed_date"),
 });
 
 export const invoices = pgTable("invoices", {

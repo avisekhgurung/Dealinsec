@@ -179,6 +179,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/contracts/:id/sign", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== "brand") {
+        return res.status(403).json({ error: "Only brands can sign contracts" });
+      }
+
+      const contract = await storage.getContract(parseInt(req.params.id));
+      if (!contract) {
+        return res.status(404).json({ error: "Contract not found" });
+      }
+
+      if (contract.signedByBrand) {
+        return res.status(400).json({ error: "Contract already signed" });
+      }
+
+      const updated = await storage.updateContract(parseInt(req.params.id), {
+        signedByBrand: true,
+        signedDate: new Date().toISOString(),
+        status: "Active",
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Contract signing error:", error);
+      res.status(500).json({ error: "Failed to sign contract" });
+    }
+  });
+
   app.get("/api/invoices", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
