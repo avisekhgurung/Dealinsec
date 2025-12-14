@@ -10,7 +10,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { BrandBottomNav } from "@/components/brand-bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { 
   ArrowLeft, 
   Calendar, 
@@ -78,6 +78,33 @@ export default function ContractDetailsPage() {
       toast({
         title: "Upload failed",
         description: "Failed to upload proof. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createBrandInvoice = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/brand-invoices", {
+        dealId: contract?.dealId,
+        brandName: contract?.brandName,
+        dealAmount: deal?.dealAmount || contract?.contractValue,
+        contractId: parseInt(params.id || "0"),
+      });
+      return res.json();
+    },
+    onSuccess: (invoice) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices"] });
+      toast({
+        title: "Invoice created",
+        description: "Brand invoice has been generated successfully.",
+      });
+      setLocation(`/brand-invoices/${invoice.id}`);
+    },
+    onError: () => {
+      toast({
+        title: "Failed to create invoice",
+        description: "Could not generate brand invoice. Please try again.",
         variant: "destructive",
       });
     },
@@ -346,6 +373,48 @@ export default function ContractDetailsPage() {
                 </CardContent>
               </Card>
             )}
+          </section>
+        )}
+
+        {!isBrand && (
+          <section className="space-y-3">
+            <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+              Invoice for Brand
+            </h3>
+            
+            <Card className="border shadow-sm">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                    <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">Generate Invoice for Brand</p>
+                    <p className="text-xs text-muted-foreground">
+                      Create a professional invoice to send to {contract.brandName}
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  className="w-full"
+                  onClick={() => createBrandInvoice.mutate()}
+                  disabled={createBrandInvoice.isPending || !contract || !deal}
+                  data-testid="button-generate-brand-invoice"
+                >
+                  {createBrandInvoice.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4 mr-2" />
+                      Generate Invoice for Brand
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
           </section>
         )}
       </main>
