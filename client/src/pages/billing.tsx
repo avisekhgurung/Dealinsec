@@ -115,7 +115,7 @@ export default function BillingPage() {
         ) : filteredInvoices.length > 0 ? (
           <div className="space-y-4">
             {filteredInvoices.map((invoice) => (
-              <Link key={invoice.id} href={`/billing/${invoice.id}`}>
+              <Link key={invoice.id} href={`/billing/invoice/${invoice.id}`}>
                 <Card 
                   className="border-0 shadow-sm hover-elevate active-elevate-2 cursor-pointer"
                   data-testid={`card-invoice-${invoice.id}`}

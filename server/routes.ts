@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertDealSchema, insertContractSchema } from "@shared/schema";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -214,7 +215,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invoice already paid" });
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const stripe = await getUncachableStripeClient();
+      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'inr',
+              product_data: {
+                name: `InfluDeal Platform Fee - ${invoice.invoiceNumber}`,
+                description: `Contract creation and platform service fee for ${invoice.brandName} deal`,
+              },
+              unit_amount: invoice.totalAmount * 100,
+            },
+            quantity: 1,
+          },
+        ],
+        mode: 'payment',
+        success_url: `${baseUrl}/billing/success?invoice_id=${invoice.id}&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/billing/invoice/${invoice.id}`,
+        metadata: {
+          invoiceId: invoice.id.toString(),
+          contractId: invoice.contractId.toString(),
+          userId: invoice.userId,
+        },
+      });
+
+      res.json({ url: session.url });
+    } catch (error) {
+      console.error("Stripe checkout error:", error);
+      res.status(500).json({ error: "Failed to create payment session" });
+    }
+  });
+
+  app.post("/api/invoices/:id/confirm-payment", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const invoice = await storage.getInvoice(parseInt(req.params.id));
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      if (invoice.userId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      if (invoice.status === "Paid") {
+        return res.json(invoice);
+      }
+
+      const { session_id } = req.body;
+      if (!session_id) {
+        return res.status(400).json({ error: "Session ID required" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(session_id);
+
+      if (session.payment_status !== 'paid') {
+        return res.status(400).json({ error: "Payment not completed" });
+      }
+
+      if (session.metadata?.invoiceId !== invoice.id.toString()) {
+        return res.status(400).json({ error: "Session does not match invoice" });
+      }
+
+      if (session.metadata?.userId !== userId) {
+        return res.status(403).json({ error: "Session does not belong to you" });
+      }
+
+      const expectedAmount = invoice.totalAmount * 100;
+      if (session.amount_total !== expectedAmount) {
+        return res.status(400).json({ error: "Amount mismatch" });
+      }
 
       const updatedInvoice = await storage.updateInvoice(parseInt(req.params.id), {
         status: "Paid",
@@ -226,7 +300,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(updatedInvoice);
     } catch (error) {
-      res.status(500).json({ error: "Payment failed" });
+      console.error("Payment confirmation error:", error);
+      res.status(500).json({ error: "Failed to confirm payment" });
     }
   });
 

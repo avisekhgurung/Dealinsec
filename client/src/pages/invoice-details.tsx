@@ -38,19 +38,15 @@ export default function InvoiceDetailsPage() {
       const res = await apiRequest("POST", `/api/invoices/${params.id}/pay`, {});
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/invoices", params.id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
-      toast({
-        title: "Payment successful",
-        description: "Your invoice has been paid and contract is now active.",
-      });
+    onSuccess: (data: { url: string }) => {
+      if (data.url) {
+        window.location.href = data.url;
+      }
     },
     onError: () => {
       toast({
         title: "Payment failed",
-        description: "Please try again later.",
+        description: "Unable to start payment. Please try again.",
         variant: "destructive",
       });
     },

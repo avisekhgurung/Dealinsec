@@ -14,6 +14,7 @@ import ContractsPage from "@/pages/contracts";
 import ContractDetailsPage from "@/pages/contract-details";
 import BillingPage from "@/pages/billing";
 import InvoiceDetailsPage from "@/pages/invoice-details";
+import PaymentSuccessPage from "@/pages/payment-success";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -41,7 +42,8 @@ function Router() {
           <Route path="/contracts" component={ContractsPage} />
           <Route path="/contracts/:id" component={ContractDetailsPage} />
           <Route path="/billing" component={BillingPage} />
-          <Route path="/billing/:id" component={InvoiceDetailsPage} />
+          <Route path="/billing/success" component={PaymentSuccessPage} />
+          <Route path="/billing/invoice/:id" component={InvoiceDetailsPage} />
         </>
       )}
       <Route component={NotFound} />
