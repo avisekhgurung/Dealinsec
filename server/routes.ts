@@ -47,6 +47,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/users/:id/public", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = await storage.getUser(req.params.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json({
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
   app.get("/api/deals", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -102,11 +119,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/contracts/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const contract = await storage.getContract(parseInt(req.params.id));
       if (!contract) {
         return res.status(404).json({ error: "Contract not found" });
       }
-      if (contract.userId !== req.user.claims.sub) {
+      const isOwner = contract.userId === userId;
+      const deal = await storage.getDeal(contract.dealId);
+      const isBrandUser = deal?.brandUserId === userId;
+      if (!isOwner && !isBrandUser) {
         return res.status(403).json({ error: "Access denied" });
       }
       res.json(contract);

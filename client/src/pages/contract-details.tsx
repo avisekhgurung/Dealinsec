@@ -21,7 +21,8 @@ import {
   Loader2,
   CheckCircle,
   ExternalLink,
-  Pen
+  Pen,
+  Download
 } from "lucide-react";
 import type { Contract, Invoice, Deal } from "@shared/schema";
 
@@ -221,16 +222,27 @@ export default function ContractDetailsPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
-        <div className="flex items-center gap-3 px-4 py-4">
+        <div className="flex items-center justify-between gap-3 px-4 py-4">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setLocation(backPath)}
+              data-testid="button-back-contracts"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h1 className="text-xl font-bold truncate">Contract Details</h1>
+          </div>
           <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => setLocation(backPath)}
-            data-testid="button-back-contracts"
+            variant="outline" 
+            size="sm"
+            onClick={() => setLocation(isBrand ? `/brand/contracts/${params.id}/export` : `/contracts/${params.id}/export`)}
+            data-testid="button-export-contract-pdf"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <Download className="w-4 h-4 mr-2" />
+            Export
           </Button>
-          <h1 className="text-xl font-bold truncate flex-1">Contract Details</h1>
         </div>
       </header>
 

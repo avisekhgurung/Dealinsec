@@ -12,6 +12,7 @@ import DealDetailsPage from "@/pages/deal-details";
 import ContractConfirmationPage from "@/pages/contract-confirmation";
 import ContractsPage from "@/pages/contracts";
 import ContractDetailsPage from "@/pages/contract-details";
+import ContractPdfPage from "@/pages/contract-pdf";
 import BillingPage from "@/pages/billing";
 import InvoiceDetailsPage from "@/pages/invoice-details";
 import PaymentSuccessPage from "@/pages/payment-success";
@@ -50,6 +51,8 @@ function Router() {
         <Route path="/brand/deals" component={BrandDealsPage} />
         <Route path="/brand/deals/:id" component={DealDetailsPage} />
         <Route path="/brand/contracts" component={BrandContractsPage} />
+        <Route path="/brand/contracts/:id" component={ContractDetailsPage} />
+        <Route path="/brand/contracts/:id/export" component={ContractPdfPage} />
         <Route component={NotFound} />
       </Switch>
     );
@@ -64,6 +67,7 @@ function Router() {
       <Route path="/deals/:id/contract" component={ContractConfirmationPage} />
       <Route path="/contracts" component={ContractsPage} />
       <Route path="/contracts/:id" component={ContractDetailsPage} />
+      <Route path="/contracts/:id/export" component={ContractPdfPage} />
       <Route path="/billing" component={BillingPage} />
       <Route path="/billing/success" component={PaymentSuccessPage} />
       <Route path="/billing/invoice/:id" component={InvoiceDetailsPage} />
