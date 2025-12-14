@@ -18,6 +18,7 @@ import PaymentSuccessPage from "@/pages/payment-success";
 import BrandDashboardPage from "@/pages/brand-dashboard";
 import BrandDealsPage from "@/pages/brand-deals";
 import BrandContractsPage from "@/pages/brand-contracts";
+import BrandInvoiceDetailsPage from "@/pages/brand-invoice-details";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -66,6 +67,7 @@ function Router() {
       <Route path="/billing" component={BillingPage} />
       <Route path="/billing/success" component={PaymentSuccessPage} />
       <Route path="/billing/invoice/:id" component={InvoiceDetailsPage} />
+      <Route path="/brand-invoices/:id" component={BrandInvoiceDetailsPage} />
       <Route component={NotFound} />
     </Switch>
   );

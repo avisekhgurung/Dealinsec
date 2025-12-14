@@ -346,6 +346,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Brand invoices (invoices influencers send to brands)
+  app.get("/api/brand-invoices", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const invoices = await storage.getBrandInvoices(userId);
+      res.json(invoices);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch brand invoices" });
+    }
+  });
+
+  app.get("/api/brand-invoices/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const invoice = await storage.getBrandInvoice(parseInt(req.params.id));
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      if (invoice.userId !== req.user.claims.sub) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      res.json(invoice);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch brand invoice" });
+    }
+  });
+
+  app.post("/api/brand-invoices", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const invoiceNumber = await storage.generateBrandInvoiceNumber();
+      
+      const influencerName = user?.firstName && user?.lastName 
+        ? `${user.firstName} ${user.lastName}` 
+        : user?.email || "Influencer";
+
+      const invoiceData = {
+        ...req.body,
+        userId,
+        invoiceNumber,
+        invoiceDate: req.body.invoiceDate || new Date().toISOString().split("T")[0],
+        influencerName,
+        influencerEmail: user?.email || null,
+        status: "Unpaid",
+      };
+
+      const invoice = await storage.createBrandInvoice(invoiceData);
+      res.status(201).json(invoice);
+    } catch (error) {
+      console.error("Brand invoice creation error:", error);
+      res.status(500).json({ error: "Failed to create brand invoice" });
+    }
+  });
+
+  app.patch("/api/brand-invoices/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const invoice = await storage.getBrandInvoice(parseInt(req.params.id));
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+      if (invoice.userId !== req.user.claims.sub) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const updated = await storage.updateBrandInvoice(parseInt(req.params.id), req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update brand invoice" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -1,11 +1,12 @@
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { 
-  users, deals, contracts, invoices,
+  users, deals, contracts, invoices, brandInvoices,
   type User, type UpsertUser,
   type Deal, type InsertDeal, 
   type Contract, type InsertContract, 
-  type Invoice, type InsertInvoice 
+  type Invoice, type InsertInvoice,
+  type BrandInvoice, type InsertBrandInvoice
 } from "@shared/schema";
 
 export interface IStorage {
@@ -30,7 +31,13 @@ export interface IStorage {
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
   updateInvoice(id: number, updates: Partial<Invoice>): Promise<Invoice | undefined>;
   
+  getBrandInvoices(userId: string): Promise<BrandInvoice[]>;
+  getBrandInvoice(id: number): Promise<BrandInvoice | undefined>;
+  createBrandInvoice(invoice: InsertBrandInvoice): Promise<BrandInvoice>;
+  updateBrandInvoice(id: number, updates: Partial<BrandInvoice>): Promise<BrandInvoice | undefined>;
+  
   generateInvoiceNumber(): Promise<string>;
+  generateBrandInvoiceNumber(): Promise<string>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -132,6 +139,30 @@ export class DatabaseStorage implements IStorage {
   async generateInvoiceNumber(): Promise<string> {
     this.invoiceCounter++;
     return `INV-${Date.now()}-${this.invoiceCounter}`;
+  }
+
+  async getBrandInvoices(userId: string): Promise<BrandInvoice[]> {
+    return db.select().from(brandInvoices).where(eq(brandInvoices.userId, userId));
+  }
+
+  async getBrandInvoice(id: number): Promise<BrandInvoice | undefined> {
+    const [invoice] = await db.select().from(brandInvoices).where(eq(brandInvoices.id, id));
+    return invoice;
+  }
+
+  async createBrandInvoice(invoice: InsertBrandInvoice): Promise<BrandInvoice> {
+    const [created] = await db.insert(brandInvoices).values(invoice as any).returning();
+    return created;
+  }
+
+  async updateBrandInvoice(id: number, updates: Partial<BrandInvoice>): Promise<BrandInvoice | undefined> {
+    const [updated] = await db.update(brandInvoices).set(updates).where(eq(brandInvoices.id, id)).returning();
+    return updated;
+  }
+
+  async generateBrandInvoiceNumber(): Promise<string> {
+    this.invoiceCounter++;
+    return `BINV-${Date.now()}-${this.invoiceCounter}`;
   }
 }
 

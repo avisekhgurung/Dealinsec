@@ -101,3 +101,23 @@ export type Contract = typeof contracts.$inferSelect;
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true });
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
 export type Invoice = typeof invoices.$inferSelect;
+
+export const brandInvoices = pgTable("brand_invoices", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  invoiceDate: text("invoice_date").notNull(),
+  dueDate: text("due_date"),
+  dealId: integer("deal_id").notNull().references(() => deals.id),
+  contractId: integer("contract_id").references(() => contracts.id),
+  brandName: text("brand_name").notNull(),
+  influencerName: text("influencer_name").notNull(),
+  influencerEmail: text("influencer_email"),
+  dealAmount: integer("deal_amount").notNull(),
+  notes: text("notes"),
+  status: text("status").notNull().default("Unpaid"),
+});
+
+export const insertBrandInvoiceSchema = createInsertSchema(brandInvoices).omit({ id: true });
+export type InsertBrandInvoice = z.infer<typeof insertBrandInvoiceSchema>;
+export type BrandInvoice = typeof brandInvoices.$inferSelect;
