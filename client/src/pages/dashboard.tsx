@@ -1,6 +1,6 @@
-import { useAuth } from "@/lib/auth-context";
+import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation, Link } from "wouter";
+import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,8 +10,10 @@ import { Plus, Briefcase, FileCheck, Receipt, ChevronRight, LogOut } from "lucid
 import type { Deal, Contract, Invoice } from "@shared/schema";
 
 export default function DashboardPage() {
-  const { influencerName, logout } = useAuth();
-  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const displayName = user?.firstName && user?.lastName 
+    ? `${user.firstName} ${user.lastName}` 
+    : user?.email || "Influencer";
 
   const { data: deals = [], isLoading: dealsLoading } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
@@ -32,8 +34,7 @@ export default function DashboardPage() {
   const recentDeals = deals.slice(0, 3);
 
   const handleLogout = () => {
-    logout();
-    setLocation("/login");
+    window.location.href = "/api/logout";
   };
 
   return (
@@ -42,7 +43,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between gap-4 px-4 py-4">
           <div>
             <p className="text-sm text-muted-foreground">Welcome back,</p>
-            <h1 className="text-xl font-bold" data-testid="text-influencer-name">{influencerName}</h1>
+            <h1 className="text-xl font-bold" data-testid="text-influencer-name">{displayName}</h1>
           </div>
           <Button 
             variant="ghost" 

@@ -30,7 +30,7 @@ export default function ContractsPage() {
     return true;
   });
 
-  const getInvoiceStatus = (contractId: string) => {
+  const getInvoiceStatus = (contractId: number) => {
     const invoice = invoices.find(i => i.contractId === contractId);
     return invoice?.status;
   };

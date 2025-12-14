@@ -1,10 +1,10 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider, useAuth } from "@/lib/auth-context";
-import LoginPage from "@/pages/login";
+import { useAuth } from "@/hooks/useAuth";
+import LandingPage from "@/pages/landing";
 import DashboardPage from "@/pages/dashboard";
 import DealsPage from "@/pages/deals";
 import CreateDealPage from "@/pages/create-deal";
@@ -16,51 +16,34 @@ import BillingPage from "@/pages/billing";
 import InvoiceDetailsPage from "@/pages/invoice-details";
 import NotFound from "@/pages/not-found";
 
-function ProtectedRoute({ component: Component }: { component: () => JSX.Element }) {
-  const { isLoggedIn } = useAuth();
-  
-  if (!isLoggedIn) {
-    return <Redirect to="/login" />;
-  }
-  
-  return <Component />;
-}
-
 function Router() {
-  const { isLoggedIn } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <Switch>
-      <Route path="/login">
-        {isLoggedIn ? <Redirect to="/" /> : <LoginPage />}
-      </Route>
-      <Route path="/">
-        <ProtectedRoute component={DashboardPage} />
-      </Route>
-      <Route path="/deals">
-        <ProtectedRoute component={DealsPage} />
-      </Route>
-      <Route path="/deals/new">
-        <ProtectedRoute component={CreateDealPage} />
-      </Route>
-      <Route path="/deals/:id">
-        <ProtectedRoute component={DealDetailsPage} />
-      </Route>
-      <Route path="/deals/:id/contract">
-        <ProtectedRoute component={ContractConfirmationPage} />
-      </Route>
-      <Route path="/contracts">
-        <ProtectedRoute component={ContractsPage} />
-      </Route>
-      <Route path="/contracts/:id">
-        <ProtectedRoute component={ContractDetailsPage} />
-      </Route>
-      <Route path="/billing">
-        <ProtectedRoute component={BillingPage} />
-      </Route>
-      <Route path="/billing/:id">
-        <ProtectedRoute component={InvoiceDetailsPage} />
-      </Route>
+      {!isAuthenticated ? (
+        <Route path="/" component={LandingPage} />
+      ) : (
+        <>
+          <Route path="/" component={DashboardPage} />
+          <Route path="/deals" component={DealsPage} />
+          <Route path="/deals/new" component={CreateDealPage} />
+          <Route path="/deals/:id" component={DealDetailsPage} />
+          <Route path="/deals/:id/contract" component={ContractConfirmationPage} />
+          <Route path="/contracts" component={ContractsPage} />
+          <Route path="/contracts/:id" component={ContractDetailsPage} />
+          <Route path="/billing" component={BillingPage} />
+          <Route path="/billing/:id" component={InvoiceDetailsPage} />
+        </>
+      )}
       <Route component={NotFound} />
     </Switch>
   );
@@ -70,12 +53,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AuthProvider>
-          <div className="min-h-screen bg-background text-foreground">
-            <Router />
-          </div>
-          <Toaster />
-        </AuthProvider>
+        <div className="min-h-screen bg-background text-foreground">
+          <Router />
+        </div>
+        <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
   );

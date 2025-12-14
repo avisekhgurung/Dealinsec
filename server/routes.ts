@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertDealSchema, insertContractSchema } from "@shared/schema";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -31,26 +32,38 @@ const upload = multer({
   },
 });
 
-export async function registerRoutes(
-  httpServer: Server,
-  app: Express
-): Promise<Server> {
-  
-  // Deals
-  app.get("/api/deals", async (req, res) => {
+export async function registerRoutes(app: Express): Promise<Server> {
+  await setupAuth(app);
+
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const deals = await storage.getDeals();
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  app.get("/api/deals", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const deals = await storage.getDeals(userId);
       res.json(deals);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch deals" });
     }
   });
 
-  app.get("/api/deals/:id", async (req, res) => {
+  app.get("/api/deals/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const deal = await storage.getDeal(req.params.id);
+      const deal = await storage.getDeal(parseInt(req.params.id));
       if (!deal) {
         return res.status(404).json({ error: "Deal not found" });
+      }
+      if (deal.userId !== req.user.claims.sub) {
+        return res.status(403).json({ error: "Access denied" });
       }
       res.json(deal);
     } catch (error) {
@@ -58,34 +71,39 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/deals", async (req, res) => {
+  app.post("/api/deals", isAuthenticated, async (req: any, res) => {
     try {
-      const parsed = insertDealSchema.safeParse(req.body);
+      const userId = req.user.claims.sub;
+      const parsed = insertDealSchema.safeParse({ ...req.body, userId });
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors });
       }
       const deal = await storage.createDeal(parsed.data);
       res.status(201).json(deal);
     } catch (error) {
+      console.error("Deal creation error:", error);
       res.status(500).json({ error: "Failed to create deal" });
     }
   });
 
-  // Contracts
-  app.get("/api/contracts", async (req, res) => {
+  app.get("/api/contracts", isAuthenticated, async (req: any, res) => {
     try {
-      const contracts = await storage.getContracts();
+      const userId = req.user.claims.sub;
+      const contracts = await storage.getContracts(userId);
       res.json(contracts);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch contracts" });
     }
   });
 
-  app.get("/api/contracts/:id", async (req, res) => {
+  app.get("/api/contracts/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const contract = await storage.getContract(req.params.id);
+      const contract = await storage.getContract(parseInt(req.params.id));
       if (!contract) {
         return res.status(404).json({ error: "Contract not found" });
+      }
+      if (contract.userId !== req.user.claims.sub) {
+        return res.status(403).json({ error: "Access denied" });
       }
       res.json(contract);
     } catch (error) {
@@ -93,30 +111,32 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/contracts", async (req, res) => {
+  app.post("/api/contracts", isAuthenticated, async (req: any, res) => {
     try {
-      const parsed = insertContractSchema.safeParse(req.body);
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const parsed = insertContractSchema.safeParse({ ...req.body, userId });
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors });
       }
 
       const contract = await storage.createContract(parsed.data);
 
-      // Update deal status to Active
       await storage.updateDeal(contract.dealId, { status: "Active" });
 
-      // Get deal details for invoice
-      const deal = await storage.getDeal(contract.dealId);
+      const invoiceNumber = await storage.generateInvoiceNumber();
+      const influencerName = user?.firstName && user?.lastName 
+        ? `${user.firstName} ${user.lastName}` 
+        : user?.email || "Influencer";
 
-      // Auto-generate invoice
-      const invoiceNumber = storage.generateInvoiceNumber();
-      const invoice = await storage.createInvoice({
+      await storage.createInvoice({
+        userId,
         invoiceNumber,
         invoiceDate: new Date().toISOString().split("T")[0],
         contractId: contract.id,
         dealId: contract.dealId,
         brandName: contract.brandName,
-        influencerName: "Alex Creator",
+        influencerName,
         contractFee: 499,
         platformFee: 500,
         totalAmount: 999,
@@ -130,18 +150,21 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/contracts/:id/proof", upload.single("proof"), async (req, res) => {
+  app.post("/api/contracts/:id/proof", isAuthenticated, upload.single("proof"), async (req: any, res) => {
     try {
-      const contract = await storage.getContract(req.params.id);
+      const contract = await storage.getContract(parseInt(req.params.id));
       if (!contract) {
         return res.status(404).json({ error: "Contract not found" });
+      }
+      if (contract.userId !== req.user.claims.sub) {
+        return res.status(403).json({ error: "Access denied" });
       }
 
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      const updated = await storage.updateContract(req.params.id, {
+      const updated = await storage.updateContract(parseInt(req.params.id), {
         proofFileName: req.file.originalname,
         proofFilePath: req.file.path,
       });
@@ -152,21 +175,24 @@ export async function registerRoutes(
     }
   });
 
-  // Invoices
-  app.get("/api/invoices", async (req, res) => {
+  app.get("/api/invoices", isAuthenticated, async (req: any, res) => {
     try {
-      const invoices = await storage.getInvoices();
+      const userId = req.user.claims.sub;
+      const invoices = await storage.getInvoices(userId);
       res.json(invoices);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch invoices" });
     }
   });
 
-  app.get("/api/invoices/:id", async (req, res) => {
+  app.get("/api/invoices/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const invoice = await storage.getInvoice(req.params.id);
+      const invoice = await storage.getInvoice(parseInt(req.params.id));
       if (!invoice) {
         return res.status(404).json({ error: "Invoice not found" });
+      }
+      if (invoice.userId !== req.user.claims.sub) {
+        return res.status(403).json({ error: "Access denied" });
       }
       res.json(invoice);
     } catch (error) {
@@ -174,26 +200,26 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/invoices/:id/pay", async (req, res) => {
+  app.post("/api/invoices/:id/pay", isAuthenticated, async (req: any, res) => {
     try {
-      const invoice = await storage.getInvoice(req.params.id);
+      const invoice = await storage.getInvoice(parseInt(req.params.id));
       if (!invoice) {
         return res.status(404).json({ error: "Invoice not found" });
+      }
+      if (invoice.userId !== req.user.claims.sub) {
+        return res.status(403).json({ error: "Access denied" });
       }
 
       if (invoice.status === "Paid") {
         return res.status(400).json({ error: "Invoice already paid" });
       }
 
-      // Mock payment processing - simulate delay
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Update invoice status
-      const updatedInvoice = await storage.updateInvoice(req.params.id, {
+      const updatedInvoice = await storage.updateInvoice(parseInt(req.params.id), {
         status: "Paid",
       });
 
-      // Update contract status to Active
       await storage.updateContract(invoice.contractId, {
         status: "Active",
       });
@@ -204,5 +230,6 @@ export async function registerRoutes(
     }
   });
 
+  const httpServer = createServer(app);
   return httpServer;
 }

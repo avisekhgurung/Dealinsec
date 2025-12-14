@@ -12,15 +12,18 @@ const statusStyles: Record<StatusType, string> = {
 };
 
 interface StatusBadgeProps {
-  status: StatusType;
+  status: string;
   className?: string;
 }
 
 export function StatusBadge({ status, className = "" }: StatusBadgeProps) {
+  const statusKey = status as StatusType;
+  const style = statusStyles[statusKey] || statusStyles.Pending;
+  
   return (
     <Badge 
       variant="secondary"
-      className={`${statusStyles[status]} text-xs font-medium uppercase tracking-wide px-3 py-1 rounded-full no-default-hover-elevate no-default-active-elevate ${className}`}
+      className={`${style} text-xs font-medium uppercase tracking-wide px-3 py-1 rounded-full no-default-hover-elevate no-default-active-elevate ${className}`}
     >
       {status}
     </Badge>

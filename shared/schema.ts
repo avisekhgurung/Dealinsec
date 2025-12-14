@@ -1,3 +1,6 @@
+import { sql } from 'drizzle-orm';
+import { pgTable, text, integer, boolean, json, serial, varchar, timestamp, index, jsonb } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const platformOptions = ["Instagram", "YouTube", "Twitter"] as const;
@@ -16,78 +19,84 @@ export const deliverableSchema = z.object({
 export type Deliverable = z.infer<typeof deliverableSchema>;
 
 export const dealStatusOptions = ["Pending", "Active", "Completed"] as const;
-
-export const dealSchema = z.object({
-  id: z.string(),
-  brandName: z.string().min(1),
-  dealTitle: z.string().min(1),
-  dealAmount: z.number().min(0),
-  startDate: z.string(),
-  endDate: z.string(),
-  deliverables: z.array(deliverableSchema).min(1),
-  status: z.enum(dealStatusOptions),
-});
-
-export type Deal = z.infer<typeof dealSchema>;
-
-export const insertDealSchema = dealSchema.omit({ id: true, status: true });
-export type InsertDeal = z.infer<typeof insertDealSchema>;
-
 export const contractStatusOptions = ["Signed", "Active", "Completed"] as const;
-
-export const contractSchema = z.object({
-  id: z.string(),
-  contractName: z.string(),
-  brandName: z.string(),
-  dealId: z.string(),
-  startDate: z.string(),
-  endDate: z.string(),
-  contractValue: z.number(),
-  status: z.enum(contractStatusOptions),
-  exclusive: z.boolean(),
-  proofFileName: z.string().optional(),
-  proofFilePath: z.string().optional(),
-});
-
-export type Contract = z.infer<typeof contractSchema>;
-
-export const insertContractSchema = contractSchema.omit({ id: true });
-export type InsertContract = z.infer<typeof insertContractSchema>;
-
 export const invoiceStatusOptions = ["Unpaid", "Paid"] as const;
+export const userRoleOptions = ["influencer", "brand"] as const;
 
-export const invoiceSchema = z.object({
-  id: z.string(),
-  invoiceNumber: z.string(),
-  invoiceDate: z.string(),
-  contractId: z.string(),
-  dealId: z.string(),
-  brandName: z.string(),
-  influencerName: z.string(),
-  contractFee: z.number(),
-  platformFee: z.number(),
-  totalAmount: z.number(),
-  status: z.enum(invoiceStatusOptions),
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  role: varchar("role").notNull().default("influencer"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export type Invoice = z.infer<typeof invoiceSchema>;
+export type UpsertUser = typeof users.$inferInsert;
+export type User = typeof users.$inferSelect;
 
-export const insertInvoiceSchema = invoiceSchema.omit({ id: true });
+export const deals = pgTable("deals", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  brandName: text("brand_name").notNull(),
+  dealTitle: text("deal_title").notNull(),
+  dealAmount: integer("deal_amount").notNull(),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  deliverables: json("deliverables").$type<Deliverable[]>().notNull(),
+  status: text("status").notNull().default("Pending"),
+});
+
+export const contracts = pgTable("contracts", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  dealId: integer("deal_id").notNull().references(() => deals.id),
+  contractName: text("contract_name").notNull(),
+  brandName: text("brand_name").notNull(),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  contractValue: integer("contract_value").notNull(),
+  status: text("status").notNull().default("Signed"),
+  exclusive: boolean("exclusive").notNull().default(true),
+  proofFileName: text("proof_file_name"),
+  proofFilePath: text("proof_file_path"),
+});
+
+export const invoices = pgTable("invoices", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  invoiceDate: text("invoice_date").notNull(),
+  contractId: integer("contract_id").notNull().references(() => contracts.id),
+  dealId: integer("deal_id").notNull().references(() => deals.id),
+  brandName: text("brand_name").notNull(),
+  influencerName: text("influencer_name").notNull(),
+  contractFee: integer("contract_fee").notNull(),
+  platformFee: integer("platform_fee").notNull(),
+  totalAmount: integer("total_amount").notNull(),
+  status: text("status").notNull().default("Unpaid"),
+});
+
+export const insertDealSchema = createInsertSchema(deals).omit({ id: true, status: true });
+export type InsertDeal = z.infer<typeof insertDealSchema>;
+export type Deal = typeof deals.$inferSelect;
+
+export const insertContractSchema = createInsertSchema(contracts).omit({ id: true });
+export type InsertContract = z.infer<typeof insertContractSchema>;
+export type Contract = typeof contracts.$inferSelect;
+
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true });
 export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
-
-export const influencerSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  email: z.string().email(),
-  phone: z.string().optional(),
-});
-
-export type Influencer = z.infer<typeof influencerSchema>;
-
-export const users = null;
-export const insertUserSchema = z.object({
-  username: z.string(),
-  password: z.string(),
-});
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = { id: string; username: string; password: string };
+export type Invoice = typeof invoices.$inferSelect;

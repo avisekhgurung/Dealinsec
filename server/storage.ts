@@ -1,134 +1,119 @@
-import { randomUUID } from "crypto";
-import type { 
-  Deal, 
-  InsertDeal, 
-  Contract, 
-  InsertContract, 
-  Invoice, 
-  InsertInvoice 
+import { db } from "./db";
+import { eq } from "drizzle-orm";
+import { 
+  users, deals, contracts, invoices,
+  type User, type UpsertUser,
+  type Deal, type InsertDeal, 
+  type Contract, type InsertContract, 
+  type Invoice, type InsertInvoice 
 } from "@shared/schema";
 
 export interface IStorage {
-  getDeals(): Promise<Deal[]>;
-  getDeal(id: string): Promise<Deal | undefined>;
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
+
+  getDeals(userId: string): Promise<Deal[]>;
+  getDeal(id: number): Promise<Deal | undefined>;
   createDeal(deal: InsertDeal): Promise<Deal>;
-  updateDeal(id: string, updates: Partial<Deal>): Promise<Deal | undefined>;
+  updateDeal(id: number, updates: Partial<Deal>): Promise<Deal | undefined>;
 
-  getContracts(): Promise<Contract[]>;
-  getContract(id: string): Promise<Contract | undefined>;
+  getContracts(userId: string): Promise<Contract[]>;
+  getContract(id: number): Promise<Contract | undefined>;
   createContract(contract: InsertContract): Promise<Contract>;
-  updateContract(id: string, updates: Partial<Contract>): Promise<Contract | undefined>;
+  updateContract(id: number, updates: Partial<Contract>): Promise<Contract | undefined>;
 
-  getInvoices(): Promise<Invoice[]>;
-  getInvoice(id: string): Promise<Invoice | undefined>;
+  getInvoices(userId: string): Promise<Invoice[]>;
+  getInvoice(id: number): Promise<Invoice | undefined>;
   createInvoice(invoice: InsertInvoice): Promise<Invoice>;
-  updateInvoice(id: string, updates: Partial<Invoice>): Promise<Invoice | undefined>;
+  updateInvoice(id: number, updates: Partial<Invoice>): Promise<Invoice | undefined>;
   
-  generateInvoiceNumber(): string;
+  generateInvoiceNumber(): Promise<string>;
 }
 
-export class MemStorage implements IStorage {
-  private deals: Map<string, Deal>;
-  private contracts: Map<string, Contract>;
-  private invoices: Map<string, Invoice>;
-  private invoiceCounter: number;
+export class DatabaseStorage implements IStorage {
+  private invoiceCounter = 1000;
 
-  constructor() {
-    this.deals = new Map();
-    this.contracts = new Map();
-    this.invoices = new Map();
-    this.invoiceCounter = 1000;
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
-  async getDeals(): Promise<Deal[]> {
-    return Array.from(this.deals.values()).sort((a, b) => 
-      new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
-    );
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return user;
   }
 
-  async getDeal(id: string): Promise<Deal | undefined> {
-    return this.deals.get(id);
+  async getDeals(userId: string): Promise<Deal[]> {
+    return db.select().from(deals).where(eq(deals.userId, userId));
   }
 
-  async createDeal(insertDeal: InsertDeal): Promise<Deal> {
-    const id = randomUUID();
-    const deal: Deal = {
-      ...insertDeal,
-      id,
-      status: "Pending",
-    };
-    this.deals.set(id, deal);
+  async getDeal(id: number): Promise<Deal | undefined> {
+    const [deal] = await db.select().from(deals).where(eq(deals.id, id));
     return deal;
   }
 
-  async updateDeal(id: string, updates: Partial<Deal>): Promise<Deal | undefined> {
-    const deal = this.deals.get(id);
-    if (!deal) return undefined;
-    const updated = { ...deal, ...updates };
-    this.deals.set(id, updated);
+  async createDeal(deal: InsertDeal): Promise<Deal> {
+    const [created] = await db.insert(deals).values(deal as any).returning();
+    return created;
+  }
+
+  async updateDeal(id: number, updates: Partial<Deal>): Promise<Deal | undefined> {
+    const [updated] = await db.update(deals).set(updates).where(eq(deals.id, id)).returning();
     return updated;
   }
 
-  async getContracts(): Promise<Contract[]> {
-    return Array.from(this.contracts.values()).sort((a, b) => 
-      new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
-    );
+  async getContracts(userId: string): Promise<Contract[]> {
+    return db.select().from(contracts).where(eq(contracts.userId, userId));
   }
 
-  async getContract(id: string): Promise<Contract | undefined> {
-    return this.contracts.get(id);
-  }
-
-  async createContract(insertContract: InsertContract): Promise<Contract> {
-    const id = randomUUID();
-    const contract: Contract = {
-      ...insertContract,
-      id,
-    };
-    this.contracts.set(id, contract);
+  async getContract(id: number): Promise<Contract | undefined> {
+    const [contract] = await db.select().from(contracts).where(eq(contracts.id, id));
     return contract;
   }
 
-  async updateContract(id: string, updates: Partial<Contract>): Promise<Contract | undefined> {
-    const contract = this.contracts.get(id);
-    if (!contract) return undefined;
-    const updated = { ...contract, ...updates };
-    this.contracts.set(id, updated);
+  async createContract(contract: InsertContract): Promise<Contract> {
+    const [created] = await db.insert(contracts).values(contract as any).returning();
+    return created;
+  }
+
+  async updateContract(id: number, updates: Partial<Contract>): Promise<Contract | undefined> {
+    const [updated] = await db.update(contracts).set(updates).where(eq(contracts.id, id)).returning();
     return updated;
   }
 
-  async getInvoices(): Promise<Invoice[]> {
-    return Array.from(this.invoices.values()).sort((a, b) => 
-      new Date(b.invoiceDate).getTime() - new Date(a.invoiceDate).getTime()
-    );
+  async getInvoices(userId: string): Promise<Invoice[]> {
+    return db.select().from(invoices).where(eq(invoices.userId, userId));
   }
 
-  async getInvoice(id: string): Promise<Invoice | undefined> {
-    return this.invoices.get(id);
-  }
-
-  async createInvoice(insertInvoice: InsertInvoice): Promise<Invoice> {
-    const id = randomUUID();
-    const invoice: Invoice = {
-      ...insertInvoice,
-      id,
-    };
-    this.invoices.set(id, invoice);
+  async getInvoice(id: number): Promise<Invoice | undefined> {
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
     return invoice;
   }
 
-  async updateInvoice(id: string, updates: Partial<Invoice>): Promise<Invoice | undefined> {
-    const invoice = this.invoices.get(id);
-    if (!invoice) return undefined;
-    const updated = { ...invoice, ...updates };
-    this.invoices.set(id, updated);
+  async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
+    const [created] = await db.insert(invoices).values(invoice as any).returning();
+    return created;
+  }
+
+  async updateInvoice(id: number, updates: Partial<Invoice>): Promise<Invoice | undefined> {
+    const [updated] = await db.update(invoices).set(updates).where(eq(invoices.id, id)).returning();
     return updated;
   }
 
-  generateInvoiceNumber(): string {
+  async generateInvoiceNumber(): Promise<string> {
     this.invoiceCounter++;
-    return `INV-${this.invoiceCounter}`;
+    return `INV-${Date.now()}-${this.invoiceCounter}`;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
