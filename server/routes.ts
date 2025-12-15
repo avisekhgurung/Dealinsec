@@ -145,7 +145,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: parsed.error.errors });
       }
 
-      const contract = await storage.createContract(parsed.data);
+      const contractData = {
+        ...parsed.data,
+        signedByInfluencer: true,
+        signedByInfluencerDate: new Date().toISOString(),
+      };
+      const contract = await storage.createContract(contractData);
 
       await storage.updateDeal(contract.dealId, { status: "Active" });
 

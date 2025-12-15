@@ -278,17 +278,47 @@ export default function ContractDetailsPage() {
               </Link>
             )}
 
-            {contract.signedByBrand && contract.signedDate && (
-              <div className="mt-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center gap-3">
+            <div className="mt-4 space-y-2">
+              <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center gap-3">
                 <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                 <div>
-                  <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Signed by Brand</p>
+                  <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Influencer Signature</p>
                   <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                    {formatDate(contract.signedDate)}
+                    {contract.signedByInfluencerDate ? formatDate(contract.signedByInfluencerDate) : "Signed"}
                   </p>
                 </div>
               </div>
-            )}
+              
+              <div className={`p-3 rounded-lg flex items-center gap-3 ${
+                contract.signedByBrand 
+                  ? "bg-emerald-50 dark:bg-emerald-900/20" 
+                  : "bg-amber-50 dark:bg-amber-900/20"
+              }`}>
+                {contract.signedByBrand ? (
+                  <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <Calendar className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                )}
+                <div>
+                  <p className={`text-sm font-medium ${
+                    contract.signedByBrand 
+                      ? "text-emerald-700 dark:text-emerald-300" 
+                      : "text-amber-700 dark:text-amber-300"
+                  }`}>
+                    Brand Signature
+                  </p>
+                  <p className={`text-xs ${
+                    contract.signedByBrand 
+                      ? "text-emerald-600 dark:text-emerald-400" 
+                      : "text-amber-600 dark:text-amber-400"
+                  }`}>
+                    {contract.signedByBrand && contract.signedDate 
+                      ? formatDate(contract.signedDate) 
+                      : "Pending - Upload signed proof"}
+                  </p>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

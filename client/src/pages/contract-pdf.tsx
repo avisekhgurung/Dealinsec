@@ -214,31 +214,75 @@ export default function ContractPdfPage() {
               </p>
               <div className="grid md:grid-cols-2 gap-8">
                 <div className="space-y-4">
-                  <p className="font-medium">Influencer</p>
-                  <div className="border-b border-foreground pt-16 pb-1">
-                    <p className="text-xs text-muted-foreground">Signature</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">Influencer</p>
+                    {contract.signedByInfluencer && (
+                      <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 no-default-hover-elevate no-default-active-elevate">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Signed
+                      </Badge>
+                    )}
                   </div>
-                  <div className="border-b border-foreground pt-8 pb-1">
-                    <p className="text-xs text-muted-foreground">Name: {influencer ? `${influencer.firstName} ${influencer.lastName}` : `${user?.firstName} ${user?.lastName}`}</p>
-                  </div>
-                  <div className="border-b border-foreground pt-8 pb-1">
-                    <p className="text-xs text-muted-foreground">Date</p>
-                  </div>
+                  {contract.signedByInfluencer ? (
+                    <>
+                      <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                        <p className="text-sm font-medium">{influencer ? `${influencer.firstName} ${influencer.lastName}` : `${user?.firstName} ${user?.lastName}`}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Digitally signed on {contract.signedByInfluencerDate ? formatDate(contract.signedByInfluencerDate) : "Contract creation"}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="border-b border-foreground pt-16 pb-1">
+                        <p className="text-xs text-muted-foreground">Signature</p>
+                      </div>
+                      <div className="border-b border-foreground pt-8 pb-1">
+                        <p className="text-xs text-muted-foreground">Name</p>
+                      </div>
+                      <div className="border-b border-foreground pt-8 pb-1">
+                        <p className="text-xs text-muted-foreground">Date</p>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div className="space-y-4">
-                  <p className="font-medium">Brand Representative</p>
-                  <div className="border-b border-foreground pt-16 pb-1">
-                    <p className="text-xs text-muted-foreground">Signature</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">Brand Representative</p>
+                    {contract.signedByBrand ? (
+                      <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 no-default-hover-elevate no-default-active-elevate">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Signed
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 no-default-hover-elevate no-default-active-elevate">
+                        Pending
+                      </Badge>
+                    )}
                   </div>
-                  <div className="border-b border-foreground pt-8 pb-1">
-                    <p className="text-xs text-muted-foreground">Name</p>
-                  </div>
-                  <div className="border-b border-foreground pt-8 pb-1">
-                    <p className="text-xs text-muted-foreground">Date</p>
-                  </div>
-                  <div className="border-dashed border-2 border-muted-foreground p-4 mt-4 text-center">
-                    <p className="text-xs text-muted-foreground">Company Stamp</p>
-                  </div>
+                  {contract.signedByBrand ? (
+                    <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                      <p className="text-sm font-medium">{contract.brandName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Signed on {contract.signedDate ? formatDate(contract.signedDate) : ""}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="border-b border-foreground pt-16 pb-1">
+                        <p className="text-xs text-muted-foreground">Signature</p>
+                      </div>
+                      <div className="border-b border-foreground pt-8 pb-1">
+                        <p className="text-xs text-muted-foreground">Name</p>
+                      </div>
+                      <div className="border-b border-foreground pt-8 pb-1">
+                        <p className="text-xs text-muted-foreground">Date</p>
+                      </div>
+                      <div className="border-dashed border-2 border-muted-foreground p-4 mt-4 text-center">
+                        <p className="text-xs text-muted-foreground">Company Stamp</p>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </CardContent>

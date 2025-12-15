@@ -73,6 +73,8 @@ export const contracts = pgTable("contracts", {
   exclusive: boolean("exclusive").notNull().default(true),
   proofFileName: text("proof_file_name"),
   proofFilePath: text("proof_file_path"),
+  signedByInfluencer: boolean("signed_by_influencer").notNull().default(false),
+  signedByInfluencerDate: text("signed_by_influencer_date"),
   signedByBrand: boolean("signed_by_brand").notNull().default(false),
   signedDate: text("signed_date"),
 });
