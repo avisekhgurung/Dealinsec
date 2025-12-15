@@ -213,28 +213,38 @@ export default function PitchPage() {
                     <div className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-sm">Nike Agreement</span>
-                        <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700">Signed</Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground">Jan 1 - Mar 31, 2025</p>
-                      <div className="flex items-center gap-1 mt-1">
-                        <CheckCircle className="w-3 h-3 text-emerald-600" />
-                        <span className="text-xs text-emerald-600">Brand approved</span>
+                      <p className="text-xs text-muted-foreground mb-2">Jan 1 - Mar 31, 2025</p>
+                      <div className="flex gap-2">
+                        <div className="flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3 text-emerald-600" />
+                          <span className="text-xs text-emerald-600">You: Signed</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3 text-emerald-600" />
+                          <span className="text-xs text-emerald-600">Brand: Signed</span>
+                        </div>
                       </div>
                     </div>
                     <div className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-sm">Spotify Contract</span>
-                        <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">Pending</Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground">Feb 1 - Apr 30, 2025</p>
-                      <div className="flex items-center gap-1 mt-1">
-                        <Clock className="w-3 h-3 text-amber-600" />
-                        <span className="text-xs text-amber-600">Awaiting signature</span>
+                      <p className="text-xs text-muted-foreground mb-2">Feb 1 - Apr 30, 2025</p>
+                      <div className="flex gap-2">
+                        <div className="flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3 text-emerald-600" />
+                          <span className="text-xs text-emerald-600">You: Signed</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-amber-600" />
+                          <span className="text-xs text-amber-600">Brand: Pending</span>
+                        </div>
                       </div>
                     </div>
                     <div className="p-2 bg-muted/30 rounded-lg text-center">
                       <FileText className="w-5 h-5 mx-auto text-muted-foreground mb-1" />
-                      <p className="text-xs text-muted-foreground">Export as PDF</p>
+                      <p className="text-xs text-muted-foreground">Export PDF & Send to Brand</p>
                     </div>
                   </div>
                 </div>
@@ -442,30 +452,32 @@ export default function PitchPage() {
                       </div>
                     </div>
                     <div className="p-2 border rounded-lg bg-muted/30">
-                      <p className="text-xs font-medium mb-1">Contract Terms</p>
-                      <ul className="text-xs text-muted-foreground space-y-1">
-                        <li className="flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3 text-emerald-600" />
-                          Exclusive partnership
-                        </li>
-                        <li className="flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3 text-emerald-600" />
-                          3 Instagram Reels
-                        </li>
-                        <li className="flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3 text-emerald-600" />
-                          Usage rights: 6 months
-                        </li>
-                      </ul>
+                      <p className="text-xs font-medium mb-2">Signature Status</p>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">You (Influencer)</span>
+                          <div className="flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3 text-emerald-600" />
+                            <span className="text-xs text-emerald-600">Signed</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">Brand (Nike)</span>
+                          <div className="flex items-center gap-1">
+                            <CheckCircle className="w-3 h-3 text-emerald-600" />
+                            <span className="text-xs text-emerald-600">Signed</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" className="flex-1 text-xs" data-testid="button-mockup-view-pdf">
                         <Eye className="w-3 h-3 mr-1" />
                         View PDF
                       </Button>
-                      <Button size="sm" variant="outline" className="flex-1 text-xs" data-testid="button-mockup-download-contract">
-                        <Download className="w-3 h-3 mr-1" />
-                        Download
+                      <Button size="sm" className="flex-1 text-xs" data-testid="button-mockup-download-contract">
+                        <Send className="w-3 h-3 mr-1" />
+                        Send to Brand
                       </Button>
                     </div>
                   </div>
@@ -493,7 +505,7 @@ export default function PitchPage() {
                     <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-4 text-center">
                       <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                       <p className="text-xs text-muted-foreground mb-2">
-                        Drag & drop your signed contract
+                        Upload brand-signed contract
                       </p>
                       <p className="text-xs text-muted-foreground">
                         PDF, JPG, PNG up to 10MB
@@ -503,7 +515,7 @@ export default function PitchPage() {
                       <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-emerald-600" />
                         <div className="flex-1">
-                          <p className="text-xs font-medium">Nike_Contract_Signed.pdf</p>
+                          <p className="text-xs font-medium">Nike_Brand_Signed.pdf</p>
                           <p className="text-xs text-muted-foreground">2.3 MB</p>
                         </div>
                         <CheckCircle className="w-4 h-4 text-emerald-600" />
@@ -511,7 +523,7 @@ export default function PitchPage() {
                     </div>
                     <Button size="sm" className="w-full text-xs" data-testid="button-mockup-upload-proof">
                       <Upload className="w-3 h-3 mr-1" />
-                      Upload Proof
+                      Upload Brand Signature
                     </Button>
                   </div>
                 </div>
@@ -547,13 +559,9 @@ export default function PitchPage() {
                         <span className="text-muted-foreground">Deal Amount</span>
                         <span>₹75,000</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Platform Fee (5%)</span>
-                        <span>-₹3,750</span>
-                      </div>
                       <div className="border-t pt-1 flex justify-between font-bold">
-                        <span>Net Amount</span>
-                        <span className="text-emerald-600">₹71,250</span>
+                        <span>Total Amount</span>
+                        <span className="text-emerald-600">₹75,000</span>
                       </div>
                     </div>
                     <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
@@ -609,13 +617,9 @@ export default function PitchPage() {
                       </div>
                     </div>
                     <div className="p-2 bg-muted/30 rounded-lg">
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-muted-foreground">Amount</span>
-                        <span className="font-bold">₹1,20,000</span>
-                      </div>
                       <div className="flex justify-between text-xs">
-                        <span className="text-muted-foreground">Platform Fee</span>
-                        <span>-₹6,000</span>
+                        <span className="text-muted-foreground">Total Amount</span>
+                        <span className="font-bold">₹1,20,000</span>
                       </div>
                     </div>
                     <Button size="sm" className="w-full text-xs" data-testid="button-mockup-generate-invoice">
