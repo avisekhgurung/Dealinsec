@@ -665,27 +665,27 @@ export default function PitchPage() {
                     <div className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-sm">Nike India</span>
-                        <span className="text-sm font-bold text-emerald-600">+₹71,250</span>
+                        <span className="text-sm font-bold text-emerald-600">+₹75,000</span>
                       </div>
                       <p className="text-xs text-muted-foreground">Dec 10, 2025</p>
                     </div>
                     <div className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-sm">Myntra</span>
-                        <span className="text-sm font-bold text-emerald-600">+₹47,500</span>
+                        <span className="text-sm font-bold text-emerald-600">+₹50,000</span>
                       </div>
                       <p className="text-xs text-muted-foreground">Dec 5, 2025</p>
                     </div>
                     <div className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-sm">Boat Audio</span>
-                        <span className="text-sm font-bold text-emerald-600">+₹28,500</span>
+                        <span className="text-sm font-bold text-emerald-600">+₹30,000</span>
                       </div>
                       <p className="text-xs text-muted-foreground">Nov 28, 2025</p>
                     </div>
                     <div className="text-center py-2 border-t">
                       <p className="text-xs text-muted-foreground">Total This Month</p>
-                      <p className="text-lg font-bold text-emerald-600">₹1,47,250</p>
+                      <p className="text-lg font-bold text-emerald-600">₹1,55,000</p>
                     </div>
                   </div>
                 </div>
