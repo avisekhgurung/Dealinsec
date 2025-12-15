@@ -192,6 +192,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await storage.updateContract(parseInt(req.params.id), {
         proofFileName: req.file.originalname,
         proofFilePath: req.file.path,
+        status: "Signed",
+        signedByBrand: true,
+        signedDate: new Date().toISOString(),
       });
 
       res.json(updated);

@@ -21,7 +21,6 @@ import {
   Loader2,
   CheckCircle,
   ExternalLink,
-  Pen,
   Download
 } from "lucide-react";
 import type { Contract, Invoice, Deal } from "@shared/schema";
@@ -80,28 +79,6 @@ export default function ContractDetailsPage() {
       toast({
         title: "Upload failed",
         description: "Failed to upload proof. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const signContract = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/contracts/${params.id}/sign`, {});
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contracts", params.id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
-      toast({
-        title: "Contract signed",
-        description: "You have successfully signed this contract.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Failed to sign",
-        description: "Could not sign the contract. Please try again.",
         variant: "destructive",
       });
     },
@@ -315,48 +292,6 @@ export default function ContractDetailsPage() {
           </CardContent>
         </Card>
 
-        {isBrand && !contract.signedByBrand && (
-          <section className="space-y-3">
-            <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Sign Contract
-            </h3>
-            
-            <Card className="border shadow-sm">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                    <Pen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">Ready to Sign</p>
-                    <p className="text-xs text-muted-foreground">
-                      Review the terms and sign to activate this contract
-                    </p>
-                  </div>
-                </div>
-                <Button 
-                  className="w-full"
-                  onClick={() => signContract.mutate()}
-                  disabled={signContract.isPending}
-                  data-testid="button-sign-contract"
-                >
-                  {signContract.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Signing...
-                    </>
-                  ) : (
-                    <>
-                      <Pen className="w-4 h-4 mr-2" />
-                      Sign Contract
-                    </>
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-          </section>
-        )}
-
         {!isBrand && (
           <section className="space-y-3">
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
@@ -480,14 +415,16 @@ export default function ContractDetailsPage() {
                   <div className="flex-1">
                     <p className="font-medium text-sm">Generate Invoice for Brand</p>
                     <p className="text-xs text-muted-foreground">
-                      Create a professional invoice to send to {contract.brandName}
+                      {contract.status !== "Signed" 
+                        ? "Upload signed contract proof to enable billing"
+                        : `Create a professional invoice to send to ${contract.brandName}`}
                     </p>
                   </div>
                 </div>
                 <Button 
                   className="w-full"
                   onClick={() => createBrandInvoice.mutate()}
-                  disabled={createBrandInvoice.isPending || !contract || !deal}
+                  disabled={createBrandInvoice.isPending || !contract || !deal || contract.status !== "Signed"}
                   data-testid="button-generate-brand-invoice"
                 >
                   {createBrandInvoice.isPending ? (
