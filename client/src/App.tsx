@@ -20,6 +20,7 @@ import BrandDashboardPage from "@/pages/brand-dashboard";
 import BrandDealsPage from "@/pages/brand-deals";
 import BrandContractsPage from "@/pages/brand-contracts";
 import BrandInvoiceDetailsPage from "@/pages/brand-invoice-details";
+import PitchPage from "@/pages/pitch";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -39,6 +40,7 @@ function Router() {
     return (
       <Switch>
         <Route path="/" component={LandingPage} />
+        <Route path="/pitch" component={PitchPage} />
         <Route component={NotFound} />
       </Switch>
     );
