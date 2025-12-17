@@ -36,9 +36,16 @@ export const sessions = pgTable(
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
+  password: varchar("password"),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  phone: varchar("phone"),
+  panNumber: varchar("pan_number"),
+  gstNumber: varchar("gst_number"),
+  digitalSignature: varchar("digital_signature"),
+  onboardingComplete: boolean("onboarding_complete").notNull().default(false),
+  contractCredits: integer("contract_credits").notNull().default(3),
   role: varchar("role").notNull().default("influencer"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -46,6 +53,9 @@ export const users = pgTable("users", {
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUser = z.infer<typeof insertUserSchema>;
 
 export const deals = pgTable("deals", {
   id: serial("id").primaryKey(),

@@ -1,0 +1,155 @@
+------------------------------------
+1️⃣ AUTHENTICATION
+------------------------------------
+
+- Email + Password Sign Up
+- Email + Password Sign In
+- No Google login
+
+Flow:
+- After first successful signup/login,
+  redirect user to “Complete Profile” screen
+- User cannot create deals or contracts until profile is completed
+
+------------------------------------
+2️⃣ PROFILE PAGE
+------------------------------------
+
+Create a Profile module with:
+
+A) View Profile
+- Influencer Name
+- Email
+- Phone (optional)
+- PAN Number
+- GST Number (optional)
+- Digital Signature (image)
+- Available Contract Credits
+
+B) Edit Profile
+- Update all fields
+- Upload or draw digital signature
+- Save securely in backend
+
+------------------------------------
+3️⃣ ONBOARDING (FIRST LOGIN ONLY)
+------------------------------------
+
+Mandatory onboarding form:
+
+Required:
+- Full Name
+- Digital Signature (upload or draw)
+- PAN Number (required)
+- GST Number (optional)
+
+Logic:
+- Block deal/contract creation until onboarding is complete
+
+------------------------------------
+4️⃣ CONTRACT CREDIT SYSTEM
+------------------------------------
+
+Replace coins with **Contract Credits**
+
+Backend rules:
+- Default credits on signup = 3
+- 1 Contract creation = 1 credit consumed
+
+Conditions:
+- If credits > 0 → allow contract creation
+- If credits = 0 → redirect to Pricing page
+
+Show remaining credits on:
+- Dashboard
+- Profile page
+
+------------------------------------
+5️⃣ PRICING PAGE
+------------------------------------
+
+Mobile-first Pricing page:
+
+Plan:
+- Buy 1 Contract Credit
+- Price: ₹299
+
+UI:
+- Pricing card
+- “Buy Contract Credit” button
+- Show current credit balance
+
+------------------------------------
+6️⃣ PAYMENT GATEWAY – PAYU (IMPORTANT)
+------------------------------------
+
+Use **PayU Payment Gateway (Redirect Checkout)**
+
+Payment flow:
+1. User clicks “Buy Contract Credit”
+2. Backend creates PayU payment request
+3. Generate required PayU hash on backend
+4. Redirect user to PayU hosted payment page
+5. On successful payment:
+   - PayU redirects to success URL
+   - Verify payment response securely
+   - Increase Contract Credits by +1
+6. On failure:
+   - Redirect to failure page
+   - Show error message
+
+Security rules:
+- Hash generation MUST be server-side
+- Never expose PayU key/secret to frontend
+- Validate payment status before updating credits
+
+------------------------------------
+7️⃣ INTEGRATION WITH EXISTING FLOW
+------------------------------------
+
+- Before creating a contract:
+  - Check Contract Credits
+  - If insufficient → redirect to Pricing page
+
+- After successful PayU payment:
+  - Update credits
+  - Redirect to Dashboard
+  - Show success toast/message
+
+------------------------------------
+8️⃣ INVOICE & CONTRACT INTEGRATION
+------------------------------------
+
+- Invoice generation should auto-use:
+  - Influencer Name
+  - PAN
+  - GST
+  - Digital Signature from Profile
+
+------------------------------------
+9️⃣ UI & UX RULES
+------------------------------------
+
+- Mobile-first only
+- Card-based UI
+- Clear validation & error messages
+- Do not break existing flows
+
+------------------------------------
+🔟 CODE QUALITY
+------------------------------------
+
+- Modular implementation
+- Add comments for PayU integration
+- No unnecessary refactoring
+
+------------------------------------
+DELIVERABLE
+------------------------------------
+
+- Profile + onboarding working
+- Contract credit system enforced
+- Pricing page live
+- PayU payment flow working
+- Credits updated only after verified payment
+- Existing app remains stable
