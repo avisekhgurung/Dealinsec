@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertDealSchema, insertContractSchema } from "@shared/schema";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated } from "./auth";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import multer from "multer";
 import path from "path";
@@ -38,9 +38,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
+      const { password: _, ...userWithoutPassword } = req.user;
+      res.json(userWithoutPassword);
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -66,7 +65,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/deals", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const deals = await storage.getDeals(userId);
       res.json(deals);
     } catch (error) {
@@ -76,7 +75,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/deals/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const deal = await storage.getDeal(parseInt(req.params.id));
       if (!deal) {
         return res.status(404).json({ error: "Deal not found" });
@@ -94,7 +93,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/deals", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const parsed = insertDealSchema.safeParse({ ...req.body, userId });
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors });
@@ -109,7 +108,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/contracts", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const contracts = await storage.getContracts(userId);
       res.json(contracts);
     } catch (error) {
@@ -119,7 +118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/contracts/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const contract = await storage.getContract(parseInt(req.params.id));
       if (!contract) {
         return res.status(404).json({ error: "Contract not found" });
@@ -138,7 +137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/contracts", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       const parsed = insertContractSchema.safeParse({ ...req.body, userId });
       if (!parsed.success) {
@@ -186,7 +185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!contract) {
         return res.status(404).json({ error: "Contract not found" });
       }
-      if (contract.userId !== req.user.claims.sub) {
+      if (contract.userId !== req.user.id) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -210,7 +209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/invoices", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const invoices = await storage.getInvoices(userId);
       res.json(invoices);
     } catch (error) {
@@ -224,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!invoice) {
         return res.status(404).json({ error: "Invoice not found" });
       }
-      if (invoice.userId !== req.user.claims.sub) {
+      if (invoice.userId !== req.user.id) {
         return res.status(403).json({ error: "Access denied" });
       }
       res.json(invoice);
@@ -239,7 +238,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!invoice) {
         return res.status(404).json({ error: "Invoice not found" });
       }
-      if (invoice.userId !== req.user.claims.sub) {
+      if (invoice.userId !== req.user.id) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -284,7 +283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/invoices/:id/confirm-payment", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const invoice = await storage.getInvoice(parseInt(req.params.id));
       if (!invoice) {
         return res.status(404).json({ error: "Invoice not found" });
@@ -340,7 +339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Brand-specific routes
   app.get("/api/brand/deals", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       if (!user || user.role !== "brand") {
         return res.status(403).json({ error: "Brand access required" });
@@ -354,7 +353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/brand/contracts", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       if (!user || user.role !== "brand") {
         return res.status(403).json({ error: "Brand access required" });
@@ -378,7 +377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Brand invoices (invoices influencers send to brands)
   app.get("/api/brand-invoices", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const invoices = await storage.getBrandInvoices(userId);
       res.json(invoices);
     } catch (error) {
@@ -392,7 +391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!invoice) {
         return res.status(404).json({ error: "Invoice not found" });
       }
-      if (invoice.userId !== req.user.claims.sub) {
+      if (invoice.userId !== req.user.id) {
         return res.status(403).json({ error: "Access denied" });
       }
       res.json(invoice);
@@ -403,7 +402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/brand-invoices", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       const invoiceNumber = await storage.generateBrandInvoiceNumber();
       
@@ -435,13 +434,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!invoice) {
         return res.status(404).json({ error: "Invoice not found" });
       }
-      if (invoice.userId !== req.user.claims.sub) {
+      if (invoice.userId !== req.user.id) {
         return res.status(403).json({ error: "Access denied" });
       }
       const updated = await storage.updateBrandInvoice(parseInt(req.params.id), req.body);
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update brand invoice" });
+    }
+  });
+
+  app.patch("/api/profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { firstName, lastName, phone, panNumber, gstNumber, digitalSignature, onboardingComplete } = req.body;
+      
+      const updates: any = {};
+      if (firstName !== undefined) updates.firstName = firstName;
+      if (lastName !== undefined) updates.lastName = lastName;
+      if (phone !== undefined) updates.phone = phone;
+      if (panNumber !== undefined) updates.panNumber = panNumber;
+      if (gstNumber !== undefined) updates.gstNumber = gstNumber;
+      if (digitalSignature !== undefined) updates.digitalSignature = digitalSignature;
+      if (onboardingComplete !== undefined) updates.onboardingComplete = onboardingComplete;
+      
+      const user = await storage.updateUser(userId, updates);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Profile update error:", error);
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  app.post("/api/profile/signature", isAuthenticated, upload.single("signature"), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      const filePath = `/uploads/${req.file.filename}`;
+      res.json({ path: filePath });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to upload signature" });
     }
   });
 

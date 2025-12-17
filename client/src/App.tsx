@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import LandingPage from "@/pages/landing";
+import OnboardingPage from "@/pages/onboarding";
 import DashboardPage from "@/pages/dashboard";
 import DealsPage from "@/pages/deals";
 import CreateDealPage from "@/pages/create-deal";
@@ -20,6 +21,8 @@ import BrandDashboardPage from "@/pages/brand-dashboard";
 import BrandDealsPage from "@/pages/brand-deals";
 import BrandContractsPage from "@/pages/brand-contracts";
 import BrandInvoiceDetailsPage from "@/pages/brand-invoice-details";
+import ProfilePage from "@/pages/profile";
+import PricingPage from "@/pages/pricing";
 import PitchPage from "@/pages/pitch";
 import NotFound from "@/pages/not-found";
 
@@ -35,6 +38,7 @@ function Router() {
   }
 
   const isBrand = user?.role === "brand";
+  const needsOnboarding = isAuthenticated && user && !user.onboardingComplete;
 
   if (!isAuthenticated) {
     return (
@@ -42,6 +46,16 @@ function Router() {
         <Route path="/" component={LandingPage} />
         <Route path="/pitch" component={PitchPage} />
         <Route component={NotFound} />
+      </Switch>
+    );
+  }
+
+  if (needsOnboarding) {
+    return (
+      <Switch>
+        <Route path="/" component={OnboardingPage} />
+        <Route path="/onboarding" component={OnboardingPage} />
+        <Route component={OnboardingPage} />
       </Switch>
     );
   }
@@ -74,6 +88,8 @@ function Router() {
       <Route path="/billing/success" component={PaymentSuccessPage} />
       <Route path="/billing/invoice/:id" component={InvoiceDetailsPage} />
       <Route path="/brand-invoices/:id" component={BrandInvoiceDetailsPage} />
+      <Route path="/profile" component={ProfilePage} />
+      <Route path="/pricing" component={PricingPage} />
       <Route component={NotFound} />
     </Switch>
   );
