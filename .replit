@@ -44,5 +44,4 @@ integrations = ["javascript_log_in_with_replit:1.0.0", "stripe:2.0.0"]
 [userenv]
 
 [userenv.shared]
-PAYU_URL = "https://test.payu.in/_payment"
-PAYU_ENVIRONMENT = "TEST"
+PAYU_BASE_URL = "https://test.payu.in"
