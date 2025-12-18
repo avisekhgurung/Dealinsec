@@ -206,20 +206,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deductCreditIfSufficient(userId: string): Promise<boolean> {
-    const user = await this.getUser(userId);
-    if (!user || user.contractCredits < 1) {
-      return false;
-    }
-    
-    const [updated] = await db.update(users)
+    const result = await db.update(users)
       .set({ 
         contractCredits: sql`${users.contractCredits} - 1`,
         updatedAt: new Date()
       })
-      .where(eq(users.id, userId))
+      .where(sql`${users.id} = ${userId} AND ${users.contractCredits} > 0`)
       .returning();
     
-    if (updated) {
+    if (result.length > 0) {
       await this.createCreditTransaction({
         userId,
         delta: -1,

@@ -7,6 +7,12 @@ import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClie
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
+
+const PAYU_MERCHANT_KEY = process.env.PAYU_MERCHANT_KEY || "";
+const PAYU_SALT = process.env.PAYU_SALT || "";
+const PAYU_BASE_URL = process.env.PAYU_BASE_URL || "https://test.payu.in";
+const CREDIT_PRICE = 299;
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -138,10 +144,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/contracts", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const user = await storage.getUser(userId);
+      
       const parsed = insertContractSchema.safeParse({ ...req.body, userId });
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors });
+      }
+
+      const creditDeducted = await storage.deductCreditIfSufficient(userId);
+      if (!creditDeducted) {
+        const user = await storage.getUser(userId);
+        return res.status(402).json({ 
+          error: "Insufficient credits",
+          message: "You need at least 1 contract credit to create a contract. Please purchase credits.",
+          creditsRequired: 1,
+          creditsAvailable: user?.contractCredits || 0
+        });
       }
 
       const contractData = {
@@ -153,6 +170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.updateDeal(contract.dealId, { status: "Active" });
 
+      const user = await storage.getUser(userId);
       const invoiceNumber = await storage.generateInvoiceNumber();
       const influencerName = user?.firstName && user?.lastName 
         ? `${user.firstName} ${user.lastName}` 
@@ -479,6 +497,162 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ path: filePath });
     } catch (error) {
       res.status(500).json({ error: "Failed to upload signature" });
+    }
+  });
+
+  app.get("/api/credits/balance", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      const transactions = await storage.getCreditTransactions(userId);
+      res.json({ 
+        balance: user?.contractCredits || 0,
+        transactions: transactions.slice(0, 10)
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch credit balance" });
+    }
+  });
+
+  app.post("/api/payments/create", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const credits = req.body.credits || 1;
+      const amount = credits * CREDIT_PRICE;
+      const orderId = `INFLU_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      await storage.createPayuOrder({
+        userId,
+        orderId,
+        amount,
+        credits,
+        status: "pending",
+      });
+
+      if (!PAYU_MERCHANT_KEY || !PAYU_SALT) {
+        return res.status(503).json({ 
+          error: "Payment gateway not configured",
+          message: "PayU credentials not set. Please configure PAYU_MERCHANT_KEY and PAYU_SALT."
+        });
+      }
+
+      const productInfo = `${credits} Contract Credit${credits > 1 ? 's' : ''}`;
+      const firstName = user.firstName || "User";
+      const email = user.email || "";
+      const phone = user.phone || "";
+
+      const hashString = `${PAYU_MERCHANT_KEY}|${orderId}|${amount}|${productInfo}|${firstName}|${email}|||||||||||${PAYU_SALT}`;
+      const hash = crypto.createHash("sha512").update(hashString).digest("hex");
+
+      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : "http://localhost:5000";
+
+      const formHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head><title>Redirecting to PayU...</title></head>
+        <body onload="document.forms['payuForm'].submit();">
+          <p>Redirecting to payment gateway...</p>
+          <form name="payuForm" action="${PAYU_BASE_URL}/_payment" method="POST">
+            <input type="hidden" name="key" value="${PAYU_MERCHANT_KEY}" />
+            <input type="hidden" name="txnid" value="${orderId}" />
+            <input type="hidden" name="amount" value="${amount}" />
+            <input type="hidden" name="productinfo" value="${productInfo}" />
+            <input type="hidden" name="firstname" value="${firstName}" />
+            <input type="hidden" name="email" value="${email}" />
+            <input type="hidden" name="phone" value="${phone}" />
+            <input type="hidden" name="surl" value="${baseUrl}/api/payments/success" />
+            <input type="hidden" name="furl" value="${baseUrl}/api/payments/failure" />
+            <input type="hidden" name="hash" value="${hash}" />
+          </form>
+        </body>
+        </html>
+      `;
+
+      res.json({ formHtml, orderId });
+    } catch (error) {
+      console.error("Payment creation error:", error);
+      res.status(500).json({ error: "Failed to create payment" });
+    }
+  });
+
+  app.post("/api/payments/success", async (req, res) => {
+    try {
+      const { txnid, mihpayid, status, hash: receivedHash, amount } = req.body;
+
+      if (!txnid) {
+        return res.redirect("/pricing?error=invalid_transaction");
+      }
+
+      const order = await storage.getPayuOrder(txnid);
+      if (!order) {
+        return res.redirect("/pricing?error=order_not_found");
+      }
+
+      if (order.status === "completed") {
+        return res.redirect("/pricing?success=true&already_processed=true");
+      }
+
+      if (order.status !== "pending") {
+        return res.redirect("/pricing?error=invalid_order_status");
+      }
+
+      const parsedAmount = parseFloat(amount);
+      if (parsedAmount !== order.amount) {
+        console.error(`Amount mismatch: expected ${order.amount}, got ${parsedAmount}`);
+        await storage.updatePayuOrder(txnid, { status: "failed" });
+        return res.redirect("/pricing?error=amount_mismatch");
+      }
+
+      if (PAYU_SALT && receivedHash) {
+        const reverseHashString = `${PAYU_SALT}|${status}|||||||||||${req.body.email || ""}|${req.body.firstname || ""}|${req.body.productinfo || ""}|${amount}|${txnid}|${PAYU_MERCHANT_KEY}`;
+        const calculatedHash = crypto.createHash("sha512").update(reverseHashString).digest("hex");
+        if (calculatedHash !== receivedHash) {
+          console.error("Hash verification failed");
+          await storage.updatePayuOrder(txnid, { status: "failed" });
+          return res.redirect("/pricing?error=verification_failed");
+        }
+      }
+
+      if (status === "success") {
+        const updateResult = await storage.updatePayuOrder(txnid, {
+          status: "completed",
+          payuTxnId: mihpayid,
+          payuHash: receivedHash,
+          completedAt: new Date(),
+        });
+
+        if (updateResult && updateResult.status === "completed") {
+          await storage.addCredits(order.userId, order.credits, "purchase", order.amount);
+        }
+        
+        res.redirect("/pricing?success=true");
+      } else {
+        await storage.updatePayuOrder(txnid, { status: "failed" });
+        res.redirect("/pricing?error=payment_failed");
+      }
+    } catch (error) {
+      console.error("Payment success callback error:", error);
+      res.redirect("/pricing?error=processing_error");
+    }
+  });
+
+  app.post("/api/payments/failure", async (req, res) => {
+    try {
+      const { txnid } = req.body;
+      if (txnid) {
+        await storage.updatePayuOrder(txnid, { status: "failed" });
+      }
+      res.redirect("/pricing?error=payment_failed");
+    } catch (error) {
+      console.error("Payment failure callback error:", error);
+      res.redirect("/pricing?error=processing_error");
     }
   });
 

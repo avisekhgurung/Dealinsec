@@ -1,20 +1,24 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation, useParams } from "wouter";
+import { useLocation, useParams, Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Shield, AlertTriangle, PenLine, Loader2 } from "lucide-react";
+import { ArrowLeft, Shield, AlertTriangle, PenLine, Loader2, CreditCard } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import type { Deal } from "@shared/schema";
 
 export default function ContractConfirmationPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [agreed, setAgreed] = useState(false);
+
+  const hasCredits = (user?.contractCredits ?? 0) >= 1;
 
   const { data: deal, isLoading } = useQuery<Deal>({
     queryKey: ["/api/deals", params.id],
@@ -42,18 +46,28 @@ export default function ContractConfirmationPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({
         title: "Contract signed",
         description: "Your exclusive contract has been created.",
       });
       setLocation(`/contracts/${contract.id}`);
     },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to create contract. Please try again.",
-        variant: "destructive",
-      });
+    onError: async (error: any) => {
+      if (error?.status === 402) {
+        toast({
+          title: "Insufficient Credits",
+          description: "You need at least 1 contract credit. Please purchase credits.",
+          variant: "destructive",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to create contract. Please try again.",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -110,6 +124,31 @@ export default function ContractConfirmationPage() {
             <span className="font-semibold text-foreground">{deal.brandName}</span>
           </p>
         </div>
+
+        {!hasCredits && (
+          <Card className="border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20">
+            <CardContent className="p-4">
+              <div className="flex gap-3">
+                <CreditCard className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="space-y-2">
+                  <p className="font-semibold text-red-900 dark:text-red-200">
+                    No Credits Available
+                  </p>
+                  <p className="text-sm text-red-800 dark:text-red-300 leading-relaxed">
+                    You need at least 1 contract credit to sign this contract. 
+                    Purchase credits to continue.
+                  </p>
+                  <Link href="/pricing">
+                    <Button size="sm" className="mt-2" data-testid="button-buy-credits">
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Buy Credits
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20">
           <CardContent className="p-4">
@@ -177,7 +216,7 @@ export default function ContractConfirmationPage() {
         <div className="space-y-3 pt-4">
           <Button
             className="w-full h-14 text-base font-semibold rounded-xl"
-            disabled={!agreed || createContract.isPending}
+            disabled={!agreed || createContract.isPending || !hasCredits}
             onClick={() => createContract.mutate()}
             data-testid="button-sign-contract"
           >

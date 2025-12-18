@@ -1,17 +1,39 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, CreditCard, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, CreditCard, Check, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
 import { BottomNav } from "@/components/bottom-nav";
+import { queryClient } from "@/lib/queryClient";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function PricingPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<"success" | "error" | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("success") === "true") {
+      setPaymentStatus("success");
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/credits/balance"] });
+      toast({ title: "Payment successful!", description: "Your credits have been added." });
+      window.history.replaceState({}, "", "/pricing");
+    } else if (params.get("error")) {
+      setPaymentStatus("error");
+      toast({ 
+        title: "Payment failed", 
+        description: params.get("error")?.replace(/_/g, " ") || "Please try again.",
+        variant: "destructive"
+      });
+      window.history.replaceState({}, "", "/pricing");
+    }
+  }, [toast]);
 
   const handlePurchase = async () => {
     setIsLoading(true);
@@ -61,6 +83,26 @@ export default function PricingPage() {
       </header>
 
       <main className="p-4 max-w-lg mx-auto">
+        {paymentStatus === "success" && (
+          <Alert className="mb-4 border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950">
+            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <AlertTitle className="text-green-800 dark:text-green-200">Payment Successful</AlertTitle>
+            <AlertDescription className="text-green-700 dark:text-green-300">
+              Your credit has been added to your account.
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {paymentStatus === "error" && (
+          <Alert className="mb-4" variant="destructive">
+            <XCircle className="h-4 w-4" />
+            <AlertTitle>Payment Failed</AlertTitle>
+            <AlertDescription>
+              There was an issue processing your payment. Please try again.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Card className="mb-6">
           <CardHeader className="text-center pb-2">
             <CardTitle className="text-lg">Your Balance</CardTitle>
