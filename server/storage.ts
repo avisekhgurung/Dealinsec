@@ -1,12 +1,14 @@
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { 
-  users, deals, contracts, invoices, brandInvoices,
+  users, deals, contracts, invoices, brandInvoices, creditTransactions, payuOrders,
   type User, type UpsertUser,
   type Deal, type InsertDeal, 
   type Contract, type InsertContract, 
   type Invoice, type InsertInvoice,
-  type BrandInvoice, type InsertBrandInvoice
+  type BrandInvoice, type InsertBrandInvoice,
+  type CreditTransaction, type InsertCreditTransaction,
+  type PayuOrder, type InsertPayuOrder
 } from "@shared/schema";
 
 export interface IStorage {
@@ -41,6 +43,15 @@ export interface IStorage {
   
   generateInvoiceNumber(): Promise<string>;
   generateBrandInvoiceNumber(): Promise<string>;
+  
+  getCreditTransactions(userId: string): Promise<CreditTransaction[]>;
+  createCreditTransaction(transaction: InsertCreditTransaction): Promise<CreditTransaction>;
+  deductCreditIfSufficient(userId: string): Promise<boolean>;
+  addCredits(userId: string, amount: number, type: string, paymentAmount?: number): Promise<User | undefined>;
+  
+  createPayuOrder(order: InsertPayuOrder): Promise<PayuOrder>;
+  getPayuOrder(orderId: string): Promise<PayuOrder | undefined>;
+  updatePayuOrder(orderId: string, updates: Partial<PayuOrder>): Promise<PayuOrder | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -181,6 +192,79 @@ export class DatabaseStorage implements IStorage {
   async generateBrandInvoiceNumber(): Promise<string> {
     this.invoiceCounter++;
     return `BINV-${Date.now()}-${this.invoiceCounter}`;
+  }
+
+  async getCreditTransactions(userId: string): Promise<CreditTransaction[]> {
+    return db.select().from(creditTransactions)
+      .where(eq(creditTransactions.userId, userId))
+      .orderBy(desc(creditTransactions.createdAt));
+  }
+
+  async createCreditTransaction(transaction: InsertCreditTransaction): Promise<CreditTransaction> {
+    const [created] = await db.insert(creditTransactions).values(transaction as any).returning();
+    return created;
+  }
+
+  async deductCreditIfSufficient(userId: string): Promise<boolean> {
+    const user = await this.getUser(userId);
+    if (!user || user.contractCredits < 1) {
+      return false;
+    }
+    
+    const [updated] = await db.update(users)
+      .set({ 
+        contractCredits: sql`${users.contractCredits} - 1`,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    
+    if (updated) {
+      await this.createCreditTransaction({
+        userId,
+        delta: -1,
+        type: "usage",
+        metadata: { action: "contract_creation" }
+      });
+      return true;
+    }
+    return false;
+  }
+
+  async addCredits(userId: string, amount: number, type: string, paymentAmount?: number): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ 
+        contractCredits: sql`${users.contractCredits} + ${amount}`,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    
+    if (updated) {
+      await this.createCreditTransaction({
+        userId,
+        delta: amount,
+        type,
+        amount: paymentAmount,
+        metadata: { credits: amount }
+      });
+    }
+    return updated;
+  }
+
+  async createPayuOrder(order: InsertPayuOrder): Promise<PayuOrder> {
+    const [created] = await db.insert(payuOrders).values(order as any).returning();
+    return created;
+  }
+
+  async getPayuOrder(orderId: string): Promise<PayuOrder | undefined> {
+    const [order] = await db.select().from(payuOrders).where(eq(payuOrders.orderId, orderId));
+    return order;
+  }
+
+  async updatePayuOrder(orderId: string, updates: Partial<PayuOrder>): Promise<PayuOrder | undefined> {
+    const [updated] = await db.update(payuOrders).set(updates).where(eq(payuOrders.orderId, orderId)).returning();
+    return updated;
   }
 }
 

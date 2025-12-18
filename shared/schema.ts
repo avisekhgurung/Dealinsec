@@ -135,3 +135,36 @@ export const brandInvoices = pgTable("brand_invoices", {
 export const insertBrandInvoiceSchema = createInsertSchema(brandInvoices).omit({ id: true });
 export type InsertBrandInvoice = z.infer<typeof insertBrandInvoiceSchema>;
 export type BrandInvoice = typeof brandInvoices.$inferSelect;
+
+export const creditTransactionTypeOptions = ["grant", "purchase", "usage", "refund"] as const;
+
+export const creditTransactions = pgTable("credit_transactions", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  delta: integer("delta").notNull(),
+  type: varchar("type").notNull(),
+  amount: integer("amount"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCreditTransactionSchema = createInsertSchema(creditTransactions).omit({ id: true, createdAt: true });
+export type InsertCreditTransaction = z.infer<typeof insertCreditTransactionSchema>;
+export type CreditTransaction = typeof creditTransactions.$inferSelect;
+
+export const payuOrders = pgTable("payu_orders", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orderId: varchar("order_id").notNull().unique(),
+  amount: integer("amount").notNull(),
+  credits: integer("credits").notNull(),
+  status: varchar("status").notNull().default("pending"),
+  payuTxnId: varchar("payu_txn_id"),
+  payuHash: varchar("payu_hash"),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertPayuOrderSchema = createInsertSchema(payuOrders).omit({ id: true, createdAt: true, completedAt: true });
+export type InsertPayuOrder = z.infer<typeof insertPayuOrderSchema>;
+export type PayuOrder = typeof payuOrders.$inferSelect;
