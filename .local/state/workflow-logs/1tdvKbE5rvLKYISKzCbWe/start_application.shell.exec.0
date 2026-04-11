@@ -1,0 +1,74 @@
+[1G[0K⠙[1G[0K
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+[1G[0K⠙[1G[0KInitializing Stripe schema...
+Stripe schema ready
+{ autoExpandLists: [90mundefined[39m, stripeApiVersion: [90mundefined[39m } StripeSync initialized
+Setting up managed webhook...
+Webhook configured: https://8dc3af8a-076f-42e8-a957-69165a4d6333-00-3vije4avwzhbr.kirk.replit.dev/api/stripe/webhook/afa31255-bee2-480b-80ff-00c11527ccbe (UUID: afa31255-bee2-480b-80ff-00c11527ccbe)
+Syncing Stripe data...
+Syncing products
+Fetching items to sync from Stripe
+Sync complete: 0 items synced
+Syncing prices
+Fetching items to sync from Stripe
+Sync complete: 0 items synced
+Syncing plans
+Fetching items to sync from Stripe
+Sync complete: 0 items synced
+Syncing customers
+Fetching items to sync from Stripe
+Sync complete: 0 items synced
+Syncing subscriptions
+Fetching items to sync from Stripe
+Sync complete: 0 items synced
+Syncing subscription schedules
+Fetching items to sync from Stripe
+Sync complete: 0 items synced
+Syncing invoices
+Fetching items to sync from Stripe
+Sync complete: 0 items synced
+Syncing charges
+4:09:27 PM [express] serving on port 5000
+Incremental sync from cursor: 1765749089
+Fetching items to sync from Stripe
+Upserting final batch of 1 items
+Sync complete: 1 items synced
+Syncing setup_intents
+Fetching items to sync from Stripe
+Sync complete: 0 items synced
+Syncing payment method
+Getting payment methods for 0 customers
+Syncing payment_intents
+Incremental sync from cursor: 1765749045
+Fetching items to sync from Stripe
+Upserting final batch of 1 items
+Sync complete: 1 items synced
+Syncing tax_ids
+Fetching items to sync from Stripe
+Sync complete: 0 items synced
+Syncing credit notes
+Fetching items to sync from Stripe
+Sync complete: 0 items synced
+Syncing disputes
+Fetching items to sync from Stripe
+Sync complete: 0 items synced
+Syncing early fraud warnings
+Fetching items to sync from Stripe
+Sync complete: 0 items synced
+Syncing refunds
+Fetching items to sync from Stripe
+Sync complete: 0 items synced
+Syncing checkout sessions
+Incremental sync from cursor: 1765749031
+Fetching items to sync from Stripe
+Upserting final batch of 1 items
+Sync complete: 1 items synced
+Stripe data synced
+Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+4:09:45 PM [express] GET /api/auth/user 401 in 2ms :: {"message":"Unauthorized"}
