@@ -265,7 +265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const stripe = await getUncachableStripeClient();
-      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+      const baseUrl = process.env.APP_URL || `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
 
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
@@ -549,9 +549,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hashString = `${PAYU_MERCHANT_KEY}|${orderId}|${amount}|${productInfo}|${firstName}|${email}|||||||||||${PAYU_SALT}`;
       const hash = crypto.createHash("sha512").update(hashString).digest("hex");
 
-      const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-        : "http://localhost:5000";
+      const baseUrl = process.env.APP_URL
+        || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "http://localhost:3000");
 
       const formHtml = `
         <!DOCTYPE html>

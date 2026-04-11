@@ -33,6 +33,12 @@ async function initStripe() {
     return;
   }
 
+  // Skip Stripe in local development (requires Replit-specific tokens)
+  if (!process.env.REPL_IDENTITY && !process.env.WEB_REPL_RENEWAL) {
+    console.log('Replit tokens not found, skipping Stripe initialization (local dev mode)');
+    return;
+  }
+
   try {
     console.log('Initializing Stripe schema...');
     await runMigrations({ 
