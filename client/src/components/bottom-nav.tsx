@@ -19,7 +19,7 @@ export function BottomNav() {
       {/* Credit pill — fixed top-right like a game HUD */}
       <Link href="/pricing">
         <div
-          className="fixed top-3 right-14 z-[60] flex items-center gap-1 px-2.5 py-1 rounded-full cursor-pointer select-none pill-press"
+          className="fixed top-[18px] right-[60px] z-[60] flex items-center gap-1.5 px-2.5 py-1 rounded-full cursor-pointer select-none pill-press"
           style={{
             background: credits > 0
               ? "linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #fde68a 100%)"

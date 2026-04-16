@@ -8,7 +8,7 @@ import { Briefcase, FileText, CreditCard, CheckCircle, Loader2 } from "lucide-re
 import { SiGoogle } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 
 export default function LandingPage() {
   const [, setLocation] = useLocation();
@@ -309,8 +309,17 @@ export default function LandingPage() {
           </Card>
         </div>
 
-        <footer className="text-center mt-12 text-sm text-muted-foreground animate-fade-in" style={{ animationDelay: "0.3s" }}>
+        <footer className="text-center mt-12 text-sm text-muted-foreground animate-fade-in space-y-3" style={{ animationDelay: "0.3s" }}>
           <p>3 Free Contract Credits on Signup</p>
+          <div className="flex items-center justify-center gap-3 flex-wrap text-xs">
+            <Link href="/terms" className="hover:text-primary transition-colors underline underline-offset-2">Terms of Service</Link>
+            <span className="text-muted-foreground/40">·</span>
+            <Link href="/privacy" className="hover:text-primary transition-colors underline underline-offset-2">Privacy Policy</Link>
+            <span className="text-muted-foreground/40">·</span>
+            <Link href="/cookies" className="hover:text-primary transition-colors underline underline-offset-2">Cookies</Link>
+            <span className="text-muted-foreground/40">·</span>
+            <Link href="/refund" className="hover:text-primary transition-colors underline underline-offset-2">Refund Policy</Link>
+          </div>
         </footer>
       </div>
     </div>

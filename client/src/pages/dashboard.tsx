@@ -162,7 +162,13 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground">Welcome back,</p>
             <h1 className="text-lg font-bold">{displayName}</h1>
           </div>
-          <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleLogout}
+            data-testid="button-logout"
+            className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+          >
             <LogOut className="w-5 h-5" />
           </Button>
         </div>

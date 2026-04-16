@@ -28,6 +28,10 @@ const BrandInvoiceDetailsPage = lazy(() => import("@/pages/brand-invoice-details
 const ProfilePage             = lazy(() => import("@/pages/profile"));
 const PricingPage             = lazy(() => import("@/pages/pricing"));
 const PitchPage               = lazy(() => import("@/pages/pitch"));
+const TermsPage               = lazy(() => import("@/pages/legal/terms"));
+const PrivacyPage             = lazy(() => import("@/pages/legal/privacy"));
+const CookiePage              = lazy(() => import("@/pages/legal/cookies"));
+const RefundPage              = lazy(() => import("@/pages/legal/refund"));
 
 // Minimal spinner shown while a lazy chunk is loading
 function PageLoader() {
@@ -53,6 +57,10 @@ function Router() {
         <Switch>
           <Route path="/" component={LandingPage} />
           <Route path="/pitch" component={PitchPage} />
+          <Route path="/terms" component={TermsPage} />
+          <Route path="/privacy" component={PrivacyPage} />
+          <Route path="/cookies" component={CookiePage} />
+          <Route path="/refund" component={RefundPage} />
           <Route component={NotFound} />
         </Switch>
       </Suspense>
@@ -89,6 +97,10 @@ function Router() {
         <Route path="/brand-invoices/:id" component={BrandInvoiceDetailsPage} />
         <Route path="/profile" component={ProfilePage} />
         <Route path="/pricing" component={PricingPage} />
+        <Route path="/terms" component={TermsPage} />
+        <Route path="/privacy" component={PrivacyPage} />
+        <Route path="/cookies" component={CookiePage} />
+        <Route path="/refund" component={RefundPage} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>
