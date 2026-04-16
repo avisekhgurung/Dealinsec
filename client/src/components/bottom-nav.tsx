@@ -16,34 +16,23 @@ export function BottomNav() {
 
   return (
     <>
-      {/* Floating credit pill — sits above bottom nav, bottom-right */}
+      {/* Credit pill — fixed top-right like a game HUD */}
       <Link href="/pricing">
         <div
-          className="fixed right-4 z-[55] flex items-center gap-1.5 px-3 py-2 rounded-2xl cursor-pointer select-none pill-press"
+          className="fixed top-3 right-3 z-[60] flex items-center gap-1 px-2.5 py-1 rounded-full cursor-pointer select-none pill-press"
           style={{
-            bottom: "calc(env(safe-area-inset-bottom, 0px) + 72px)",
             background: credits > 0
               ? "linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #fde68a 100%)"
               : "linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)",
             border: credits > 0 ? "1.5px solid #f59e0b" : "1.5px solid #fb7185",
             boxShadow: credits > 0
-              ? "0 4px 16px rgba(245,158,11,0.35), 0 1px 3px rgba(0,0,0,0.1)"
-              : "0 4px 16px rgba(251,113,133,0.25), 0 1px 3px rgba(0,0,0,0.08)",
+              ? "0 2px 10px rgba(245,158,11,0.3), 0 1px 2px rgba(0,0,0,0.08)"
+              : "0 2px 10px rgba(251,113,133,0.2), 0 1px 2px rgba(0,0,0,0.06)",
           }}
         >
-          {/* Pulsing dot */}
-          <span className="relative flex h-2 w-2">
-            {credits > 0 && (
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-70" />
-            )}
-            <span className={`relative inline-flex rounded-full h-2 w-2 ${credits > 0 ? "bg-amber-500" : "bg-rose-400"}`} />
-          </span>
           <Coins className={`w-3.5 h-3.5 ${credits > 0 ? "text-amber-600" : "text-rose-500"}`} />
           <span className={`text-xs font-black tabular-nums ${credits > 0 ? "text-amber-800" : "text-rose-600"}`}>
             {credits}
-          </span>
-          <span className={`text-[10px] font-semibold ${credits > 0 ? "text-amber-700/70" : "text-rose-500/80"}`}>
-            {credits === 1 ? "credit" : "credits"}
           </span>
         </div>
       </Link>
