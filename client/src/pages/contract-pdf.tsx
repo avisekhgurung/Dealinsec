@@ -11,9 +11,8 @@ export default function ContractPdfPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const isBrand = user?.role === "brand";
-  const backPath = isBrand ? `/brand/contracts/${id}` : `/contracts/${id}`;
-  const contractsPath = isBrand ? "/brand/contracts" : "/contracts";
+  const backPath = `/contracts/${id}`;
+  const contractsPath = "/contracts";
 
   const { data: contract, isLoading } = useQuery<Contract>({
     queryKey: ["/api/contracts", id],

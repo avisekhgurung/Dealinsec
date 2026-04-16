@@ -31,7 +31,7 @@ export function getSession() {
 
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
-  app.use(getSession());
+  // Session is registered in index.ts before passport, so we don't register it again here
 
   app.post("/api/auth/signup", async (req, res) => {
     try {

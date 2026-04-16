@@ -7,6 +7,7 @@ import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from './stripeClient';
 import { WebhookHandlers } from './webhookHandlers';
 import { setupGoogleAuth } from './googleAuth';
+import { getSession } from './auth';
 
 const app = express();
 
@@ -113,6 +114,9 @@ async function initStripe() {
   );
 
   app.use(express.urlencoded({ extended: false }));
+
+  // Session must come before passport
+  app.use(getSession());
 
   // Google OAuth
   setupGoogleAuth();

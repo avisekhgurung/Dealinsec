@@ -45,9 +45,13 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
+      // 60 seconds before data is considered stale — balances freshness vs extra requests
+      staleTime: 60 * 1000,
+      // Keep unused data in cache for 5 minutes
+      gcTime: 5 * 60 * 1000,
+      // Refetch when user returns to the tab so they always see current deal/contract state
+      refetchOnWindowFocus: true,
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
       retry: false,
     },
     mutations: {

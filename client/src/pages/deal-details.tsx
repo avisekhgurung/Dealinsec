@@ -6,7 +6,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { PlatformIcon } from "@/components/platform-icon";
 import { BottomNav } from "@/components/bottom-nav";
-import { BrandBottomNav } from "@/components/brand-bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -18,14 +17,13 @@ export default function DealDetailsPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
-  const isBrand = user?.role === "brand";
 
   const { data: deal, isLoading } = useQuery<Deal>({
     queryKey: ["/api/deals", params.id],
   });
 
   const { data: contracts = [] } = useQuery<Contract[]>({
-    queryKey: isBrand ? ["/api/brand/contracts"] : ["/api/contracts"],
+    queryKey: ["/api/contracts"],
   });
 
   // Fetch quote for this deal without throwing on 404
@@ -37,13 +35,11 @@ export default function DealDetailsPage() {
       if (!res.ok) return null;
       return res.json();
     },
-    enabled: !isBrand,
   });
 
   // Fetch brand invoices to check if one exists for this deal
   const { data: brandInvoices = [] } = useQuery<BrandInvoice[]>({
     queryKey: ["/api/brand-invoices"],
-    enabled: !isBrand,
   });
 
   const generateQuote = useMutation({
@@ -97,8 +93,7 @@ export default function DealDetailsPage() {
   // Determine current step (1=Deal, 2=Quote, 3=Agreement, 4=Invoice)
   const currentStep = hasInvoice ? 4 : hasContract ? (hasProof ? 4 : 3) : hasQuote ? 3 : 2;
 
-  const backPath = isBrand ? "/brand/deals" : "/deals";
-  const Nav = isBrand ? BrandBottomNav : BottomNav;
+  const backPath = "/deals";
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("en-IN", {
@@ -131,7 +126,7 @@ export default function DealDetailsPage() {
             </CardContent>
           </Card>
         </main>
-        <Nav />
+        <BottomNav />
       </div>
     );
   }
@@ -155,7 +150,7 @@ export default function DealDetailsPage() {
             </Button>
           </Link>
         </main>
-        <Nav />
+        <BottomNav />
       </div>
     );
   }
@@ -212,8 +207,8 @@ export default function DealDetailsPage() {
               </div>
             </div>
 
-            {/* Mini step indicator (influencer only) */}
-            {!isBrand && (
+            {/* Mini step indicator */}
+            {(
               <div className="mt-4 mb-2">
                 <div className="flex items-center justify-between">
                   {[
@@ -252,8 +247,8 @@ export default function DealDetailsPage() {
               </div>
             )}
 
-            {/* 4-step action buttons (influencer only) */}
-            {!isBrand && (
+            {/* 4-step action buttons */}
+            {(
               <div className="mt-3 space-y-2">
                 {/* Step 1 → 2: Generate Quote */}
                 {!hasQuote && (
@@ -334,7 +329,7 @@ export default function DealDetailsPage() {
             )}
 
             {/* Mark as Completed (Active deals) */}
-            {!isBrand && deal.status === "Active" && (
+            {deal.status === "Active" && (
               <div className="mt-3">
                 <Button
                   className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
@@ -398,7 +393,7 @@ export default function DealDetailsPage() {
         </section>
       </main>
 
-      <Nav />
+      <BottomNav />
     </div>
   );
 }
