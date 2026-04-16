@@ -1,16 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
-import { ArrowLeft, Download, FileText, Calendar, Building2, User } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { ArrowLeft, Download } from "lucide-react";
 import type { BrandInvoice, Deal } from "@shared/schema";
 
 export default function BrandInvoiceDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
 
   const { data: invoice, isLoading } = useQuery<BrandInvoice>({
     queryKey: ["/api/brand-invoices", id],
@@ -21,41 +21,45 @@ export default function BrandInvoiceDetailsPage() {
     enabled: !!invoice?.dealId,
   });
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("en-IN", {
+  const fmt = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString("en-IN", {
       day: "numeric",
       month: "long",
       year: "numeric",
     });
-  };
 
-  const handleExportPDF = () => {
-    window.print();
-  };
+  const fmtShort = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
 
+  /* ── Loading ────────────────────────────────────── */
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="glass-header sticky top-0 z-40">
+        <header className="glass-header sticky top-0 z-40 print:hidden">
           <div className="flex items-center gap-3 px-4 py-4">
             <Skeleton className="h-9 w-9" />
             <Skeleton className="h-6 w-32" />
           </div>
         </header>
         <div className="px-4 py-6 space-y-4">
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-48 w-full rounded-xl" />
+          <Skeleton className="h-32 w-full rounded-xl" />
         </div>
       </div>
     );
   }
 
+  /* ── Not found ──────────────────────────────────── */
   if (!invoice) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="glass-header sticky top-0 z-40">
+        <header className="glass-header sticky top-0 z-40 print:hidden">
           <div className="flex items-center gap-3 px-4 py-4">
-            <Button variant="ghost" size="icon" onClick={() => setLocation("/billing")} data-testid="button-back">
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/billing")}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className="text-xl font-bold">Invoice Not Found</h1>
@@ -66,141 +70,262 @@ export default function BrandInvoiceDetailsPage() {
     );
   }
 
+  /* ── Amount breakdown ───────────────────────────── */
+  const totalAmount = invoice.dealAmount;
+  const gstRate = 0.18;
+  const baseAmount = Math.round(totalAmount / (1 + gstRate));
+  const gstAmount = totalAmount - baseAmount;
+
+  const influencerName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+    invoice.influencerName ||
+    "—";
+  const influencerEmail = user?.email || invoice.influencerEmail || "";
+  const influencerPhone = user?.phone || "";
+  const influencerPan = user?.panNumber || "";
+  const influencerAddress = user?.billingAddress || "";
+  const signatureUrl = user?.digitalSignature || "";
+
   return (
     <>
-      <div className="min-h-screen bg-background pb-20 print:pb-0 print:min-h-0">
+      <div className="min-h-screen bg-background pb-20 print:pb-0 print:bg-white print:min-h-0">
+
+        {/* ── App header (hidden in print) ──────────── */}
         <header className="glass-header sticky top-0 z-40 print:hidden">
           <div className="flex items-center justify-between gap-3 px-4 py-4">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => setLocation("/billing")} data-testid="button-back">
+              <Button variant="ghost" size="icon" onClick={() => setLocation("/billing")}>
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <h1 className="text-xl font-bold">Invoice</h1>
             </div>
-            <Button onClick={handleExportPDF} className="gradient-btn text-white" data-testid="button-export-pdf">
+            <Button onClick={() => window.print()} className="gradient-btn text-white">
               <Download className="w-4 h-4 mr-2" />
               Export PDF
             </Button>
           </div>
         </header>
 
-        <main className="px-4 py-6 space-y-6 print:px-8 print:py-4 animate-fade-in">
-          <div className="hidden print-show mb-8" style={{ display: "none" }}>
-            <h1 className="text-3xl font-bold text-center">INVOICE</h1>
-          </div>
+        {/* ─────────────────── INVOICE DOCUMENT ─────────────────── */}
+        <main className="invoice-doc px-4 py-6 max-w-2xl mx-auto animate-fade-in print:max-w-none print:px-0 print:py-0 print:mx-0">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-md border border-gray-100 dark:border-zinc-800 overflow-hidden print:rounded-none print:shadow-none print:border-0">
 
-          <Card className="glass-card print:shadow-none print:border-0">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-muted-foreground" />
-                  <CardTitle className="text-lg">{invoice.invoiceNumber}</CardTitle>
-                </div>
-                <Badge variant={invoice.status === "Paid" ? "default" : "secondary"} data-testid="status-badge">
-                  {invoice.status}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+            {/* ── Top colour band + INVOICE title ────── */}
+            <div
+              className="px-6 py-5 text-white"
+              style={{ background: "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)" }}
+            >
+              <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
-                  <p className="text-muted-foreground">Invoice Date</p>
-                  <p className="font-medium">{formatDate(invoice.invoiceDate)}</p>
+                  <h1 className="text-2xl font-extrabold tracking-wide">INVOICE</h1>
+                  <p className="text-sm text-white/80 mt-1 font-medium">{invoice.invoiceNumber}</p>
                 </div>
-                {invoice.dueDate && (
-                  <div>
-                    <p className="text-muted-foreground">Due Date</p>
-                    <p className="font-medium">{formatDate(invoice.dueDate)}</p>
-                  </div>
+                <div className="text-right text-sm">
+                  <span
+                    className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
+                      invoice.status === "Paid"
+                        ? "bg-emerald-500/30 text-emerald-100 border border-emerald-300/40"
+                        : "bg-amber-500/30 text-amber-100 border border-amber-300/40"
+                    }`}
+                  >
+                    {invoice.status}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Dates row ──────────────────────────── */}
+            <div className="px-6 py-3 bg-gray-50 dark:bg-zinc-800/60 flex flex-wrap gap-6 text-xs border-b border-gray-100 dark:border-zinc-700">
+              <div>
+                <span className="text-gray-400 uppercase tracking-wider font-semibold">Invoice Date</span>
+                <p className="text-gray-800 dark:text-gray-200 font-semibold mt-0.5">{fmt(invoice.invoiceDate)}</p>
+              </div>
+              {invoice.dueDate && (
+                <div>
+                  <span className="text-gray-400 uppercase tracking-wider font-semibold">Due Date</span>
+                  <p className="text-gray-800 dark:text-gray-200 font-semibold mt-0.5">{fmt(invoice.dueDate)}</p>
+                </div>
+              )}
+            </div>
+
+            {/* ── FROM / TO two-column ────────────────── */}
+            <div className="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-6 border-b border-gray-100 dark:border-zinc-700">
+              {/* FROM */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500 mb-2">From</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{influencerName}</p>
+                {influencerEmail && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{influencerEmail}</p>
+                )}
+                {influencerPhone && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{influencerPhone}</p>
+                )}
+                {influencerPan && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <span className="font-semibold text-gray-600 dark:text-gray-300">PAN:</span> {influencerPan}
+                  </p>
+                )}
+                {influencerAddress && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed whitespace-pre-line">
+                    {influencerAddress}
+                  </p>
                 )}
               </div>
-            </CardContent>
-          </Card>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <Card className="glass-card print:shadow-none print:border">
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-muted-foreground" />
-                  <CardTitle className="text-sm font-medium text-muted-foreground">FROM</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="font-semibold">{invoice.influencerName}</p>
-                {invoice.influencerEmail && (
-                  <p className="text-sm text-muted-foreground">{invoice.influencerEmail}</p>
+              {/* TO */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 mb-2">Bill To</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{invoice.brandName}</p>
+                {deal && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Re: {deal.dealTitle}
+                  </p>
                 )}
-              </CardContent>
-            </Card>
-
-            <Card className="glass-card print:shadow-none print:border">
-              <CardHeader className="pb-2">
-                <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-muted-foreground" />
-                  <CardTitle className="text-sm font-medium text-muted-foreground">TO</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <p className="font-semibold">{invoice.brandName}</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card className="glass-card print:shadow-none print:border">
-            <CardHeader>
-              <CardTitle className="text-base">Invoice Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="border border-white/10 rounded-md overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-white/5">
-                    <tr>
-                      <th className="text-left p-3 font-medium">Description</th>
-                      <th className="text-right p-3 font-medium">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-t border-white/10">
-                      <td className="p-3">
-                        <p className="font-medium">{deal?.dealTitle || "Brand Deal"}</p>
-                        {deal && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {formatDate(deal.startDate)} - {formatDate(deal.endDate)}
-                          </p>
-                        )}
-                      </td>
-                      <td className="p-3 text-right font-semibold">
-                        ₹{invoice.dealAmount.toLocaleString("en-IN")}
-                      </td>
-                    </tr>
-                  </tbody>
-                  <tfoot className="bg-white/5">
-                    <tr className="border-t-2 border-white/10">
-                      <td className="p-3 font-bold">Total Amount</td>
-                      <td className="p-3 text-right font-bold text-lg">
-                        ₹{invoice.dealAmount.toLocaleString("en-IN")}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          {invoice.notes && (
-            <Card className="glass-card print:shadow-none print:border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Notes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{invoice.notes}</p>
-              </CardContent>
-            </Card>
-          )}
+            {/* ── Line items table ────────────────────── */}
+            <div className="px-6 py-5">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b-2 border-gray-200 dark:border-zinc-700">
+                    <th className="text-left pb-2 font-semibold text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">#</th>
+                    <th className="text-left pb-2 font-semibold text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Description</th>
+                    <th className="text-center pb-2 font-semibold text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Period</th>
+                    <th className="text-right pb-2 font-semibold text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Main service line */}
+                  <tr className="border-b border-gray-100 dark:border-zinc-800">
+                    <td className="py-3 text-gray-600 dark:text-gray-300">1</td>
+                    <td className="py-3">
+                      <p className="font-medium text-gray-900 dark:text-gray-100">
+                        {deal?.dealTitle || "Influencer Marketing Services"}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Content creation & brand promotion
+                      </p>
+                      {deal?.deliverables && deal.deliverables.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {deal.deliverables.map((d: any, i: number) => (
+                            <span
+                              key={i}
+                              className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 font-medium"
+                            >
+                              {d.platform} · {d.contentType} ×{d.quantity}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="py-3 text-center text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      {deal
+                        ? `${fmtShort(deal.startDate)} – ${fmtShort(deal.endDate)}`
+                        : "—"}
+                    </td>
+                    <td className="py-3 text-right font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                      ₹{baseAmount.toLocaleString("en-IN")}
+                    </td>
+                  </tr>
+                </tbody>
 
-          <div className="hidden print-show mt-12 pt-8 border-t text-center text-sm text-gray-400" style={{ display: "none" }}>
-            <p>Thank you for your business!</p>
-            <p className="mt-2">Generated via InfluDeal</p>
+                {/* ── Totals ───────────────────────── */}
+                <tfoot>
+                  <tr>
+                    <td colSpan={3} className="pt-4 pr-4 text-right text-xs text-gray-500 dark:text-gray-400">
+                      Subtotal
+                    </td>
+                    <td className="pt-4 text-right text-sm font-medium text-gray-700 dark:text-gray-300">
+                      ₹{baseAmount.toLocaleString("en-IN")}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colSpan={3} className="pt-1 pr-4 text-right text-xs text-gray-500 dark:text-gray-400">
+                      GST (18%)
+                    </td>
+                    <td className="pt-1 text-right text-sm font-medium text-gray-700 dark:text-gray-300">
+                      ₹{gstAmount.toLocaleString("en-IN")}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colSpan={3} className="pt-3 pr-4 text-right font-bold text-gray-900 dark:text-gray-100 border-t-2 border-gray-200 dark:border-zinc-700">
+                      Total Amount
+                    </td>
+                    <td className="pt-3 text-right border-t-2 border-gray-200 dark:border-zinc-700">
+                      <span className="text-lg font-extrabold text-violet-600 dark:text-violet-400">
+                        ₹{totalAmount.toLocaleString("en-IN")}
+                      </span>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* ── Notes ───────────────────────────────── */}
+            {invoice.notes && (
+              <div className="px-6 py-4 border-t border-gray-100 dark:border-zinc-700">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Notes</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap leading-relaxed">
+                  {invoice.notes}
+                </p>
+              </div>
+            )}
+
+            {/* ── Bank / Payment terms ────────────────── */}
+            <div className="px-6 py-4 bg-gray-50 dark:bg-zinc-800/40 border-t border-gray-100 dark:border-zinc-700">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Payment Terms</p>
+              <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
+                <li>Payment due within 30 days of invoice date</li>
+                <li>Please reference invoice number <strong>{invoice.invoiceNumber}</strong> with payment</li>
+                <li>All amounts are in Indian Rupees (₹ / INR)</li>
+              </ul>
+            </div>
+
+            {/* ── Signature block ─────────────────────── */}
+            <div className="px-6 py-6 border-t border-gray-100 dark:border-zinc-700">
+              <div className="flex flex-col sm:flex-row justify-between gap-8">
+                {/* Authorised signatory */}
+                <div className="flex-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">
+                    Authorised Signatory
+                  </p>
+                  {signatureUrl ? (
+                    <div className="mb-2">
+                      <img
+                        src={signatureUrl}
+                        alt="Digital Signature"
+                        className="h-16 max-w-[200px] object-contain"
+                        style={{ filter: "contrast(1.2)" }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="h-16 w-48 border-b-2 border-gray-300 dark:border-zinc-600 mb-2" />
+                  )}
+                  <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{influencerName}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Date: {fmt(invoice.invoiceDate)}
+                  </p>
+                </div>
+
+                {/* Received by (brand) */}
+                <div className="flex-1">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">
+                    Received By
+                  </p>
+                  <div className="h-16 w-48 border-b-2 border-gray-300 dark:border-zinc-600 mb-2" />
+                  <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{invoice.brandName}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Date: _______________</p>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Footer ──────────────────────────────── */}
+            <div className="px-6 py-3 bg-gray-50 dark:bg-zinc-800/40 border-t border-gray-100 dark:border-zinc-700 text-center">
+              <p className="text-[10px] text-gray-400">
+                This is a computer-generated invoice. Generated via InfluDeal.
+              </p>
+            </div>
           </div>
         </main>
 
@@ -209,29 +334,46 @@ export default function BrandInvoiceDetailsPage() {
         </div>
       </div>
 
+      {/* ── Print styles ─────────────────────────────── */}
       <style>{`
         @media print {
-          @page { margin: 1.2cm; size: A4; }
+          @page { margin: 0.8cm; size: A4; }
+
+          * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 
           body { background: #ffffff !important; margin: 0; }
 
-          /* Hide UI chrome */
+          /* Hide all app chrome */
           header, nav, footer,
-          [data-testid="button-back"],
-          [data-testid="button-export-pdf"] { display: none !important; }
+          [data-testid], .glass-header,
+          .print\\:hidden { display: none !important; }
 
-          body > div, .min-h-screen { padding-bottom: 0 !important; }
+          body > div,
+          .min-h-screen { padding-bottom: 0 !important; min-height: 0 !important; background: white !important; }
 
-          main { padding: 0 !important; max-width: 100% !important; }
-
-          .glass-card {
-            background: #ffffff !important;
-            border: 1px solid #e5e7eb !important;
-            box-shadow: none !important;
+          /* Invoice doc fills page */
+          .invoice-doc {
+            padding: 0 !important;
+            margin: 0 !important;
+            max-width: 100% !important;
           }
 
-          /* Show the print-only title block */
-          .print-show { display: block !important; }
+          .invoice-doc > div {
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+          }
+
+          /* Force gradient header in print */
+          .invoice-doc > div > div:first-child {
+            background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%) !important;
+          }
+
+          /* Force bg colours */
+          .bg-gray-50 { background-color: #f9fafb !important; }
+          .bg-violet-50 { background-color: #f5f3ff !important; }
+
+          img { max-width: 200px; }
         }
       `}</style>
     </>

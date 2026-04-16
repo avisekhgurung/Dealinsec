@@ -22,7 +22,7 @@ import {
   ExternalLink,
   Download
 } from "lucide-react";
-import type { Contract, Deal } from "@shared/schema";
+import type { Contract, Deal, BrandInvoice } from "@shared/schema";
 
 export default function ContractDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -40,6 +40,18 @@ export default function ContractDetailsPage() {
     queryKey: ["/api/deals", contract?.dealId],
     enabled: !!contract?.dealId,
   });
+
+  const { data: brandInvoices = [] } = useQuery<BrandInvoice[]>({
+    queryKey: ["/api/brand-invoices"],
+  });
+
+  const contractId = parseInt(params.id || "0");
+  const brandInvoice = brandInvoices.find(inv => inv.contractId === contractId);
+  const hasInvoice = !!brandInvoice;
+  const hasProof = !!contract?.proofFileName;
+
+  // Timeline step: 1=Deal done, 2=Quote done, 3=Agreement active/done, 4=Invoice
+  const timelineStep = hasInvoice ? 4 : hasProof ? 4 : 3;
 
   const backPath = "/contracts";
 
@@ -213,6 +225,51 @@ export default function ContractDetailsPage() {
       </header>
 
       <main className="px-4 py-6 space-y-6 animate-fade-in">
+
+        {/* 4-step workflow timeline */}
+        <div className="flex items-center justify-between px-1">
+          {[
+            { label: "Deal",      step: 1 },
+            { label: "Quote",     step: 2 },
+            { label: "Agreement", step: 3 },
+            { label: "Invoice",   step: 4 },
+          ].map((s, idx, arr) => {
+            const isDone   = s.step < timelineStep || (s.step === 3 && hasInvoice) || (s.step === 4 && hasInvoice);
+            const isActive = s.step === timelineStep && !hasInvoice;
+            return (
+              <div key={s.step} className="flex items-center flex-1">
+                <div className="flex flex-col items-center gap-0.5">
+                  <div
+                    className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-all
+                      ${isDone
+                        ? "bg-emerald-500 text-white shadow-sm shadow-emerald-200 dark:shadow-emerald-900"
+                        : isActive
+                        ? "bg-amber-400 text-white shadow-sm shadow-amber-200 dark:shadow-amber-900 ring-2 ring-amber-300/50"
+                        : "bg-muted text-muted-foreground"
+                      }`}
+                  >
+                    {isDone ? <CheckCircle2 className="w-3.5 h-3.5" /> : s.step}
+                  </div>
+                  <span
+                    className={`text-[10px] font-semibold whitespace-nowrap
+                      ${isDone ? "text-emerald-600 dark:text-emerald-400"
+                        : isActive ? "text-amber-600 dark:text-amber-400"
+                        : "text-muted-foreground"}`}
+                  >
+                    {s.label}
+                  </span>
+                </div>
+                {idx < arr.length - 1 && (
+                  <div
+                    className={`flex-1 h-0.5 mx-1 rounded-full transition-colors
+                      ${s.step < timelineStep ? "bg-emerald-400" : "bg-muted"}`}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+
         <Card className="glass-card border-0">
           <CardContent className="p-6">
             <div className="flex items-start justify-between gap-3 mb-4">
