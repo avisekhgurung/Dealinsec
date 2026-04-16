@@ -11,12 +11,15 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 
-const PAYU_MERCHANT_KEY = process.env.PAYU_MERCHANT_KEY || "";
-const PAYU_SALT = process.env.PAYU_SALT || "";
-// Accept PAYU_URL (full URL with path) or PAYU_BASE_URL (base only, /_payment appended)
-const _payuUrlRaw = process.env.PAYU_URL || process.env.PAYU_BASE_URL || "https://test.payu.in";
-const PAYU_PAYMENT_URL = _payuUrlRaw.endsWith("/_payment") ? _payuUrlRaw : `${_payuUrlRaw}/_payment`;
-const CREDIT_PRICE = parseInt(process.env.CREDIT_VALUE ?? "299");
+// PayU config — read lazily so .env files loaded at runtime are picked up
+function getPayuConfig() {
+  const key = process.env.PAYU_MERCHANT_KEY || "";
+  const salt = process.env.PAYU_SALT || "";
+  const raw = process.env.PAYU_URL || process.env.PAYU_BASE_URL || "https://test.payu.in";
+  const url = raw.endsWith("/_payment") ? raw : `${raw}/_payment`;
+  const price = parseInt(process.env.CREDIT_VALUE ?? "299");
+  return { key, salt, url, price };
+}
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -606,8 +609,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
 
+      const payu = getPayuConfig();
+
+      if (!payu.key || !payu.salt) {
+        console.error("PayU not configured. PAYU_MERCHANT_KEY:", !!process.env.PAYU_MERCHANT_KEY, "PAYU_SALT:", !!process.env.PAYU_SALT);
+        return res.status(503).json({
+          error: "Payment gateway not configured",
+          message: "PayU credentials not set. Please configure PAYU_MERCHANT_KEY and PAYU_SALT."
+        });
+      }
+
       const credits = req.body.credits || 1;
-      const amount = credits * CREDIT_PRICE;
+      const amount = credits * payu.price;
       const orderId = `INFLU_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
       await storage.createPayuOrder({
@@ -618,19 +631,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "pending",
       });
 
-      if (!PAYU_MERCHANT_KEY || !PAYU_SALT) {
-        return res.status(503).json({ 
-          error: "Payment gateway not configured",
-          message: "PayU credentials not set. Please configure PAYU_MERCHANT_KEY and PAYU_SALT."
-        });
-      }
-
       const productInfo = `${credits} Contract Credit${credits > 1 ? 's' : ''}`;
       const firstName = user.firstName || "User";
       const email = user.email || "";
       const phone = user.phone || "";
 
-      const hashString = `${PAYU_MERCHANT_KEY}|${orderId}|${amount}|${productInfo}|${firstName}|${email}|||||||||||${PAYU_SALT}`;
+      const hashString = `${payu.key}|${orderId}|${amount}|${productInfo}|${firstName}|${email}|||||||||||${payu.salt}`;
       const hash = crypto.createHash("sha512").update(hashString).digest("hex");
 
       const baseUrl = process.env.APP_URL
@@ -642,8 +648,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         <head><title>Redirecting to PayU...</title></head>
         <body onload="document.forms['payuForm'].submit();">
           <p>Redirecting to payment gateway...</p>
-          <form name="payuForm" action="${PAYU_PAYMENT_URL}" method="POST">
-            <input type="hidden" name="key" value="${PAYU_MERCHANT_KEY}" />
+          <form name="payuForm" action="${payu.url}" method="POST">
+            <input type="hidden" name="key" value="${payu.key}" />
             <input type="hidden" name="txnid" value="${orderId}" />
             <input type="hidden" name="amount" value="${amount}" />
             <input type="hidden" name="productinfo" value="${productInfo}" />
@@ -693,8 +699,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.redirect("/pricing?error=amount_mismatch");
       }
 
-      if (PAYU_SALT && receivedHash) {
-        const reverseHashString = `${PAYU_SALT}|${status}|||||||||||${req.body.email || ""}|${req.body.firstname || ""}|${req.body.productinfo || ""}|${amount}|${txnid}|${PAYU_MERCHANT_KEY}`;
+      const payu = getPayuConfig();
+      if (payu.salt && receivedHash) {
+        const reverseHashString = `${payu.salt}|${status}|||||||||||${req.body.email || ""}|${req.body.firstname || ""}|${req.body.productinfo || ""}|${amount}|${txnid}|${payu.key}`;
         const calculatedHash = crypto.createHash("sha512").update(reverseHashString).digest("hex");
         if (calculatedHash !== receivedHash) {
           console.error("Hash verification failed");

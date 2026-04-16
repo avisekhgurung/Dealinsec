@@ -187,6 +187,7 @@ async function initStripe() {
     listenOptions,
     () => {
       log(`serving on ${host}:${port}`);
+      log(`PayU configured: KEY=${!!process.env.PAYU_MERCHANT_KEY} SALT=${!!process.env.PAYU_SALT}`);
     },
   );
 })();
