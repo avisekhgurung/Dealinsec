@@ -283,7 +283,7 @@ export default function ContractConfirmationPage() {
                     <p className="text-sm text-red-800 dark:text-red-300 leading-relaxed">
                       Purchase at least 1 agreement credit to continue.
                     </p>
-                    <Link href="/pricing">
+                    <Link href={`/pricing?redirect=/deals/${params.id}/contract`}>
                       <Button size="sm" className="mt-1 gradient-btn text-white" data-testid="button-buy-credits">
                         <CreditCard className="w-4 h-4 mr-2" />
                         Buy Credits

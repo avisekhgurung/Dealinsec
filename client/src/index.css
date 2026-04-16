@@ -492,3 +492,160 @@
     }
   }
 }
+
+/* ── Native App Feel ────────────────────────────────────────────────────────── */
+
+/* Smooth momentum scrolling on iOS + prevent overscroll bounce */
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  /* Prevent iOS momentum scroll bounce on the body */
+  overscroll-behavior: none;
+  /* Smoother font rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Disable text selection highlights for native feel */
+  -webkit-tap-highlight-color: transparent;
+  /* Prevent callout menu on long-press */
+  -webkit-touch-callout: none;
+}
+
+/* Allow smooth scroll inside scroll containers */
+.scroll-container {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* Touch-friendly buttons - instant response, no 300ms delay */
+button, a, [role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer;
+}
+
+/* Snappy press animation on all buttons */
+button:not(:disabled):active,
+[role="button"]:not(:disabled):active {
+  transform: scale(0.97);
+  transition: transform 0.08s ease;
+}
+
+/* ── Spring card reveal ────────────────────────────────────────────────────── */
+@keyframes spring-in {
+  0%   { opacity: 0; transform: translateY(16px) scale(0.97); }
+  60%  { opacity: 1; transform: translateY(-3px) scale(1.005); }
+  80%  { transform: translateY(2px) scale(0.998); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-spring-in {
+  animation: spring-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-fade-up {
+  animation: fade-up 0.35s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+/* Stagger children of animated containers */
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 60ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 120ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 180ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 240ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 300ms; }
+
+/* ── Bottom nav safe area ─────────────────────────────────────────────────── */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── Card interaction feels ────────────────────────────────────────────────── */
+.card-interactive {
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.18s ease;
+  cursor: pointer;
+}
+
+.card-interactive:active {
+  transform: scale(0.985);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+/* ── Gradient button enhanced press ────────────────────────────────────────── */
+.gradient-btn {
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  will-change: transform;
+}
+
+.gradient-btn:not(:disabled):active {
+  transform: scale(0.96) !important;
+  box-shadow: 0 2px 8px -2px rgba(124, 58, 237, 0.3) !important;
+}
+
+/* ── Pill / chip press animation ────────────────────────────────────────────── */
+.pill-press {
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.pill-press:active {
+  transform: scale(0.94);
+  opacity: 0.85;
+}
+
+/* ── Scrollbar hide (mobile native feel) ───────────────────────────────────── */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Focus ring — accessible but native-looking ─────────────────────────────── */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ── Credit pill keyframe ───────────────────────────────────────────────────── */
+@keyframes credit-pop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.12); }
+  70%  { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+
+.animate-credit-pop {
+  animation: credit-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Animate the fade-in (override default for spring feel) ─────────────────── */
+.animate-fade-in {
+  animation: spring-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}

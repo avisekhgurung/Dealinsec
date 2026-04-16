@@ -1,30 +1,79 @@
 import { Badge } from "@/components/ui/badge";
+import {
+  Clock,
+  Zap,
+  CheckCircle2,
+  Shield,
+  CreditCard,
+  AlertCircle,
+} from "lucide-react";
 
-type StatusType = "Pending" | "Active" | "Completed" | "Signed" | "Paid" | "Unpaid";
+type StatusType = "Pending" | "Active" | "Completed" | "Signed" | "Paid" | "Unpaid" | "Draft" | "Sent";
 
-const statusStyles: Record<StatusType, string> = {
-  Pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  Active: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
-  Completed: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  Signed: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400",
-  Paid: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
-  Unpaid: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400",
+const statusConfig: Record<StatusType, { style: string; icon: React.ElementType; dot: string }> = {
+  Pending: {
+    style: "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800/50",
+    icon: Clock,
+    dot: "bg-amber-400",
+  },
+  Active: {
+    style: "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/50",
+    icon: Zap,
+    dot: "bg-emerald-400",
+  },
+  Completed: {
+    style: "bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/50",
+    icon: CheckCircle2,
+    dot: "bg-blue-400",
+  },
+  Signed: {
+    style: "bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-900/20 dark:text-violet-400 dark:border-violet-800/50",
+    icon: Shield,
+    dot: "bg-violet-400",
+  },
+  Paid: {
+    style: "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/50",
+    icon: CreditCard,
+    dot: "bg-emerald-400",
+  },
+  Unpaid: {
+    style: "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-900/20 dark:text-rose-400 dark:border-rose-800/50",
+    icon: AlertCircle,
+    dot: "bg-rose-400",
+  },
+  Draft: {
+    style: "bg-slate-50 text-slate-600 border border-slate-200 dark:bg-slate-900/20 dark:text-slate-400 dark:border-slate-700/50",
+    icon: Clock,
+    dot: "bg-slate-400",
+  },
+  Sent: {
+    style: "bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-900/20 dark:text-sky-400 dark:border-sky-800/50",
+    icon: Zap,
+    dot: "bg-sky-400",
+  },
 };
+
+const fallback = statusConfig.Pending;
 
 interface StatusBadgeProps {
   status: string;
   className?: string;
+  showIcon?: boolean;
 }
 
-export function StatusBadge({ status, className = "" }: StatusBadgeProps) {
-  const statusKey = status as StatusType;
-  const style = statusStyles[statusKey] || statusStyles.Pending;
-  
+export function StatusBadge({ status, className = "", showIcon = true }: StatusBadgeProps) {
+  const config = statusConfig[status as StatusType] ?? fallback;
+  const Icon = config.icon;
+
   return (
-    <Badge 
+    <Badge
       variant="secondary"
-      className={`${style} text-xs font-medium uppercase tracking-wide px-3 py-1 rounded-full no-default-hover-elevate no-default-active-elevate ${className}`}
+      className={`inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full no-default-hover-elevate no-default-active-elevate ${config.style} ${className}`}
     >
+      {showIcon && (
+        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dot}`} />
+      )}
+      <Icon className="w-3 h-3 shrink-0" />
       {status}
     </Badge>
   );

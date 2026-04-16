@@ -13,8 +13,10 @@ import crypto from "crypto";
 
 const PAYU_MERCHANT_KEY = process.env.PAYU_MERCHANT_KEY || "";
 const PAYU_SALT = process.env.PAYU_SALT || "";
-const PAYU_BASE_URL = process.env.PAYU_BASE_URL || "https://test.payu.in";
-const CREDIT_PRICE = 299;
+// Accept PAYU_URL (full URL with path) or PAYU_BASE_URL (base only, /_payment appended)
+const _payuUrlRaw = process.env.PAYU_URL || process.env.PAYU_BASE_URL || "https://test.payu.in";
+const PAYU_PAYMENT_URL = _payuUrlRaw.endsWith("/_payment") ? _payuUrlRaw : `${_payuUrlRaw}/_payment`;
+const CREDIT_PRICE = parseInt(process.env.CREDIT_VALUE ?? "299");
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -640,7 +642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         <head><title>Redirecting to PayU...</title></head>
         <body onload="document.forms['payuForm'].submit();">
           <p>Redirecting to payment gateway...</p>
-          <form name="payuForm" action="${PAYU_BASE_URL}/_payment" method="POST">
+          <form name="payuForm" action="${PAYU_PAYMENT_URL}" method="POST">
             <input type="hidden" name="key" value="${PAYU_MERCHANT_KEY}" />
             <input type="hidden" name="txnid" value="${orderId}" />
             <input type="hidden" name="amount" value="${amount}" />

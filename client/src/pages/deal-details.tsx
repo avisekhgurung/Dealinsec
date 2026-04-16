@@ -9,7 +9,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt } from "lucide-react";
+import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard } from "lucide-react";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
 
 export default function DealDetailsPage() {
@@ -274,16 +274,29 @@ export default function DealDetailsPage() {
 
                 {/* Step 2 → 3: Create Agreement */}
                 {hasQuote && !hasContract && (
-                  <Link href={`/deals/${deal.id}/contract`}>
-                    <Button
-                      className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
-                      data-testid="button-create-contract"
-                    >
-                      <FileCheck className="w-5 h-5 mr-2" />
-                      Create Agreement
-                      <span className="ml-auto text-xs bg-white/20 rounded-full px-2 py-0.5">1 credit</span>
-                    </Button>
-                  </Link>
+                  (user?.contractCredits ?? 0) < 1 ? (
+                    <Link href={`/pricing?redirect=/deals/${deal.id}/contract`}>
+                      <Button
+                        className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
+                        data-testid="button-buy-credit-for-contract"
+                      >
+                        <CreditCard className="w-5 h-5 mr-2" />
+                        Buy Credit to Create Agreement
+                        <span className="ml-auto text-xs bg-white/20 rounded-full px-2 py-0.5">0 credits</span>
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link href={`/deals/${deal.id}/contract`}>
+                      <Button
+                        className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
+                        data-testid="button-create-contract"
+                      >
+                        <FileCheck className="w-5 h-5 mr-2" />
+                        Create Agreement
+                        <span className="ml-auto text-xs bg-white/20 rounded-full px-2 py-0.5">1 credit</span>
+                      </Button>
+                    </Link>
+                  )
                 )}
 
                 {/* Step 3: Agreement created, prompt to upload proof */}
