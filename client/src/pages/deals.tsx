@@ -70,7 +70,7 @@ export default function DealsPage() {
                         <p className="font-semibold truncate">{deal.dealTitle}</p>
                         <p className="text-sm text-muted-foreground truncate">{deal.brandName}</p>
                       </div>
-                      <StatusBadge status={deal.status} />
+                      <StatusBadge status={deal.status} size="compact" />
                     </div>
 
                     <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">

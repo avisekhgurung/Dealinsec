@@ -58,21 +58,32 @@ const fallback = statusConfig.Pending;
 interface StatusBadgeProps {
   status: string;
   className?: string;
-  showIcon?: boolean;
+  /** "default" shows dot + icon + text. "compact" shows just dot + text (smaller). */
+  size?: "default" | "compact";
 }
 
-export function StatusBadge({ status, className = "", showIcon = true }: StatusBadgeProps) {
+export function StatusBadge({ status, className = "", size = "default" }: StatusBadgeProps) {
   const config = statusConfig[status as StatusType] ?? fallback;
   const Icon = config.icon;
+
+  if (size === "compact") {
+    return (
+      <Badge
+        variant="secondary"
+        className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0 no-default-hover-elevate no-default-active-elevate ${config.style} ${className}`}
+      >
+        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dot}`} />
+        {status}
+      </Badge>
+    );
+  }
 
   return (
     <Badge
       variant="secondary"
-      className={`inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full no-default-hover-elevate no-default-active-elevate ${config.style} ${className}`}
+      className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0 no-default-hover-elevate no-default-active-elevate ${config.style} ${className}`}
     >
-      {showIcon && (
-        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dot}`} />
-      )}
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dot}`} />
       <Icon className="w-3 h-3 shrink-0" />
       {status}
     </Badge>

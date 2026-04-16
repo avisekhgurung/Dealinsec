@@ -354,7 +354,7 @@ export default function DashboardPage() {
                           </p>
                           <p className="text-xs text-muted-foreground truncate">{deal.brandName}</p>
                         </div>
-                        <StatusBadge status={deal.status} />
+                        <StatusBadge status={deal.status} size="compact" />
                       </div>
                       <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/10">
                         <span className="text-base font-bold text-primary">
@@ -394,13 +394,14 @@ export default function DashboardPage() {
         )}
       </main>
 
-      {/* FAB */}
+      {/* FAB — positioned above credit pill + bottom nav */}
       <Link href="/deals/new">
         <button
           data-testid="fab-create-deal"
-          className="gradient-btn fixed bottom-20 right-4 w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover-elevate active-elevate-2 z-40"
+          className="gradient-btn fixed right-4 w-12 h-12 rounded-full shadow-lg flex items-center justify-center z-40"
+          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 120px)" }}
         >
-          <Plus className="w-6 h-6 text-white" />
+          <Plus className="w-5 h-5 text-white" />
         </button>
       </Link>
 
