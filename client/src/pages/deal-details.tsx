@@ -225,20 +225,20 @@ export default function DealDetailsPage() {
                           <div
                             className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold transition-all
                               ${isDone
-                                ? "bg-emerald-500 text-white"
+                                ? "bg-emerald-500 text-white shadow-sm shadow-emerald-200"
                                 : isActive
-                                ? "bg-gradient-to-br from-violet-500 to-purple-600 text-white"
+                                ? "bg-amber-400 text-white shadow-sm shadow-amber-200 ring-2 ring-amber-300/50"
                                 : "bg-muted text-muted-foreground"
                               }`}
                           >
                             {isDone ? <CheckCircle2 className="w-3.5 h-3.5" /> : s.step}
                           </div>
-                          <span className={`text-[10px] font-medium ${isDone ? "text-emerald-500" : isActive ? "text-primary" : "text-muted-foreground"}`}>
+                          <span className={`text-[10px] font-medium ${isDone ? "text-emerald-600" : isActive ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
                             {s.label}
                           </span>
                         </div>
                         {idx < arr.length - 1 && (
-                          <div className={`flex-1 h-px mx-0.5 ${s.step < currentStep ? "bg-emerald-400" : "bg-muted"}`} />
+                          <div className={`flex-1 h-px mx-0.5 ${s.step < currentStep ? "bg-emerald-400" : isActive && s.step === currentStep - 1 ? "bg-amber-300" : "bg-muted"}`} />
                         )}
                       </div>
                     );

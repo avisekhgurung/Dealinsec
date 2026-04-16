@@ -464,34 +464,43 @@ export default function ContractPdfPage() {
 
       <style>{`
         @media print {
-          body {
-            background: #ffffff !important;
-          }
-          body * {
-            visibility: hidden;
-          }
-          main, main * {
-            visibility: visible;
-          }
+          @page { margin: 1.2cm; size: A4; }
+
+          /* Reset body */
+          body { background: #ffffff !important; margin: 0; }
+
+          /* Hide UI chrome — header, nav, buttons */
+          header, nav, footer,
+          [data-testid="button-back"],
+          [data-testid="button-export-pdf"],
+          [data-testid="button-back-bottom"],
+          [data-testid="button-print-bottom"] { display: none !important; }
+
+          /* Remove mobile padding so content fills the page */
+          body > div, .min-h-screen { padding: 0 !important; margin: 0 !important; }
+
           main {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            background: #ffffff;
+            padding: 0 !important;
+            margin: 0 !important;
+            max-width: 100% !important;
           }
-          .print\\:hidden {
-            display: none !important;
-          }
+
+          /* Force gradient banner to print in colour */
           .gradient-primary {
-            background: #6d28d9 !important;
+            background: linear-gradient(135deg, #6d28d9, #7c3aed) !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
-          @page {
-            margin: 1.2cm;
-            size: A4;
+
+          /* Clean card styles for print */
+          .glass-card {
+            background: #ffffff !important;
+            border: 1px solid #e5e7eb !important;
+            box-shadow: none !important;
           }
+
+          /* Avoid page break inside a card */
+          .glass-card { page-break-inside: avoid; }
         }
       `}</style>
     </>

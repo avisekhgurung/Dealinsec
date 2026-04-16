@@ -131,9 +131,9 @@ export default function QuotePreviewPage() {
                   <div
                     className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold transition-all
                       ${isCompleted
-                        ? "bg-emerald-500 text-white"
+                        ? "bg-emerald-500 text-white shadow-sm shadow-emerald-200"
                         : isActive
-                        ? "bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg shadow-purple-500/30"
+                        ? "bg-amber-400 text-white shadow-sm shadow-amber-200 ring-2 ring-amber-300/50"
                         : "bg-muted text-muted-foreground"
                       }`}
                   >
@@ -147,13 +147,13 @@ export default function QuotePreviewPage() {
                   </div>
                   <span
                     className={`text-xs font-medium whitespace-nowrap
-                      ${isCompleted ? "text-emerald-600 dark:text-emerald-400" : isActive ? "text-primary" : "text-muted-foreground"}`}
+                      ${isCompleted ? "text-emerald-600 dark:text-emerald-400" : isActive ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-muted-foreground"}`}
                   >
                     {s.label}
                   </span>
                 </div>
                 {idx < STEPS.length - 1 && (
-                  <div className={`flex-1 h-0.5 mx-1 rounded-full ${s.step < 2 ? "bg-emerald-400" : "bg-muted"}`} />
+                  <div className={`flex-1 h-0.5 mx-1 rounded-full ${s.step < 2 ? "bg-emerald-400" : s.step === 2 ? "bg-amber-300" : "bg-muted"}`} />
                 )}
               </div>
             );
@@ -310,6 +310,30 @@ export default function QuotePreviewPage() {
       </main>
 
       <BottomNav />
+
+      <style>{`
+        @media print {
+          @page { margin: 1.2cm; size: A4; }
+
+          body { background: #ffffff !important; margin: 0; }
+
+          /* Hide everything except the document card */
+          header, nav, footer { display: none !important; }
+
+          body > div, .min-h-screen { padding-bottom: 0 !important; }
+
+          /* The action buttons + bottom nav are hidden via print:hidden Tailwind class */
+
+          /* Force gradient header to print */
+          .bg-gradient-to-r { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+          .glass-card {
+            background: #ffffff !important;
+            border: 1px solid #e5e7eb !important;
+            box-shadow: none !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

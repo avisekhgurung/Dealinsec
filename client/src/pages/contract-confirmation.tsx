@@ -152,34 +152,34 @@ export default function ContractConfirmationPage() {
 
         {/* 4-step timeline */}
         <div className="flex items-center justify-between px-2">
-          {/* Step 1 */}
+          {/* Step 1 — done */}
           <div className="flex flex-col items-center gap-1">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-emerald-500 shadow-sm shadow-emerald-200 flex items-center justify-center">
               <CheckCircle className="w-4 h-4 text-white" />
             </div>
-            <span className="text-xs font-medium text-primary">Deal</span>
+            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Deal</span>
           </div>
-          <div className="flex-1 h-0.5 bg-primary mx-1" />
-          {/* Step 2 */}
+          <div className="flex-1 h-0.5 bg-emerald-400 mx-1" />
+          {/* Step 2 — done */}
           <div className="flex flex-col items-center gap-1">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-emerald-500 shadow-sm shadow-emerald-200 flex items-center justify-center">
               <CheckCircle className="w-4 h-4 text-white" />
             </div>
-            <span className="text-xs font-medium text-primary">Quote</span>
+            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Quote</span>
           </div>
-          <div className="flex-1 h-0.5 bg-primary mx-1" />
-          {/* Step 3 — active */}
+          <div className="flex-1 h-0.5 bg-amber-300 mx-1" />
+          {/* Step 3 — active (amber) */}
           <div className="flex flex-col items-center gap-1">
-            <div className="w-8 h-8 rounded-full bg-primary ring-4 ring-primary/20 flex items-center justify-center">
-              <Circle className="w-4 h-4 text-white fill-white" />
+            <div className="w-8 h-8 rounded-full bg-amber-400 ring-2 ring-amber-300/50 shadow-sm shadow-amber-200 flex items-center justify-center">
+              <span className="w-2.5 h-2.5 rounded-full bg-white" />
             </div>
-            <span className="text-xs font-bold text-primary">Agreement</span>
+            <span className="text-xs font-bold text-amber-600 dark:text-amber-400">Agreement</span>
           </div>
           <div className="flex-1 h-0.5 bg-muted mx-1" />
-          {/* Step 4 */}
+          {/* Step 4 — upcoming */}
           <div className="flex flex-col items-center gap-1">
             <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-              <Circle className="w-4 h-4 text-muted-foreground" />
+              <span className="text-xs font-bold text-muted-foreground">4</span>
             </div>
             <span className="text-xs text-muted-foreground">Invoice</span>
           </div>

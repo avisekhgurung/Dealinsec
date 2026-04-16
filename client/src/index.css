@@ -450,4 +450,45 @@
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
   }
+
+  /* ── Mobile input / form responsiveness ──────────────────────────────────── */
+  input,
+  textarea,
+  select {
+    /* Prevent iOS zoom on focus (requires font-size >= 16px) */
+    font-size: 16px;
+    /* Full width by default */
+    width: 100%;
+    /* Ensure consistent box-sizing */
+    box-sizing: border-box;
+  }
+
+  /* Shadcn Input override — comfortable tap target on mobile */
+  .input-mobile,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="url"],
+  input[type="search"],
+  textarea {
+    min-height: 44px;           /* Apple HIG tap target minimum */
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+  }
+
+  /* Fix select elements on iOS */
+  select {
+    -webkit-appearance: none;
+    appearance: none;
+    min-height: 44px;
+  }
+
+  /* Stack two-column grids on very small screens */
+  @media (max-width: 360px) {
+    .grid-cols-2 {
+      grid-template-columns: 1fr;
+    }
+  }
 }

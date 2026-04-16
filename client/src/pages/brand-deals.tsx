@@ -15,7 +15,7 @@ export default function BrandDealsPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+      <header className="glass-header sticky top-0 z-40">
         <div className="flex items-center gap-4 px-4 py-4">
           <Link href="/">
             <Button variant="ghost" size="icon" data-testid="button-back">
@@ -26,11 +26,11 @@ export default function BrandDealsPage() {
         </div>
       </header>
 
-      <main className="px-4 py-6 space-y-4">
+      <main className="px-4 py-6 space-y-4 animate-fade-in">
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <Card key={i} className="border-0 shadow-sm">
+              <Card key={i} className="glass-card border-0">
                 <CardContent className="p-4">
                   <Skeleton className="h-5 w-3/4 mb-2" />
                   <Skeleton className="h-4 w-1/2 mb-4" />
@@ -43,7 +43,7 @@ export default function BrandDealsPage() {
           <div className="space-y-3">
             {deals.map((deal) => (
               <Link key={deal.id} href={`/brand/deals/${deal.id}`}>
-                <Card className="border-0 shadow-sm hover-elevate active-elevate-2 cursor-pointer" data-testid={`card-deal-${deal.id}`}>
+                <Card className="glass-card border-0 hover-elevate active-elevate-2 cursor-pointer" data-testid={`card-deal-${deal.id}`}>
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -52,7 +52,7 @@ export default function BrandDealsPage() {
                       </div>
                       <StatusBadge status={deal.status} />
                     </div>
-                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/10">
                       <span className="text-lg font-bold text-primary">
                         {"\u20B9"}{deal.dealAmount.toLocaleString()}
                       </span>
@@ -66,7 +66,7 @@ export default function BrandDealsPage() {
             ))}
           </div>
         ) : (
-          <Card className="border-0 shadow-sm">
+          <Card className="glass-card border-0">
             <CardContent className="py-12 text-center">
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted mx-auto mb-4">
                 <Briefcase className="w-8 h-8 text-muted-foreground" />

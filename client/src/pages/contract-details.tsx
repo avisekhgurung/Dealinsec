@@ -7,7 +7,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/status-badge";
 import { BottomNav } from "@/components/bottom-nav";
-import { BrandBottomNav } from "@/components/brand-bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -30,7 +29,6 @@ export default function ContractDetailsPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
-  const isBrand = user?.role === "brand";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -40,7 +38,6 @@ export default function ContractDetailsPage() {
 
   const { data: invoices = [] } = useQuery<Invoice[]>({
     queryKey: ["/api/invoices"],
-    enabled: !isBrand,
   });
 
   const { data: deal } = useQuery<Deal>({
@@ -51,8 +48,7 @@ export default function ContractDetailsPage() {
   const contractId = parseInt(params.id || "0");
   const invoice = invoices.find(i => i.contractId === contractId);
 
-  const backPath = isBrand ? "/brand/contracts" : "/contracts";
-  const Nav = isBrand ? BrandBottomNav : BottomNav;
+  const backPath = "/contracts";
 
   const uploadProof = useMutation({
     mutationFn: async (file: File) => {
@@ -169,7 +165,7 @@ export default function ContractDetailsPage() {
             </CardContent>
           </Card>
         </main>
-        <Nav />
+        <BottomNav />
       </div>
     );
   }
@@ -191,7 +187,7 @@ export default function ContractDetailsPage() {
             <Button variant="outline" className="mt-4">Back to Contracts</Button>
           </Link>
         </main>
-        <Nav />
+        <BottomNav />
       </div>
     );
   }
@@ -214,7 +210,7 @@ export default function ContractDetailsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setLocation(isBrand ? `/brand/contracts/${params.id}/export` : `/contracts/${params.id}/export`)}
+            onClick={() => setLocation(`/contracts/${params.id}/export`)}
             data-testid="button-export-contract-pdf"
           >
             <Download className="w-4 h-4 mr-2" />
@@ -267,7 +263,7 @@ export default function ContractDetailsPage() {
             </div>
 
             {deal && (
-              <Link href={isBrand ? `/brand/deals/${deal.id}` : `/deals/${deal.id}`}>
+              <Link href={`/deals/${deal.id}`}>
                 <div className="mt-4 p-3 rounded-lg bg-muted/50 flex items-center justify-between hover-elevate active-elevate-2 cursor-pointer">
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4 text-muted-foreground" />
@@ -312,8 +308,7 @@ export default function ContractDetailsPage() {
           </CardContent>
         </Card>
 
-        {!isBrand && (
-          <section className="space-y-3">
+        <section className="space-y-3">
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
               Contract Proof
             </h3>
@@ -372,16 +367,14 @@ export default function ContractDetailsPage() {
               </CardContent>
             </Card>
           </section>
-        )}
 
-        {!isBrand && (
-          <section className="space-y-3">
+        <section className="space-y-3">
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
               Invoice & Payment
             </h3>
 
             {invoice ? (
-              <Link href={`/billing/${invoice.id}`}>
+              <Link href={`/billing/invoice/${invoice.id}`}>
                 <Card className="glass-card border-0 hover-elevate active-elevate-2 cursor-pointer">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-3">
@@ -418,10 +411,8 @@ export default function ContractDetailsPage() {
               </Card>
             )}
           </section>
-        )}
 
-        {!isBrand && (
-          <section className="space-y-3">
+        <section className="space-y-3">
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
               Invoice for Brand
             </h3>
@@ -462,10 +453,9 @@ export default function ContractDetailsPage() {
               </CardContent>
             </Card>
           </section>
-        )}
       </main>
 
-      <Nav />
+      <BottomNav />
     </div>
   );
 }
