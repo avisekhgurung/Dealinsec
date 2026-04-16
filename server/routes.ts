@@ -231,6 +231,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? `${user.firstName} ${user.lastName}` 
         : user?.email || "Influencer";
 
+      // Credit was consumed above — the invoice is considered Paid via credit.
+      // creditValue: 1 credit = ₹299 platform fee, no extra charge.
+      const creditValue = parseInt(process.env.CREDIT_VALUE ?? "299");
       await storage.createInvoice({
         userId,
         invoiceNumber,
@@ -239,10 +242,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dealId: contract.dealId,
         brandName: contract.brandName,
         influencerName,
-        contractFee: 499,
-        platformFee: 500,
-        totalAmount: 999,
-        status: "Unpaid",
+        contractFee: creditValue,
+        platformFee: 0,
+        totalAmount: creditValue,
+        // Paid immediately because the user consumed a credit as payment
+        status: "Paid",
       });
 
       res.status(201).json(contract);

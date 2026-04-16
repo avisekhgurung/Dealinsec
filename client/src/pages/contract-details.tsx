@@ -19,6 +19,7 @@ import {
   Receipt,
   Loader2,
   CheckCircle,
+  CheckCircle2,
   ExternalLink,
   Download
 } from "lucide-react";
@@ -370,38 +371,42 @@ export default function ContractDetailsPage() {
 
         <section className="space-y-3">
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Invoice & Payment
+              Platform Fee
             </h3>
 
             {invoice ? (
-              <Link href={`/billing/invoice/${invoice.id}`}>
-                <Card className="glass-card border-0 hover-elevate active-elevate-2 cursor-pointer">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`flex items-center justify-center w-10 h-10 rounded-lg ${
-                          invoice.status === "Paid"
-                            ? "bg-emerald-100 dark:bg-emerald-900/30"
-                            : "bg-amber-100 dark:bg-amber-900/30"
-                        }`}>
-                          <Receipt className={`w-5 h-5 ${
-                            invoice.status === "Paid"
-                              ? "text-emerald-600 dark:text-emerald-400"
-                              : "text-amber-600 dark:text-amber-400"
-                          }`} />
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">{invoice.invoiceNumber}</p>
-                          <p className="text-xs text-muted-foreground">
-                            ₹{invoice.totalAmount.toLocaleString()}
-                          </p>
-                        </div>
+              <Card className={`border-0 ${invoice.status === "Paid"
+                ? "bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-800/40"
+                : "glass-card"}`}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`flex items-center justify-center w-10 h-10 rounded-lg ${
+                        invoice.status === "Paid"
+                          ? "bg-emerald-100 dark:bg-emerald-900/30"
+                          : "bg-amber-100 dark:bg-amber-900/30"
+                      }`}>
+                        {invoice.status === "Paid"
+                          ? <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                          : <Receipt className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                        }
                       </div>
-                      <StatusBadge status={invoice.status} />
+                      <div>
+                        <p className="font-medium text-sm">
+                          {invoice.status === "Paid" ? "Paid via Credit" : invoice.invoiceNumber}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {invoice.status === "Paid"
+                            ? `₹${invoice.totalAmount.toLocaleString()} · 1 credit consumed`
+                            : `₹${invoice.totalAmount.toLocaleString()} due`
+                          }
+                        </p>
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </Link>
+                    <StatusBadge status={invoice.status} />
+                  </div>
+                </CardContent>
+              </Card>
             ) : (
               <Card className="glass-card border-0">
                 <CardContent className="py-8 text-center">
