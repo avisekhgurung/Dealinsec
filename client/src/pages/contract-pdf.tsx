@@ -1,11 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Download, Building2, Shield, CheckCircle } from "lucide-react";
+import { ArrowLeft, Printer, Shield, Lock } from "lucide-react";
 import type { Contract, Deal } from "@shared/schema";
 
 export default function ContractPdfPage() {
@@ -33,26 +32,14 @@ export default function ContractPdfPage() {
     });
   };
 
-  const handleExportPDF = () => {
+  const handlePrint = () => {
     window.print();
-  };
-
-  const getDeliverablesSummary = () => {
-    if (!deal?.deliverables || deal.deliverables.length === 0) {
-      return "content creation and promotional services as mutually agreed";
-    }
-    
-    const deliverableTexts = deal.deliverables.map((d, i) => {
-      return `(${i + 1}) ${d.quantity} ${d.contentType}${d.quantity > 1 ? 's' : ''} on ${d.platform} platform, delivered ${d.frequency.toLowerCase()}`;
-    });
-    
-    return deliverableTexts.join('; ');
   };
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
+        <header className="glass-header sticky top-0 z-40">
           <div className="flex items-center gap-3 px-4 py-4">
             <Skeleton className="h-9 w-9" />
             <Skeleton className="h-6 w-32" />
@@ -69,12 +56,12 @@ export default function ContractPdfPage() {
   if (!contract) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
+        <header className="glass-header sticky top-0 z-40">
           <div className="flex items-center gap-3 px-4 py-4">
             <Button variant="ghost" size="icon" onClick={() => setLocation(contractsPath)} data-testid="button-back">
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-xl font-bold">Contract Not Found</h1>
+            <h1 className="text-xl font-bold">Agreement Not Found</h1>
           </div>
         </header>
       </div>
@@ -83,309 +70,406 @@ export default function ContractPdfPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-background pb-20 print:pb-0 print:min-h-0">
-        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border print:hidden">
+      <div className="min-h-screen bg-background pb-20 print:pb-0 print:min-h-0 print:bg-white">
+
+        {/* Screen-only header */}
+        <header className="glass-header sticky top-0 z-40 print:hidden">
           <div className="flex items-center justify-between gap-3 px-4 py-4">
             <div className="flex items-center gap-3">
               <Button variant="ghost" size="icon" onClick={() => setLocation(backPath)} data-testid="button-back">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              <h1 className="text-xl font-bold">Contract Agreement</h1>
+              <h1 className="text-xl font-bold">Agreement Document</h1>
             </div>
-            <Button onClick={handleExportPDF} data-testid="button-export-pdf">
-              <Download className="w-4 h-4 mr-2" />
-              Export PDF
+            <Button onClick={handlePrint} className="gradient-btn text-white" data-testid="button-export-pdf">
+              <Printer className="w-4 h-4 mr-2" />
+              Print / Save PDF
             </Button>
           </div>
         </header>
 
-        <main className="px-4 py-6 space-y-6 print:px-12 print:py-8 max-w-4xl mx-auto">
-          <div className="text-center mb-10">
-            <h1 className="text-2xl font-bold tracking-wide uppercase print:text-3xl">Influencer Marketing Agreement</h1>
-            <p className="text-sm text-muted-foreground mt-2">Reference: {contract.contractName}</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Effective Date: {formatDate(contract.startDate)}
-            </p>
+        <main className="px-4 py-6 max-w-4xl mx-auto animate-fade-in print:px-0 print:py-0 print:max-w-none">
+
+          {/* ── Header Banner ── */}
+          <div className="rounded-2xl overflow-hidden mb-6 print:rounded-none print:mb-8 gradient-primary">
+            <div className="px-8 py-7 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <p className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1">InfluDeal Platform</p>
+                <h1 className="text-white text-2xl md:text-3xl font-extrabold tracking-wide uppercase">
+                  Influencer Marketing Agreement
+                </h1>
+              </div>
+              <div className="text-right text-white/90 text-sm space-y-0.5">
+                <p className="font-semibold text-white">Ref: {contract.contractName}</p>
+                <p>Dated: {formatDate(contract.startDate)}</p>
+                {contract.exclusive && (
+                  <span className="inline-flex items-center gap-1 bg-white/20 text-white text-xs font-semibold px-2 py-0.5 rounded-full mt-1">
+                    <Lock className="w-3 h-3" /> Exclusive
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
 
-          <Card className="print:shadow-none print:border-0">
-            <CardContent className="p-6 space-y-8 text-sm leading-relaxed print:p-0">
-              
-              <section>
-                <h2 className="text-base font-bold mb-4 uppercase tracking-wide border-b pb-2">Article 1: Parties and Recitals</h2>
-                <p className="text-muted-foreground mb-3">
-                  This Influencer Marketing Agreement ("Agreement") is made and entered into as of {formatDate(contract.startDate)} 
-                  by and between <strong>{contract.brandName}</strong> (hereinafter referred to as the "Brand" or "Client"), 
-                  and the content creator engaged pursuant to the underlying deal arrangement (hereinafter referred to as the "Creator").
-                </p>
-                <p className="text-muted-foreground mb-3">
-                  WHEREAS, the Brand desires to engage the Creator to provide content creation, promotion, and influencer 
-                  marketing services; and WHEREAS, the Creator possesses the skills, experience, and audience reach necessary 
-                  to perform such services; NOW, THEREFORE, in consideration of the mutual covenants and agreements set forth 
-                  herein, the parties agree as follows.
-                </p>
-                {contract.exclusive && (
-                  <div className="flex items-center gap-2 p-3 bg-violet-50 dark:bg-violet-900/20 rounded-md mt-4">
-                    <Shield className="w-5 h-5 text-violet-600 dark:text-violet-400 flex-shrink-0" />
-                    <span className="text-sm font-medium text-violet-700 dark:text-violet-400">
-                      This Agreement is designated as an Exclusive Partnership Arrangement
-                    </span>
+          {/* ── Parties Section ── */}
+          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 mb-6 print:rounded-none">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 print:text-gray-500">
+              Parties to this Agreement
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Party A */}
+              <div className="space-y-2">
+                <div className="text-xs font-bold uppercase tracking-wide text-primary mb-3">
+                  Party A — Creator / Influencer
+                </div>
+                <div className="text-sm space-y-1.5">
+                  <div>
+                    <span className="text-muted-foreground text-xs">Full Name</span>
+                    <p className="font-semibold">{[user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "—"}</p>
                   </div>
-                )}
-              </section>
-
-              <section>
-                <h2 className="text-base font-bold mb-4 uppercase tracking-wide border-b pb-2">Article 2: Term and Duration</h2>
-                <p className="text-muted-foreground mb-3">
-                  <strong>2.1 Effective Date.</strong> This Agreement shall become effective on {formatDate(contract.startDate)} 
-                  (the "Effective Date") and shall continue in full force and effect until {formatDate(contract.endDate)} 
-                  (the "Expiration Date"), unless earlier terminated in accordance with Article 7 of this Agreement.
-                </p>
-                <p className="text-muted-foreground">
-                  <strong>2.2 Renewal.</strong> This Agreement may be renewed or extended only by mutual written agreement 
-                  of both parties, executed at least fifteen (15) days prior to the Expiration Date. Any such renewal shall 
-                  be subject to renegotiation of terms, including but not limited to compensation and scope of services.
-                </p>
-              </section>
-
-              <section>
-                <h2 className="text-base font-bold mb-4 uppercase tracking-wide border-b pb-2">Article 3: Scope of Work and Deliverables</h2>
-                <p className="text-muted-foreground mb-3">
-                  <strong>3.1 Services.</strong> The Creator agrees to provide content creation and promotional services 
-                  as specified in the underlying deal arrangement titled "{deal?.dealTitle || contract.contractName}". 
-                  The specific deliverables shall include: {getDeliverablesSummary()}.
-                </p>
-                <p className="text-muted-foreground mb-3">
-                  <strong>3.2 Content Standards.</strong> All content delivered under this Agreement shall be original, 
-                  professionally produced, and compliant with all applicable advertising standards, Federal Trade Commission 
-                  guidelines, and platform-specific policies. The Creator shall clearly disclose the sponsored nature of all 
-                  content in accordance with applicable disclosure requirements.
-                </p>
-                <p className="text-muted-foreground mb-3">
-                  <strong>3.3 Approval Process.</strong> The Brand shall have the right to review and approve all content 
-                  prior to publication. The Creator shall submit content for review at least forty-eight (48) hours before 
-                  the scheduled publication date. The Brand shall provide approval or revision requests within twenty-four (24) 
-                  hours of receipt. Failure to respond within this period shall constitute deemed approval.
-                </p>
-                <p className="text-muted-foreground">
-                  <strong>3.4 Revisions.</strong> The Creator shall make up to two (2) rounds of revisions to any content 
-                  at no additional cost, provided such revision requests are made within the approval period and do not 
-                  materially alter the original scope of the deliverable.
-                </p>
-              </section>
-
-              <section>
-                <h2 className="text-base font-bold mb-4 uppercase tracking-wide border-b pb-2">Article 4: Compensation and Payment</h2>
-                <p className="text-muted-foreground mb-3">
-                  <strong>4.1 Total Compensation.</strong> In consideration for the services rendered under this Agreement, 
-                  the Brand agrees to pay the Creator a total fee of <strong>₹{contract.contractValue.toLocaleString("en-IN")}</strong> 
-                  (Indian Rupees {contract.contractValue.toLocaleString("en-IN")} only) (the "Contract Value").
-                </p>
-                <p className="text-muted-foreground mb-3">
-                  <strong>4.2 Payment Schedule.</strong> Unless otherwise agreed in writing, payment shall be structured 
-                  as follows: (a) Fifty percent (50%) of the Contract Value shall be payable upon execution of this Agreement 
-                  as an advance payment; and (b) The remaining fifty percent (50%) shall be payable within thirty (30) days 
-                  following the successful completion and approval of all deliverables specified herein.
-                </p>
-                <p className="text-muted-foreground mb-3">
-                  <strong>4.3 Payment Method.</strong> All payments shall be made via electronic bank transfer to the 
-                  account designated by the Creator. The Creator shall be responsible for providing accurate banking 
-                  information and for any applicable taxes on income received.
-                </p>
-                <p className="text-muted-foreground">
-                  <strong>4.4 Late Payment.</strong> In the event of late payment, the Brand shall pay interest on any 
-                  outstanding amounts at the rate of one and one-half percent (1.5%) per month, or the maximum rate 
-                  permitted by law, whichever is lower.
-                </p>
-              </section>
-
-              <section>
-                <h2 className="text-base font-bold mb-4 uppercase tracking-wide border-b pb-2">Article 5: Intellectual Property Rights</h2>
-                <p className="text-muted-foreground mb-3">
-                  <strong>5.1 License Grant.</strong> Upon full payment of the Contract Value, the Creator grants to the 
-                  Brand a non-exclusive, worldwide, royalty-free license to use, reproduce, modify, display, and distribute 
-                  the content created under this Agreement for marketing and promotional purposes.
-                </p>
-                <p className="text-muted-foreground mb-3">
-                  <strong>5.2 License Duration.</strong> The license granted herein shall remain in effect for a period 
-                  of twelve (12) months following the later of: (a) the Expiration Date; or (b) the date of final payment. 
-                  Thereafter, the Brand may negotiate an extension of the license at mutually agreeable terms.
-                </p>
-                <p className="text-muted-foreground">
-                  <strong>5.3 Creator Rights.</strong> The Creator retains all ownership rights in the original content 
-                  and may use such content for personal portfolio, promotional, and non-commercial purposes, provided 
-                  such use does not compete with or diminish the value of the Brand's licensed use.
-                </p>
-              </section>
-
-              <section>
-                <h2 className="text-base font-bold mb-4 uppercase tracking-wide border-b pb-2">Article 6: Confidentiality</h2>
-                <p className="text-muted-foreground mb-3">
-                  <strong>6.1 Confidential Information.</strong> Each party acknowledges that it may receive confidential 
-                  and proprietary information from the other party, including but not limited to business strategies, 
-                  marketing plans, financial information, trade secrets, and technical data ("Confidential Information").
-                </p>
-                <p className="text-muted-foreground mb-3">
-                  <strong>6.2 Non-Disclosure.</strong> Each party agrees to: (a) hold all Confidential Information in 
-                  strict confidence; (b) use such information solely for the purposes of performing obligations under 
-                  this Agreement; and (c) not disclose such information to any third party without prior written consent, 
-                  except as required by law.
-                </p>
-                <p className="text-muted-foreground">
-                  <strong>6.3 Duration.</strong> The obligations of confidentiality set forth in this Article shall 
-                  survive the termination or expiration of this Agreement for a period of two (2) years. The financial 
-                  terms of this Agreement shall be treated as Confidential Information of both parties.
-                </p>
-              </section>
-
-              <section>
-                <h2 className="text-base font-bold mb-4 uppercase tracking-wide border-b pb-2">Article 7: Termination</h2>
-                <p className="text-muted-foreground mb-3">
-                  <strong>7.1 Termination for Convenience.</strong> Either party may terminate this Agreement without 
-                  cause by providing thirty (30) days written notice to the other party.
-                </p>
-                <p className="text-muted-foreground mb-3">
-                  <strong>7.2 Termination for Cause.</strong> Either party may terminate this Agreement immediately 
-                  upon written notice if the other party: (a) materially breaches any provision of this Agreement and 
-                  fails to cure such breach within ten (10) days of receiving written notice; (b) becomes insolvent or 
-                  files for bankruptcy; or (c) engages in conduct that materially damages the reputation of the other party.
-                </p>
-                <p className="text-muted-foreground mb-3">
-                  <strong>7.3 Effect of Termination.</strong> Upon termination: (a) the Creator shall be entitled to 
-                  compensation for all completed and approved deliverables up to the date of termination; (b) any advance 
-                  payments for undelivered services shall be promptly refunded; and (c) all Confidential Information 
-                  shall be returned or destroyed.
-                </p>
-                <p className="text-muted-foreground">
-                  <strong>7.4 Force Majeure.</strong> Neither party shall be liable for any failure or delay in 
-                  performance due to circumstances beyond its reasonable control, including but not limited to acts of 
-                  God, natural disasters, war, terrorism, strikes, or government actions. In such event, the affected 
-                  party shall promptly notify the other and make reasonable efforts to mitigate the impact.
-                </p>
-              </section>
-
-              <section>
-                <h2 className="text-base font-bold mb-4 uppercase tracking-wide border-b pb-2">Article 8: General Provisions</h2>
-                <p className="text-muted-foreground mb-3">
-                  <strong>8.1 Entire Agreement.</strong> This Agreement constitutes the entire understanding between 
-                  the parties and supersedes all prior negotiations, representations, warranties, and agreements relating 
-                  to this subject matter.
-                </p>
-                <p className="text-muted-foreground mb-3">
-                  <strong>8.2 Amendments.</strong> No modification or amendment of this Agreement shall be binding unless 
-                  made in writing and signed by both parties.
-                </p>
-                <p className="text-muted-foreground mb-3">
-                  <strong>8.3 Governing Law.</strong> This Agreement shall be governed by and construed in accordance 
-                  with the laws of India. Any disputes arising under this Agreement shall be subject to the exclusive 
-                  jurisdiction of the courts located in the territory where the Brand maintains its principal place of business.
-                </p>
-                <p className="text-muted-foreground mb-3">
-                  <strong>8.4 Dispute Resolution.</strong> Prior to initiating any legal proceedings, the parties agree 
-                  to attempt to resolve any dispute through good faith negotiation for a period of thirty (30) days. 
-                  If negotiation fails, disputes may be submitted to binding arbitration in accordance with the 
-                  Arbitration and Conciliation Act, 1996.
-                </p>
-                <p className="text-muted-foreground">
-                  <strong>8.5 Indemnification.</strong> Each party agrees to indemnify, defend, and hold harmless the 
-                  other party from and against any claims, damages, losses, and expenses (including reasonable attorney's 
-                  fees) arising out of or related to: (a) any breach of this Agreement; (b) any violation of applicable 
-                  laws; or (c) any infringement of third-party intellectual property rights.
-                </p>
-              </section>
-
-            </CardContent>
-          </Card>
-
-          <Card className="print:shadow-none print:border mt-8">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-base uppercase tracking-wide">Brand Authorization and Execution</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-6">
-                IN WITNESS WHEREOF, the undersigned authorized representative of the Brand has executed this Agreement 
-                as of the date set forth below, thereby confirming acceptance of all terms and conditions herein and 
-                authorizing the commencement of the engagement.
-              </p>
-              
-              <div className="border-t pt-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <Building2 className="w-5 h-5 text-muted-foreground" />
-                  <p className="font-bold text-lg">For and on behalf of: {contract.brandName}</p>
-                  {contract.signedByBrand && (
-                    <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 no-default-hover-elevate no-default-active-elevate ml-2">
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Executed
-                    </Badge>
+                  {user?.billingAddress && (
+                    <div>
+                      <span className="text-muted-foreground text-xs">Address</span>
+                      <p className="font-medium">{user.billingAddress}</p>
+                    </div>
+                  )}
+                  {user?.panNumber && (
+                    <div>
+                      <span className="text-muted-foreground text-xs">PAN</span>
+                      <p className="font-medium font-mono">{user.panNumber}</p>
+                    </div>
+                  )}
+                  {user?.email && (
+                    <div>
+                      <span className="text-muted-foreground text-xs">Email</span>
+                      <p className="font-medium">{user.email}</p>
+                    </div>
+                  )}
+                  {user?.phone && (
+                    <div>
+                      <span className="text-muted-foreground text-xs">Phone</span>
+                      <p className="font-medium">{user.phone}</p>
+                    </div>
                   )}
                 </div>
-                
-                {contract.signedByBrand ? (
-                  <div className="p-6 bg-muted/50 rounded-lg">
-                    <p className="text-base font-semibold mb-1">{contract.brandName}</p>
-                    <p className="text-sm text-muted-foreground mb-3">Authorized Representative</p>
-                    <p className="text-sm text-muted-foreground">
-                      Executed on: {contract.signedDate ? formatDate(contract.signedDate) : formatDate(contract.startDate)}
-                    </p>
+              </div>
+
+              {/* Party B */}
+              <div className="space-y-2 md:border-l md:border-white/10 md:pl-6 print:border-gray-200">
+                <div className="text-xs font-bold uppercase tracking-wide text-primary mb-3">
+                  Party B — Brand / Client
+                </div>
+                <div className="text-sm space-y-1.5">
+                  <div>
+                    <span className="text-muted-foreground text-xs">Brand Name</span>
+                    <p className="font-semibold">{contract.brandName}</p>
                   </div>
+                  <div>
+                    <span className="text-muted-foreground text-xs">Deal Title</span>
+                    <p className="font-medium">{deal?.dealTitle || contract.contractName}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Agreement Details ── */}
+          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 mb-6 print:rounded-none">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 print:text-gray-500">
+              Agreement Details
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <span className="text-muted-foreground text-xs block mb-1">Effective Date</span>
+                <span className="font-semibold">{formatDate(contract.startDate)}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground text-xs block mb-1">End Date</span>
+                <span className="font-semibold">{formatDate(contract.endDate)}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground text-xs block mb-1">Deal Value</span>
+                <span className="font-bold text-primary text-base">
+                  ₹{contract.contractValue.toLocaleString("en-IN")}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground text-xs block mb-1">Type</span>
+                {contract.exclusive ? (
+                  <Badge className="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 no-default-hover-elevate no-default-active-elevate">
+                    <Lock className="w-3 h-3 mr-1" />
+                    Exclusive
+                  </Badge>
                 ) : (
-                  <div className="space-y-8">
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Authorized Signature</p>
-                      <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg min-h-[140px] flex items-center justify-center bg-muted/10">
-                        <p className="text-sm text-muted-foreground/60 text-center px-4">
-                          Sign here or affix signature image
-                        </p>
+                  <Badge variant="secondary">Non-Exclusive</Badge>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Deliverables Table ── */}
+          {deal?.deliverables && deal.deliverables.length > 0 && (
+            <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 mb-6 print:rounded-none overflow-x-auto">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 print:text-gray-500">
+                Deliverables
+              </h2>
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-white/10 print:border-gray-300">
+                    <th className="text-left pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">Platform</th>
+                    <th className="text-left pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">Content Type</th>
+                    <th className="text-left pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">Qty</th>
+                    <th className="text-left pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">Frequency</th>
+                    <th className="text-left pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {deal.deliverables.map((d, i) => (
+                    <tr
+                      key={i}
+                      className="border-b border-white/5 print:border-gray-100 last:border-0"
+                    >
+                      <td className="py-2.5 pr-4 font-medium">{d.platform}</td>
+                      <td className="py-2.5 pr-4">{d.contentType}</td>
+                      <td className="py-2.5 pr-4 font-semibold">{d.quantity}</td>
+                      <td className="py-2.5 pr-4 capitalize">{d.frequency}</td>
+                      <td className="py-2.5 text-muted-foreground text-xs">{d.notes || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* ── Numbered Clauses ── */}
+          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 mb-6 print:rounded-none space-y-6">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground print:text-gray-500">
+              Terms &amp; Conditions
+            </h2>
+
+            {/* Clause 1 */}
+            <div className="space-y-1.5">
+              <h3 className="font-bold text-sm flex items-center gap-2">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">1</span>
+                Scope of Work
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
+                The Creator agrees to provide influencer marketing and content creation services for the Brand
+                as described in the Deliverables section above, in connection with the deal titled
+                "{deal?.dealTitle || contract.contractName}". All content shall be original, professionally produced,
+                and compliant with applicable advertising standards and platform policies.
+              </p>
+            </div>
+
+            {/* Clause 2 */}
+            <div className="space-y-1.5">
+              <h3 className="font-bold text-sm flex items-center gap-2">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">2</span>
+                Deliverables &amp; Timeline
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
+                All deliverables shall be submitted for Brand approval at least 48 hours before the scheduled
+                publication date. The Brand shall provide approval or revision requests within 24 hours of receipt.
+                The Creator shall incorporate up to two (2) rounds of revisions at no additional charge.
+                This Agreement is effective from <strong>{formatDate(contract.startDate)}</strong> through{" "}
+                <strong>{formatDate(contract.endDate)}</strong>.
+              </p>
+            </div>
+
+            {/* Clause 3 */}
+            <div className="space-y-1.5">
+              <h3 className="font-bold text-sm flex items-center gap-2">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">3</span>
+                Compensation (₹{contract.contractValue.toLocaleString("en-IN")})
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
+                In consideration for the services rendered, the Brand shall pay the Creator a total fee of{" "}
+                <strong>₹{contract.contractValue.toLocaleString("en-IN")}</strong> (Indian Rupees{" "}
+                {contract.contractValue.toLocaleString("en-IN")} only). Payment shall be structured as:
+                50% advance upon execution and 50% within 30 days of final deliverable approval.
+                Late payments attract interest at 1.5% per month.
+              </p>
+            </div>
+
+            {/* Clause 4 */}
+            <div className="space-y-1.5">
+              <h3 className="font-bold text-sm flex items-center gap-2">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">4</span>
+                Content Rights &amp; Usage
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
+                Upon full payment, the Creator grants the Brand a non-exclusive, worldwide, royalty-free license
+                to use, reproduce, display, and distribute the content for marketing and promotional purposes for
+                12 months following the Agreement expiry. The Creator retains all ownership rights and may use
+                content for personal portfolio purposes.
+              </p>
+            </div>
+
+            {/* Clause 5 */}
+            <div className="space-y-1.5">
+              <h3 className="font-bold text-sm flex items-center gap-2">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">5</span>
+                Exclusivity Terms
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
+                {contract.exclusive
+                  ? "This Agreement is EXCLUSIVE. During the Agreement period, the Creator shall not enter into similar influencer marketing arrangements with direct competitors of the Brand without prior written consent. All brand deals during this period must be registered on the InfluDeal platform."
+                  : "This Agreement is NON-EXCLUSIVE. The Creator may engage with other brands and clients during the Agreement period, provided such engagements do not directly conflict with or diminish the promotional value of this Agreement."}
+              </p>
+            </div>
+
+            {/* Clause 6 */}
+            <div className="space-y-1.5">
+              <h3 className="font-bold text-sm flex items-center gap-2">
+                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">6</span>
+                Governing Law (Indian Contract Act 1872)
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
+                This Agreement shall be governed by and construed in accordance with the laws of India,
+                including the Indian Contract Act, 1872. Any disputes shall first be attempted to be resolved
+                through good-faith negotiation for 30 days, failing which disputes shall be submitted to
+                binding arbitration under the Arbitration and Conciliation Act, 1996. The courts of India
+                shall have exclusive jurisdiction for any legal proceedings.
+              </p>
+            </div>
+          </div>
+
+          {/* ── Signature Blocks ── */}
+          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 mb-6 print:rounded-none">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6 print:text-gray-500">
+              Signatures
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+              {/* Creator Signature */}
+              <div className="space-y-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-primary">
+                  Party A — Creator / Influencer
+                </p>
+
+                {/* Signature image or placeholder */}
+                <div className="min-h-[100px] border-2 border-dashed border-white/20 print:border-gray-300 rounded-xl flex items-center justify-center bg-white/5 print:bg-gray-50 overflow-hidden">
+                  {user?.digitalSignature ? (
+                    <img
+                      src={user.digitalSignature}
+                      alt="Creator Signature"
+                      className="max-h-24 max-w-full object-contain p-2"
+                    />
+                  ) : (
+                    <p className="text-xs text-muted-foreground/60 text-center px-4 print:text-gray-400">
+                      Signature on file
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-3 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 print:text-gray-500">Printed Name</p>
+                    <div className="border-b-2 border-foreground/30 print:border-gray-400 pb-1 font-medium">
+                      {[user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || ""}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 print:text-gray-500">Date</p>
+                    <div className="border-b-2 border-foreground/30 print:border-gray-400 pb-1">
+                      {contract.signedDate ? formatDate(contract.signedDate) : formatDate(contract.startDate)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Brand Signature */}
+              <div className="space-y-4 md:border-l md:border-white/10 md:pl-8 print:border-gray-200">
+                <p className="text-xs font-bold uppercase tracking-wide text-primary">
+                  Party B — Brand / Client
+                </p>
+
+                {contract.signedByBrand ? (
+                  <>
+                    <div className="min-h-[100px] border-2 border-dashed border-white/20 print:border-gray-300 rounded-xl flex items-center justify-center bg-white/5 print:bg-gray-50">
+                      <div className="text-center">
+                        <Shield className="w-6 h-6 text-emerald-500 mx-auto mb-1" />
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">Digitally Executed</p>
                       </div>
                     </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-3 text-sm">
                       <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Full Name of Signatory</p>
-                        <div className="border-b-2 border-foreground h-10"></div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 print:text-gray-500">Authorised Signatory</p>
+                        <div className="border-b-2 border-foreground/30 print:border-gray-400 pb-1 font-medium">
+                          {contract.brandName}
+                        </div>
                       </div>
                       <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Designation / Title</p>
-                        <div className="border-b-2 border-foreground h-10"></div>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Date of Execution</p>
-                        <div className="border-b-2 border-foreground h-10"></div>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Company Seal / Stamp</p>
-                        <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg min-h-[80px] flex items-center justify-center bg-muted/10">
-                          <p className="text-xs text-muted-foreground/60">Affix seal here</p>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 print:text-gray-500">Date</p>
+                        <div className="border-b-2 border-foreground/30 print:border-gray-400 pb-1">
+                          {contract.signedDate ? formatDate(contract.signedDate) : formatDate(contract.startDate)}
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="min-h-[100px] border-2 border-dashed border-white/20 print:border-gray-300 rounded-xl flex items-center justify-center bg-white/5 print:bg-gray-50">
+                      <p className="text-xs text-muted-foreground/60 text-center px-4 print:text-gray-400">
+                        Authorised Signatory
+                      </p>
+                    </div>
+                    <div className="space-y-3 text-sm">
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 print:text-gray-500">Full Name</p>
+                        <div className="border-b-2 border-foreground/30 print:border-gray-400 h-8" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 print:text-gray-500">Date</p>
+                        <div className="border-b-2 border-foreground/30 print:border-gray-400 h-8" />
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
-            </CardContent>
-          </Card>
-
-          <div className="print:block hidden mt-12 pt-6 border-t text-center text-xs text-muted-foreground">
-            <p className="font-medium">End of Agreement</p>
-            <p className="mt-2">Reference: {contract.contractName}</p>
-            <p>Contract Period: {formatDate(contract.startDate)} through {formatDate(contract.endDate)}</p>
-            <p>Contract Value: ₹{contract.contractValue.toLocaleString("en-IN")}</p>
-            <p className="mt-2">Generated via InfluDeal Platform</p>
+            </div>
           </div>
+
+          {/* ── Footer (print only) ── */}
+          <div className="hidden print:block mt-10 pt-6 border-t border-gray-200 text-center text-xs text-gray-400 space-y-1">
+            <p className="font-semibold text-gray-600">End of Agreement</p>
+            <p>Reference: {contract.contractName}</p>
+            <p>Agreement Period: {formatDate(contract.startDate)} — {formatDate(contract.endDate)}</p>
+            <p>Agreement Value: ₹{contract.contractValue.toLocaleString("en-IN")}</p>
+            <p className="mt-2">Generated via InfluDeal Platform · Governed by Indian Contract Act 1872</p>
+          </div>
+
+          {/* ── Screen action buttons ── */}
+          <div className="flex gap-3 print:hidden mt-2">
+            <Button
+              variant="outline"
+              className="flex-1 h-12 rounded-xl"
+              onClick={() => setLocation(backPath)}
+              data-testid="button-back-bottom"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+            <Button
+              className="flex-1 h-12 rounded-xl gradient-btn text-white"
+              onClick={handlePrint}
+              data-testid="button-print-bottom"
+            >
+              <Printer className="w-4 h-4 mr-2" />
+              Print / Save PDF
+            </Button>
+          </div>
+
         </main>
       </div>
 
       <style>{`
         @media print {
+          body {
+            background: #ffffff !important;
+          }
           body * {
             visibility: hidden;
-          }
-          .print\\:block,
-          .print\\:block * {
-            visibility: visible;
           }
           main, main * {
             visibility: visible;
@@ -395,9 +479,19 @@ export default function ContractPdfPage() {
             left: 0;
             top: 0;
             width: 100%;
+            background: #ffffff;
+          }
+          .print\\:hidden {
+            display: none !important;
+          }
+          .gradient-primary {
+            background: #6d28d9 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           @page {
-            margin: 1.5cm;
+            margin: 1.2cm;
+            size: A4;
           }
         }
       `}</style>

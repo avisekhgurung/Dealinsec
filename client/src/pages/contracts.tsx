@@ -51,7 +51,7 @@ export default function ContractsPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+      <header className="glass-header sticky top-0 z-40">
         <div className="px-4 py-4">
           <h1 className="text-xl font-bold mb-4">Contracts</h1>
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
@@ -61,7 +61,7 @@ export default function ContractsPage() {
                 variant={filter === f.value ? "default" : "outline"}
                 size="sm"
                 onClick={() => setFilter(f.value)}
-                className="flex-shrink-0 rounded-full"
+                className={`flex-shrink-0 rounded-full ${filter === f.value ? "gradient-btn text-white" : ""}`}
                 data-testid={`filter-${f.value}`}
               >
                 {f.label}
@@ -71,11 +71,11 @@ export default function ContractsPage() {
         </div>
       </header>
 
-      <main className="px-4 py-6">
+      <main className="px-4 py-6 animate-fade-in">
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <Card key={i} className="border-0 shadow-sm">
+              <Card key={i} className="glass-card border-0">
                 <CardContent className="p-4 space-y-3">
                   <Skeleton className="h-5 w-3/4" />
                   <Skeleton className="h-4 w-1/2" />
@@ -91,11 +91,11 @@ export default function ContractsPage() {
           <div className="space-y-4">
             {filteredContracts.map((contract) => {
               const invoiceStatus = getInvoiceStatus(contract.id);
-              
+
               return (
                 <Link key={contract.id} href={`/contracts/${contract.id}`}>
-                  <Card 
-                    className="border-0 shadow-sm hover-elevate active-elevate-2 cursor-pointer"
+                  <Card
+                    className="glass-card border-0 hover-elevate active-elevate-2 cursor-pointer"
                     data-testid={`card-contract-${contract.id}`}
                   >
                     <CardContent className="p-4">
@@ -114,10 +114,10 @@ export default function ContractsPage() {
                         <span>{formatDate(contract.startDate)} - {formatDate(contract.endDate)}</span>
                       </div>
 
-                      <div className="flex items-center justify-between pt-3 border-t border-border">
+                      <div className="flex items-center justify-between pt-3 border-t border-white/10">
                         <div className="flex items-center gap-2 flex-wrap">
                           {contract.exclusive && (
-                            <Badge 
+                            <Badge
                               variant="secondary"
                               className="bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400 no-default-hover-elevate no-default-active-elevate"
                             >
@@ -126,7 +126,7 @@ export default function ContractsPage() {
                             </Badge>
                           )}
                           {contract.proofFileName && (
-                            <Badge 
+                            <Badge
                               variant="secondary"
                               className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 no-default-hover-elevate no-default-active-elevate"
                             >
@@ -135,10 +135,10 @@ export default function ContractsPage() {
                             </Badge>
                           )}
                           {invoiceStatus && (
-                            <Badge 
+                            <Badge
                               variant="secondary"
                               className={`no-default-hover-elevate no-default-active-elevate ${
-                                invoiceStatus === "Paid" 
+                                invoiceStatus === "Paid"
                                   ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
                                   : "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400"
                               }`}
@@ -161,20 +161,20 @@ export default function ContractsPage() {
             })}
           </div>
         ) : (
-          <Card className="border-0 shadow-sm">
+          <Card className="glass-card border-0">
             <CardContent className="py-12 text-center">
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted mx-auto mb-4">
                 <FileText className="w-8 h-8 text-muted-foreground" />
               </div>
               <h3 className="font-semibold mb-1">No contracts yet</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                {filter === "all" 
+                {filter === "all"
                   ? "Accept a deal to create your first contract"
                   : `No ${filter} contracts found`}
               </p>
               {filter !== "all" && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setFilter("all")}
                   data-testid="button-view-all"
                 >

@@ -39,21 +39,21 @@ export default function PaymentSuccessPage() {
 
   useEffect(() => {
     if (hasConfirmed) return;
-    
+
     if (!invoiceId || !sessionId) {
       setStatus("error");
       return;
     }
-    
+
     setHasConfirmed(true);
     confirmPayment.mutate();
   }, [invoiceId, sessionId, hasConfirmed]);
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <main className="px-4 py-12 flex flex-col items-center justify-center min-h-[70vh]">
+      <main className="px-4 py-12 flex flex-col items-center justify-center min-h-[70vh] animate-fade-in">
         {status === "loading" && (
-          <Card className="w-full max-w-md">
+          <Card className="glass-card w-full max-w-md border-0">
             <CardContent className="p-8 text-center space-y-4">
               <Loader2 className="w-12 h-12 mx-auto animate-spin text-primary" />
               <h1 className="text-xl font-bold">Confirming Payment</h1>
@@ -65,7 +65,8 @@ export default function PaymentSuccessPage() {
         )}
 
         {status === "success" && (
-          <Card className="w-full max-w-md border-emerald-200 dark:border-emerald-800">
+          <Card className="glass-card w-full max-w-md border-0 overflow-hidden">
+            <div className="h-1 w-full bg-gradient-to-r from-emerald-400 to-emerald-600" />
             <CardContent className="p-8 text-center space-y-4">
               <div className="w-16 h-16 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
                 <CheckCircle className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
@@ -77,16 +78,16 @@ export default function PaymentSuccessPage() {
                 Your invoice has been paid and your contract is now active.
               </p>
               <div className="pt-4 space-y-2">
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="gradient-btn w-full text-white"
                   onClick={() => setLocation("/billing")}
                   data-testid="button-view-billing"
                 >
                   View Billing
                 </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full" 
+                <Button
+                  variant="outline"
+                  className="w-full glass-card"
                   onClick={() => setLocation("/contracts")}
                   data-testid="button-view-contracts"
                 >
@@ -98,7 +99,7 @@ export default function PaymentSuccessPage() {
         )}
 
         {status === "error" && (
-          <Card className="w-full max-w-md border-destructive/50">
+          <Card className="glass-card w-full max-w-md border-destructive/30">
             <CardContent className="p-8 text-center space-y-4">
               <div className="w-16 h-16 mx-auto rounded-full bg-destructive/10 flex items-center justify-center">
                 <XCircle className="w-10 h-10 text-destructive" />
@@ -108,8 +109,8 @@ export default function PaymentSuccessPage() {
                 We couldn't verify your payment. If you were charged, please contact support.
               </p>
               <div className="pt-4">
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="gradient-btn w-full text-white"
                   onClick={() => setLocation("/billing")}
                   data-testid="button-back-billing"
                 >

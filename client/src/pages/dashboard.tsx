@@ -11,8 +11,8 @@ import type { Deal, Contract, Invoice } from "@shared/schema";
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const displayName = user?.firstName && user?.lastName 
-    ? `${user.firstName} ${user.lastName}` 
+  const displayName = user?.firstName && user?.lastName
+    ? `${user.firstName} ${user.lastName}`
     : user?.email || "Influencer";
 
   const { data: deals = [], isLoading: dealsLoading } = useQuery<Deal[]>({
@@ -39,15 +39,15 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+      <header className="glass-header sticky top-0 z-40">
         <div className="flex items-center justify-between gap-4 px-4 py-4">
           <div>
             <p className="text-sm text-muted-foreground">Welcome back,</p>
             <h1 className="text-xl font-bold" data-testid="text-influencer-name">{displayName}</h1>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={handleLogout}
             data-testid="button-logout"
           >
@@ -57,85 +57,79 @@ export default function DashboardPage() {
       </header>
 
       <main className="px-4 py-6 space-y-6">
-        <div className="grid gap-4">
-          <Card className="border-0 shadow-md">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10">
-                    <Briefcase className="w-6 h-6 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Active Deals</p>
-                    {dealsLoading ? (
-                      <Skeleton className="h-8 w-12 mt-1" />
-                    ) : (
-                      <p className="text-3xl font-bold" data-testid="text-active-deals">{activeDeals}</p>
-                    )}
-                  </div>
+        <div className="grid gap-4 animate-fade-in">
+          <div className="gradient-card-purple rounded-2xl p-5 shadow-lg">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/20">
+                  <Briefcase className="w-6 h-6 text-white" />
                 </div>
-                <Link href="/deals">
-                  <Button variant="ghost" size="icon">
-                    <ChevronRight className="w-5 h-5" />
-                  </Button>
-                </Link>
+                <div>
+                  <p className="text-sm font-medium text-white/80">Active Deals</p>
+                  {dealsLoading ? (
+                    <Skeleton className="h-8 w-12 mt-1 bg-white/20" />
+                  ) : (
+                    <p className="text-3xl font-bold text-white" data-testid="text-active-deals">{activeDeals}</p>
+                  )}
+                </div>
               </div>
-            </CardContent>
-          </Card>
+              <Link href="/deals">
+                <Button variant="ghost" size="icon" className="text-white hover:bg-white/20">
+                  <ChevronRight className="w-5 h-5" />
+                </Button>
+              </Link>
+            </div>
+          </div>
 
-          <Card className="border-0 shadow-md">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-900/30">
-                    <FileCheck className="w-6 h-6 text-violet-600 dark:text-violet-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Signed Contracts</p>
-                    {contractsLoading ? (
-                      <Skeleton className="h-8 w-12 mt-1" />
-                    ) : (
-                      <p className="text-3xl font-bold" data-testid="text-signed-contracts">{signedContracts}</p>
-                    )}
-                  </div>
+          <div className="gradient-card-indigo rounded-2xl p-5 shadow-lg">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/20">
+                  <FileCheck className="w-6 h-6 text-white" />
                 </div>
-                <Link href="/contracts">
-                  <Button variant="ghost" size="icon">
-                    <ChevronRight className="w-5 h-5" />
-                  </Button>
-                </Link>
+                <div>
+                  <p className="text-sm font-medium text-white/80">Signed Contracts</p>
+                  {contractsLoading ? (
+                    <Skeleton className="h-8 w-12 mt-1 bg-white/20" />
+                  ) : (
+                    <p className="text-3xl font-bold text-white" data-testid="text-signed-contracts">{signedContracts}</p>
+                  )}
+                </div>
               </div>
-            </CardContent>
-          </Card>
+              <Link href="/contracts">
+                <Button variant="ghost" size="icon" className="text-white hover:bg-white/20">
+                  <ChevronRight className="w-5 h-5" />
+                </Button>
+              </Link>
+            </div>
+          </div>
 
-          <Card className="border-0 shadow-md">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
-                    <Receipt className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Paid Invoices</p>
-                    {invoicesLoading ? (
-                      <Skeleton className="h-8 w-12 mt-1" />
-                    ) : (
-                      <p className="text-3xl font-bold" data-testid="text-paid-invoices">{paidInvoices}</p>
-                    )}
-                  </div>
+          <div className="gradient-card-emerald rounded-2xl p-5 shadow-lg">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/20">
+                  <Receipt className="w-6 h-6 text-white" />
                 </div>
-                <Link href="/billing">
-                  <Button variant="ghost" size="icon">
-                    <ChevronRight className="w-5 h-5" />
-                  </Button>
-                </Link>
+                <div>
+                  <p className="text-sm font-medium text-white/80">Paid Invoices</p>
+                  {invoicesLoading ? (
+                    <Skeleton className="h-8 w-12 mt-1 bg-white/20" />
+                  ) : (
+                    <p className="text-3xl font-bold text-white" data-testid="text-paid-invoices">{paidInvoices}</p>
+                  )}
+                </div>
               </div>
-            </CardContent>
-          </Card>
+              <Link href="/billing">
+                <Button variant="ghost" size="icon" className="text-white hover:bg-white/20">
+                  <ChevronRight className="w-5 h-5" />
+                </Button>
+              </Link>
+            </div>
+          </div>
         </div>
 
         {recentDeals.length > 0 && (
-          <section className="space-y-3">
+          <section className="space-y-3 animate-fade-in">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Recent Deals</h2>
               <Link href="/deals">
@@ -147,7 +141,7 @@ export default function DashboardPage() {
             <div className="space-y-3">
               {recentDeals.map((deal) => (
                 <Link key={deal.id} href={`/deals/${deal.id}`}>
-                  <Card className="border-0 shadow-sm hover-elevate active-elevate-2 cursor-pointer">
+                  <Card className="glass-card border-0 hover-elevate active-elevate-2 cursor-pointer">
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
@@ -158,9 +152,9 @@ export default function DashboardPage() {
                         </div>
                         <StatusBadge status={deal.status} />
                       </div>
-                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/10">
                         <span className="text-lg font-bold text-primary">
-                          ₹{deal.dealAmount.toLocaleString()}
+                          {"\u20B9"}{deal.dealAmount.toLocaleString()}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {deal.deliverables.length} deliverable{deal.deliverables.length !== 1 ? "s" : ""}
@@ -175,9 +169,9 @@ export default function DashboardPage() {
         )}
 
         {deals.length === 0 && !dealsLoading && (
-          <Card className="border-0 shadow-sm">
+          <Card className="glass-card border-0 animate-fade-in">
             <CardContent className="py-12 text-center">
-              <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted mx-auto mb-4">
+              <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 mx-auto mb-4">
                 <Briefcase className="w-8 h-8 text-muted-foreground" />
               </div>
               <h3 className="font-semibold mb-1">No deals yet</h3>
@@ -185,7 +179,7 @@ export default function DashboardPage() {
                 Create your first brand deal to get started
               </p>
               <Link href="/deals/new">
-                <Button data-testid="button-create-first-deal">
+                <Button className="gradient-btn" data-testid="button-create-first-deal">
                   <Plus className="w-4 h-4 mr-2" />
                   Create Deal
                 </Button>
@@ -198,9 +192,9 @@ export default function DashboardPage() {
       <Link href="/deals/new">
         <button
           data-testid="fab-create-deal"
-          className="fixed bottom-20 right-4 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover-elevate active-elevate-2 z-40"
+          className="gradient-btn fixed bottom-20 right-4 w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover-elevate active-elevate-2 z-40"
         >
-          <Plus className="w-6 h-6" />
+          <Plus className="w-6 h-6 text-white" />
         </button>
       </Link>
 

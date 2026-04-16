@@ -35,7 +35,7 @@ export async function setupAuth(app: Express) {
 
   app.post("/api/auth/signup", async (req, res) => {
     try {
-      const { email, password, firstName, lastName } = req.body;
+      const { email, password, firstName, lastName, role } = req.body;
 
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
@@ -43,6 +43,10 @@ export async function setupAuth(app: Express) {
 
       if (password.length < 6) {
         return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+
+      if (role && role !== "influencer") {
+        return res.status(400).json({ message: "Only influencer signup is available right now" });
       }
 
       const existingUser = await storage.getUserByEmail(email);
@@ -59,7 +63,7 @@ export async function setupAuth(app: Express) {
         lastName: lastName || null,
         role: "influencer",
         onboardingComplete: false,
-        contractCredits: 3,
+        contractCredits: parseInt(process.env.SIGNUP_FREE_CREDITS ?? '1'),
       });
 
       (req.session as any).userId = user.id;

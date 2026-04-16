@@ -3,7 +3,7 @@ import { pgTable, text, integer, boolean, json, serial, varchar, timestamp, inde
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const platformOptions = ["Instagram", "YouTube", "Twitter"] as const;
+export const platformOptions = ["Instagram", "YouTube", "Twitter", "Facebook"] as const;
 export const contentTypeOptions = ["Reel", "Video", "Story", "Post"] as const;
 export const frequencyOptions = ["Per Week", "Per Month", "One-time"] as const;
 
@@ -44,8 +44,9 @@ export const users = pgTable("users", {
   panNumber: varchar("pan_number"),
   gstNumber: varchar("gst_number"),
   digitalSignature: varchar("digital_signature"),
+  billingAddress: varchar("billing_address"),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
-  contractCredits: integer("contract_credits").notNull().default(3),
+  contractCredits: integer("contract_credits").notNull().default(1),
   role: varchar("role").notNull().default("influencer"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -168,3 +169,15 @@ export const payuOrders = pgTable("payu_orders", {
 export const insertPayuOrderSchema = createInsertSchema(payuOrders).omit({ id: true, createdAt: true, completedAt: true });
 export type InsertPayuOrder = z.infer<typeof insertPayuOrderSchema>;
 export type PayuOrder = typeof payuOrders.$inferSelect;
+
+export const quotes = pgTable("quotes", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  dealId: integer("deal_id").notNull().references(() => deals.id),
+  status: varchar("status").notNull().default("draft"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertQuoteSchema = createInsertSchema(quotes).omit({ id: true, createdAt: true });
+export type InsertQuote = z.infer<typeof insertQuoteSchema>;
+export type Quote = typeof quotes.$inferSelect;

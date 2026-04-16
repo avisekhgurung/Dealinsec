@@ -1,10 +1,12 @@
 import express, { type Request, Response, NextFunction } from "express";
+import passport from "passport";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from './stripeClient';
 import { WebhookHandlers } from './webhookHandlers';
+import { setupGoogleAuth } from './googleAuth';
 
 const app = express();
 
@@ -41,10 +43,7 @@ async function initStripe() {
 
   try {
     console.log('Initializing Stripe schema...');
-    await runMigrations({ 
-      databaseUrl,
-      schema: 'stripe'
-    });
+    await runMigrations({ databaseUrl });
     console.log('Stripe schema ready');
 
     const stripeSync = await getStripeSync();
@@ -115,6 +114,23 @@ async function initStripe() {
 
   app.use(express.urlencoded({ extended: false }));
 
+  // Google OAuth
+  setupGoogleAuth();
+  app.use(passport.initialize());
+  app.use(passport.session());
+
+  app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+  app.get(
+    "/api/auth/google/callback",
+    passport.authenticate("google", { failureRedirect: "/?error=google_auth_failed" }),
+    (req: any, res) => {
+      if (req.user) {
+        (req.session as any).userId = req.user.id;
+      }
+      res.redirect("/");
+    }
+  );
+
   app.use((req, res, next) => {
     const start = Date.now();
     const path = req.path;
@@ -159,14 +175,14 @@ async function initStripe() {
   }
 
   const port = parseInt(process.env.PORT || "5000", 10);
+  const isProduction = process.env.NODE_ENV === "production";
+  const host = isProduction ? "0.0.0.0" : "127.0.0.1";
+  const listenOptions: any = { port, host };
+
   httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
+    listenOptions,
     () => {
-      log(`serving on port ${port}`);
+      log(`serving on ${host}:${port}`);
     },
   );
 })();

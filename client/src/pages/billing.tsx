@@ -49,7 +49,7 @@ export default function BillingPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+      <header className="glass-header sticky top-0 z-40">
         <div className="px-4 py-4">
           <h1 className="text-xl font-bold mb-4">Billing</h1>
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
@@ -59,7 +59,11 @@ export default function BillingPage() {
                 variant={filter === f.value ? "default" : "outline"}
                 size="sm"
                 onClick={() => setFilter(f.value)}
-                className="flex-shrink-0 rounded-full"
+                className={`flex-shrink-0 rounded-full ${
+                  filter === f.value
+                    ? "gradient-btn text-white"
+                    : "glass-card border-white/20"
+                }`}
                 data-testid={`filter-${f.value}`}
               >
                 {f.label}
@@ -69,36 +73,32 @@ export default function BillingPage() {
         </div>
       </header>
 
-      <main className="px-4 py-6 space-y-6">
+      <main className="px-4 py-6 space-y-6 animate-fade-in">
         {!isLoading && invoices.length > 0 && (
           <div className="grid grid-cols-2 gap-4">
-            <Card className="border-0 shadow-md bg-emerald-50 dark:bg-emerald-950/30">
-              <CardContent className="p-4">
-                <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-1">
-                  Total Paid
-                </p>
-                <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300" data-testid="text-total-paid">
-                  ₹{totalPaid.toLocaleString()}
-                </p>
-              </CardContent>
-            </Card>
-            <Card className="border-0 shadow-md bg-rose-50 dark:bg-rose-950/30">
-              <CardContent className="p-4">
-                <p className="text-xs font-medium text-rose-600 dark:text-rose-400 mb-1">
-                  Total Unpaid
-                </p>
-                <p className="text-2xl font-bold text-rose-700 dark:text-rose-300" data-testid="text-total-unpaid">
-                  ₹{totalUnpaid.toLocaleString()}
-                </p>
-              </CardContent>
-            </Card>
+            <div className="gradient-card-emerald rounded-2xl p-4 shadow-lg">
+              <p className="text-xs font-medium text-white/80 mb-1">
+                Total Paid
+              </p>
+              <p className="text-2xl font-bold text-white" data-testid="text-total-paid">
+                ₹{totalPaid.toLocaleString()}
+              </p>
+            </div>
+            <div className="gradient-card-rose rounded-2xl p-4 shadow-lg">
+              <p className="text-xs font-medium text-white/80 mb-1">
+                Total Unpaid
+              </p>
+              <p className="text-2xl font-bold text-white" data-testid="text-total-unpaid">
+                ₹{totalUnpaid.toLocaleString()}
+              </p>
+            </div>
           </div>
         )}
 
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <Card key={i} className="border-0 shadow-sm">
+              <Card key={i} className="glass-card border-0">
                 <CardContent className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-2">
@@ -116,8 +116,8 @@ export default function BillingPage() {
           <div className="space-y-4">
             {filteredInvoices.map((invoice) => (
               <Link key={invoice.id} href={`/billing/invoice/${invoice.id}`}>
-                <Card 
-                  className="border-0 shadow-sm hover-elevate active-elevate-2 cursor-pointer"
+                <Card
+                  className="glass-card border-0 shadow-sm hover-elevate active-elevate-2 cursor-pointer"
                   data-testid={`card-invoice-${invoice.id}`}
                 >
                   <CardContent className="p-4">
@@ -138,7 +138,7 @@ export default function BillingPage() {
                       <span>{formatDate(invoice.invoiceDate)}</span>
                     </div>
 
-                    <div className="flex items-center justify-between pt-3 border-t border-border">
+                    <div className="flex items-center justify-between pt-3 border-t border-white/10">
                       <span className="text-2xl font-bold">
                         ₹{invoice.totalAmount.toLocaleString()}
                       </span>
@@ -150,9 +150,9 @@ export default function BillingPage() {
             ))}
           </div>
         ) : (
-          <Card className="border-0 shadow-sm">
+          <Card className="glass-card border-0">
             <CardContent className="py-12 text-center">
-              <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted mx-auto mb-4">
+              <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 mx-auto mb-4">
                 <Receipt className="w-8 h-8 text-muted-foreground" />
               </div>
               <h3 className="font-semibold mb-1">No invoices yet</h3>
@@ -162,9 +162,10 @@ export default function BillingPage() {
                   : `No ${filter} invoices found`}
               </p>
               {filter !== "all" && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setFilter("all")}
+                  className="glass-card"
                   data-testid="button-view-all-invoices"
                 >
                   View All Invoices

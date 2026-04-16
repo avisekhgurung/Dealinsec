@@ -1,7 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertDealSchema, insertContractSchema } from "@shared/schema";
+import { insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable } from "@shared/schema";
+import { eq } from "drizzle-orm";
+import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./auth";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import multer from "multer";
@@ -109,6 +111,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Deal creation error:", error);
       res.status(500).json({ error: "Failed to create deal" });
+    }
+  });
+
+  // Generate or get quote for a deal
+  app.post("/api/deals/:id/quote", isAuthenticated, async (req: any, res) => {
+    try {
+      const dealId = parseInt(req.params.id);
+      const deal = await storage.getDeal(dealId);
+      if (!deal) return res.status(404).json({ error: "Deal not found" });
+      if (deal.userId !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+
+      const existing = await storage.getQuoteByDealId(dealId);
+      if (existing) {
+        return res.json(existing);
+      }
+      const quote = await storage.createQuote({ userId: req.user.id, dealId, status: "draft" });
+      res.status(201).json(quote);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create quote" });
+    }
+  });
+
+  app.get("/api/deals/:id/quote", isAuthenticated, async (req: any, res) => {
+    try {
+      const dealId = parseInt(req.params.id);
+      const deal = await storage.getDeal(dealId);
+      if (!deal) return res.status(404).json({ error: "Deal not found" });
+      if (deal.userId !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+
+      const quote = await storage.getQuoteByDealId(dealId);
+      if (!quote) return res.status(404).json({ error: "Quote not found" });
+      res.json(quote);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch quote" });
+    }
+  });
+
+  // Mark deal as completed
+  app.patch("/api/deals/:id/complete", isAuthenticated, async (req: any, res) => {
+    try {
+      const dealId = parseInt(req.params.id);
+      const deal = await storage.getDeal(dealId);
+      if (!deal) return res.status(404).json({ error: "Deal not found" });
+      if (deal.userId !== req.user.id && deal.brandUserId !== req.user.id) {
+        return res.status(403).json({ error: "Not authorized" });
+      }
+      if (deal.status !== "Active") {
+        return res.status(400).json({ error: "Only active deals can be completed" });
+      }
+      const updated = await storage.updateDeal(dealId, { status: "Completed" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to complete deal" });
     }
   });
 
@@ -380,6 +435,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(contracts);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch brand contracts" });
+    }
+  });
+
+  // Brand can see invoices sent to them
+  app.get("/api/brand/received-invoices", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== "brand") {
+        return res.status(403).json({ error: "Brand access required" });
+      }
+      const brandDeals = await storage.getDealsForBrand(userId);
+      const dealIds = brandDeals.map(d => d.id);
+      if (dealIds.length === 0) return res.json([]);
+      const allBrandInvoices = await Promise.all(
+        brandDeals.map(async (deal) => {
+          const invoiceList = await db.select().from(brandInvoicesTable).where(eq(brandInvoicesTable.dealId, deal.id));
+          return invoiceList;
+        })
+      );
+      res.json(allBrandInvoices.flat());
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch received invoices" });
     }
   });
 

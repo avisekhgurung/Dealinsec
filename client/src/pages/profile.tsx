@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Upload, ArrowLeft, Edit, LogOut, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -23,6 +24,7 @@ export default function ProfilePage() {
   const [phone, setPhone] = useState(user?.phone || "");
   const [panNumber, setPanNumber] = useState(user?.panNumber || "");
   const [gstNumber, setGstNumber] = useState(user?.gstNumber || "");
+  const [billingAddress, setBillingAddress] = useState((user as any)?.billingAddress || "");
   const [signaturePreview, setSignaturePreview] = useState<string | null>(user?.digitalSignature || null);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
 
@@ -80,6 +82,7 @@ export default function ProfilePage() {
         phone: phone || null,
         panNumber: panNumber || null,
         gstNumber: gstNumber || null,
+        billingAddress: billingAddress.trim() || null,
         digitalSignature: digitalSignaturePath,
       });
 
@@ -101,7 +104,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-50 bg-background border-b px-4 py-3 flex items-center gap-3">
+      <header className="glass-header sticky top-0 z-50 px-4 py-3 flex items-center gap-3">
         <Link href="/">
           <Button variant="ghost" size="icon" data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
@@ -110,7 +113,13 @@ export default function ProfilePage() {
         <h1 className="text-xl font-semibold">Profile</h1>
         <div className="ml-auto flex gap-2">
           {!isEditing && (
-            <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} data-testid="button-edit-profile">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditing(true)}
+              className="gradient-btn text-white border-0"
+              data-testid="button-edit-profile"
+            >
               <Edit className="h-4 w-4 mr-2" />
               Edit
             </Button>
@@ -121,13 +130,13 @@ export default function ProfilePage() {
         </div>
       </header>
 
-      <main className="p-4 space-y-4 max-w-lg mx-auto">
-        <Card>
+      <main className="p-4 space-y-4 max-w-lg mx-auto animate-fade-in">
+        <Card className="glass-card border-0">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between gap-2">
               <CardTitle>Contract Credits</CardTitle>
               <Link href="/pricing">
-                <Button size="sm" data-testid="button-buy-credits">
+                <Button size="sm" className="gradient-btn text-white" data-testid="button-buy-credits">
                   <CreditCard className="h-4 w-4 mr-2" />
                   Buy Credits
                 </Button>
@@ -143,7 +152,7 @@ export default function ProfilePage() {
         </Card>
 
         {isEditing ? (
-          <Card>
+          <Card className="glass-card border-0">
             <CardHeader>
               <CardTitle>Edit Profile</CardTitle>
               <CardDescription>Update your profile information</CardDescription>
@@ -207,8 +216,20 @@ export default function ProfilePage() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="billingAddress">Billing Address</Label>
+                <Textarea
+                  id="billingAddress"
+                  value={billingAddress}
+                  onChange={(e) => setBillingAddress(e.target.value)}
+                  placeholder="Full address for invoices (street, city, state, PIN)"
+                  rows={3}
+                  data-testid="input-billing-address"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label>Digital Signature</Label>
-                <div className="border-2 border-dashed rounded-md p-4">
+                <div className="border-2 border-dashed border-white/20 rounded-md p-4">
                   {signaturePreview ? (
                     <div className="space-y-2">
                       <img
@@ -221,7 +242,7 @@ export default function ProfilePage() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="w-full"
+                        className="w-full glass-card"
                         onClick={() => {
                           setSignaturePreview(null);
                           setSignatureFile(null);
@@ -237,6 +258,7 @@ export default function ProfilePage() {
                         type="button"
                         variant="outline"
                         onClick={() => fileInputRef.current?.click()}
+                        className="glass-card"
                         data-testid="button-upload-signature"
                       >
                         <Upload className="h-4 w-4 mr-2" />
@@ -257,7 +279,7 @@ export default function ProfilePage() {
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  className="flex-1"
+                  className="flex-1 glass-card"
                   onClick={() => setIsEditing(false)}
                   disabled={isLoading}
                   data-testid="button-cancel"
@@ -265,7 +287,7 @@ export default function ProfilePage() {
                   Cancel
                 </Button>
                 <Button
-                  className="flex-1"
+                  className="flex-1 gradient-btn text-white"
                   onClick={handleSave}
                   disabled={isLoading}
                   data-testid="button-save-profile"
@@ -276,7 +298,7 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
         ) : (
-          <Card>
+          <Card className="glass-card border-0">
             <CardHeader>
               <CardTitle>Profile Information</CardTitle>
             </CardHeader>
@@ -304,6 +326,13 @@ export default function ProfilePage() {
               <div className="space-y-1">
                 <Label className="text-muted-foreground">GST Number</Label>
                 <p className="font-medium" data-testid="text-gst">{user?.gstNumber || "Not set"}</p>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-muted-foreground">Billing Address</Label>
+                <p className="font-medium whitespace-pre-wrap" data-testid="text-billing-address">
+                  {(user as any)?.billingAddress || "Not provided"}
+                </p>
               </div>
 
               {user?.digitalSignature && (

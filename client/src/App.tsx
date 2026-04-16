@@ -17,13 +17,11 @@ import ContractPdfPage from "@/pages/contract-pdf";
 import BillingPage from "@/pages/billing";
 import InvoiceDetailsPage from "@/pages/invoice-details";
 import PaymentSuccessPage from "@/pages/payment-success";
-import BrandDashboardPage from "@/pages/brand-dashboard";
-import BrandDealsPage from "@/pages/brand-deals";
-import BrandContractsPage from "@/pages/brand-contracts";
 import BrandInvoiceDetailsPage from "@/pages/brand-invoice-details";
 import ProfilePage from "@/pages/profile";
 import PricingPage from "@/pages/pricing";
 import PitchPage from "@/pages/pitch";
+import QuotePreviewPage from "@/pages/quote-preview";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -37,7 +35,6 @@ function Router() {
     );
   }
 
-  const isBrand = user?.role === "brand";
   const needsOnboarding = isAuthenticated && user && !user.onboardingComplete;
 
   if (!isAuthenticated) {
@@ -60,26 +57,13 @@ function Router() {
     );
   }
 
-  if (isBrand) {
-    return (
-      <Switch>
-        <Route path="/" component={BrandDashboardPage} />
-        <Route path="/brand/deals" component={BrandDealsPage} />
-        <Route path="/brand/deals/:id" component={DealDetailsPage} />
-        <Route path="/brand/contracts" component={BrandContractsPage} />
-        <Route path="/brand/contracts/:id" component={ContractDetailsPage} />
-        <Route path="/brand/contracts/:id/export" component={ContractPdfPage} />
-        <Route component={NotFound} />
-      </Switch>
-    );
-  }
-
   return (
     <Switch>
       <Route path="/" component={DashboardPage} />
       <Route path="/deals" component={DealsPage} />
       <Route path="/deals/new" component={CreateDealPage} />
       <Route path="/deals/:id" component={DealDetailsPage} />
+      <Route path="/deals/:id/quote" component={QuotePreviewPage} />
       <Route path="/deals/:id/contract" component={ContractConfirmationPage} />
       <Route path="/contracts" component={ContractsPage} />
       <Route path="/contracts/:id" component={ContractDetailsPage} />

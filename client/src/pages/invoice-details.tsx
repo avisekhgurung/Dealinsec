@@ -8,10 +8,10 @@ import { StatusBadge } from "@/components/status-badge";
 import { BottomNav } from "@/components/bottom-nav";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { 
-  ArrowLeft, 
-  Sparkles, 
-  Calendar, 
+import {
+  ArrowLeft,
+  Sparkles,
+  Calendar,
   CreditCard,
   CheckCircle,
   Loader2,
@@ -63,7 +63,7 @@ export default function InvoiceDetailsPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
+        <header className="glass-header sticky top-0 z-40">
           <div className="flex items-center gap-3 px-4 py-4">
             <Button variant="ghost" size="icon" onClick={() => setLocation("/billing")}>
               <ArrowLeft className="w-5 h-5" />
@@ -72,7 +72,7 @@ export default function InvoiceDetailsPage() {
           </div>
         </header>
         <main className="px-4 py-6 space-y-4">
-          <Card className="border-0 shadow-md">
+          <Card className="glass-card border-0">
             <CardContent className="p-6 space-y-4">
               <Skeleton className="h-8 w-full" />
               <Skeleton className="h-24 w-full" />
@@ -88,7 +88,7 @@ export default function InvoiceDetailsPage() {
   if (!invoice) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
+        <header className="glass-header sticky top-0 z-40">
           <div className="flex items-center gap-3 px-4 py-4">
             <Button variant="ghost" size="icon" onClick={() => setLocation("/billing")}>
               <ArrowLeft className="w-5 h-5" />
@@ -99,7 +99,7 @@ export default function InvoiceDetailsPage() {
         <main className="px-4 py-12 text-center">
           <p className="text-muted-foreground">Invoice not found</p>
           <Link href="/billing">
-            <Button variant="outline" className="mt-4">Back to Billing</Button>
+            <Button variant="outline" className="mt-4 glass-card">Back to Billing</Button>
           </Link>
         </main>
         <BottomNav />
@@ -109,11 +109,11 @@ export default function InvoiceDetailsPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+      <header className="glass-header sticky top-0 z-40">
         <div className="flex items-center gap-3 px-4 py-4">
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setLocation("/billing")}
             data-testid="button-back-billing"
           >
@@ -124,9 +124,9 @@ export default function InvoiceDetailsPage() {
         </div>
       </header>
 
-      <main className="px-4 py-6 space-y-6">
-        <Card className="border-0 shadow-md overflow-hidden">
-          <div className="bg-primary/5 dark:bg-primary/10 px-6 py-4 border-b border-border">
+      <main className="px-4 py-6 space-y-6 animate-fade-in">
+        <Card className="glass-card border-0 overflow-hidden">
+          <div className="bg-primary/5 dark:bg-primary/10 px-6 py-4 border-b border-white/10">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
@@ -170,7 +170,7 @@ export default function InvoiceDetailsPage() {
             </div>
 
             {deal && (
-              <div className="p-3 rounded-lg bg-muted/50">
+              <div className="p-3 rounded-lg bg-white/5 border border-white/10">
                 <p className="text-xs font-medium text-muted-foreground mb-1">Deal</p>
                 <p className="font-medium text-sm">{deal.dealTitle}</p>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -185,7 +185,7 @@ export default function InvoiceDetailsPage() {
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Charges
               </p>
-              
+
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Contract Creation Fee</span>
@@ -218,7 +218,7 @@ export default function InvoiceDetailsPage() {
 
         {invoice.status === "Unpaid" ? (
           <Button
-            className="w-full h-14 text-base font-semibold rounded-xl"
+            className="gradient-btn w-full h-14 text-base font-semibold rounded-xl text-white"
             onClick={() => processPayment.mutate()}
             disabled={processPayment.isPending}
             data-testid="button-pay-now"
@@ -236,7 +236,7 @@ export default function InvoiceDetailsPage() {
             )}
           </Button>
         ) : (
-          <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+          <Card className="glass-card border-emerald-200/30 dark:border-emerald-800/30">
             <CardContent className="p-4 flex items-center gap-3">
               <CheckCircle className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
               <div>

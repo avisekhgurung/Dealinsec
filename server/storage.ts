@@ -1,14 +1,15 @@
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
-import { 
-  users, deals, contracts, invoices, brandInvoices, creditTransactions, payuOrders,
+import {
+  users, deals, contracts, invoices, brandInvoices, creditTransactions, payuOrders, quotes,
   type User, type UpsertUser,
-  type Deal, type InsertDeal, 
-  type Contract, type InsertContract, 
+  type Deal, type InsertDeal,
+  type Contract, type InsertContract,
   type Invoice, type InsertInvoice,
   type BrandInvoice, type InsertBrandInvoice,
   type CreditTransaction, type InsertCreditTransaction,
-  type PayuOrder, type InsertPayuOrder
+  type PayuOrder, type InsertPayuOrder,
+  type Quote, type InsertQuote
 } from "@shared/schema";
 
 export interface IStorage {
@@ -52,6 +53,10 @@ export interface IStorage {
   createPayuOrder(order: InsertPayuOrder): Promise<PayuOrder>;
   getPayuOrder(orderId: string): Promise<PayuOrder | undefined>;
   updatePayuOrder(orderId: string, updates: Partial<PayuOrder>): Promise<PayuOrder | undefined>;
+
+  createQuote(data: InsertQuote): Promise<Quote>;
+  getQuoteByDealId(dealId: number): Promise<Quote | undefined>;
+  updateQuote(id: number, updates: Partial<Quote>): Promise<Quote | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -259,6 +264,21 @@ export class DatabaseStorage implements IStorage {
 
   async updatePayuOrder(orderId: string, updates: Partial<PayuOrder>): Promise<PayuOrder | undefined> {
     const [updated] = await db.update(payuOrders).set(updates).where(eq(payuOrders.orderId, orderId)).returning();
+    return updated;
+  }
+
+  async createQuote(data: InsertQuote): Promise<Quote> {
+    const [created] = await db.insert(quotes).values(data as any).returning();
+    return created;
+  }
+
+  async getQuoteByDealId(dealId: number): Promise<Quote | undefined> {
+    const [quote] = await db.select().from(quotes).where(eq(quotes.dealId, dealId));
+    return quote;
+  }
+
+  async updateQuote(id: number, updates: Partial<Quote>): Promise<Quote | undefined> {
+    const [updated] = await db.update(quotes).set(updates).where(eq(quotes.id, id)).returning();
     return updated;
   }
 }

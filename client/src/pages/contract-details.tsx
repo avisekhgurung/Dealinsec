@@ -11,13 +11,13 @@ import { BrandBottomNav } from "@/components/brand-bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { 
-  ArrowLeft, 
-  Calendar, 
-  Shield, 
-  Upload, 
-  FileText, 
-  Receipt, 
+import {
+  ArrowLeft,
+  Calendar,
+  Shield,
+  Upload,
+  FileText,
+  Receipt,
   Loader2,
   CheckCircle,
   ExternalLink,
@@ -50,7 +50,7 @@ export default function ContractDetailsPage() {
 
   const contractId = parseInt(params.id || "0");
   const invoice = invoices.find(i => i.contractId === contractId);
-  
+
   const backPath = isBrand ? "/brand/contracts" : "/contracts";
   const Nav = isBrand ? BrandBottomNav : BottomNav;
 
@@ -58,12 +58,12 @@ export default function ContractDetailsPage() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("proof", file);
-      
+
       const response = await fetch(`/api/contracts/${params.id}/proof`, {
         method: "POST",
         body: formData,
       });
-      
+
       if (!response.ok) throw new Error("Upload failed");
       return response.json();
     },
@@ -153,7 +153,7 @@ export default function ContractDetailsPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
+        <header className="glass-header sticky top-0 z-40">
           <div className="flex items-center gap-3 px-4 py-4">
             <Button variant="ghost" size="icon" onClick={() => setLocation(backPath)}>
               <ArrowLeft className="w-5 h-5" />
@@ -162,7 +162,7 @@ export default function ContractDetailsPage() {
           </div>
         </header>
         <main className="px-4 py-6 space-y-4">
-          <Card className="border-0 shadow-md">
+          <Card className="glass-card border-0">
             <CardContent className="p-6 space-y-4">
               <Skeleton className="h-8 w-3/4" />
               <Skeleton className="h-5 w-1/2" />
@@ -177,7 +177,7 @@ export default function ContractDetailsPage() {
   if (!contract) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
+        <header className="glass-header sticky top-0 z-40">
           <div className="flex items-center gap-3 px-4 py-4">
             <Button variant="ghost" size="icon" onClick={() => setLocation(backPath)}>
               <ArrowLeft className="w-5 h-5" />
@@ -198,12 +198,12 @@ export default function ContractDetailsPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+      <header className="glass-header sticky top-0 z-40">
         <div className="flex items-center justify-between gap-3 px-4 py-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setLocation(backPath)}
               data-testid="button-back-contracts"
             >
@@ -211,8 +211,8 @@ export default function ContractDetailsPage() {
             </Button>
             <h1 className="text-xl font-bold truncate">Contract Details</h1>
           </div>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={() => setLocation(isBrand ? `/brand/contracts/${params.id}/export` : `/contracts/${params.id}/export`)}
             data-testid="button-export-contract-pdf"
@@ -223,8 +223,8 @@ export default function ContractDetailsPage() {
         </div>
       </header>
 
-      <main className="px-4 py-6 space-y-6">
-        <Card className="border-0 shadow-md">
+      <main className="px-4 py-6 space-y-6 animate-fade-in">
+        <Card className="glass-card border-0">
           <CardContent className="p-6">
             <div className="flex items-start justify-between gap-3 mb-4">
               <div className="flex-1 min-w-0">
@@ -238,7 +238,7 @@ export default function ContractDetailsPage() {
 
             <div className="flex flex-wrap gap-2 mb-4">
               {contract.exclusive && (
-                <Badge 
+                <Badge
                   variant="secondary"
                   className="bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400 no-default-hover-elevate no-default-active-elevate"
                 >
@@ -248,7 +248,7 @@ export default function ContractDetailsPage() {
               )}
             </div>
 
-            <div className="space-y-3 py-4 border-y border-border">
+            <div className="space-y-3 py-4 border-y border-white/10">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
@@ -280,8 +280,8 @@ export default function ContractDetailsPage() {
 
             <div className="mt-4">
               <div className={`p-4 rounded-lg flex items-center gap-3 ${
-                contract.signedByBrand 
-                  ? "bg-emerald-50 dark:bg-emerald-900/20" 
+                contract.signedByBrand
+                  ? "bg-emerald-50 dark:bg-emerald-900/20"
                   : "bg-amber-50 dark:bg-amber-900/20"
               }`}>
                 {contract.signedByBrand ? (
@@ -291,19 +291,19 @@ export default function ContractDetailsPage() {
                 )}
                 <div className="flex-1">
                   <p className={`text-sm font-semibold ${
-                    contract.signedByBrand 
-                      ? "text-emerald-700 dark:text-emerald-300" 
+                    contract.signedByBrand
+                      ? "text-emerald-700 dark:text-emerald-300"
                       : "text-amber-700 dark:text-amber-300"
                   }`}>
                     Brand Authorization
                   </p>
                   <p className={`text-xs ${
-                    contract.signedByBrand 
-                      ? "text-emerald-600 dark:text-emerald-400" 
+                    contract.signedByBrand
+                      ? "text-emerald-600 dark:text-emerald-400"
                       : "text-amber-600 dark:text-amber-400"
                   }`}>
-                    {contract.signedByBrand && contract.signedDate 
-                      ? `Signed on ${formatDate(contract.signedDate)}` 
+                    {contract.signedByBrand && contract.signedDate
+                      ? `Signed on ${formatDate(contract.signedDate)}`
                       : "Awaiting brand signature"}
                   </p>
                 </div>
@@ -317,8 +317,8 @@ export default function ContractDetailsPage() {
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
               Contract Proof
             </h3>
-            
-            <Card className="border shadow-sm">
+
+            <Card className="glass-card border-0">
               <CardContent className="p-4">
                 {contract.proofFileName ? (
                   <div className="flex items-center gap-3">
@@ -361,7 +361,7 @@ export default function ContractDetailsPage() {
                     )}
                   </button>
                 )}
-                
+
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -379,10 +379,10 @@ export default function ContractDetailsPage() {
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
               Invoice & Payment
             </h3>
-            
+
             {invoice ? (
               <Link href={`/billing/${invoice.id}`}>
-                <Card className="border shadow-sm hover-elevate active-elevate-2 cursor-pointer">
+                <Card className="glass-card border-0 hover-elevate active-elevate-2 cursor-pointer">
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
@@ -410,7 +410,7 @@ export default function ContractDetailsPage() {
                 </Card>
               </Link>
             ) : (
-              <Card className="border shadow-sm">
+              <Card className="glass-card border-0">
                 <CardContent className="py-8 text-center">
                   <Receipt className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">No invoice generated yet</p>
@@ -425,8 +425,8 @@ export default function ContractDetailsPage() {
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
               Invoice for Brand
             </h3>
-            
-            <Card className="border shadow-sm">
+
+            <Card className="glass-card border-0">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30">
@@ -435,14 +435,14 @@ export default function ContractDetailsPage() {
                   <div className="flex-1">
                     <p className="font-medium text-sm">Generate Invoice for Brand</p>
                     <p className="text-xs text-muted-foreground">
-                      {contract.status !== "Signed" 
+                      {contract.status !== "Signed"
                         ? "Upload signed contract proof to enable billing"
                         : `Create a professional invoice to send to ${contract.brandName}`}
                     </p>
                   </div>
                 </div>
-                <Button 
-                  className="w-full"
+                <Button
+                  className="w-full gradient-btn text-white"
                   onClick={() => createBrandInvoice.mutate()}
                   disabled={createBrandInvoice.isPending || !contract || !deal || contract.status !== "Signed"}
                   data-testid="button-generate-brand-invoice"

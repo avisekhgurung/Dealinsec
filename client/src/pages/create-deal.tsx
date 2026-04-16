@@ -19,10 +19,10 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PlatformIcon } from "@/components/platform-icon";
 import { ArrowLeft, Plus, Trash2, Loader2 } from "lucide-react";
-import { 
-  insertDealSchema, 
-  platformOptions, 
-  contentTypeOptions, 
+import {
+  insertDealSchema,
+  platformOptions,
+  contentTypeOptions,
   frequencyOptions
 } from "@shared/schema";
 
@@ -120,11 +120,11 @@ export default function CreateDealPage() {
 
   return (
     <div className="min-h-screen bg-background pb-8">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+      <header className="glass-header sticky top-0 z-40">
         <div className="flex items-center gap-3 px-4 py-4">
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setLocation("/deals")}
             data-testid="button-back"
           >
@@ -134,12 +134,12 @@ export default function CreateDealPage() {
         </div>
       </header>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 py-6 space-y-6">
-        <section className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 py-6 space-y-6 animate-fade-in">
+        <section className="glass-card rounded-xl p-5 space-y-4">
           <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
             Brand Details
           </h2>
-          
+
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="brandName">Brand Name</Label>
@@ -263,12 +263,12 @@ export default function CreateDealPage() {
 
           <div className="space-y-4">
             {fields.map((field, index) => (
-              <Card key={field.id} className="border shadow-sm">
+              <Card key={field.id} className="glass-card border-0">
                 <CardContent className="p-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <PlatformIcon 
-                        platform={form.watch(`deliverables.${index}.platform`) || "Instagram"} 
+                      <PlatformIcon
+                        platform={form.watch(`deliverables.${index}.platform`) || "Instagram"}
                         size={18}
                       />
                       <span className="font-medium text-sm">Deliverable {index + 1}</span>
@@ -291,11 +291,11 @@ export default function CreateDealPage() {
                       <Label className="text-xs">Platform</Label>
                       <Select
                         value={form.watch(`deliverables.${index}.platform`)}
-                        onValueChange={(value) => 
+                        onValueChange={(value) =>
                           form.setValue(`deliverables.${index}.platform`, value as typeof platformOptions[number])
                         }
                       >
-                        <SelectTrigger 
+                        <SelectTrigger
                           className="h-11"
                           data-testid={`select-platform-${index}`}
                         >
@@ -318,11 +318,11 @@ export default function CreateDealPage() {
                       <Label className="text-xs">Content Type</Label>
                       <Select
                         value={form.watch(`deliverables.${index}.contentType`)}
-                        onValueChange={(value) => 
+                        onValueChange={(value) =>
                           form.setValue(`deliverables.${index}.contentType`, value as typeof contentTypeOptions[number])
                         }
                       >
-                        <SelectTrigger 
+                        <SelectTrigger
                           className="h-11"
                           data-testid={`select-content-type-${index}`}
                         >
@@ -353,11 +353,11 @@ export default function CreateDealPage() {
                       <Label className="text-xs">Frequency</Label>
                       <Select
                         value={form.watch(`deliverables.${index}.frequency`)}
-                        onValueChange={(value) => 
+                        onValueChange={(value) =>
                           form.setValue(`deliverables.${index}.frequency`, value as typeof frequencyOptions[number])
                         }
                       >
-                        <SelectTrigger 
+                        <SelectTrigger
                           className="h-11"
                           data-testid={`select-frequency-${index}`}
                         >
@@ -407,7 +407,7 @@ export default function CreateDealPage() {
         <div className="pt-4">
           <Button
             type="submit"
-            className="w-full h-14 text-base font-semibold rounded-xl"
+            className="w-full h-14 text-base font-semibold rounded-xl gradient-btn text-white"
             disabled={createDeal.isPending}
             data-testid="button-submit-deal"
           >

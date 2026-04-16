@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Upload, PenTool } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -18,6 +19,7 @@ export default function OnboardingPage() {
   const [phone, setPhone] = useState("");
   const [panNumber, setPanNumber] = useState("");
   const [gstNumber, setGstNumber] = useState("");
+  const [billingAddress, setBillingAddress] = useState("");
   const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
 
@@ -65,10 +67,12 @@ export default function OnboardingPage() {
       return;
     }
 
-    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-    if (!panRegex.test(panNumber.toUpperCase())) {
-      toast({ title: "Invalid PAN format", description: "Format: ABCDE1234F", variant: "destructive" });
-      return;
+    if (panNumber.trim()) {
+      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+      if (!panRegex.test(panNumber.toUpperCase())) {
+        toast({ title: "Invalid PAN format", description: "Format: ABCDE1234F", variant: "destructive" });
+        return;
+      }
     }
 
     if (!signatureFile && !signaturePreview) {
@@ -100,8 +104,9 @@ export default function OnboardingPage() {
         firstName,
         lastName,
         phone: phone.replace(/\D/g, ""),
-        panNumber: panNumber.toUpperCase(),
+        panNumber: panNumber.trim() ? panNumber.toUpperCase() : null,
         gstNumber: gstNumber.trim() || null,
+        billingAddress: billingAddress.trim() || null,
         digitalSignature: digitalSignaturePath,
         onboardingComplete: true,
       });
@@ -122,7 +127,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted flex items-center justify-center px-4 py-8">
-      <Card className="w-full max-w-md">
+      <Card className="glass-card w-full max-w-md border-0 animate-fade-in">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Complete Your Profile</CardTitle>
           <CardDescription>
@@ -187,8 +192,20 @@ export default function OnboardingPage() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="billingAddress">Billing Address (Optional)</Label>
+              <Textarea
+                id="billingAddress"
+                placeholder="Full address for invoices (street, city, state, PIN)"
+                value={billingAddress}
+                onChange={(e) => setBillingAddress(e.target.value)}
+                rows={3}
+                data-testid="input-billing-address"
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label>Digital Signature *</Label>
-              <div className="border-2 border-dashed rounded-md p-4">
+              <div className="border-2 border-dashed border-white/20 rounded-md p-4">
                 {signaturePreview ? (
                   <div className="space-y-2">
                     <img
@@ -240,7 +257,7 @@ export default function OnboardingPage() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={isLoading} data-testid="button-complete-profile">
+            <Button type="submit" className="gradient-btn w-full" disabled={isLoading} data-testid="button-complete-profile">
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Complete Profile"}
             </Button>
           </form>

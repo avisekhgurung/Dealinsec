@@ -26,8 +26,8 @@ export default function PricingPage() {
       window.history.replaceState({}, "", "/pricing");
     } else if (params.get("error")) {
       setPaymentStatus("error");
-      toast({ 
-        title: "Payment failed", 
+      toast({
+        title: "Payment failed",
         description: params.get("error")?.replace(/_/g, " ") || "Please try again.",
         variant: "destructive"
       });
@@ -51,7 +51,7 @@ export default function PricingPage() {
       }
 
       const data = await res.json();
-      
+
       if (data.redirectUrl) {
         window.location.href = data.redirectUrl;
       } else if (data.formHtml) {
@@ -73,7 +73,7 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-50 bg-background border-b px-4 py-3 flex items-center gap-3">
+      <header className="glass-header sticky top-0 z-50 px-4 py-3 flex items-center gap-3">
         <Link href="/">
           <Button variant="ghost" size="icon" data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
@@ -82,7 +82,7 @@ export default function PricingPage() {
         <h1 className="text-xl font-semibold">Pricing</h1>
       </header>
 
-      <main className="p-4 max-w-lg mx-auto">
+      <main className="p-4 max-w-lg mx-auto animate-fade-in">
         {paymentStatus === "success" && (
           <Alert className="mb-4 border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950">
             <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
@@ -92,7 +92,7 @@ export default function PricingPage() {
             </AlertDescription>
           </Alert>
         )}
-        
+
         {paymentStatus === "error" && (
           <Alert className="mb-4" variant="destructive">
             <XCircle className="h-4 w-4" />
@@ -103,7 +103,7 @@ export default function PricingPage() {
           </Alert>
         )}
 
-        <Card className="mb-6">
+        <Card className="glass-card border-0 mb-6">
           <CardHeader className="text-center pb-2">
             <CardTitle className="text-lg">Your Balance</CardTitle>
           </CardHeader>
@@ -115,12 +115,13 @@ export default function PricingPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-primary">
-          <CardHeader className="text-center">
+        <Card className="glass-card border-primary/30 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/5 pointer-events-none" />
+          <CardHeader className="text-center relative">
             <CardTitle className="text-2xl">Contract Credit</CardTitle>
             <CardDescription>Create professional contracts with brands</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 relative">
             <div className="text-center">
               <span className="text-4xl font-bold">₹299</span>
               <span className="text-muted-foreground"> / credit</span>
@@ -144,9 +145,9 @@ export default function PricingPage() {
               </li>
             </ul>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="relative">
             <Button
-              className="w-full"
+              className="gradient-btn w-full text-white shadow-[0_0_20px_rgba(var(--primary-rgb,99,102,241),0.3)] hover:shadow-[0_0_30px_rgba(var(--primary-rgb,99,102,241),0.5)] transition-shadow"
               size="lg"
               onClick={handlePurchase}
               disabled={isLoading}

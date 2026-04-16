@@ -12,20 +12,20 @@ export function BottomNav() {
   const [location] = useLocation();
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 bg-background border-t border-border h-16 z-50 safe-area-pb">
+    <nav className="fixed bottom-0 inset-x-0 glass-nav h-16 z-50 safe-area-pb">
       <div className="flex items-center justify-around h-full max-w-lg mx-auto px-2">
         {navItems.map((item) => {
-          const isActive = location === item.path || 
+          const isActive = location === item.path ||
             (item.path !== "/" && location.startsWith(item.path));
           const Icon = item.icon;
-          
+
           return (
             <Link key={item.path} href={item.path}>
               <button
                 data-testid={`nav-${item.label.toLowerCase()}`}
                 className={`flex flex-col items-center justify-center gap-1 w-16 h-full transition-colors ${
-                  isActive 
-                    ? "text-primary" 
+                  isActive
+                    ? "text-purple-600 dark:text-purple-400"
                     : "text-muted-foreground"
                 }`}
               >
@@ -33,6 +33,9 @@ export function BottomNav() {
                 <span className={`text-xs font-medium ${isActive ? "font-semibold" : ""}`}>
                   {item.label}
                 </span>
+                {isActive && (
+                  <div className="w-1 h-1 rounded-full gradient-primary" />
+                )}
               </button>
             </Link>
           );
