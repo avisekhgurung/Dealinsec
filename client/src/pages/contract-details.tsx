@@ -16,14 +16,13 @@ import {
   Shield,
   Upload,
   FileText,
-  Receipt,
   Loader2,
   CheckCircle,
   CheckCircle2,
   ExternalLink,
   Download
 } from "lucide-react";
-import type { Contract, Invoice, Deal } from "@shared/schema";
+import type { Contract, Deal } from "@shared/schema";
 
 export default function ContractDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -37,17 +36,10 @@ export default function ContractDetailsPage() {
     queryKey: ["/api/contracts", params.id],
   });
 
-  const { data: invoices = [] } = useQuery<Invoice[]>({
-    queryKey: ["/api/invoices"],
-  });
-
   const { data: deal } = useQuery<Deal>({
     queryKey: ["/api/deals", contract?.dealId],
     enabled: !!contract?.dealId,
   });
-
-  const contractId = parseInt(params.id || "0");
-  const invoice = invoices.find(i => i.contractId === contractId);
 
   const backPath = "/contracts";
 
@@ -367,54 +359,6 @@ export default function ContractDetailsPage() {
                 />
               </CardContent>
             </Card>
-          </section>
-
-        <section className="space-y-3">
-            <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Platform Fee
-            </h3>
-
-            {invoice ? (
-              <Card className={`border-0 ${invoice.status === "Paid"
-                ? "bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/50 dark:border-emerald-800/40"
-                : "glass-card"}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`flex items-center justify-center w-10 h-10 rounded-lg ${
-                        invoice.status === "Paid"
-                          ? "bg-emerald-100 dark:bg-emerald-900/30"
-                          : "bg-amber-100 dark:bg-amber-900/30"
-                      }`}>
-                        {invoice.status === "Paid"
-                          ? <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                          : <Receipt className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                        }
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">
-                          {invoice.status === "Paid" ? "Paid via Credit" : invoice.invoiceNumber}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {invoice.status === "Paid"
-                            ? `₹${invoice.totalAmount.toLocaleString()} · 1 credit consumed`
-                            : `₹${invoice.totalAmount.toLocaleString()} due`
-                          }
-                        </p>
-                      </div>
-                    </div>
-                    <StatusBadge status={invoice.status} />
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="glass-card border-0">
-                <CardContent className="py-8 text-center">
-                  <Receipt className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">No invoice generated yet</p>
-                </CardContent>
-              </Card>
-            )}
           </section>
 
         <section className="space-y-3">
