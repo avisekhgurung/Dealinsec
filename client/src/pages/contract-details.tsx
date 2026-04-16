@@ -358,6 +358,36 @@ export default function ContractDetailsPage() {
           </CardContent>
         </Card>
 
+        {/* ── Download Agreement PDF — prominent CTA ── */}
+        <Card className="glass-card border-0 overflow-hidden">
+          <div className="bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-white/20 backdrop-blur-sm">
+                <FileText className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-white font-bold text-base">Agreement PDF</h3>
+                <p className="text-white/75 text-xs leading-snug">
+                  Download &amp; send to {contract.brandName} for signing
+                </p>
+              </div>
+            </div>
+          </div>
+          <CardContent className="p-4 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              A professional agreement document with all deal terms, deliverables, timeline, and signature blocks — ready for the brand to review and sign.
+            </p>
+            <Button
+              className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
+              onClick={() => setLocation(`/contracts/${params.id}/export`)}
+              data-testid="button-download-agreement-pdf"
+            >
+              <Download className="w-5 h-5 mr-2" />
+              View &amp; Download Agreement PDF
+            </Button>
+          </CardContent>
+        </Card>
+
         <section className="space-y-3">
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
               Contract Proof
