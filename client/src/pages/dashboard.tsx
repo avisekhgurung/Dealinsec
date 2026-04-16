@@ -394,17 +394,6 @@ export default function DashboardPage() {
         )}
       </main>
 
-      {/* FAB — positioned above credit pill + bottom nav */}
-      <Link href="/deals/new">
-        <button
-          data-testid="fab-create-deal"
-          className="gradient-btn fixed right-4 w-12 h-12 rounded-full shadow-lg flex items-center justify-center z-40"
-          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 120px)" }}
-        >
-          <Plus className="w-5 h-5 text-white" />
-        </button>
-      </Link>
-
       <BottomNav />
     </div>
   );
