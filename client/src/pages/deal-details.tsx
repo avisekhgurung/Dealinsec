@@ -27,7 +27,7 @@ export default function DealDetailsPage() {
   });
 
   // Fetch quote for this deal without throwing on 404
-  const { data: quote } = useQuery<Quote | null>({
+  const { data: quote, isLoading: quoteLoading } = useQuery<Quote | null>({
     queryKey: ["/api/deals", params.id, "quote"],
     queryFn: async () => {
       const res = await fetch(`/api/deals/${params.id}/quote`, { credentials: "include" });
@@ -89,6 +89,7 @@ export default function DealDetailsPage() {
   const brandInvoice = brandInvoices.find(inv => inv.dealId === dealId);
   const hasInvoice = !!brandInvoice;
   const hasQuote = !!quote;
+  const stepsReady = !quoteLoading;
 
   // Determine current step (1=Deal, 2=Quote, 3=Agreement, 4=Invoice)
   const currentStep = hasInvoice ? 4 : hasContract ? (hasProof ? 4 : 3) : hasQuote ? 3 : 2;
@@ -247,8 +248,8 @@ export default function DealDetailsPage() {
               </div>
             )}
 
-            {/* 4-step action buttons */}
-            {(
+            {/* 4-step action buttons — only shown once quote query resolves */}
+            {stepsReady && (
               <div className="mt-3 space-y-2">
                 {/* Step 1 → 2: Generate Quote */}
                 {!hasQuote && (
