@@ -1,10 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowLeft, Download } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ArrowLeft, Download, CheckCircle, Loader2 } from "lucide-react";
 import type { BrandInvoice, Deal } from "@shared/schema";
 
 export default function BrandInvoiceDetailsPage() {
@@ -19,6 +21,23 @@ export default function BrandInvoiceDetailsPage() {
   const { data: deal } = useQuery<Deal>({
     queryKey: ["/api/deals", invoice?.dealId],
     enabled: !!invoice?.dealId,
+  });
+
+  const { toast } = useToast();
+
+  const markPaid = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/brand-invoices/${id}`, { status: "Paid" });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices", id] });
+      toast({ title: "Invoice marked as paid" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update", variant: "destructive" });
+    },
   });
 
   const fmt = (dateStr: string) =>
@@ -70,11 +89,8 @@ export default function BrandInvoiceDetailsPage() {
     );
   }
 
-  /* ── Amount breakdown ───────────────────────────── */
+  /* ── Amount ───────────────────────────── */
   const totalAmount = invoice.dealAmount;
-  const gstRate = 0.18;
-  const baseAmount = Math.round(totalAmount / (1 + gstRate));
-  const gstAmount = totalAmount - baseAmount;
 
   const influencerName =
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
@@ -242,29 +258,13 @@ export default function BrandInvoiceDetailsPage() {
                         : "—"}
                     </td>
                     <td className="py-3 text-right font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">
-                      ₹{baseAmount.toLocaleString("en-IN")}
+                      ₹{totalAmount.toLocaleString("en-IN")}
                     </td>
                   </tr>
                 </tbody>
 
-                {/* ── Totals ───────────────────────── */}
+                {/* ── Total ───────────────────────── */}
                 <tfoot>
-                  <tr>
-                    <td colSpan={3} className="pt-4 pr-4 text-right text-xs text-gray-500 dark:text-gray-400">
-                      Subtotal
-                    </td>
-                    <td className="pt-4 text-right text-sm font-medium text-gray-700 dark:text-gray-300">
-                      ₹{baseAmount.toLocaleString("en-IN")}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td colSpan={3} className="pt-1 pr-4 text-right text-xs text-gray-500 dark:text-gray-400">
-                      GST (18%)
-                    </td>
-                    <td className="pt-1 text-right text-sm font-medium text-gray-700 dark:text-gray-300">
-                      ₹{gstAmount.toLocaleString("en-IN")}
-                    </td>
-                  </tr>
                   <tr>
                     <td colSpan={3} className="pt-3 pr-4 text-right font-bold text-gray-900 dark:text-gray-100 border-t-2 border-gray-200 dark:border-zinc-700">
                       Total Amount
@@ -337,6 +337,34 @@ export default function BrandInvoiceDetailsPage() {
             </div>
           </div>
         </main>
+
+        {/* Mark as Paid / Paid status */}
+        <div className="px-4 pb-6 print:hidden">
+          {invoice.status === "Unpaid" ? (
+            <Button
+              className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
+              onClick={() => markPaid.mutate()}
+              disabled={markPaid.isPending}
+            >
+              {markPaid.isPending ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-5 h-5 mr-2" />
+                  Mark as Paid
+                </>
+              )}
+            </Button>
+          ) : (
+            <div className="flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30">
+              <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <span className="font-semibold text-emerald-700 dark:text-emerald-300">Payment Received</span>
+            </div>
+          )}
+        </div>
 
         <div className="print:hidden">
           <BottomNav />

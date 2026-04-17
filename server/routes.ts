@@ -660,6 +660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dealAmount: advanceAmount,
         invoiceType: "advance",
         splitPercentage: advancePercentage,
+        status: "Paid" as const,
       });
 
       const finalInvoice = await storage.createBrandInvoice({
@@ -668,6 +669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dealAmount: finalAmount,
         invoiceType: "final",
         splitPercentage: 100 - advancePercentage,
+        status: "Unpaid" as const,
       });
 
       res.status(201).json([advanceInvoice, finalInvoice]);

@@ -22,22 +22,20 @@ import { PlatformIcon } from "@/components/platform-icon";
 import { BottomNav } from "@/components/bottom-nav";
 import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle } from "lucide-react";
 import {
-  insertDealSchema,
   platformOptions,
   contentTypeOptions,
   frequencyOptions,
-  deliverableModeOptions,
 } from "@shared/schema";
 import type { Deal, Deliverable } from "@shared/schema";
 
-const formSchema = insertDealSchema.omit({ userId: true }).extend({
+const formSchema = z.object({
   brandName: z.string().min(1, "Brand name is required"),
   dealTitle: z.string().min(1, "Deal title is required"),
   dealAmount: z.coerce.number().min(1, "Deal amount must be positive"),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
   brandUserId: z.string().optional().nullable(),
-  deliverableMode: z.enum(deliverableModeOptions),
+  deliverableMode: z.enum(["all", "any_one"]).optional().default("all"),
   deliverables: z.array(z.object({
     id: z.string(),
     platform: z.enum(platformOptions),
@@ -310,40 +308,6 @@ export default function EditDealPage() {
                   </p>
                 )}
               </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            Deliverable Mode
-          </h2>
-          <div className="glass-card rounded-xl p-5">
-            <div className="flex gap-3">
-              <label className="flex-1 cursor-pointer">
-                <input
-                  type="radio"
-                  className="peer sr-only"
-                  value="all"
-                  {...form.register("deliverableMode")}
-                />
-                <div className="rounded-lg border-2 border-muted p-3 text-center transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
-                  <p className="font-medium text-sm">All Required</p>
-                  <p className="text-xs text-muted-foreground mt-1">Brand must complete all deliverables</p>
-                </div>
-              </label>
-              <label className="flex-1 cursor-pointer">
-                <input
-                  type="radio"
-                  className="peer sr-only"
-                  value="any_one"
-                  {...form.register("deliverableMode")}
-                />
-                <div className="rounded-lg border-2 border-muted p-3 text-center transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
-                  <p className="font-medium text-sm">Brand Chooses One</p>
-                  <p className="text-xs text-muted-foreground mt-1">Brand picks one deliverable option</p>
-                </div>
-              </label>
             </div>
           </div>
         </section>

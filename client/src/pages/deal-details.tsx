@@ -11,7 +11,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check } from "lucide-react";
+import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle } from "lucide-react";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
 
 export default function DealDetailsPage() {
@@ -135,7 +135,7 @@ export default function DealDetailsPage() {
   const contract = contracts.find(c => c.dealId === dealId);
   const hasProof = !!contract?.proofFileName;
   const hasInvoice = dealBrandInvoices.length > 0;
-  const hasQuote = !!quote;
+  const hasQuote = !!quote && quote.status === "draft";
   const stepsReady = !quoteLoading;
 
   // Determine current step (1=Deal, 2=Quote, 3=Agreement, 4=Invoice)
@@ -303,6 +303,16 @@ export default function DealDetailsPage() {
             {/* 4-step action buttons — only shown once quote query resolves */}
             {stepsReady && (
               <div className="mt-3 space-y-2">
+                {/* Revised quote banner */}
+                {quote && quote.status === "revised" && (
+                  <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      Deal was edited. Previous quote is outdated — please generate a new one.
+                    </p>
+                  </div>
+                )}
+
                 {/* Step 1 → 2: Generate Quote */}
                 {!hasQuote && (
                   <Button
