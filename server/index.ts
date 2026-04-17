@@ -126,11 +126,9 @@ async function initStripe() {
   app.use(passport.session());
 
   app.get("/api/auth/google", (req: any, res, next) => {
-    // Store referral code in session before redirecting to Google
-    if (req.query.ref) {
-      (req.session as any).referralCode = req.query.ref;
-    }
-    passport.authenticate("google", { scope: ["profile", "email"] })(req, res, next);
+    // Pass referral code via OAuth state parameter so it survives the redirect
+    const state = req.query.ref ? JSON.stringify({ ref: req.query.ref }) : undefined;
+    passport.authenticate("google", { scope: ["profile", "email"], state })(req, res, next);
   });
   app.get(
     "/api/auth/google/callback",
@@ -139,20 +137,32 @@ async function initStripe() {
       if (req.user) {
         (req.session as any).userId = req.user.id;
 
-        // Process referral code if present in session
-        const referralCode = (req.session as any).referralCode;
+        // Process referral code from OAuth state parameter
+        let referralCode: string | null = null;
+        try {
+          if (req.query.state) {
+            const state = JSON.parse(req.query.state as string);
+            referralCode = state.ref || null;
+          }
+        } catch {}
+
         if (referralCode) {
-          delete (req.session as any).referralCode;
           try {
             const referrer = await storage.getUserByReferralCode(referralCode);
             if (referrer && referrer.id !== req.user.id) {
-              const creditsToAward = parseInt(process.env.REFERRAL_CREDITS ?? '1');
-              await storage.addCredits(referrer.id, creditsToAward, 'referral');
-              await storage.createReferral({
-                referrerId: referrer.id,
-                referredUserId: req.user.id,
-                creditAwarded: creditsToAward,
-              });
+              // Check if referral already exists to prevent duplicates
+              const existingReferrals = await storage.getReferralsByUser(referrer.id);
+              const alreadyReferred = existingReferrals.some((r: any) => r.referredUserId === req.user.id);
+              if (!alreadyReferred) {
+                const creditsToAward = parseInt(process.env.REFERRAL_CREDITS ?? '1');
+                await storage.addCredits(referrer.id, creditsToAward, 'referral');
+                await storage.createReferral({
+                  referrerId: referrer.id,
+                  referredUserId: req.user.id,
+                  creditAwarded: creditsToAward,
+                });
+                console.log(`Referral credit awarded to ${referrer.email} from ${req.user.email}`);
+              }
             }
           } catch (err) {
             console.error("Referral processing error:", err);

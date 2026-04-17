@@ -176,7 +176,10 @@ export default function DashboardPage() {
 
   const recentDeals = deals.slice(0, 3);
 
-  const handleLogout = () => { window.location.href = "/api/logout"; };
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    window.location.href = "/";
+  };
 
   return (
     <div className="min-h-screen bg-background pb-24">

@@ -55,8 +55,8 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      setLocation("/");
+      queryClient.clear();
+      window.location.href = "/";
     } catch (error) {
       toast({ title: "Failed to logout", variant: "destructive" });
     }
