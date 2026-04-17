@@ -25,7 +25,7 @@ export default function DealsPage() {
     <div className="min-h-screen bg-background pb-20">
       <header className="glass-header sticky top-0 z-40">
         <div className="flex items-center justify-between gap-4 px-4 py-4">
-          <h1 className="text-xl font-bold">Brand Deals</h1>
+          <h1 className="text-xl font-bold">Deals</h1>
           <Link href="/deals/new">
             <Button size="sm" className="gradient-btn text-white" data-testid="button-new-deal">
               <Plus className="w-4 h-4 mr-1" />

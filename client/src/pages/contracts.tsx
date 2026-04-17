@@ -53,7 +53,7 @@ export default function ContractsPage() {
     <div className="min-h-screen bg-background pb-20">
       <header className="glass-header sticky top-0 z-40">
         <div className="px-4 py-4">
-          <h1 className="text-xl font-bold mb-4">Contracts</h1>
+          <h1 className="text-xl font-bold mb-4">Agreements</h1>
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
             {filters.map((f) => (
               <Button
@@ -166,7 +166,7 @@ export default function ContractsPage() {
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted mx-auto mb-4">
                 <FileText className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h3 className="font-semibold mb-1">No contracts yet</h3>
+              <h3 className="font-semibold mb-1">No agreements yet</h3>
               <p className="text-sm text-muted-foreground mb-4">
                 {filter === "all"
                   ? "Accept a deal to create your first contract"
