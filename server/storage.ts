@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
 import {
-  users, deals, contracts, invoices, brandInvoices, creditTransactions, payuOrders, quotes,
+  users, deals, contracts, invoices, brandInvoices, creditTransactions, payuOrders, quotes, referrals,
   type User, type UpsertUser,
   type Deal, type InsertDeal,
   type Contract, type InsertContract,
@@ -9,7 +9,8 @@ import {
   type BrandInvoice, type InsertBrandInvoice,
   type CreditTransaction, type InsertCreditTransaction,
   type PayuOrder, type InsertPayuOrder,
-  type Quote, type InsertQuote
+  type Quote, type InsertQuote,
+  type Referral, type InsertReferral
 } from "@shared/schema";
 
 export interface IStorage {
@@ -56,7 +57,14 @@ export interface IStorage {
 
   createQuote(data: InsertQuote): Promise<Quote>;
   getQuoteByDealId(dealId: number): Promise<Quote | undefined>;
+  getQuotesByDealId(dealId: number): Promise<Quote[]>;
   updateQuote(id: number, updates: Partial<Quote>): Promise<Quote | undefined>;
+
+  getBrandInvoicesByDealId(dealId: number): Promise<BrandInvoice[]>;
+
+  getUserByReferralCode(code: string): Promise<User | undefined>;
+  createReferral(data: InsertReferral): Promise<Referral>;
+  getReferralsByUser(userId: string): Promise<Referral[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -273,13 +281,35 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getQuoteByDealId(dealId: number): Promise<Quote | undefined> {
-    const [quote] = await db.select().from(quotes).where(eq(quotes.dealId, dealId));
+    const [quote] = await db.select().from(quotes).where(eq(quotes.dealId, dealId)).orderBy(desc(quotes.createdAt)).limit(1);
     return quote;
+  }
+
+  async getQuotesByDealId(dealId: number): Promise<Quote[]> {
+    return db.select().from(quotes).where(eq(quotes.dealId, dealId)).orderBy(desc(quotes.createdAt));
   }
 
   async updateQuote(id: number, updates: Partial<Quote>): Promise<Quote | undefined> {
     const [updated] = await db.update(quotes).set(updates).where(eq(quotes.id, id)).returning();
     return updated;
+  }
+
+  async getBrandInvoicesByDealId(dealId: number): Promise<BrandInvoice[]> {
+    return db.select().from(brandInvoices).where(eq(brandInvoices.dealId, dealId));
+  }
+
+  async getUserByReferralCode(code: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.referralCode, code));
+    return user;
+  }
+
+  async createReferral(data: InsertReferral): Promise<Referral> {
+    const [created] = await db.insert(referrals).values(data as any).returning();
+    return created;
+  }
+
+  async getReferralsByUser(userId: string): Promise<Referral[]> {
+    return db.select().from(referrals).where(eq(referrals.referrerId, userId)).orderBy(desc(referrals.createdAt));
   }
 }
 

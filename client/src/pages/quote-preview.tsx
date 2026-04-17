@@ -4,7 +4,7 @@ import { getQueryFn, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { BottomNav } from "@/components/bottom-nav";
-import { ArrowLeft, Download, ArrowRight, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Download, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
 import { SiInstagram, SiYoutube, SiFacebook } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import type { Deal, User, Quote } from "@shared/schema";
@@ -41,6 +41,17 @@ export default function QuotePreviewPage() {
   const { data: authUser } = useQuery<User>({
     queryKey: ["/api/auth/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+
+  // Fetch quote for this deal without throwing on 404
+  const { data: quote } = useQuery<Quote | null>({
+    queryKey: ["/api/deals", params.id, "quote"],
+    queryFn: async () => {
+      const res = await fetch(`/api/deals/${params.id}/quote`, { credentials: "include" });
+      if (res.status === 404) return null;
+      if (!res.ok) return null;
+      return res.json();
+    },
   });
 
   const dealId = parseInt(params.id || "0");
@@ -161,6 +172,18 @@ export default function QuotePreviewPage() {
         </div>
       </div>
 
+      {quote?.status === "revised" && (
+        <div className="px-4 pt-2 print:hidden">
+          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">This quote has been revised</p>
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">The deal details were updated. Go back to the deal page to generate a new quote.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className="px-4 py-4 space-y-6 animate-fade-in">
         {/* Professional Quote Document */}
         <div className="glass-card rounded-2xl overflow-hidden border border-white/10 print:shadow-none print:border print:border-gray-200">
@@ -168,7 +191,9 @@ export default function QuotePreviewPage() {
           <div className="bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-6 text-white print:bg-purple-700">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-3xl font-extrabold tracking-wider mb-1">QUOTATION</h2>
+                <h2 className="text-3xl font-extrabold tracking-wider mb-1">
+                  QUOTATION{quote?.version && quote.version > 1 ? ` (Revised - v${quote.version})` : ""}
+                </h2>
                 <p className="text-violet-200 font-mono text-sm">{quoteNumber}</p>
               </div>
               <div className="text-right text-sm">
@@ -207,8 +232,13 @@ export default function QuotePreviewPage() {
             {/* Deliverables table */}
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-                Deliverables
+                {deal.deliverableMode === "any_one" ? "Deliverable Options (choose one)" : "Deliverables"}
               </p>
+              {deal.deliverableMode === "any_one" && (
+                <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2 text-sm text-amber-800 dark:text-amber-300 mb-3">
+                  The brand may choose <strong>one</strong> of the following deliverables.
+                </div>
+              )}
               <div className="overflow-x-auto rounded-xl border border-white/10">
                 <table className="w-full text-sm">
                   <thead>

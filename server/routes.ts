@@ -119,7 +119,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Generate or get quote for a deal
+  // Edit a deal (only Pending deals)
+  app.patch("/api/deals/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const dealId = parseInt(req.params.id);
+      const deal = await storage.getDeal(dealId);
+      if (!deal) return res.status(404).json({ error: "Deal not found" });
+      if (deal.userId !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      if (deal.status !== "Pending") {
+        return res.status(400).json({ error: "Only pending deals can be edited" });
+      }
+
+      const { brandName, dealTitle, dealAmount, startDate, endDate, deliverables, brandUserId, deliverableMode } = req.body;
+      const updates: any = {};
+      if (brandName !== undefined) updates.brandName = brandName;
+      if (dealTitle !== undefined) updates.dealTitle = dealTitle;
+      if (dealAmount !== undefined) updates.dealAmount = dealAmount;
+      if (startDate !== undefined) updates.startDate = startDate;
+      if (endDate !== undefined) updates.endDate = endDate;
+      if (deliverables !== undefined) updates.deliverables = deliverables;
+      if (brandUserId !== undefined) updates.brandUserId = brandUserId;
+      if (deliverableMode !== undefined) updates.deliverableMode = deliverableMode;
+
+      const updated = await storage.updateDeal(dealId, updates);
+
+      // If a quote exists, mark it as revised so user can regenerate
+      const existingQuote = await storage.getQuoteByDealId(dealId);
+      if (existingQuote && existingQuote.status === "draft") {
+        await storage.updateQuote(existingQuote.id, { status: "revised" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Deal update error:", error);
+      res.status(500).json({ error: "Failed to update deal" });
+    }
+  });
+
+  // Generate or get quote for a deal (supports revision flow)
   app.post("/api/deals/:id/quote", isAuthenticated, async (req: any, res) => {
     try {
       const dealId = parseInt(req.params.id);
@@ -128,10 +165,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (deal.userId !== req.user.id) return res.status(403).json({ error: "Not authorized" });
 
       const existing = await storage.getQuoteByDealId(dealId);
-      if (existing) {
+
+      // If latest quote is still draft, return it (idempotent)
+      if (existing && existing.status === "draft") {
         return res.json(existing);
       }
-      const quote = await storage.createQuote({ userId: req.user.id, dealId, status: "draft" });
+
+      // Create new quote (first one, or after revision)
+      const newVersion = existing ? (existing.version || 1) + 1 : 1;
+      const quote = await storage.createQuote({
+        userId: req.user.id,
+        dealId,
+        status: "draft",
+        version: newVersion,
+      });
       res.status(201).json(quote);
     } catch (error) {
       res.status(500).json({ error: "Failed to create quote" });
@@ -549,11 +596,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all brand invoices for a specific deal
+  app.get("/api/deals/:id/brand-invoices", isAuthenticated, async (req: any, res) => {
+    try {
+      const dealId = parseInt(req.params.id);
+      const deal = await storage.getDeal(dealId);
+      if (!deal) return res.status(404).json({ error: "Deal not found" });
+      if (deal.userId !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+
+      const invoices = await storage.getBrandInvoicesByDealId(dealId);
+      res.json(invoices);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch invoices" });
+    }
+  });
+
+  // Split deal amount into advance + final invoices
+  app.post("/api/deals/:id/split-invoices", isAuthenticated, async (req: any, res) => {
+    try {
+      const dealId = parseInt(req.params.id);
+      const deal = await storage.getDeal(dealId);
+      if (!deal) return res.status(404).json({ error: "Deal not found" });
+      if (deal.userId !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+
+      const { advancePercentage } = req.body;
+      if (!advancePercentage || advancePercentage < 1 || advancePercentage > 99) {
+        return res.status(400).json({ error: "advancePercentage must be between 1 and 99" });
+      }
+
+      // Check if split invoices already exist for this deal
+      const existing = await storage.getBrandInvoicesByDealId(dealId);
+      if (existing.length > 0) {
+        return res.status(400).json({ error: "Invoices already exist for this deal" });
+      }
+
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      const influencerName = user?.firstName && user?.lastName
+        ? `${user.firstName} ${user.lastName}`
+        : user?.email || "Influencer";
+
+      const advanceAmount = Math.round(deal.dealAmount * advancePercentage / 100);
+      const finalAmount = deal.dealAmount - advanceAmount;
+
+      // Find contractId for this deal
+      const contracts = await storage.getContracts(userId);
+      const contract = contracts.find(c => c.dealId === dealId);
+
+      const baseData = {
+        userId,
+        invoiceDate: new Date().toISOString().split("T")[0],
+        dealId,
+        contractId: contract?.id || null,
+        brandName: deal.brandName,
+        influencerName,
+        influencerEmail: user?.email || null,
+        status: "Unpaid" as const,
+      };
+
+      const advanceInvoice = await storage.createBrandInvoice({
+        ...baseData,
+        invoiceNumber: await storage.generateBrandInvoiceNumber(),
+        dealAmount: advanceAmount,
+        invoiceType: "advance",
+        splitPercentage: advancePercentage,
+      });
+
+      const finalInvoice = await storage.createBrandInvoice({
+        ...baseData,
+        invoiceNumber: await storage.generateBrandInvoiceNumber(),
+        dealAmount: finalAmount,
+        invoiceType: "final",
+        splitPercentage: 100 - advancePercentage,
+      });
+
+      res.status(201).json([advanceInvoice, finalInvoice]);
+    } catch (error) {
+      console.error("Split invoice error:", error);
+      res.status(500).json({ error: "Failed to create split invoices" });
+    }
+  });
+
+  // Get referral info for authenticated user
+  app.get("/api/referrals", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      const referralsList = await storage.getReferralsByUser(userId);
+      const totalCreditsEarned = referralsList.reduce((sum, r) => sum + (r.creditAwarded || 0), 0);
+
+      res.json({
+        referralCode: user?.referralCode || null,
+        referrals: referralsList,
+        totalCreditsEarned,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch referral info" });
+    }
+  });
+
   app.patch("/api/profile", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { firstName, lastName, phone, panNumber, gstNumber, digitalSignature, onboardingComplete } = req.body;
-      
+      const { firstName, lastName, phone, panNumber, gstNumber, digitalSignature, onboardingComplete, billingAddress } = req.body;
+
       const updates: any = {};
       if (firstName !== undefined) updates.firstName = firstName;
       if (lastName !== undefined) updates.lastName = lastName;
@@ -562,6 +708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (gstNumber !== undefined) updates.gstNumber = gstNumber;
       if (digitalSignature !== undefined) updates.digitalSignature = digitalSignature;
       if (onboardingComplete !== undefined) updates.onboardingComplete = onboardingComplete;
+      if (billingAddress !== undefined) updates.billingAddress = billingAddress;
       
       const user = await storage.updateUser(userId, updates);
       if (!user) {

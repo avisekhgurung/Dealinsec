@@ -20,8 +20,11 @@ import {
   CheckCircle,
   CheckCircle2,
   ExternalLink,
-  Download
+  Download,
+  Scissors,
+  Receipt
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import type { Contract, Deal, BrandInvoice } from "@shared/schema";
 
 export default function ContractDetailsPage() {
@@ -31,6 +34,9 @@ export default function ContractDetailsPage() {
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [showSplitInput, setShowSplitInput] = useState(false);
+  const [splitPercentageStr, setSplitPercentageStr] = useState("50");
+  const splitPercentage = Math.min(99, Math.max(1, parseInt(splitPercentageStr) || 50));
 
   const { data: contract, isLoading } = useQuery<Contract>({
     queryKey: ["/api/contracts", params.id],
@@ -455,37 +461,118 @@ export default function ContractDetailsPage() {
 
             <Card className="glass-card border-0">
               <CardContent className="p-4">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                    <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">Generate Invoice for Brand</p>
-                    <p className="text-xs text-muted-foreground">
-                      {contract.status !== "Signed"
-                        ? "Upload signed contract proof to enable billing"
-                        : `Create a professional invoice to send to ${contract.brandName}`}
+                {!hasInvoice ? (
+                  <>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                        <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">Generate Invoice for Brand</p>
+                        <p className="text-xs text-muted-foreground">
+                          {contract.status !== "Signed"
+                            ? "Upload signed contract proof to enable billing"
+                            : `Create a professional invoice to send to ${contract.brandName}`}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Single invoice */}
+                    <Button
+                      className="w-full gradient-btn text-white mb-2"
+                      onClick={() => createBrandInvoice.mutate()}
+                      disabled={createBrandInvoice.isPending || !contract || !deal || contract.status !== "Signed"}
+                      data-testid="button-generate-brand-invoice"
+                    >
+                      {createBrandInvoice.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="w-4 h-4 mr-2" />
+                          Generate Single Invoice
+                        </>
+                      )}
+                    </Button>
+
+                    {/* Split invoice toggle */}
+                    {!showSplitInput ? (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => setShowSplitInput(true)}
+                        disabled={contract.status !== "Signed"}
+                      >
+                        <Scissors className="w-4 h-4 mr-2" />
+                        Split Invoice (Advance + Final)
+                      </Button>
+                    ) : (
+                      <div className="border border-white/10 rounded-lg p-3 space-y-3">
+                        <p className="text-sm font-medium">Split into Advance + Final</p>
+                        <div className="flex items-center gap-3">
+                          <label className="text-xs text-muted-foreground whitespace-nowrap">Advance %</label>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            value={splitPercentageStr}
+                            onChange={(e) => setSplitPercentageStr(e.target.value.replace(/[^0-9]/g, ""))}
+                            className="w-20 h-8 text-sm"
+                            placeholder="50"
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            ₹{Math.round((deal?.dealAmount || 0) * splitPercentage / 100).toLocaleString()} + ₹{((deal?.dealAmount || 0) - Math.round((deal?.dealAmount || 0) * splitPercentage / 100)).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            className="flex-1 gradient-btn text-white"
+                            onClick={async () => {
+                              try {
+                                const res = await apiRequest("POST", `/api/deals/${contract.dealId}/split-invoices`, { advancePercentage: splitPercentage });
+                                const invoices = await res.json();
+                                queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices"] });
+                                toast({ title: "Invoices created", description: "Advance and final invoices generated." });
+                                setShowSplitInput(false);
+                                if (invoices[0]) setLocation(`/brand-invoices/${invoices[0].id}`);
+                              } catch {
+                                toast({ title: "Error", description: "Failed to create split invoices.", variant: "destructive" });
+                              }
+                            }}
+                            disabled={!deal}
+                          >
+                            Create Split Invoices
+                          </Button>
+                          <Button variant="outline" onClick={() => setShowSplitInput(false)}>Cancel</Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4" />
+                      Invoice{brandInvoices.filter(inv => inv.contractId === contractId).length > 1 ? "s" : ""} Generated
                     </p>
+                    {brandInvoices.filter(inv => inv.contractId === contractId).map(inv => (
+                      <Link key={inv.id} href={`/brand-invoices/${inv.id}`}>
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover-elevate cursor-pointer">
+                          <div className="flex items-center gap-2">
+                            <Receipt className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm font-medium">
+                              {(inv as any).invoiceType === "advance" ? "Advance" : (inv as any).invoiceType === "final" ? "Final" : "Invoice"}
+                            </span>
+                            <span className="text-xs text-muted-foreground">₹{inv.dealAmount.toLocaleString()}</span>
+                          </div>
+                          <Badge variant={inv.status === "Paid" ? "default" : "secondary"} className="text-xs">
+                            {inv.status}
+                          </Badge>
+                        </div>
+                      </Link>
+                    ))}
                   </div>
-                </div>
-                <Button
-                  className="w-full gradient-btn text-white"
-                  onClick={() => createBrandInvoice.mutate()}
-                  disabled={createBrandInvoice.isPending || !contract || !deal || contract.status !== "Signed"}
-                  data-testid="button-generate-brand-invoice"
-                >
-                  {createBrandInvoice.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="w-4 h-4 mr-2" />
-                      Generate Invoice for Brand
-                    </>
-                  )}
-                </Button>
+                )}
               </CardContent>
             </Card>
           </section>

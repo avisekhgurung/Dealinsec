@@ -59,7 +59,7 @@ export default function BrandInvoiceDetailsPage() {
       <div className="min-h-screen bg-background pb-20">
         <header className="glass-header sticky top-0 z-40 print:hidden">
           <div className="flex items-center gap-3 px-4 py-4">
-            <Button variant="ghost" size="icon" onClick={() => setLocation("/billing")}>
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/invoices")}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className="text-xl font-bold">Invoice Not Found</h1>
@@ -94,7 +94,7 @@ export default function BrandInvoiceDetailsPage() {
         <header className="glass-header sticky top-0 z-40 print:hidden">
           <div className="flex items-center justify-between gap-3 px-4 py-4">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => setLocation("/billing")}>
+              <Button variant="ghost" size="icon" onClick={() => setLocation("/invoices")}>
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <h1 className="text-xl font-bold">Invoice</h1>
@@ -118,7 +118,24 @@ export default function BrandInvoiceDetailsPage() {
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                   <h1 className="text-2xl font-extrabold tracking-wide">INVOICE</h1>
-                  <p className="text-sm text-white/80 mt-1 font-medium">{invoice.invoiceNumber}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-sm text-white/80 font-medium">{invoice.invoiceNumber}</p>
+                    {invoice.invoiceType === "advance" && (
+                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-500/30 text-amber-100 border border-amber-300/40">
+                        Advance Payment
+                      </span>
+                    )}
+                    {invoice.invoiceType === "final" && (
+                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-emerald-500/30 text-emerald-100 border border-emerald-300/40">
+                        Final Payment
+                      </span>
+                    )}
+                  </div>
+                  {(invoice.invoiceType === "advance" || invoice.invoiceType === "final") && (invoice as any).splitPercentage && (
+                    <p className="text-[10px] text-white/60 mt-0.5">
+                      {(invoice as any).splitPercentage}% of total deal value
+                    </p>
+                  )}
                 </div>
                 <div className="text-right text-sm">
                   <span
@@ -291,32 +308,24 @@ export default function BrandInvoiceDetailsPage() {
                     Authorised Signatory
                   </p>
                   {signatureUrl ? (
-                    <div className="mb-2">
+                    <div className="mb-1">
                       <img
                         src={signatureUrl}
                         alt="Digital Signature"
-                        className="h-16 max-w-[200px] object-contain"
-                        style={{ filter: "contrast(1.2)" }}
+                        className="h-10 w-auto object-contain"
                       />
                     </div>
                   ) : (
-                    <div className="h-16 w-48 border-b-2 border-gray-300 dark:border-zinc-600 mb-2" />
+                    <>
+                      <div className="h-16 w-48 border-b-2 border-gray-300 dark:border-zinc-600 mb-2" />
+                      <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{influencerName}</p>
+                    </>
                   )}
-                  <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{influencerName}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                     Date: {fmt(invoice.invoiceDate)}
                   </p>
                 </div>
 
-                {/* Received by (brand) */}
-                <div className="flex-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">
-                    Received By
-                  </p>
-                  <div className="h-16 w-48 border-b-2 border-gray-300 dark:border-zinc-600 mb-2" />
-                  <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{invoice.brandName}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Date: _______________</p>
-                </div>
               </div>
             </div>
 
@@ -373,7 +382,16 @@ export default function BrandInvoiceDetailsPage() {
           .bg-gray-50 { background-color: #f9fafb !important; }
           .bg-violet-50 { background-color: #f5f3ff !important; }
 
-          img { max-width: 200px; }
+          img {
+            max-width: 100% !important;
+            max-height: 80px !important;
+            object-fit: contain !important;
+          }
+
+          .invoice-doc img {
+            display: block !important;
+            visibility: visible !important;
+          }
         }
       `}</style>
     </>

@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useParams, Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { PlatformIcon } from "@/components/platform-icon";
@@ -9,7 +11,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard } from "lucide-react";
+import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check } from "lucide-react";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
 
 export default function DealDetailsPage() {
@@ -17,6 +19,25 @@ export default function DealDetailsPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
+  const [splitPercentageStr, setSplitPercentageStr] = useState("50");
+  const [completedIds, setCompletedIds] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(`deliverables-done-${params.id}`);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  const toggleDeliverable = (id: string) => {
+    setCompletedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      localStorage.setItem(`deliverables-done-${params.id}`, JSON.stringify(Array.from(next)));
+      return next;
+    });
+  };
+  const splitPercentage = Math.min(99, Math.max(1, parseInt(splitPercentageStr) || 50));
+  const [showSplitInput, setShowSplitInput] = useState(false);
 
   const { data: deal, isLoading } = useQuery<Deal>({
     queryKey: ["/api/deals", params.id],
@@ -37,9 +58,14 @@ export default function DealDetailsPage() {
     },
   });
 
-  // Fetch brand invoices to check if one exists for this deal
-  const { data: brandInvoices = [] } = useQuery<BrandInvoice[]>({
-    queryKey: ["/api/brand-invoices"],
+  // Fetch brand invoices specific to this deal
+  const { data: dealBrandInvoices = [] } = useQuery<BrandInvoice[]>({
+    queryKey: ["/api/deals", params.id, "brand-invoices"],
+    queryFn: async () => {
+      const res = await fetch(`/api/deals/${params.id}/brand-invoices`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
   });
 
   const generateQuote = useMutation({
@@ -82,12 +108,33 @@ export default function DealDetailsPage() {
     },
   });
 
+  const splitInvoices = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/deals/${params.id}/split-invoices`, { advancePercentage: splitPercentage });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/deals", params.id, "brand-invoices"] });
+      setShowSplitInput(false);
+      toast({
+        title: "Split invoices created",
+        description: `Advance (${splitPercentage}%) and Final (${100 - splitPercentage}%) invoices generated.`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create split invoices. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const dealId = parseInt(params.id || "0");
   const hasContract = contracts.some(c => c.dealId === dealId);
   const contract = contracts.find(c => c.dealId === dealId);
   const hasProof = !!contract?.proofFileName;
-  const brandInvoice = brandInvoices.find(inv => inv.dealId === dealId);
-  const hasInvoice = !!brandInvoice;
+  const hasInvoice = dealBrandInvoices.length > 0;
   const hasQuote = !!quote;
   const stepsReady = !quoteLoading;
 
@@ -169,6 +216,11 @@ export default function DealDetailsPage() {
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className="text-xl font-bold truncate flex-1">Deal Details</h1>
+          {deal.status === "Pending" && (
+            <Button variant="outline" size="icon" onClick={() => setLocation(`/deals/${deal.id}/edit`)} data-testid="button-edit-deal">
+              <Pencil className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       </header>
 
@@ -319,25 +371,90 @@ export default function DealDetailsPage() {
 
                 {/* Step 3 → 4: Generate Invoice for Brand */}
                 {hasContract && hasProof && !hasInvoice && (
-                  <Link href={contract ? `/contracts/${contract.id}` : "/contracts"}>
-                    <Button
-                      className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
-                      data-testid="button-generate-invoice"
-                    >
-                      <Receipt className="w-5 h-5 mr-2" />
-                      Generate Invoice
-                    </Button>
-                  </Link>
+                  <div className="space-y-2">
+                    <Link href={contract ? `/contracts/${contract.id}` : "/contracts"}>
+                      <Button
+                        className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
+                        data-testid="button-generate-invoice"
+                      >
+                        <Receipt className="w-5 h-5 mr-2" />
+                        Generate Single Invoice
+                      </Button>
+                    </Link>
+
+                    {!showSplitInput ? (
+                      <Button
+                        variant="outline"
+                        className="w-full h-12 font-semibold rounded-xl"
+                        onClick={() => setShowSplitInput(true)}
+                        data-testid="button-split-invoice"
+                      >
+                        <Scissors className="w-5 h-5 mr-2" />
+                        Split Invoice (Advance + Final)
+                      </Button>
+                    ) : (
+                      <div className="space-y-2 p-3 rounded-xl border border-border bg-muted/50">
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm font-medium whitespace-nowrap">Advance %</label>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            value={splitPercentageStr}
+                            onChange={(e) => setSplitPercentageStr(e.target.value.replace(/[^0-9]/g, ""))}
+                            className="w-20 h-9 text-center"
+                            placeholder="50"
+                            data-testid="input-split-percentage"
+                          />
+                          <span className="text-sm text-muted-foreground">/ {100 - splitPercentage}% Final</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            className="flex-1 h-10 font-semibold rounded-lg gradient-btn text-white"
+                            onClick={() => splitInvoices.mutate()}
+                            disabled={splitInvoices.isPending}
+                            data-testid="button-confirm-split"
+                          >
+                            {splitInvoices.isPending ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Creating...
+                              </>
+                            ) : (
+                              "Create Split Invoices"
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="h-10 rounded-lg"
+                            onClick={() => setShowSplitInput(false)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
 
-                {/* View existing invoice */}
-                {hasInvoice && brandInvoice && (
-                  <Link href={`/brand-invoices/${brandInvoice.id}`}>
-                    <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-                      <CheckCircle className="w-5 h-5" />
-                      <span className="font-medium text-sm">Invoice Generated</span>
-                    </div>
-                  </Link>
+                {/* View existing invoices */}
+                {hasInvoice && (
+                  <div className="space-y-2">
+                    {dealBrandInvoices.map((inv) => (
+                      <Link key={inv.id} href={`/brand-invoices/${inv.id}`}>
+                        <div className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                          <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                          <span className="font-medium text-sm flex-1">
+                            {(inv as any).invoiceType === "advance"
+                              ? "Advance Invoice"
+                              : (inv as any).invoiceType === "final"
+                              ? "Final Invoice"
+                              : "Invoice"}
+                          </span>
+                          <StatusBadge status={inv.status} />
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
@@ -370,39 +487,69 @@ export default function DealDetailsPage() {
 
         <section className="space-y-3">
           <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            Deliverables ({deal.deliverables.length})
+            Deliverables ({completedIds.size}/{deal.deliverables.length} Completed)
+            {(deal as any).deliverableMode === "any_one" && (
+              <span className="ml-2 text-xs text-amber-600 dark:text-amber-400 normal-case font-normal">
+                (Brand chooses one)
+              </span>
+            )}
           </h3>
 
+          {deal.deliverables.length > 0 && (
+            <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                style={{ width: `${(completedIds.size / deal.deliverables.length) * 100}%` }}
+              />
+            </div>
+          )}
+
           <div className="space-y-3">
-            {deal.deliverables.map((deliverable, index) => (
-              <Card key={deliverable.id} className="glass-card border-0">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-muted">
-                      <PlatformIcon platform={deliverable.platform} size={20} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium" data-testid={`text-deliverable-platform-${index}`}>
-                          {deliverable.platform}
-                        </span>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                          {deliverable.contentType}
-                        </span>
+            {deal.deliverables.map((deliverable, index) => {
+              const isCompleted = completedIds.has(deliverable.id);
+              return (
+                <Card key={deliverable.id} className="glass-card border-0">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <button
+                        onClick={() => toggleDeliverable(deliverable.id)}
+                        className={`flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all mt-2 flex-shrink-0 ${
+                          isCompleted
+                            ? "bg-emerald-500 border-emerald-500 text-white"
+                            : "border-gray-300 dark:border-zinc-600"
+                        }`}
+                      >
+                        {isCompleted && <Check className="w-4 h-4" />}
+                      </button>
+                      <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-muted">
+                        <PlatformIcon platform={deliverable.platform} size={20} />
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {deliverable.quantity}x {deliverable.frequency}
-                      </p>
-                      {deliverable.notes && (
-                        <p className="text-sm text-muted-foreground mt-2 italic">
-                          {deliverable.notes}
+                      <div className={`flex-1 min-w-0 transition-opacity ${isCompleted ? "opacity-60" : ""}`}>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className={`font-medium ${isCompleted ? "line-through" : ""}`}
+                            data-testid={`text-deliverable-platform-${index}`}
+                          >
+                            {deliverable.platform}
+                          </span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                            {deliverable.contentType}
+                          </span>
+                        </div>
+                        <p className={`text-sm text-muted-foreground mt-1 ${isCompleted ? "line-through" : ""}`}>
+                          {deliverable.quantity}x {deliverable.frequency}
                         </p>
-                      )}
+                        {deliverable.notes && (
+                          <p className={`text-sm text-muted-foreground mt-2 italic ${isCompleted ? "line-through" : ""}`}>
+                            {deliverable.notes}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </section>
       </main>

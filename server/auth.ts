@@ -2,9 +2,16 @@ import session from "express-session";
 import type { Express, RequestHandler } from "express";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import { storage } from "./storage";
 
 const SALT_ROUNDS = 10;
+
+function generateReferralCode(email: string): string {
+  const prefix = email.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, "X");
+  const suffix = crypto.randomBytes(3).toString("hex").substring(0, 5).toUpperCase();
+  return `${prefix}${suffix}`;
+}
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000;
@@ -35,7 +42,7 @@ export async function setupAuth(app: Express) {
 
   app.post("/api/auth/signup", async (req, res) => {
     try {
-      const { email, password, firstName, lastName, role } = req.body;
+      const { email, password, firstName, lastName, role, referralCode } = req.body;
 
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
@@ -64,7 +71,23 @@ export async function setupAuth(app: Express) {
         role: "influencer",
         onboardingComplete: false,
         contractCredits: parseInt(process.env.SIGNUP_FREE_CREDITS ?? '1'),
+        referralCode: generateReferralCode(email),
       });
+
+      // Award referral credits if a valid referral code was provided
+      if (referralCode) {
+        const referrer = await storage.getUserByReferralCode(referralCode);
+        if (referrer && referrer.id !== user.id) {
+          const creditsToAward = parseInt(process.env.REFERRAL_CREDITS ?? '1');
+          await storage.addCredits(referrer.id, creditsToAward, 'referral');
+          await storage.addCredits(user.id, creditsToAward, 'referral');
+          await storage.createReferral({
+            referrerId: referrer.id,
+            referredUserId: user.id,
+            creditAwarded: creditsToAward,
+          });
+        }
+      }
 
       (req.session as any).userId = user.id;
 

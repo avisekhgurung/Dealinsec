@@ -65,7 +65,7 @@ export default function InvoiceDetailsPage() {
       <div className="min-h-screen bg-background pb-20">
         <header className="glass-header sticky top-0 z-40">
           <div className="flex items-center gap-3 px-4 py-4">
-            <Button variant="ghost" size="icon" onClick={() => setLocation("/billing")}>
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/invoices")}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <Skeleton className="h-6 w-32" />
@@ -90,7 +90,7 @@ export default function InvoiceDetailsPage() {
       <div className="min-h-screen bg-background pb-20">
         <header className="glass-header sticky top-0 z-40">
           <div className="flex items-center gap-3 px-4 py-4">
-            <Button variant="ghost" size="icon" onClick={() => setLocation("/billing")}>
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/invoices")}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className="text-xl font-bold">Invoice Details</h1>
@@ -98,7 +98,7 @@ export default function InvoiceDetailsPage() {
         </header>
         <main className="px-4 py-12 text-center">
           <p className="text-muted-foreground">Invoice not found</p>
-          <Link href="/billing">
+          <Link href="/invoices">
             <Button variant="outline" className="mt-4 glass-card">Back to Billing</Button>
           </Link>
         </main>
@@ -114,7 +114,7 @@ export default function InvoiceDetailsPage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setLocation("/billing")}
+            onClick={() => setLocation("/invoices")}
             data-testid="button-back-billing"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -182,27 +182,10 @@ export default function InvoiceDetailsPage() {
             <Separator />
 
             <div className="space-y-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Charges
-              </p>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Contract Creation Fee</span>
-                  <span className="font-medium">₹{invoice.contractFee.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Platform Service Fee</span>
-                  <span className="font-medium">₹{invoice.platformFee.toLocaleString()}</span>
-                </div>
-              </div>
-
-              <Separator />
-
               <div className="flex justify-between items-center">
-                <span className="font-semibold">Total Amount</span>
+                <span className="font-semibold">Deal Amount</span>
                 <span className="text-2xl font-bold text-primary" data-testid="text-total-amount">
-                  ₹{invoice.totalAmount.toLocaleString()}
+                  ₹{deal ? Number(deal.dealAmount).toLocaleString("en-IN") : invoice.totalAmount.toLocaleString("en-IN")}
                 </span>
               </div>
             </div>

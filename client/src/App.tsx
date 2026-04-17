@@ -15,6 +15,7 @@ const OnboardingPage          = lazy(() => import("@/pages/onboarding"));
 const DashboardPage           = lazy(() => import("@/pages/dashboard"));
 const DealsPage               = lazy(() => import("@/pages/deals"));
 const CreateDealPage          = lazy(() => import("@/pages/create-deal"));
+const EditDealPage            = lazy(() => import("@/pages/edit-deal"));
 const DealDetailsPage         = lazy(() => import("@/pages/deal-details"));
 const QuotePreviewPage        = lazy(() => import("@/pages/quote-preview"));
 const ContractConfirmationPage = lazy(() => import("@/pages/contract-confirmation"));
@@ -86,14 +87,15 @@ function Router() {
         <Route path="/deals" component={DealsPage} />
         <Route path="/deals/new" component={CreateDealPage} />
         <Route path="/deals/:id/quote" component={QuotePreviewPage} />
+        <Route path="/deals/:id/edit" component={EditDealPage} />
         <Route path="/deals/:id/contract" component={ContractConfirmationPage} />
         <Route path="/deals/:id" component={DealDetailsPage} />
         <Route path="/contracts" component={ContractsPage} />
         <Route path="/contracts/:id/export" component={ContractPdfPage} />
         <Route path="/contracts/:id" component={ContractDetailsPage} />
-        <Route path="/billing/success" component={PaymentSuccessPage} />
-        <Route path="/billing/invoice/:id" component={InvoiceDetailsPage} />
-        <Route path="/billing" component={BillingPage} />
+        <Route path="/invoices/success" component={PaymentSuccessPage} />
+        <Route path="/invoices/:id" component={InvoiceDetailsPage} />
+        <Route path="/invoices" component={BillingPage} />
         <Route path="/brand-invoices/:id" component={BrandInvoiceDetailsPage} />
         <Route path="/profile" component={ProfilePage} />
         <Route path="/pricing" component={PricingPage} />

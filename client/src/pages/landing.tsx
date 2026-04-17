@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,13 @@ export default function LandingPage() {
   const [signupPassword, setSignupPassword] = useState("");
   const [signupFirstName, setSignupFirstName] = useState("");
   const [signupLastName, setSignupLastName] = useState("");
+  const [referralCode, setReferralCode] = useState("");
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const ref = urlParams.get("ref");
+    if (ref) setReferralCode(ref);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +56,7 @@ export default function LandingPage() {
         password: signupPassword,
         firstName: signupFirstName,
         lastName: signupLastName,
+        referralCode: referralCode || undefined,
       });
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       setLocation("/");
@@ -150,6 +158,13 @@ export default function LandingPage() {
         </div>
 
         {/* Auth card */}
+        {referralCode && (
+          <div className="max-w-md mx-auto mb-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl px-4 py-3 text-center">
+            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+              Referred by a friend! Sign up to get bonus credits.
+            </p>
+          </div>
+        )}
         <div
           className="text-center animate-fade-in"
           style={{ animationDelay: "0.2s" }}

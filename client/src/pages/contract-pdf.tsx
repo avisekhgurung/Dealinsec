@@ -90,11 +90,11 @@ export default function ContractPdfPage() {
         <main className="px-4 py-6 max-w-4xl mx-auto animate-fade-in print:px-0 print:py-0 print:max-w-none">
 
           {/* ── Header Banner ── */}
-          <div className="rounded-2xl overflow-hidden mb-6 print:rounded-none print:mb-8 gradient-primary">
-            <div className="px-8 py-7 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="rounded-2xl overflow-hidden mb-3 print:mb-2 print:rounded-none gradient-primary">
+            <div className="px-8 py-4 print:py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
                 <p className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1">InfluDeal Platform</p>
-                <h1 className="text-white text-2xl md:text-3xl font-extrabold tracking-wide uppercase">
+                <h1 className="text-white text-2xl md:text-3xl print:text-xl font-extrabold tracking-wide uppercase">
                   Influencer Marketing Agreement
                 </h1>
               </div>
@@ -111,7 +111,7 @@ export default function ContractPdfPage() {
           </div>
 
           {/* ── Parties Section ── */}
-          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 mb-6 print:rounded-none">
+          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 print:p-4 mb-3 print:mb-2 print:rounded-none">
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 print:text-gray-500">
               Parties to this Agreement
             </h2>
@@ -173,7 +173,7 @@ export default function ContractPdfPage() {
           </div>
 
           {/* ── Agreement Details ── */}
-          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 mb-6 print:rounded-none">
+          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 print:p-4 mb-3 print:mb-2 print:rounded-none">
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 print:text-gray-500">
               Agreement Details
             </h2>
@@ -208,10 +208,15 @@ export default function ContractPdfPage() {
 
           {/* ── Deliverables Table ── */}
           {deal?.deliverables && deal.deliverables.length > 0 && (
-            <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 mb-6 print:rounded-none overflow-x-auto">
+            <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 print:p-4 mb-3 print:mb-2 print:rounded-none overflow-x-auto">
               <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 print:text-gray-500">
-                Deliverables
+                {deal.deliverableMode === "any_one" ? "Deliverable Options (Brand Chooses One)" : "Deliverables"}
               </h2>
+              {deal.deliverableMode === "any_one" && (
+                <p className="text-xs text-amber-700 dark:text-amber-400 mb-3 print:text-amber-700">
+                  Note: The brand shall select one of the following deliverable options.
+                </p>
+              )}
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-white/10 print:border-gray-300">
@@ -241,13 +246,13 @@ export default function ContractPdfPage() {
           )}
 
           {/* ── Numbered Clauses ── */}
-          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 mb-6 print:rounded-none space-y-6">
+          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 print:p-4 mb-3 print:mb-2 print:rounded-none space-y-6" style={{ breakInside: 'auto' }}>
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground print:text-gray-500">
               Terms &amp; Conditions
             </h2>
 
             {/* Clause 1 */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5" style={{ pageBreakInside: 'avoid' }}>
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">1</span>
                 Scope of Work
@@ -261,7 +266,7 @@ export default function ContractPdfPage() {
             </div>
 
             {/* Clause 2 */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5" style={{ pageBreakInside: 'avoid' }}>
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">2</span>
                 Deliverables &amp; Timeline
@@ -276,7 +281,7 @@ export default function ContractPdfPage() {
             </div>
 
             {/* Clause 3 */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5" style={{ pageBreakInside: 'avoid' }}>
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">3</span>
                 Compensation (₹{contract.contractValue.toLocaleString("en-IN")})
@@ -291,7 +296,7 @@ export default function ContractPdfPage() {
             </div>
 
             {/* Clause 4 */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5" style={{ pageBreakInside: 'avoid' }}>
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">4</span>
                 Content Rights &amp; Usage
@@ -305,7 +310,7 @@ export default function ContractPdfPage() {
             </div>
 
             {/* Clause 5 */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5" style={{ pageBreakInside: 'avoid' }}>
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">5</span>
                 Exclusivity Terms
@@ -318,7 +323,7 @@ export default function ContractPdfPage() {
             </div>
 
             {/* Clause 6 */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5" style={{ pageBreakInside: 'avoid' }}>
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">6</span>
                 Governing Law (Indian Contract Act 1872)
@@ -334,7 +339,7 @@ export default function ContractPdfPage() {
           </div>
 
           {/* ── Signature Blocks ── */}
-          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 mb-6 print:rounded-none">
+          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 print:p-4 mb-3 print:mb-2 print:rounded-none">
             <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6 print:text-gray-500">
               Signatures
             </h2>
@@ -347,12 +352,12 @@ export default function ContractPdfPage() {
                 </p>
 
                 {/* Signature image or placeholder */}
-                <div className="min-h-[100px] border-2 border-dashed border-white/20 print:border-gray-300 rounded-xl flex items-center justify-center bg-white/5 print:bg-gray-50 overflow-hidden">
+                <div className="min-h-[60px] border-2 border-dashed border-white/20 print:border-gray-300 rounded-xl flex items-center justify-center bg-white/5 print:bg-gray-50 overflow-hidden">
                   {user?.digitalSignature ? (
                     <img
                       src={user.digitalSignature}
                       alt="Creator Signature"
-                      className="max-h-24 max-w-full object-contain p-2"
+                      className="h-10 print:h-8 w-auto object-contain p-1"
                     />
                   ) : (
                     <p className="text-xs text-muted-foreground/60 text-center px-4 print:text-gray-400">
@@ -362,12 +367,14 @@ export default function ContractPdfPage() {
                 </div>
 
                 <div className="space-y-3 text-sm">
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 print:text-gray-500">Printed Name</p>
-                    <div className="border-b-2 border-foreground/30 print:border-gray-400 pb-1 font-medium">
-                      {[user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || ""}
+                  {!user?.digitalSignature && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 print:text-gray-500">Printed Name</p>
+                      <div className="border-b-2 border-foreground/30 print:border-gray-400 pb-1 font-medium">
+                        {[user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || ""}
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 print:text-gray-500">Date</p>
                     <div className="border-b-2 border-foreground/30 print:border-gray-400 pb-1">
@@ -497,10 +504,16 @@ export default function ContractPdfPage() {
             background: #ffffff !important;
             border: 1px solid #e5e7eb !important;
             box-shadow: none !important;
+            padding: 1rem !important;
+            break-inside: auto;
           }
 
-          /* Avoid page break inside a card */
-          .glass-card { page-break-inside: avoid; }
+          /* Keep signature images compact */
+          img {
+            max-height: 64px !important;
+            object-fit: contain !important;
+            display: block !important;
+          }
         }
       `}</style>
     </>

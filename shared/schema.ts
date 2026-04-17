@@ -47,6 +47,7 @@ export const users = pgTable("users", {
   billingAddress: varchar("billing_address"),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   contractCredits: integer("contract_credits").notNull().default(1),
+  referralCode: varchar("referral_code").unique(),
   role: varchar("role").notNull().default("influencer"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -68,8 +69,11 @@ export const deals = pgTable("deals", {
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),
   deliverables: json("deliverables").$type<Deliverable[]>().notNull(),
+  deliverableMode: varchar("deliverable_mode").notNull().default("all"),
   status: text("status").notNull().default("Pending"),
 });
+
+export const deliverableModeOptions = ["all", "any_one"] as const;
 
 export const contracts = pgTable("contracts", {
   id: serial("id").primaryKey(),
@@ -129,15 +133,19 @@ export const brandInvoices = pgTable("brand_invoices", {
   influencerName: text("influencer_name").notNull(),
   influencerEmail: text("influencer_email"),
   dealAmount: integer("deal_amount").notNull(),
+  invoiceType: varchar("invoice_type").notNull().default("full"),
+  splitPercentage: integer("split_percentage"),
   notes: text("notes"),
   status: text("status").notNull().default("Unpaid"),
 });
+
+export const brandInvoiceTypeOptions = ["full", "advance", "final"] as const;
 
 export const insertBrandInvoiceSchema = createInsertSchema(brandInvoices).omit({ id: true });
 export type InsertBrandInvoice = z.infer<typeof insertBrandInvoiceSchema>;
 export type BrandInvoice = typeof brandInvoices.$inferSelect;
 
-export const creditTransactionTypeOptions = ["grant", "purchase", "usage", "refund"] as const;
+export const creditTransactionTypeOptions = ["grant", "purchase", "usage", "refund", "referral"] as const;
 
 export const creditTransactions = pgTable("credit_transactions", {
   id: serial("id").primaryKey(),
@@ -175,9 +183,24 @@ export const quotes = pgTable("quotes", {
   userId: varchar("user_id").notNull().references(() => users.id),
   dealId: integer("deal_id").notNull().references(() => deals.id),
   status: varchar("status").notNull().default("draft"),
+  version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const insertQuoteSchema = createInsertSchema(quotes).omit({ id: true, createdAt: true });
 export type InsertQuote = z.infer<typeof insertQuoteSchema>;
 export type Quote = typeof quotes.$inferSelect;
+
+// Referrals table
+export const referrals = pgTable("referrals", {
+  id: serial("id").primaryKey(),
+  referrerId: varchar("referrer_id").notNull().references(() => users.id),
+  referredUserId: varchar("referred_user_id").notNull().references(() => users.id),
+  status: varchar("status").notNull().default("completed"),
+  creditAwarded: integer("credit_awarded").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertReferralSchema = createInsertSchema(referrals).omit({ id: true, createdAt: true });
+export type InsertReferral = z.infer<typeof insertReferralSchema>;
+export type Referral = typeof referrals.$inferSelect;

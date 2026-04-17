@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
 import { StatusBadge } from "@/components/status-badge";
+import { useMemo } from "react";
 import {
   Plus, Briefcase, FileCheck, Receipt, ChevronRight, LogOut,
-  TrendingUp, IndianRupee, Clock
+  TrendingUp, IndianRupee, Clock, CheckCircle2
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -56,6 +57,27 @@ function buildPlatformDist(deals: Deal[]) {
   return Object.entries(map).map(([platform, count]) => ({ platform, count }));
 }
 
+function buildDeliverableCompletion(deals: Deal[]) {
+  const platformMap: Record<string, { total: number; completed: number }> = {};
+  deals.forEach(d => {
+    let completedIds: Set<string> = new Set();
+    try {
+      const stored = localStorage.getItem(`deliverables-done-${d.id}`);
+      if (stored) completedIds = new Set(JSON.parse(stored));
+    } catch {}
+    d.deliverables.forEach(del => {
+      if (!platformMap[del.platform]) platformMap[del.platform] = { total: 0, completed: 0 };
+      platformMap[del.platform].total += 1;
+      if (completedIds.has(del.id)) platformMap[del.platform].completed += 1;
+    });
+  });
+  return Object.entries(platformMap).map(([platform, data]) => ({
+    platform,
+    total: data.total,
+    completed: data.completed,
+  }));
+}
+
 const STATUS_COLORS: Record<string, string> = {
   Pending: "#f59e0b",
   Active: "#8b5cf6",
@@ -88,22 +110,22 @@ function StatCard({ title, value, icon: Icon, colorClass, href, loading }: {
 }) {
   return (
     <Link href={href}>
-      <div className={`${colorClass} rounded-2xl p-4 shadow-lg hover-elevate cursor-pointer`}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/20">
-              <Icon className="w-5 h-5 text-white" />
+      <div className={`${colorClass} rounded-2xl p-3 sm:p-4 shadow-lg hover-elevate cursor-pointer overflow-hidden`}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 shrink-0">
+              <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
             </div>
-            <div>
-              <p className="text-xs font-medium text-white/80">{title}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] sm:text-xs font-medium text-white/80 truncate">{title}</p>
               {loading ? (
-                <Skeleton className="h-7 w-10 mt-0.5 bg-white/20" />
+                <Skeleton className="h-6 w-10 mt-0.5 bg-white/20" />
               ) : (
-                <p className="text-2xl font-bold text-white">{value}</p>
+                <p className="text-lg sm:text-xl font-bold text-white truncate leading-tight">{value}</p>
               )}
             </div>
           </div>
-          <ChevronRight className="w-4 h-4 text-white/60" />
+          <ChevronRight className="w-4 h-4 text-white/60 shrink-0" />
         </div>
       </div>
     </Link>
@@ -148,6 +170,9 @@ export default function DashboardPage() {
   const revenueOverTime = buildRevenueOverTime(deals);
   const statusDist = buildStatusDist(deals);
   const platformDist = buildPlatformDist(deals);
+  const deliverableCompletion = useMemo(() => buildDeliverableCompletion(deals), [deals]);
+  const totalDeliverables = deliverableCompletion.reduce((s, d) => s + d.total, 0);
+  const completedDeliverables = deliverableCompletion.reduce((s, d) => s + d.completed, 0);
 
   const recentDeals = deals.slice(0, 3);
 
@@ -183,7 +208,7 @@ export default function DashboardPage() {
           <StatCard title="Agreements" value={signedContracts} icon={FileCheck}
             colorClass="gradient-card-indigo" href="/contracts" loading={isLoading} />
           <StatCard title="Paid Invoices" value={paidInvoices} icon={Receipt}
-            colorClass="gradient-card-emerald" href="/billing" loading={isLoading} />
+            colorClass="gradient-card-emerald" href="/invoices" loading={isLoading} />
           <StatCard
             title="Pipeline Value"
             value={isLoading ? "…" : `₹${(totalRevenue + pendingRevenue).toLocaleString("en-IN")}`}
@@ -197,21 +222,21 @@ export default function DashboardPage() {
         {/* ── Revenue summary strip ── */}
         {!isLoading && (totalRevenue > 0 || pendingRevenue > 0) && (
           <div className="grid grid-cols-2 gap-3">
-            <div className="glass-card rounded-xl p-3 border-0">
+            <div className="glass-card rounded-xl p-3 border-0 overflow-hidden">
               <div className="flex items-center gap-2 mb-1">
-                <TrendingUp className="w-4 h-4 text-emerald-500" />
+                <TrendingUp className="w-4 h-4 text-emerald-500 shrink-0" />
                 <span className="text-xs text-muted-foreground">Earned</span>
               </div>
-              <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+              <p className={`font-bold text-emerald-600 dark:text-emerald-400 truncate leading-tight ${totalRevenue.toLocaleString("en-IN").length > 7 ? "text-base" : "text-xl"}`}>
                 ₹{totalRevenue.toLocaleString("en-IN")}
               </p>
             </div>
-            <div className="glass-card rounded-xl p-3 border-0">
+            <div className="glass-card rounded-xl p-3 border-0 overflow-hidden">
               <div className="flex items-center gap-2 mb-1">
-                <Clock className="w-4 h-4 text-amber-500" />
+                <Clock className="w-4 h-4 text-amber-500 shrink-0" />
                 <span className="text-xs text-muted-foreground">Pending</span>
               </div>
-              <p className="text-xl font-bold text-amber-600 dark:text-amber-400">
+              <p className={`font-bold text-amber-600 dark:text-amber-400 truncate leading-tight ${pendingRevenue.toLocaleString("en-IN").length > 7 ? "text-base" : "text-xl"}`}>
                 ₹{pendingRevenue.toLocaleString("en-IN")}
               </p>
             </div>
@@ -339,6 +364,61 @@ export default function DashboardPage() {
           </>
         )}
 
+        {/* ── Deliverable Completion Widget ── */}
+        {totalDeliverables > 0 && (
+          <Card className="glass-card border-0">
+            <CardHeader className="pb-2 px-4 pt-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  Deliverable Progress
+                </CardTitle>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {completedDeliverables}/{totalDeliverables} done
+                </span>
+              </div>
+              {/* Overall progress bar */}
+              <div className="w-full h-2 bg-muted rounded-full mt-2 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${totalDeliverables > 0 ? (completedDeliverables / totalDeliverables) * 100 : 0}%`,
+                    background: "linear-gradient(90deg, #8b5cf6, #10b981)",
+                  }}
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 pt-2">
+              <div className="space-y-3">
+                {deliverableCompletion.map((item, i) => {
+                  const pct = item.total > 0 ? Math.round((item.completed / item.total) * 100) : 0;
+                  return (
+                    <div key={item.platform} className="flex items-center gap-3">
+                      <div
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: PLATFORM_COLORS[i % PLATFORM_COLORS.length] }}
+                      />
+                      <span className="text-xs font-medium w-20 truncate">{item.platform}</span>
+                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{
+                            width: `${pct}%`,
+                            backgroundColor: PLATFORM_COLORS[i % PLATFORM_COLORS.length],
+                          }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground w-12 text-right">
+                        {item.completed}/{item.total}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* ── Recent Deals ── */}
         {recentDeals.length > 0 && (
           <section className="space-y-3">
@@ -348,10 +428,10 @@ export default function DashboardPage() {
                 <Button variant="ghost" size="sm" className="text-primary text-xs h-7">View All</Button>
               </Link>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-4">
               {recentDeals.map((deal) => (
                 <Link key={deal.id} href={`/deals/${deal.id}`}>
-                  <Card className="glass-card border-0 hover-elevate active-elevate-2 cursor-pointer">
+                  <Card className="glass-card border hover-elevate active-elevate-2 cursor-pointer rounded-xl shadow-sm">
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">

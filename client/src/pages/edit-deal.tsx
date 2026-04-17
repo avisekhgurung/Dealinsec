@@ -1,7 +1,8 @@
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useParams } from "wouter";
+import { useEffect } from "react";
 import { z } from "zod";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,13 +19,16 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PlatformIcon } from "@/components/platform-icon";
-import { ArrowLeft, Plus, Trash2, Loader2 } from "lucide-react";
+import { BottomNav } from "@/components/bottom-nav";
+import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle } from "lucide-react";
 import {
   insertDealSchema,
   platformOptions,
   contentTypeOptions,
-  frequencyOptions
+  frequencyOptions,
+  deliverableModeOptions,
 } from "@shared/schema";
+import type { Deal, Deliverable } from "@shared/schema";
 
 const formSchema = insertDealSchema.omit({ userId: true }).extend({
   brandName: z.string().min(1, "Brand name is required"),
@@ -33,7 +37,7 @@ const formSchema = insertDealSchema.omit({ userId: true }).extend({
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
   brandUserId: z.string().optional().nullable(),
-  deliverableMode: z.enum(["all", "any_one"]).optional().default("all"),
+  deliverableMode: z.enum(deliverableModeOptions),
   deliverables: z.array(z.object({
     id: z.string(),
     platform: z.enum(platformOptions),
@@ -44,13 +48,30 @@ const formSchema = insertDealSchema.omit({ userId: true }).extend({
   })).min(1, "At least one deliverable is required"),
 });
 
-type BrandOption = { id: string; name: string };
-
 type FormData = z.infer<typeof formSchema>;
 
-export default function CreateDealPage() {
+type BrandOption = { id: string; name: string };
+
+export default function EditDealPage() {
+  const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+
+  const { data: deal, isLoading: isDealLoading } = useQuery<Deal>({
+    queryKey: ["/api/deals", params.id],
+  });
+
+  const { data: existingQuote } = useQuery({
+    queryKey: ["/api/deals", params.id, "quote"],
+    queryFn: async () => {
+      try {
+        const res = await apiRequest("GET", `/api/deals/${params.id}/quote`);
+        return res.json();
+      } catch {
+        return null;
+      }
+    },
+  });
 
   const { data: brands = [] } = useQuery<BrandOption[]>({
     queryKey: ["/api/brands"],
@@ -64,7 +85,7 @@ export default function CreateDealPage() {
       dealAmount: 0,
       startDate: "",
       endDate: "",
-      deliverableMode: "all" as const,
+      deliverableMode: "all",
       deliverables: [
         {
           id: crypto.randomUUID(),
@@ -78,35 +99,58 @@ export default function CreateDealPage() {
     },
   });
 
+  useEffect(() => {
+    if (deal) {
+      form.reset({
+        brandName: deal.brandName,
+        dealTitle: deal.dealTitle,
+        dealAmount: deal.dealAmount,
+        startDate: deal.startDate,
+        endDate: deal.endDate,
+        brandUserId: deal.brandUserId ?? undefined,
+        deliverableMode: (deal as any).deliverableMode ?? "all",
+        deliverables: (deal.deliverables as Deliverable[]).map((d) => ({
+          id: d.id ?? crypto.randomUUID(),
+          platform: d.platform,
+          contentType: d.contentType,
+          quantity: d.quantity,
+          frequency: d.frequency,
+          notes: d.notes ?? "",
+        })),
+      });
+    }
+  }, [deal]);
+
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "deliverables",
   });
 
-  const createDeal = useMutation({
+  const updateDeal = useMutation({
     mutationFn: async (data: FormData) => {
-      const res = await apiRequest("POST", "/api/deals", data);
+      const res = await apiRequest("PATCH", `/api/deals/${params.id}`, data);
       return res.json();
     },
-    onSuccess: (deal) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals", params.id] });
       toast({
-        title: "Deal created",
-        description: "Your brand deal has been created successfully.",
+        title: "Deal updated",
+        description: "Your brand deal has been updated successfully.",
       });
-      setLocation(`/deals/${deal.id}`);
+      setLocation(`/deals/${params.id}`);
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to create deal. Please try again.",
+        description: "Failed to update deal. Please try again.",
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: FormData) => {
-    createDeal.mutate(data);
+    updateDeal.mutate(data);
   };
 
   const addDeliverable = () => {
@@ -120,23 +164,40 @@ export default function CreateDealPage() {
     });
   };
 
+  if (isDealLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background pb-8">
+    <div className="min-h-screen bg-background pb-24">
       <header className="glass-header sticky top-0 z-40">
         <div className="flex items-center gap-3 px-4 py-4">
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setLocation("/deals")}
+            onClick={() => setLocation(`/deals/${params.id}`)}
             data-testid="button-back"
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-xl font-bold">Create Deal</h1>
+          <h1 className="text-xl font-bold">Edit Deal</h1>
         </div>
       </header>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 py-6 space-y-6 animate-fade-in">
+        {existingQuote && (
+          <div className="flex items-start gap-3 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4">
+            <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-yellow-700 dark:text-yellow-400">
+              Saving changes will mark the current quotation as revised. You can regenerate a new quote afterward.
+            </p>
+          </div>
+        )}
+
         <section className="glass-card rounded-xl p-5 space-y-4">
           <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
             Brand Details
@@ -201,7 +262,7 @@ export default function CreateDealPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dealAmount">Deal Amount (₹)</Label>
+              <Label htmlFor="dealAmount">Deal Amount (&#8377;)</Label>
               <Input
                 id="dealAmount"
                 type="number"
@@ -254,6 +315,40 @@ export default function CreateDealPage() {
         </section>
 
         <section className="space-y-4">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+            Deliverable Mode
+          </h2>
+          <div className="glass-card rounded-xl p-5">
+            <div className="flex gap-3">
+              <label className="flex-1 cursor-pointer">
+                <input
+                  type="radio"
+                  className="peer sr-only"
+                  value="all"
+                  {...form.register("deliverableMode")}
+                />
+                <div className="rounded-lg border-2 border-muted p-3 text-center transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
+                  <p className="font-medium text-sm">All Required</p>
+                  <p className="text-xs text-muted-foreground mt-1">Brand must complete all deliverables</p>
+                </div>
+              </label>
+              <label className="flex-1 cursor-pointer">
+                <input
+                  type="radio"
+                  className="peer sr-only"
+                  value="any_one"
+                  {...form.register("deliverableMode")}
+                />
+                <div className="rounded-lg border-2 border-muted p-3 text-center transition-colors peer-checked:border-primary peer-checked:bg-primary/5">
+                  <p className="font-medium text-sm">Brand Chooses One</p>
+                  <p className="text-xs text-muted-foreground mt-1">Brand picks one deliverable option</p>
+                </div>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
               Deliverables
@@ -262,7 +357,6 @@ export default function CreateDealPage() {
               {fields.length} item{fields.length !== 1 ? "s" : ""}
             </span>
           </div>
-
 
           <div className="space-y-4">
             {fields.map((field, index) => (
@@ -411,20 +505,22 @@ export default function CreateDealPage() {
           <Button
             type="submit"
             className="w-full h-14 text-base font-semibold rounded-xl gradient-btn text-white"
-            disabled={createDeal.isPending}
+            disabled={updateDeal.isPending}
             data-testid="button-submit-deal"
           >
-            {createDeal.isPending ? (
+            {updateDeal.isPending ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Creating...
+                Saving...
               </>
             ) : (
-              "Create Deal"
+              "Save Changes"
             )}
           </Button>
         </div>
       </form>
+
+      <BottomNav />
     </div>
   );
 }

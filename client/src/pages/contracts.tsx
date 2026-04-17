@@ -88,14 +88,14 @@ export default function ContractsPage() {
             ))}
           </div>
         ) : filteredContracts.length > 0 ? (
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             {filteredContracts.map((contract) => {
               const invoiceStatus = getInvoiceStatus(contract.id);
 
               return (
                 <Link key={contract.id} href={`/contracts/${contract.id}`}>
                   <Card
-                    className="glass-card border-0 hover-elevate active-elevate-2 cursor-pointer"
+                    className="glass-card border hover-elevate active-elevate-2 cursor-pointer rounded-xl shadow-sm"
                     data-testid={`card-contract-${contract.id}`}
                   >
                     <CardContent className="p-4">

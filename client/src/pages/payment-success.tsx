@@ -80,7 +80,7 @@ export default function PaymentSuccessPage() {
               <div className="pt-4 space-y-2">
                 <Button
                   className="gradient-btn w-full text-white"
-                  onClick={() => setLocation("/billing")}
+                  onClick={() => setLocation("/invoices")}
                   data-testid="button-view-billing"
                 >
                   View Billing
@@ -111,7 +111,7 @@ export default function PaymentSuccessPage() {
               <div className="pt-4">
                 <Button
                   className="gradient-btn w-full text-white"
-                  onClick={() => setLocation("/billing")}
+                  onClick={() => setLocation("/invoices")}
                   data-testid="button-back-billing"
                 >
                   Back to Billing

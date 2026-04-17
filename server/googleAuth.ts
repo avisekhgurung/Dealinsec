@@ -1,6 +1,13 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import crypto from "crypto";
 import { storage } from "./storage";
+
+function generateReferralCode(email: string): string {
+  const prefix = email.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, "X");
+  const suffix = crypto.randomBytes(3).toString("hex").substring(0, 5).toUpperCase();
+  return `${prefix}${suffix}`;
+}
 
 export function setupGoogleAuth() {
   const clientID = process.env.GOOGLE_CLIENT_ID;
@@ -36,6 +43,7 @@ export function setupGoogleAuth() {
               role: "influencer",
               onboardingComplete: false,
               contractCredits: signupCredits,
+              referralCode: generateReferralCode(email),
             });
           }
 

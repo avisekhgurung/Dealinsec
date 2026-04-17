@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
 import passport from "passport";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
@@ -160,6 +161,9 @@ async function initStripe() {
 
     next();
   });
+
+  // Serve uploaded files (signatures, proofs, etc.)
+  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
   const httpServer = await registerRoutes(app);
 

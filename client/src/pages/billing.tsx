@@ -6,32 +6,38 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
 import { StatusBadge } from "@/components/status-badge";
-import { Receipt, Calendar, ChevronRight } from "lucide-react";
-import type { Invoice } from "@shared/schema";
+import { Receipt, Calendar, ChevronRight, Briefcase, SplitSquareHorizontal } from "lucide-react";
+import type { Invoice, Deal, BrandInvoice } from "@shared/schema";
 
 type FilterType = "all" | "paid" | "unpaid";
 
 export default function BillingPage() {
   const [filter, setFilter] = useState<FilterType>("all");
 
-  const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
-    queryKey: ["/api/invoices"],
+  const { data: brandInvoices = [], isLoading } = useQuery<BrandInvoice[]>({
+    queryKey: ["/api/brand-invoices"],
   });
 
-  const filteredInvoices = invoices.filter((invoice) => {
+  const { data: deals = [] } = useQuery<Deal[]>({
+    queryKey: ["/api/deals"],
+  });
+
+  const getDeal = (dealId: number) => deals.find(d => d.id === dealId);
+
+  const filteredInvoices = brandInvoices.filter((invoice) => {
     if (filter === "all") return true;
     if (filter === "paid") return invoice.status === "Paid";
     if (filter === "unpaid") return invoice.status === "Unpaid";
     return true;
   });
 
-  const totalPaid = invoices
+  const totalPaid = brandInvoices
     .filter(i => i.status === "Paid")
-    .reduce((sum, i) => sum + i.totalAmount, 0);
+    .reduce((sum, i) => sum + Number(i.dealAmount), 0);
 
-  const totalUnpaid = invoices
+  const totalUnpaid = brandInvoices
     .filter(i => i.status === "Unpaid")
-    .reduce((sum, i) => sum + i.totalAmount, 0);
+    .reduce((sum, i) => sum + Number(i.dealAmount), 0);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("en-IN", {
@@ -51,7 +57,7 @@ export default function BillingPage() {
     <div className="min-h-screen bg-background pb-20">
       <header className="glass-header sticky top-0 z-40">
         <div className="px-4 py-4">
-          <h1 className="text-xl font-bold mb-4">Billing</h1>
+          <h1 className="text-xl font-bold mb-4">Invoices</h1>
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
             {filters.map((f) => (
               <Button
@@ -74,22 +80,22 @@ export default function BillingPage() {
       </header>
 
       <main className="px-4 py-6 space-y-6 animate-fade-in">
-        {!isLoading && invoices.length > 0 && (
+        {!isLoading && brandInvoices.length > 0 && (
           <div className="grid grid-cols-2 gap-4">
-            <div className="gradient-card-emerald rounded-2xl p-4 shadow-lg">
-              <p className="text-xs font-medium text-white/80 mb-1">
+            <div className="gradient-card-emerald rounded-2xl p-3 sm:p-4 shadow-lg overflow-hidden">
+              <p className="text-[10px] sm:text-xs font-medium text-white/80 mb-1">
                 Total Paid
               </p>
-              <p className="text-2xl font-bold text-white" data-testid="text-total-paid">
-                ₹{totalPaid.toLocaleString()}
+              <p className="text-lg sm:text-xl font-bold text-white truncate leading-tight" data-testid="text-total-paid">
+                ₹{totalPaid.toLocaleString("en-IN")}
               </p>
             </div>
-            <div className="gradient-card-rose rounded-2xl p-4 shadow-lg">
-              <p className="text-xs font-medium text-white/80 mb-1">
+            <div className="gradient-card-rose rounded-2xl p-3 sm:p-4 shadow-lg overflow-hidden">
+              <p className="text-[10px] sm:text-xs font-medium text-white/80 mb-1">
                 Total Unpaid
               </p>
-              <p className="text-2xl font-bold text-white" data-testid="text-total-unpaid">
-                ₹{totalUnpaid.toLocaleString()}
+              <p className="text-lg sm:text-xl font-bold text-white truncate leading-tight" data-testid="text-total-unpaid">
+                ₹{totalUnpaid.toLocaleString("en-IN")}
               </p>
             </div>
           </div>
@@ -113,41 +119,70 @@ export default function BillingPage() {
             ))}
           </div>
         ) : filteredInvoices.length > 0 ? (
-          <div className="space-y-4">
-            {filteredInvoices.map((invoice) => (
-              <Link key={invoice.id} href={`/billing/invoice/${invoice.id}`}>
-                <Card
-                  className="glass-card border-0 shadow-sm hover-elevate active-elevate-2 cursor-pointer"
-                  data-testid={`card-invoice-${invoice.id}`}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div>
-                        <p className="font-semibold font-mono text-sm">
-                          {invoice.invoiceNumber}
-                        </p>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {invoice.brandName}
-                        </p>
+          <div className="flex flex-col gap-4">
+            {filteredInvoices.map((invoice) => {
+              const deal = getDeal(invoice.dealId);
+              const isAdvance = invoice.invoiceType === "advance";
+              const isFinal = invoice.invoiceType === "final";
+              const isSplit = isAdvance || isFinal;
+              return (
+                <Link key={invoice.id} href={`/brand-invoices/${invoice.id}`}>
+                  <Card
+                    className="glass-card border hover-elevate active-elevate-2 cursor-pointer rounded-xl shadow-sm"
+                    data-testid={`card-invoice-${invoice.id}`}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-sm truncate">
+                              {deal?.dealTitle || invoice.brandName}
+                            </p>
+                            {isSplit && (
+                              <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                                isAdvance
+                                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                              }`}>
+                                {isAdvance ? "Advance" : "Final"}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {invoice.brandName}
+                          </p>
+                        </div>
+                        <StatusBadge status={invoice.status} />
                       </div>
-                      <StatusBadge status={invoice.status} />
-                    </div>
 
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
-                      <Calendar className="w-3.5 h-3.5" />
-                      <span>{formatDate(invoice.invoiceDate)}</span>
-                    </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {formatDate(invoice.invoiceDate)}
+                        </span>
+                        <span className="font-mono text-[10px] opacity-70">
+                          {invoice.invoiceNumber}
+                        </span>
+                      </div>
 
-                    <div className="flex items-center justify-between pt-3 border-t border-white/10">
-                      <span className="text-2xl font-bold">
-                        ₹{invoice.totalAmount.toLocaleString()}
-                      </span>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+                      <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                        <div>
+                          <span className="text-lg font-bold text-primary">
+                            ₹{Number(invoice.dealAmount).toLocaleString("en-IN")}
+                          </span>
+                          {isSplit && invoice.splitPercentage && (
+                            <span className="text-[11px] text-muted-foreground ml-2">
+                              ({invoice.splitPercentage}% of deal)
+                            </span>
+                          )}
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
           </div>
         ) : (
           <Card className="glass-card border-0">

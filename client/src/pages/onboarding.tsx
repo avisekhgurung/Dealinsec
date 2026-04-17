@@ -75,6 +75,11 @@ export default function OnboardingPage() {
       }
     }
 
+    if (!billingAddress.trim()) {
+      toast({ title: "Billing address is required", variant: "destructive" });
+      return;
+    }
+
     if (!signatureFile && !signaturePreview) {
       toast({ title: "Digital signature is required", variant: "destructive" });
       return;
@@ -192,7 +197,7 @@ export default function OnboardingPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="billingAddress">Billing Address (Optional)</Label>
+              <Label htmlFor="billingAddress">Billing Address *</Label>
               <Textarea
                 id="billingAddress"
                 placeholder="Full address for invoices (street, city, state, PIN)"

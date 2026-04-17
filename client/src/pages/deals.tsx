@@ -57,11 +57,11 @@ export default function DealsPage() {
             ))}
           </div>
         ) : deals.length > 0 ? (
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
             {deals.map((deal) => (
               <Link key={deal.id} href={`/deals/${deal.id}`}>
                 <Card
-                  className="glass-card border-0 hover-elevate active-elevate-2 cursor-pointer"
+                  className="glass-card border hover-elevate active-elevate-2 cursor-pointer rounded-xl shadow-sm"
                   data-testid={`card-deal-${deal.id}`}
                 >
                   <CardContent className="p-4">
