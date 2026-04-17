@@ -80,7 +80,6 @@ export async function setupAuth(app: Express) {
         if (referrer && referrer.id !== user.id) {
           const creditsToAward = parseInt(process.env.REFERRAL_CREDITS ?? '1');
           await storage.addCredits(referrer.id, creditsToAward, 'referral');
-          await storage.addCredits(user.id, creditsToAward, 'referral');
           await storage.createReferral({
             referrerId: referrer.id,
             referredUserId: user.id,

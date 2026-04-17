@@ -449,7 +449,7 @@ export default function ProfilePage() {
                 <h3 className="font-semibold">Referral Program</h3>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                Share your referral code with friends. Both of you get free credits when they sign up!
+                Share your referral code with friends. You get a free credit for every friend who signs up!
               </p>
 
               {referralData?.referralCode && (
@@ -479,8 +479,24 @@ export default function ProfilePage() {
                         toast({ title: "Link copied!", description: "Referral link copied to clipboard" });
                       }}
                     >
+                      <Copy className="w-3 h-3 mr-1" />
+                      Copy Link
+                    </Button>
+                    <Button
+                      className="flex-1 text-xs gradient-btn text-white"
+                      onClick={() => {
+                        const url = `${window.location.origin}/?ref=${referralData.referralCode}`;
+                        const text = `Join InfluDeal and manage your brand deals like a pro! Sign up using my referral link and we both get free credits 🎉`;
+                        if (navigator.share) {
+                          navigator.share({ title: "Join InfluDeal", text, url }).catch(() => {});
+                        } else {
+                          navigator.clipboard.writeText(`${text}\n${url}`);
+                          toast({ title: "Copied!", description: "Share text copied to clipboard" });
+                        }
+                      }}
+                    >
                       <Share2 className="w-3 h-3 mr-1" />
-                      Copy Referral Link
+                      Share
                     </Button>
                   </div>
 

@@ -9,6 +9,7 @@ import { getStripeSync } from './stripeClient';
 import { WebhookHandlers } from './webhookHandlers';
 import { setupGoogleAuth } from './googleAuth';
 import { getSession } from './auth';
+import { storage } from './storage';
 
 const app = express();
 
@@ -124,13 +125,39 @@ async function initStripe() {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  app.get("/api/auth/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+  app.get("/api/auth/google", (req: any, res, next) => {
+    // Store referral code in session before redirecting to Google
+    if (req.query.ref) {
+      (req.session as any).referralCode = req.query.ref;
+    }
+    passport.authenticate("google", { scope: ["profile", "email"] })(req, res, next);
+  });
   app.get(
     "/api/auth/google/callback",
     passport.authenticate("google", { failureRedirect: "/?error=google_auth_failed" }),
-    (req: any, res) => {
+    async (req: any, res) => {
       if (req.user) {
         (req.session as any).userId = req.user.id;
+
+        // Process referral code if present in session
+        const referralCode = (req.session as any).referralCode;
+        if (referralCode) {
+          delete (req.session as any).referralCode;
+          try {
+            const referrer = await storage.getUserByReferralCode(referralCode);
+            if (referrer && referrer.id !== req.user.id) {
+              const creditsToAward = parseInt(process.env.REFERRAL_CREDITS ?? '1');
+              await storage.addCredits(referrer.id, creditsToAward, 'referral');
+              await storage.createReferral({
+                referrerId: referrer.id,
+                referredUserId: req.user.id,
+                creditAwarded: creditsToAward,
+              });
+            }
+          } catch (err) {
+            console.error("Referral processing error:", err);
+          }
+        }
       }
       res.redirect("/");
     }

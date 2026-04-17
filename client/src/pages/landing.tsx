@@ -161,7 +161,7 @@ export default function LandingPage() {
         {referralCode && (
           <div className="max-w-md mx-auto mb-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl px-4 py-3 text-center">
             <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
-              Referred by a friend! Sign up to get bonus credits.
+              You've been referred by a friend! Sign up to get started.
             </p>
           </div>
         )}
@@ -188,7 +188,7 @@ export default function LandingPage() {
                   <div className="space-y-4">
                     <button
                       type="button"
-                      onClick={() => { window.location.href = '/api/auth/google'; }}
+                      onClick={() => { window.location.href = referralCode ? `/api/auth/google?ref=${referralCode}` : '/api/auth/google'; }}
                       className="glass-card rounded-xl border border-white/30 flex items-center gap-3 w-full py-3 px-4 cursor-pointer hover:shadow-md transition-all"
                     >
                       <SiGoogle className="h-5 w-5 text-[#4285F4]" />
@@ -243,7 +243,7 @@ export default function LandingPage() {
                   <div className="space-y-4">
                     <button
                       type="button"
-                      onClick={() => { window.location.href = '/api/auth/google'; }}
+                      onClick={() => { window.location.href = referralCode ? `/api/auth/google?ref=${referralCode}` : '/api/auth/google'; }}
                       className="glass-card rounded-xl border border-white/30 flex items-center gap-3 w-full py-3 px-4 cursor-pointer hover:shadow-md transition-all"
                     >
                       <SiGoogle className="h-5 w-5 text-[#4285F4]" />
