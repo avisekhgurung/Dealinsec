@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * ================================================================
+ *  BRAND PALETTE — "Emerald + Slate" (active)
+ *  Primary: emerald-600 #059669   Hover: emerald-700 #047857
+ *  Accent:  teal-600    #0D9488
+ *  Surface: slate-50    #F8FAFC   Text: slate-900 #0F172A
+ *
+ *  Other palettes (swap later if needed):
+ *  - Navy + Electric Blue:  primary 215 28% 17%  accent 217 91% 60%
+ *  - Black + Neon Lime:     primary 0 0% 4%      accent 83 78% 55%
+ *  - Deep Teal + Warm White: primary 174 77% 26% accent 38 92% 50%
+ * ================================================================
+ */
+
 /* LIGHT MODE */
 :root {
   --button-outline: rgba(0,0,0, .10);
@@ -9,38 +23,38 @@
   --opaque-button-border-intensity: -8;
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
-  --background: 240 20% 97%;
-  --foreground: 240 10% 9%;
-  --border: 240 10% 88%;
+  --background: 210 20% 98%;
+  --foreground: 222 47% 11%;
+  --border: 215 20% 88%;
   --card: 0 0% 100%;
-  --card-foreground: 240 10% 9%;
-  --card-border: 240 10% 92%;
-  --sidebar: 240 15% 95%;
-  --sidebar-foreground: 240 10% 9%;
-  --sidebar-border: 240 10% 90%;
-  --sidebar-primary: 262 83% 58%;
-  --sidebar-primary-foreground: 0 0% 98%;
-  --sidebar-accent: 262 30% 93%;
-  --sidebar-accent-foreground: 262 15% 15%;
-  --sidebar-ring: 262 83% 58%;
+  --card-foreground: 222 47% 11%;
+  --card-border: 215 20% 92%;
+  --sidebar: 210 20% 96%;
+  --sidebar-foreground: 222 47% 11%;
+  --sidebar-border: 215 20% 90%;
+  --sidebar-primary: 160 84% 30%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 160 60% 94%;
+  --sidebar-accent-foreground: 160 60% 15%;
+  --sidebar-ring: 160 84% 30%;
   --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 9%;
-  --popover-border: 240 10% 91%;
-  --primary: 262 83% 58%;
+  --popover-foreground: 222 47% 11%;
+  --popover-border: 215 20% 91%;
+  --primary: 160 84% 30%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 240 10% 93%;
-  --secondary-foreground: 240 10% 9%;
-  --muted: 240 10% 94%;
-  --muted-foreground: 240 5% 46%;
-  --accent: 262 30% 95%;
-  --accent-foreground: 262 15% 15%;
+  --secondary: 215 16% 93%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 20% 94%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 160 60% 95%;
+  --accent-foreground: 160 60% 15%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 98%;
-  --input: 240 10% 70%;
-  --ring: 262 83% 58%;
-  --chart-1: 262 70% 50%;
-  --chart-2: 280 65% 55%;
-  --chart-3: 200 70% 45%;
+  --input: 215 20% 75%;
+  --ring: 160 84% 30%;
+  --chart-1: 160 84% 30%;
+  --chart-2: 174 77% 36%;
+  --chart-3: 215 28% 40%;
   --chart-4: 25 85% 55%;
   --chart-5: 340 75% 50%;
   --font-sans: Open Sans, sans-serif;
@@ -93,38 +107,38 @@
   --opaque-button-border-intensity: 9;
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
-  --background: 240 15% 5%;
-  --foreground: 0 0% 95%;
-  --border: 240 10% 16%;
-  --card: 240 12% 8%;
-  --card-foreground: 0 0% 95%;
-  --card-border: 240 10% 12%;
-  --sidebar: 240 12% 9%;
-  --sidebar-foreground: 0 0% 95%;
-  --sidebar-border: 240 10% 14%;
-  --sidebar-primary: 262 80% 65%;
+  --background: 215 28% 6%;
+  --foreground: 210 20% 96%;
+  --border: 215 20% 16%;
+  --card: 215 28% 9%;
+  --card-foreground: 210 20% 96%;
+  --card-border: 215 20% 14%;
+  --sidebar: 215 28% 9%;
+  --sidebar-foreground: 210 20% 96%;
+  --sidebar-border: 215 20% 15%;
+  --sidebar-primary: 160 70% 45%;
   --sidebar-primary-foreground: 0 0% 98%;
-  --sidebar-accent: 262 15% 18%;
-  --sidebar-accent-foreground: 0 0% 95%;
-  --sidebar-ring: 262 80% 65%;
-  --popover: 240 12% 10%;
-  --popover-foreground: 0 0% 95%;
-  --popover-border: 240 10% 16%;
-  --primary: 262 80% 65%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 240 10% 15%;
-  --secondary-foreground: 0 0% 95%;
-  --muted: 240 10% 14%;
-  --muted-foreground: 240 5% 65%;
-  --accent: 262 15% 18%;
-  --accent-foreground: 262 12% 92%;
+  --sidebar-accent: 160 30% 18%;
+  --sidebar-accent-foreground: 160 30% 92%;
+  --sidebar-ring: 160 70% 45%;
+  --popover: 215 28% 10%;
+  --popover-foreground: 210 20% 96%;
+  --popover-border: 215 20% 16%;
+  --primary: 160 70% 45%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 20% 16%;
+  --secondary-foreground: 210 20% 96%;
+  --muted: 215 20% 14%;
+  --muted-foreground: 215 16% 65%;
+  --accent: 160 30% 18%;
+  --accent-foreground: 160 30% 92%;
   --destructive: 0 75% 55%;
   --destructive-foreground: 0 0% 98%;
-  --input: 240 10% 30%;
-  --ring: 262 80% 65%;
-  --chart-1: 262 75% 70%;
-  --chart-2: 280 70% 72%;
-  --chart-3: 200 75% 65%;
+  --input: 215 20% 30%;
+  --ring: 160 70% 45%;
+  --chart-1: 160 70% 50%;
+  --chart-2: 174 70% 55%;
+  --chart-3: 215 30% 70%;
   --chart-4: 25 85% 68%;
   --chart-5: 340 75% 68%;
   --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
@@ -172,12 +186,12 @@
 
   body {
     @apply font-sans antialiased text-foreground;
-    background: linear-gradient(135deg, hsl(262 40% 96%) 0%, hsl(240 30% 95%) 50%, hsl(280 30% 96%) 100%);
+    background: linear-gradient(135deg, hsl(160 30% 98%) 0%, hsl(180 20% 97%) 50%, hsl(210 20% 98%) 100%);
     min-height: 100vh;
   }
 
   .dark body {
-    background: linear-gradient(135deg, hsl(240 20% 5%) 0%, hsl(262 20% 8%) 50%, hsl(240 15% 4%) 100%);
+    background: linear-gradient(135deg, hsl(215 28% 5%) 0%, hsl(160 25% 7%) 50%, hsl(215 28% 4%) 100%);
   }
 }
 
@@ -204,8 +218,8 @@
 }
 
 .glass-card:hover {
-  box-shadow: 0 8px 32px -4px rgba(124, 58, 237, 0.1);
-  border-color: rgba(124, 58, 237, 0.15);
+  box-shadow: 0 8px 32px -4px rgba(5, 150, 105, 0.1);
+  border-color: rgba(5, 150, 105, 0.15);
 }
 
 .dark .glass-card {
@@ -216,8 +230,8 @@
 
 .dark .glass-card:hover {
   background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(124, 58, 237, 0.2);
-  box-shadow: 0 8px 32px -4px rgba(124, 58, 237, 0.15);
+  border-color: rgba(16, 185, 129, 0.2);
+  box-shadow: 0 8px 32px -4px rgba(16, 185, 129, 0.15);
 }
 
 .glass-nav {
@@ -244,17 +258,20 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-/* Gradient Utilities */
+/* Gradient Utilities — Emerald + Teal */
 .gradient-primary {
-  background: linear-gradient(135deg, #7c3aed 0%, #6366f1 50%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #059669 0%, #0D9488 50%, #10b981 100%);
 }
 
+/* Named for backward compat — now mapped to distinct semantic palette */
 .gradient-card-purple {
-  background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
+  /* Orange — "active / hustle / energy" feel */
+  background: linear-gradient(135deg, #EA580C 0%, #F97316 100%);
 }
 
 .gradient-card-indigo {
-  background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
+  /* Blue — "trust / documents" feel */
+  background: linear-gradient(135deg, #1D4ED8 0%, #3B82F6 100%);
 }
 
 .gradient-card-emerald {
@@ -270,20 +287,20 @@
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, #7c3aed 0%, #6366f1 50%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #059669 0%, #0D9488 50%, #10b981 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .gradient-btn {
-  background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%);
-  box-shadow: 0 4px 14px -2px rgba(124, 58, 237, 0.4);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 4px 14px -2px rgba(5, 150, 105, 0.35);
   transition: all 0.3s ease;
 }
 
 .gradient-btn:hover {
-  box-shadow: 0 6px 20px -2px rgba(124, 58, 237, 0.5);
+  box-shadow: 0 6px 20px -2px rgba(5, 150, 105, 0.45);
   transform: translateY(-1px);
 }
 
@@ -291,25 +308,25 @@
   transform: translateY(0);
 }
 
-/* Decorative Orbs */
+/* Decorative Orbs — retained names, remapped to brand tones */
 .orb {
   position: absolute;
   border-radius: 50%;
   filter: blur(80px);
-  opacity: 0.4;
+  opacity: 0.3;
   pointer-events: none;
 }
 
 .orb-purple {
-  background: radial-gradient(circle, #7c3aed 0%, transparent 70%);
+  background: radial-gradient(circle, #059669 0%, transparent 70%);
 }
 
 .orb-indigo {
-  background: radial-gradient(circle, #6366f1 0%, transparent 70%);
+  background: radial-gradient(circle, #0D9488 0%, transparent 70%);
 }
 
 .orb-pink {
-  background: radial-gradient(circle, #ec4899 0%, transparent 70%);
+  background: radial-gradient(circle, #14b8a6 0%, transparent 70%);
 }
 
 /* Animations */
@@ -605,7 +622,7 @@ button:not(:disabled):active,
 
 .gradient-btn:not(:disabled):active {
   transform: scale(0.96) !important;
-  box-shadow: 0 2px 8px -2px rgba(124, 58, 237, 0.3) !important;
+  box-shadow: 0 2px 8px -2px rgba(5, 150, 105, 0.3) !important;
 }
 
 /* ── Pill / chip press animation ────────────────────────────────────────────── */

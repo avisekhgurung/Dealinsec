@@ -27,9 +27,9 @@ const statusConfig: Record<StatusType, { style: string; icon: React.ElementType;
     dot: "bg-blue-400",
   },
   Signed: {
-    style: "bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-900/20 dark:text-violet-400 dark:border-violet-800/50",
+    style: "bg-teal-50 text-teal-700 border border-teal-200 dark:bg-teal-900/20 dark:text-teal-400 dark:border-teal-800/50",
     icon: Shield,
-    dot: "bg-violet-400",
+    dot: "bg-teal-400",
   },
   Paid: {
     style: "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/50",

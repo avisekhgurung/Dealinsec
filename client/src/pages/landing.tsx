@@ -78,7 +78,7 @@ export default function LandingPage() {
         className="absolute inset-0 pointer-events-none opacity-[0.35] dark:opacity-[0.15]"
         style={{
           backgroundImage:
-            "radial-gradient(circle, rgba(124, 58, 237, 0.15) 1px, transparent 1px)",
+            "radial-gradient(circle, rgba(5, 150, 105, 0.15) 1px, transparent 1px)",
           backgroundSize: "24px 24px",
         }}
       />
@@ -88,7 +88,7 @@ export default function LandingPage() {
         className="absolute top-0 right-0 w-[600px] h-[600px] pointer-events-none opacity-40 dark:opacity-20"
         style={{
           background:
-            "radial-gradient(circle at center, rgba(124, 58, 237, 0.18) 0%, transparent 70%)",
+            "radial-gradient(circle at center, rgba(5, 150, 105, 0.18) 0%, transparent 70%)",
         }}
       />
 
@@ -98,7 +98,7 @@ export default function LandingPage() {
           <div className="flex items-center gap-2">
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ background: "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)" }}
+              style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
             >
               <Sparkles className="w-4 h-4 text-white" strokeWidth={2.5} />
             </div>
@@ -117,9 +117,9 @@ export default function LandingPage() {
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Left: copy */}
             <div className="space-y-6 animate-fade-in">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-50 dark:bg-violet-950/40 border border-violet-200/60 dark:border-violet-800/40">
-                <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
-                <span className="text-xs font-medium text-violet-700 dark:text-violet-300">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
                   Built for Indian creators
                 </span>
               </div>
@@ -128,7 +128,7 @@ export default function LandingPage() {
                 Run your brand deals like a{" "}
                 <span
                   style={{
-                    background: "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)",
+                    background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                     backgroundClip: "text",
@@ -151,8 +151,8 @@ export default function LandingPage() {
                   "Track advances, payments, and deliverables",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-2.5 text-sm text-neutral-700 dark:text-neutral-300">
-                    <div className="flex items-center justify-center w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-900/40 mt-0.5 flex-shrink-0">
-                      <Check className="w-3 h-3 text-violet-600 dark:text-violet-400" strokeWidth={3} />
+                    <div className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 mt-0.5 flex-shrink-0">
+                      <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" strokeWidth={3} />
                     </div>
                     <span>{item}</span>
                   </li>
@@ -215,7 +215,7 @@ export default function LandingPage() {
                         onClick={() => { window.location.href = referralCode ? `/api/auth/google?ref=${referralCode}` : '/api/auth/google'; }}
                         className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors text-sm font-medium text-neutral-800 dark:text-neutral-200"
                       >
-                        <SiGoogle className="h-4 w-4 text-[#4285F4]" />
+                        <SiGoogle className="h-4 w-4 text-emerald-600" />
                         <span>Continue with Google</span>
                       </button>
 
@@ -283,7 +283,7 @@ export default function LandingPage() {
                           type="submit"
                           className="w-full h-10 text-sm font-semibold text-white border-0 mt-2"
                           style={{
-                            background: "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)",
+                            background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)",
                           }}
                           disabled={isLoading}
                           data-testid="button-signup"
@@ -306,7 +306,7 @@ export default function LandingPage() {
                         onClick={() => { window.location.href = referralCode ? `/api/auth/google?ref=${referralCode}` : '/api/auth/google'; }}
                         className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors text-sm font-medium text-neutral-800 dark:text-neutral-200"
                       >
-                        <SiGoogle className="h-4 w-4 text-[#4285F4]" />
+                        <SiGoogle className="h-4 w-4 text-emerald-600" />
                         <span>Continue with Google</span>
                       </button>
 
@@ -347,7 +347,7 @@ export default function LandingPage() {
                           type="submit"
                           className="w-full h-10 text-sm font-semibold text-white border-0 mt-2"
                           style={{
-                            background: "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)",
+                            background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)",
                           }}
                           disabled={isLoading}
                           data-testid="button-login"
@@ -367,7 +367,7 @@ export default function LandingPage() {
         <div className="border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30">
           <div className="max-w-6xl mx-auto px-6 py-12 lg:py-16">
             <div className="text-center mb-10">
-              <p className="text-xs uppercase tracking-widest text-violet-600 dark:text-violet-400 font-semibold mb-2">
+              <p className="text-xs uppercase tracking-widest text-emerald-600 dark:text-emerald-400 font-semibold mb-2">
                 How it works
               </p>
               <h2 className="text-2xl md:text-3xl font-bold text-neutral-900 dark:text-white tracking-tight">
@@ -404,7 +404,7 @@ export default function LandingPage() {
             <div className="flex items-center gap-2">
               <div
                 className="w-6 h-6 rounded-md flex items-center justify-center"
-                style={{ background: "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)" }}
+                style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
               >
                 <Sparkles className="w-3 h-3 text-white" strokeWidth={2.5} />
               </div>
@@ -439,7 +439,7 @@ function FeatureItem({
     <div className="relative">
       <div className="flex items-center gap-3 mb-3">
         <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 shadow-sm">
-          <Icon className="w-4 h-4 text-violet-600 dark:text-violet-400" strokeWidth={2.2} />
+          <Icon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" strokeWidth={2.2} />
         </div>
         <span className="text-xs font-mono text-neutral-400 dark:text-neutral-500 tracking-wider">{step}</span>
       </div>

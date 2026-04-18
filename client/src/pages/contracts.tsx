@@ -147,7 +147,7 @@ export default function ContractsPage() {
                           {contract.exclusive && (
                             <Badge
                               variant="secondary"
-                              className="bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400 no-default-hover-elevate no-default-active-elevate"
+                              className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 no-default-hover-elevate no-default-active-elevate"
                             >
                               <Shield className="w-3 h-3 mr-1" />
                               Exclusive

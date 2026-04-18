@@ -35,13 +35,13 @@ export function BottomNav() {
                 data-testid={`nav-${item.label.toLowerCase()}`}
                 className="relative flex flex-col items-center justify-center gap-0.5 w-14 h-14 rounded-2xl transition-all duration-200"
                 style={{
-                  color: isActive ? "hsl(262 80% 55%)" : "hsl(240 5% 55%)",
+                  color: isActive ? "hsl(160 84% 30%)" : "hsl(215 16% 47%)",
                 }}
               >
                 {isActive && (
                   <span
                     className="absolute inset-x-1 top-1 bottom-1 rounded-xl"
-                    style={{ background: "linear-gradient(135deg, hsl(262 83% 58% / 0.12) 0%, hsl(280 70% 65% / 0.08) 100%)" }}
+                    style={{ background: "linear-gradient(135deg, hsl(160 84% 30% / 0.12) 0%, hsl(174 77% 36% / 0.08) 100%)" }}
                   />
                 )}
                 <div className="relative">

@@ -129,7 +129,7 @@ export default function BrandInvoiceDetailsPage() {
             {/* ── Top colour band + INVOICE title ────── */}
             <div
               className="px-6 py-5 text-white"
-              style={{ background: "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)" }}
+              style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
             >
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
@@ -185,7 +185,7 @@ export default function BrandInvoiceDetailsPage() {
             <div className="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-6 border-b border-gray-100 dark:border-zinc-700">
               {/* FROM */}
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500 mb-2">From</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-2">From</p>
                 <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{influencerName}</p>
                 {influencerEmail && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{influencerEmail}</p>
@@ -207,7 +207,7 @@ export default function BrandInvoiceDetailsPage() {
 
               {/* TO */}
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500 mb-2">Bill To</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-teal-600 mb-2">Bill To</p>
                 <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{invoice.brandName}</p>
                 {deal && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -244,7 +244,7 @@ export default function BrandInvoiceDetailsPage() {
                           {deal.deliverables.map((d: any, i: number) => (
                             <span
                               key={i}
-                              className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 font-medium"
+                              className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 font-medium"
                             >
                               {d.platform} · {d.contentType} ×{d.quantity}
                             </span>
@@ -270,7 +270,7 @@ export default function BrandInvoiceDetailsPage() {
                       Total Amount
                     </td>
                     <td className="pt-3 text-right border-t-2 border-gray-200 dark:border-zinc-700">
-                      <span className="text-lg font-extrabold text-violet-600 dark:text-violet-400">
+                      <span className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">
                         ₹{totalAmount.toLocaleString("en-IN")}
                       </span>
                     </td>
@@ -403,12 +403,12 @@ export default function BrandInvoiceDetailsPage() {
 
           /* Force gradient header in print */
           .invoice-doc > div > div:first-child {
-            background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%) !important;
+            background: linear-gradient(135deg, #059669 0%, #0D9488 100%) !important;
           }
 
           /* Force bg colours */
           .bg-gray-50 { background-color: #f9fafb !important; }
-          .bg-violet-50 { background-color: #f5f3ff !important; }
+          .bg-emerald-50 { background-color: #ecfdf5 !important; }
 
           img {
             max-width: 100% !important;

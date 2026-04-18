@@ -13,14 +13,14 @@ export function AppLoader() {
         className="absolute inset-0 opacity-60"
         style={{
           background:
-            "radial-gradient(ellipse at 30% 20%, rgba(124, 58, 237, 0.12) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, rgba(99, 102, 241, 0.12) 0%, transparent 50%)",
+            "radial-gradient(ellipse at 30% 20%, rgba(5, 150, 105, 0.12) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, rgba(13, 148, 136, 0.12) 0%, transparent 50%)",
         }}
       />
 
       {/* Floating orbs */}
-      <div className="absolute top-1/4 left-1/4 w-40 h-40 rounded-full bg-violet-400/20 blur-3xl animate-pulse-slow" />
+      <div className="absolute top-1/4 left-1/4 w-40 h-40 rounded-full bg-emerald-400/20 blur-3xl animate-pulse-slow" />
       <div
-        className="absolute bottom-1/4 right-1/4 w-52 h-52 rounded-full bg-indigo-400/20 blur-3xl animate-pulse-slow"
+        className="absolute bottom-1/4 right-1/4 w-52 h-52 rounded-full bg-teal-400/20 blur-3xl animate-pulse-slow"
         style={{ animationDelay: "1s" }}
       />
 
@@ -41,8 +41,8 @@ export function AppLoader() {
               />
               <defs>
                 <linearGradient id="loader-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#7c3aed" />
-                  <stop offset="100%" stopColor="#6366f1" />
+                  <stop offset="0%" stopColor="#059669" />
+                  <stop offset="100%" stopColor="#0D9488" />
                 </linearGradient>
               </defs>
             </svg>
@@ -55,7 +55,7 @@ export function AppLoader() {
                 cx="50"
                 cy="50"
                 r="44"
-                stroke="rgba(124, 58, 237, 0.25)"
+                stroke="rgba(5, 150, 105, 0.25)"
                 strokeWidth="1.5"
                 strokeDasharray="2 8"
               />
@@ -67,8 +67,8 @@ export function AppLoader() {
             <div
               className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg animate-breathe"
               style={{
-                background: "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)",
-                boxShadow: "0 10px 32px -6px rgba(124, 58, 237, 0.5)",
+                background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)",
+                boxShadow: "0 10px 32px -6px rgba(5, 150, 105, 0.5)",
               }}
             >
               <Sparkles className="w-7 h-7 text-white" strokeWidth={2.5} />
@@ -81,7 +81,7 @@ export function AppLoader() {
           <h1
             className="text-2xl font-bold tracking-tight"
             style={{
-              background: "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)",
+              background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
@@ -124,7 +124,7 @@ export function AppLoader() {
         @keyframes bounce-dot { 0%, 80%, 100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-6px); opacity: 1; } }
         @keyframes pipeline-step {
           0% { transform: scale(0.85); opacity: 0.4; }
-          30% { transform: scale(1.08); opacity: 1; box-shadow: 0 6px 20px -4px rgba(124, 58, 237, 0.5); }
+          30% { transform: scale(1.08); opacity: 1; box-shadow: 0 6px 20px -4px rgba(5, 150, 105, 0.5); }
           100% { transform: scale(1); opacity: 0.85; }
         }
         @keyframes pipeline-flow {
@@ -140,7 +140,7 @@ export function AppLoader() {
           animation: pipeline-step 2.4s ease-in-out infinite;
         }
         .animate-pipeline-flow {
-          background: linear-gradient(90deg, rgba(124, 58, 237, 0.1) 0%, #7c3aed 50%, rgba(99, 102, 241, 0.1) 100%);
+          background: linear-gradient(90deg, rgba(5, 150, 105, 0.1) 0%, #059669 50%, rgba(13, 148, 136, 0.1) 100%);
           background-size: 200% 100%;
           animation: pipeline-flow 1.6s linear infinite;
         }
@@ -161,7 +161,7 @@ function PipelineStep({
   return (
     <div className="flex flex-col items-center gap-1.5">
       <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center bg-white dark:bg-white/10 border border-violet-200/50 dark:border-violet-500/20 animate-pipeline-step"
+        className="w-10 h-10 rounded-xl flex items-center justify-center bg-white dark:bg-white/10 border border-emerald-200/50 dark:border-emerald-500/20 animate-pipeline-step"
         style={{ animationDelay: `${delay}s` }}
       >
         <Icon className="w-4 h-4 text-primary" strokeWidth={2.2} />
@@ -191,8 +191,8 @@ export function RouteLoader() {
         <div
           className="h-full w-full origin-left animate-route-progress"
           style={{
-            background: "linear-gradient(90deg, #7c3aed 0%, #6366f1 50%, #a78bfa 100%)",
-            boxShadow: "0 0 10px rgba(124, 58, 237, 0.6)",
+            background: "linear-gradient(90deg, #059669 0%, #0D9488 50%, #10b981 100%)",
+            boxShadow: "0 0 10px rgba(5, 150, 105, 0.6)",
           }}
         />
       </div>
@@ -231,8 +231,8 @@ export function InlineLoader({ label }: { label?: string }) {
             />
             <defs>
               <linearGradient id="inline-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#7c3aed" />
-                <stop offset="100%" stopColor="#6366f1" />
+                <stop offset="0%" stopColor="#059669" />
+                <stop offset="100%" stopColor="#0D9488" />
               </linearGradient>
             </defs>
           </svg>
@@ -240,7 +240,7 @@ export function InlineLoader({ label }: { label?: string }) {
         <div className="absolute inset-2 flex items-center justify-center">
           <div
             className="w-4 h-4 rounded-md"
-            style={{ background: "linear-gradient(135deg, #7c3aed 0%, #6366f1 100%)" }}
+            style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
           />
         </div>
       </div>

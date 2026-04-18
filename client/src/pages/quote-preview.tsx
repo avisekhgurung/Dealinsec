@@ -188,16 +188,16 @@ export default function QuotePreviewPage() {
         {/* Professional Quote Document */}
         <div className="glass-card rounded-2xl overflow-hidden border border-white/10 print:shadow-none print:border print:border-gray-200">
           {/* Document header */}
-          <div className="bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-6 text-white print:bg-purple-700">
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-6 text-white print:bg-emerald-700">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-3xl font-extrabold tracking-wider mb-1">
                   QUOTATION{quote?.version && quote.version > 1 ? ` (Revised - v${quote.version})` : ""}
                 </h2>
-                <p className="text-violet-200 font-mono text-sm">{quoteNumber}</p>
+                <p className="text-emerald-100 font-mono text-sm">{quoteNumber}</p>
               </div>
               <div className="text-right text-sm">
-                <p className="text-violet-200">Date: <span className="text-white font-medium">{formattedDate}</span></p>
+                <p className="text-emerald-100">Date: <span className="text-white font-medium">{formattedDate}</span></p>
                 <p className="mt-1 bg-white/20 rounded-full px-3 py-0.5 text-xs font-medium">
                   Valid for 30 days
                 </p>
@@ -278,7 +278,7 @@ export default function QuotePreviewPage() {
             <hr className="border-white/10" />
 
             {/* Amount section */}
-            <div className="flex items-center justify-between bg-gradient-to-r from-violet-500/10 to-purple-500/10 rounded-xl px-5 py-4 border border-violet-400/20">
+            <div className="flex items-center justify-between bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-xl px-5 py-4 border border-emerald-400/20">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Total Deal Value</p>
                 <p className="text-3xl font-extrabold text-primary mt-0.5">

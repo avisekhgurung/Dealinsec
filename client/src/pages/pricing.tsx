@@ -207,7 +207,7 @@ export default function PricingPage() {
 
         {/* ── Buy credit card ── */}
         <Card className="glass-card border-primary/20 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-violet-500/5 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-teal-500/5 pointer-events-none" />
 
           {/* Popular badge */}
           <div className="absolute top-4 right-4">

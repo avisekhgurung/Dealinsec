@@ -61,7 +61,7 @@ function ProgressBar({ active }: { active: boolean }) {
   return (
     <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
       <div
-        className="h-full rounded-full bg-gradient-to-r from-violet-500 to-purple-400 transition-all ease-out"
+        className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all ease-out"
         style={{ width: `${width}%`, transitionDuration: "2800ms" }}
       />
     </div>
@@ -138,12 +138,12 @@ export function CreditAnimationOverlay({ show, phase, creditsAfter }: Props) {
           className={`relative w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl transition-all duration-300
             ${show ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}
           style={{
-            background: "linear-gradient(135deg, hsl(262 30% 12%) 0%, hsl(240 20% 8%) 100%)",
+            background: "linear-gradient(135deg, hsl(160 30% 12%) 0%, hsl(215 25% 8%) 100%)",
             border: "1px solid rgba(255,255,255,0.08)",
           }}
         >
           {/* Top gradient strip */}
-          <div className="h-1 w-full bg-gradient-to-r from-amber-400 via-violet-500 to-emerald-400" />
+          <div className="h-1 w-full bg-gradient-to-r from-amber-400 via-teal-500 to-emerald-400" />
 
           <div className="px-8 py-10 flex flex-col items-center gap-6 text-center">
 

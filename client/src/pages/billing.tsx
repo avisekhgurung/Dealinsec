@@ -212,14 +212,14 @@ export default function BillingPage() {
                               isAdvance
                                 ? "bg-blue-100 dark:bg-blue-900/30"
                                 : isFinal
-                                ? "bg-violet-100 dark:bg-violet-900/30"
+                                ? "bg-teal-100 dark:bg-teal-900/30"
                                 : "bg-gray-100 dark:bg-gray-800/30"
                             }`}>
                               <Receipt className={`w-4 h-4 ${
                                 isAdvance
                                   ? "text-blue-600 dark:text-blue-400"
                                   : isFinal
-                                  ? "text-violet-600 dark:text-violet-400"
+                                  ? "text-teal-600 dark:text-teal-400"
                                   : "text-muted-foreground"
                               }`} />
                             </div>
@@ -234,7 +234,7 @@ export default function BillingPage() {
                                   <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
                                     isAdvance
                                       ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                                      : "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400"
+                                      : "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400"
                                   }`}>
                                     {invoice.splitPercentage}%
                                   </span>

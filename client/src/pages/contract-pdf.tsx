@@ -195,7 +195,7 @@ export default function ContractPdfPage() {
               <div>
                 <span className="text-muted-foreground text-xs block mb-1">Type</span>
                 {contract.exclusive ? (
-                  <Badge className="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 no-default-hover-elevate no-default-active-elevate">
+                  <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 no-default-hover-elevate no-default-active-elevate">
                     <Lock className="w-3 h-3 mr-1" />
                     Exclusive
                   </Badge>
@@ -494,7 +494,7 @@ export default function ContractPdfPage() {
 
           /* Force gradient banner to print in colour */
           .gradient-primary {
-            background: linear-gradient(135deg, #6d28d9, #7c3aed) !important;
+            background: linear-gradient(135deg, #047857, #059669) !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }

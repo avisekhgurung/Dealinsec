@@ -319,7 +319,7 @@ export default function ContractDetailsPage() {
               {contract.exclusive && (
                 <Badge
                   variant="secondary"
-                  className="bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400 no-default-hover-elevate no-default-active-elevate"
+                  className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 no-default-hover-elevate no-default-active-elevate"
                 >
                   <Shield className="w-3 h-3 mr-1" />
                   Exclusive Contract
@@ -393,7 +393,7 @@ export default function ContractDetailsPage() {
 
         {/* ── Download Agreement PDF — prominent CTA ── */}
         <Card className="glass-card border-0 overflow-hidden">
-          <div className="bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-4">
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-4">
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-white/20 backdrop-blur-sm">
                 <FileText className="w-6 h-6 text-white" />
@@ -586,14 +586,14 @@ export default function ContractDetailsPage() {
                               (inv as any).invoiceType === "advance"
                                 ? "bg-blue-100 dark:bg-blue-900/30"
                                 : (inv as any).invoiceType === "final"
-                                ? "bg-violet-100 dark:bg-violet-900/30"
+                                ? "bg-teal-100 dark:bg-teal-900/30"
                                 : "bg-gray-100 dark:bg-gray-800/30"
                             }`}>
                               <Receipt className={`w-4 h-4 ${
                                 (inv as any).invoiceType === "advance"
                                   ? "text-blue-600 dark:text-blue-400"
                                   : (inv as any).invoiceType === "final"
-                                  ? "text-violet-600 dark:text-violet-400"
+                                  ? "text-teal-600 dark:text-teal-400"
                                   : "text-muted-foreground"
                               }`} />
                             </div>

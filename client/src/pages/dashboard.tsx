@@ -79,12 +79,12 @@ function buildDeliverableCompletion(deals: Deal[]) {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  Pending: "#f59e0b",
-  Active: "#8b5cf6",
-  Completed: "#10b981",
-  Cancelled: "#ef4444",
+  Pending: "#f59e0b",   // amber — waiting
+  Active: "#3B82F6",    // blue — in progress
+  Completed: "#059669", // emerald — done (money earned)
+  Cancelled: "#94a3b8", // slate — inactive
 };
-const PLATFORM_COLORS = ["#8b5cf6", "#ec4899", "#ef4444", "#3b82f6", "#10b981"];
+const PLATFORM_COLORS = ["#3B82F6", "#0D9488", "#f59e0b", "#64748B", "#e11d48"];
 
 // ─── custom tooltip ──────────────────────────────────────────────────────────
 
@@ -103,30 +103,48 @@ function CustomTooltip({ active, payload, label, prefix = "" }: any) {
 }
 
 // ─── stat card ───────────────────────────────────────────────────────────────
+// Elegant Linear/Stripe-style: white surface + subtle colored icon tile.
+// tone controls the small icon chip color only, not the whole card.
 
-function StatCard({ title, value, icon: Icon, colorClass, href, loading }: {
-  title: string; value: number | string; icon: any;
-  colorClass: string; href: string; loading: boolean;
+type StatTone = "emerald" | "blue" | "amber" | "slate";
+
+const TONE_STYLES: Record<StatTone, { bg: string; text: string }> = {
+  emerald: { bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-600 dark:text-emerald-400" },
+  blue:    { bg: "bg-blue-100 dark:bg-blue-900/30",       text: "text-blue-600 dark:text-blue-400" },
+  amber:   { bg: "bg-amber-100 dark:bg-amber-900/30",     text: "text-amber-600 dark:text-amber-400" },
+  slate:   { bg: "bg-slate-100 dark:bg-slate-800/60",     text: "text-slate-600 dark:text-slate-300" },
+};
+
+function StatCard({ title, value, icon: Icon, tone, href, loading }: {
+  title: string;
+  value: number | string;
+  icon: any;
+  tone: StatTone;
+  href: string;
+  loading: boolean;
 }) {
+  const t = TONE_STYLES[tone];
   return (
     <Link href={href}>
-      <div className={`${colorClass} rounded-2xl p-3 sm:p-4 shadow-lg hover-elevate cursor-pointer overflow-hidden`}>
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-            <div className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 shrink-0">
-              <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-xs font-medium text-white/80 truncate">{title}</p>
-              {loading ? (
-                <Skeleton className="h-6 w-10 mt-0.5 bg-white/20" />
-              ) : (
-                <p className="text-lg sm:text-xl font-bold text-white truncate leading-tight">{value}</p>
-              )}
-            </div>
+      <div
+        className="rounded-2xl p-3 sm:p-4 cursor-pointer overflow-hidden bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 hover:shadow-md transition-all"
+      >
+        <div className="flex items-start justify-between gap-2 mb-2 sm:mb-3">
+          <div className={`flex items-center justify-center w-9 h-9 rounded-xl shrink-0 ${t.bg}`}>
+            <Icon className={`w-4 h-4 ${t.text}`} strokeWidth={2.2} />
           </div>
-          <ChevronRight className="w-4 h-4 text-white/60 shrink-0" />
+          <ChevronRight className="w-4 h-4 text-neutral-400 dark:text-neutral-600 shrink-0 mt-1" />
         </div>
+        <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 truncate mb-0.5">
+          {title}
+        </p>
+        {loading ? (
+          <Skeleton className="h-7 w-16" />
+        ) : (
+          <p className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-white truncate leading-tight tracking-tight">
+            {value}
+          </p>
+        )}
       </div>
     </Link>
   );
@@ -207,16 +225,16 @@ export default function DashboardPage() {
         {/* ── Stat cards ── */}
         <section className="grid grid-cols-2 gap-3">
           <StatCard title="Active Deals" value={activeDeals} icon={Briefcase}
-            colorClass="gradient-card-purple" href="/deals" loading={isLoading} />
+            tone="amber" href="/deals" loading={isLoading} />
           <StatCard title="Agreements" value={signedContracts} icon={FileCheck}
-            colorClass="gradient-card-indigo" href="/contracts" loading={isLoading} />
+            tone="blue" href="/contracts" loading={isLoading} />
           <StatCard title="Paid Invoices" value={paidInvoices} icon={Receipt}
-            colorClass="gradient-card-emerald" href="/invoices" loading={isLoading} />
+            tone="emerald" href="/invoices" loading={isLoading} />
           <StatCard
             title="Pipeline Value"
             value={isLoading ? "…" : `₹${(totalRevenue + pendingRevenue).toLocaleString("en-IN")}`}
             icon={IndianRupee}
-            colorClass="gradient-card-rose"
+            tone="slate"
             href="/deals"
             loading={false}
           />
@@ -260,15 +278,15 @@ export default function DashboardPage() {
                     <AreaChart data={dealsOverTime} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                       <defs>
                         <linearGradient id="colorDeals" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                          <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                       <XAxis dataKey="month" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
                       <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
                       <Tooltip content={<CustomTooltip />} />
-                      <Area type="monotone" dataKey="count" name="Deals" stroke="#8b5cf6" strokeWidth={2} fill="url(#colorDeals)" dot={{ r: 3, fill: "#8b5cf6" }} />
+                      <Area type="monotone" dataKey="count" name="Deals" stroke="#3B82F6" strokeWidth={2} fill="url(#colorDeals)" dot={{ r: 3, fill: "#3B82F6" }} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -386,7 +404,7 @@ export default function DashboardPage() {
                   className="h-full rounded-full transition-all duration-500"
                   style={{
                     width: `${totalDeliverables > 0 ? (completedDeliverables / totalDeliverables) * 100 : 0}%`,
-                    background: "linear-gradient(90deg, #8b5cf6, #10b981)",
+                    background: "linear-gradient(90deg, #059669, #10b981)",
                   }}
                 />
               </div>
