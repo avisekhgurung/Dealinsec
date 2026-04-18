@@ -1,17 +1,45 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
 import { StatusBadge } from "@/components/status-badge";
-import { Plus, Briefcase, ChevronRight, Calendar } from "lucide-react";
+import { Plus, Briefcase, ChevronRight, Calendar, Search, X } from "lucide-react";
 import type { Deal } from "@shared/schema";
 
+type FilterType = "all" | "pending" | "active" | "completed";
+
 export default function DealsPage() {
+  const [filter, setFilter] = useState<FilterType>("all");
+  const [search, setSearch] = useState("");
+
   const { data: deals = [], isLoading } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
   });
+
+  const filteredDeals = useMemo(() => {
+    return deals.filter((deal) => {
+      // Status filter
+      if (filter === "pending" && deal.status !== "Pending") return false;
+      if (filter === "active" && deal.status !== "Active") return false;
+      if (filter === "completed" && deal.status !== "Completed") return false;
+
+      // Search filter
+      if (search.trim()) {
+        const q = search.toLowerCase().trim();
+        return (
+          deal.dealTitle.toLowerCase().includes(q) ||
+          deal.brandName.toLowerCase().includes(q) ||
+          deal.dealAmount.toString().includes(q)
+        );
+      }
+
+      return true;
+    });
+  }, [deals, filter, search]);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("en-IN", {
@@ -21,17 +49,58 @@ export default function DealsPage() {
     });
   };
 
+  const filters: { value: FilterType; label: string }[] = [
+    { value: "all", label: "All" },
+    { value: "pending", label: "Pending" },
+    { value: "active", label: "Active" },
+    { value: "completed", label: "Completed" },
+  ];
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="glass-header sticky top-0 z-40">
-        <div className="flex items-center justify-between gap-4 px-4 py-4">
-          <h1 className="text-xl font-bold">Deals</h1>
-          <Link href="/deals/new">
-            <Button size="sm" className="gradient-btn text-white" data-testid="button-new-deal">
-              <Plus className="w-4 h-4 mr-1" />
-              New
-            </Button>
-          </Link>
+        <div className="px-4 py-4 space-y-3">
+          <div className="flex items-center justify-between gap-4">
+            <h1 className="text-xl font-bold">Deals</h1>
+            <Link href="/deals/new">
+              <Button size="sm" className="gradient-btn text-white" data-testid="button-new-deal">
+                <Plus className="w-4 h-4 mr-1" />
+                New
+              </Button>
+            </Link>
+          </div>
+
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search deals..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 pr-8 h-9 bg-white/50 dark:bg-white/5 rounded-xl text-sm"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
+                <X className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+
+          {/* Filters */}
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+            {filters.map((f) => (
+              <Button
+                key={f.value}
+                variant={filter === f.value ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilter(f.value)}
+                className={`flex-shrink-0 rounded-full ${filter === f.value ? "gradient-btn text-white" : ""}`}
+                data-testid={`filter-${f.value}`}
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
         </div>
       </header>
 
@@ -56,9 +125,9 @@ export default function DealsPage() {
               </Card>
             ))}
           </div>
-        ) : deals.length > 0 ? (
+        ) : filteredDeals.length > 0 ? (
           <div className="flex flex-col gap-4">
-            {deals.map((deal) => (
+            {filteredDeals.map((deal) => (
               <Link key={deal.id} href={`/deals/${deal.id}`}>
                 <Card
                   className="glass-card border hover-elevate active-elevate-2 cursor-pointer rounded-xl shadow-sm"
@@ -100,16 +169,33 @@ export default function DealsPage() {
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted mx-auto mb-4">
                 <Briefcase className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h3 className="font-semibold mb-1">No deals yet</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Create your first brand deal to get started
-              </p>
-              <Link href="/deals/new">
-                <Button className="gradient-btn text-white" data-testid="button-create-deal-empty">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Deal
-                </Button>
-              </Link>
+              {search || filter !== "all" ? (
+                <>
+                  <h3 className="font-semibold mb-1">No matches found</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Try a different search or filter
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => { setSearch(""); setFilter("all"); }}
+                  >
+                    Clear Filters
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h3 className="font-semibold mb-1">No deals yet</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Create your first brand deal to get started
+                  </p>
+                  <Link href="/deals/new">
+                    <Button className="gradient-btn text-white" data-testid="button-create-deal-empty">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Deal
+                    </Button>
+                  </Link>
+                </>
+              )}
             </CardContent>
           </Card>
         )}

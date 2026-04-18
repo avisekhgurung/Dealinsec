@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,33 +7,44 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { BottomNav } from "@/components/bottom-nav";
 import { StatusBadge } from "@/components/status-badge";
-import { FileText, Calendar, Shield, ChevronRight, FileCheck } from "lucide-react";
-import type { Contract, Invoice } from "@shared/schema";
+import { FileText, Calendar, Shield, ChevronRight, FileCheck, Search, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import type { Contract, Deal } from "@shared/schema";
 
 type FilterType = "all" | "active" | "completed";
 
 export default function ContractsPage() {
   const [filter, setFilter] = useState<FilterType>("all");
+  const [search, setSearch] = useState("");
 
   const { data: contracts = [], isLoading } = useQuery<Contract[]>({
     queryKey: ["/api/contracts"],
   });
 
-  const { data: invoices = [] } = useQuery<Invoice[]>({
-    queryKey: ["/api/invoices"],
+  const { data: deals = [] } = useQuery<Deal[]>({
+    queryKey: ["/api/deals"],
   });
 
-  const filteredContracts = contracts.filter((contract) => {
-    if (filter === "all") return true;
-    if (filter === "active") return contract.status === "Active" || contract.status === "Signed";
-    if (filter === "completed") return contract.status === "Completed";
-    return true;
-  });
+  const getDeal = (dealId: number | null) => deals.find(d => d.id === dealId);
 
-  const getInvoiceStatus = (contractId: number) => {
-    const invoice = invoices.find(i => i.contractId === contractId);
-    return invoice?.status;
-  };
+  const filteredContracts = useMemo(() => {
+    return contracts.filter((contract) => {
+      if (filter === "active" && contract.status !== "Active" && contract.status !== "Signed") return false;
+      if (filter === "completed" && contract.status !== "Completed") return false;
+
+      if (search.trim()) {
+        const q = search.toLowerCase().trim();
+        const deal = getDeal(contract.dealId);
+        return (
+          contract.contractName.toLowerCase().includes(q) ||
+          contract.brandName.toLowerCase().includes(q) ||
+          (deal?.dealTitle || "").toLowerCase().includes(q)
+        );
+      }
+
+      return true;
+    });
+  }, [contracts, filter, search, deals]);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("en-IN", {
@@ -52,8 +63,25 @@ export default function ContractsPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="glass-header sticky top-0 z-40">
-        <div className="px-4 py-4">
-          <h1 className="text-xl font-bold mb-4">Agreements</h1>
+        <div className="px-4 py-4 space-y-3">
+          <h1 className="text-xl font-bold">Agreements</h1>
+
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by deal or brand..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 pr-8 h-9 bg-white/50 dark:bg-white/5 rounded-xl text-sm"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
+                <X className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
             {filters.map((f) => (
               <Button
@@ -90,7 +118,7 @@ export default function ContractsPage() {
         ) : filteredContracts.length > 0 ? (
           <div className="flex flex-col gap-4">
             {filteredContracts.map((contract) => {
-              const invoiceStatus = getInvoiceStatus(contract.id);
+              const deal = getDeal(contract.dealId);
 
               return (
                 <Link key={contract.id} href={`/contracts/${contract.id}`}>
@@ -115,7 +143,7 @@ export default function ContractsPage() {
                       </div>
 
                       <div className="flex items-center justify-between pt-3 border-t border-white/10">
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           {contract.exclusive && (
                             <Badge
                               variant="secondary"
@@ -132,18 +160,6 @@ export default function ContractsPage() {
                             >
                               <FileCheck className="w-3 h-3 mr-1" />
                               Proof
-                            </Badge>
-                          )}
-                          {invoiceStatus && (
-                            <Badge
-                              variant="secondary"
-                              className={`no-default-hover-elevate no-default-active-elevate ${
-                                invoiceStatus === "Paid"
-                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
-                                  : "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400"
-                              }`}
-                            >
-                              {invoiceStatus}
                             </Badge>
                           )}
                         </div>
@@ -166,20 +182,26 @@ export default function ContractsPage() {
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted mx-auto mb-4">
                 <FileText className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h3 className="font-semibold mb-1">No agreements yet</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                {filter === "all"
-                  ? "Accept a deal to create your first contract"
-                  : `No ${filter} contracts found`}
-              </p>
-              {filter !== "all" && (
-                <Button
-                  variant="outline"
-                  onClick={() => setFilter("all")}
-                  data-testid="button-view-all"
-                >
-                  View All Contracts
-                </Button>
+              {search || filter !== "all" ? (
+                <>
+                  <h3 className="font-semibold mb-1">No matches found</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Try a different search or filter
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => { setSearch(""); setFilter("all"); }}
+                  >
+                    Clear Filters
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h3 className="font-semibold mb-1">No agreements yet</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Accept a deal to create your first agreement
+                  </p>
+                </>
               )}
             </CardContent>
           </Card>

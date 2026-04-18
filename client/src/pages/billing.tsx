@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,13 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
 import { StatusBadge } from "@/components/status-badge";
-import { Receipt, Calendar, ChevronRight, Briefcase, SplitSquareHorizontal } from "lucide-react";
-import type { Invoice, Deal, BrandInvoice } from "@shared/schema";
+import { Receipt, Calendar, ChevronRight, Briefcase, Search, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import type { Deal, BrandInvoice } from "@shared/schema";
 
 type FilterType = "all" | "paid" | "unpaid";
 
 export default function BillingPage() {
   const [filter, setFilter] = useState<FilterType>("all");
+  const [search, setSearch] = useState("");
 
   const { data: brandInvoices = [], isLoading } = useQuery<BrandInvoice[]>({
     queryKey: ["/api/brand-invoices"],
@@ -24,12 +26,36 @@ export default function BillingPage() {
 
   const getDeal = (dealId: number) => deals.find(d => d.id === dealId);
 
-  const filteredInvoices = brandInvoices.filter((invoice) => {
-    if (filter === "all") return true;
-    if (filter === "paid") return invoice.status === "Paid";
-    if (filter === "unpaid") return invoice.status === "Unpaid";
-    return true;
-  });
+  const filteredInvoices = useMemo(() => {
+    return brandInvoices.filter((invoice) => {
+      if (filter === "paid" && invoice.status !== "Paid") return false;
+      if (filter === "unpaid" && invoice.status !== "Unpaid") return false;
+
+      if (search.trim()) {
+        const q = search.toLowerCase().trim();
+        const deal = getDeal(invoice.dealId);
+        return (
+          invoice.brandName.toLowerCase().includes(q) ||
+          (deal?.dealTitle || "").toLowerCase().includes(q) ||
+          invoice.invoiceNumber.toLowerCase().includes(q) ||
+          invoice.dealAmount.toString().includes(q)
+        );
+      }
+
+      return true;
+    });
+  }, [brandInvoices, filter, search, deals]);
+
+  // Group filtered invoices by deal
+  const groupedByDeal = useMemo(() => {
+    const groups = new Map<number, BrandInvoice[]>();
+    for (const inv of filteredInvoices) {
+      const existing = groups.get(inv.dealId) || [];
+      existing.push(inv);
+      groups.set(inv.dealId, existing);
+    }
+    return Array.from(groups.entries());
+  }, [filteredInvoices]);
 
   const totalPaid = brandInvoices
     .filter(i => i.status === "Paid")
@@ -56,8 +82,25 @@ export default function BillingPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="glass-header sticky top-0 z-40">
-        <div className="px-4 py-4">
-          <h1 className="text-xl font-bold mb-4">Invoices</h1>
+        <div className="px-4 py-4 space-y-3">
+          <h1 className="text-xl font-bold">Invoices</h1>
+
+          {/* Search bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by deal, brand, or invoice..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 pr-8 h-9 bg-white/50 dark:bg-white/5 rounded-xl text-sm"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
+                <X className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
             {filters.map((f) => (
               <Button
@@ -118,69 +161,106 @@ export default function BillingPage() {
               </Card>
             ))}
           </div>
-        ) : filteredInvoices.length > 0 ? (
-          <div className="flex flex-col gap-4">
-            {filteredInvoices.map((invoice) => {
-              const deal = getDeal(invoice.dealId);
-              const isAdvance = invoice.invoiceType === "advance";
-              const isFinal = invoice.invoiceType === "final";
-              const isSplit = isAdvance || isFinal;
+        ) : groupedByDeal.length > 0 ? (
+          <div className="flex flex-col gap-6">
+            {groupedByDeal.map(([dealId, invoices]) => {
+              const deal = getDeal(dealId);
+              const totalDealAmount = invoices.reduce((s, inv) => s + Number(inv.dealAmount), 0);
+
               return (
-                <Link key={invoice.id} href={`/brand-invoices/${invoice.id}`}>
-                  <Card
-                    className="glass-card border hover-elevate active-elevate-2 cursor-pointer rounded-xl shadow-sm"
-                    data-testid={`card-invoice-${invoice.id}`}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold text-sm truncate">
-                              {deal?.dealTitle || invoice.brandName}
-                            </p>
-                            {isSplit && (
-                              <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                                isAdvance
-                                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                              }`}>
-                                {isAdvance ? "Advance" : "Final"}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground truncate">
-                            {invoice.brandName}
+                <Card key={dealId} className="glass-card border-0 rounded-2xl overflow-hidden">
+                  {/* Deal group header */}
+                  <div className="bg-muted/40 px-4 py-3 border-b border-white/10">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 flex-shrink-0">
+                          <Briefcase className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold truncate">
+                            {deal?.dealTitle || invoices[0]?.brandName || "Deal"}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            {deal?.brandName || invoices[0]?.brandName}
                           </p>
                         </div>
-                        <StatusBadge status={invoice.status} />
                       </div>
+                      <p className="text-sm font-bold text-primary flex-shrink-0 ml-3">
+                        ₹{totalDealAmount.toLocaleString("en-IN")}
+                      </p>
+                    </div>
+                  </div>
 
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5" />
-                          {formatDate(invoice.invoiceDate)}
-                        </span>
-                        <span className="font-mono text-[10px] opacity-70">
-                          {invoice.invoiceNumber}
-                        </span>
-                      </div>
+                  {/* Invoice rows inside the card */}
+                  <CardContent className="p-0">
+                    {invoices.map((invoice, idx) => {
+                      const isAdvance = invoice.invoiceType === "advance";
+                      const isFinal = invoice.invoiceType === "final";
+                      const isSplit = isAdvance || isFinal;
+                      const isLast = idx === invoices.length - 1;
 
-                      <div className="flex items-center justify-between pt-3 border-t border-white/10">
-                        <div>
-                          <span className="text-lg font-bold text-primary">
-                            ₹{Number(invoice.dealAmount).toLocaleString("en-IN")}
-                          </span>
-                          {isSplit && invoice.splitPercentage && (
-                            <span className="text-[11px] text-muted-foreground ml-2">
-                              ({invoice.splitPercentage}% of deal)
-                            </span>
-                          )}
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
+                      return (
+                        <Link key={invoice.id} href={`/brand-invoices/${invoice.id}`}>
+                          <div
+                            className={`flex items-center gap-3 px-4 py-3.5 hover:bg-muted/30 active:bg-muted/50 transition-colors cursor-pointer ${
+                              !isLast ? "border-b border-white/5" : ""
+                            }`}
+                            data-testid={`card-invoice-${invoice.id}`}
+                          >
+                            {/* Icon */}
+                            <div className={`flex items-center justify-center w-9 h-9 rounded-lg flex-shrink-0 ${
+                              isAdvance
+                                ? "bg-blue-100 dark:bg-blue-900/30"
+                                : isFinal
+                                ? "bg-violet-100 dark:bg-violet-900/30"
+                                : "bg-gray-100 dark:bg-gray-800/30"
+                            }`}>
+                              <Receipt className={`w-4 h-4 ${
+                                isAdvance
+                                  ? "text-blue-600 dark:text-blue-400"
+                                  : isFinal
+                                  ? "text-violet-600 dark:text-violet-400"
+                                  : "text-muted-foreground"
+                              }`} />
+                            </div>
+
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium truncate">
+                                  {isSplit ? (isAdvance ? "Advance" : "Final") : "Full Invoice"}
+                                </p>
+                                {isSplit && invoice.splitPercentage && (
+                                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                                    isAdvance
+                                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                      : "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400"
+                                  }`}>
+                                    {invoice.splitPercentage}%
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[11px] text-muted-foreground">{invoice.invoiceNumber}</span>
+                                <span className="text-[11px] text-muted-foreground">· {formatDate(invoice.invoiceDate)}</span>
+                              </div>
+                            </div>
+
+                            {/* Amount + Status */}
+                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                              <span className="text-sm font-bold text-primary">
+                                ₹{Number(invoice.dealAmount).toLocaleString("en-IN")}
+                              </span>
+                              <StatusBadge status={invoice.status} />
+                            </div>
+
+                            <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
               );
             })}
           </div>
@@ -190,21 +270,27 @@ export default function BillingPage() {
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 mx-auto mb-4">
                 <Receipt className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h3 className="font-semibold mb-1">No invoices yet</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                {filter === "all"
-                  ? "Invoices will appear here after signing contracts"
-                  : `No ${filter} invoices found`}
-              </p>
-              {filter !== "all" && (
-                <Button
-                  variant="outline"
-                  onClick={() => setFilter("all")}
-                  className="glass-card"
-                  data-testid="button-view-all-invoices"
-                >
-                  View All Invoices
-                </Button>
+              {search || filter !== "all" ? (
+                <>
+                  <h3 className="font-semibold mb-1">No matches found</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Try a different search or filter
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => { setSearch(""); setFilter("all"); }}
+                    className="glass-card"
+                  >
+                    Clear Filters
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h3 className="font-semibold mb-1">No invoices yet</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Invoices will appear here after signing agreements
+                  </p>
+                </>
               )}
             </CardContent>
           </Card>

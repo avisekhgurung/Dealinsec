@@ -573,7 +573,7 @@ export default function ContractDetailsPage() {
                     )}
                   </>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="flex flex-col gap-3">
                     <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
                       <CheckCircle className="w-4 h-4" />
                       Invoice{dealBrandInvoices.length > 1 ? "s" : ""} Generated

@@ -5,6 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
+import { AppLoader, RouteLoader } from "@/components/app-loader";
 
 // Eagerly loaded — always needed for first render
 import LandingPage from "@/pages/landing";
@@ -34,27 +35,20 @@ const PrivacyPage             = lazy(() => import("@/pages/legal/privacy"));
 const CookiePage              = lazy(() => import("@/pages/legal/cookies"));
 const RefundPage              = lazy(() => import("@/pages/legal/refund"));
 
-// Minimal spinner shown while a lazy chunk is loading
-function PageLoader() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-    </div>
-  );
-}
-
 function Router() {
   const { isAuthenticated, isLoading, user } = useAuth();
 
+  // Initial app load (auth check) → full branded splash, shown once per session
   if (isLoading) {
-    return <PageLoader />;
+    return <AppLoader />;
   }
 
   const needsOnboarding = isAuthenticated && user && !user.onboardingComplete;
 
+  // Route transitions → thin gradient progress bar, non-blocking
   if (!isAuthenticated) {
     return (
-      <Suspense fallback={<PageLoader />}>
+      <Suspense fallback={<RouteLoader />}>
         <Switch>
           <Route path="/" component={LandingPage} />
           <Route path="/pitch" component={PitchPage} />
@@ -70,7 +64,7 @@ function Router() {
 
   if (needsOnboarding) {
     return (
-      <Suspense fallback={<PageLoader />}>
+      <Suspense fallback={<RouteLoader />}>
         <Switch>
           <Route path="/" component={OnboardingPage} />
           <Route path="/onboarding" component={OnboardingPage} />
@@ -81,7 +75,7 @@ function Router() {
   }
 
   return (
-    <Suspense fallback={<PageLoader />}>
+    <Suspense fallback={<RouteLoader />}>
       <Switch>
         <Route path="/" component={DashboardPage} />
         <Route path="/deals" component={DealsPage} />
