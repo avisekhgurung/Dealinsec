@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useParams, Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Shield, AlertTriangle, PenLine, Loader2, CreditCard, CheckCircle } from "lucide-react";
+import { ArrowLeft, Shield, AlertTriangle, PenLine, Loader2, CreditCard, CheckCircle, Upload } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { CreditAnimationOverlay } from "@/components/credit-animation-overlay";
 import type { Deal } from "@shared/schema";
@@ -24,6 +24,9 @@ export default function ContractConfirmationPage() {
   const [agreed, setAgreed] = useState(false);
   const [billingAddress, setBillingAddress] = useState("");
   const [panNumber, setPanNumber] = useState("");
+  const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
+  const [signatureFile, setSignatureFile] = useState<File | null>(null);
+  const signatureInputRef = useRef<HTMLInputElement>(null);
   const [overlayPhase, setOverlayPhase] = useState<Phase>("reserving");
   const [showOverlay, setShowOverlay] = useState(false);
   const [contractId, setContractId] = useState<number | null>(null);
@@ -32,13 +35,14 @@ export default function ContractConfirmationPage() {
   const hasCredits = credits >= 1;
   const needsBillingAddress = !user?.billingAddress;
   const needsPan = !user?.panNumber;
+  const needsSignature = !user?.digitalSignature;
 
   const { data: deal, isLoading } = useQuery<Deal>({
     queryKey: ["/api/deals", params.id],
   });
 
   const updateProfile = useMutation({
-    mutationFn: async (profileData: { billingAddress?: string; panNumber?: string }) => {
+    mutationFn: async (profileData: { billingAddress?: string; panNumber?: string; digitalSignature?: string }) => {
       const res = await apiRequest("PATCH", "/api/profile", profileData);
       return res.json();
     },
@@ -46,6 +50,19 @@ export default function ContractConfirmationPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     },
   });
+
+  const handleSignatureSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Upload an image (PNG/JPG).", variant: "destructive" });
+      return;
+    }
+    setSignatureFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setSignaturePreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
 
   const createContract = useMutation({
     mutationFn: async () => {
@@ -55,10 +72,26 @@ export default function ContractConfirmationPage() {
       setOverlayPhase("reserving");
       setShowOverlay(true);
 
+      // Upload signature if provided
+      let digitalSignaturePath: string | undefined;
+      if (needsSignature && signatureFile) {
+        const formData = new FormData();
+        formData.append("signature", signatureFile);
+        const uploadRes = await fetch("/api/profile/signature", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (!uploadRes.ok) throw new Error("Failed to upload signature");
+        const uploadData = await uploadRes.json();
+        digitalSignaturePath = uploadData.path;
+      }
+
       // Save missing profile fields
-      const profileUpdates: { billingAddress?: string; panNumber?: string } = {};
+      const profileUpdates: { billingAddress?: string; panNumber?: string; digitalSignature?: string } = {};
       if (needsBillingAddress && billingAddress.trim()) profileUpdates.billingAddress = billingAddress.trim();
       if (needsPan && panNumber.trim()) profileUpdates.panNumber = panNumber.trim();
+      if (digitalSignaturePath) profileUpdates.digitalSignature = digitalSignaturePath;
       if (Object.keys(profileUpdates).length > 0) await updateProfile.mutateAsync(profileUpdates);
 
       // Brief pause so user sees the "Reserving" phase
@@ -126,7 +159,8 @@ export default function ContractConfirmationPage() {
     !createContract.isPending &&
     hasCredits &&
     (!needsBillingAddress || billingAddress.trim().length > 0) &&
-    (!needsPan || panNumber.trim().length > 0);
+    (!needsPan || panNumber.trim().length > 0) &&
+    (!needsSignature || !!signatureFile);
 
   if (isLoading) {
     return (
@@ -333,11 +367,11 @@ export default function ContractConfirmationPage() {
             </CardContent>
           </Card>
 
-          {(needsBillingAddress || needsPan) && (
+          {(needsBillingAddress || needsPan || needsSignature) && (
             <Card className="glass-card border-0">
               <CardContent className="p-5 space-y-4">
                 <h3 className="font-semibold text-sm">Complete Your Profile</h3>
-                <p className="text-xs text-muted-foreground">Required for the agreement document.</p>
+                <p className="text-xs text-muted-foreground">Required for the agreement document — saved to your profile so we won't ask again.</p>
 
                 {needsBillingAddress && (
                   <div className="space-y-1.5">
@@ -369,6 +403,57 @@ export default function ContractConfirmationPage() {
                       className="glass-card border-white/10 uppercase"
                       data-testid="input-pan-number"
                     />
+                  </div>
+                )}
+
+                {needsSignature && (
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">
+                      Digital Signature <span className="text-red-500">*</span>
+                    </Label>
+                    <div className="border-2 border-dashed border-border rounded-lg p-3">
+                      {signaturePreview ? (
+                        <div className="space-y-2">
+                          <div className="rounded bg-white flex items-center justify-center p-2">
+                            <img src={signaturePreview} alt="Signature preview" className="max-h-16 object-contain" />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              setSignaturePreview(null);
+                              setSignatureFile(null);
+                              if (signatureInputRef.current) signatureInputRef.current.value = "";
+                            }}
+                          >
+                            Replace
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="text-center space-y-1.5 py-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => signatureInputRef.current?.click()}
+                            data-testid="button-upload-signature"
+                          >
+                            <Upload className="w-3.5 h-3.5 mr-2" />
+                            Upload signature
+                          </Button>
+                          <p className="text-[11px] text-muted-foreground">PNG or JPG — appears on the agreement PDF</p>
+                          <input
+                            ref={signatureInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleSignatureSelect}
+                            className="hidden"
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </CardContent>

@@ -16,7 +16,6 @@ export default function OnboardingPage() {
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
-  const [gstNumber, setGstNumber] = useState("");
   const [billingAddress, setBillingAddress] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,18 +25,10 @@ export default function OnboardingPage() {
       toast({ title: "Full name is required", variant: "destructive" });
       return;
     }
-
-    if (!phone.trim()) {
-      toast({ title: "Phone number is required", variant: "destructive" });
+    if (!/^[6-9]\d{9}$/.test(phone.replace(/\D/g, ""))) {
+      toast({ title: "Enter a valid 10-digit Indian mobile number", variant: "destructive" });
       return;
     }
-
-    const phoneRegex = /^[6-9]\d{9}$/;
-    if (!phoneRegex.test(phone.replace(/\D/g, ""))) {
-      toast({ title: "Invalid phone number", description: "Enter a valid 10-digit Indian mobile number", variant: "destructive" });
-      return;
-    }
-
     if (!billingAddress.trim()) {
       toast({ title: "Billing address is required", variant: "destructive" });
       return;
@@ -53,13 +44,12 @@ export default function OnboardingPage() {
         firstName,
         lastName,
         phone: phone.replace(/\D/g, ""),
-        gstNumber: gstNumber.trim() || null,
-        billingAddress: billingAddress.trim() || null,
+        billingAddress: billingAddress.trim(),
         onboardingComplete: true,
       });
 
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      toast({ title: "You're in!", description: "Add your PAN, bank & signature from Profile whenever you're ready." });
+      toast({ title: "You're in!", description: "We'll ask for PAN, bank & signature only when you need them." });
       setLocation("/dashboard");
     } catch (error: any) {
       toast({
@@ -78,7 +68,7 @@ export default function OnboardingPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Welcome to Dealinsec</CardTitle>
           <CardDescription>
-            Just a few quick details to get you started. You can complete the rest from Profile anytime.
+            Just 3 quick details to start. We'll ask for the rest right when you need them.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -114,7 +104,7 @@ export default function OnboardingPage() {
               <Label htmlFor="billingAddress">Billing Address *</Label>
               <Textarea
                 id="billingAddress"
-                placeholder="Full address for invoices (street, city, state, PIN)"
+                placeholder="Street, city, state, PIN (appears on invoices)"
                 value={billingAddress}
                 onChange={(e) => setBillingAddress(e.target.value)}
                 rows={3}
@@ -122,28 +112,15 @@ export default function OnboardingPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="gstNumber">GST Number (Optional)</Label>
-              <Input
-                id="gstNumber"
-                type="text"
-                placeholder="22AAAAA0000A1Z5"
-                value={gstNumber}
-                onChange={(e) => setGstNumber(e.target.value.toUpperCase())}
-                maxLength={15}
-                data-testid="input-gst"
-              />
-            </div>
-
             <div className="rounded-xl bg-primary/5 border border-primary/15 p-3.5 flex gap-2.5">
               <Sparkles className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
               <p className="text-xs text-muted-foreground leading-relaxed">
-                <span className="font-semibold text-foreground">PAN, bank details & digital signature</span> can be added later from Profile.
-                You'll need them before sending your first invoice or signing an agreement.
+                <span className="font-semibold text-foreground">PAN &amp; signature</span> are collected right before your first agreement.{" "}
+                <span className="font-semibold text-foreground">Bank details</span> are collected right before your first invoice. No mid-flow surprises.
               </p>
             </div>
 
-            <Button type="submit" className="gradient-btn w-full" disabled={isLoading} data-testid="button-complete-profile">
+            <Button type="submit" className="gradient-btn w-full h-11" disabled={isLoading} data-testid="button-complete-profile">
               {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Continue"}
             </Button>
           </form>

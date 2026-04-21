@@ -70,7 +70,7 @@ export async function setupAuth(app: Express) {
         lastName: lastName || null,
         role: "influencer",
         onboardingComplete: false,
-        contractCredits: parseInt(process.env.SIGNUP_FREE_CREDITS ?? '1'),
+        contractCredits: parseInt(process.env.SIGNUP_FREE_CREDITS ?? '3'),
         referralCode: generateReferralCode(email),
       });
 

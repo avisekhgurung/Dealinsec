@@ -21,7 +21,9 @@ export default function ProfilePage() {
   });
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");
@@ -153,14 +155,80 @@ export default function ProfilePage() {
 
       {/* Avatar + Identity */}
       <div className="flex flex-col items-center -mt-12 relative z-10">
-        <div
-          className="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-lg ring-4 ring-background"
-          style={{
-            background: "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(280 80% 50%) 100%)",
-          }}
+        <button
+          type="button"
+          onClick={() => photoInputRef.current?.click()}
+          disabled={uploadingPhoto}
+          className="group relative w-24 h-24 rounded-full shadow-lg ring-4 ring-background overflow-hidden disabled:opacity-70 focus:outline-none focus-visible:ring-primary"
+          data-testid="button-profile-photo"
+          aria-label="Change profile photo"
         >
-          {initials}
-        </div>
+          {user?.profileImageUrl ? (
+            <img
+              src={user.profileImageUrl}
+              alt={fullName}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div
+              className="w-full h-full flex items-center justify-center text-3xl font-bold text-white"
+              style={{ background: "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(280 80% 50%) 100%)" }}
+            >
+              {initials}
+            </div>
+          )}
+
+          {/* Hover overlay */}
+          <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
+            {uploadingPhoto ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <div className="flex flex-col items-center gap-0.5">
+                <Upload className="w-4 h-4" />
+                <span className="text-[10px] font-semibold">
+                  {user?.profileImageUrl ? "Replace" : "Upload"}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              if (!file.type.startsWith("image/")) {
+                toast({ title: "Invalid file", description: "Upload an image.", variant: "destructive" });
+                return;
+              }
+              if (file.size > 5 * 1024 * 1024) {
+                toast({ title: "File too large", description: "Max 5MB.", variant: "destructive" });
+                return;
+              }
+              setUploadingPhoto(true);
+              try {
+                const formData = new FormData();
+                formData.append("photo", file);
+                const res = await fetch("/api/profile/photo", {
+                  method: "POST",
+                  body: formData,
+                  credentials: "include",
+                });
+                if (!res.ok) throw new Error("Upload failed");
+                await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+                toast({ title: "Profile photo updated" });
+              } catch (err: any) {
+                toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+              } finally {
+                setUploadingPhoto(false);
+                if (photoInputRef.current) photoInputRef.current.value = "";
+              }
+            }}
+          />
+        </button>
       </div>
 
       {/* Name + email below avatar */}

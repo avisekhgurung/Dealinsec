@@ -25,6 +25,9 @@ import {
   Receipt
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Landmark } from "lucide-react";
 import type { Contract, Deal, BrandInvoice } from "@shared/schema";
 
 export default function ContractDetailsPage() {
@@ -33,12 +36,21 @@ export default function ContractDetailsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const agreementInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [uploadingAgreement, setUploadingAgreement] = useState(false);
   const [showSplitInput, setShowSplitInput] = useState(false);
   const [splitPercentageStr, setSplitPercentageStr] = useState("50");
   const splitPercentage = Math.min(99, Math.max(1, parseInt(splitPercentageStr) || 50));
+
+  // Bank details gate before generating brand invoice
+  const hasBankDetails =
+    !!(user as any)?.accountNumber && !!(user as any)?.ifscCode && !!(user as any)?.accountHolderName;
+  const [bankModalOpen, setBankModalOpen] = useState(false);
+  const [bankModalIntent, setBankModalIntent] = useState<"single" | "split" | null>(null);
+  const [bAccountHolder, setBAccountHolder] = useState("");
+  const [bAccountNumber, setBAccountNumber] = useState("");
+  const [bIfsc, setBIfsc] = useState("");
+  const [bBankName, setBBankName] = useState("");
+  const [savingBank, setSavingBank] = useState(false);
 
   const { data: contract, isLoading } = useQuery<Contract>({
     queryKey: ["/api/contracts", params.id],
@@ -66,49 +78,6 @@ export default function ContractDetailsPage() {
   const timelineStep = hasInvoice ? 4 : hasProof ? 4 : 3;
 
   const backPath = "/contracts";
-
-  const uploadAgreement = useMutation({
-    mutationFn: async (file: File) => {
-      const formData = new FormData();
-      formData.append("agreement", file);
-      const response = await fetch(`/api/contracts/${params.id}/agreement`, {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Upload failed");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contracts", params.id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
-      toast({ title: "Agreement uploaded", description: "You can now download it anytime." });
-    },
-    onError: () => {
-      toast({ title: "Upload failed", description: "Please try again.", variant: "destructive" });
-    },
-  });
-
-  const handleAgreementSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const validTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
-    if (!validTypes.includes(file.type)) {
-      toast({ title: "Invalid file type", description: "Upload a PDF, Word doc or image.", variant: "destructive" });
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      toast({ title: "File too large", description: "Maximum file size is 10MB.", variant: "destructive" });
-      return;
-    }
-    setUploadingAgreement(true);
-    try {
-      await uploadAgreement.mutateAsync(file);
-    } finally {
-      setUploadingAgreement(false);
-      if (agreementInputRef.current) agreementInputRef.current.value = "";
-    }
-  };
 
   const uploadProof = useMutation({
     mutationFn: async (file: File) => {
@@ -466,108 +435,45 @@ export default function ContractDetailsPage() {
           </CardContent>
         </Card>
 
-        {/* ── Uploaded Agreement Document ────────────── */}
-        <section className="space-y-3">
-          <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            Uploaded Agreement Document
-          </h3>
-
-          <Card className="glass-card border-0">
-            <CardContent className="p-4 space-y-3">
-              {(contract as any)?.uploadedAgreementFileName ? (
-                <>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
-                      <FileText className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate" data-testid="text-agreement-filename">
-                        {(contract as any).uploadedAgreementFileName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Available for download</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      className="flex-1 gradient-btn text-white"
-                      onClick={() => {
-                        window.location.href = `/api/contracts/${params.id}/agreement`;
-                      }}
-                      data-testid="button-download-uploaded-agreement"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => agreementInputRef.current?.click()}
-                      disabled={uploadingAgreement}
-                      data-testid="button-replace-uploaded-agreement"
-                    >
-                      {uploadingAgreement ? <Loader2 className="w-4 h-4 animate-spin" /> : "Replace"}
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <button
-                  onClick={() => agreementInputRef.current?.click()}
-                  disabled={uploadingAgreement}
-                  className="w-full h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover-elevate active-elevate-2 transition-colors"
-                  data-testid="button-upload-agreement-doc"
-                >
-                  {uploadingAgreement ? (
-                    <>
-                      <Loader2 className="w-6 h-6 animate-spin" />
-                      <span className="text-sm">Uploading...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-6 h-6" />
-                      <span className="text-sm font-medium">Upload Agreement Document</span>
-                      <span className="text-xs">PDF, Word or image (max 10MB)</span>
-                    </>
-                  )}
-                </button>
-              )}
-
-              <input
-                ref={agreementInputRef}
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
-                className="hidden"
-                onChange={handleAgreementSelect}
-              />
-            </CardContent>
-          </Card>
-        </section>
-
         <section className="space-y-3">
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
               Contract Proof
             </h3>
 
             <Card className="glass-card border-0">
-              <CardContent className="p-4">
+              <CardContent className="p-4 space-y-3">
                 {contract.proofFileName ? (
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
-                      <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                  <>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                        <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate" data-testid="text-proof-filename">
+                          {contract.proofFileName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Signed proof on file</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate" data-testid="text-proof-filename">
-                        {contract.proofFileName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Proof uploaded</p>
+                    <div className="flex gap-2">
+                      <Button
+                        className="flex-1 gradient-btn text-white"
+                        onClick={() => { window.location.href = `/api/contracts/${params.id}/proof`; }}
+                        data-testid="button-download-proof"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Download
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        data-testid="button-replace-proof"
+                      >
+                        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Replace"}
+                      </Button>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploading}
-                    >
-                      Replace
-                    </Button>
-                  </div>
+                  </>
                 ) : (
                   <button
                     onClick={() => fileInputRef.current?.click()}
@@ -627,7 +533,14 @@ export default function ContractDetailsPage() {
                     {/* Single invoice */}
                     <Button
                       className="w-full gradient-btn text-white mb-2"
-                      onClick={() => createBrandInvoice.mutate()}
+                      onClick={() => {
+                        if (!hasBankDetails) {
+                          setBankModalIntent("single");
+                          setBankModalOpen(true);
+                          return;
+                        }
+                        createBrandInvoice.mutate();
+                      }}
                       disabled={createBrandInvoice.isPending || !contract || !deal || contract.status !== "Signed"}
                       data-testid="button-generate-brand-invoice"
                     >
@@ -675,7 +588,14 @@ export default function ContractDetailsPage() {
                         <div className="flex gap-2">
                           <Button
                             className="flex-1 gradient-btn text-white"
-                            onClick={() => splitInvoices.mutate()}
+                            onClick={() => {
+                              if (!hasBankDetails) {
+                                setBankModalIntent("split");
+                                setBankModalOpen(true);
+                                return;
+                              }
+                              splitInvoices.mutate();
+                            }}
                             disabled={!deal || splitInvoices.isPending}
                           >
                             {splitInvoices.isPending ? (
@@ -742,6 +662,115 @@ export default function ContractDetailsPage() {
             </Card>
           </section>
       </main>
+
+      {/* Bank details modal — shown just before first invoice */}
+      <Dialog open={bankModalOpen} onOpenChange={setBankModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Landmark className="w-4 h-4 text-primary" />
+              </div>
+              <DialogTitle>Add your bank details</DialogTitle>
+            </div>
+            <DialogDescription>
+              These appear on every invoice you send so brands can pay you directly.
+              Saved to your profile — we'll only ask once.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!bAccountHolder.trim() || !bAccountNumber.trim() || !bIfsc.trim() || !bBankName.trim()) {
+                toast({ title: "Please fill every bank field", variant: "destructive" });
+                return;
+              }
+              if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bIfsc.toUpperCase())) {
+                toast({ title: "Invalid IFSC format", description: "Example: HDFC0001234", variant: "destructive" });
+                return;
+              }
+              setSavingBank(true);
+              try {
+                await apiRequest("PATCH", "/api/profile", {
+                  accountHolderName: bAccountHolder.trim(),
+                  accountNumber: bAccountNumber.replace(/\s/g, ""),
+                  ifscCode: bIfsc.toUpperCase(),
+                  bankName: bBankName.trim(),
+                });
+                await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+                setBankModalOpen(false);
+                // Trigger the original intent
+                if (bankModalIntent === "single") createBrandInvoice.mutate();
+                else if (bankModalIntent === "split") splitInvoices.mutate();
+              } catch (err: any) {
+                toast({ title: "Failed to save bank details", description: err.message, variant: "destructive" });
+              } finally {
+                setSavingBank(false);
+              }
+            }}
+            className="space-y-3"
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="bAccountHolder" className="text-xs">Account Holder Name</Label>
+              <Input
+                id="bAccountHolder"
+                value={bAccountHolder}
+                onChange={(e) => setBAccountHolder(e.target.value)}
+                placeholder="As per bank records"
+                data-testid="input-modal-account-holder"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="bAccountNumber" className="text-xs">Account Number</Label>
+              <Input
+                id="bAccountNumber"
+                value={bAccountNumber}
+                onChange={(e) => setBAccountNumber(e.target.value.replace(/\D/g, ""))}
+                placeholder="XXXXXXXXXXXX"
+                inputMode="numeric"
+                data-testid="input-modal-account-number"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="bIfsc" className="text-xs">IFSC</Label>
+                <Input
+                  id="bIfsc"
+                  value={bIfsc}
+                  onChange={(e) => setBIfsc(e.target.value.toUpperCase())}
+                  placeholder="HDFC0001234"
+                  maxLength={11}
+                  data-testid="input-modal-ifsc"
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="bBankName" className="text-xs">Bank Name</Label>
+                <Input
+                  id="bBankName"
+                  value={bBankName}
+                  onChange={(e) => setBBankName(e.target.value)}
+                  placeholder="HDFC Bank"
+                  data-testid="input-modal-bank-name"
+                  required
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setBankModalOpen(false)} disabled={savingBank}>
+                Cancel
+              </Button>
+              <Button type="submit" className="gradient-btn text-white" disabled={savingBank} data-testid="button-save-bank-and-generate">
+                {savingBank ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save & generate invoice"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <BottomNav />
     </div>

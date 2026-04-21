@@ -34,7 +34,7 @@ export function setupGoogleAuth() {
           let user = await storage.getUserByEmail(email);
 
           if (!user) {
-            const signupCredits = parseInt(process.env.SIGNUP_FREE_CREDITS ?? "1");
+            const signupCredits = parseInt(process.env.SIGNUP_FREE_CREDITS ?? "3");
             user = await storage.createUser({
               email,
               firstName: profile.name?.givenName || profile.displayName,

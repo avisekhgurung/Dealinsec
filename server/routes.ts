@@ -338,38 +338,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Upload the actual Agreement document (PDF, image, etc.)
-  app.post("/api/contracts/:id/agreement", isAuthenticated, upload.single("agreement"), async (req: any, res) => {
+  // Download the uploaded Contract Proof
+  app.get("/api/contracts/:id/proof", isAuthenticated, async (req: any, res) => {
     try {
       const contract = await storage.getContract(parseInt(req.params.id));
       if (!contract) return res.status(404).json({ error: "Contract not found" });
       if (contract.userId !== req.user.id) return res.status(403).json({ error: "Access denied" });
-      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      if (!contract.proofFilePath) return res.status(404).json({ error: "No proof uploaded" });
 
-      const updated = await storage.updateContract(parseInt(req.params.id), {
-        uploadedAgreementFileName: req.file.originalname,
-        uploadedAgreementPath: req.file.path,
-      });
-
-      res.json(updated);
+      res.download(contract.proofFilePath, contract.proofFileName || "contract-proof");
     } catch (error) {
-      console.error("Agreement upload error:", error);
-      res.status(500).json({ error: "Failed to upload agreement" });
-    }
-  });
-
-  // Download the uploaded Agreement document
-  app.get("/api/contracts/:id/agreement", isAuthenticated, async (req: any, res) => {
-    try {
-      const contract = await storage.getContract(parseInt(req.params.id));
-      if (!contract) return res.status(404).json({ error: "Contract not found" });
-      if (contract.userId !== req.user.id) return res.status(403).json({ error: "Access denied" });
-      if (!contract.uploadedAgreementPath) return res.status(404).json({ error: "No agreement uploaded" });
-
-      res.download(contract.uploadedAgreementPath, contract.uploadedAgreementFileName || "agreement");
-    } catch (error) {
-      console.error("Agreement download error:", error);
-      res.status(500).json({ error: "Failed to download agreement" });
+      console.error("Proof download error:", error);
+      res.status(500).json({ error: "Failed to download proof" });
     }
   });
 
@@ -744,6 +724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         panNumber,
         gstNumber,
         digitalSignature,
+        profileImageUrl,
         onboardingComplete,
         billingAddress,
         accountHolderName,
@@ -759,6 +740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (panNumber !== undefined) updates.panNumber = panNumber;
       if (gstNumber !== undefined) updates.gstNumber = gstNumber;
       if (digitalSignature !== undefined) updates.digitalSignature = digitalSignature;
+      if (profileImageUrl !== undefined) updates.profileImageUrl = profileImageUrl;
       if (onboardingComplete !== undefined) updates.onboardingComplete = onboardingComplete;
       if (billingAddress !== undefined) updates.billingAddress = billingAddress;
       if (accountHolderName !== undefined) updates.accountHolderName = accountHolderName;
@@ -775,6 +757,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Profile update error:", error);
       res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  app.post("/api/profile/photo", isAuthenticated, upload.single("photo"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      const filePath = `/uploads/${req.file.filename}`;
+      await storage.updateUser(req.user.id, { profileImageUrl: filePath });
+      res.json({ path: filePath });
+    } catch (error) {
+      console.error("Profile photo upload error:", error);
+      res.status(500).json({ error: "Failed to upload photo" });
     }
   });
 
