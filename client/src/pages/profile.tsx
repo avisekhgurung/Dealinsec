@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, ArrowLeft, Edit, LogOut, CreditCard, Copy, Share2, User, Mail, Phone, FileText, Building, MapPin, PenTool, Sparkles } from "lucide-react";
+import { Loader2, Upload, ArrowLeft, Edit, LogOut, CreditCard, Copy, Share2, User, Mail, Phone, FileText, Building, MapPin, PenTool, Sparkles, Landmark, Hash } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -29,6 +29,10 @@ export default function ProfilePage() {
   const [panNumber, setPanNumber] = useState(user?.panNumber || "");
   const [gstNumber, setGstNumber] = useState(user?.gstNumber || "");
   const [billingAddress, setBillingAddress] = useState((user as any)?.billingAddress || "");
+  const [accountHolderName, setAccountHolderName] = useState((user as any)?.accountHolderName || "");
+  const [accountNumber, setAccountNumber] = useState((user as any)?.accountNumber || "");
+  const [ifscCode, setIfscCode] = useState((user as any)?.ifscCode || "");
+  const [bankName, setBankName] = useState((user as any)?.bankName || "");
   const [signaturePreview, setSignaturePreview] = useState<string | null>(user?.digitalSignature || null);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
 
@@ -84,9 +88,13 @@ export default function ProfilePage() {
         firstName: firstName || null,
         lastName: lastName || null,
         phone: phone || null,
-        panNumber: panNumber || null,
-        gstNumber: gstNumber || null,
+        panNumber: panNumber ? panNumber.toUpperCase() : null,
+        gstNumber: gstNumber ? gstNumber.toUpperCase() : null,
         billingAddress: billingAddress.trim() || null,
+        accountHolderName: accountHolderName.trim() || null,
+        accountNumber: accountNumber.replace(/\s/g, "") || null,
+        ifscCode: ifscCode ? ifscCode.toUpperCase() : null,
+        bankName: bankName.trim() || null,
         digitalSignature: digitalSignaturePath,
       });
 
@@ -240,6 +248,63 @@ export default function ProfilePage() {
               />
             </div>
 
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <Landmark className="h-4 w-4 text-primary" />
+                <div>
+                  <h4 className="font-semibold text-sm">Bank details</h4>
+                  <p className="text-xs text-muted-foreground">Required for invoices — used to receive payments from brands.</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="accountHolderName">Account Holder Name</Label>
+                <Input
+                  id="accountHolderName"
+                  value={accountHolderName}
+                  onChange={(e) => setAccountHolderName(e.target.value)}
+                  placeholder="As per bank records"
+                  data-testid="input-account-holder"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="accountNumber">Account Number</Label>
+                <Input
+                  id="accountNumber"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, ""))}
+                  placeholder="XXXXXXXXXXXX"
+                  inputMode="numeric"
+                  data-testid="input-account-number"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="ifscCode">IFSC</Label>
+                  <Input
+                    id="ifscCode"
+                    value={ifscCode}
+                    onChange={(e) => setIfscCode(e.target.value.toUpperCase())}
+                    placeholder="HDFC0001234"
+                    maxLength={11}
+                    data-testid="input-ifsc"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bankName">Bank Name</Label>
+                  <Input
+                    id="bankName"
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    placeholder="HDFC Bank"
+                    data-testid="input-bank-name"
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label>Digital Signature</Label>
               <div className="border-2 border-dashed border-white/20 rounded-xl p-4">
@@ -383,6 +448,63 @@ export default function ProfilePage() {
                     <p className="font-medium whitespace-pre-wrap" data-testid="text-billing-address">
                       {(user as any)?.billingAddress || "Not provided"}
                     </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bank Details Card */}
+            <div className="glass-card rounded-2xl p-5 border-0" style={{ background: "linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.8) 100%)" }}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Landmark className="h-4 w-4 text-primary" />
+                  <h3 className="font-semibold">Bank Details</h3>
+                </div>
+                {!(user as any)?.accountNumber && (
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-600 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 px-2 py-0.5 rounded">
+                    Required for invoices
+                  </span>
+                )}
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <User className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Account Holder</p>
+                    <p className="font-medium" data-testid="text-account-holder">{(user as any)?.accountHolderName || "Not set"}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Hash className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Account Number</p>
+                    <p className="font-medium font-mono" data-testid="text-account-number">
+                      {(user as any)?.accountNumber
+                        ? `${"•".repeat(Math.max(0, (user as any).accountNumber.length - 4))}${(user as any).accountNumber.slice(-4)}`
+                        : "Not set"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <FileText className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">IFSC</p>
+                    <p className="font-medium font-mono" data-testid="text-ifsc">{(user as any)?.ifscCode || "Not set"}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Building className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">Bank Name</p>
+                    <p className="font-medium" data-testid="text-bank-name">{(user as any)?.bankName || "Not set"}</p>
                   </div>
                 </div>
               </div>

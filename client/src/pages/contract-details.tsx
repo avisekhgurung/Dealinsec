@@ -33,7 +33,9 @@ export default function ContractDetailsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const agreementInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadingAgreement, setUploadingAgreement] = useState(false);
   const [showSplitInput, setShowSplitInput] = useState(false);
   const [splitPercentageStr, setSplitPercentageStr] = useState("50");
   const splitPercentage = Math.min(99, Math.max(1, parseInt(splitPercentageStr) || 50));
@@ -64,6 +66,49 @@ export default function ContractDetailsPage() {
   const timelineStep = hasInvoice ? 4 : hasProof ? 4 : 3;
 
   const backPath = "/contracts";
+
+  const uploadAgreement = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("agreement", file);
+      const response = await fetch(`/api/contracts/${params.id}/agreement`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Upload failed");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contracts", params.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
+      toast({ title: "Agreement uploaded", description: "You can now download it anytime." });
+    },
+    onError: () => {
+      toast({ title: "Upload failed", description: "Please try again.", variant: "destructive" });
+    },
+  });
+
+  const handleAgreementSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const validTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+    if (!validTypes.includes(file.type)) {
+      toast({ title: "Invalid file type", description: "Upload a PDF, Word doc or image.", variant: "destructive" });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Maximum file size is 10MB.", variant: "destructive" });
+      return;
+    }
+    setUploadingAgreement(true);
+    try {
+      await uploadAgreement.mutateAsync(file);
+    } finally {
+      setUploadingAgreement(false);
+      if (agreementInputRef.current) agreementInputRef.current.value = "";
+    }
+  };
 
   const uploadProof = useMutation({
     mutationFn: async (file: File) => {
@@ -420,6 +465,81 @@ export default function ContractDetailsPage() {
             </Button>
           </CardContent>
         </Card>
+
+        {/* ── Uploaded Agreement Document ────────────── */}
+        <section className="space-y-3">
+          <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+            Uploaded Agreement Document
+          </h3>
+
+          <Card className="glass-card border-0">
+            <CardContent className="p-4 space-y-3">
+              {(contract as any)?.uploadedAgreementFileName ? (
+                <>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
+                      <FileText className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate" data-testid="text-agreement-filename">
+                        {(contract as any).uploadedAgreementFileName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Available for download</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1 gradient-btn text-white"
+                      onClick={() => {
+                        window.location.href = `/api/contracts/${params.id}/agreement`;
+                      }}
+                      data-testid="button-download-uploaded-agreement"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => agreementInputRef.current?.click()}
+                      disabled={uploadingAgreement}
+                      data-testid="button-replace-uploaded-agreement"
+                    >
+                      {uploadingAgreement ? <Loader2 className="w-4 h-4 animate-spin" /> : "Replace"}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <button
+                  onClick={() => agreementInputRef.current?.click()}
+                  disabled={uploadingAgreement}
+                  className="w-full h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover-elevate active-elevate-2 transition-colors"
+                  data-testid="button-upload-agreement-doc"
+                >
+                  {uploadingAgreement ? (
+                    <>
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                      <span className="text-sm">Uploading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-6 h-6" />
+                      <span className="text-sm font-medium">Upload Agreement Document</span>
+                      <span className="text-xs">PDF, Word or image (max 10MB)</span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              <input
+                ref={agreementInputRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                className="hidden"
+                onChange={handleAgreementSelect}
+              />
+            </CardContent>
+          </Card>
+        </section>
 
         <section className="space-y-3">
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">

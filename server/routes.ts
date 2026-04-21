@@ -130,7 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Only pending deals can be edited" });
       }
 
-      const { brandName, dealTitle, dealAmount, startDate, endDate, deliverables, brandUserId, deliverableMode } = req.body;
+      const { brandName, dealTitle, dealAmount, startDate, endDate, deliverables, brandUserId, deliverableMode, standardTermIds, customTerms } = req.body;
       const updates: any = {};
       if (brandName !== undefined) updates.brandName = brandName;
       if (dealTitle !== undefined) updates.dealTitle = dealTitle;
@@ -140,6 +140,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (deliverables !== undefined) updates.deliverables = deliverables;
       if (brandUserId !== undefined) updates.brandUserId = brandUserId;
       if (deliverableMode !== undefined) updates.deliverableMode = deliverableMode;
+      if (standardTermIds !== undefined) updates.standardTermIds = standardTermIds;
+      if (customTerms !== undefined) updates.customTerms = customTerms;
 
       const updated = await storage.updateDeal(dealId, updates);
 
@@ -333,6 +335,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to upload proof" });
+    }
+  });
+
+  // Upload the actual Agreement document (PDF, image, etc.)
+  app.post("/api/contracts/:id/agreement", isAuthenticated, upload.single("agreement"), async (req: any, res) => {
+    try {
+      const contract = await storage.getContract(parseInt(req.params.id));
+      if (!contract) return res.status(404).json({ error: "Contract not found" });
+      if (contract.userId !== req.user.id) return res.status(403).json({ error: "Access denied" });
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+      const updated = await storage.updateContract(parseInt(req.params.id), {
+        uploadedAgreementFileName: req.file.originalname,
+        uploadedAgreementPath: req.file.path,
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Agreement upload error:", error);
+      res.status(500).json({ error: "Failed to upload agreement" });
+    }
+  });
+
+  // Download the uploaded Agreement document
+  app.get("/api/contracts/:id/agreement", isAuthenticated, async (req: any, res) => {
+    try {
+      const contract = await storage.getContract(parseInt(req.params.id));
+      if (!contract) return res.status(404).json({ error: "Contract not found" });
+      if (contract.userId !== req.user.id) return res.status(403).json({ error: "Access denied" });
+      if (!contract.uploadedAgreementPath) return res.status(404).json({ error: "No agreement uploaded" });
+
+      res.download(contract.uploadedAgreementPath, contract.uploadedAgreementFileName || "agreement");
+    } catch (error) {
+      console.error("Agreement download error:", error);
+      res.status(500).json({ error: "Failed to download agreement" });
     }
   });
 
@@ -700,7 +737,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/profile", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const { firstName, lastName, phone, panNumber, gstNumber, digitalSignature, onboardingComplete, billingAddress } = req.body;
+      const {
+        firstName,
+        lastName,
+        phone,
+        panNumber,
+        gstNumber,
+        digitalSignature,
+        onboardingComplete,
+        billingAddress,
+        accountHolderName,
+        accountNumber,
+        ifscCode,
+        bankName,
+      } = req.body;
 
       const updates: any = {};
       if (firstName !== undefined) updates.firstName = firstName;
@@ -711,7 +761,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (digitalSignature !== undefined) updates.digitalSignature = digitalSignature;
       if (onboardingComplete !== undefined) updates.onboardingComplete = onboardingComplete;
       if (billingAddress !== undefined) updates.billingAddress = billingAddress;
-      
+      if (accountHolderName !== undefined) updates.accountHolderName = accountHolderName;
+      if (accountNumber !== undefined) updates.accountNumber = accountNumber;
+      if (ifscCode !== undefined) updates.ifscCode = ifscCode ? ifscCode.toUpperCase() : ifscCode;
+      if (bankName !== undefined) updates.bankName = bankName;
+
       const user = await storage.updateUser(userId, updates);
       if (!user) {
         return res.status(404).json({ error: "User not found" });

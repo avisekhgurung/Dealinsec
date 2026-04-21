@@ -8,6 +8,7 @@ import { ArrowLeft, Download, ArrowRight, CheckCircle2, AlertTriangle } from "lu
 import { SiInstagram, SiYoutube, SiFacebook } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import type { Deal, User, Quote } from "@shared/schema";
+import { STANDARD_TERMS } from "@shared/schema";
 
 function getPlatformIcon(platform: string) {
   switch (platform.toLowerCase()) {
@@ -294,24 +295,34 @@ export default function QuotePreviewPage() {
             <hr className="border-white/10" />
 
             {/* Terms & Conditions */}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-                Terms & Conditions
-              </p>
-              <ul className="space-y-2 text-sm text-muted-foreground list-none">
-                {[
-                  "Payment is due within 15 days of invoice issuance. Late payments may incur a 2% monthly interest charge.",
-                  "Up to 2 rounds of revisions are included per deliverable. Additional revisions will be billed separately.",
-                  "The brand is granted a 12-month non-exclusive usage license for all content created under this agreement unless otherwise negotiated.",
-                  "This quotation is valid for 30 days from the date of issuance. Pricing is subject to change after expiry.",
-                ].map((term, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-primary/60" />
-                    <span>{term}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {(() => {
+              const selectedIds = ((deal as any).standardTermIds as string[] | null) ?? STANDARD_TERMS.map((t) => t.id);
+              const selectedTerms = STANDARD_TERMS.filter((t) => selectedIds.includes(t.id));
+              const customTerms = (deal as any).customTerms as string | null;
+              const customLines = (customTerms ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+              if (selectedTerms.length === 0 && customLines.length === 0) return null;
+              return (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
+                    Terms &amp; Conditions
+                  </p>
+                  <ul className="space-y-2 text-sm text-muted-foreground list-none">
+                    {selectedTerms.map((t) => (
+                      <li key={t.id} className="flex items-start gap-2">
+                        <span className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-primary/60" />
+                        <span>{t.label}</span>
+                      </li>
+                    ))}
+                    {customLines.map((line, i) => (
+                      <li key={`custom-${i}`} className="flex items-start gap-2">
+                        <span className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-amber-500/80" />
+                        <span>{line}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
 
             {/* Footer */}
             <div className="pt-2 text-center text-xs text-muted-foreground border-t border-white/10">

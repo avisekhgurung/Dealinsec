@@ -224,7 +224,7 @@ export default function DashboardPage() {
 
         {/* ── Stat cards ── */}
         <section className="grid grid-cols-2 gap-3">
-          <StatCard title="Active Deals" value={activeDeals} icon={Briefcase}
+          <StatCard title="Deals" value={activeDeals} icon={Briefcase}
             tone="amber" href="/deals" loading={isLoading} />
           <StatCard title="Agreements" value={signedContracts} icon={FileCheck}
             tone="blue" href="/contracts" loading={isLoading} />

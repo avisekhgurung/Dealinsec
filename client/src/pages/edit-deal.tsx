@@ -20,11 +20,13 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PlatformIcon } from "@/components/platform-icon";
 import { BottomNav } from "@/components/bottom-nav";
-import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, FileText } from "lucide-react";
 import {
   platformOptions,
   contentTypeOptions,
   frequencyOptions,
+  STANDARD_TERMS,
 } from "@shared/schema";
 import type { Deal, Deliverable } from "@shared/schema";
 
@@ -44,6 +46,8 @@ const formSchema = z.object({
     frequency: z.enum(frequencyOptions),
     notes: z.string().optional(),
   })).min(1, "At least one deliverable is required"),
+  standardTermIds: z.array(z.string()).optional().default([]),
+  customTerms: z.string().optional().nullable(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -94,6 +98,8 @@ export default function EditDealPage() {
           notes: "",
         },
       ],
+      standardTermIds: STANDARD_TERMS.map((t) => t.id),
+      customTerms: "",
     },
   });
 
@@ -115,6 +121,8 @@ export default function EditDealPage() {
           frequency: d.frequency,
           notes: d.notes ?? "",
         })),
+        standardTermIds: ((deal as any).standardTermIds as string[] | null) ?? STANDARD_TERMS.map((t) => t.id),
+        customTerms: (deal as any).customTerms ?? "",
       });
     }
   }, [deal]);
@@ -463,6 +471,67 @@ export default function EditDealPage() {
               {form.formState.errors.deliverables.message}
             </p>
           )}
+        </section>
+
+        <section className="glass-card rounded-xl p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+              Terms &amp; Conditions
+            </h2>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Standard terms (uncheck any you don't want)
+            </p>
+            <div className="space-y-2.5">
+              {STANDARD_TERMS.map((t) => {
+                const selected = form.watch("standardTermIds") || [];
+                const checked = selected.includes(t.id);
+                return (
+                  <label
+                    key={t.id}
+                    htmlFor={`term-${t.id}`}
+                    className="flex items-start gap-3 p-3 rounded-lg border border-border/60 bg-background/60 hover:border-primary/40 transition-colors cursor-pointer"
+                  >
+                    <Checkbox
+                      id={`term-${t.id}`}
+                      checked={checked}
+                      onCheckedChange={(next) => {
+                        const current = form.getValues("standardTermIds") || [];
+                        if (next) {
+                          form.setValue("standardTermIds", Array.from(new Set([...current, t.id])));
+                        } else {
+                          form.setValue(
+                            "standardTermIds",
+                            current.filter((id) => id !== t.id),
+                          );
+                        }
+                      }}
+                      className="mt-0.5"
+                      data-testid={`checkbox-term-${t.id}`}
+                    />
+                    <span className="text-sm leading-relaxed">{t.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2 pt-2 border-t border-border/60">
+            <Label htmlFor="customTerms" className="text-xs font-semibold">
+              Your own terms (optional)
+            </Label>
+            <Textarea
+              id="customTerms"
+              placeholder="Add any custom clauses — usage rights, exclusivity, posting schedule, etc."
+              rows={4}
+              className="resize-none"
+              data-testid="textarea-custom-terms"
+              {...form.register("customTerms")}
+            />
+          </div>
         </section>
 
         <div className="pt-4">

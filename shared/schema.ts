@@ -45,6 +45,10 @@ export const users = pgTable("users", {
   gstNumber: varchar("gst_number"),
   digitalSignature: varchar("digital_signature"),
   billingAddress: varchar("billing_address"),
+  accountHolderName: varchar("account_holder_name"),
+  accountNumber: varchar("account_number"),
+  ifscCode: varchar("ifsc_code"),
+  bankName: varchar("bank_name"),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   contractCredits: integer("contract_credits").notNull().default(1),
   referralCode: varchar("referral_code").unique(),
@@ -70,10 +74,23 @@ export const deals = pgTable("deals", {
   endDate: text("end_date").notNull(),
   deliverables: json("deliverables").$type<Deliverable[]>().notNull(),
   deliverableMode: varchar("deliverable_mode").notNull().default("all"),
+  standardTermIds: json("standard_term_ids").$type<string[]>().default(sql`'[]'::json`),
+  customTerms: text("custom_terms"),
   status: text("status").notNull().default("Pending"),
 });
 
 export const deliverableModeOptions = ["all", "any_one"] as const;
+
+// Selectable standard T&Cs applied on quotations / deals.
+export const STANDARD_TERMS = [
+  { id: "validity_30", label: "This quotation is valid for 30 days from the date of issue." },
+  { id: "advance_50", label: "50% advance payment is required to confirm the collaboration." },
+  { id: "balance_7d", label: "The remaining 50% must be paid within 7 days after content delivery or posting." },
+  { id: "revisions_2", label: "Up to 2 video changes are included. All change requests must be submitted together at one time." },
+  { id: "cancellation", label: "If the project is cancelled after work has started, the advance payment is non-refundable. If content has already been created, full payment may be required." },
+] as const;
+
+export type StandardTermId = typeof STANDARD_TERMS[number]["id"];
 
 export const contracts = pgTable("contracts", {
   id: serial("id").primaryKey(),
@@ -88,6 +105,8 @@ export const contracts = pgTable("contracts", {
   exclusive: boolean("exclusive").notNull().default(true),
   proofFileName: text("proof_file_name"),
   proofFilePath: text("proof_file_path"),
+  uploadedAgreementFileName: text("uploaded_agreement_file_name"),
+  uploadedAgreementPath: text("uploaded_agreement_path"),
   signedByInfluencer: boolean("signed_by_influencer").notNull().default(false),
   signedByInfluencerDate: text("signed_by_influencer_date"),
   signedByBrand: boolean("signed_by_brand").notNull().default(false),

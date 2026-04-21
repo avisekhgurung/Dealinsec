@@ -101,6 +101,11 @@ export default function BrandInvoiceDetailsPage() {
   const influencerPan = user?.panNumber || "";
   const influencerAddress = user?.billingAddress || "";
   const signatureUrl = user?.digitalSignature || "";
+  const bankAccountHolder = (user as any)?.accountHolderName || "";
+  const bankAccountNumber = (user as any)?.accountNumber || "";
+  const bankIfsc = (user as any)?.ifscCode || "";
+  const bankName = (user as any)?.bankName || "";
+  const hasBankDetails = bankAccountHolder || bankAccountNumber || bankIfsc || bankName;
 
   return (
     <>
@@ -289,7 +294,52 @@ export default function BrandInvoiceDetailsPage() {
               </div>
             )}
 
-            {/* ── Bank / Payment terms ────────────────── */}
+            {/* ── Bank Details ────────────────────────── */}
+            {hasBankDetails ? (
+              <div className="px-6 py-4 border-t border-gray-100 dark:border-zinc-700">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-2">Bank Details</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
+                  {bankAccountHolder && (
+                    <div className="flex gap-2">
+                      <span className="text-gray-500 dark:text-gray-400 w-[110px]">Account Holder</span>
+                      <span className="text-gray-900 dark:text-gray-100 font-semibold">{bankAccountHolder}</span>
+                    </div>
+                  )}
+                  {bankAccountNumber && (
+                    <div className="flex gap-2">
+                      <span className="text-gray-500 dark:text-gray-400 w-[110px]">Account Number</span>
+                      <span className="text-gray-900 dark:text-gray-100 font-mono font-semibold">{bankAccountNumber}</span>
+                    </div>
+                  )}
+                  {bankIfsc && (
+                    <div className="flex gap-2">
+                      <span className="text-gray-500 dark:text-gray-400 w-[110px]">IFSC</span>
+                      <span className="text-gray-900 dark:text-gray-100 font-mono font-semibold">{bankIfsc}</span>
+                    </div>
+                  )}
+                  {bankName && (
+                    <div className="flex gap-2">
+                      <span className="text-gray-500 dark:text-gray-400 w-[110px]">Bank Name</span>
+                      <span className="text-gray-900 dark:text-gray-100 font-semibold">{bankName}</span>
+                    </div>
+                  )}
+                  {influencerPan && (
+                    <div className="flex gap-2">
+                      <span className="text-gray-500 dark:text-gray-400 w-[110px]">PAN</span>
+                      <span className="text-gray-900 dark:text-gray-100 font-mono font-semibold">{influencerPan}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="px-6 py-3 border-t border-amber-200 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-950/20 print:hidden">
+                <p className="text-xs text-amber-800 dark:text-amber-300">
+                  <strong>Heads up:</strong> Add your bank details in Profile so they appear on invoices going forward.
+                </p>
+              </div>
+            )}
+
+            {/* ── Payment terms ───────────────────────── */}
             <div className="px-6 py-4 bg-gray-50 dark:bg-zinc-800/40 border-t border-gray-100 dark:border-zinc-700">
               <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Payment Terms</p>
               <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
