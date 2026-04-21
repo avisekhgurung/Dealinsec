@@ -52,7 +52,7 @@ const NAV_LINKS = [
 ];
 
 const DASHBOARD_LINKS = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard },
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Deals", href: "/deals", icon: Briefcase },
   { label: "Agreements", href: "/contracts", icon: FileCheck },
   { label: "Invoices", href: "/invoices", icon: Receipt },
@@ -239,7 +239,7 @@ export default function LandingPage() {
       await apiRequest("POST", "/api/auth/login", { email: loginEmail, password: loginPassword });
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       setAuthModalOpen(false);
-      setLocation("/");
+      setLocation("/dashboard");
     } catch (error: any) {
       toast({
         title: "Login Failed",
@@ -264,7 +264,7 @@ export default function LandingPage() {
       });
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       setAuthModalOpen(false);
-      setLocation("/");
+      setLocation("/dashboard");
     } catch (error: any) {
       toast({
         title: "Signup Failed",
@@ -294,7 +294,7 @@ export default function LandingPage() {
         <Hero
           referralCode={referralCode}
           isAuthenticated={isAuthenticated}
-          onPrimaryClick={() => (isAuthenticated ? setLocation("/") : openAuth("signup"))}
+          onPrimaryClick={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
         />
         <TrustStrip />
         <FeatureGrid />
@@ -306,7 +306,7 @@ export default function LandingPage() {
         <FAQSection />
         <FinalCTA
           isAuthenticated={isAuthenticated}
-          onCTA={() => (isAuthenticated ? setLocation("/") : openAuth("signup"))}
+          onCTA={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
         />
       </main>
 
@@ -550,7 +550,7 @@ function Header({
           <div className="flex items-center gap-2">
             {isAuthenticated ? (
               <>
-                <Link href="/">
+                <Link href="/dashboard">
                   <Button
                     className="hidden sm:inline-flex h-9 px-4 text-sm font-semibold text-white border-0 shadow-sm shadow-emerald-500/20"
                     style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
@@ -723,7 +723,7 @@ function Hero({
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
               </span>
               <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                Built for Collaborations · Made in India
+                Deal · Sign · Secured · Made in India
               </span>
             </motion.div>
 
@@ -731,9 +731,8 @@ function Hero({
               variants={fadeUp}
               className="text-[2.5rem] sm:text-5xl lg:text-[4.5rem] font-bold tracking-tight leading-[1.02]"
             >
-              Turning Collaborations
+              Deals. In seconds.
               <br />
-              into{" "}
               <span
                 className="relative inline-block"
                 style={{
@@ -743,7 +742,7 @@ function Hero({
                   backgroundClip: "text",
                 }}
               >
-                Professional Deals
+                Secured for life.
                 <motion.span
                   className="absolute -bottom-1 left-0 right-0 h-[6px] rounded-full opacity-40"
                   style={{ background: "linear-gradient(90deg, transparent, #10B981, transparent)" }}
@@ -755,9 +754,9 @@ function Hero({
             </motion.h1>
 
             <motion.p variants={fadeUp} className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
-              Quotations, agreements, invoices, deals and payments —{" "}
-              <span className="font-semibold text-neutral-900 dark:text-white">all in less than a minute.</span>{" "}
-              One dashboard. Simple, professional, and built to get you paid on time.
+              Quotations, agreements, invoices and payments —{" "}
+              <span className="font-semibold text-neutral-900 dark:text-white">every deal, in seconds, sealed with security.</span>{" "}
+              One dashboard. Built to get you paid on time.
             </motion.p>
 
             <motion.div variants={fadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
@@ -1384,8 +1383,8 @@ function Testimonials() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
           eyebrow="Loved by creators"
-          title="Join thousands closing better deals"
-          subtitle="Real stories from real creators who ship brand work through Dealinsec."
+          title="Deals closed. Payments secured."
+          subtitle="Real stories from creators who ship brand work through Dealinsec — in seconds, every time."
         />
 
         <motion.div
@@ -1580,13 +1579,13 @@ function FinalCTA({ isAuthenticated, onCTA }: { isAuthenticated: boolean; onCTA:
           <div className="relative">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm mb-5">
               <Zap className="w-3.5 h-3.5 text-emerald-200" />
-              <span className="text-xs font-semibold text-emerald-50">Ready to level up your deals?</span>
+              <span className="text-xs font-semibold text-emerald-50">Your next deal is seconds away.</span>
             </div>
             <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-4">
-              Start closing better deals<br />in the next 60 seconds.
+              Deals in seconds.<br />Secured for life.
             </h2>
             <p className="text-base sm:text-lg text-emerald-100/90 max-w-xl mx-auto mb-8">
-              Join 10,000+ creators running their collaborations like a business. Free to start — no credit card required.
+              Join 10,000+ creators closing professional deals — quoted, signed, invoiced and paid. Free to start, no credit card required.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Button
@@ -1619,7 +1618,7 @@ function Footer() {
           <div className="col-span-2 md:col-span-1">
             <DealinsecLogo size="md" withText />
             <p className="text-xs text-neutral-500 mt-4 leading-relaxed max-w-[220px]">
-              Turning creator collaborations into professional deals.
+              Deals in seconds. Secured for life.
             </p>
             <div className="flex items-center gap-3 mt-4">
               {[SiInstagram, SiX, SiYoutube, SiLinkedin].map((Icon, i) => (

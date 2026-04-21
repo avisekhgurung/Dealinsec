@@ -126,7 +126,7 @@ export default function ProfilePage() {
           }}
         />
         <div className="absolute top-0 left-0 right-0 px-4 pt-3 flex items-center justify-between z-10">
-          <Link href="/">
+          <Link href="/dashboard">
             <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" data-testid="button-back">
               <ArrowLeft className="h-5 w-5" />
             </Button>

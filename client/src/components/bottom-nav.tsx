@@ -3,7 +3,7 @@ import { Home, Briefcase, FileCheck, Receipt, UserCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
-  { path: "/", label: "Home", icon: Home },
+  { path: "/dashboard", label: "Home", icon: Home },
   { path: "/deals", label: "Deals", icon: Briefcase },
   { path: "/contracts", label: "Agreements", icon: FileCheck },
   { path: "/invoices", label: "Invoices", icon: Receipt },

@@ -60,7 +60,7 @@ export default function OnboardingPage() {
 
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({ title: "You're in!", description: "Add your PAN, bank & signature from Profile whenever you're ready." });
-      setLocation("/");
+      setLocation("/dashboard");
     } catch (error: any) {
       toast({
         title: "Failed to save profile",

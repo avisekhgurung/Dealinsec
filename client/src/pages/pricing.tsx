@@ -109,7 +109,7 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="glass-header sticky top-0 z-50 px-4 py-3 flex items-center gap-3">
-        <Link href="/">
+        <Link href="/dashboard">
           <Button variant="ghost" size="icon" data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
           </Button>

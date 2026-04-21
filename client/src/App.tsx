@@ -45,7 +45,9 @@ function Router() {
 
   const needsOnboarding = isAuthenticated && user && !user.onboardingComplete;
 
-  // Route transitions → thin gradient progress bar, non-blocking
+  // Landing page lives at "/" for everyone — logged-out visitors see marketing,
+  // logged-in visitors see the same page with a Dashboard button in the header.
+  // All authenticated app routes sit under /dashboard, /deals, /contracts, etc.
   if (!isAuthenticated) {
     return (
       <Suspense fallback={<RouteLoader />}>
@@ -66,7 +68,6 @@ function Router() {
     return (
       <Suspense fallback={<RouteLoader />}>
         <Switch>
-          <Route path="/" component={OnboardingPage} />
           <Route path="/onboarding" component={OnboardingPage} />
           <Route component={OnboardingPage} />
         </Switch>
@@ -77,7 +78,8 @@ function Router() {
   return (
     <Suspense fallback={<RouteLoader />}>
       <Switch>
-        <Route path="/" component={DashboardPage} />
+        <Route path="/" component={LandingPage} />
+        <Route path="/dashboard" component={DashboardPage} />
         <Route path="/deals" component={DealsPage} />
         <Route path="/deals/new" component={CreateDealPage} />
         <Route path="/deals/:id/quote" component={QuotePreviewPage} />
@@ -93,6 +95,7 @@ function Router() {
         <Route path="/brand-invoices/:id" component={BrandInvoiceDetailsPage} />
         <Route path="/profile" component={ProfilePage} />
         <Route path="/pricing" component={PricingPage} />
+        <Route path="/pitch" component={PitchPage} />
         <Route path="/terms" component={TermsPage} />
         <Route path="/privacy" component={PrivacyPage} />
         <Route path="/cookies" component={CookiePage} />

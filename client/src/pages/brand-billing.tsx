@@ -24,7 +24,7 @@ export default function BrandBillingPage() {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 glass-header border-b border-border">
         <div className="px-4 py-4 flex items-center gap-3">
-          <Link href="/">
+          <Link href="/dashboard">
             <button className="p-1 -ml-1 rounded-lg hover:bg-muted transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </button>
