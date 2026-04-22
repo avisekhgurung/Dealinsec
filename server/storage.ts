@@ -42,6 +42,7 @@ export interface IStorage {
   getBrandInvoice(id: number): Promise<BrandInvoice | undefined>;
   createBrandInvoice(invoice: InsertBrandInvoice): Promise<BrandInvoice>;
   updateBrandInvoice(id: number, updates: Partial<BrandInvoice>): Promise<BrandInvoice | undefined>;
+  deleteBrandInvoice(id: number): Promise<void>;
   
   generateInvoiceNumber(): Promise<string>;
   generateBrandInvoiceNumber(): Promise<string>;
@@ -200,6 +201,10 @@ export class DatabaseStorage implements IStorage {
   async updateBrandInvoice(id: number, updates: Partial<BrandInvoice>): Promise<BrandInvoice | undefined> {
     const [updated] = await db.update(brandInvoices).set(updates).where(eq(brandInvoices.id, id)).returning();
     return updated;
+  }
+
+  async deleteBrandInvoice(id: number): Promise<void> {
+    await db.delete(brandInvoices).where(eq(brandInvoices.id, id));
   }
 
   async generateBrandInvoiceNumber(): Promise<string> {

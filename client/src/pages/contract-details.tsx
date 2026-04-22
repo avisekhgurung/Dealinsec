@@ -22,7 +22,9 @@ import {
   ExternalLink,
   Download,
   Scissors,
-  Receipt
+  Receipt,
+  Trash2,
+  Pencil,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,6 +53,11 @@ export default function ContractDetailsPage() {
   const [bIfsc, setBIfsc] = useState("");
   const [bBankName, setBBankName] = useState("");
   const [savingBank, setSavingBank] = useState(false);
+
+  // Invoice amount override + inline edit
+  const [customAmount, setCustomAmount] = useState("");
+  const [editingInvoiceId, setEditingInvoiceId] = useState<number | null>(null);
+  const [editAmount, setEditAmount] = useState("");
 
   const { data: contract, isLoading } = useQuery<Contract>({
     queryKey: ["/api/contracts", params.id],
@@ -110,11 +117,12 @@ export default function ContractDetailsPage() {
   });
 
   const createBrandInvoice = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (override?: number) => {
+      const amount = override ?? (deal?.dealAmount || contract?.contractValue || 0);
       const res = await apiRequest("POST", "/api/brand-invoices", {
         dealId: contract?.dealId,
         brandName: contract?.brandName,
-        dealAmount: deal?.dealAmount || contract?.contractValue,
+        dealAmount: amount,
         contractId: parseInt(params.id || "0"),
       });
       return res.json();
@@ -126,6 +134,7 @@ export default function ContractDetailsPage() {
         title: "Invoice created",
         description: "Brand invoice has been generated successfully.",
       });
+      setCustomAmount("");
       setLocation(`/brand-invoices/${invoice.id}`);
     },
     onError: () => {
@@ -154,6 +163,52 @@ export default function ContractDetailsPage() {
       toast({
         title: "Failed to split invoice",
         description: "Could not create split invoices. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteBrandInvoice = useMutation({
+    mutationFn: async (invoiceId: number) => {
+      const res = await fetch(`/api/brand-invoices/${invoiceId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Delete failed");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals", contract?.dealId, "brand-invoices"] });
+      toast({ title: "Invoice deleted" });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Failed to delete invoice",
+        description: err?.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateInvoiceAmount = useMutation({
+    mutationFn: async ({ invoiceId, amount }: { invoiceId: number; amount: number }) => {
+      const res = await apiRequest("PATCH", `/api/brand-invoices/${invoiceId}`, { dealAmount: amount });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/deals", contract?.dealId, "brand-invoices"] });
+      toast({ title: "Invoice amount updated" });
+      setEditingInvoiceId(null);
+      setEditAmount("");
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Failed to update amount",
+        description: err?.message || "Please try again.",
         variant: "destructive",
       });
     },
@@ -512,117 +567,21 @@ export default function ContractDetailsPage() {
               Invoice for Brand
             </h3>
 
-            <Card className="glass-card border-0">
-              <CardContent className="p-4">
-                {!hasInvoice ? (
-                  <>
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                        <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">Generate Invoice for Brand</p>
-                        <p className="text-xs text-muted-foreground">
-                          {contract.status !== "Signed"
-                            ? "Upload signed contract proof to enable billing"
-                            : `Create a professional invoice to send to ${contract.brandName}`}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Single invoice */}
-                    <Button
-                      className="w-full gradient-btn text-white mb-2"
-                      onClick={() => {
-                        if (!hasBankDetails) {
-                          setBankModalIntent("single");
-                          setBankModalOpen(true);
-                          return;
-                        }
-                        createBrandInvoice.mutate();
-                      }}
-                      disabled={createBrandInvoice.isPending || !contract || !deal || contract.status !== "Signed"}
-                      data-testid="button-generate-brand-invoice"
-                    >
-                      {createBrandInvoice.isPending ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Generating...
-                        </>
-                      ) : (
-                        <>
-                          <FileText className="w-4 h-4 mr-2" />
-                          Generate Single Invoice
-                        </>
-                      )}
-                    </Button>
-
-                    {/* Split invoice toggle */}
-                    {!showSplitInput ? (
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => setShowSplitInput(true)}
-                        disabled={contract.status !== "Signed"}
-                      >
-                        <Scissors className="w-4 h-4 mr-2" />
-                        Split Invoice (Advance + Final)
-                      </Button>
-                    ) : (
-                      <div className="border border-white/10 rounded-lg p-3 space-y-3">
-                        <p className="text-sm font-medium">Split into Advance + Final</p>
-                        <div className="flex items-center gap-3">
-                          <label className="text-xs text-muted-foreground whitespace-nowrap">Advance %</label>
-                          <Input
-                            type="text"
-                            inputMode="numeric"
-                            value={splitPercentageStr}
-                            onChange={(e) => setSplitPercentageStr(e.target.value.replace(/[^0-9]/g, ""))}
-                            className="w-20 h-8 text-sm"
-                            placeholder="50"
-                          />
-                          <span className="text-xs text-muted-foreground">
-                            ₹{Math.round((deal?.dealAmount || 0) * splitPercentage / 100).toLocaleString()} + ₹{((deal?.dealAmount || 0) - Math.round((deal?.dealAmount || 0) * splitPercentage / 100)).toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            className="flex-1 gradient-btn text-white"
-                            onClick={() => {
-                              if (!hasBankDetails) {
-                                setBankModalIntent("split");
-                                setBankModalOpen(true);
-                                return;
-                              }
-                              splitInvoices.mutate();
-                            }}
-                            disabled={!deal || splitInvoices.isPending}
-                          >
-                            {splitInvoices.isPending ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Creating...
-                              </>
-                            ) : (
-                              "Create Split Invoices"
-                            )}
-                          </Button>
-                          <Button variant="outline" onClick={() => setShowSplitInput(false)} disabled={splitInvoices.isPending}>Cancel</Button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4" />
-                      Invoice{dealBrandInvoices.length > 1 ? "s" : ""} Generated
-                    </p>
-                    {dealBrandInvoices.map(inv => (
-                      <Link key={inv.id} href={`/brand-invoices/${inv.id}`}>
-                        <div className="flex items-center justify-between p-3 rounded-xl border bg-card shadow-sm hover-elevate cursor-pointer">
-                          <div className="flex items-center gap-3">
-                            <div className={`flex items-center justify-center w-9 h-9 rounded-lg ${
+            {/* Existing invoices — always visible when present */}
+            {hasInvoice && (
+              <Card className="glass-card border-0">
+                <CardContent className="p-4 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                    {dealBrandInvoices.length} invoice{dealBrandInvoices.length > 1 ? "s" : ""} on file
+                  </p>
+                  {dealBrandInvoices.map(inv => {
+                    const isEditing = editingInvoiceId === inv.id;
+                    const typeLabel = (inv as any).invoiceType === "advance" ? "Advance Invoice" : (inv as any).invoiceType === "final" ? "Final Invoice" : "Invoice";
+                    return (
+                      <div key={inv.id} className="p-3 rounded-xl border bg-card shadow-sm space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <Link href={`/brand-invoices/${inv.id}`} className="flex items-center gap-3 flex-1 min-w-0 hover-elevate rounded-lg -m-1 p-1 cursor-pointer">
+                            <div className={`flex items-center justify-center w-9 h-9 rounded-lg flex-shrink-0 ${
                               (inv as any).invoiceType === "advance"
                                 ? "bg-blue-100 dark:bg-blue-900/30"
                                 : (inv as any).invoiceType === "final"
@@ -637,25 +596,229 @@ export default function ContractDetailsPage() {
                                   : "text-muted-foreground"
                               }`} />
                             </div>
-                            <div>
-                              <span className="text-sm font-medium block">
-                                {(inv as any).invoiceType === "advance" ? "Advance Invoice" : (inv as any).invoiceType === "final" ? "Final Invoice" : "Invoice"}
-                              </span>
-                              <span className="text-xs text-muted-foreground">₹{inv.dealAmount.toLocaleString()}</span>
+                            <div className="min-w-0">
+                              <span className="text-sm font-medium block truncate">{typeLabel}</span>
+                              <span className="text-xs text-muted-foreground">₹{inv.dealAmount.toLocaleString()} · {inv.invoiceNumber}</span>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2">
+                          </Link>
+                          <div className="flex items-center gap-1 ml-2">
                             <Badge
                               variant={inv.status === "Paid" ? "default" : "secondary"}
                               className={`text-xs ${inv.status === "Paid" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : ""}`}
                             >
                               {inv.status}
                             </Badge>
-                            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+                            {inv.status !== "Paid" && !isEditing && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                  onClick={() => {
+                                    setEditingInvoiceId(inv.id);
+                                    setEditAmount(String(inv.dealAmount));
+                                  }}
+                                  data-testid={`button-edit-invoice-${inv.id}`}
+                                  aria-label="Edit amount"
+                                  title="Edit amount"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-rose-600"
+                                  onClick={() => {
+                                    if (confirm(`Delete invoice ${inv.invoiceNumber}? This cannot be undone.`)) {
+                                      deleteBrandInvoice.mutate(inv.id);
+                                    }
+                                  }}
+                                  disabled={deleteBrandInvoice.isPending}
+                                  data-testid={`button-delete-invoice-${inv.id}`}
+                                  aria-label="Delete invoice"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </div>
-                      </Link>
-                    ))}
+
+                        {isEditing && (
+                          <div className="flex items-center gap-2 pt-2 border-t border-border/60">
+                            <div className="relative flex-1">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+                              <Input
+                                type="text"
+                                inputMode="numeric"
+                                value={editAmount}
+                                onChange={(e) => setEditAmount(e.target.value.replace(/\D/g, ""))}
+                                className="pl-7 h-9"
+                                autoFocus
+                                data-testid={`input-edit-invoice-${inv.id}`}
+                              />
+                            </div>
+                            <Button
+                              size="sm"
+                              className="gradient-btn text-white h-9"
+                              onClick={() => {
+                                const n = parseInt(editAmount, 10);
+                                if (!Number.isFinite(n) || n < 1) {
+                                  toast({ title: "Invalid amount", description: "Enter a positive number.", variant: "destructive" });
+                                  return;
+                                }
+                                updateInvoiceAmount.mutate({ invoiceId: inv.id, amount: n });
+                              }}
+                              disabled={updateInvoiceAmount.isPending}
+                              data-testid={`button-save-invoice-${inv.id}`}
+                            >
+                              {updateInvoiceAmount.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-9"
+                              onClick={() => {
+                                setEditingInvoiceId(null);
+                                setEditAmount("");
+                              }}
+                              disabled={updateInvoiceAmount.isPending}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Generate new — always available while contract is signed */}
+            <Card className="glass-card border-0">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                    <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{hasInvoice ? "Generate another invoice" : "Generate Invoice for Brand"}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {contract.status !== "Signed"
+                        ? "Upload signed contract proof to enable billing"
+                        : hasInvoice
+                        ? "Invoice amounts or terms changed? Create a new one anytime."
+                        : `Create a professional invoice to send to ${contract.brandName}`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Custom amount override (optional) */}
+                <div className="mb-3">
+                  <Label htmlFor="invoice-custom-amount" className="text-xs text-muted-foreground mb-1.5 block">
+                    Invoice amount <span className="text-muted-foreground/70 font-normal">(optional — defaults to deal amount ₹{deal ? Number(deal.dealAmount).toLocaleString("en-IN") : "—"})</span>
+                  </Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+                    <Input
+                      id="invoice-custom-amount"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder={deal ? String(deal.dealAmount) : "0"}
+                      value={customAmount}
+                      onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
+                      className="pl-7 h-9"
+                      data-testid="input-custom-invoice-amount"
+                    />
+                  </div>
+                </div>
+
+                {/* Single invoice */}
+                <Button
+                  className="w-full gradient-btn text-white mb-2"
+                  onClick={() => {
+                    if (!hasBankDetails) {
+                      setBankModalIntent("single");
+                      setBankModalOpen(true);
+                      return;
+                    }
+                    const parsed = customAmount.trim() ? parseInt(customAmount, 10) : undefined;
+                    if (parsed !== undefined && (!Number.isFinite(parsed) || parsed < 1)) {
+                      toast({ title: "Invalid amount", description: "Enter a positive number.", variant: "destructive" });
+                      return;
+                    }
+                    createBrandInvoice.mutate(parsed);
+                  }}
+                  disabled={createBrandInvoice.isPending || !contract || !deal || contract.status !== "Signed"}
+                  data-testid="button-generate-brand-invoice"
+                >
+                  {createBrandInvoice.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4 mr-2" />
+                      {hasInvoice ? "Generate another single invoice" : "Generate Single Invoice"}
+                    </>
+                  )}
+                </Button>
+
+                {/* Split invoice toggle */}
+                {!showSplitInput ? (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setShowSplitInput(true)}
+                    disabled={contract.status !== "Signed"}
+                  >
+                    <Scissors className="w-4 h-4 mr-2" />
+                    Split Invoice (Advance + Final)
+                  </Button>
+                ) : (
+                  <div className="border border-white/10 rounded-lg p-3 space-y-3">
+                    <p className="text-sm font-medium">Split into Advance + Final</p>
+                    <div className="flex items-center gap-3">
+                      <label className="text-xs text-muted-foreground whitespace-nowrap">Advance %</label>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        value={splitPercentageStr}
+                        onChange={(e) => setSplitPercentageStr(e.target.value.replace(/[^0-9]/g, ""))}
+                        className="w-20 h-8 text-sm"
+                        placeholder="50"
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        ₹{Math.round((deal?.dealAmount || 0) * splitPercentage / 100).toLocaleString()} + ₹{((deal?.dealAmount || 0) - Math.round((deal?.dealAmount || 0) * splitPercentage / 100)).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        className="flex-1 gradient-btn text-white"
+                        onClick={() => {
+                          if (!hasBankDetails) {
+                            setBankModalIntent("split");
+                            setBankModalOpen(true);
+                            return;
+                          }
+                          splitInvoices.mutate();
+                        }}
+                        disabled={!deal || splitInvoices.isPending}
+                      >
+                        {splitInvoices.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          "Create Split Invoices"
+                        )}
+                      </Button>
+                      <Button variant="outline" onClick={() => setShowSplitInput(false)} disabled={splitInvoices.isPending}>Cancel</Button>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -701,8 +864,12 @@ export default function ContractDetailsPage() {
                 await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
                 setBankModalOpen(false);
                 // Trigger the original intent
-                if (bankModalIntent === "single") createBrandInvoice.mutate();
-                else if (bankModalIntent === "split") splitInvoices.mutate();
+                if (bankModalIntent === "single") {
+                  const parsed = customAmount.trim() ? parseInt(customAmount, 10) : undefined;
+                  createBrandInvoice.mutate(parsed);
+                } else if (bankModalIntent === "split") {
+                  splitInvoices.mutate();
+                }
               } catch (err: any) {
                 toast({ title: "Failed to save bank details", description: err.message, variant: "destructive" });
               } finally {

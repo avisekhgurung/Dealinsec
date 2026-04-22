@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, Printer, Shield, Lock } from "lucide-react";
 import type { Contract, Deal } from "@shared/schema";
+import { STANDARD_TERMS } from "@shared/schema";
+
+function slugify(s: string): string {
+  return (s || "")
+    .normalize("NFKD")
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+}
 
 export default function ContractPdfPage() {
   const { id } = useParams<{ id: string }>();
@@ -30,6 +40,17 @@ export default function ContractPdfPage() {
       year: "numeric",
     });
   };
+
+  // Set document.title so browsers use a brand-specific PDF filename on print.
+  useEffect(() => {
+    if (!contract) return;
+    const previous = document.title;
+    const brand = slugify(contract.brandName) || "Agreement";
+    document.title = `Agreement_${brand}_${contract.id}`;
+    return () => {
+      document.title = previous;
+    };
+  }, [contract]);
 
   const handlePrint = () => {
     window.print();
@@ -93,7 +114,7 @@ export default function ContractPdfPage() {
           <div className="rounded-2xl overflow-hidden mb-3 print:mb-2 print:rounded-none gradient-primary">
             <div className="px-8 py-4 print:py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
-                <p className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1">InfluDeal Platform</p>
+                <p className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1">Dealinsec Platform</p>
                 <h1 className="text-white text-2xl md:text-3xl print:text-xl font-extrabold tracking-wide uppercase">
                   Influencer Marketing Agreement
                 </h1>
@@ -317,7 +338,7 @@ export default function ContractPdfPage() {
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
                 {contract.exclusive
-                  ? "This Agreement is EXCLUSIVE. During the Agreement period, the Creator shall not enter into similar influencer marketing arrangements with direct competitors of the Brand without prior written consent. All brand deals during this period must be registered on the InfluDeal platform."
+                  ? "This Agreement is EXCLUSIVE. During the Agreement period, the Creator shall not enter into similar influencer marketing arrangements with direct competitors of the Brand without prior written consent. All brand deals during this period must be registered on the Dealinsec platform."
                   : "This Agreement is NON-EXCLUSIVE. The Creator may engage with other brands and clients during the Agreement period, provided such engagements do not directly conflict with or diminish the promotional value of this Agreement."}
               </p>
             </div>
@@ -336,6 +357,46 @@ export default function ContractPdfPage() {
                 shall have exclusive jurisdiction for any legal proceedings.
               </p>
             </div>
+
+            {/* Clause 7 — Deal-specific terms carried over from the quotation */}
+            {(() => {
+              if (!deal) return null;
+              const selectedIds = ((deal as any).standardTermIds as string[] | null) ?? [];
+              const selectedTerms = STANDARD_TERMS.filter((t) => selectedIds.includes(t.id));
+              const customTerms = (deal as any).customTerms as string | null;
+              const customLines = (customTerms ?? "")
+                .split("\n")
+                .map((l: string) => l.trim())
+                .filter(Boolean);
+              if (selectedTerms.length === 0 && customLines.length === 0) return null;
+              return (
+                <div className="space-y-1.5" style={{ pageBreakInside: 'avoid' }}>
+                  <h3 className="font-bold text-sm flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">7</span>
+                    Deal-Specific Terms
+                  </h3>
+                  <p className="text-xs text-muted-foreground pl-8 print:text-gray-600">
+                    The following terms were agreed to in the quotation and carry over to this Agreement:
+                  </p>
+                  <ul className="pl-8 space-y-1.5">
+                    {selectedTerms.map((t, i) => (
+                      <li key={t.id} className="flex items-start gap-2 text-sm text-muted-foreground print:text-gray-700">
+                        <span className="font-semibold text-primary mt-0.5 flex-shrink-0">7.{i + 1}</span>
+                        <span className="leading-relaxed">{t.label}</span>
+                      </li>
+                    ))}
+                    {customLines.map((line: string, i: number) => (
+                      <li key={`custom-${i}`} className="flex items-start gap-2 text-sm text-muted-foreground print:text-gray-700">
+                        <span className="font-semibold text-primary mt-0.5 flex-shrink-0">
+                          7.{selectedTerms.length + i + 1}
+                        </span>
+                        <span className="leading-relaxed">{line}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
           </div>
 
           {/* ── Signature Blocks ── */}
@@ -442,7 +503,7 @@ export default function ContractPdfPage() {
             <p>Reference: {contract.contractName}</p>
             <p>Agreement Period: {formatDate(contract.startDate)} — {formatDate(contract.endDate)}</p>
             <p>Agreement Value: ₹{contract.contractValue.toLocaleString("en-IN")}</p>
-            <p className="mt-2">Generated via InfluDeal Platform · Governed by Indian Contract Act 1872</p>
+            <p className="mt-2">Generated via Dealinsec Platform · Governed by Indian Contract Act 1872</p>
           </div>
 
           {/* ── Screen action buttons ── */}

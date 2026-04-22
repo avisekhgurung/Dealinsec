@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,14 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Download, CheckCircle, Loader2 } from "lucide-react";
 import type { BrandInvoice, Deal } from "@shared/schema";
+
+function slugify(s: string): string {
+  return (s || "")
+    .normalize("NFKD")
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+}
 
 export default function BrandInvoiceDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -53,6 +62,17 @@ export default function BrandInvoiceDetailsPage() {
       month: "short",
       year: "numeric",
     });
+
+  useEffect(() => {
+    if (!invoice) return;
+    const previous = document.title;
+    const brand = slugify(invoice.brandName) || "Invoice";
+    const typeSuffix =
+      invoice.invoiceType === "advance" ? "_Advance" :
+      invoice.invoiceType === "final" ? "_Final" : "";
+    document.title = `Invoice_${brand}${typeSuffix}_${invoice.invoiceNumber}`;
+    return () => { document.title = previous; };
+  }, [invoice]);
 
   /* ── Loading ────────────────────────────────────── */
   if (isLoading) {
@@ -382,7 +402,7 @@ export default function BrandInvoiceDetailsPage() {
             {/* ── Footer ──────────────────────────────── */}
             <div className="px-6 py-3 bg-gray-50 dark:bg-zinc-800/40 border-t border-gray-100 dark:border-zinc-700 text-center">
               <p className="text-[10px] text-gray-400">
-                This is a computer-generated invoice. Generated via InfluDeal.
+                This is a computer-generated invoice. Generated via Dealinsec.
               </p>
             </div>
           </div>

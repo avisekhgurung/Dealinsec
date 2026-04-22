@@ -136,8 +136,8 @@ export default function DealsPage() {
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate">{deal.dealTitle}</p>
-                        <p className="text-sm text-muted-foreground truncate">{deal.brandName}</p>
+                        <p className="font-semibold truncate">{deal.brandName}</p>
+                        <p className="text-sm text-muted-foreground truncate">{deal.dealTitle}</p>
                       </div>
                       <StatusBadge status={deal.status} size="compact" />
                     </div>

@@ -606,10 +606,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (invoice.userId !== req.user.id) {
         return res.status(403).json({ error: "Access denied" });
       }
-      const updated = await storage.updateBrandInvoice(parseInt(req.params.id), req.body);
+
+      // Paid invoices are locked — only status changes are allowed (e.g. accidental undo).
+      // Amount/notes edits are rejected to prevent retroactive accounting surprises.
+      if (invoice.status === "Paid") {
+        const amountChange = req.body.dealAmount !== undefined && req.body.dealAmount !== invoice.dealAmount;
+        const notesChange = req.body.notes !== undefined && req.body.notes !== invoice.notes;
+        if (amountChange || notesChange) {
+          return res.status(400).json({ error: "Paid invoices cannot be edited. Mark it Unpaid first or delete and recreate." });
+        }
+      }
+
+      // Coerce dealAmount to int if provided as string
+      const updates: any = { ...req.body };
+      if (updates.dealAmount !== undefined) {
+        const n = typeof updates.dealAmount === "string" ? parseInt(updates.dealAmount, 10) : updates.dealAmount;
+        if (!Number.isFinite(n) || n < 1) {
+          return res.status(400).json({ error: "Invoice amount must be a positive number" });
+        }
+        updates.dealAmount = n;
+      }
+
+      const updated = await storage.updateBrandInvoice(parseInt(req.params.id), updates);
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update brand invoice" });
+    }
+  });
+
+  app.delete("/api/brand-invoices/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const invoice = await storage.getBrandInvoice(parseInt(req.params.id));
+      if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+      if (invoice.userId !== req.user.id) return res.status(403).json({ error: "Access denied" });
+      if (invoice.status === "Paid") {
+        return res.status(400).json({ error: "Paid invoices cannot be deleted" });
+      }
+      await storage.deleteBrandInvoice(parseInt(req.params.id));
+      res.status(204).end();
+    } catch (error) {
+      console.error("Delete brand invoice error:", error);
+      res.status(500).json({ error: "Failed to delete brand invoice" });
     }
   });
 
@@ -641,12 +678,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "advancePercentage must be between 1 and 99" });
       }
 
-      // Check if split invoices already exist for this deal
-      const existing = await storage.getBrandInvoicesByDealId(dealId);
-      if (existing.length > 0) {
-        return res.status(400).json({ error: "Invoices already exist for this deal" });
-      }
-
+      // Allow multiple invoice sets per deal — invoices can be regenerated as the deal evolves.
       const userId = req.user.id;
       const user = await storage.getUser(userId);
       const influencerName = user?.firstName && user?.lastName
@@ -677,7 +709,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dealAmount: advanceAmount,
         invoiceType: "advance",
         splitPercentage: advancePercentage,
-        status: "Paid" as const,
+        status: "Unpaid" as const,
       });
 
       const finalInvoice = await storage.createBrandInvoice({

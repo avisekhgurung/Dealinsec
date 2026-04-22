@@ -133,7 +133,7 @@ export default function InvoiceDetailsPage() {
                   <Sparkles className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="font-bold">InfluDeal</p>
+                  <p className="font-bold">Dealinsec</p>
                   <p className="text-xs text-muted-foreground">Platform Invoice</p>
                 </div>
               </div>
@@ -193,7 +193,7 @@ export default function InvoiceDetailsPage() {
             <div className="pt-2 text-center">
               <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
                 <FileText className="w-3 h-3" />
-                Invoice generated via InfluDeal Platform
+                Invoice generated via Dealinsec Platform
               </p>
             </div>
           </CardContent>

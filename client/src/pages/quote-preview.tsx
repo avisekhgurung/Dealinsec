@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest } from "@/lib/queryClient";
@@ -9,6 +10,14 @@ import { SiInstagram, SiYoutube, SiFacebook } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import type { Deal, User, Quote } from "@shared/schema";
 import { STANDARD_TERMS } from "@shared/schema";
+
+function slugify(s: string): string {
+  return (s || "")
+    .normalize("NFKD")
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+}
 
 function getPlatformIcon(platform: string) {
   switch (platform.toLowerCase()) {
@@ -64,6 +73,14 @@ export default function QuotePreviewPage() {
     year: "numeric",
   });
   const quoteNumber = `QUO-${dealId}-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+
+  useEffect(() => {
+    if (!deal) return;
+    const previous = document.title;
+    const brand = slugify(deal.brandName) || "Quote";
+    document.title = `Quote_${brand}_${quoteNumber}`;
+    return () => { document.title = previous; };
+  }, [deal, quoteNumber]);
 
   const handlePrint = () => {
     window.print();
@@ -326,7 +343,7 @@ export default function QuotePreviewPage() {
 
             {/* Footer */}
             <div className="pt-2 text-center text-xs text-muted-foreground border-t border-white/10">
-              Generated via <span className="font-semibold text-primary">InfluDeal</span> — Professional Influencer Management Platform
+              Generated via <span className="font-semibold text-primary">Dealinsec</span> — Turn collaborations into professional deals
             </div>
           </div>
         </div>
