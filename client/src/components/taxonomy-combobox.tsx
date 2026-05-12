@@ -68,13 +68,13 @@ export function TaxonomyCombobox({
   if (customMode) {
     return (
       <div className="flex items-stretch gap-1.5">
-        <div className="relative flex-1">
-          <SquarePen className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          <Input
+        <div className="flex items-center flex-1 h-11 px-3 rounded-md border border-input/80 bg-background focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/15 transition-colors">
+          <SquarePen className="w-3.5 h-3.5 text-muted-foreground pointer-events-none flex-shrink-0" />
+          <input
             value={value === OTHER_OPTION ? "" : value}
             onChange={(e) => onChange(e.target.value)}
             placeholder={isFreeForm ? "Type your category" : "Type a custom value"}
-            className="h-11 pl-9 bg-background border-input/80 focus-visible:border-primary/60 focus-visible:ring-primary/15 transition-colors"
+            className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground/60 outline-none pl-2.5"
             data-testid={testId}
           />
         </div>
@@ -125,21 +125,21 @@ export function TaxonomyCombobox({
         sideOffset={6}
       >
         {/* Search bar */}
-        <div className="relative border-b border-input/40 bg-muted/30">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+        <div className="flex items-center h-11 px-3.5 border-b border-input/40 bg-muted/30">
+          <Search className="w-4 h-4 text-muted-foreground pointer-events-none flex-shrink-0" />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search categories..."
-            className="w-full h-11 pl-10 pr-3 bg-transparent text-sm placeholder:text-muted-foreground/70 outline-none"
+            className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground/60 outline-none pl-2.5 min-w-0"
             autoFocus
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+              className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 ml-2"
             >
               Clear
             </button>
