@@ -10,6 +10,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import { uploadFileToImageKit, isImageKitConfigured } from "./imagekitClient";
 
 // PayU config — read lazily so .env files loaded at runtime are picked up
 function getPayuConfig() {
@@ -324,9 +325,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
+      // Upload to ImageKit (or fall back to local path if not configured)
+      let proofFilePath = req.file.path;
+      if (isImageKitConfigured()) {
+        const uploaded = await uploadFileToImageKit(req.file, {
+          folder: "contracts",
+          baseName: `contract-${req.params.id}-proof`,
+        });
+        proofFilePath = uploaded.url; // store the public CDN URL
+      }
+
       const updated = await storage.updateContract(parseInt(req.params.id), {
         proofFileName: req.file.originalname,
-        proofFilePath: req.file.path,
+        proofFilePath,
         status: "Signed",
         signedByBrand: true,
         signedDate: new Date().toISOString(),
@@ -334,11 +345,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(updated);
     } catch (error) {
+      console.error("Proof upload error:", error);
       res.status(500).json({ error: "Failed to upload proof" });
     }
   });
 
-  // Download the uploaded Contract Proof
+  // Download the uploaded Contract Proof.
+  // If the stored path is an external URL (ImageKit), redirect; if it's a
+  // local file (legacy uploads), stream from disk.
   app.get("/api/contracts/:id/proof", isAuthenticated, async (req: any, res) => {
     try {
       const contract = await storage.getContract(parseInt(req.params.id));
@@ -346,6 +360,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (contract.userId !== req.user.id) return res.status(403).json({ error: "Access denied" });
       if (!contract.proofFilePath) return res.status(404).json({ error: "No proof uploaded" });
 
+      if (/^https?:\/\//.test(contract.proofFilePath)) {
+        return res.redirect(contract.proofFilePath);
+      }
       res.download(contract.proofFilePath, contract.proofFileName || "contract-proof");
     } catch (error) {
       console.error("Proof download error:", error);
@@ -795,7 +812,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/profile/photo", isAuthenticated, upload.single("photo"), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      const filePath = `/uploads/${req.file.filename}`;
+
+      // Prefer ImageKit so files survive Railway redeploys.
+      let filePath: string;
+      if (isImageKitConfigured()) {
+        const uploaded = await uploadFileToImageKit(req.file, {
+          folder: "profiles",
+          baseName: `user-${req.user.id}-photo`,
+        });
+        filePath = uploaded.url;
+      } else {
+        filePath = `/uploads/${req.file.filename}`;
+      }
+
       await storage.updateUser(req.user.id, { profileImageUrl: filePath });
       res.json({ path: filePath });
     } catch (error) {
@@ -809,9 +838,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
-      const filePath = `/uploads/${req.file.filename}`;
+
+      let filePath: string;
+      if (isImageKitConfigured()) {
+        const uploaded = await uploadFileToImageKit(req.file, {
+          folder: "signatures",
+          baseName: `user-${req.user.id}-signature`,
+        });
+        filePath = uploaded.url;
+      } else {
+        filePath = `/uploads/${req.file.filename}`;
+      }
+
       res.json({ path: filePath });
     } catch (error) {
+      console.error("Signature upload error:", error);
       res.status(500).json({ error: "Failed to upload signature" });
     }
   });
