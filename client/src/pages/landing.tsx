@@ -31,6 +31,10 @@ import {
   Quote,
   Star,
   IndianRupee,
+  Users,
+  Lightbulb,
+  Camera,
+  PenTool,
 } from "lucide-react";
 import { SiGoogle, SiInstagram, SiYoutube, SiX, SiFacebook, SiLinkedin } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
@@ -44,9 +48,9 @@ import { DealinsecLogo } from "@/components/dealinsec-logo";
 // ────────────────────────────────────────────────────────────────────────────
 
 const NAV_LINKS = [
+  { label: "Who it's for", href: "#who" },
   { label: "Features", href: "#features" },
   { label: "How it works", href: "#how" },
-  { label: "Showcase", href: "#showcase" },
   { label: "Pricing", href: "/pricing" },
   { label: "FAQ", href: "#faq" },
 ];
@@ -127,8 +131,8 @@ const WORKFLOW_STEPS = [
 
 const STATS = [
   { value: "60s", label: "To first invoice", sub: "From signup to sent" },
-  { value: "10K+", label: "Active creators", sub: "Across India" },
-  { value: "₹100Cr+", label: "Deals processed", sub: "And counting" },
+  { value: "50+", label: "Early users", sub: "Creators · Freelancers · Agencies" },
+  { value: "₹28L+", label: "Deal value transacted", sub: "Across 120+ deals" },
   { value: "99.9%", label: "Uptime", sub: "Enterprise-grade" },
 ];
 
@@ -158,6 +162,10 @@ const TESTIMONIALS = [
 
 const FAQS = [
   {
+    q: "Is this only for creators and influencers?",
+    a: "No. Creators are our beachhead because that's where we have the strongest signal, but the platform works for freelancers, agencies, consultants, photographers, and any service business that closes paid deals with clients or brands. The same workflow — deal → quote → contract → invoice — applies to everyone.",
+  },
+  {
     q: "Is Dealinsec free to use?",
     a: "Deals, quotations, invoices and payment tracking are always free. Agreements cost 1 credit (₹299). Every new account gets 3 free credits on signup, and there are no platform fees on deal value.",
   },
@@ -180,6 +188,44 @@ const FAQS = [
   {
     q: "Is my data secure?",
     a: "All data is encrypted in transit and at rest. Sessions are secured, and we never share your information with third parties.",
+  },
+];
+
+const WHO_WE_SERVE = [
+  {
+    icon: Sparkles,
+    title: "Creators",
+    tagline: "Beachhead",
+    desc: "Lifestyle, tech, finance, beauty — anyone closing brand deals on Instagram, YouTube, or X.",
+    accent: "emerald",
+  },
+  {
+    icon: PenTool,
+    title: "Freelancers",
+    tagline: "15M+ in India",
+    desc: "Designers, editors, writers, developers shipping work for retainer or per-project clients.",
+    accent: "teal",
+  },
+  {
+    icon: Users,
+    title: "Agencies & SMBs",
+    tagline: "6 Cr+ in India",
+    desc: "Boutique studios, marketing teams, and service businesses billing multiple clients each month.",
+    accent: "cyan",
+  },
+  {
+    icon: Lightbulb,
+    title: "Consultants",
+    tagline: "4M+ in India",
+    desc: "Coaches, advisors, and independent professionals selling hours, workshops, or retainers.",
+    accent: "indigo",
+  },
+  {
+    icon: Camera,
+    title: "Service Vendors",
+    tagline: "10M+ in India",
+    desc: "Photographers, planners, producers, trainers — anyone who closes paid work with a client.",
+    accent: "amber",
   },
 ];
 
@@ -301,6 +347,7 @@ export default function LandingPage() {
           onPrimaryClick={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
         />
         <TrustStrip />
+        <WhoWeServeSection />
         <FeatureGrid />
         <WorkflowSection />
         <ProductShowcase />
@@ -760,8 +807,8 @@ function Hero({
 
             <motion.p variants={fadeUp} className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
               Quotations, agreements, invoices and payments —{" "}
-              <span className="font-semibold text-neutral-900 dark:text-white">every deal, in seconds, sealed with security.</span>{" "}
-              One dashboard. Built to get you paid on time.
+              <span className="font-semibold text-neutral-900 dark:text-white">one workflow for creators, freelancers, agencies, and every service business that closes deals.</span>{" "}
+              Built for India.
             </motion.p>
 
             <motion.div variants={fadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
@@ -992,7 +1039,7 @@ function TrustStrip() {
           viewport={{ once: true }}
           className="text-center text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-6"
         >
-          Trusted by creators on
+          Built for deals across every platform
         </motion.p>
         <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-5 opacity-70">
           {[
@@ -1015,6 +1062,72 @@ function TrustStrip() {
             </motion.div>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function WhoWeServeSection() {
+  return (
+    <section id="who" className="py-20 sm:py-28 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionHeader
+          eyebrow="Who we serve"
+          title={
+            <>
+              Built for{" "}
+              <span style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                every business
+              </span>{" "}
+              that closes deals
+            </>
+          }
+          subtitle="We started with creators because that's where the pain was loudest. The same workflow powers freelancers, agencies, consultants, and service vendors today."
+        />
+
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-80px" }}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-5 mt-14"
+        >
+          {WHO_WE_SERVE.map((p) => (
+            <motion.div
+              key={p.title}
+              variants={fadeUp}
+              whileHover={{ y: -4 }}
+              className="group relative rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-6 hover:border-emerald-300 dark:hover:border-emerald-700/70 hover:shadow-xl hover:shadow-emerald-500/10 transition-all duration-300 overflow-hidden"
+            >
+              <div
+                className="absolute top-0 left-0 right-0 h-1"
+                style={{ background: "linear-gradient(90deg, #059669, #0D9488)" }}
+              />
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 bg-emerald-50 dark:bg-emerald-950/40 group-hover:scale-110 transition-transform">
+                <p.icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <h3 className="text-base font-semibold">{p.title}</h3>
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">
+                  {p.tagline}
+                </span>
+              </div>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">{p.desc}</p>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mt-12 max-w-3xl mx-auto rounded-2xl border border-neutral-900/90 dark:border-neutral-700 bg-neutral-950 dark:bg-neutral-900 p-5 sm:p-6 text-center"
+        >
+          <p className="text-sm sm:text-base text-neutral-200 font-medium leading-relaxed">
+            <span className="text-emerald-400 font-semibold">One platform.</span>{" "}
+            Every deal-led business. Whether you're a solo creator or a 50-person agency — same workflow, same simple pricing.
+          </p>
+        </motion.div>
       </div>
     </section>
   );
@@ -1803,9 +1916,9 @@ function Footer() {
           <FooterColumn
             title="Product"
             links={[
+              { label: "Who it's for", href: "#who" },
               { label: "Features", href: "#features" },
               { label: "How it works", href: "#how" },
-              { label: "Showcase", href: "#showcase" },
               { label: "Pricing", href: "/pricing" },
             ]}
           />
