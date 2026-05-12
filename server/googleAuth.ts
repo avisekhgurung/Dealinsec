@@ -59,6 +59,11 @@ export function setupGoogleAuth() {
   passport.deserializeUser(async (id: string, done) => {
     try {
       const user = await storage.getUser(id);
+      if (!user) {
+        // User no longer exists (deleted, db reset, etc.) — clear the stale session
+        // by signalling "no user" instead of throwing a deserialization failure.
+        return done(null, false);
+      }
       done(null, user);
     } catch (err) {
       done(err, null);
