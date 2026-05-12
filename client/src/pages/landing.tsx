@@ -1905,8 +1905,20 @@ function Footer() {
               Deals in seconds. Secured for life.
             </p>
             <div className="flex items-center gap-3 mt-4">
-              {[SiInstagram, SiX, SiYoutube, SiLinkedin].map((Icon, i) => (
-                <a key={i} href="#" className="text-neutral-400 hover:text-emerald-600 transition-colors">
+              {[
+                { Icon: SiInstagram, href: "https://www.instagram.com/dealinsec", label: "Instagram" },
+                { Icon: SiX, href: "#", label: "X" },
+                { Icon: SiYoutube, href: "#", label: "YouTube" },
+                { Icon: SiLinkedin, href: "#", label: "LinkedIn" },
+              ].map(({ Icon, href, label }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target={href.startsWith("http") ? "_blank" : undefined}
+                  rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
+                  aria-label={label}
+                  className="text-neutral-400 hover:text-emerald-600 transition-colors"
+                >
                   <Icon className="w-4 h-4" />
                 </a>
               ))}
