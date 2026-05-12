@@ -69,11 +69,8 @@ export function DesktopSidebar() {
       {/* ── Logo ── */}
       <div className="h-16 flex items-center px-5 border-b border-sidebar-border">
         <Link href="/dashboard">
-          <button className="flex items-center gap-2.5 group">
+          <button className="group outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-md">
             <DealinsecLogo size="sm" />
-            <div className="text-base font-bold text-sidebar-foreground tracking-tight group-hover:text-primary transition-colors">
-              DealInSec
-            </div>
           </button>
         </Link>
       </div>
