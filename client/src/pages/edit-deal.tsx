@@ -232,14 +232,20 @@ export default function EditDealPage() {
           </div>
         )}
 
-        <section className="glass-card rounded-xl p-5 space-y-4">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            Deal Type
-          </h2>
-          <p className="text-xs text-muted-foreground -mt-2">
-            Changing the deal type will reset deliverable category/output so you can pick from the right list.
-          </p>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+        <section className="glass-card rounded-xl p-5 sm:p-6 space-y-5">
+          <div className="flex items-baseline justify-between gap-3">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-primary mb-1">
+                Deal Type
+              </div>
+              <h2 className="text-base font-semibold text-foreground">Engagement category</h2>
+            </div>
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+              Changing resets deliverables
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
             {dealTypeOptions.map((dt) => {
               const meta = dealTypeMeta[dt];
               const selected = dealType === dt;
@@ -248,18 +254,31 @@ export default function EditDealPage() {
                   key={dt}
                   type="button"
                   onClick={() => handleDealTypeChange(dt)}
-                  className={`relative rounded-xl border p-3 text-left transition-all ${
+                  className={`group relative rounded-xl border p-4 text-left transition-all duration-150 ${
                     selected
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "border-border/60 hover:border-primary/40 bg-background/40"
+                      ? "border-primary/70 bg-gradient-to-br from-primary/[0.07] to-primary/[0.02] shadow-[0_1px_2px_rgba(0,0,0,0.04),0_0_0_1px_rgba(16,185,129,0.18)]"
+                      : "border-input/60 hover:border-primary/40 hover:bg-muted/40 bg-background/60"
                   }`}
                   data-testid={`select-deal-type-${dt}`}
                 >
-                  <div className="text-xl mb-1">{meta.emoji}</div>
-                  <div className={`text-sm font-semibold ${selected ? "text-primary" : ""}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className={`text-2xl leading-none transition-transform ${selected ? "scale-110" : "group-hover:scale-105"}`}>
+                      {meta.emoji}
+                    </div>
+                    <div
+                      className={`w-4 h-4 rounded-full border-2 transition-all flex items-center justify-center ${
+                        selected
+                          ? "border-primary bg-primary"
+                          : "border-input/60 group-hover:border-primary/40"
+                      }`}
+                    >
+                      {selected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </div>
+                  </div>
+                  <div className={`text-sm font-semibold leading-tight ${selected ? "text-primary" : "text-foreground"}`}>
                     {meta.label}
                   </div>
-                  <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                  <div className="text-[11px] text-muted-foreground/90 mt-1 leading-snug line-clamp-2">
                     {meta.description}
                   </div>
                 </button>
