@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
 import { StatusBadge } from "@/components/status-badge";
 import { Plus, Briefcase, ChevronRight, Calendar, Search, X } from "lucide-react";
+import { dealTypeMeta } from "@shared/dealTypeTaxonomy";
 import type { Deal } from "@shared/schema";
 
 type FilterType = "all" | "pending" | "active" | "completed";
@@ -136,7 +137,14 @@ export default function DealsPage() {
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate">{deal.brandName}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold truncate">{deal.brandName}</p>
+                          {(deal as any).dealType && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-medium border border-primary/20 shrink-0">
+                              {(dealTypeMeta as any)[(deal as any).dealType]?.emoji ?? "·"} {(deal as any).dealType}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground truncate">{deal.dealTitle}</p>
                       </div>
                       <StatusBadge status={deal.status} size="compact" />

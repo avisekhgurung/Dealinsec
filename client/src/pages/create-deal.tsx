@@ -18,19 +18,25 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PlatformIcon } from "@/components/platform-icon";
+import { TaxonomyCombobox } from "@/components/taxonomy-combobox";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Plus, Trash2, Loader2, FileText } from "lucide-react";
 import {
   insertDealSchema,
-  platformOptions,
-  contentTypeOptions,
   frequencyOptions,
   STANDARD_TERMS,
 } from "@shared/schema";
+import {
+  dealTypeOptions,
+  dealTypeMeta,
+  TAXONOMY,
+  type DealType,
+} from "@shared/dealTypeTaxonomy";
 
 const formSchema = insertDealSchema.omit({ userId: true }).extend({
-  brandName: z.string().min(1, "Brand name is required"),
+  brandName: z.string().min(1, "Client / brand name is required"),
   dealTitle: z.string().min(1, "Deal title is required"),
+  dealType: z.enum(dealTypeOptions).default("Creator"),
   dealAmount: z.coerce.number().min(1, "Deal amount must be positive"),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
@@ -38,10 +44,10 @@ const formSchema = insertDealSchema.omit({ userId: true }).extend({
   deliverableMode: z.enum(["all", "any_one"]).optional().default("all"),
   deliverables: z.array(z.object({
     id: z.string(),
-    platform: z.enum(platformOptions),
-    contentType: z.enum(contentTypeOptions),
+    platform: z.string().min(1, "Category is required"),
+    contentType: z.string().min(1, "Output type is required"),
     quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
-    frequency: z.enum(frequencyOptions),
+    frequency: z.string().min(1, "Frequency is required"),
     notes: z.string().optional(),
   })).min(1, "At least one deliverable is required"),
   standardTermIds: z.array(z.string()).optional().default([]),
@@ -65,6 +71,7 @@ export default function CreateDealPage() {
     defaultValues: {
       brandName: "",
       dealTitle: "",
+      dealType: "Creator",
       dealAmount: 0,
       startDate: "",
       endDate: "",
@@ -84,6 +91,9 @@ export default function CreateDealPage() {
     },
   });
 
+  const dealType = (form.watch("dealType") as DealType) || "Creator";
+  const taxonomy = TAXONOMY[dealType];
+
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "deliverables",
@@ -98,7 +108,7 @@ export default function CreateDealPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
       toast({
         title: "Deal created",
-        description: "Your brand deal has been created successfully.",
+        description: "Your deal has been created successfully.",
       });
       setLocation(`/deals/${deal.id}`);
     },
@@ -118,13 +128,34 @@ export default function CreateDealPage() {
   const addDeliverable = () => {
     append({
       id: crypto.randomUUID(),
-      platform: "Instagram",
-      contentType: "Reel",
+      platform: "",
+      contentType: "",
       quantity: 1,
       frequency: "One-time",
       notes: "",
     });
   };
+
+  // When dealType changes, reset all deliverable category/type fields so the
+  // user picks from the new taxonomy (prevents stale Creator values lingering
+  // on a Freelance deal, etc.)
+  const handleDealTypeChange = (next: DealType) => {
+    form.setValue("dealType", next);
+    const current = form.getValues("deliverables");
+    form.setValue(
+      "deliverables",
+      current.map((d) => ({ ...d, platform: "", contentType: "" })),
+    );
+  };
+
+  const labels = {
+    Creator: { category: "Platform", type: "Content Type", who: "Brand Name" },
+    Freelance: { category: "Category", type: "Output", who: "Client Name" },
+    Consulting: { category: "Practice Area", type: "Format", who: "Client Name" },
+    "Service Vendor": { category: "Service", type: "Output", who: "Client Name" },
+    Custom: { category: "Category", type: "Output", who: "Client / Brand" },
+  } as const;
+  const L = labels[dealType];
 
   return (
     <div className="min-h-screen bg-background pb-8">
@@ -143,17 +174,58 @@ export default function CreateDealPage() {
       </header>
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 py-6 space-y-6 animate-fade-in">
+        {/* Deal Type — first step, drives downstream taxonomy */}
         <section className="glass-card rounded-xl p-5 space-y-4">
           <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            Brand Details
+            Deal Type
+          </h2>
+          <p className="text-xs text-muted-foreground -mt-2">
+            Pick the type that best describes this engagement. This tailors the deliverable options below.
+          </p>
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+            {dealTypeOptions.map((dt) => {
+              const meta = dealTypeMeta[dt];
+              const selected = dealType === dt;
+              return (
+                <button
+                  key={dt}
+                  type="button"
+                  onClick={() => handleDealTypeChange(dt)}
+                  className={`relative rounded-xl border p-3 text-left transition-all ${
+                    selected
+                      ? "border-primary bg-primary/5 shadow-sm"
+                      : "border-border/60 hover:border-primary/40 bg-background/40"
+                  }`}
+                  data-testid={`select-deal-type-${dt}`}
+                >
+                  <div className="text-xl mb-1">{meta.emoji}</div>
+                  <div className={`text-sm font-semibold ${selected ? "text-primary" : ""}`}>
+                    {meta.label}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">
+                    {meta.description}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="glass-card rounded-xl p-5 space-y-4">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+            {dealType === "Creator" ? "Brand Details" : "Client Details"}
           </h2>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="brandName">Brand Name</Label>
+              <Label htmlFor="brandName">{L.who}</Label>
               <Input
                 id="brandName"
-                placeholder="e.g., Nike, Adidas"
+                placeholder={
+                  dealType === "Creator"
+                    ? "e.g., Nike, Adidas, Mamaearth"
+                    : "Client / company name"
+                }
                 className="h-12"
                 data-testid="input-brand-name"
                 {...form.register("brandName")}
@@ -276,10 +348,14 @@ export default function CreateDealPage() {
                 <CardContent className="p-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <PlatformIcon
-                        platform={form.watch(`deliverables.${index}.platform`) || "Instagram"}
-                        size={18}
-                      />
+                      {dealType === "Creator" ? (
+                        <PlatformIcon
+                          platform={form.watch(`deliverables.${index}.platform`) || "Instagram"}
+                          size={18}
+                        />
+                      ) : (
+                        <span className="text-lg">{dealTypeMeta[dealType].emoji}</span>
+                      )}
                       <span className="font-medium text-sm">Deliverable {index + 1}</span>
                     </div>
                     {fields.length > 1 && (
@@ -295,54 +371,27 @@ export default function CreateDealPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label className="text-xs">Platform</Label>
-                      <Select
-                        value={form.watch(`deliverables.${index}.platform`)}
-                        onValueChange={(value) =>
-                          form.setValue(`deliverables.${index}.platform`, value as typeof platformOptions[number])
-                        }
-                      >
-                        <SelectTrigger
-                          className="h-11"
-                          data-testid={`select-platform-${index}`}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {platformOptions.map((platform) => (
-                            <SelectItem key={platform} value={platform}>
-                              <div className="flex items-center gap-2">
-                                <PlatformIcon platform={platform} size={16} />
-                                {platform}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label className="text-xs">{L.category}</Label>
+                      <TaxonomyCombobox
+                        groups={taxonomy.categories}
+                        value={form.watch(`deliverables.${index}.platform`) || ""}
+                        onChange={(v) => form.setValue(`deliverables.${index}.platform`, v, { shouldValidate: true })}
+                        placeholder={`Choose ${L.category.toLowerCase()}`}
+                        testId={`select-platform-${index}`}
+                      />
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-xs">Content Type</Label>
-                      <Select
-                        value={form.watch(`deliverables.${index}.contentType`)}
-                        onValueChange={(value) =>
-                          form.setValue(`deliverables.${index}.contentType`, value as typeof contentTypeOptions[number])
-                        }
-                      >
-                        <SelectTrigger
-                          className="h-11"
-                          data-testid={`select-content-type-${index}`}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {contentTypeOptions.map((type) => (
-                            <SelectItem key={type} value={type}>{type}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label className="text-xs">{L.type}</Label>
+                      <TaxonomyCombobox
+                        groups={taxonomy.outputs}
+                        value={form.watch(`deliverables.${index}.contentType`) || ""}
+                        onChange={(v) => form.setValue(`deliverables.${index}.contentType`, v, { shouldValidate: true })}
+                        placeholder={`Choose ${L.type.toLowerCase()}`}
+                        testId={`select-content-type-${index}`}
+                      />
                     </div>
                   </div>
 
@@ -363,7 +412,7 @@ export default function CreateDealPage() {
                       <Select
                         value={form.watch(`deliverables.${index}.frequency`)}
                         onValueChange={(value) =>
-                          form.setValue(`deliverables.${index}.frequency`, value as typeof frequencyOptions[number])
+                          form.setValue(`deliverables.${index}.frequency`, value)
                         }
                       >
                         <SelectTrigger

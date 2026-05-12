@@ -2,17 +2,35 @@ import { sql } from 'drizzle-orm';
 import { pgTable, text, integer, boolean, json, serial, varchar, timestamp, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { dealTypeOptions as TAXONOMY_DEAL_TYPES } from "./dealTypeTaxonomy";
 
+// Legacy enum options — kept for backward compat with existing UI helpers.
+// New deals can store any string here (validated client-side against taxonomy).
 export const platformOptions = ["Instagram", "YouTube", "Twitter", "Facebook"] as const;
 export const contentTypeOptions = ["Reel", "Video", "Story", "Post"] as const;
-export const frequencyOptions = ["Per Week", "Per Month", "One-time"] as const;
+export const frequencyOptions = [
+  "One-time",
+  "Per week",
+  "Per month",
+  "Per quarter",
+  "Per event",
+  "Per session",
+  "Per day",
+  "Per hour",
+] as const;
 
+export const dealTypeOptions = TAXONOMY_DEAL_TYPES;
+export type DealTypeOption = (typeof dealTypeOptions)[number];
+
+// Deliverable is now generic — `platform` and `contentType` accept any string
+// (e.g. "Instagram"/"Reel" for Creator, "Wedding photography"/"Per shoot" for
+// Service Vendor). Frontend validates against the taxonomy.
 export const deliverableSchema = z.object({
   id: z.string(),
-  platform: z.enum(platformOptions),
-  contentType: z.enum(contentTypeOptions),
+  platform: z.string().min(1),
+  contentType: z.string().min(1),
   quantity: z.number().min(1),
-  frequency: z.enum(frequencyOptions),
+  frequency: z.string().min(1),
   notes: z.string().optional(),
 });
 
@@ -69,6 +87,7 @@ export const deals = pgTable("deals", {
   brandUserId: varchar("brand_user_id").references(() => users.id),
   brandName: text("brand_name").notNull(),
   dealTitle: text("deal_title").notNull(),
+  dealType: varchar("deal_type").notNull().default("Creator"),
   dealAmount: integer("deal_amount").notNull(),
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
 import { PlatformIcon } from "@/components/platform-icon";
+import { dealTypeMeta } from "@shared/dealTypeTaxonomy";
 import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -232,9 +233,16 @@ export default function DealDetailsPage() {
                 <h2 className="text-xl font-bold truncate" data-testid="text-deal-title">
                   {deal.dealTitle}
                 </h2>
-                <p className="text-muted-foreground" data-testid="text-brand-name">
-                  {deal.brandName}
-                </p>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <p className="text-muted-foreground" data-testid="text-brand-name">
+                    {deal.brandName}
+                  </p>
+                  {(deal as any).dealType && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20" data-testid="text-deal-type">
+                      {(dealTypeMeta as any)[(deal as any).dealType]?.emoji ?? "·"} {(deal as any).dealType}
+                    </span>
+                  )}
+                </div>
               </div>
               <StatusBadge status={deal.status} />
             </div>
