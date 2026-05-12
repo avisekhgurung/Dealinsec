@@ -16,7 +16,7 @@ export function BottomNav() {
   const credits = user?.contractCredits ?? 0;
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 safe-area-pb" style={{
+    <nav className="fixed bottom-0 inset-x-0 z-50 safe-area-pb lg:hidden" style={{
       background: "rgba(255,255,255,0.82)",
       backdropFilter: "blur(28px)",
       WebkitBackdropFilter: "blur(28px)",

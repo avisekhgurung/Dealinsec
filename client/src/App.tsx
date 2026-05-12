@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { AppLoader, RouteLoader } from "@/components/app-loader";
+import { DesktopSidebar } from "@/components/desktop-sidebar";
+import { useLocation } from "wouter";
 
 // Eagerly loaded — always needed for first render
 import LandingPage from "@/pages/landing";
@@ -35,8 +37,28 @@ const PrivacyPage             = lazy(() => import("@/pages/legal/privacy"));
 const CookiePage              = lazy(() => import("@/pages/legal/cookies"));
 const RefundPage              = lazy(() => import("@/pages/legal/refund"));
 
+// Routes where the desktop sidebar + content offset should NOT apply
+// (full-bleed marketing / auth / standalone routes).
+const FULL_BLEED_ROUTES = new Set([
+  "/",
+  "/pitch",
+  "/terms",
+  "/privacy",
+  "/cookies",
+  "/refund",
+  "/onboarding",
+]);
+
+function isFullBleedRoute(pathname: string) {
+  if (FULL_BLEED_ROUTES.has(pathname)) return true;
+  // Contract PDF print-friendly view also goes full-bleed
+  if (pathname.match(/^\/contracts\/[^/]+\/export$/)) return true;
+  return false;
+}
+
 function Router() {
   const { isAuthenticated, isLoading, user } = useAuth();
+  const [location] = useLocation();
 
   // Initial app load (auth check) → full branded splash, shown once per session
   if (isLoading) {
@@ -75,34 +97,41 @@ function Router() {
     );
   }
 
+  const showShell = !isFullBleedRoute(location);
+
   return (
-    <Suspense fallback={<RouteLoader />}>
-      <Switch>
-        <Route path="/" component={LandingPage} />
-        <Route path="/dashboard" component={DashboardPage} />
-        <Route path="/deals" component={DealsPage} />
-        <Route path="/deals/new" component={CreateDealPage} />
-        <Route path="/deals/:id/quote" component={QuotePreviewPage} />
-        <Route path="/deals/:id/edit" component={EditDealPage} />
-        <Route path="/deals/:id/contract" component={ContractConfirmationPage} />
-        <Route path="/deals/:id" component={DealDetailsPage} />
-        <Route path="/contracts" component={ContractsPage} />
-        <Route path="/contracts/:id/export" component={ContractPdfPage} />
-        <Route path="/contracts/:id" component={ContractDetailsPage} />
-        <Route path="/invoices/success" component={PaymentSuccessPage} />
-        <Route path="/invoices/:id" component={InvoiceDetailsPage} />
-        <Route path="/invoices" component={BillingPage} />
-        <Route path="/brand-invoices/:id" component={BrandInvoiceDetailsPage} />
-        <Route path="/profile" component={ProfilePage} />
-        <Route path="/pricing" component={PricingPage} />
-        <Route path="/pitch" component={PitchPage} />
-        <Route path="/terms" component={TermsPage} />
-        <Route path="/privacy" component={PrivacyPage} />
-        <Route path="/cookies" component={CookiePage} />
-        <Route path="/refund" component={RefundPage} />
-        <Route component={NotFound} />
-      </Switch>
-    </Suspense>
+    <>
+      {showShell && <DesktopSidebar />}
+      <div className={showShell ? "lg:pl-72" : ""}>
+        <Suspense fallback={<RouteLoader />}>
+          <Switch>
+            <Route path="/" component={LandingPage} />
+            <Route path="/dashboard" component={DashboardPage} />
+            <Route path="/deals" component={DealsPage} />
+            <Route path="/deals/new" component={CreateDealPage} />
+            <Route path="/deals/:id/quote" component={QuotePreviewPage} />
+            <Route path="/deals/:id/edit" component={EditDealPage} />
+            <Route path="/deals/:id/contract" component={ContractConfirmationPage} />
+            <Route path="/deals/:id" component={DealDetailsPage} />
+            <Route path="/contracts" component={ContractsPage} />
+            <Route path="/contracts/:id/export" component={ContractPdfPage} />
+            <Route path="/contracts/:id" component={ContractDetailsPage} />
+            <Route path="/invoices/success" component={PaymentSuccessPage} />
+            <Route path="/invoices/:id" component={InvoiceDetailsPage} />
+            <Route path="/invoices" component={BillingPage} />
+            <Route path="/brand-invoices/:id" component={BrandInvoiceDetailsPage} />
+            <Route path="/profile" component={ProfilePage} />
+            <Route path="/pricing" component={PricingPage} />
+            <Route path="/pitch" component={PitchPage} />
+            <Route path="/terms" component={TermsPage} />
+            <Route path="/privacy" component={PrivacyPage} />
+            <Route path="/cookies" component={CookiePage} />
+            <Route path="/refund" component={RefundPage} />
+            <Route component={NotFound} />
+          </Switch>
+        </Suspense>
+      </div>
+    </>
   );
 }
 

@@ -220,10 +220,10 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="px-4 py-5 space-y-6 animate-fade-in">
+      <main className="px-4 py-5 space-y-6 animate-fade-in lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-8 lg:space-y-8">
 
         {/* ── Stat cards ── */}
-        <section className="grid grid-cols-2 gap-3">
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
           <StatCard title="Deals" value={activeDeals} icon={Briefcase}
             tone="amber" href="/deals" loading={isLoading} />
           <StatCard title="Agreements" value={signedContracts} icon={FileCheck}

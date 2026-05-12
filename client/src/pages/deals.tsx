@@ -105,7 +105,7 @@ export default function DealsPage() {
         </div>
       </header>
 
-      <main className="px-4 py-6 animate-fade-in">
+      <main className="px-4 py-6 animate-fade-in lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-8 lg:space-y-8">
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (

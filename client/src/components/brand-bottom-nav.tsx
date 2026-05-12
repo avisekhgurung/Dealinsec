@@ -12,7 +12,7 @@ export function BrandBottomNav() {
   const [location] = useLocation();
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 glass-nav h-16 z-50 safe-area-pb">
+    <nav className="fixed bottom-0 inset-x-0 glass-nav h-16 z-50 safe-area-pb lg:hidden">
       <div className="flex items-center justify-around h-full max-w-lg mx-auto px-2">
         {navItems.map((item) => {
           const isActive = location === item.path ||

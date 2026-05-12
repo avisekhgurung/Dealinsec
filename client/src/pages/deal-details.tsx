@@ -225,7 +225,7 @@ export default function DealDetailsPage() {
         </div>
       </header>
 
-      <main className="px-4 py-6 space-y-6 animate-fade-in">
+      <main className="px-4 py-6 space-y-6 animate-fade-in lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-8 lg:space-y-8">
         <Card className="glass-card border-0">
           <CardContent className="p-6">
             <div className="flex items-start justify-between gap-3 mb-4">

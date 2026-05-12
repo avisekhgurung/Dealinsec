@@ -326,7 +326,7 @@ export default function ContractDetailsPage() {
         </div>
       </header>
 
-      <main className="px-4 py-6 space-y-6 animate-fade-in">
+      <main className="px-4 py-6 space-y-6 animate-fade-in lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-8 lg:space-y-8">
 
         {/* 4-step workflow timeline */}
         <div className="flex items-center justify-between px-1">
