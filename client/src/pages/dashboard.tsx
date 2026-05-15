@@ -446,7 +446,7 @@ export default function DashboardPage() {
                   {moneyPie.length > 0 && (
                     <Card className="glass-card border-0">
                       <CardHeader className="pb-1 px-4 pt-4 lg:px-6 lg:pt-6">
-                        <CardTitle className="text-sm lg:text-base font-semibold">Money Status</CardTitle>
+                        <CardTitle className="text-sm lg:text-base font-semibold">Invoice Status</CardTitle>
                         <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">
                           Invoices by amount · {brandInvoices.length} total
                         </p>
