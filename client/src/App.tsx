@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -105,7 +105,11 @@ function Router() {
       <div className={showShell ? "lg:pl-72" : ""}>
         <Suspense fallback={<RouteLoader />}>
           <Switch>
-            <Route path="/" component={LandingPage} />
+            {/* Authenticated users hitting `/` go straight to the dashboard
+                — the marketing landing page is for logged-out visitors only. */}
+            <Route path="/">
+              <Redirect to="/dashboard" />
+            </Route>
             <Route path="/dashboard" component={DashboardPage} />
             <Route path="/deals" component={DealsPage} />
             <Route path="/deals/new" component={CreateDealPage} />
