@@ -72,7 +72,70 @@ function buildDeliverableCompletion(deals: Deal[]) {
   }));
 }
 
-const PLATFORM_COLORS = ["#3B82F6", "#0D9488", "#f59e0b", "#64748B", "#e11d48"];
+// Fallback palette for unmapped categories (Freelance/Consulting/Custom)
+const PLATFORM_COLORS = ["#0E8C5A", "#10B981", "#0D9488", "#06B6D4", "#1D4ED8", "#7C3AED", "#F59E0B", "#EC4899", "#64748B"];
+
+// Brand-accurate colors per platform / category — covers creator platforms
+// and common service / freelance / consulting categories from the taxonomy.
+const BRAND_COLORS: Record<string, string> = {
+  // Creator — global platforms
+  "Instagram":           "#E1306C",
+  "YouTube":             "#FF0000",
+  "Twitter (X)":         "#0F1419",
+  "Twitter":             "#0F1419",
+  "X":                   "#0F1419",
+  "Facebook":            "#1877F2",
+  "LinkedIn":            "#0A66C2",
+  "Threads":             "#0F1419",
+  "Pinterest":           "#E60023",
+  "Snapchat":            "#FFFC00",
+  "TikTok":              "#010101",
+  // Creator — India-first platforms
+  "ShareChat":           "#FF5C00",
+  "Moj":                 "#FF1654",
+  "Josh":                "#FF3DAA",
+  "Roposo":              "#FF4081",
+  "Chingari":            "#F7444E",
+  "Koo":                 "#F7B500",
+  // Audio / Podcast
+  "Spotify":             "#1DB954",
+  "JioSaavn":            "#2BC5B4",
+  "Apple Podcasts":      "#A855F7",
+  "Amazon Music":        "#25D1DA",
+  "KuKu FM":             "#FF6B35",
+  "Pocket FM":           "#FB923C",
+  // Streaming
+  "Twitch":              "#9146FF",
+  "YouTube Live":        "#FF0000",
+  "Instagram Live":      "#E1306C",
+  "Discord Stage":       "#5865F2",
+  // Newsletter
+  "Substack":            "#FF6719",
+  "Beehiiv":             "#FFB200",
+  "Revue":               "#FF6900",
+  "Medium":              "#000000",
+  // Messaging
+  "Telegram channel":    "#26A5E4",
+  "WhatsApp Channel":    "#25D366",
+  "Discord server":      "#5865F2",
+  // Freelance / Consulting / Service Vendor — category-tone tints
+  "Design":              "#EC4899",
+  "Development":         "#1D4ED8",
+  "Writing":             "#7C3AED",
+  "Marketing":           "#F59E0B",
+  "Video & Audio":       "#06B6D4",
+  "Photography":         "#0E8C5A",
+  "Wedding":             "#E11D48",
+  "Events & Corporate":  "#F97316",
+  "Beauty & Personal care": "#EC4899",
+  "Fitness & Sports":    "#10B981",
+  "Tutoring & Coaching": "#1D4ED8",
+  "Wellness & Therapy":  "#0E8C5A",
+};
+
+function colorForPlatform(name: string, fallbackIndex: number): string {
+  return BRAND_COLORS[name] ?? PLATFORM_COLORS[fallbackIndex % PLATFORM_COLORS.length];
+}
 
 // ─── custom tooltip ──────────────────────────────────────────────────────────
 
@@ -431,8 +494,8 @@ export default function DashboardPage() {
                                 axisLine={false} tickLine={false} />
                               <Tooltip content={<CustomTooltip />} />
                               <Bar dataKey="count" name="Deliverables" radius={[6, 6, 0, 0]} maxBarSize={64}>
-                                {platformDist.map((_, i) => (
-                                  <Cell key={i} fill={PLATFORM_COLORS[i % PLATFORM_COLORS.length]} />
+                                {platformDist.map((entry, i) => (
+                                  <Cell key={i} fill={colorForPlatform(entry.platform, i)} />
                                 ))}
                               </Bar>
                             </BarChart>
@@ -559,7 +622,7 @@ export default function DashboardPage() {
                     <div key={item.platform} className="flex items-center gap-3">
                       <div
                         className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: PLATFORM_COLORS[i % PLATFORM_COLORS.length] }}
+                        style={{ backgroundColor: colorForPlatform(item.platform, i) }}
                       />
                       <span className="text-xs font-medium w-20 truncate">{item.platform}</span>
                       <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -567,7 +630,7 @@ export default function DashboardPage() {
                           className="h-full rounded-full transition-all duration-500"
                           style={{
                             width: `${pct}%`,
-                            backgroundColor: PLATFORM_COLORS[i % PLATFORM_COLORS.length],
+                            backgroundColor: colorForPlatform(item.platform, i),
                           }}
                         />
                       </div>
