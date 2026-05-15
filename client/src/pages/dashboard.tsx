@@ -127,21 +127,21 @@ function StatCard({ title, value, icon: Icon, tone, href, loading }: {
   return (
     <Link href={href}>
       <div
-        className="rounded-2xl p-3 sm:p-4 cursor-pointer overflow-hidden bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 hover:shadow-md transition-all"
+        className="group rounded-2xl p-3 sm:p-4 lg:p-5 cursor-pointer overflow-hidden bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 hover:border-primary/40 dark:hover:border-primary/40 hover:shadow-lg hover:shadow-primary/[0.04] transition-all duration-200"
       >
-        <div className="flex items-start justify-between gap-2 mb-2 sm:mb-3">
-          <div className={`flex items-center justify-center w-9 h-9 rounded-xl shrink-0 ${t.bg}`}>
-            <Icon className={`w-4 h-4 ${t.text}`} strokeWidth={2.2} />
+        <div className="flex items-start justify-between gap-2 mb-2 sm:mb-3 lg:mb-4">
+          <div className={`flex items-center justify-center w-9 h-9 lg:w-11 lg:h-11 rounded-xl shrink-0 ${t.bg} group-hover:scale-105 transition-transform`}>
+            <Icon className={`w-4 h-4 lg:w-5 lg:h-5 ${t.text}`} strokeWidth={2.2} />
           </div>
-          <ChevronRight className="w-4 h-4 text-neutral-400 dark:text-neutral-600 shrink-0 mt-1" />
+          <ChevronRight className="w-4 h-4 lg:w-5 lg:h-5 text-neutral-400 dark:text-neutral-600 shrink-0 mt-1 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
         </div>
-        <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 truncate mb-0.5">
+        <p className="text-[11px] lg:text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400 truncate mb-0.5 lg:mb-1">
           {title}
         </p>
         {loading ? (
-          <Skeleton className="h-7 w-16" />
+          <Skeleton className="h-7 lg:h-10 w-16 lg:w-24" />
         ) : (
-          <p className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-white truncate leading-tight tracking-tight">
+          <p className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl font-bold text-neutral-900 dark:text-white truncate leading-tight tracking-tight">
             {value}
           </p>
         )}
@@ -200,30 +200,36 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      {/* Header */}
-      <header className="glass-header sticky top-0 z-40">
-        <div className="flex items-center justify-between gap-4 px-4 py-4">
+    <div className="min-h-screen bg-background pb-24 lg:pb-12">
+      {/* Header — compact on mobile, generous on desktop SaaS-style */}
+      <header className="glass-header sticky top-0 z-40 lg:border-b lg:border-neutral-200/60 dark:lg:border-neutral-800/60">
+        <div className="flex items-center justify-between gap-4 px-4 py-4 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-6">
           <div>
-            <p className="text-xs text-muted-foreground">Welcome back,</p>
-            <h1 className="text-lg font-bold">{displayName}</h1>
+            <p className="text-xs lg:text-sm text-muted-foreground">Welcome back,</p>
+            <h1 className="text-lg lg:text-2xl font-bold tracking-tight">{displayName}</h1>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleLogout}
-            data-testid="button-logout"
-            className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-          >
-            <LogOut className="w-5 h-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <span className="hidden lg:inline-flex items-center gap-2 rounded-full bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              All systems operational
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleLogout}
+              data-testid="button-logout"
+              className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 lg:hidden"
+            >
+              <LogOut className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
       </header>
 
       <main className="px-4 py-5 space-y-6 animate-fade-in lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-8 lg:space-y-8">
 
         {/* ── Stat cards ── */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
           <StatCard title="Deals" value={totalDeals} icon={Briefcase}
             tone="amber" href="/deals" loading={isLoading} />
           <StatCard title="Agreements" value={signedContracts} icon={FileCheck}
@@ -242,22 +248,22 @@ export default function DashboardPage() {
 
         {/* ── Revenue summary strip ── */}
         {!isLoading && (totalRevenue > 0 || pendingRevenue > 0) && (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="glass-card rounded-xl p-3 border-0 overflow-hidden">
-              <div className="flex items-center gap-2 mb-1">
-                <TrendingUp className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span className="text-xs text-muted-foreground">Earned</span>
+          <div className="grid grid-cols-2 gap-3 lg:gap-5">
+            <div className="glass-card rounded-xl p-3 lg:p-5 border-0 overflow-hidden">
+              <div className="flex items-center gap-2 mb-1 lg:mb-2">
+                <TrendingUp className="w-4 h-4 lg:w-5 lg:h-5 text-emerald-500 shrink-0" />
+                <span className="text-xs lg:text-sm text-muted-foreground uppercase tracking-wider lg:tracking-wide font-medium">Earned</span>
               </div>
-              <p className={`font-bold text-emerald-600 dark:text-emerald-400 truncate leading-tight ${totalRevenue.toLocaleString("en-IN").length > 7 ? "text-base" : "text-xl"}`}>
+              <p className={`font-bold text-emerald-600 dark:text-emerald-400 truncate leading-tight ${totalRevenue.toLocaleString("en-IN").length > 7 ? "text-base lg:text-2xl" : "text-xl lg:text-3xl"}`}>
                 ₹{totalRevenue.toLocaleString("en-IN")}
               </p>
             </div>
-            <div className="glass-card rounded-xl p-3 border-0 overflow-hidden">
-              <div className="flex items-center gap-2 mb-1">
-                <Clock className="w-4 h-4 text-amber-500 shrink-0" />
-                <span className="text-xs text-muted-foreground">Pending</span>
+            <div className="glass-card rounded-xl p-3 lg:p-5 border-0 overflow-hidden">
+              <div className="flex items-center gap-2 mb-1 lg:mb-2">
+                <Clock className="w-4 h-4 lg:w-5 lg:h-5 text-amber-500 shrink-0" />
+                <span className="text-xs lg:text-sm text-muted-foreground uppercase tracking-wider lg:tracking-wide font-medium">Pending</span>
               </div>
-              <p className={`font-bold text-amber-600 dark:text-amber-400 truncate leading-tight ${pendingRevenue.toLocaleString("en-IN").length > 7 ? "text-base" : "text-xl"}`}>
+              <p className={`font-bold text-amber-600 dark:text-amber-400 truncate leading-tight ${pendingRevenue.toLocaleString("en-IN").length > 7 ? "text-base lg:text-2xl" : "text-xl lg:text-3xl"}`}>
                 ₹{pendingRevenue.toLocaleString("en-IN")}
               </p>
             </div>
@@ -267,90 +273,102 @@ export default function DashboardPage() {
         {/* ── Charts (only shown when there's data) ── */}
         {deals.length > 0 && (
           <>
-            {/* Deals over time */}
-            {dealsOverTime.length > 1 && (
-              <Card className="glass-card border-0">
-                <CardHeader className="pb-2 px-4 pt-4">
-                  <CardTitle className="text-sm font-semibold">Deals Over Time</CardTitle>
-                </CardHeader>
-                <CardContent className="px-2 pb-4">
-                  <ResponsiveContainer width="100%" height={160}>
-                    <AreaChart data={dealsOverTime} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="colorDeals" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                      <XAxis dataKey="month" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Area type="monotone" dataKey="count" name="Deals" stroke="#3B82F6" strokeWidth={2} fill="url(#colorDeals)" dot={{ r: 3, fill: "#3B82F6" }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            )}
+            {/* Trend charts — side-by-side on desktop */}
+            <div className="grid lg:grid-cols-2 gap-3 lg:gap-5">
+              {/* Deals over time */}
+              {dealsOverTime.length > 1 && (
+                <Card className="glass-card border-0">
+                  <CardHeader className="pb-2 px-4 pt-4 lg:px-6 lg:pt-6">
+                    <CardTitle className="text-sm lg:text-base font-semibold">Deals Over Time</CardTitle>
+                    <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Monthly count of new deals</p>
+                  </CardHeader>
+                  <CardContent className="px-2 lg:px-4 pb-4 lg:pb-6">
+                    <div className="h-[160px] lg:h-[260px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={dealsOverTime} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="colorDeals" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                          <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Area type="monotone" dataKey="count" name="Deals" stroke="#3B82F6" strokeWidth={2.5} fill="url(#colorDeals)" dot={{ r: 3, fill: "#3B82F6" }} activeDot={{ r: 5 }} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
-            {/* Revenue over time */}
-            {revenueOverTime.length > 1 && (
-              <Card className="glass-card border-0">
-                <CardHeader className="pb-2 px-4 pt-4">
-                  <CardTitle className="text-sm font-semibold">Revenue Trend (₹)</CardTitle>
-                </CardHeader>
-                <CardContent className="px-2 pb-4">
-                  <ResponsiveContainer width="100%" height={160}>
-                    <AreaChart data={revenueOverTime} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                      <XAxis dataKey="month" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false}
-                        tickFormatter={v => v >= 1000 ? `${Math.round(v / 1000)}k` : v} />
-                      <Tooltip content={<CustomTooltip prefix="₹" />} />
-                      <Area type="monotone" dataKey="amount" name="Revenue" stroke="#10b981" strokeWidth={2} fill="url(#colorRevenue)" dot={{ r: 3, fill: "#10b981" }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            )}
+              {/* Revenue over time */}
+              {revenueOverTime.length > 1 && (
+                <Card className="glass-card border-0">
+                  <CardHeader className="pb-2 px-4 pt-4 lg:px-6 lg:pt-6">
+                    <CardTitle className="text-sm lg:text-base font-semibold">Revenue Trend (₹)</CardTitle>
+                    <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Monthly platform-fee revenue</p>
+                  </CardHeader>
+                  <CardContent className="px-2 lg:px-4 pb-4 lg:pb-6">
+                    <div className="h-[160px] lg:h-[260px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={revenueOverTime} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                          <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false}
+                            tickFormatter={v => v >= 1000 ? `${Math.round(v / 1000)}k` : v} />
+                          <Tooltip content={<CustomTooltip prefix="₹" />} />
+                          <Area type="monotone" dataKey="amount" name="Revenue" stroke="#10b981" strokeWidth={2.5} fill="url(#colorRevenue)" dot={{ r: 3, fill: "#10b981" }} activeDot={{ r: 5 }} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 lg:gap-5">
               {/* Deal status pie */}
               {statusDist.length > 0 && (
                 <Card className="glass-card border-0">
-                  <CardHeader className="pb-1 px-3 pt-3">
-                    <CardTitle className="text-xs font-semibold">Deal Status</CardTitle>
+                  <CardHeader className="pb-1 px-3 pt-3 lg:px-5 lg:pt-5">
+                    <CardTitle className="text-xs lg:text-sm font-semibold">Deal Status</CardTitle>
                   </CardHeader>
-                  <CardContent className="px-1 pb-3">
-                    <ResponsiveContainer width="100%" height={130}>
-                      <PieChart>
-                        <Pie data={statusDist} cx="50%" cy="50%" innerRadius={30} outerRadius={50}
-                          dataKey="value" nameKey="name" paddingAngle={3}>
-                          {statusDist.map((entry, i) => (
-                            <Cell key={i} fill={STATUS_COLORS[entry.name] ?? PLATFORM_COLORS[i % PLATFORM_COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (!active || !payload?.length) return null;
-                            return (
-                              <div className="bg-background/95 border border-white/20 rounded-lg p-2 text-xs shadow-lg">
-                                <p style={{ color: payload[0].payload.fill }} className="font-semibold">{payload[0].name}</p>
-                                <p>{payload[0].value} deal{payload[0].value !== 1 ? "s" : ""}</p>
-                              </div>
-                            );
-                          }}
-                        />
-                        <Legend iconSize={8} iconType="circle"
-                          formatter={(value) => <span className="text-[10px] text-muted-foreground">{value}</span>} />
-                      </PieChart>
-                    </ResponsiveContainer>
+                  <CardContent className="px-1 pb-3 lg:px-3 lg:pb-5">
+                    <div className="h-[130px] lg:h-[220px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={statusDist} cx="50%" cy="50%" innerRadius={30} outerRadius={50}
+                            dataKey="value" nameKey="name" paddingAngle={3}
+                            className="lg:[&_.recharts-pie]:!translate-y-0">
+                            {statusDist.map((entry, i) => (
+                              <Cell key={i} fill={STATUS_COLORS[entry.name] ?? PLATFORM_COLORS[i % PLATFORM_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            content={({ active, payload }) => {
+                              if (!active || !payload?.length) return null;
+                              return (
+                                <div className="bg-background/95 border border-white/20 rounded-lg p-2 text-xs shadow-lg">
+                                  <p style={{ color: payload[0].payload.fill }} className="font-semibold">{payload[0].name}</p>
+                                  <p>{payload[0].value} deal{payload[0].value !== 1 ? "s" : ""}</p>
+                                </div>
+                              );
+                            }}
+                          />
+                          <Legend iconSize={8} iconType="circle"
+                            formatter={(value) => <span className="text-[10px] lg:text-xs text-muted-foreground">{value}</span>} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
                   </CardContent>
                 </Card>
               )}
@@ -358,26 +376,28 @@ export default function DashboardPage() {
               {/* Platform bar chart */}
               {platformDist.length > 0 && (
                 <Card className="glass-card border-0">
-                  <CardHeader className="pb-1 px-3 pt-3">
-                    <CardTitle className="text-xs font-semibold">Platforms</CardTitle>
+                  <CardHeader className="pb-1 px-3 pt-3 lg:px-5 lg:pt-5">
+                    <CardTitle className="text-xs lg:text-sm font-semibold">Platforms</CardTitle>
                   </CardHeader>
-                  <CardContent className="px-1 pb-3">
-                    <ResponsiveContainer width="100%" height={130}>
-                      <BarChart data={platformDist} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                        <XAxis dataKey="platform" tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
-                          axisLine={false} tickLine={false}
-                          tickFormatter={v => v.slice(0, 2)} />
-                        <YAxis allowDecimals={false} tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
-                          axisLine={false} tickLine={false} />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Bar dataKey="count" name="Deliverables" radius={[4, 4, 0, 0]}>
-                          {platformDist.map((_, i) => (
-                            <Cell key={i} fill={PLATFORM_COLORS[i % PLATFORM_COLORS.length]} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
+                  <CardContent className="px-1 pb-3 lg:px-3 lg:pb-5">
+                    <div className="h-[130px] lg:h-[220px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={platformDist} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                          <XAxis dataKey="platform" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                            axisLine={false} tickLine={false}
+                            tickFormatter={v => v.slice(0, 3)} />
+                          <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                            axisLine={false} tickLine={false} />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Bar dataKey="count" name="Deliverables" radius={[4, 4, 0, 0]}>
+                            {platformDist.map((_, i) => (
+                              <Cell key={i} fill={PLATFORM_COLORS[i % PLATFORM_COLORS.length]} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
                   </CardContent>
                 </Card>
               )}

@@ -58,49 +58,56 @@ export default function DealsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <header className="glass-header sticky top-0 z-40">
-        <div className="px-4 py-4 space-y-3">
+    <div className="min-h-screen bg-background pb-20 lg:pb-12">
+      <header className="glass-header sticky top-0 z-40 lg:border-b lg:border-neutral-200/60 dark:lg:border-neutral-800/60">
+        <div className="px-4 py-4 space-y-3 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-6 lg:space-y-5">
           <div className="flex items-center justify-between gap-4">
-            <h1 className="text-xl font-bold">Deals</h1>
+            <div>
+              <h1 className="text-xl lg:text-3xl font-bold tracking-tight">Deals</h1>
+              <p className="hidden lg:block text-sm text-muted-foreground mt-0.5">
+                {filteredDeals.length} {filteredDeals.length === 1 ? "deal" : "deals"} · {filter !== "all" ? filter : "all statuses"}
+              </p>
+            </div>
             <Link href="/deals/new">
-              <Button size="sm" className="gradient-btn text-white" data-testid="button-new-deal">
-                <Plus className="w-4 h-4 mr-1" />
-                New
+              <Button size="sm" className="gradient-btn text-white lg:h-10 lg:px-5 lg:text-sm" data-testid="button-new-deal">
+                <Plus className="w-4 h-4 mr-1 lg:mr-2" />
+                <span className="lg:inline">New</span><span className="hidden lg:inline">&nbsp;Deal</span>
               </Button>
             </Link>
           </div>
 
-          {/* Search bar */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search deals..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-8 h-9 bg-white/50 dark:bg-white/5 rounded-xl text-sm"
-            />
-            {search && (
-              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
-                <X className="w-3.5 h-3.5 text-muted-foreground" />
-              </button>
-            )}
-          </div>
+          <div className="flex flex-col lg:flex-row lg:items-center lg:gap-4 gap-3">
+            {/* Search bar */}
+            <div className="relative flex-1 lg:max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search deals..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 pr-8 h-9 lg:h-10 bg-white/50 dark:bg-white/5 rounded-xl text-sm"
+              />
+              {search && (
+                <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <X className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
+              )}
+            </div>
 
-          {/* Filters */}
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
-            {filters.map((f) => (
-              <Button
-                key={f.value}
-                variant={filter === f.value ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFilter(f.value)}
-                className={`flex-shrink-0 rounded-full ${filter === f.value ? "gradient-btn text-white" : ""}`}
-                data-testid={`filter-${f.value}`}
-              >
-                {f.label}
-              </Button>
-            ))}
+            {/* Filters */}
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 lg:pb-0 lg:flex-shrink-0">
+              {filters.map((f) => (
+                <Button
+                  key={f.value}
+                  variant={filter === f.value ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilter(f.value)}
+                  className={`flex-shrink-0 rounded-full ${filter === f.value ? "gradient-btn text-white" : ""}`}
+                  data-testid={`filter-${f.value}`}
+                >
+                  {f.label}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
       </header>
@@ -127,7 +134,7 @@ export default function DealsPage() {
             ))}
           </div>
         ) : filteredDeals.length > 0 ? (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:gap-5">
             {filteredDeals.map((deal) => (
               <Link key={deal.id} href={`/deals/${deal.id}`}>
                 <Card
