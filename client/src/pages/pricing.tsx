@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, CreditCard, Check, Loader2, CheckCircle, XCircle, Zap, ArrowRight } from "lucide-react";
+import { ArrowLeft, CreditCard, Check, Loader2, CheckCircle, XCircle, Zap, ArrowRight, Shield, Lock, Sparkles, TrendingUp, Users, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
@@ -107,14 +107,14 @@ export default function PricingPage() {
   const credits = user?.contractCredits ?? 0;
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <header className="glass-header sticky top-0 z-50 px-4 py-3 flex items-center gap-3">
+    <div className="min-h-screen bg-background pb-20 lg:pb-12">
+      <header className="glass-header sticky top-0 z-50 px-4 py-3 flex items-center gap-3 lg:max-w-5xl lg:mx-auto lg:px-8 lg:py-5">
         <Link href="/dashboard">
           <Button variant="ghost" size="icon" data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
           </Button>
         </Link>
-        <h1 className="text-xl font-semibold flex-1">Buy Credits</h1>
+        <h1 className="text-xl lg:text-2xl font-semibold flex-1">Pricing</h1>
         {/* Credit balance pill */}
         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
           <span className="text-sm font-black text-amber-500">₹</span>
@@ -125,7 +125,7 @@ export default function PricingPage() {
         </div>
       </header>
 
-      <main className="p-4 max-w-lg mx-auto space-y-4 animate-fade-in">
+      <main className="p-4 max-w-lg mx-auto space-y-4 animate-fade-in lg:max-w-5xl lg:px-8 lg:py-6 lg:space-y-6">
 
         {/* ── Success banner with redirect countdown ── */}
         {paymentStatus === "success" && (
@@ -205,46 +205,98 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* ── Buy credit card ── */}
-        <Card className="glass-card border-primary/20 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-teal-500/5 pointer-events-none" />
+        {/* ── Pricing hero card with anchor pricing + tactics ── */}
+        <Card className="glass-card border-primary/30 relative overflow-hidden shadow-xl shadow-primary/[0.08]">
+          {/* Subtle bg gradient */}
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-emerald-500/[0.05] pointer-events-none" />
 
-          {/* Popular badge */}
-          <div className="absolute top-4 right-4">
-            <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-primary/10 text-primary border border-primary/20">
-              <Zap className="w-3 h-3" />
-              Most Popular
-            </span>
+          {/* Top promotional bar */}
+          <div className="relative bg-gradient-to-r from-primary to-emerald-600 text-white px-4 py-2 text-center">
+            <div className="flex items-center justify-center gap-2 text-xs lg:text-sm font-bold uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5" />
+              Launch Offer · Save ₹300 · Limited Time
+              <Sparkles className="w-3.5 h-3.5" />
+            </div>
           </div>
 
-          <CardHeader className="relative pb-2 pt-6">
-            <CardTitle className="text-lg">Agreement Credit</CardTitle>
-            <div className="flex items-baseline gap-1 mt-2">
-              <span className="text-4xl font-black">₹299</span>
-              <span className="text-muted-foreground text-sm">/ credit</span>
-            </div>
-          </CardHeader>
-
-          <CardContent className="relative space-y-3 pb-4">
-            {[
-              "Create 1 exclusive agreement with a brand",
-              "Professional PDF with your digital signature",
-              "Auto-generate invoice for brand billing",
-              "Credits never expire",
-              "Secure payment via PayU",
-            ].map((feature, i) => (
-              <div key={i} className="flex items-center gap-2.5 text-sm">
-                <div className="flex-shrink-0 w-4 h-4 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
-                  <Check className="w-2.5 h-2.5 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                {feature}
+          <div className="relative p-5 lg:p-7">
+            {/* Title row */}
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <p className="text-[11px] lg:text-xs uppercase tracking-[0.1em] font-bold text-primary mb-1">
+                  Contract Credit
+                </p>
+                <h3 className="text-xl lg:text-2xl font-bold text-foreground">
+                  1 signed agreement = 1 credit
+                </h3>
               </div>
-            ))}
-          </CardContent>
+              <span className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] lg:text-xs font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                <Zap className="w-3 h-3" />
+                50% OFF
+              </span>
+            </div>
 
-          <CardFooter className="relative flex-col gap-2 pt-0">
+            {/* Anchor pricing — slashed old + bold new */}
+            <div className="flex items-end gap-3 mb-2">
+              <span className="text-base lg:text-lg text-muted-foreground line-through decoration-2 decoration-rose-400/70">
+                ₹599
+              </span>
+              <div className="flex items-baseline gap-1">
+                <span className="text-5xl lg:text-6xl font-black text-foreground leading-none tracking-tight">
+                  ₹299
+                </span>
+                <span className="text-sm lg:text-base text-muted-foreground font-medium">/ credit</span>
+              </div>
+            </div>
+
+            {/* Savings call-out */}
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold mb-5">
+              <TrendingUp className="w-3.5 h-3.5" />
+              You save ₹300 today — pay once, use anytime
+            </div>
+
+            {/* Value-justification ROI bar */}
+            <div className="rounded-xl bg-muted/40 border border-border/50 p-3 lg:p-4 mb-5">
+              <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-2">
+                Why ₹299 is practically free
+              </p>
+              <div className="grid grid-cols-3 gap-3 lg:gap-4 text-center">
+                <div>
+                  <p className="text-base lg:text-lg font-bold text-foreground">₹35K</p>
+                  <p className="text-[10px] lg:text-[11px] text-muted-foreground leading-tight mt-0.5">Avg deal value</p>
+                </div>
+                <div className="border-x border-border/50">
+                  <p className="text-base lg:text-lg font-bold text-primary">0.85%</p>
+                  <p className="text-[10px] lg:text-[11px] text-muted-foreground leading-tight mt-0.5">Of your deal</p>
+                </div>
+                <div>
+                  <p className="text-base lg:text-lg font-bold text-emerald-600 dark:text-emerald-400">10 hrs</p>
+                  <p className="text-[10px] lg:text-[11px] text-muted-foreground leading-tight mt-0.5">Saved/week</p>
+                </div>
+              </div>
+            </div>
+
+            {/* What's included */}
+            <ul className="space-y-2.5 mb-6">
+              {[
+                "Legally-worded agreement with e-signature",
+                "GST-ready invoice auto-generated",
+                "Brand-side dashboard for tracking",
+                "Credits never expire",
+                "Secure UPI / Card / Netbanking via PayU",
+              ].map((feature) => (
+                <li key={feature} className="flex items-start gap-2.5 text-sm lg:text-[15px]">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center mt-px">
+                    <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" strokeWidth={3} />
+                  </div>
+                  <span className="text-foreground">{feature}</span>
+                </li>
+              ))}
+            </ul>
+
+            {/* CTA */}
             <Button
-              className="gradient-btn w-full text-white h-13 text-base font-semibold rounded-xl shadow-lg"
+              className="gradient-btn w-full text-white h-12 lg:h-14 text-base lg:text-lg font-bold rounded-xl shadow-lg shadow-primary/30"
               size="lg"
               onClick={handlePurchase}
               disabled={isLoading}
@@ -258,15 +310,61 @@ export default function PricingPage() {
               ) : (
                 <>
                   <CreditCard className="h-5 w-5 mr-2" />
-                  Buy 1 Credit — ₹299
+                  Get 1 Credit for ₹299
+                  <ArrowRight className="h-4 w-4 ml-2" />
                 </>
               )}
             </Button>
-            <p className="text-xs text-center text-muted-foreground">
-              Secured by PayU · No subscription · Pay once, use anytime
-            </p>
-          </CardFooter>
+
+            {/* Trust signals row */}
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 mt-4 text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <Shield className="w-3 h-3 text-emerald-500" /> 7-day refund
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <Lock className="w-3 h-3 text-emerald-500" /> 256-bit encrypted
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <Check className="w-3 h-3 text-emerald-500" /> No subscription
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <Check className="w-3 h-3 text-emerald-500" /> UPI · Cards · NetBanking
+              </span>
+            </div>
+          </div>
         </Card>
+
+        {/* Social proof bar */}
+        <div className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-4 lg:p-5 flex items-center gap-3 lg:gap-4">
+          <div className="flex -space-x-2 flex-shrink-0">
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="w-8 h-8 lg:w-10 lg:h-10 rounded-full ring-2 ring-background flex items-center justify-center text-xs lg:text-sm font-bold text-white"
+                style={{
+                  background: ["linear-gradient(135deg,#10B981,#0D9488)",
+                    "linear-gradient(135deg,#3B82F6,#6366F1)",
+                    "linear-gradient(135deg,#F59E0B,#F97316)",
+                    "linear-gradient(135deg,#EC4899,#A855F7)"][i],
+                }}
+              >
+                {["A","P","R","M"][i]}
+              </div>
+            ))}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <Users className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+              <p className="text-sm lg:text-base font-semibold truncate">50+ creators joined this month</p>
+            </div>
+            <div className="flex items-center gap-1.5 text-[11px] lg:text-xs text-muted-foreground">
+              <div className="flex">
+                {[1,2,3,4,5].map((s) => <Star key={s} className="w-3 h-3 fill-amber-400 text-amber-400" />)}
+              </div>
+              <span>4.9 · "Cut deal admin time in half" — Priya R.</span>
+            </div>
+          </div>
+        </div>
 
         {/* How it works */}
         <div className="glass-card rounded-2xl border-0 p-5 space-y-3">
