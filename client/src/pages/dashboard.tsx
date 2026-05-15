@@ -172,8 +172,8 @@ export default function DashboardPage() {
 
   const isLoading = dealsLoading || contractsLoading || invoicesLoading;
 
-  // Stat counts
-  const activeDeals = deals.filter(d => d.status === "Pending" || d.status === "Active").length;
+  // Stat counts — show total deals across all statuses (Pending + Active + Completed)
+  const totalDeals = deals.length;
   const signedContracts = contracts.filter(c => c.status === "Signed" || c.status === "Active").length;
   const paidInvoices = invoices.filter(i => i.status === "Paid").length;
   const totalRevenue = deals
@@ -224,7 +224,7 @@ export default function DashboardPage() {
 
         {/* ── Stat cards ── */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-          <StatCard title="Deals" value={activeDeals} icon={Briefcase}
+          <StatCard title="Deals" value={totalDeals} icon={Briefcase}
             tone="amber" href="/deals" loading={isLoading} />
           <StatCard title="Agreements" value={signedContracts} icon={FileCheck}
             tone="blue" href="/contracts" loading={isLoading} />
