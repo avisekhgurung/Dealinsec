@@ -118,7 +118,7 @@ export default function ProfilePage() {
   const initials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join("").toUpperCase() || user?.email?.[0]?.toUpperCase() || "?";
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-20 lg:pb-12">
       {/* Gradient Banner Header */}
       <div className="relative">
         <div
@@ -237,10 +237,10 @@ export default function ProfilePage() {
         <p className="text-sm text-muted-foreground" data-testid="text-email">{user?.email || "No email"}</p>
       </div>
 
-      <main className="px-4 space-y-4 max-w-lg mx-auto animate-fade-in">
+      <main className="px-4 space-y-4 max-w-lg mx-auto animate-fade-in lg:max-w-6xl lg:px-8 lg:space-y-6 xl:px-12">
         {isEditing ? (
-          /* ---- Edit Mode ---- */
-          <div className="glass-card rounded-2xl p-5 space-y-5" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border) / 0.5)" }}>
+          /* ---- Edit Mode (form readable width even on wide screens) ---- */
+          <div className="glass-card rounded-2xl p-5 lg:p-7 space-y-5 lg:max-w-3xl lg:mx-auto" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border) / 0.5)" }}>
             <div className="flex items-center gap-2 mb-1">
               <Edit className="h-4 w-4 text-primary" />
               <h3 className="font-semibold text-lg">Edit Profile</h3>
@@ -443,8 +443,8 @@ export default function ProfilePage() {
             </div>
           </div>
         ) : (
-          /* ---- View Mode: Card Grid ---- */
-          <div className="space-y-4">
+          /* ---- View Mode: Card Grid (stack on mobile, 2-col on desktop) ---- */
+          <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-5 lg:auto-rows-min">
             {/* Personal Info Card */}
             <div className="glass-card rounded-2xl p-5 border-0" style={{ background: "linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.8) 100%)" }}>
               <div className="flex items-center gap-2 mb-4">
