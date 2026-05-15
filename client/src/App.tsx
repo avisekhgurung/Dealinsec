@@ -75,7 +75,9 @@ function Router() {
       <Suspense fallback={<RouteLoader />}>
         <Switch>
           <Route path="/" component={LandingPage} />
-          <Route path="/pricing" component={PricingPage} />
+          {/* /pricing is intentionally NOT here — it's the in-app credit
+              purchase page, secured to logged-in users only. Public pricing
+              info lives in the LandingPage's #pricing section. */}
           <Route path="/pitch" component={PitchPage} />
           <Route path="/terms" component={TermsPage} />
           <Route path="/privacy" component={PrivacyPage} />

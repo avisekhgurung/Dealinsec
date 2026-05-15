@@ -51,7 +51,7 @@ const NAV_LINKS = [
   { label: "Who it's for", href: "#who" },
   { label: "Features", href: "#features" },
   { label: "How it works", href: "#how" },
-  { label: "Pricing", href: "/pricing" },
+  { label: "Pricing", href: "#pricing" },
   { label: "FAQ", href: "#faq" },
 ];
 
@@ -1670,7 +1670,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
   ];
 
   return (
-    <section className="py-20 sm:py-28 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/20">
+    <section id="pricing" className="py-20 sm:py-28 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/20 scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
           eyebrow="Pay only for what you use"
@@ -1969,7 +1969,7 @@ function Footer() {
               { label: "Who it's for", href: "#who" },
               { label: "Features", href: "#features" },
               { label: "How it works", href: "#how" },
-              { label: "Pricing", href: "/pricing" },
+              { label: "Pricing", href: "#pricing" },
             ]}
           />
           <FooterColumn
