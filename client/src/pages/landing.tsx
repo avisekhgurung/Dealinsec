@@ -1718,57 +1718,95 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
             <p className="text-[11px] text-neutral-500 text-center mt-3">3 free credits included on signup.</p>
           </motion.div>
 
-          {/* Agreement credit */}
+          {/* Agreement credit — conversion-optimized with anchor pricing */}
           <motion.div
             variants={fadeUp}
-            className="relative rounded-2xl border border-emerald-500 bg-white dark:bg-neutral-900 p-7 shadow-xl shadow-emerald-500/15 scale-[1.02]"
+            className="relative rounded-2xl border border-emerald-500 bg-white dark:bg-neutral-900 shadow-xl shadow-emerald-500/15 scale-[1.02] overflow-hidden"
           >
+            {/* Promo bar */}
             <div
-              className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[10px] font-bold text-white uppercase tracking-widest"
+              className="px-4 py-2 text-center text-white text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-1.5"
               style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
             >
-              Pay when you sign
+              <Sparkles className="w-3 h-3" />
+              Launch Offer · Save ₹300
+              <Sparkles className="w-3 h-3" />
             </div>
-            <div className="flex items-center gap-2 mb-1">
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center"
+
+            <div className="p-7">
+              <div className="flex items-start justify-between gap-3 mb-1">
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center"
+                    style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
+                  >
+                    <FileSignature className="w-4 h-4 text-white" />
+                  </div>
+                  <p className="text-sm font-semibold">Agreement credit</p>
+                </div>
+                <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                  <Zap className="w-2.5 h-2.5" />
+                  50% OFF
+                </span>
+              </div>
+
+              {/* Anchor pricing */}
+              <div className="mt-4 flex items-end gap-2">
+                <span className="text-base text-neutral-400 line-through decoration-2 decoration-rose-400/60">
+                  ₹599
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span
+                    className="text-4xl font-bold tracking-tight"
+                    style={{
+                      background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      backgroundClip: "text",
+                    }}
+                  >
+                    ₹299
+                  </span>
+                  <span className="text-sm text-neutral-500">/ credit</span>
+                </div>
+              </div>
+
+              {/* Loss-aversion savings pill */}
+              <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold">
+                You save ₹300 · pay once, use anytime
+              </div>
+
+              <ul className="mt-5 space-y-2.5">
+                {creditPerks.map((f) => (
+                  <li key={f} className="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+                    <Check className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <Button
+                onClick={onCTA}
+                className="w-full mt-6 h-11 text-sm font-bold text-white border-0 shadow-md shadow-emerald-500/30"
                 style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
               >
-                <FileSignature className="w-4 h-4 text-white" />
+                Get 1 Credit for ₹299
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+
+              {/* Trust signals row */}
+              <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mt-3 text-[10px] text-neutral-500">
+                <span className="inline-flex items-center gap-1">
+                  <Shield className="w-2.5 h-2.5 text-emerald-500" /> 7-day refund
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Lock className="w-2.5 h-2.5 text-emerald-500" /> Encrypted
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Check className="w-2.5 h-2.5 text-emerald-500" /> UPI · Cards · NetBanking
+                </span>
               </div>
-              <p className="text-sm font-semibold">Agreement credit</p>
             </div>
-            <div className="mt-4 flex items-baseline gap-1">
-              <span
-                className="text-4xl font-bold tracking-tight"
-                style={{
-                  background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                ₹299
-              </span>
-              <span className="text-sm text-neutral-500">/ credit</span>
-            </div>
-            <p className="text-xs text-neutral-500 mt-1">One credit locks in one professional agreement. That's it.</p>
-            <ul className="mt-5 space-y-2.5">
-              {creditPerks.map((f) => (
-                <li key={f} className="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-                  <Check className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                  <span>{f}</span>
-                </li>
-              ))}
-            </ul>
-            <Button
-              onClick={onCTA}
-              className="w-full mt-6 h-10 text-sm font-semibold text-white border-0 shadow-md shadow-emerald-500/20"
-              style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
-            >
-              Buy a credit
-            </Button>
-            <p className="text-[11px] text-neutral-500 text-center mt-3">Pay once, use anytime · no subscription.</p>
           </motion.div>
         </motion.div>
 

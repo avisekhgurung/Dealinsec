@@ -334,6 +334,67 @@ export default function PricingPage() {
           </div>
         </Card>
 
+        {/* Free-forever card — reinforce value before credit purchase */}
+        <Card className="glass-card border-emerald-500/20 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/60 via-transparent to-teal-50/40 dark:from-emerald-950/20 dark:to-teal-950/10 pointer-events-none" />
+          <div className="relative p-5 lg:p-6">
+            <div className="flex items-start justify-between gap-3 mb-3 lg:mb-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-7 h-7 lg:w-8 lg:h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center">
+                    <Sparkles className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <p className="text-[10px] lg:text-xs uppercase tracking-[0.1em] font-bold text-emerald-700 dark:text-emerald-400">
+                    Always Free
+                  </p>
+                </div>
+                <h3 className="text-lg lg:text-xl font-bold text-foreground">
+                  Everything below — ₹0 forever
+                </h3>
+                <p className="text-xs lg:text-sm text-muted-foreground mt-1">
+                  You only pay when you lock in a signed contract.
+                </p>
+              </div>
+              <span className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] lg:text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                <Check className="w-3 h-3" strokeWidth={3} />
+                ₹0
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 lg:gap-3">
+              {[
+                { label: "Create deals",         desc: "Unlimited" },
+                { label: "Send quotations",     desc: "Unlimited" },
+                { label: "Generate invoices",   desc: "Unlimited" },
+                { label: "Track payments",      desc: "Real-time" },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-lg bg-white/60 dark:bg-card/60 border border-border/40 p-2.5 lg:p-3"
+                >
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <Check className="w-3 h-3 lg:w-3.5 lg:h-3.5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" strokeWidth={3} />
+                    <span className="text-xs lg:text-sm font-semibold text-foreground truncate">
+                      {item.label}
+                    </span>
+                  </div>
+                  <p className="text-[10px] lg:text-[11px] text-muted-foreground ml-[18px] lg:ml-[20px]">
+                    {item.desc}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Bonus: 3 free credits on signup */}
+            <div className="mt-3 lg:mt-4 flex items-center gap-2 rounded-lg bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/40 px-3 py-2">
+              <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+              <p className="text-[11px] lg:text-xs text-amber-900 dark:text-amber-200">
+                <span className="font-bold">Bonus:</span> 3 free agreement credits on signup · referrals = +1 each
+              </p>
+            </div>
+          </div>
+        </Card>
+
         {/* Social proof bar */}
         <div className="rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm p-4 lg:p-5 flex items-center gap-3 lg:gap-4">
           <div className="flex -space-x-2 flex-shrink-0">
