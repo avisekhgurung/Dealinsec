@@ -203,7 +203,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background pb-24 lg:pb-12">
       {/* Header — compact on mobile, generous on desktop SaaS-style */}
       <header className="glass-header sticky top-0 z-40 lg:border-b lg:border-neutral-200/60 dark:lg:border-neutral-800/60">
-        <div className="flex items-center justify-between gap-4 px-4 py-4 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-6">
+        <div className="flex items-center justify-between gap-4 px-4 py-4 lg:max-w-7xl lg:mx-auto lg:px-8 lg:py-6 xl:px-12">
           <div>
             <p className="text-xs lg:text-sm text-muted-foreground">Welcome back,</p>
             <h1 className="text-lg lg:text-2xl font-bold tracking-tight">{displayName}</h1>
@@ -226,7 +226,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="px-4 py-5 space-y-6 animate-fade-in lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-8 lg:space-y-8">
+      <main className="px-4 py-5 space-y-6 animate-fade-in lg:max-w-7xl lg:mx-auto lg:px-8 lg:py-8 lg:space-y-8 xl:px-12">
 
         {/* ── Stat cards ── */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
@@ -245,6 +245,74 @@ export default function DashboardPage() {
             loading={false}
           />
         </section>
+
+        {/* ── Deal Status breakdown — segmented bar + responsive counts ── */}
+        {!isLoading && totalDeals > 0 && (() => {
+          const pending = deals.filter(d => d.status === "Pending").length;
+          const active = deals.filter(d => d.status === "Active").length;
+          const completed = deals.filter(d => d.status === "Completed").length;
+          const segments = [
+            { label: "Pending",   count: pending,   color: "bg-amber-500",   dot: "bg-amber-500" },
+            { label: "Active",    count: active,    color: "bg-blue-500",    dot: "bg-blue-500" },
+            { label: "Completed", count: completed, color: "bg-emerald-500", dot: "bg-emerald-500" },
+          ];
+          return (
+            <Card className="glass-card border-0">
+              <CardContent className="p-4 lg:p-6">
+                <div className="flex items-center justify-between mb-3 lg:mb-4 flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-sm lg:text-base font-semibold text-foreground">Deal Status</h3>
+                    <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">
+                      Distribution of {totalDeals} deal{totalDeals !== 1 ? "s" : ""} by status
+                    </p>
+                  </div>
+                  <Link href="/deals">
+                    <Button variant="ghost" size="sm" className="text-xs lg:text-sm h-7 lg:h-8 text-primary hover:text-primary">
+                      View all <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                    </Button>
+                  </Link>
+                </div>
+
+                {/* Segmented progress bar (always full width, scales naturally) */}
+                <div className="flex w-full h-2.5 lg:h-3 rounded-full overflow-hidden bg-muted">
+                  {segments.map((s) =>
+                    s.count > 0 ? (
+                      <div
+                        key={s.label}
+                        className={`${s.color} transition-all duration-500`}
+                        style={{ width: `${(s.count / totalDeals) * 100}%` }}
+                        title={`${s.label}: ${s.count}`}
+                      />
+                    ) : null,
+                  )}
+                </div>
+
+                {/* Count chips — responsive: 3 cols always, but layout adapts */}
+                <div className="grid grid-cols-3 gap-2 lg:gap-4 mt-4 lg:mt-5">
+                  {segments.map((s) => {
+                    const pct = totalDeals > 0 ? Math.round((s.count / totalDeals) * 100) : 0;
+                    return (
+                      <div key={s.label} className="min-w-0">
+                        <div className="flex items-center gap-1.5 lg:gap-2 mb-1">
+                          <span className={`w-2 h-2 lg:w-2.5 lg:h-2.5 rounded-full ${s.dot} shrink-0`} />
+                          <span className="text-[10px] lg:text-xs uppercase tracking-wider font-semibold text-muted-foreground truncate">
+                            {s.label}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline gap-1.5 lg:gap-2">
+                          <span className="text-lg lg:text-2xl xl:text-3xl font-bold text-foreground leading-none">
+                            {s.count}
+                          </span>
+                          <span className="text-[10px] lg:text-xs text-muted-foreground">{pct}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* ── Revenue summary strip ── */}
         {!isLoading && (totalRevenue > 0 || pendingRevenue > 0) && (
@@ -283,7 +351,7 @@ export default function DashboardPage() {
                     <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Monthly count of new deals</p>
                   </CardHeader>
                   <CardContent className="px-2 lg:px-4 pb-4 lg:pb-6">
-                    <div className="h-[160px] lg:h-[260px]">
+                    <div className="h-[180px] sm:h-[200px] lg:h-[320px] xl:h-[380px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={dealsOverTime} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                           <defs>
@@ -312,7 +380,7 @@ export default function DashboardPage() {
                     <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Monthly platform-fee revenue</p>
                   </CardHeader>
                   <CardContent className="px-2 lg:px-4 pb-4 lg:pb-6">
-                    <div className="h-[160px] lg:h-[260px]">
+                    <div className="h-[180px] sm:h-[200px] lg:h-[320px] xl:h-[380px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={revenueOverTime} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                           <defs>
@@ -343,7 +411,7 @@ export default function DashboardPage() {
                     <CardTitle className="text-xs lg:text-sm font-semibold">Deal Status</CardTitle>
                   </CardHeader>
                   <CardContent className="px-1 pb-3 lg:px-3 lg:pb-5">
-                    <div className="h-[130px] lg:h-[220px]">
+                    <div className="h-[150px] sm:h-[170px] lg:h-[280px] xl:h-[320px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie data={statusDist} cx="50%" cy="50%" innerRadius={30} outerRadius={50}
@@ -380,7 +448,7 @@ export default function DashboardPage() {
                     <CardTitle className="text-xs lg:text-sm font-semibold">Platforms</CardTitle>
                   </CardHeader>
                   <CardContent className="px-1 pb-3 lg:px-3 lg:pb-5">
-                    <div className="h-[130px] lg:h-[220px]">
+                    <div className="h-[150px] sm:h-[170px] lg:h-[280px] xl:h-[320px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={platformDist} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
