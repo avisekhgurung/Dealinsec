@@ -12,8 +12,8 @@ import {
   TrendingUp, IndianRupee, Clock, CheckCircle2
 } from "lucide-react";
 import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+  AreaChart, Area, BarChart, Bar, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import type { Deal, Contract, Invoice } from "@shared/schema";
 
@@ -39,12 +39,6 @@ function buildRevenueOverTime(deals: Deal[]) {
     map[key] = (map[key] ?? 0) + Number(d.dealAmount);
   });
   return Object.entries(map).slice(-6).map(([month, amount]) => ({ month, amount }));
-}
-
-function buildStatusDist(deals: Deal[]) {
-  const map: Record<string, number> = {};
-  deals.forEach(d => { map[d.status] = (map[d.status] ?? 0) + 1; });
-  return Object.entries(map).map(([name, value]) => ({ name, value }));
 }
 
 function buildPlatformDist(deals: Deal[]) {
@@ -78,12 +72,6 @@ function buildDeliverableCompletion(deals: Deal[]) {
   }));
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  Pending: "#f59e0b",   // amber — waiting
-  Active: "#3B82F6",    // blue — in progress
-  Completed: "#059669", // emerald — done (money earned)
-  Cancelled: "#94a3b8", // slate — inactive
-};
 const PLATFORM_COLORS = ["#3B82F6", "#0D9488", "#f59e0b", "#64748B", "#e11d48"];
 
 // ─── custom tooltip ──────────────────────────────────────────────────────────
@@ -186,7 +174,6 @@ export default function DashboardPage() {
   // Chart data
   const dealsOverTime = buildDealsOverTime(deals);
   const revenueOverTime = buildRevenueOverTime(deals);
-  const statusDist = buildStatusDist(deals);
   const platformDist = buildPlatformDist(deals);
   const deliverableCompletion = useMemo(() => buildDeliverableCompletion(deals), [deals]);
   const totalDeliverables = deliverableCompletion.reduce((s, d) => s + d.total, 0);
@@ -403,73 +390,36 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3 lg:gap-5">
-              {/* Deal status pie */}
-              {statusDist.length > 0 && (
-                <Card className="glass-card border-0">
-                  <CardHeader className="pb-1 px-3 pt-3 lg:px-5 lg:pt-5">
-                    <CardTitle className="text-xs lg:text-sm font-semibold">Deal Status</CardTitle>
-                  </CardHeader>
-                  <CardContent className="px-1 pb-3 lg:px-3 lg:pb-5">
-                    <div className="h-[150px] sm:h-[170px] lg:h-[280px] xl:h-[320px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={statusDist} cx="50%" cy="50%" innerRadius={30} outerRadius={50}
-                            dataKey="value" nameKey="name" paddingAngle={3}
-                            className="lg:[&_.recharts-pie]:!translate-y-0">
-                            {statusDist.map((entry, i) => (
-                              <Cell key={i} fill={STATUS_COLORS[entry.name] ?? PLATFORM_COLORS[i % PLATFORM_COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            content={({ active, payload }) => {
-                              if (!active || !payload?.length) return null;
-                              return (
-                                <div className="bg-background/95 border border-white/20 rounded-lg p-2 text-xs shadow-lg">
-                                  <p style={{ color: payload[0].payload.fill }} className="font-semibold">{payload[0].name}</p>
-                                  <p>{payload[0].value} deal{payload[0].value !== 1 ? "s" : ""}</p>
-                                </div>
-                              );
-                            }}
-                          />
-                          <Legend iconSize={8} iconType="circle"
-                            formatter={(value) => <span className="text-[10px] lg:text-xs text-muted-foreground">{value}</span>} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Platform bar chart */}
-              {platformDist.length > 0 && (
-                <Card className="glass-card border-0">
-                  <CardHeader className="pb-1 px-3 pt-3 lg:px-5 lg:pt-5">
-                    <CardTitle className="text-xs lg:text-sm font-semibold">Platforms</CardTitle>
-                  </CardHeader>
-                  <CardContent className="px-1 pb-3 lg:px-3 lg:pb-5">
-                    <div className="h-[150px] sm:h-[170px] lg:h-[280px] xl:h-[320px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={platformDist} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                          <XAxis dataKey="platform" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                            axisLine={false} tickLine={false}
-                            tickFormatter={v => v.slice(0, 3)} />
-                          <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                            axisLine={false} tickLine={false} />
-                          <Tooltip content={<CustomTooltip />} />
-                          <Bar dataKey="count" name="Deliverables" radius={[4, 4, 0, 0]}>
-                            {platformDist.map((_, i) => (
-                              <Cell key={i} fill={PLATFORM_COLORS[i % PLATFORM_COLORS.length]} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+            {/* Platform/category distribution — full width.
+                (Deal Status pie removed — duplicated the segmented breakdown
+                widget above the trend charts.) */}
+            {platformDist.length > 0 && (
+              <Card className="glass-card border-0">
+                <CardHeader className="pb-1 px-4 pt-4 lg:px-6 lg:pt-6">
+                  <CardTitle className="text-sm lg:text-base font-semibold">Platform Distribution</CardTitle>
+                  <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Deliverables across platforms / categories</p>
+                </CardHeader>
+                <CardContent className="px-2 pb-4 lg:px-4 lg:pb-6">
+                  <div className="h-[180px] sm:h-[200px] lg:h-[300px] xl:h-[360px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={platformDist} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                        <XAxis dataKey="platform" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                          axisLine={false} tickLine={false} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                          axisLine={false} tickLine={false} />
+                        <Tooltip content={<CustomTooltip />} />
+                        <Bar dataKey="count" name="Deliverables" radius={[6, 6, 0, 0]} maxBarSize={64}>
+                          {platformDist.map((_, i) => (
+                            <Cell key={i} fill={PLATFORM_COLORS[i % PLATFORM_COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </>
         )}
 
