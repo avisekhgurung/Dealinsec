@@ -75,6 +75,7 @@ function Router() {
       <Suspense fallback={<RouteLoader />}>
         <Switch>
           <Route path="/" component={LandingPage} />
+          <Route path="/pricing" component={PricingPage} />
           <Route path="/pitch" component={PitchPage} />
           <Route path="/terms" component={TermsPage} />
           <Route path="/privacy" component={PrivacyPage} />
