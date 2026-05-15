@@ -119,14 +119,33 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-12">
-      {/* Gradient Banner Header */}
+      {/* Gradient Banner Header — professional emerald/teal brand gradient */}
       <div className="relative">
         <div
-          className="h-40"
+          className="h-40 lg:h-48 relative overflow-hidden"
           style={{
-            background: "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.6) 50%, hsl(280 80% 50%) 100%)",
+            background: "linear-gradient(135deg, hsl(160 84% 22%) 0%, hsl(160 84% 30%) 45%, hsl(174 77% 36%) 100%)",
           }}
-        />
+        >
+          {/* Subtle radial highlight — adds depth without being noisy */}
+          <div
+            className="absolute inset-0 opacity-60"
+            style={{
+              background: "radial-gradient(ellipse at 80% 0%, rgba(255,255,255,0.18) 0%, transparent 55%)",
+            }}
+          />
+          {/* Decorative geometric accent — bottom-left subtle ring */}
+          <div className="absolute -bottom-16 -left-16 w-48 h-48 rounded-full border border-white/10" />
+          <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full border border-white/10" />
+          {/* Fine grid texture overlay for premium fintech feel */}
+          <div
+            className="absolute inset-0 opacity-[0.05]"
+            style={{
+              backgroundImage: "linear-gradient(rgba(255,255,255,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.4) 1px, transparent 1px)",
+              backgroundSize: "32px 32px",
+            }}
+          />
+        </div>
         <div className="absolute top-0 left-0 right-0 px-4 pt-3 flex items-center justify-between z-10">
           <Link href="/dashboard">
             <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" data-testid="button-back">
@@ -172,7 +191,7 @@ export default function ProfilePage() {
           ) : (
             <div
               className="w-full h-full flex items-center justify-center text-3xl font-bold text-white"
-              style={{ background: "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(280 80% 50%) 100%)" }}
+              style={{ background: "linear-gradient(135deg, hsl(160 84% 30%) 0%, hsl(174 77% 36%) 100%)" }}
             >
               {initials}
             </div>
@@ -601,7 +620,7 @@ export default function ProfilePage() {
             <div
               className="rounded-2xl p-5 border-0 relative overflow-hidden"
               style={{
-                background: "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(280 80% 50%) 100%)",
+                background: "linear-gradient(135deg, hsl(160 84% 22%) 0%, hsl(160 84% 30%) 50%, hsl(174 77% 36%) 100%)",
               }}
             >
               <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/10 -mr-10 -mt-10" />
