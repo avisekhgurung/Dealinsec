@@ -54,8 +54,7 @@ export default function ContractDetailsPage() {
   const [bBankName, setBBankName] = useState("");
   const [savingBank, setSavingBank] = useState(false);
 
-  // Invoice amount override + inline edit
-  const [customAmount, setCustomAmount] = useState("");
+  // Inline edit of existing invoice amount (post-creation correction only)
   const [editingInvoiceId, setEditingInvoiceId] = useState<number | null>(null);
   const [editAmount, setEditAmount] = useState("");
 
@@ -134,7 +133,6 @@ export default function ContractDetailsPage() {
         title: "Invoice created",
         description: "Brand invoice has been generated successfully.",
       });
-      setCustomAmount("");
       setLocation(`/brand-invoices/${invoice.id}`);
     },
     onError: () => {
@@ -715,27 +713,16 @@ export default function ContractDetailsPage() {
                   </div>
                 </div>
 
-                {/* Custom amount override (optional) */}
-                <div className="mb-3">
-                  <Label htmlFor="invoice-custom-amount" className="text-xs text-muted-foreground mb-1.5 block">
-                    Invoice amount <span className="text-muted-foreground/70 font-normal">(optional — defaults to deal amount ₹{deal ? Number(deal.dealAmount).toLocaleString("en-IN") : "—"})</span>
-                  </Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
-                    <Input
-                      id="invoice-custom-amount"
-                      type="text"
-                      inputMode="numeric"
-                      placeholder={deal ? String(deal.dealAmount) : "0"}
-                      value={customAmount}
-                      onChange={(e) => setCustomAmount(e.target.value.replace(/\D/g, ""))}
-                      className="pl-7 h-9"
-                      data-testid="input-custom-invoice-amount"
-                    />
-                  </div>
+                {/* Single invoice — locked to deal amount (no editable override).
+                    If the brand-side amount truly differs, edit the deal itself
+                    or use the split flow. Editable invoice amount on a signed
+                    contract creates legal inconsistency. */}
+                <div className="mb-3 flex items-center justify-between rounded-lg border border-input/60 bg-muted/30 px-3 py-2.5">
+                  <span className="text-xs text-muted-foreground">Invoice amount (from signed contract)</span>
+                  <span className="text-sm font-semibold text-foreground">
+                    ₹{deal ? Number(deal.dealAmount).toLocaleString("en-IN") : "—"}
+                  </span>
                 </div>
-
-                {/* Single invoice */}
                 <Button
                   className="w-full gradient-btn text-white mb-2"
                   onClick={() => {
@@ -744,12 +731,7 @@ export default function ContractDetailsPage() {
                       setBankModalOpen(true);
                       return;
                     }
-                    const parsed = customAmount.trim() ? parseInt(customAmount, 10) : undefined;
-                    if (parsed !== undefined && (!Number.isFinite(parsed) || parsed < 1)) {
-                      toast({ title: "Invalid amount", description: "Enter a positive number.", variant: "destructive" });
-                      return;
-                    }
-                    createBrandInvoice.mutate(parsed);
+                    createBrandInvoice.mutate(undefined);
                   }}
                   disabled={createBrandInvoice.isPending || !contract || !deal || contract.status !== "Signed"}
                   data-testid="button-generate-brand-invoice"
@@ -865,8 +847,7 @@ export default function ContractDetailsPage() {
                 setBankModalOpen(false);
                 // Trigger the original intent
                 if (bankModalIntent === "single") {
-                  const parsed = customAmount.trim() ? parseInt(customAmount, 10) : undefined;
-                  createBrandInvoice.mutate(parsed);
+                  createBrandInvoice.mutate(undefined);
                 } else if (bankModalIntent === "split") {
                   splitInvoices.mutate();
                 }
