@@ -774,6 +774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         gstNumber,
         digitalSignature,
         profileImageUrl,
+        coverImageUrl,
         onboardingComplete,
         billingAddress,
         accountHolderName,
@@ -790,6 +791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (gstNumber !== undefined) updates.gstNumber = gstNumber;
       if (digitalSignature !== undefined) updates.digitalSignature = digitalSignature;
       if (profileImageUrl !== undefined) updates.profileImageUrl = profileImageUrl;
+      if (coverImageUrl !== undefined) updates.coverImageUrl = coverImageUrl;
       if (onboardingComplete !== undefined) updates.onboardingComplete = onboardingComplete;
       if (billingAddress !== undefined) updates.billingAddress = billingAddress;
       if (accountHolderName !== undefined) updates.accountHolderName = accountHolderName;
@@ -830,6 +832,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Profile photo upload error:", error);
       res.status(500).json({ error: "Failed to upload photo" });
+    }
+  });
+
+  app.post("/api/profile/cover", isAuthenticated, upload.single("cover"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+      let filePath: string;
+      if (isImageKitConfigured()) {
+        const uploaded = await uploadFileToImageKit(req.file, {
+          folder: "covers",
+          baseName: `user-${req.user.id}-cover`,
+        });
+        filePath = uploaded.url;
+      } else {
+        filePath = `/uploads/${req.file.filename}`;
+      }
+
+      await storage.updateUser(req.user.id, { coverImageUrl: filePath });
+      res.json({ path: filePath });
+    } catch (error) {
+      console.error("Cover image upload error:", error);
+      res.status(500).json({ error: "Failed to upload cover image" });
     }
   });
 

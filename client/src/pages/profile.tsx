@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, ArrowLeft, Edit, LogOut, CreditCard, Copy, Share2, User, Mail, Phone, FileText, Building, MapPin, PenTool, Sparkles, Landmark, Hash } from "lucide-react";
+import { Loader2, Upload, ArrowLeft, Edit, LogOut, CreditCard, Copy, Share2, User, Mail, Phone, FileText, Building, MapPin, PenTool, Sparkles, Landmark, Hash, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,8 +22,10 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const [firstName, setFirstName] = useState(user?.firstName || "");
   const [lastName, setLastName] = useState(user?.lastName || "");
@@ -119,54 +121,139 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-12">
-      {/* Gradient Banner Header — professional emerald/teal brand gradient */}
+      {/* Cover Header — uploadable image OR brand gradient fallback */}
       <div className="relative">
-        <div
-          className="h-40 lg:h-48 relative overflow-hidden"
-          style={{
-            background: "linear-gradient(135deg, hsl(160 84% 22%) 0%, hsl(160 84% 30%) 45%, hsl(174 77% 36%) 100%)",
-          }}
+        <button
+          type="button"
+          onClick={() => coverInputRef.current?.click()}
+          disabled={uploadingCover}
+          className="group block w-full h-40 lg:h-56 relative overflow-hidden cursor-pointer disabled:cursor-wait"
+          aria-label={user?.coverImageUrl ? "Change cover image" : "Upload cover image"}
+          style={
+            user?.coverImageUrl
+              ? {
+                  backgroundImage: `url(${user.coverImageUrl})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }
+              : {
+                  background:
+                    "linear-gradient(135deg, hsl(160 84% 22%) 0%, hsl(160 84% 30%) 45%, hsl(174 77% 36%) 100%)",
+                }
+          }
+          data-testid="button-cover-upload"
         >
-          {/* Subtle radial highlight — adds depth without being noisy */}
-          <div
-            className="absolute inset-0 opacity-60"
-            style={{
-              background: "radial-gradient(ellipse at 80% 0%, rgba(255,255,255,0.18) 0%, transparent 55%)",
+          {/* Decorative overlays only on default gradient (not on real photo) */}
+          {!user?.coverImageUrl && (
+            <>
+              <div
+                className="absolute inset-0 opacity-60 pointer-events-none"
+                style={{ background: "radial-gradient(ellipse at 80% 0%, rgba(255,255,255,0.18) 0%, transparent 55%)" }}
+              />
+              <div className="absolute -bottom-16 -left-16 w-48 h-48 rounded-full border border-white/10 pointer-events-none" />
+              <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full border border-white/10 pointer-events-none" />
+              <div
+                className="absolute inset-0 opacity-[0.05] pointer-events-none"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(rgba(255,255,255,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.4) 1px, transparent 1px)",
+                  backgroundSize: "32px 32px",
+                }}
+              />
+            </>
+          )}
+
+          {/* Hover overlay for editing — semi-transparent + camera icon */}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-end justify-end p-3 lg:p-4">
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/40 backdrop-blur-sm text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+              {uploadingCover ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Camera className="w-3.5 h-3.5" />
+                  {user?.coverImageUrl ? "Change cover" : "Upload cover"}
+                </>
+              )}
+            </div>
+          </div>
+
+          <input
+            ref={coverInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              if (!file.type.startsWith("image/")) {
+                toast({ title: "Invalid file", description: "Upload an image.", variant: "destructive" });
+                return;
+              }
+              if (file.size > 5 * 1024 * 1024) {
+                toast({ title: "File too large", description: "Max 5MB.", variant: "destructive" });
+                return;
+              }
+              setUploadingCover(true);
+              try {
+                const formData = new FormData();
+                formData.append("cover", file);
+                const res = await fetch("/api/profile/cover", {
+                  method: "POST",
+                  body: formData,
+                  credentials: "include",
+                });
+                if (!res.ok) throw new Error("Upload failed");
+                await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+                toast({ title: "Cover updated" });
+              } catch (err: any) {
+                toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+              } finally {
+                setUploadingCover(false);
+                if (coverInputRef.current) coverInputRef.current.value = "";
+              }
             }}
           />
-          {/* Decorative geometric accent — bottom-left subtle ring */}
-          <div className="absolute -bottom-16 -left-16 w-48 h-48 rounded-full border border-white/10" />
-          <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full border border-white/10" />
-          {/* Fine grid texture overlay for premium fintech feel */}
-          <div
-            className="absolute inset-0 opacity-[0.05]"
-            style={{
-              backgroundImage: "linear-gradient(rgba(255,255,255,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.4) 1px, transparent 1px)",
-              backgroundSize: "32px 32px",
-            }}
-          />
-        </div>
-        <div className="absolute top-0 left-0 right-0 px-4 pt-3 flex items-center justify-between z-10">
-          <Link href="/dashboard">
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" data-testid="button-back">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <div className="flex gap-2">
+        </button>
+
+        {/* Top action bar — consistent button sizing */}
+        <div className="absolute top-0 left-0 right-0 px-4 pt-3 flex items-center justify-between z-10 pointer-events-none">
+          <div className="pointer-events-auto">
+            <Link href="/dashboard">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white bg-black/20 hover:bg-black/40 backdrop-blur-sm rounded-full h-9 w-9"
+                data-testid="button-back"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+          <div className="flex gap-2 pointer-events-auto">
             {!isEditing && (
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon"
                 onClick={() => setIsEditing(true)}
-                className="text-white hover:bg-white/20"
+                className="text-white bg-black/20 hover:bg-black/40 backdrop-blur-sm rounded-full h-9 w-9"
                 data-testid="button-edit-profile"
+                aria-label="Edit profile"
               >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit
+                <Edit className="h-4 w-4" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" onClick={handleLogout} data-testid="button-logout">
-              <LogOut className="h-5 w-5" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white bg-black/20 hover:bg-black/40 backdrop-blur-sm rounded-full h-9 w-9"
+              onClick={handleLogout}
+              data-testid="button-logout"
+              aria-label="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>
