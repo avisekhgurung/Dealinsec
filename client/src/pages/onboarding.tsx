@@ -29,10 +29,8 @@ export default function OnboardingPage() {
       toast({ title: "Enter a valid 10-digit Indian mobile number", variant: "destructive" });
       return;
     }
-    if (!billingAddress.trim()) {
-      toast({ title: "Billing address is required", variant: "destructive" });
-      return;
-    }
+    // Billing address is OPTIONAL during onboarding — collected later when
+    // the user generates an invoice or contract (progressive profile pattern).
 
     setIsLoading(true);
     try {
@@ -44,7 +42,7 @@ export default function OnboardingPage() {
         firstName,
         lastName,
         phone: phone.replace(/\D/g, ""),
-        billingAddress: billingAddress.trim(),
+        billingAddress: billingAddress.trim() || undefined,
         onboardingComplete: true,
       });
 
@@ -101,10 +99,13 @@ export default function OnboardingPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="billingAddress">Billing Address *</Label>
+              <div className="flex items-baseline justify-between">
+                <Label htmlFor="billingAddress">Billing Address</Label>
+                <span className="text-[11px] text-muted-foreground font-medium">Optional · for invoices</span>
+              </div>
               <Textarea
                 id="billingAddress"
-                placeholder="Street, city, state, PIN (appears on invoices)"
+                placeholder="Street, city, state, PIN (you can add this later)"
                 value={billingAddress}
                 onChange={(e) => setBillingAddress(e.target.value)}
                 rows={3}
@@ -115,7 +116,7 @@ export default function OnboardingPage() {
             <div className="rounded-xl bg-primary/5 border border-primary/15 p-3.5 flex gap-2.5">
               <Sparkles className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
               <p className="text-xs text-muted-foreground leading-relaxed">
-                <span className="font-semibold text-foreground">PAN &amp; signature</span> are collected right before your first agreement.{" "}
+                <span className="font-semibold text-foreground">Billing address, PAN &amp; signature</span> are collected right before your first agreement.{" "}
                 <span className="font-semibold text-foreground">Bank details</span> are collected right before your first invoice. No mid-flow surprises.
               </p>
             </div>
