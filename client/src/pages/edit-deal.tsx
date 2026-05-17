@@ -2,7 +2,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -130,8 +130,16 @@ export default function EditDealPage() {
     );
   };
 
+  // Itemizable custom terms — initialized from deal on load
+  const [customTermsList, setCustomTermsList] = useState<string[]>([""]);
+  const syncCustomTerms = (next: string[]) => {
+    setCustomTermsList(next);
+    form.setValue("customTerms", next.map(t => t.trim()).filter(Boolean).join("\n"));
+  };
+
   useEffect(() => {
     if (deal) {
+      const rawCustomTerms = (deal as any).customTerms ?? "";
       form.reset({
         brandName: deal.brandName,
         dealTitle: deal.dealTitle,
@@ -150,8 +158,12 @@ export default function EditDealPage() {
           notes: d.notes ?? "",
         })),
         standardTermIds: ((deal as any).standardTermIds as string[] | null) ?? STANDARD_TERMS.map((t) => t.id),
-        customTerms: (deal as any).customTerms ?? "",
+        customTerms: rawCustomTerms,
       });
+      // Split saved customTerms back into list — fallback to single empty
+      // entry if blank so the user sees at least one input row.
+      const parts = String(rawCustomTerms).split(/\n+/).map(s => s.trim()).filter(Boolean);
+      setCustomTermsList(parts.length > 0 ? parts : [""]);
     }
   }, [deal]);
 
@@ -583,18 +595,59 @@ export default function EditDealPage() {
             </div>
           </div>
 
-          <div className="space-y-2 pt-2 border-t border-border/60">
-            <Label htmlFor="customTerms" className="text-xs font-semibold">
-              Your own terms (optional)
-            </Label>
-            <Textarea
-              id="customTerms"
-              placeholder="Add any custom clauses — usage rights, exclusivity, posting schedule, etc."
-              rows={4}
-              className="resize-none"
-              data-testid="textarea-custom-terms"
-              {...form.register("customTerms")}
-            />
+          <div className="space-y-3 pt-2 border-t border-border/60">
+            <div>
+              <Label className="text-xs font-semibold">
+                Your own terms (optional)
+              </Label>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Add as many clauses as you need — exclusivity, usage rights, posting schedule, revisions, etc.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              {customTermsList.map((term, i) => (
+                <div key={i} className="flex gap-2 items-start">
+                  <span className="flex-shrink-0 w-6 h-9 flex items-center justify-center text-xs font-semibold text-muted-foreground tabular-nums">
+                    {i + 1}.
+                  </span>
+                  <div className="flex-1">
+                    <Input
+                      value={term}
+                      onChange={(e) => syncCustomTerms(customTermsList.map((t, j) => j === i ? e.target.value : t))}
+                      placeholder={i === 0 ? "e.g. Content must be posted by 5pm IST" : "Add another clause"}
+                      className="h-9"
+                      data-testid={`input-custom-term-${i}`}
+                    />
+                  </div>
+                  {customTermsList.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 flex-shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => syncCustomTerms(customTermsList.filter((_, j) => j !== i))}
+                      data-testid={`button-remove-custom-term-${i}`}
+                      aria-label={`Remove term ${i + 1}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full h-9 border-dashed"
+              onClick={() => syncCustomTerms([...customTermsList, ""])}
+              data-testid="button-add-custom-term"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              Add another term
+            </Button>
           </div>
         </section>
 
