@@ -9,6 +9,31 @@ import { BottomNav } from "@/components/bottom-nav";
 import { queryClient } from "@/lib/queryClient";
 
 const REDIRECT_KEY = "postPaymentRedirect";
+const RAZORPAY_SCRIPT = "https://checkout.razorpay.com/v1/checkout.js";
+
+declare global {
+  interface Window {
+    Razorpay?: any;
+  }
+}
+
+// Lazily inject the Razorpay Checkout script once.
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (window.Razorpay) return resolve(true);
+    const existing = document.querySelector(`script[src="${RAZORPAY_SCRIPT}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve(true));
+      existing.addEventListener("error", () => resolve(false));
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = RAZORPAY_SCRIPT;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
 
 export default function PricingPage() {
   const { user } = useAuth();
@@ -71,29 +96,86 @@ export default function PricingPage() {
   const handlePurchase = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/payments/create", {
+      // 1. Load Razorpay Checkout script
+      const ok = await loadRazorpayScript();
+      if (!ok || !window.Razorpay) {
+        throw new Error("Could not load payment gateway. Check your connection and retry.");
+      }
+
+      // 2. Create order on our server
+      const res = await fetch("/api/payments/razorpay/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ credits: 1 }),
         credentials: "include",
       });
-
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.message || "Failed to initiate payment");
+        throw new Error(error.message || error.error || "Failed to initiate payment");
       }
+      const order = await res.json();
 
-      const data = await res.json();
+      // 3. Open Razorpay Checkout (UPI QR / cards / netbanking)
+      const rzp = new window.Razorpay({
+        key: order.keyId,
+        order_id: order.orderId,
+        amount: order.amount,
+        currency: order.currency,
+        name: order.name,
+        description: order.description,
+        image: "/icon-192.png",
+        prefill: order.prefill,
+        theme: { color: "#0E8C5A" },
+        handler: async (response: any) => {
+          // 4. Verify payment on our server → grants the credit
+          try {
+            const verifyRes = await fetch("/api/payments/razorpay/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+            if (!verifyRes.ok) throw new Error("Verification failed");
 
-      if (data.redirectUrl) {
-        window.location.href = data.redirectUrl;
-      } else if (data.formHtml) {
-        const container = document.createElement("div");
-        container.innerHTML = data.formHtml;
-        document.body.appendChild(container);
-        const form = container.querySelector("form");
-        if (form) form.submit();
-      }
+            setPaymentStatus("success");
+            await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+            await queryClient.invalidateQueries({ queryKey: ["/api/credits/balance"] });
+            toast({ title: "Payment successful!", description: "Your credit has been added.", variant: "success" as any });
+
+            const savedRedirect = localStorage.getItem(REDIRECT_KEY);
+            if (savedRedirect) {
+              setRedirectAfter(savedRedirect);
+              localStorage.removeItem(REDIRECT_KEY);
+            }
+          } catch {
+            toast({
+              title: "Verification pending",
+              description: "Payment received — credit will reflect shortly. Refresh in a moment.",
+              variant: "destructive",
+            });
+          } finally {
+            setIsLoading(false);
+          }
+        },
+        modal: {
+          ondismiss: () => setIsLoading(false), // user closed the checkout
+        },
+      });
+
+      rzp.on("payment.failed", (resp: any) => {
+        toast({
+          title: "Payment failed",
+          description: resp?.error?.description || "Please try again.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+      });
+
+      rzp.open();
     } catch (error: any) {
       toast({
         title: "Payment Failed",
@@ -283,7 +365,7 @@ export default function PricingPage() {
                 "GST-ready invoice auto-generated",
                 "Brand-side dashboard for tracking",
                 "Credits never expire",
-                "Secure UPI / Card / Netbanking via PayU",
+                "Secure UPI / Card / Netbanking via Razorpay",
               ].map((feature) => (
                 <li key={feature} className="flex items-start gap-2.5 text-sm lg:text-[15px]">
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center mt-px">
@@ -305,7 +387,7 @@ export default function PricingPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                  Redirecting to PayU…
+                  Opening secure checkout…
                 </>
               ) : (
                 <>

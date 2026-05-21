@@ -11,6 +11,14 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import { uploadFileToImageKit, isImageKitConfigured } from "./imagekitClient";
+import {
+  isRazorpayConfigured,
+  getRazorpayKeyId,
+  getCreditPrice,
+  createRazorpayOrder,
+  verifyPaymentSignature,
+  verifyWebhookSignature,
+} from "./razorpayClient";
 
 // PayU config — read lazily so .env files loaded at runtime are picked up
 function getPayuConfig() {
@@ -1039,6 +1047,154 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Payment failure callback error:", error);
       res.redirect("/pricing?error=processing_error");
     }
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // RAZORPAY — primary payment gateway (UPI QR / cards / netbanking)
+  // ─────────────────────────────────────────────────────────────────────
+
+  // Step 1: create an order. Frontend opens Razorpay Checkout with the
+  // returned orderId + key. Reuses the payu_orders table for persistence.
+  app.post("/api/payments/razorpay/order", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      if (!isRazorpayConfigured()) {
+        return res.status(503).json({
+          error: "Payment gateway not configured",
+          message: "Razorpay credentials not set. Configure RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.",
+        });
+      }
+
+      const credits = Math.max(1, parseInt(req.body.credits, 10) || 1);
+      const price = getCreditPrice();
+      const amountInRupees = credits * price;
+      const receipt = `DIS_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+      const order = await createRazorpayOrder({
+        amountInRupees,
+        receipt,
+        notes: { userId, credits: String(credits) },
+      });
+
+      // Persist as pending — orderId column holds the Razorpay order id
+      await storage.createPayuOrder({
+        userId,
+        orderId: order.id,
+        amount: amountInRupees,
+        credits,
+        status: "pending",
+      });
+
+      res.json({
+        keyId: getRazorpayKeyId(),
+        orderId: order.id,
+        amount: order.amount,        // paise
+        currency: order.currency,
+        credits,
+        name: "DealInSec",
+        description: `${credits} Contract Credit${credits > 1 ? "s" : ""}`,
+        prefill: {
+          name: [user.firstName, user.lastName].filter(Boolean).join(" ") || undefined,
+          email: user.email || undefined,
+          contact: user.phone || undefined,
+        },
+      });
+    } catch (error) {
+      console.error("Razorpay order creation error:", error);
+      res.status(500).json({ error: "Failed to create payment order" });
+    }
+  });
+
+  // Step 2: verify payment after Checkout success (called from the browser).
+  // This is the primary credit-grant path; the webhook is a backup.
+  app.post("/api/payments/razorpay/verify", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+      if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+        return res.status(400).json({ error: "Missing payment verification fields" });
+      }
+
+      const order = await storage.getPayuOrder(razorpay_order_id);
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      if (order.userId !== userId) return res.status(403).json({ error: "Order does not belong to you" });
+
+      // Idempotent — if already completed, just succeed
+      if (order.status === "completed") {
+        return res.json({ success: true, alreadyProcessed: true });
+      }
+
+      const valid = verifyPaymentSignature({
+        orderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+        signature: razorpay_signature,
+      });
+      if (!valid) {
+        await storage.updatePayuOrder(razorpay_order_id, { status: "failed" });
+        return res.status(400).json({ error: "Signature verification failed" });
+      }
+
+      const updated = await storage.updatePayuOrder(razorpay_order_id, {
+        status: "completed",
+        payuTxnId: razorpay_payment_id,
+        payuHash: razorpay_signature,
+        completedAt: new Date(),
+      });
+
+      if (updated && updated.status === "completed") {
+        await storage.addCredits(order.userId, order.credits, "purchase", order.amount);
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Razorpay verify error:", error);
+      res.status(500).json({ error: "Failed to verify payment" });
+    }
+  });
+
+  // Step 3 (backup): webhook for server-to-server confirmation.
+  // The global express.json({ verify }) stashed the exact bytes on
+  // req.rawBody — we HMAC over those to verify authenticity.
+  app.post("/api/payments/razorpay/webhook", async (req: any, res) => {
+      try {
+        const signature = req.headers["x-razorpay-signature"] as string;
+        const rawBody: string = req.rawBody
+          ? req.rawBody.toString("utf8")
+          : JSON.stringify(req.body);
+
+        if (!verifyWebhookSignature(rawBody, signature)) {
+          return res.status(400).json({ error: "Invalid webhook signature" });
+        }
+
+        const event = JSON.parse(rawBody);
+        // We care about successful payments
+        if (event.event === "payment.captured" || event.event === "order.paid") {
+          const entity = event.payload?.payment?.entity || event.payload?.order?.entity;
+          const orderId = entity?.order_id || entity?.id;
+          const paymentId = entity?.id;
+          if (orderId) {
+            const order = await storage.getPayuOrder(orderId);
+            if (order && order.status !== "completed") {
+              const updated = await storage.updatePayuOrder(orderId, {
+                status: "completed",
+                payuTxnId: paymentId,
+                completedAt: new Date(),
+              });
+              if (updated && updated.status === "completed") {
+                await storage.addCredits(order.userId, order.credits, "purchase", order.amount);
+              }
+            }
+          }
+        }
+
+        res.json({ received: true });
+      } catch (error) {
+        console.error("Razorpay webhook error:", error);
+        res.status(500).json({ error: "Webhook processing failed" });
+      }
   });
 
   const httpServer = createServer(app);
