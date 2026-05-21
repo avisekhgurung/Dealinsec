@@ -19,6 +19,12 @@ import {
   verifyPaymentSignature,
   verifyWebhookSignature,
 } from "./razorpayClient";
+import {
+  sendEmail,
+  paymentReceiptEmail,
+  contractSignedEmail,
+  paymentReceivedEmail,
+} from "./emails";
 
 // PayU config — read lazily so .env files loaded at runtime are picked up
 function getPayuConfig() {
@@ -311,6 +317,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Paid immediately because the user consumed a credit as payment
         status: "Paid",
       });
+
+      // Contract-signed email — best-effort
+      if (user?.email) {
+        const { subject, html } = contractSignedEmail({
+          firstName: user.firstName || undefined,
+          brandName: contract.brandName,
+          contractValue: contract.contractValue,
+          contractId: contract.id,
+        });
+        void sendEmail({ to: user.email, subject, html });
+      }
 
       res.status(201).json(contract);
     } catch (error) {
@@ -653,6 +670,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updated = await storage.updateBrandInvoice(parseInt(req.params.id), updates);
+
+      // "Payment received" email — only when transitioning Unpaid -> Paid
+      if (invoice.status !== "Paid" && updates.status === "Paid" && updated) {
+        const owner = await storage.getUser(req.user.id);
+        if (owner?.email) {
+          const { subject, html } = paymentReceivedEmail({
+            firstName: owner.firstName || undefined,
+            brandName: updated.brandName,
+            amount: updated.dealAmount,
+            invoiceNumber: updated.invoiceNumber,
+          });
+          void sendEmail({ to: owner.email, subject, html });
+        }
+      }
+
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update brand invoice" });
@@ -1168,6 +1200,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (updated && updated.status === "completed") {
         await storage.addCredits(order.userId, order.credits, "purchase", order.amount);
+
+        // Payment receipt email — best-effort
+        const buyer = await storage.getUser(order.userId);
+        if (buyer?.email) {
+          const { subject, html } = paymentReceiptEmail({
+            firstName: buyer.firstName || undefined,
+            credits: order.credits,
+            amount: order.amount,
+            paymentId: razorpay_payment_id,
+            date: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
+          });
+          void sendEmail({ to: buyer.email, subject, html });
+        }
       }
 
       res.json({ success: true });

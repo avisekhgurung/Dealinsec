@@ -4,6 +4,7 @@ import connectPg from "connect-pg-simple";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { storage } from "./storage";
+import { sendEmail, welcomeEmail } from "./emails";
 
 const SALT_ROUNDS = 10;
 
@@ -89,6 +90,12 @@ export async function setupAuth(app: Express) {
       }
 
       (req.session as any).userId = user.id;
+
+      // Welcome email — best-effort, non-blocking
+      if (user.email) {
+        const { subject, html } = welcomeEmail({ firstName: user.firstName || undefined });
+        void sendEmail({ to: user.email, subject, html });
+      }
 
       const { password: _, ...userWithoutPassword } = user;
       res.status(201).json(userWithoutPassword);
