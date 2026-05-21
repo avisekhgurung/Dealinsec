@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, CreditCard, Check, Loader2, CheckCircle, XCircle, Zap, ArrowRight, Shield, Lock, Sparkles, TrendingUp, Users, Star } from "lucide-react";
+import { ArrowLeft, CreditCard, Check, Loader2, Zap, ArrowRight, Shield, Lock, Sparkles, TrendingUp, Users, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
 import { BottomNav } from "@/components/bottom-nav";
 import { queryClient } from "@/lib/queryClient";
+import { PaymentResult } from "@/components/payment-result";
 
 const REDIRECT_KEY = "postPaymentRedirect";
 const RAZORPAY_SCRIPT = "https://checkout.razorpay.com/v1/checkout.js";
@@ -41,8 +42,8 @@ export default function PricingPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<"success" | "error" | null>(null);
+  const [paymentErrorReason, setPaymentErrorReason] = useState<string>("");
   const [redirectAfter, setRedirectAfter] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState(3);
 
   // On mount: persist ?redirect= param and detect PayU callback
   useEffect(() => {
@@ -76,22 +77,8 @@ export default function PricingPage() {
     }
   }, [toast]);
 
-  // Countdown timer for redirect after success
-  useEffect(() => {
-    if (!redirectAfter) return;
-    setCountdown(3);
-    const interval = setInterval(() => {
-      setCountdown(c => {
-        if (c <= 1) {
-          clearInterval(interval);
-          setLocation(redirectAfter);
-          return 0;
-        }
-        return c - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [redirectAfter]);
+  // Redirect-after-success is now handled by the PaymentResult overlay's
+  // "Continue to Agreement" button (manual, no auto-navigate).
 
   const handlePurchase = async () => {
     setIsLoading(true);
@@ -167,21 +154,15 @@ export default function PricingPage() {
       });
 
       rzp.on("payment.failed", (resp: any) => {
-        toast({
-          title: "Payment failed",
-          description: resp?.error?.description || "Please try again.",
-          variant: "destructive",
-        });
+        setPaymentErrorReason(resp?.error?.description || "Your payment couldn't be processed. No money was deducted — please try again.");
+        setPaymentStatus("error");
         setIsLoading(false);
       });
 
       rzp.open();
     } catch (error: any) {
-      toast({
-        title: "Payment Failed",
-        description: error.message || "Could not process payment",
-        variant: "destructive",
-      });
+      setPaymentErrorReason(error.message || "Could not start the payment. Please try again.");
+      setPaymentStatus("error");
       setIsLoading(false);
     }
   };
@@ -207,59 +188,21 @@ export default function PricingPage() {
         </div>
       </header>
 
+      {/* Animated full-screen payment result overlay (success / failure) */}
+      <PaymentResult
+        state={paymentStatus}
+        credits={1}
+        errorReason={paymentErrorReason}
+        continueLabel={redirectAfter ? "Continue to Agreement" : undefined}
+        onContinue={redirectAfter ? () => setLocation(redirectAfter) : undefined}
+        onRetry={() => {
+          setPaymentStatus(null);
+          handlePurchase();
+        }}
+        onClose={() => setPaymentStatus(null)}
+      />
+
       <main className="p-4 max-w-lg mx-auto space-y-4 animate-fade-in lg:max-w-5xl lg:px-8 lg:py-6 lg:space-y-6">
-
-        {/* ── Success banner with redirect countdown ── */}
-        {paymentStatus === "success" && (
-          <div className="rounded-2xl overflow-hidden border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30">
-            <div className="p-4 flex items-start gap-3">
-              <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-emerald-900 dark:text-emerald-100">Payment Successful!</p>
-                <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-0.5">
-                  1 credit has been added to your account.
-                </p>
-                {redirectAfter && (
-                  <div className="mt-3 flex items-center gap-2">
-                    <div className="flex-1 h-1.5 rounded-full bg-emerald-200 dark:bg-emerald-800 overflow-hidden">
-                      <div
-                        className="h-full bg-emerald-500 rounded-full transition-all"
-                        style={{ width: `${((3 - countdown) / 3) * 100}%`, transitionDuration: "1000ms" }}
-                      />
-                    </div>
-                    <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300 shrink-0">
-                      Returning in {countdown}s…
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-            {redirectAfter && (
-              <div className="px-4 pb-4">
-                <Button
-                  className="w-full gradient-btn text-white rounded-xl h-11"
-                  onClick={() => setLocation(redirectAfter)}
-                >
-                  Continue to Agreement
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Error banner ── */}
-        {paymentStatus === "error" && (
-          <div className="rounded-2xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-4 flex items-start gap-3">
-            <XCircle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
-            <div>
-              <p className="font-semibold text-red-900 dark:text-red-100">Payment Failed</p>
-              <p className="text-sm text-red-700 dark:text-red-300 mt-0.5">
-                There was an issue processing your payment. Please try again.
-              </p>
-            </div>
-          </div>
-        )}
 
         {/* ── Balance card ── */}
         <div className="relative overflow-hidden rounded-2xl border border-amber-200/60 dark:border-amber-800/40">
