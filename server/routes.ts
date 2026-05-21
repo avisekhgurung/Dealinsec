@@ -1053,6 +1053,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // RAZORPAY — primary payment gateway (UPI QR / cards / netbanking)
   // ─────────────────────────────────────────────────────────────────────
 
+  // Public config — lets the frontend render the live price (driven by the
+  // CREDIT_VALUE env var) so testing at ₹1 shows ₹1 everywhere.
+  app.get("/api/payments/config", (_req, res) => {
+    const price = getCreditPrice();
+    res.json({
+      creditPrice: price,
+      // Marketing anchor only makes sense at real prices; hide for low test values.
+      anchorPrice: price >= 100 ? Math.round(price * 2) : null,
+      razorpayEnabled: isRazorpayConfigured(),
+    });
+  });
+
   // Step 1: create an order. Frontend opens Razorpay Checkout with the
   // returned orderId + key. Reuses the payu_orders table for persistence.
   app.post("/api/payments/razorpay/order", isAuthenticated, async (req: any, res) => {

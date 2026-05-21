@@ -45,6 +45,23 @@ export default function PricingPage() {
   const [paymentErrorReason, setPaymentErrorReason] = useState<string>("");
   const [redirectAfter, setRedirectAfter] = useState<string | null>(null);
 
+  // Live pricing — driven by server CREDIT_VALUE env var (set to 1 for testing)
+  const [creditPrice, setCreditPrice] = useState<number>(299);
+  const [anchorPrice, setAnchorPrice] = useState<number | null>(599);
+  useEffect(() => {
+    fetch("/api/payments/config", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((cfg) => {
+        if (cfg?.creditPrice) {
+          setCreditPrice(cfg.creditPrice);
+          setAnchorPrice(cfg.anchorPrice ?? null);
+        }
+      })
+      .catch(() => {});
+  }, []);
+  const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+  const savings = anchorPrice ? anchorPrice - creditPrice : 0;
+
   // On mount: persist ?redirect= param and detect PayU callback
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -236,13 +253,15 @@ export default function PricingPage() {
           <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-emerald-500/[0.05] pointer-events-none" />
 
           {/* Top promotional bar */}
-          <div className="relative bg-gradient-to-r from-primary to-emerald-600 text-white px-4 py-2 text-center">
-            <div className="flex items-center justify-center gap-2 text-xs lg:text-sm font-bold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5" />
-              Launch Offer · Save ₹300 · Limited Time
-              <Sparkles className="w-3.5 h-3.5" />
+          {savings > 0 && (
+            <div className="relative bg-gradient-to-r from-primary to-emerald-600 text-white px-4 py-2 text-center">
+              <div className="flex items-center justify-center gap-2 text-xs lg:text-sm font-bold uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5" />
+                Launch Offer · Save {fmt(savings)} · Limited Time
+                <Sparkles className="w-3.5 h-3.5" />
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="relative p-5 lg:p-7">
             {/* Title row */}
@@ -255,35 +274,41 @@ export default function PricingPage() {
                   1 signed agreement = 1 credit
                 </h3>
               </div>
-              <span className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] lg:text-xs font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                <Zap className="w-3 h-3" />
-                50% OFF
-              </span>
+              {anchorPrice && (
+                <span className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] lg:text-xs font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                  <Zap className="w-3 h-3" />
+                  {Math.round((savings / anchorPrice) * 100)}% OFF
+                </span>
+              )}
             </div>
 
             {/* Anchor pricing — slashed old + bold new */}
             <div className="flex items-end gap-3 mb-2">
-              <span className="text-base lg:text-lg text-muted-foreground line-through decoration-2 decoration-rose-400/70">
-                ₹599
-              </span>
+              {anchorPrice && (
+                <span className="text-base lg:text-lg text-muted-foreground line-through decoration-2 decoration-rose-400/70">
+                  {fmt(anchorPrice)}
+                </span>
+              )}
               <div className="flex items-baseline gap-1">
                 <span className="text-5xl lg:text-6xl font-black text-foreground leading-none tracking-tight">
-                  ₹299
+                  {fmt(creditPrice)}
                 </span>
                 <span className="text-sm lg:text-base text-muted-foreground font-medium">/ credit</span>
               </div>
             </div>
 
             {/* Savings call-out */}
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold mb-5">
-              <TrendingUp className="w-3.5 h-3.5" />
-              You save ₹300 today — pay once, use anytime
-            </div>
+            {savings > 0 && (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold mb-5">
+                <TrendingUp className="w-3.5 h-3.5" />
+                You save {fmt(savings)} today — pay once, use anytime
+              </div>
+            )}
 
             {/* Value-justification ROI bar */}
             <div className="rounded-xl bg-muted/40 border border-border/50 p-3 lg:p-4 mb-5">
               <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-2">
-                Why ₹299 is practically free
+                Why {fmt(creditPrice)} is practically free
               </p>
               <div className="grid grid-cols-3 gap-3 lg:gap-4 text-center">
                 <div>
@@ -335,7 +360,7 @@ export default function PricingPage() {
               ) : (
                 <>
                   <CreditCard className="h-5 w-5 mr-2" />
-                  Get 1 Credit for ₹299
+                  Get 1 Credit for {fmt(creditPrice)}
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </>
               )}
