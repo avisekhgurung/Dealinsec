@@ -42,7 +42,7 @@ export default function PitchPage() {
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 print:bg-white">
         <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border print:hidden">
           <div className="flex items-center justify-between gap-3 px-4 py-4 max-w-6xl mx-auto">
-            <h1 className="text-xl font-bold">InfluDeal Pitch</h1>
+            <h1 className="text-xl font-bold">DealInSec Pitch</h1>
             <Button onClick={handleExportPDF} data-testid="button-export-pdf">
               <Download className="w-4 h-4 mr-2" />
               Export PDF
@@ -58,7 +58,7 @@ export default function PitchPage() {
               <span className="text-sm font-medium">For Professional Influencers</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4 print:text-3xl">
-              InfluDeal
+              DealInSec
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto print:text-base">
               Manage your brand deals, contracts, and billing like a pro. 
@@ -99,7 +99,7 @@ export default function PitchPage() {
 
           <section>
             <h2 className="text-2xl font-bold text-center mb-8 print:text-xl print:mb-4">
-              How InfluDeal Works
+              How DealInSec Works
             </h2>
             
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 print:gap-3">
@@ -116,7 +116,7 @@ export default function PitchPage() {
                       <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
                       <div className="w-2 h-2 rounded-full bg-green-400"></div>
                     </div>
-                    <span className="text-xs text-muted-foreground">InfluDeal</span>
+                    <span className="text-xs text-muted-foreground">DealInSec</span>
                   </div>
                   <div className="p-3 space-y-3">
                     <div className="text-center py-2">
@@ -789,7 +789,7 @@ export default function PitchPage() {
 
           <section className="py-8 print:py-4">
             <h2 className="text-2xl font-bold text-center mb-6 print:text-xl">
-              Why Influencers Choose InfluDeal
+              Why Influencers Choose DealInSec
             </h2>
             <div className="grid md:grid-cols-3 gap-6 print:gap-3">
               <div className="flex items-start gap-3">
@@ -831,7 +831,7 @@ export default function PitchPage() {
           <section className="text-center py-8 bg-muted/30 rounded-2xl print:py-4">
             <h2 className="text-2xl font-bold mb-2 print:text-xl">Ready to Level Up Your Influencer Business?</h2>
             <p className="text-muted-foreground mb-6 print:mb-4">
-              Join thousands of creators who manage their brand deals professionally with InfluDeal.
+              Join thousands of creators who manage their brand deals professionally with DealInSec.
             </p>
             <div className="flex items-center justify-center gap-4 flex-wrap print:hidden">
               <Button size="lg">
@@ -840,12 +840,12 @@ export default function PitchPage() {
               </Button>
             </div>
             <div className="hidden print:block">
-              <p className="font-bold text-lg">www.infludeal.com</p>
+              <p className="font-bold text-lg">www.dealinsec.com</p>
             </div>
           </section>
 
           <footer className="text-center py-6 text-sm text-muted-foreground border-t print:py-2">
-            <p>InfluDeal - Professional Deal Management for Influencers</p>
+            <p>DealInSec - Professional Deal Management for Influencers</p>
             <p className="mt-1">Track Deals. Sign Contracts. Get Paid.</p>
           </footer>
 

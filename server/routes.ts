@@ -444,7 +444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             price_data: {
               currency: 'inr',
               product_data: {
-                name: `InfluDeal Platform Fee - ${invoice.invoiceNumber}`,
+                name: `DealInSec Platform Fee - ${invoice.invoiceNumber}`,
                 description: `Contract creation and platform service fee for ${invoice.brandName} deal`,
               },
               unit_amount: invoice.totalAmount * 100,

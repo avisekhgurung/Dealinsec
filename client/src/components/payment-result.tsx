@@ -258,7 +258,7 @@ function ErrorContent({
         </Button>
         <p className="text-[11px] text-muted-foreground pt-1">
           If money was deducted, it auto-refunds in 5-7 days. Need help?{" "}
-          <a href="mailto:hello@dealinsec.com" className="text-primary font-medium hover:underline">
+          <a href="mailto:support@dealinsec.com" className="text-primary font-medium hover:underline">
             Contact support
           </a>
         </p>

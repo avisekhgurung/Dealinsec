@@ -782,9 +782,9 @@ export default function ProfilePage() {
                       className="flex-1 text-xs gradient-btn text-white"
                       onClick={() => {
                         const url = `${window.location.origin}/?ref=${referralData.referralCode}`;
-                        const text = `Join InfluDeal and manage your brand deals like a pro! Sign up using my referral link and we both get free credits 🎉`;
+                        const text = `Join DealInSec and manage your brand deals like a pro! Sign up using my referral link and we both get free credits 🎉`;
                         if (navigator.share) {
-                          navigator.share({ title: "Join InfluDeal", text, url }).catch(() => {});
+                          navigator.share({ title: "Join DealInSec", text, url }).catch(() => {});
                         } else {
                           navigator.clipboard.writeText(`${text}\n${url}`);
                           toast({ title: "Copied!", description: "Share text copied to clipboard" });

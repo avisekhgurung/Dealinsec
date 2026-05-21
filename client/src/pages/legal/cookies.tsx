@@ -18,7 +18,7 @@ export default function CookiePolicy() {
         <p className="text-muted-foreground text-xs">Last updated: 16 April 2026</p>
 
         <p>
-          This Cookie Policy explains how InfluDeal Technologies ("we", "us") uses cookies
+          This Cookie Policy explains how DealInSec Technologies ("we", "us") uses cookies
           and similar tracking technologies on our platform.
         </p>
 
@@ -104,8 +104,8 @@ export default function CookiePolicy() {
         <h2>6. Contact Us</h2>
         <p>
           For questions about cookies:<br />
-          <strong>Email:</strong> privacy@infludeal.com<br />
-          <strong>Address:</strong> InfluDeal Technologies, Bengaluru, Karnataka, India
+          <strong>Email:</strong> support@dealinsec.com<br />
+          <strong>Address:</strong> DealInSec Technologies, Bengaluru, Karnataka, India
         </p>
       </main>
     </div>

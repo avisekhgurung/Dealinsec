@@ -18,13 +18,13 @@ export default function RefundPolicy() {
         <p className="text-muted-foreground text-xs">Last updated: 16 April 2026</p>
 
         <p>
-          This Refund Policy applies to all purchases made on InfluDeal ("Platform"),
-          operated by InfluDeal Technologies ("Company", "we", "us").
+          This Refund Policy applies to all purchases made on DealInSec ("Platform"),
+          operated by DealInSec Technologies ("Company", "we", "us").
         </p>
 
         <h2>1. What You Purchase</h2>
         <p>
-          On InfluDeal, you purchase <strong>Agreement Credits</strong>. Each credit allows
+          On DealInSec, you purchase <strong>Agreement Credits</strong>. Each credit allows
           you to generate one exclusive influencer marketing agreement document. Credits are
           priced at <strong>₹299 per credit</strong> (or as displayed at the time of purchase).
         </p>
@@ -83,7 +83,7 @@ export default function RefundPolicy() {
 
         <h2>4. How to Request a Refund</h2>
         <ol>
-          <li>Email <strong>support@infludeal.com</strong> with the subject line "Refund Request".</li>
+          <li>Email <strong>support@dealinsec.com</strong> with the subject line "Refund Request".</li>
           <li>Include your registered email address and PayU transaction ID.</li>
           <li>We will acknowledge your request within 48 hours.</li>
           <li>Approved refunds are processed within <strong>5–7 business days</strong> to your original payment method.</li>
@@ -91,7 +91,7 @@ export default function RefundPolicy() {
 
         <h2>5. Cancellation</h2>
         <p>
-          InfluDeal uses a <strong>pay-per-use model</strong> (not a subscription). There is
+          DealInSec uses a <strong>pay-per-use model</strong> (not a subscription). There is
           no recurring billing to cancel. You simply purchase credits when you need them.
         </p>
 
@@ -105,9 +105,9 @@ export default function RefundPolicy() {
         <h2>7. Contact Us</h2>
         <p>
           For refund-related queries:<br />
-          <strong>Email:</strong> support@infludeal.com<br />
+          <strong>Email:</strong> support@dealinsec.com<br />
           <strong>Response time:</strong> Within 48 hours<br />
-          <strong>Address:</strong> InfluDeal Technologies, Bengaluru, Karnataka, India
+          <strong>Address:</strong> DealInSec Technologies, Bengaluru, Karnataka, India
         </p>
       </main>
     </div>

@@ -19,7 +19,7 @@ export default function TermsOfService() {
 
         <h2>1. Acceptance of Terms</h2>
         <p>
-          By accessing or using InfluDeal ("Platform"), operated by InfluDeal Technologies
+          By accessing or using DealInSec ("Platform"), operated by DealInSec Technologies
           ("Company", "we", "us"), you agree to be bound by these Terms of Service. If you
           do not agree, do not use the Platform.
         </p>
@@ -40,7 +40,7 @@ export default function TermsOfService() {
         </ul>
 
         <h2>4. Platform Services</h2>
-        <p>InfluDeal provides influencer deal management tools including:</p>
+        <p>DealInSec provides influencer deal management tools including:</p>
         <ul>
           <li><strong>Deal Management</strong> — Create and track brand collaboration deals.</li>
           <li><strong>Quotation Generation</strong> — Generate professional quotations (free).</li>
@@ -70,7 +70,7 @@ export default function TermsOfService() {
         <h2>7. Intellectual Property</h2>
         <p>
           All content, branding, design, code, and materials on the Platform are owned by
-          InfluDeal Technologies and protected under the Copyright Act, 1957 and the
+          DealInSec Technologies and protected under the Copyright Act, 1957 and the
           Trade Marks Act, 1999. You may not copy, reproduce, or distribute any part of
           the Platform without our prior written consent.
         </p>
@@ -80,7 +80,7 @@ export default function TermsOfService() {
           <li>The Platform is provided on an "as-is" and "as-available" basis.</li>
           <li>We do not guarantee uninterrupted or error-free service.</li>
           <li>
-            InfluDeal is not a party to any agreement between you and brands. We provide
+            DealInSec is not a party to any agreement between you and brands. We provide
             tools to generate documents but do not guarantee their legal enforceability.
           </li>
           <li>
@@ -117,8 +117,8 @@ export default function TermsOfService() {
         <h2>12. Contact Us</h2>
         <p>
           For questions about these Terms, contact us at:<br />
-          <strong>Email:</strong> legal@infludeal.com<br />
-          <strong>Address:</strong> InfluDeal Technologies, Bengaluru, Karnataka, India
+          <strong>Email:</strong> support@dealinsec.com<br />
+          <strong>Address:</strong> DealInSec Technologies, Bengaluru, Karnataka, India
         </p>
       </main>
     </div>

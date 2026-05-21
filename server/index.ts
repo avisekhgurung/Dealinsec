@@ -57,7 +57,7 @@ async function initStripe() {
       `${webhookBaseUrl}/api/stripe/webhook`,
       {
         enabled_events: ['*'],
-        description: 'Managed webhook for InfluDeal Stripe sync',
+        description: 'Managed webhook for DealInSec Stripe sync',
       }
     );
     console.log(`Webhook configured: ${webhook.url} (UUID: ${uuid})`);

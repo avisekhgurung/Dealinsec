@@ -8,7 +8,7 @@
  * Required env var:
  *   RESEND_API_KEY
  * Optional:
- *   EMAIL_FROM        (default: "DealInSec <hello@dealinsec.com>")
+ *   EMAIL_FROM        (default: "DealInSec <support@dealinsec.com>")
  *   APP_URL           (used for links/buttons; default https://www.dealinsec.com)
  */
 import { Resend } from "resend";
@@ -25,7 +25,7 @@ function getResend(): Resend {
 }
 
 function fromAddress(): string {
-  return process.env.EMAIL_FROM || "DealInSec <hello@dealinsec.com>";
+  return process.env.EMAIL_FROM || "DealInSec <support@dealinsec.com>";
 }
 
 function appUrl(): string {
@@ -113,7 +113,7 @@ function layout(opts: { preview: string; bodyHtml: string }): string {
             <p style="margin:0;color:${COLORS.muted};font-size:12px;">
               <a href="${base}" style="color:${COLORS.primary};text-decoration:none;">dealinsec.com</a>
               &nbsp;·&nbsp;
-              <a href="mailto:hello@dealinsec.com" style="color:${COLORS.primary};text-decoration:none;">hello@dealinsec.com</a>
+              <a href="mailto:support@dealinsec.com" style="color:${COLORS.primary};text-decoration:none;">support@dealinsec.com</a>
             </p>
           </td>
         </tr>

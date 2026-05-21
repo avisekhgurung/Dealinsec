@@ -18,7 +18,7 @@ export default function PrivacyPolicy() {
         <p className="text-muted-foreground text-xs">Last updated: 16 April 2026</p>
 
         <p>
-          This Privacy Policy explains how InfluDeal Technologies ("Company", "we", "us")
+          This Privacy Policy explains how DealInSec Technologies ("Company", "we", "us")
           collects, uses, stores, and protects your personal data in compliance with the
           Digital Personal Data Protection Act, 2023 (DPDP Act) and the Information
           Technology Act, 2000.
@@ -93,7 +93,7 @@ export default function PrivacyPolicy() {
 
         <h2>7. Children's Data</h2>
         <p>
-          InfluDeal is not intended for users under 18 years of age. We do not knowingly
+          DealInSec is not intended for users under 18 years of age. We do not knowingly
           collect data from minors. If we become aware of such data, we will delete it promptly.
         </p>
 
@@ -114,16 +114,16 @@ export default function PrivacyPolicy() {
         <h2>10. Grievance Officer</h2>
         <p>
           In accordance with Section 13 of the DPDP Act and Rule 5(9) of the IT Rules, 2011:<br />
-          <strong>Name:</strong> Grievance Officer, InfluDeal Technologies<br />
-          <strong>Email:</strong> grievance@infludeal.com<br />
+          <strong>Name:</strong> Grievance Officer, DealInSec Technologies<br />
+          <strong>Email:</strong> support@dealinsec.com<br />
           <strong>Response time:</strong> Within 72 hours of receiving a complaint.
         </p>
 
         <h2>11. Contact Us</h2>
         <p>
           For privacy-related queries:<br />
-          <strong>Email:</strong> privacy@infludeal.com<br />
-          <strong>Address:</strong> InfluDeal Technologies, Bengaluru, Karnataka, India
+          <strong>Email:</strong> support@dealinsec.com<br />
+          <strong>Address:</strong> DealInSec Technologies, Bengaluru, Karnataka, India
         </p>
       </main>
     </div>

@@ -1985,7 +1985,7 @@ function Footer() {
             title="Resources"
             links={[
               { label: "Cookies", href: "/cookies" },
-              { label: "Contact", href: "mailto:hello@dealinsec.com" },
+              { label: "Contact", href: "mailto:support@dealinsec.com" },
             ]}
           />
         </div>
