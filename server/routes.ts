@@ -1114,9 +1114,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           contact: user.phone || undefined,
         },
       });
-    } catch (error) {
-      console.error("Razorpay order creation error:", error);
-      res.status(500).json({ error: "Failed to create payment order" });
+    } catch (error: any) {
+      // Surface the real Razorpay reason — most failures here are credential
+      // or amount issues (wrong key/secret, test-vs-live mismatch, etc.)
+      const rzpDesc =
+        error?.error?.description ||
+        error?.description ||
+        error?.message ||
+        "Unknown error";
+      console.error("Razorpay order creation error:", JSON.stringify(error?.error || error, null, 2));
+      res.status(500).json({
+        error: "Failed to create payment order",
+        reason: rzpDesc,
+      });
     }
   });
 
