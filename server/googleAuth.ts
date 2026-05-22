@@ -2,6 +2,7 @@ import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import crypto from "crypto";
 import { storage } from "./storage";
+import { sendEmail, welcomeEmail } from "./emails";
 
 function generateReferralCode(email: string): string {
   const prefix = email.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, "X");
@@ -45,6 +46,10 @@ export function setupGoogleAuth() {
               contractCredits: signupCredits,
               referralCode: generateReferralCode(email),
             });
+
+            // Welcome email for new Google sign-ups — best-effort
+            const { subject, html } = welcomeEmail({ firstName: user.firstName || undefined });
+            void sendEmail({ to: email, subject, html });
           }
 
           return done(null, user);
