@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { AppLoader, RouteLoader } from "@/components/app-loader";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
+import { InstallPrompt } from "@/components/install-prompt";
 import { useLocation } from "wouter";
 
 // Eagerly loaded — always needed for first render
@@ -149,6 +150,7 @@ function App() {
         <div className="min-h-screen bg-background text-foreground">
           <Router />
         </div>
+        <InstallPrompt />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

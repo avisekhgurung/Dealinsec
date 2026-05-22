@@ -2,11 +2,69 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
   plugins: [
     react(),
     runtimeErrorOverlay(),
+    VitePWA({
+      registerType: "autoUpdate",
+      includeAssets: ["favicon.svg", "favicon.png", "apple-touch-icon.png"],
+      manifest: {
+        name: "DealInSec — Deal Management OS",
+        short_name: "DealInSec",
+        description:
+          "Track, sign, and bill every client or brand deal — in one workflow. Built for India.",
+        theme_color: "#0E8C5A",
+        background_color: "#0F172A",
+        display: "standalone",
+        orientation: "portrait",
+        scope: "/",
+        start_url: "/dashboard",
+        categories: ["business", "productivity", "finance"],
+        icons: [
+          { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
+          { src: "/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        ],
+      },
+      workbox: {
+        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        // Don't precache the giant index — let navigations hit network first
+        navigateFallbackDenylist: [/^\/api\//],
+        runtimeCaching: [
+          {
+            // App shell — network first so users get fresh deploys
+            urlPattern: ({ request }) => request.mode === "navigate",
+            handler: "NetworkFirst",
+            options: { cacheName: "pages", networkTimeoutSeconds: 3 },
+          },
+          {
+            // Static assets — cache first
+            urlPattern: ({ request }) =>
+              ["style", "script", "worker", "font"].includes(request.destination),
+            handler: "StaleWhileRevalidate",
+            options: { cacheName: "assets" },
+          },
+          {
+            // ImageKit + uploaded images
+            urlPattern: ({ url }) => url.hostname.includes("imagekit.io"),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "images",
+              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
+          {
+            // Never cache API responses (always fresh data)
+            urlPattern: ({ url }) => url.pathname.startsWith("/api/"),
+            handler: "NetworkOnly",
+          },
+        ],
+      },
+      devOptions: { enabled: false },
+    }),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
