@@ -1998,7 +1998,7 @@ function Footer() {
             { Icon: Shield, text: "256-bit encrypted" },
             { Icon: Lock, text: "Secure payments via Razorpay" },
             { Icon: Check, text: "UPI · Cards · NetBanking" },
-            { Icon: Zap, text: "No subscription · Pay per deal" },
+            { Icon: Zap, text: "No subscription · Pay per agreement" },
           ].map(({ Icon, text }) => (
             <span key={text} className="inline-flex items-center gap-1.5 text-[11px] text-neutral-500">
               <Icon className="w-3.5 h-3.5 text-emerald-600" />
@@ -2008,10 +2008,10 @@ function Footer() {
         </div>
 
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-neutral-500">
-          <p>© {new Date().getFullYear()} DealInSec. Built with care in Northeast India. 🏔️</p>
-          <p className="flex items-center gap-1.5">
-            Made by Avisekh Gurung &amp; Priyat Tamang
-          </p>
+          <p>© {new Date().getFullYear()} DealInSec. All rights reserved.</p>
+          <a href="mailto:support@dealinsec.com" className="hover:text-emerald-600 transition-colors">
+            support@dealinsec.com
+          </a>
         </div>
       </div>
     </footer>
