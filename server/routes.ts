@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable } from "@shared/schema";
+import { insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, newsletterSubscribers } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./auth";
@@ -1262,6 +1262,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Razorpay webhook error:", error);
         res.status(500).json({ error: "Webhook processing failed" });
       }
+  });
+
+  // Newsletter / waitlist capture (public — from landing footer)
+  app.post("/api/newsletter", async (req, res) => {
+    try {
+      const email = String(req.body.email || "").trim().toLowerCase();
+      const source = String(req.body.source || "footer").slice(0, 40);
+      // basic email shape check
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: "Please enter a valid email" });
+      }
+      // Idempotent — ignore duplicates gracefully
+      await db
+        .insert(newsletterSubscribers)
+        .values({ email, source })
+        .onConflictDoNothing();
+      res.status(201).json({ success: true });
+    } catch (error) {
+      console.error("Newsletter signup error:", error);
+      res.status(500).json({ error: "Could not subscribe. Please try again." });
+    }
   });
 
   const httpServer = createServer(app);

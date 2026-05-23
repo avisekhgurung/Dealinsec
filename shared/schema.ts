@@ -241,3 +241,15 @@ export const referrals = pgTable("referrals", {
 export const insertReferralSchema = createInsertSchema(referrals).omit({ id: true, createdAt: true });
 export type InsertReferral = z.infer<typeof insertReferralSchema>;
 export type Referral = typeof referrals.$inferSelect;
+
+// Newsletter / waitlist email capture (from landing footer)
+export const newsletterSubscribers = pgTable("newsletter_subscribers", {
+  id: serial("id").primaryKey(),
+  email: varchar("email").notNull().unique(),
+  source: varchar("source").default("footer"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNewsletterSchema = createInsertSchema(newsletterSubscribers).omit({ id: true, createdAt: true });
+export type InsertNewsletterSubscriber = z.infer<typeof insertNewsletterSchema>;
+export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect;

@@ -1936,28 +1936,30 @@ function Footer() {
   return (
     <footer className="border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-950 relative z-[1]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
+        {/* Newsletter strip */}
+        <NewsletterStrip />
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10 mt-12">
           <div className="col-span-2 md:col-span-1">
             <DealinsecLogo size="md" withText />
-            <p className="text-xs text-neutral-500 mt-4 leading-relaxed max-w-[220px]">
-              Deals in seconds. Secured for life.
+            <p className="text-xs text-neutral-500 mt-4 leading-relaxed max-w-[240px]">
+              The deal-management OS for every business — track, sign, and bill every client or brand deal in one workflow.
             </p>
-            <div className="flex items-center gap-3 mt-4">
+            <div className="flex items-center gap-3 mt-5">
               {[
                 { Icon: SiInstagram, href: "https://www.instagram.com/dealinsec", label: "Instagram" },
-                { Icon: SiX, href: "#", label: "X" },
-                { Icon: SiYoutube, href: "#", label: "YouTube" },
-                { Icon: SiLinkedin, href: "#", label: "LinkedIn" },
+                { Icon: SiLinkedin, href: "https://www.linkedin.com/company/dealinsec", label: "LinkedIn" },
+                { Icon: SiX, href: "https://x.com/dealinsec", label: "X" },
               ].map(({ Icon, href, label }) => (
                 <a
                   key={label}
                   href={href}
-                  target={href.startsWith("http") ? "_blank" : undefined}
-                  rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   aria-label={label}
-                  className="text-neutral-400 hover:text-emerald-600 transition-colors"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-emerald-600 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors"
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-3.5 h-3.5" />
                 </a>
               ))}
             </div>
@@ -1990,15 +1992,99 @@ function Footer() {
           />
         </div>
 
-        <div className="pt-6 border-t border-neutral-200 dark:border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-neutral-500">
-          <p>© {new Date().getFullYear()} Dealinsec. Made with care in India.</p>
-          <p className="flex items-center gap-2">
-            <Shield className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Secured with 256-bit encryption</span>
+        {/* Trust badges */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pb-6 border-b border-neutral-200 dark:border-neutral-800">
+          {[
+            { Icon: Shield, text: "256-bit encrypted" },
+            { Icon: Lock, text: "Secure payments via Razorpay" },
+            { Icon: Check, text: "UPI · Cards · NetBanking" },
+            { Icon: Zap, text: "No subscription · Pay per deal" },
+          ].map(({ Icon, text }) => (
+            <span key={text} className="inline-flex items-center gap-1.5 text-[11px] text-neutral-500">
+              <Icon className="w-3.5 h-3.5 text-emerald-600" />
+              {text}
+            </span>
+          ))}
+        </div>
+
+        <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-neutral-500">
+          <p>© {new Date().getFullYear()} DealInSec. Built with care in Northeast India. 🏔️</p>
+          <p className="flex items-center gap-1.5">
+            Made by Avisekh Gurung &amp; Priyat Tamang
           </p>
         </div>
       </div>
     </footer>
+  );
+}
+
+function NewsletterStrip() {
+  const { toast } = useToast();
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const subscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), source: "footer" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Could not subscribe");
+      }
+      setDone(true);
+      setEmail("");
+    } catch (err: any) {
+      toast({ title: "Hmm, that didn't work", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-6 lg:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+      <div className="max-w-md">
+        <h3 className="text-lg lg:text-xl font-bold text-neutral-900 dark:text-white">
+          Deal tips, straight to your inbox
+        </h3>
+        <p className="text-sm text-neutral-500 mt-1">
+          Get practical tips on closing brand deals, pricing your work, and getting paid on time. No spam.
+        </p>
+      </div>
+      {done ? (
+        <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold text-sm">
+          <Check className="w-5 h-5" />
+          You're in! Check your inbox soon.
+        </div>
+      ) : (
+        <form onSubmit={subscribe} className="flex w-full lg:w-auto gap-2">
+          <Input
+            type="email"
+            required
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="h-11 lg:w-64 bg-white dark:bg-neutral-900"
+            data-testid="input-newsletter-email"
+          />
+          <Button
+            type="submit"
+            disabled={loading}
+            className="h-11 px-5 text-sm font-semibold text-white border-0 shrink-0"
+            style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
+            data-testid="button-newsletter-subscribe"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Subscribe"}
+          </Button>
+        </form>
+      )}
+    </div>
   );
 }
 
