@@ -1,12 +1,13 @@
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
 import {
-  users, deals, contracts, invoices, brandInvoices, creditTransactions, payuOrders, quotes, referrals,
+  users, deals, contracts, invoices, brandInvoices, invoiceAttachments, creditTransactions, payuOrders, quotes, referrals,
   type User, type UpsertUser,
   type Deal, type InsertDeal,
   type Contract, type InsertContract,
   type Invoice, type InsertInvoice,
   type BrandInvoice, type InsertBrandInvoice,
+  type InvoiceAttachment, type InsertInvoiceAttachment,
   type CreditTransaction, type InsertCreditTransaction,
   type PayuOrder, type InsertPayuOrder,
   type Quote, type InsertQuote,
@@ -43,6 +44,11 @@ export interface IStorage {
   createBrandInvoice(invoice: InsertBrandInvoice): Promise<BrandInvoice>;
   updateBrandInvoice(id: number, updates: Partial<BrandInvoice>): Promise<BrandInvoice | undefined>;
   deleteBrandInvoice(id: number): Promise<void>;
+
+  getInvoiceAttachments(brandInvoiceId: number): Promise<InvoiceAttachment[]>;
+  getInvoiceAttachment(id: number): Promise<InvoiceAttachment | undefined>;
+  createInvoiceAttachment(data: InsertInvoiceAttachment): Promise<InvoiceAttachment>;
+  deleteInvoiceAttachment(id: number): Promise<void>;
   
   generateInvoiceNumber(): Promise<string>;
   generateBrandInvoiceNumber(): Promise<string>;
@@ -210,6 +216,26 @@ export class DatabaseStorage implements IStorage {
   async generateBrandInvoiceNumber(): Promise<string> {
     this.invoiceCounter++;
     return `BINV-${Date.now()}-${this.invoiceCounter}`;
+  }
+
+  async getInvoiceAttachments(brandInvoiceId: number): Promise<InvoiceAttachment[]> {
+    return db.select().from(invoiceAttachments)
+      .where(eq(invoiceAttachments.brandInvoiceId, brandInvoiceId))
+      .orderBy(desc(invoiceAttachments.createdAt));
+  }
+
+  async getInvoiceAttachment(id: number): Promise<InvoiceAttachment | undefined> {
+    const [attachment] = await db.select().from(invoiceAttachments).where(eq(invoiceAttachments.id, id));
+    return attachment;
+  }
+
+  async createInvoiceAttachment(data: InsertInvoiceAttachment): Promise<InvoiceAttachment> {
+    const [created] = await db.insert(invoiceAttachments).values(data as any).returning();
+    return created;
+  }
+
+  async deleteInvoiceAttachment(id: number): Promise<void> {
+    await db.delete(invoiceAttachments).where(eq(invoiceAttachments.id, id));
   }
 
   async getCreditTransactions(userId: string): Promise<CreditTransaction[]> {

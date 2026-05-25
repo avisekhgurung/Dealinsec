@@ -182,6 +182,37 @@ export const insertBrandInvoiceSchema = createInsertSchema(brandInvoices).omit({
 export type InsertBrandInvoice = z.infer<typeof insertBrandInvoiceSchema>;
 export type BrandInvoice = typeof brandInvoices.$inferSelect;
 
+// Tax & supporting documents attached to an invoice (GST invoice copy, TDS
+// certificate, payment receipt, etc.). Centralises the paperwork creators
+// otherwise scatter across email/WhatsApp, so tax filing is a single tap away.
+export const invoiceDocumentCategories = [
+  "GST Invoice",
+  "TDS Certificate",
+  "Form 16A",
+  "Payment Receipt",
+  "Bank Statement",
+  "Purchase Order",
+  "Other",
+] as const;
+export type InvoiceDocumentCategory = (typeof invoiceDocumentCategories)[number];
+
+export const invoiceAttachments = pgTable("invoice_attachments", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  brandInvoiceId: integer("brand_invoice_id").notNull().references(() => brandInvoices.id),
+  category: varchar("category").notNull().default("Other"),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileId: varchar("file_id"),          // ImageKit fileId, for later deletion (null for local uploads)
+  fileSize: integer("file_size"),
+  mimeType: varchar("mime_type"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertInvoiceAttachmentSchema = createInsertSchema(invoiceAttachments).omit({ id: true, createdAt: true });
+export type InsertInvoiceAttachment = z.infer<typeof insertInvoiceAttachmentSchema>;
+export type InvoiceAttachment = typeof invoiceAttachments.$inferSelect;
+
 export const creditTransactionTypeOptions = ["grant", "purchase", "usage", "refund", "referral"] as const;
 
 export const creditTransactions = pgTable("credit_transactions", {

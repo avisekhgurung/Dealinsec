@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Download, CheckCircle, Loader2 } from "lucide-react";
+import { InvoiceAttachments } from "@/components/invoice-attachments";
 import type { BrandInvoice, Deal } from "@shared/schema";
 
 function slugify(s: string): string {
@@ -405,6 +406,11 @@ export default function BrandInvoiceDetailsPage() {
                 This is a computer-generated invoice. Generated via Dealinsec.
               </p>
             </div>
+          </div>
+
+          {/* ── Tax documents (GST / TDS / receipts) ─ hidden in print ── */}
+          <div className="mt-6">
+            <InvoiceAttachments invoiceId={invoice.id} />
           </div>
         </main>
 

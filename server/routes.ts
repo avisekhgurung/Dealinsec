@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, newsletterSubscribers } from "@shared/schema";
+import { insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, newsletterSubscribers, invoiceDocumentCategories } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./auth";
@@ -10,7 +10,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
-import { uploadFileToImageKit, isImageKitConfigured } from "./imagekitClient";
+import { uploadFileToImageKit, isImageKitConfigured, deleteFromImageKit } from "./imagekitClient";
 import {
   isRazorpayConfigured,
   getRazorpayKeyId,
@@ -704,6 +704,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Delete brand invoice error:", error);
       res.status(500).json({ error: "Failed to delete brand invoice" });
+    }
+  });
+
+  // ── Invoice tax documents (GST invoice / TDS certificate / receipts) ──────
+  // Centralises the paperwork creators need for tax filing, attached per invoice.
+  app.get("/api/brand-invoices/:id/attachments", isAuthenticated, async (req: any, res) => {
+    try {
+      const invoice = await storage.getBrandInvoice(parseInt(req.params.id));
+      if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+      if (invoice.userId !== req.user.id) return res.status(403).json({ error: "Access denied" });
+      const attachments = await storage.getInvoiceAttachments(invoice.id);
+      res.json(attachments);
+    } catch (error) {
+      console.error("List attachments error:", error);
+      res.status(500).json({ error: "Failed to fetch documents" });
+    }
+  });
+
+  app.post("/api/brand-invoices/:id/attachments", isAuthenticated, upload.single("file"), async (req: any, res) => {
+    try {
+      const invoice = await storage.getBrandInvoice(parseInt(req.params.id));
+      if (!invoice) return res.status(404).json({ error: "Invoice not found" });
+      if (invoice.userId !== req.user.id) return res.status(403).json({ error: "Access denied" });
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+      const category = invoiceDocumentCategories.includes(req.body.category)
+        ? req.body.category
+        : "Other";
+
+      // Store on ImageKit so files survive redeploys; fall back to local path.
+      let fileUrl = `/uploads/${req.file.filename}`;
+      let fileId: string | null = null;
+      if (isImageKitConfigured()) {
+        const uploaded = await uploadFileToImageKit(req.file, {
+          folder: "invoice-documents",
+          baseName: `invoice-${invoice.id}-${String(category).replace(/\s+/g, "-").toLowerCase()}`,
+        });
+        fileUrl = uploaded.url;
+        fileId = uploaded.fileId;
+      }
+
+      const attachment = await storage.createInvoiceAttachment({
+        userId: req.user.id,
+        brandInvoiceId: invoice.id,
+        category,
+        fileName: req.file.originalname,
+        fileUrl,
+        fileId,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype,
+      });
+      res.status(201).json(attachment);
+    } catch (error) {
+      console.error("Attachment upload error:", error);
+      res.status(500).json({ error: "Failed to upload document" });
+    }
+  });
+
+  // Download a document — redirect to CDN URL or stream a legacy local file.
+  app.get("/api/attachments/:id/download", isAuthenticated, async (req: any, res) => {
+    try {
+      const attachment = await storage.getInvoiceAttachment(parseInt(req.params.id));
+      if (!attachment) return res.status(404).json({ error: "Document not found" });
+      if (attachment.userId !== req.user.id) return res.status(403).json({ error: "Access denied" });
+      if (/^https?:\/\//.test(attachment.fileUrl)) {
+        return res.redirect(attachment.fileUrl);
+      }
+      res.download(attachment.fileUrl, attachment.fileName);
+    } catch (error) {
+      console.error("Attachment download error:", error);
+      res.status(500).json({ error: "Failed to download document" });
+    }
+  });
+
+  app.delete("/api/attachments/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const attachment = await storage.getInvoiceAttachment(parseInt(req.params.id));
+      if (!attachment) return res.status(404).json({ error: "Document not found" });
+      if (attachment.userId !== req.user.id) return res.status(403).json({ error: "Access denied" });
+      if (attachment.fileId) await deleteFromImageKit(attachment.fileId);
+      await storage.deleteInvoiceAttachment(attachment.id);
+      res.status(204).end();
+    } catch (error) {
+      console.error("Attachment delete error:", error);
+      res.status(500).json({ error: "Failed to delete document" });
     }
   });
 
