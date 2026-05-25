@@ -84,7 +84,12 @@ function Router() {
           <Route path="/privacy" component={PrivacyPage} />
           <Route path="/cookies" component={CookiePage} />
           <Route path="/refund" component={RefundPage} />
-          <Route component={NotFound} />
+          {/* Any protected/unknown route while logged out (e.g. the PWA
+              opening at its start_url /dashboard) → bounce to landing so the
+              user can log in, instead of a dead 404. */}
+          <Route>
+            <Redirect to="/" />
+          </Route>
         </Switch>
       </Suspense>
     );
