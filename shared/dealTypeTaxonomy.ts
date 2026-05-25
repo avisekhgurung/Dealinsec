@@ -763,6 +763,41 @@ export function getAgreementCopy(dealType?: string | null): AgreementCopy {
   return AGREEMENT_COPY.Creator;
 }
 
+// ───────────────────────────────────────────────────────────────────────
+// Deliverable field labels — deal-type-aware names for the two deliverable
+// columns/dropdowns and the counterparty name field. Used by deal create/edit
+// forms and read-only displays (quote, agreement PDF) so wording is consistent
+// everywhere (a wedding photographer sees "Service / Output", not "Platform").
+// ───────────────────────────────────────────────────────────────────────
+
+export interface DeliverableLabels {
+  /** First field/column — e.g. "Platform", "Category", "Service" */
+  category: string;
+  /** Second field/column — e.g. "Content Type", "Output", "Format" */
+  type: string;
+  /** Counterparty name field — e.g. "Brand Name", "Client Name" */
+  who: string;
+}
+
+const DELIVERABLE_LABELS: Record<DealType, DeliverableLabels> = {
+  Creator: { category: "Platform", type: "Content Type", who: "Brand Name" },
+  Freelance: { category: "Category", type: "Output", who: "Client Name" },
+  Consulting: { category: "Practice Area", type: "Format", who: "Client Name" },
+  "Service Vendor": { category: "Service", type: "Output", who: "Client Name" },
+  Custom: { category: "Category", type: "Output", who: "Client / Brand" },
+};
+
+/**
+ * Deal-type-aware labels for the deliverable fields. Falls back to Creator
+ * ("Platform" / "Content Type") for unknown/legacy deal types.
+ */
+export function getDeliverableLabels(dealType?: string | null): DeliverableLabels {
+  if (dealType && dealType in DELIVERABLE_LABELS) {
+    return DELIVERABLE_LABELS[dealType as DealType];
+  }
+  return DELIVERABLE_LABELS.Creator;
+}
+
 /** Universal frequency options (applies to all deal types). */
 export const frequencyOptions = [
   "One-time",

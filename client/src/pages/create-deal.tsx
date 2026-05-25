@@ -31,6 +31,7 @@ import {
   dealTypeOptions,
   dealTypeMeta,
   TAXONOMY,
+  getDeliverableLabels,
   type DealType,
 } from "@shared/dealTypeTaxonomy";
 
@@ -157,14 +158,7 @@ export default function CreateDealPage() {
     );
   };
 
-  const labels = {
-    Creator: { category: "Platform", type: "Content Type", who: "Brand Name" },
-    Freelance: { category: "Category", type: "Output", who: "Client Name" },
-    Consulting: { category: "Practice Area", type: "Format", who: "Client Name" },
-    "Service Vendor": { category: "Service", type: "Output", who: "Client Name" },
-    Custom: { category: "Category", type: "Output", who: "Client / Brand" },
-  } as const;
-  const L = labels[dealType];
+  const L = getDeliverableLabels(dealType);
 
   return (
     <div className="min-h-screen bg-background pb-8">

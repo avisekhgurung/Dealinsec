@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, Printer, Shield, Lock } from "lucide-react";
 import type { Contract, Deal } from "@shared/schema";
 import { STANDARD_TERMS } from "@shared/schema";
-import { getAgreementCopy } from "@shared/dealTypeTaxonomy";
+import { getAgreementCopy, getDeliverableLabels } from "@shared/dealTypeTaxonomy";
 
 function slugify(s: string): string {
   return (s || "")
@@ -37,6 +37,7 @@ export default function ContractPdfPage() {
   // Deal-type-aware language for the agreement document (title, party roles,
   // scope, rights & exclusivity clauses). Falls back to Creator copy.
   const copy = getAgreementCopy(deal?.dealType);
+  const dLabels = getDeliverableLabels(deal?.dealType);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("en-IN", {
@@ -246,8 +247,8 @@ export default function ContractPdfPage() {
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-white/10 print:border-gray-300">
-                    <th className="text-left pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">Platform</th>
-                    <th className="text-left pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">Content Type</th>
+                    <th className="text-left pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">{dLabels.category}</th>
+                    <th className="text-left pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">{dLabels.type}</th>
                     <th className="text-left pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">Qty</th>
                     <th className="text-left pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">Frequency</th>
                     <th className="text-left pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">Notes</th>

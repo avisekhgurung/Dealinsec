@@ -10,6 +10,7 @@ import { SiInstagram, SiYoutube, SiFacebook } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import type { Deal, User, Quote } from "@shared/schema";
 import { STANDARD_TERMS } from "@shared/schema";
+import { getDeliverableLabels } from "@shared/dealTypeTaxonomy";
 
 function slugify(s: string): string {
   return (s || "")
@@ -47,6 +48,9 @@ export default function QuotePreviewPage() {
   const { data: deal, isLoading: dealLoading } = useQuery<Deal>({
     queryKey: ["/api/deals", params.id],
   });
+
+  // Deal-type-aware column labels for the deliverables table.
+  const dLabels = getDeliverableLabels(deal?.dealType);
 
   const { data: authUser } = useQuery<User>({
     queryKey: ["/api/auth/user"],
@@ -261,8 +265,8 @@ export default function QuotePreviewPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wide">
-                      <th className="text-left px-4 py-3 font-medium">Platform</th>
-                      <th className="text-left px-4 py-3 font-medium">Content Type</th>
+                      <th className="text-left px-4 py-3 font-medium">{dLabels.category}</th>
+                      <th className="text-left px-4 py-3 font-medium">{dLabels.type}</th>
                       <th className="text-center px-4 py-3 font-medium">Qty</th>
                       <th className="text-left px-4 py-3 font-medium">Frequency</th>
                       <th className="text-left px-4 py-3 font-medium">Notes</th>

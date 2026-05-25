@@ -31,6 +31,7 @@ import {
   dealTypeOptions,
   dealTypeMeta,
   TAXONOMY,
+  getDeliverableLabels,
   type DealType,
 } from "@shared/dealTypeTaxonomy";
 import { TaxonomyCombobox } from "@/components/taxonomy-combobox";
@@ -112,14 +113,7 @@ export default function EditDealPage() {
 
   const dealType = (form.watch("dealType") as DealType) || "Creator";
   const taxonomy = TAXONOMY[dealType];
-  const labels = {
-    Creator: { category: "Platform", type: "Content Type", who: "Brand Name" },
-    Freelance: { category: "Category", type: "Output", who: "Client Name" },
-    Consulting: { category: "Practice Area", type: "Format", who: "Client Name" },
-    "Service Vendor": { category: "Service", type: "Output", who: "Client Name" },
-    Custom: { category: "Category", type: "Output", who: "Client / Brand" },
-  } as const;
-  const L = labels[dealType];
+  const L = getDeliverableLabels(dealType);
 
   const handleDealTypeChange = (next: DealType) => {
     form.setValue("dealType", next);

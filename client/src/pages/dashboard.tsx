@@ -613,7 +613,7 @@ export default function DashboardPage() {
                   {platformDist.length > 0 && (
                     <Card className="glass-card border-0 lg:col-span-2">
                       <CardHeader className="pb-1 px-4 pt-4 lg:px-6 lg:pt-6">
-                        <CardTitle className="text-sm lg:text-base font-semibold">Platform Distribution</CardTitle>
+                        <CardTitle className="text-sm lg:text-base font-semibold">Deliverables by Category</CardTitle>
                         <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Deliverables across platforms / categories</p>
                       </CardHeader>
                       <CardContent className="px-2 pb-4 lg:px-4 lg:pb-6">
