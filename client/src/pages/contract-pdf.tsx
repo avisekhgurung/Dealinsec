@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ArrowLeft, Printer, Shield, Lock } from "lucide-react";
 import type { Contract, Deal } from "@shared/schema";
 import { STANDARD_TERMS } from "@shared/schema";
+import { getAgreementCopy } from "@shared/dealTypeTaxonomy";
 
 function slugify(s: string): string {
   return (s || "")
@@ -32,6 +33,10 @@ export default function ContractPdfPage() {
     queryKey: ["/api/deals", contract?.dealId],
     enabled: !!contract?.dealId,
   });
+
+  // Deal-type-aware language for the agreement document (title, party roles,
+  // scope, rights & exclusivity clauses). Falls back to Creator copy.
+  const copy = getAgreementCopy(deal?.dealType);
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString("en-IN", {
@@ -116,7 +121,7 @@ export default function ContractPdfPage() {
               <div>
                 <p className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1">Dealinsec Platform</p>
                 <h1 className="text-white text-2xl md:text-3xl print:text-xl font-extrabold tracking-wide uppercase">
-                  Influencer Marketing Agreement
+                  {copy.title}
                 </h1>
               </div>
               <div className="text-right text-white/90 text-sm space-y-0.5">
@@ -140,7 +145,7 @@ export default function ContractPdfPage() {
               {/* Party A */}
               <div className="space-y-2">
                 <div className="text-xs font-bold uppercase tracking-wide text-primary mb-3">
-                  Party A — Creator / Influencer
+                  Party A — {copy.providerRole}
                 </div>
                 <div className="text-sm space-y-1.5">
                   <div>
@@ -177,11 +182,11 @@ export default function ContractPdfPage() {
               {/* Party B */}
               <div className="space-y-2 md:border-l md:border-white/10 md:pl-6 print:border-gray-200">
                 <div className="text-xs font-bold uppercase tracking-wide text-primary mb-3">
-                  Party B — Brand / Client
+                  Party B — {copy.clientRole}
                 </div>
                 <div className="text-sm space-y-1.5">
                   <div>
-                    <span className="text-muted-foreground text-xs">Brand Name</span>
+                    <span className="text-muted-foreground text-xs">{copy.clientFieldLabel}</span>
                     <p className="font-semibold">{contract.brandName}</p>
                   </div>
                   <div>
@@ -279,10 +284,9 @@ export default function ContractPdfPage() {
                 Scope of Work
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
-                The Creator agrees to provide influencer marketing and content creation services for the Brand
-                as described in the Deliverables section above, in connection with the deal titled
-                "{deal?.dealTitle || contract.contractName}". All content shall be original, professionally produced,
-                and compliant with applicable advertising standards and platform policies.
+                The {copy.providerNoun} agrees to provide {copy.serviceDescription} for the {copy.clientNoun}
+                {" "}as described in the Deliverables section above, in connection with the engagement titled
+                {" "}"{deal?.dealTitle || contract.contractName}". {copy.complianceNote}
               </p>
             </div>
 
@@ -293,9 +297,10 @@ export default function ContractPdfPage() {
                 Deliverables &amp; Timeline
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
-                All deliverables shall be submitted for Brand approval at least 48 hours before the scheduled
-                publication date. The Brand shall provide approval or revision requests within 24 hours of receipt.
-                The Creator shall incorporate up to two (2) rounds of revisions at no additional charge.
+                All deliverables shall be submitted for {copy.clientNoun} approval at least 48 hours before the
+                scheduled delivery or publication date. The {copy.clientNoun} shall provide approval or revision
+                requests within 24 hours of receipt. The {copy.providerNoun} shall incorporate up to two (2) rounds
+                of revisions at no additional charge.
                 This Agreement is effective from <strong>{formatDate(contract.startDate)}</strong> through{" "}
                 <strong>{formatDate(contract.endDate)}</strong>.
               </p>
@@ -308,7 +313,7 @@ export default function ContractPdfPage() {
                 Compensation (₹{contract.contractValue.toLocaleString("en-IN")})
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
-                In consideration for the services rendered, the Brand shall pay the Creator a total fee of{" "}
+                In consideration for the services rendered, the {copy.clientNoun} shall pay the {copy.providerNoun} a total fee of{" "}
                 <strong>₹{contract.contractValue.toLocaleString("en-IN")}</strong> (Indian Rupees{" "}
                 {contract.contractValue.toLocaleString("en-IN")} only). Payment shall be structured as:
                 50% advance upon execution and 50% within 30 days of final deliverable approval.
@@ -320,13 +325,10 @@ export default function ContractPdfPage() {
             <div className="space-y-1.5" style={{ pageBreakInside: 'avoid' }}>
               <h3 className="font-bold text-sm flex items-center gap-2">
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">4</span>
-                Content Rights &amp; Usage
+                {copy.rightsHeading}
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
-                Upon full payment, the Creator grants the Brand a non-exclusive, worldwide, royalty-free license
-                to use, reproduce, display, and distribute the content for marketing and promotional purposes for
-                12 months following the Agreement expiry. The Creator retains all ownership rights and may use
-                content for personal portfolio purposes.
+                {copy.rightsText}
               </p>
             </div>
 
@@ -337,9 +339,7 @@ export default function ContractPdfPage() {
                 Exclusivity Terms
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
-                {contract.exclusive
-                  ? "This Agreement is EXCLUSIVE. During the Agreement period, the Creator shall not enter into similar influencer marketing arrangements with direct competitors of the Brand without prior written consent. All brand deals during this period must be registered on the Dealinsec platform."
-                  : "This Agreement is NON-EXCLUSIVE. The Creator may engage with other brands and clients during the Agreement period, provided such engagements do not directly conflict with or diminish the promotional value of this Agreement."}
+                {contract.exclusive ? copy.exclusiveText : copy.nonExclusiveText}
               </p>
             </div>
 
@@ -409,7 +409,7 @@ export default function ContractPdfPage() {
               {/* Creator Signature */}
               <div className="space-y-4">
                 <p className="text-xs font-bold uppercase tracking-wide text-primary">
-                  Party A — Creator / Influencer
+                  Party A — {copy.providerRole}
                 </p>
 
                 {/* Signature image or placeholder */}
@@ -417,7 +417,7 @@ export default function ContractPdfPage() {
                   {user?.digitalSignature ? (
                     <img
                       src={user.digitalSignature}
-                      alt="Creator Signature"
+                      alt={`${copy.providerNoun} Signature`}
                       className="h-10 print:h-8 w-auto object-contain p-1"
                     />
                   ) : (
@@ -448,7 +448,7 @@ export default function ContractPdfPage() {
               {/* Brand Signature */}
               <div className="space-y-4 md:border-l md:border-white/10 md:pl-8 print:border-gray-200">
                 <p className="text-xs font-bold uppercase tracking-wide text-primary">
-                  Party B — Brand / Client
+                  Party B — {copy.clientRole}
                 </p>
 
                 {contract.signedByBrand ? (

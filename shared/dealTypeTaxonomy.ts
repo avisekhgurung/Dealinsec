@@ -633,6 +633,136 @@ export function getOutputOptions(dealType: DealType): { group: string; option: s
   return flat;
 }
 
+// ───────────────────────────────────────────────────────────────────────
+// Agreement document copy — deal-type-aware language for the generated PDF
+// ───────────────────────────────────────────────────────────────────────
+
+export interface AgreementCopy {
+  /** Banner title of the agreement PDF */
+  title: string;
+  /** Party A label (the user) — e.g. "Creator / Influencer", "Service Provider" */
+  providerRole: string;
+  /** Inline noun for the user, capitalised — e.g. "Creator", "Freelancer" */
+  providerNoun: string;
+  /** Party B label (the counterparty) */
+  clientRole: string;
+  /** Inline noun for the counterparty — e.g. "Brand", "Client" */
+  clientNoun: string;
+  /** Field label used for the counterparty's name in the parties block */
+  clientFieldLabel: string;
+  /** Phrase describing the services, used in the Scope clause */
+  serviceDescription: string;
+  /** Compliance sentence tail for the Scope clause */
+  complianceNote: string;
+  /** Heading for the rights/ownership clause */
+  rightsHeading: string;
+  /** Full paragraph for the rights/ownership clause */
+  rightsText: string;
+  /** Exclusivity clause text when the deal is exclusive */
+  exclusiveText: string;
+  /** Exclusivity clause text when the deal is non-exclusive */
+  nonExclusiveText: string;
+}
+
+const AGREEMENT_COPY: Record<DealType, AgreementCopy> = {
+  Creator: {
+    title: "Influencer Marketing Agreement",
+    providerRole: "Creator / Influencer",
+    providerNoun: "Creator",
+    clientRole: "Brand / Client",
+    clientNoun: "Brand",
+    clientFieldLabel: "Brand Name",
+    serviceDescription: "influencer marketing and content creation services",
+    complianceNote: "All content shall be original, professionally produced, and compliant with applicable advertising standards and platform policies (including ASCI guidelines).",
+    rightsHeading: "Content Rights & Usage",
+    rightsText:
+      "Upon full payment, the Creator grants the Brand a non-exclusive, worldwide, royalty-free license to use, reproduce, display, and distribute the content for marketing and promotional purposes for 12 months following the Agreement expiry. The Creator retains all ownership rights and may use the content for personal portfolio purposes.",
+    exclusiveText:
+      "This Agreement is EXCLUSIVE. During the Agreement period, the Creator shall not enter into similar influencer marketing arrangements with direct competitors of the Brand without prior written consent. All brand deals during this period must be registered on the Dealinsec platform.",
+    nonExclusiveText:
+      "This Agreement is NON-EXCLUSIVE. The Creator may engage with other brands and clients during the Agreement period, provided such engagements do not directly conflict with or diminish the promotional value of this Agreement.",
+  },
+  Freelance: {
+    title: "Freelance Services Agreement",
+    providerRole: "Freelancer / Service Provider",
+    providerNoun: "Freelancer",
+    clientRole: "Client",
+    clientNoun: "Client",
+    clientFieldLabel: "Client Name",
+    serviceDescription: "freelance professional services",
+    complianceNote: "All work shall be original, professionally executed, and compliant with applicable laws and industry standards.",
+    rightsHeading: "Work Product & Ownership",
+    rightsText:
+      "Upon full and final payment, the Freelancer assigns to the Client all rights, title, and interest in the final deliverables produced under this Agreement. Until full payment is received, all work product remains the property of the Freelancer. The Freelancer retains the right to display the work in their portfolio unless otherwise agreed in writing.",
+    exclusiveText:
+      "This Agreement is EXCLUSIVE for its scope. During the Agreement period, the Freelancer shall not provide identical competing deliverables to a direct competitor of the Client for the same project without prior written consent.",
+    nonExclusiveText:
+      "This Agreement is NON-EXCLUSIVE. The Freelancer may take on other clients and projects during the Agreement period, provided such work does not delay or compromise the deliverables agreed herein.",
+  },
+  Consulting: {
+    title: "Consulting Services Agreement",
+    providerRole: "Consultant / Advisor",
+    providerNoun: "Consultant",
+    clientRole: "Client",
+    clientNoun: "Client",
+    clientFieldLabel: "Client Name",
+    serviceDescription: "professional consulting and advisory services",
+    complianceNote: "All advice and deliverables shall be provided professionally and in good faith, in compliance with applicable laws and professional standards.",
+    rightsHeading: "Deliverables & Confidentiality",
+    rightsText:
+      "All reports, recommendations, and deliverables prepared under this Agreement are provided for the Client's internal use upon full payment. Both parties shall keep confidential any proprietary or sensitive information disclosed during the engagement. The Consultant's advice is provided in good faith and does not constitute a guarantee of specific business outcomes.",
+    exclusiveText:
+      "This Agreement is EXCLUSIVE for its scope. During the Agreement period, the Consultant shall not provide directly competing advisory services to a direct competitor of the Client on the same matter without prior written consent.",
+    nonExclusiveText:
+      "This Agreement is NON-EXCLUSIVE. The Consultant may advise other clients during the Agreement period, provided no conflict of interest arises and confidentiality is maintained.",
+  },
+  "Service Vendor": {
+    title: "Service Agreement",
+    providerRole: "Service Provider",
+    providerNoun: "Service Provider",
+    clientRole: "Client",
+    clientNoun: "Client",
+    clientFieldLabel: "Client Name",
+    serviceDescription: "the professional services described herein",
+    complianceNote: "All services shall be delivered professionally and in compliance with applicable laws and safety standards.",
+    rightsHeading: "Deliverables & Usage",
+    rightsText:
+      "Upon full payment, the Service Provider grants the Client the right to use the delivered work (such as photographs, recordings, or other outputs) for personal or agreed purposes. The Service Provider retains the right to showcase the work as part of their portfolio unless the Client requests otherwise in writing.",
+    exclusiveText:
+      "This Agreement is EXCLUSIVE for the booked dates and scope. During the booked period, the Service Provider commits the agreed resources solely to the Client for this engagement.",
+    nonExclusiveText:
+      "This Agreement is NON-EXCLUSIVE. The Service Provider may serve other clients during the period, provided the commitments under this Agreement are fully honoured.",
+  },
+  Custom: {
+    title: "Service Agreement",
+    providerRole: "Service Provider",
+    providerNoun: "Service Provider",
+    clientRole: "Client",
+    clientNoun: "Client",
+    clientFieldLabel: "Client Name",
+    serviceDescription: "the services described herein",
+    complianceNote: "All work shall be carried out professionally and in compliance with applicable laws and standards.",
+    rightsHeading: "Deliverables & Usage Rights",
+    rightsText:
+      "Upon full payment, the Service Provider grants the Client the agreed rights to use the deliverables produced under this Agreement. The Service Provider retains ownership of any pre-existing materials and the right to reference the work in their portfolio unless otherwise agreed in writing.",
+    exclusiveText:
+      "This Agreement is EXCLUSIVE for its scope. During the Agreement period, the Service Provider shall not provide the same deliverables to a direct competitor of the Client without prior written consent.",
+    nonExclusiveText:
+      "This Agreement is NON-EXCLUSIVE. The Service Provider may engage with other clients during the Agreement period, provided the commitments under this Agreement are honoured.",
+  },
+};
+
+/**
+ * Returns deal-type-appropriate language for the generated agreement PDF.
+ * Falls back to Creator copy for unknown/legacy deal types.
+ */
+export function getAgreementCopy(dealType?: string | null): AgreementCopy {
+  if (dealType && dealType in AGREEMENT_COPY) {
+    return AGREEMENT_COPY[dealType as DealType];
+  }
+  return AGREEMENT_COPY.Creator;
+}
+
 /** Universal frequency options (applies to all deal types). */
 export const frequencyOptions = [
   "One-time",
