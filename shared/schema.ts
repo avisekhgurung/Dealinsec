@@ -102,12 +102,16 @@ export const deals = pgTable("deals", {
 export const deliverableModeOptions = ["all", "any_one"] as const;
 
 // Selectable standard T&Cs applied on quotations / deals.
+// Wording is deal-type-neutral on purpose — these defaults appear on every deal
+// type (creators, freelancers, consultants, service vendors), so they avoid
+// creator-only words like "video" or "posting" and use "deliverables/work"
+// instead. IDs are stable; only labels are looked up at render time.
 export const STANDARD_TERMS = [
   { id: "validity_30", label: "This quotation is valid for 30 days from the date of issue." },
-  { id: "advance_50", label: "50% advance payment is required to confirm the collaboration." },
-  { id: "balance_7d", label: "The remaining 50% must be paid within 7 days after content delivery or posting." },
-  { id: "revisions_2", label: "Up to 2 video changes are included. All change requests must be submitted together at one time." },
-  { id: "cancellation", label: "If the project is cancelled after work has started, the advance payment is non-refundable. If content has already been created, full payment may be required." },
+  { id: "advance_50", label: "50% advance payment is required to confirm the project." },
+  { id: "balance_7d", label: "The remaining 50% is due within 7 days of final delivery of the agreed deliverables." },
+  { id: "revisions_2", label: "Up to 2 rounds of revisions are included. All change requests must be submitted together at one time." },
+  { id: "cancellation", label: "If the project is cancelled after work has started, the advance payment is non-refundable. If the work has already been delivered, full payment may be required." },
 ] as const;
 
 export type StandardTermId = typeof STANDARD_TERMS[number]["id"];
