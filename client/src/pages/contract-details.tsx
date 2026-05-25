@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/confirm-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   ArrowLeft,
@@ -38,6 +39,7 @@ export default function ContractDetailsPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const confirm = useConfirm();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [showSplitInput, setShowSplitInput] = useState(false);
@@ -632,10 +634,14 @@ export default function ContractDetailsPage() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-muted-foreground hover:text-rose-600"
-                                  onClick={() => {
-                                    if (confirm(`Delete invoice ${inv.invoiceNumber}? This cannot be undone.`)) {
-                                      deleteBrandInvoice.mutate(inv.id);
-                                    }
+                                  onClick={async () => {
+                                    const ok = await confirm({
+                                      title: "Delete this invoice?",
+                                      description: `Invoice ${inv.invoiceNumber} for ₹${inv.dealAmount.toLocaleString("en-IN")} will be permanently deleted. This cannot be undone.`,
+                                      confirmText: "Delete invoice",
+                                      destructive: true,
+                                    });
+                                    if (ok) deleteBrandInvoice.mutate(inv.id);
                                   }}
                                   disabled={deleteBrandInvoice.isPending}
                                   data-testid={`button-delete-invoice-${inv.id}`}

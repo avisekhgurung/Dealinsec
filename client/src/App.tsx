@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { AppLoader, RouteLoader } from "@/components/app-loader";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { InstallPrompt } from "@/components/install-prompt";
+import { ConfirmProvider } from "@/components/confirm-dialog";
 import { useLocation } from "wouter";
 
 // Eagerly loaded — always needed for first render
@@ -152,11 +153,13 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="min-h-screen bg-background text-foreground">
-          <Router />
-        </div>
-        <InstallPrompt />
-        <Toaster />
+        <ConfirmProvider>
+          <div className="min-h-screen bg-background text-foreground">
+            <Router />
+          </div>
+          <InstallPrompt />
+          <Toaster />
+        </ConfirmProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

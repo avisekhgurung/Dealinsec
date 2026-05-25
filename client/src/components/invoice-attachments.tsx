@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/confirm-dialog";
 import { queryClient } from "@/lib/queryClient";
 import {
   invoiceDocumentCategories,
@@ -54,6 +55,7 @@ const categoryStyle: Record<string, string> = {
 
 export function InvoiceAttachments({ invoiceId }: { invoiceId: number | string }) {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const fileRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState<InvoiceDocumentCategory>("GST Invoice");
 
@@ -234,7 +236,15 @@ export function InvoiceAttachments({ invoiceId }: { invoiceId: number | string }
                 </a>
                 <button
                   type="button"
-                  onClick={() => deleteDoc.mutate(a.id)}
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: "Remove this document?",
+                      description: `"${a.fileName}" (${a.category}) will be permanently removed from this invoice.`,
+                      confirmText: "Remove document",
+                      destructive: true,
+                    });
+                    if (ok) deleteDoc.mutate(a.id);
+                  }}
                   disabled={deleteDoc.isPending}
                   className="flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex-shrink-0 disabled:opacity-50"
                   title="Remove"
