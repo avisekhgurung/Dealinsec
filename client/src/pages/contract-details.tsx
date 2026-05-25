@@ -25,6 +25,7 @@ import {
   Receipt,
   Trash2,
   Pencil,
+  IndianRupee,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,11 +44,16 @@ export default function ContractDetailsPage() {
   const [splitPercentageStr, setSplitPercentageStr] = useState("50");
   const splitPercentage = Math.min(99, Math.max(1, parseInt(splitPercentageStr) || 50));
 
+  // Custom-amount invoice (partial bills, add-ons, amounts ≠ deal value)
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customAmountStr, setCustomAmountStr] = useState("");
+  const customAmount = parseInt(customAmountStr || "0", 10);
+
   // Bank details gate before generating brand invoice
   const hasBankDetails =
     !!(user as any)?.accountNumber && !!(user as any)?.ifscCode && !!(user as any)?.accountHolderName;
   const [bankModalOpen, setBankModalOpen] = useState(false);
-  const [bankModalIntent, setBankModalIntent] = useState<"single" | "split" | null>(null);
+  const [bankModalIntent, setBankModalIntent] = useState<"single" | "split" | "custom" | null>(null);
   const [bAccountHolder, setBAccountHolder] = useState("");
   const [bAccountNumber, setBAccountNumber] = useState("");
   const [bIfsc, setBIfsc] = useState("");
@@ -803,6 +809,79 @@ export default function ContractDetailsPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Custom amount invoice — partial bills, add-ons, retainers */}
+                {!showCustomInput ? (
+                  <Button
+                    variant="outline"
+                    className="w-full mt-2"
+                    onClick={() => setShowCustomInput(true)}
+                    disabled={contract.status !== "Signed"}
+                    data-testid="button-show-custom-invoice"
+                  >
+                    <IndianRupee className="w-4 h-4 mr-2" />
+                    Custom Amount Invoice
+                  </Button>
+                ) : (
+                  <div className="border border-white/10 rounded-lg p-3 space-y-3 mt-2">
+                    <p className="text-sm font-medium">Custom amount invoice</p>
+                    <p className="text-xs text-muted-foreground">
+                      For partial bills, add-ons or retainers where the amount differs from the deal value.
+                    </p>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        value={customAmountStr}
+                        onChange={(e) => setCustomAmountStr(e.target.value.replace(/\D/g, ""))}
+                        placeholder="Enter amount"
+                        className="pl-7 h-9"
+                        autoFocus
+                        data-testid="input-custom-invoice-amount"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        className="flex-1 gradient-btn text-white"
+                        onClick={() => {
+                          if (!Number.isFinite(customAmount) || customAmount < 1) {
+                            toast({
+                              title: "Enter a valid amount",
+                              description: "Amount must be a positive number.",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          if (!hasBankDetails) {
+                            setBankModalIntent("custom");
+                            setBankModalOpen(true);
+                            return;
+                          }
+                          createBrandInvoice.mutate(customAmount);
+                        }}
+                        disabled={createBrandInvoice.isPending}
+                        data-testid="button-create-custom-invoice"
+                      >
+                        {createBrandInvoice.isPending ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          "Create Custom Invoice"
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => { setShowCustomInput(false); setCustomAmountStr(""); }}
+                        disabled={createBrandInvoice.isPending}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </section>
@@ -850,6 +929,8 @@ export default function ContractDetailsPage() {
                   createBrandInvoice.mutate(undefined);
                 } else if (bankModalIntent === "split") {
                   splitInvoices.mutate();
+                } else if (bankModalIntent === "custom") {
+                  createBrandInvoice.mutate(customAmount);
                 }
               } catch (err: any) {
                 toast({ title: "Failed to save bank details", description: err.message, variant: "destructive" });

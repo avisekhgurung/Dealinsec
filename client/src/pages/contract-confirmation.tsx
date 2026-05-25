@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Shield, AlertTriangle, PenLine, Loader2, CreditCard, CheckCircle, Upload } from "lucide-react";
+import { ArrowLeft, Shield, AlertTriangle, PenLine, Loader2, CreditCard, CheckCircle, Upload, FileText, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { CreditAnimationOverlay } from "@/components/credit-animation-overlay";
+import { STANDARD_TERMS } from "@shared/schema";
 import type { Deal } from "@shared/schema";
 
 type Phase = "reserving" | "creating" | "done";
@@ -31,6 +32,12 @@ export default function ContractConfirmationPage() {
   const [showOverlay, setShowOverlay] = useState(false);
   const [contractId, setContractId] = useState<number | null>(null);
 
+  // Terms & Conditions — seeded from the deal, editable before the agreement is
+  // created. Saved back to the deal so they carry into the agreement PDF.
+  const [standardTermIds, setStandardTermIds] = useState<string[]>([]);
+  const [customTermsList, setCustomTermsList] = useState<string[]>([""]);
+  const [termsInitialized, setTermsInitialized] = useState(false);
+
   const credits = user?.contractCredits ?? 0;
   const hasCredits = credits >= 1;
   const needsBillingAddress = !user?.billingAddress;
@@ -40,6 +47,18 @@ export default function ContractConfirmationPage() {
   const { data: deal, isLoading } = useQuery<Deal>({
     queryKey: ["/api/deals", params.id],
   });
+
+  // Seed the terms editor from the deal once it loads (standard terms default
+  // to all selected, matching the deal-creation behaviour).
+  useEffect(() => {
+    if (!deal || termsInitialized) return;
+    const ids = ((deal as any).standardTermIds as string[] | null) ?? STANDARD_TERMS.map((t) => t.id);
+    setStandardTermIds(ids);
+    const raw = ((deal as any).customTerms as string | null) ?? "";
+    const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+    setCustomTermsList(lines.length ? lines : [""]);
+    setTermsInitialized(true);
+  }, [deal, termsInitialized]);
 
   const updateProfile = useMutation({
     mutationFn: async (profileData: { billingAddress?: string; panNumber?: string; digitalSignature?: string }) => {
@@ -93,6 +112,19 @@ export default function ContractConfirmationPage() {
       if (needsPan && panNumber.trim()) profileUpdates.panNumber = panNumber.trim();
       if (digitalSignaturePath) profileUpdates.digitalSignature = digitalSignaturePath;
       if (Object.keys(profileUpdates).length > 0) await updateProfile.mutateAsync(profileUpdates);
+
+      // Persist the (possibly edited) terms onto the deal so they carry into
+      // the agreement PDF — the deal is the single source of truth for terms.
+      // Non-fatal: a terms-save hiccup must never block the agreement itself.
+      try {
+        const customTerms = customTermsList.map((t) => t.trim()).filter(Boolean).join("\n");
+        await apiRequest("PATCH", `/api/deals/${deal.id}`, {
+          standardTermIds,
+          customTerms,
+        });
+      } catch (err) {
+        console.warn("Failed to save agreement terms to deal (continuing):", err);
+      }
 
       // Brief pause so user sees the "Reserving" phase
       await new Promise(r => setTimeout(r, 900));
@@ -459,6 +491,99 @@ export default function ContractConfirmationPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* ── Terms & Conditions — editable before creating the agreement ── */}
+          <Card className="glass-card border-0">
+            <CardContent className="p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-primary" />
+                <h3 className="font-semibold text-sm">Terms &amp; Conditions</h3>
+              </div>
+              <p className="text-xs text-muted-foreground -mt-2">
+                These appear on the agreement PDF. Adjust the standard terms or add your own below.
+              </p>
+
+              <div className="space-y-2.5">
+                {STANDARD_TERMS.map((t) => {
+                  const checked = standardTermIds.includes(t.id);
+                  return (
+                    <label
+                      key={t.id}
+                      htmlFor={`cterm-${t.id}`}
+                      className="flex items-start gap-3 p-3 rounded-lg border border-border/60 bg-background/60 hover:border-primary/40 transition-colors cursor-pointer"
+                    >
+                      <Checkbox
+                        id={`cterm-${t.id}`}
+                        checked={checked}
+                        onCheckedChange={(next) => {
+                          setStandardTermIds((cur) =>
+                            next ? Array.from(new Set([...cur, t.id])) : cur.filter((id) => id !== t.id),
+                          );
+                        }}
+                        className="mt-0.5"
+                        data-testid={`checkbox-agreement-term-${t.id}`}
+                      />
+                      <span className="text-sm leading-relaxed">{t.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="space-y-3 pt-2 border-t border-border/60">
+                <div>
+                  <Label className="text-xs font-semibold">Your own terms (optional)</Label>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Add clauses specific to this agreement — exclusivity, usage rights, posting schedule, revisions, etc.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  {customTermsList.map((term, i) => (
+                    <div key={i} className="flex gap-2 items-start">
+                      <span className="flex-shrink-0 w-6 h-9 flex items-center justify-center text-xs font-semibold text-muted-foreground tabular-nums">
+                        {i + 1}.
+                      </span>
+                      <div className="flex-1">
+                        <Input
+                          value={term}
+                          onChange={(e) =>
+                            setCustomTermsList((cur) => cur.map((t, j) => (j === i ? e.target.value : t)))
+                          }
+                          placeholder={i === 0 ? "e.g. Content must be posted by 5pm IST" : "Add another clause"}
+                          className="h-9"
+                          data-testid={`input-agreement-custom-term-${i}`}
+                        />
+                      </div>
+                      {customTermsList.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 flex-shrink-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => setCustomTermsList((cur) => cur.filter((_, j) => j !== i))}
+                          aria-label={`Remove term ${i + 1}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-9 border-dashed"
+                  onClick={() => setCustomTermsList((cur) => [...cur, ""])}
+                  data-testid="button-add-agreement-custom-term"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  Add another term
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="flex items-start gap-3 p-4 rounded-xl bg-muted/40">
             <Checkbox
