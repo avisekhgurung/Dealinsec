@@ -74,8 +74,15 @@ export function InvoiceAttachments({ invoiceId }: { invoiceId: number | string }
         credentials: "include",
       });
       if (!res.ok) {
-        const msg = (await res.text()) || "Upload failed";
-        throw new Error(msg);
+        // Prefer the server's structured reason; fall back to a generic hint.
+        let msg = "";
+        try {
+          const body = await res.json();
+          msg = body?.error || body?.reason || "";
+        } catch {
+          msg = (await res.text().catch(() => "")) || "";
+        }
+        throw new Error(msg || `Upload failed (${res.status})`);
       }
       return res.json();
     },
@@ -83,10 +90,10 @@ export function InvoiceAttachments({ invoiceId }: { invoiceId: number | string }
       queryClient.invalidateQueries({ queryKey: listKey });
       toast({ title: "Document attached", description: `${category} saved to this invoice.` });
     },
-    onError: () => {
+    onError: (err: any) => {
       toast({
         title: "Upload failed",
-        description: "Use a PDF or image under 5 MB and try again.",
+        description: err?.message || "Use a PDF or image under 5 MB and try again.",
         variant: "destructive",
       });
     },

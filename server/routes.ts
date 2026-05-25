@@ -756,9 +756,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mimeType: req.file.mimetype,
       });
       res.status(201).json(attachment);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Attachment upload error:", error);
-      res.status(500).json({ error: "Failed to upload document" });
+      const msg = String(error?.message || "");
+      // Most common cause: the invoice_attachments table hasn't been created
+      // yet (db:push not run). Surface a clear, actionable reason.
+      const missingTable = /relation .*invoice_attachments.* does not exist|no such table/i.test(msg);
+      res.status(500).json({
+        error: missingTable
+          ? "Document storage isn't set up yet. Run the database migration (npm run db:push)."
+          : "Failed to upload document",
+        reason: msg || undefined,
+      });
     }
   });
 
