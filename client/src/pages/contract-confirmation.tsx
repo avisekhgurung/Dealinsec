@@ -13,7 +13,7 @@ import { ArrowLeft, Shield, AlertTriangle, PenLine, Loader2, CreditCard, CheckCi
 import { useAuth } from "@/hooks/useAuth";
 import { CreditAnimationOverlay } from "@/components/credit-animation-overlay";
 import { STANDARD_TERMS } from "@shared/schema";
-import type { Deal } from "@shared/schema";
+import type { Deal, Contract } from "@shared/schema";
 
 type Phase = "reserving" | "creating" | "done";
 
@@ -47,6 +47,13 @@ export default function ContractConfirmationPage() {
   const { data: deal, isLoading } = useQuery<Deal>({
     queryKey: ["/api/deals", params.id],
   });
+
+  // One deal → one agreement. If this deal already has a contract, we block
+  // creating another (and never charge a second credit).
+  const { data: contracts = [] } = useQuery<Contract[]>({
+    queryKey: ["/api/contracts"],
+  });
+  const existingContract = contracts.find((c) => c.dealId === Number(params.id));
 
   // Seed the terms editor from the deal once it loads (standard terms default
   // to all selected, matching the deal-creation behaviour).
@@ -165,6 +172,15 @@ export default function ContractConfirmationPage() {
           variant: "destructive",
         });
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      } else if (error?.message?.includes("409")) {
+        // Deal already has an agreement (e.g. created in another tab). No credit
+        // was charged — send the user to the existing agreement.
+        toast({
+          title: "Agreement already exists",
+          description: "This deal already has an agreement, so no new one was created.",
+        });
+        queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
+        setLocation(`/deals/${params.id}`);
       } else {
         toast({
           title: "Error",
@@ -216,6 +232,60 @@ export default function ContractConfirmationPage() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Deal not found</p>
+      </div>
+    );
+  }
+
+  // This deal already has an agreement — block creating a duplicate (and a
+  // second credit charge). Point the user to the existing one instead.
+  if (existingContract) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="glass-header sticky top-0 z-40">
+          <div className="flex items-center gap-3 px-4 py-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation(`/deals/${params.id}`)}
+              data-testid="button-back-deal"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h1 className="text-xl font-bold">Create Agreement</h1>
+          </div>
+        </header>
+        <main className="px-4 py-8 max-w-lg mx-auto animate-fade-in">
+          <Card className="glass-card border-0">
+            <CardContent className="p-6 text-center space-y-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 mx-auto">
+                <CheckCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold">Agreement already created</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  This deal already has an agreement. A deal can have only one agreement —
+                  no extra credit is needed.
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 pt-2">
+                <Button
+                  className="w-full h-12 rounded-xl gradient-btn text-white"
+                  onClick={() => setLocation(`/contracts/${existingContract.id}`)}
+                  data-testid="button-view-existing-agreement"
+                >
+                  View Agreement
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full h-12 rounded-xl"
+                  onClick={() => setLocation(`/deals/${params.id}`)}
+                >
+                  Back to Deal
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </main>
       </div>
     );
   }

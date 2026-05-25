@@ -274,6 +274,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: parsed.error.errors });
       }
 
+      // One deal → one agreement. Guard against duplicates (e.g. the user hits
+      // the confirmation page again via back-button) BEFORE deducting a credit,
+      // so they're never charged twice for the same deal.
+      const existingContract = await storage.getContractByDealId(parsed.data.dealId);
+      if (existingContract) {
+        return res.status(409).json({
+          error: "An agreement already exists for this deal.",
+          contractId: existingContract.id,
+        });
+      }
+
       const creditDeducted = await storage.deductCreditIfSufficient(userId);
       if (!creditDeducted) {
         const user = await storage.getUser(userId);

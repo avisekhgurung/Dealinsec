@@ -30,6 +30,7 @@ export interface IStorage {
 
   getContracts(userId: string): Promise<Contract[]>;
   getContract(id: number): Promise<Contract | undefined>;
+  getContractByDealId(dealId: number): Promise<Contract | undefined>;
   createContract(contract: InsertContract): Promise<Contract>;
   updateContract(id: number, updates: Partial<Contract>): Promise<Contract | undefined>;
   getContractsForBrand(brandUserId: string): Promise<Contract[]>;
@@ -145,6 +146,11 @@ export class DatabaseStorage implements IStorage {
 
   async getContract(id: number): Promise<Contract | undefined> {
     const [contract] = await db.select().from(contracts).where(eq(contracts.id, id));
+    return contract;
+  }
+
+  async getContractByDealId(dealId: number): Promise<Contract | undefined> {
+    const [contract] = await db.select().from(contracts).where(eq(contracts.dealId, dealId));
     return contract;
   }
 
