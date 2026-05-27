@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import { AppLoader, RouteLoader } from "@/components/app-loader";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { InstallPrompt } from "@/components/install-prompt";
 import { ConfirmProvider } from "@/components/confirm-dialog";
+import { trackPageView } from "@/lib/analytics";
 import { useLocation } from "wouter";
 
 // Eagerly loaded — always needed for first render
@@ -61,6 +62,13 @@ function isFullBleedRoute(pathname: string) {
 function Router() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const [location] = useLocation();
+
+  // Fire a GA4 page_view on every SPA route change (and on first render).
+  // The gtag config in index.html has send_page_view:false, so this is the
+  // single source of truth for page views.
+  useEffect(() => {
+    trackPageView(location);
+  }, [location]);
 
   // Initial app load (auth check) → full branded splash, shown once per session
   if (isLoading) {

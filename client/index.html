@@ -25,6 +25,17 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <title>Dealinsec — Deals in seconds. Secured.</title>
+
+    <!-- Google Analytics (GA4) -->
+    <!-- SPA route changes are tracked from the React side (see lib/analytics.ts),
+         so we disable the automatic first-load page_view to avoid double-counting. -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-W3VTLRH79B"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){ dataLayer.push(arguments); }
+      gtag('js', new Date());
+      gtag('config', 'G-W3VTLRH79B', { send_page_view: false });
+    </script>
   </head>
   <body>
     <div id="root"></div>
