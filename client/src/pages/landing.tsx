@@ -130,10 +130,10 @@ const WORKFLOW_STEPS = [
 ];
 
 const STATS = [
-  { value: "60s", label: "To first invoice", sub: "From signup to sent" },
-  { value: "50+", label: "Early users", sub: "Creators · Freelancers · Agencies" },
-  { value: "₹28L+", label: "Deal value transacted", sub: "Across 120+ deals" },
-  { value: "99.9%", label: "Uptime", sub: "Enterprise-grade" },
+  { value: "5-in-1", label: "One workflow", sub: "Deals · Quotes · Contracts · Invoices · Insights" },
+  { value: "60s", label: "To your first invoice", sub: "From signup to sent" },
+  { value: "₹0", label: "Platform fee", sub: "On every deal you close" },
+  { value: "GST", label: "Ready invoices", sub: "UPI · PAN · IFSC built in" },
 ];
 
 const TESTIMONIALS = [
@@ -352,7 +352,7 @@ export default function LandingPage() {
         <WorkflowSection />
         <ProductShowcase />
         <StatsSection />
-        <Testimonials />
+        {/* Testimonials hidden until we have real users. Re-enable <Testimonials /> once you have genuine quotes. */}
         <ReferralSection onCTA={() => (isAuthenticated ? setLocation("/profile") : openAuth("signup"))} />
         <PricingPreview onCTA={() => (isAuthenticated ? setLocation("/pricing") : openAuth("signup"))} />
         <FAQSection />
@@ -783,7 +783,7 @@ function Hero({
               variants={fadeUp}
               className="text-[2.5rem] sm:text-5xl lg:text-[4.5rem] font-bold tracking-tight leading-[1.02]"
             >
-              Deals. In seconds.
+              Get every deal in writing.
               <br />
               <span
                 className="relative inline-block"
@@ -794,7 +794,7 @@ function Hero({
                   backgroundClip: "text",
                 }}
               >
-                Secured for life.
+                And get paid on time.
                 <motion.span
                   className="absolute -bottom-1 left-0 right-0 h-[6px] rounded-full opacity-40"
                   style={{ background: "linear-gradient(90deg, transparent, #10B981, transparent)" }}
@@ -806,8 +806,8 @@ function Hero({
             </motion.h1>
 
             <motion.p variants={fadeUp} className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
-              Quotations, agreements, invoices and payments —{" "}
-              <span className="font-semibold text-neutral-900 dark:text-white">one workflow for creators, freelancers, agencies, and every service business that closes deals.</span>{" "}
+              One simple workflow — quotation, agreement, invoice, payment —{" "}
+              <span className="font-semibold text-neutral-900 dark:text-white">so you look professional, never chase a client, and get paid on time.</span>{" "}
               Built for India.
             </motion.p>
 
