@@ -41,6 +41,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import { trackEvent } from "@/lib/analytics";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -312,6 +313,7 @@ export default function LandingPage() {
         lastName: signupLastName,
         referralCode: referralCode || undefined,
       });
+      trackEvent("sign_up", { method: "email", referred: !!referralCode });
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       setAuthModalOpen(false);
       setLocation("/dashboard");

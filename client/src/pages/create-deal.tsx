@@ -34,6 +34,7 @@ import {
   getDeliverableLabels,
   type DealType,
 } from "@shared/dealTypeTaxonomy";
+import { trackEvent } from "@/lib/analytics";
 
 const formSchema = insertDealSchema.omit({ userId: true }).extend({
   brandName: z.string().min(1, "Client / brand name is required"),
@@ -115,6 +116,7 @@ export default function CreateDealPage() {
       return res.json();
     },
     onSuccess: (deal) => {
+      trackEvent("create_deal", { deal_type: deal?.dealType });
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
       toast({
         title: "Deal created",

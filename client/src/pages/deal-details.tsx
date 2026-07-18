@@ -12,6 +12,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { trackEvent } from "@/lib/analytics";
 import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle } from "lucide-react";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
 
@@ -75,6 +76,7 @@ export default function DealDetailsPage() {
       return res.json();
     },
     onSuccess: () => {
+      trackEvent("generate_quote");
       queryClient.invalidateQueries({ queryKey: ["/api/deals", params.id, "quote"] });
       setLocation(`/deals/${params.id}/quote`);
     },

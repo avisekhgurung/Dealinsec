@@ -75,8 +75,59 @@ async function initStripe() {
   }
 }
 
+// Canonical host + scheme. Google indexed three variants of this site
+// (http://, https://apex, https://www) as separate pages, splitting ranking
+// signal. Force one canonical origin with 301s so link equity consolidates.
+// Behind Cloudflare + Render, the real scheme/host arrive in x-forwarded-*.
+const CANONICAL_HOST = process.env.CANONICAL_HOST || "www.dealinsec.com";
+
+function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
+  // Only enforce in production and only for the real domain — never touch
+  // localhost, Render's *.onrender.com health checks, or preview hosts.
+  if (process.env.NODE_ENV !== "production") return next();
+
+  const forwardedHost = (req.headers["x-forwarded-host"] as string) || req.headers.host || "";
+  const host = forwardedHost.split(":")[0].toLowerCase();
+  const proto = ((req.headers["x-forwarded-proto"] as string) || req.protocol || "https")
+    .split(",")[0].trim();
+
+  // Apex or bare domain → canonical host; any http → https. Leave unrelated
+  // hosts (onrender.com, etc.) alone so infra keeps working.
+  const isOurDomain = host === "dealinsec.com" || host === "www.dealinsec.com";
+  const needsHostFix = isOurDomain && host !== CANONICAL_HOST;
+  const needsProtoFix = isOurDomain && proto !== "https";
+
+  if (needsHostFix || needsProtoFix) {
+    return res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
+  }
+  return next();
+}
+
 (async () => {
   await initStripe();
+
+  app.use(canonicalRedirect);
+
+  // robots.txt — allow crawling, point at the sitemap. App/API routes are not
+  // linked publicly, so we don't need to disallow them for SEO.
+  app.get("/robots.txt", (_req, res) => {
+    res.type("text/plain").send(
+      `User-agent: *\nAllow: /\n\nSitemap: https://${CANONICAL_HOST}/sitemap.xml\n`,
+    );
+  });
+
+  // sitemap.xml — the public, indexable pages only (the app itself is behind
+  // auth and intentionally excluded).
+  app.get("/sitemap.xml", (_req, res) => {
+    const base = `https://${CANONICAL_HOST}`;
+    const paths = ["/", "/pitch", "/terms", "/privacy", "/cookies", "/refund"];
+    const urls = paths
+      .map((p) => `  <url>\n    <loc>${base}${p}</loc>\n    <changefreq>weekly</changefreq>\n  </url>`)
+      .join("\n");
+    res
+      .type("application/xml")
+      .send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
+  });
 
   app.post(
     '/api/stripe/webhook/:uuid',
