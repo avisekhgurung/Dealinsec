@@ -1,21 +1,104 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { type ColumnDef } from "@tanstack/react-table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
 import { StatusBadge } from "@/components/status-badge";
+import { DataTable } from "@/components/data-table/data-table";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { unguardCell } from "@/lib/csv";
+import { useToast } from "@/hooks/use-toast";
 import { Plus, Briefcase, ChevronRight, Calendar, Search, X } from "lucide-react";
 import { dealTypeMeta } from "@shared/dealTypeTaxonomy";
 import type { Deal } from "@shared/schema";
 
 type FilterType = "all" | "pending" | "active" | "completed";
 
+const fmtDate = (s: string) =>
+  new Date(s).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+function uuid(): string {
+  try { return crypto.randomUUID(); } catch { return `id-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
+}
+
+// Desktop table columns.
+const columns: ColumnDef<Deal>[] = [
+  {
+    accessorKey: "brandName",
+    header: "Brand",
+    meta: { label: "Brand" },
+    cell: ({ row }) => <span className="font-semibold text-foreground">{row.original.brandName}</span>,
+  },
+  {
+    accessorKey: "dealTitle",
+    header: "Deal",
+    meta: { label: "Deal" },
+    cell: ({ row }) => <span className="text-muted-foreground">{row.original.dealTitle}</span>,
+  },
+  {
+    accessorKey: "dealType",
+    header: "Type",
+    meta: { label: "Type" },
+    cell: ({ row }) => {
+      const t = (row.original as any).dealType as string | undefined;
+      return t ? (
+        <span className="text-xs px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
+          {(dealTypeMeta as any)[t]?.emoji ?? "·"} {t}
+        </span>
+      ) : <span className="text-muted-foreground">—</span>;
+    },
+  },
+  {
+    accessorKey: "dealAmount",
+    header: "Amount",
+    meta: { label: "Amount", align: "right", exportValue: (d) => d.dealAmount },
+    cell: ({ row }) => <span className="font-semibold text-primary tabular-nums">₹{row.original.dealAmount.toLocaleString("en-IN")}</span>,
+  },
+  {
+    accessorKey: "startDate",
+    header: "Start",
+    meta: { label: "Start", exportValue: (d) => d.startDate },
+    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.startDate)}</span>,
+  },
+  {
+    accessorKey: "endDate",
+    header: "End",
+    meta: { label: "End", exportValue: (d) => d.endDate },
+    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.endDate)}</span>,
+  },
+  {
+    id: "deliverables",
+    accessorFn: (d) => d.deliverables.length,
+    header: "Items",
+    meta: { label: "Deliverables", align: "center", exportValue: (d) => d.deliverables.length },
+    enableGlobalFilter: false,
+    cell: ({ row }) => <span className="tabular-nums">{row.original.deliverables.length}</span>,
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    meta: { label: "Status" },
+    cell: ({ row }) => <StatusBadge status={row.original.status} size="compact" />,
+    filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
+  },
+  {
+    id: "actions",
+    header: "",
+    enableSorting: false,
+    enableHiding: false,
+    cell: () => <ChevronRight className="w-4 h-4 text-muted-foreground" />,
+  },
+];
+
 export default function DealsPage() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [search, setSearch] = useState("");
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
 
   const { data: deals = [], isLoading } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
@@ -23,12 +106,9 @@ export default function DealsPage() {
 
   const filteredDeals = useMemo(() => {
     return deals.filter((deal) => {
-      // Status filter
       if (filter === "pending" && deal.status !== "Pending") return false;
       if (filter === "active" && deal.status !== "Active") return false;
       if (filter === "completed" && deal.status !== "Completed") return false;
-
-      // Search filter
       if (search.trim()) {
         const q = search.toLowerCase().trim();
         return (
@@ -37,18 +117,9 @@ export default function DealsPage() {
           deal.dealAmount.toString().includes(q)
         );
       }
-
       return true;
     });
   }, [deals, filter, search]);
-
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  };
 
   const filters: { value: FilterType; label: string }[] = [
     { value: "all", label: "All" },
@@ -57,15 +128,52 @@ export default function DealsPage() {
     { value: "completed", label: "Completed" },
   ];
 
+  // Bulk-create deals from an imported CSV (round-trips the export format).
+  async function importDeals(rows: Record<string, string>[]) {
+    if (!rows.length) {
+      toast({ title: "Nothing to import", description: "No rows found in the file.", variant: "destructive" });
+      return;
+    }
+    const today = new Date().toISOString().split("T")[0];
+    let ok = 0, skipped = 0;
+    for (const r of rows) {
+      // unguardCell reverses the export's formula-guard apostrophe so a value
+      // like "@nike" round-trips cleanly instead of becoming "'@nike".
+      const brandName = unguardCell((r["Brand"] ?? r["brandName"] ?? "").trim());
+      const dealTitle = unguardCell((r["Deal"] ?? r["dealTitle"] ?? "").trim());
+      const amount = parseInt(String(r["Amount"] ?? r["dealAmount"] ?? "").replace(/[^0-9]/g, ""), 10);
+      if (!brandName || !dealTitle) { skipped++; continue; }
+      try {
+        await apiRequest("POST", "/api/deals", {
+          brandName,
+          dealTitle,
+          dealType: unguardCell((r["Type"] ?? r["dealType"] ?? "Creator").trim()) || "Creator",
+          dealAmount: Number.isFinite(amount) ? amount : 0,
+          startDate: unguardCell((r["Start"] ?? r["startDate"] ?? today).trim()) || today,
+          endDate: unguardCell((r["End"] ?? r["endDate"] ?? today).trim()) || today,
+          deliverables: [{ id: uuid(), platform: "General", contentType: "Service", quantity: 1, frequency: "One-time" }],
+          deliverableMode: "all",
+          standardTermIds: [],
+        });
+        ok++;
+      } catch { skipped++; }
+    }
+    await queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+    toast({
+      title: `Imported ${ok} deal${ok !== 1 ? "s" : ""}`,
+      description: skipped ? `${skipped} row${skipped !== 1 ? "s" : ""} skipped (missing brand or title).` : "All rows imported.",
+    });
+  }
+
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-12">
       <header className="glass-header sticky top-0 z-40 lg:border-b lg:border-neutral-200/60 dark:lg:border-neutral-800/60">
-        <div className="px-4 py-4 space-y-3 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-6 lg:space-y-5">
+        <div className="px-4 py-4 space-y-3 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-6 lg:space-y-0">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h1 className="text-xl lg:text-3xl font-bold tracking-tight">Deals</h1>
               <p className="hidden lg:block text-sm text-muted-foreground mt-0.5">
-                {filteredDeals.length} {filteredDeals.length === 1 ? "deal" : "deals"} · {filter !== "all" ? filter : "all statuses"}
+                {deals.length} {deals.length === 1 ? "deal" : "deals"} total
               </p>
             </div>
             <Link href="/deals/new">
@@ -76,15 +184,15 @@ export default function DealsPage() {
             </Link>
           </div>
 
-          <div className="flex flex-col lg:flex-row lg:items-center lg:gap-4 gap-3">
-            {/* Search bar */}
-            <div className="relative flex-1 lg:max-w-md">
+          {/* Mobile-only search + status chips (desktop uses the table toolbar) */}
+          <div className="flex flex-col gap-3 lg:hidden">
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search deals..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 pr-8 h-9 lg:h-10 bg-white/50 dark:bg-white/5 rounded-xl text-sm"
+                className="pl-9 pr-8 h-9 bg-white/50 dark:bg-white/5 rounded-xl text-sm"
               />
               {search && (
                 <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -92,9 +200,7 @@ export default function DealsPage() {
                 </button>
               )}
             </div>
-
-            {/* Filters */}
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 lg:pb-0 lg:flex-shrink-0">
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
               {filters.map((f) => (
                 <Button
                   key={f.value}
@@ -112,107 +218,107 @@ export default function DealsPage() {
         </div>
       </header>
 
-      <main className="px-4 py-6 animate-fade-in lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-8 lg:space-y-8">
+      <main className="px-4 py-6 animate-fade-in lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-8">
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
               <Card key={i} className="glass-card border-0">
                 <CardContent className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-5 w-3/4" />
-                      <Skeleton className="h-4 w-1/2" />
-                    </div>
+                    <div className="flex-1 space-y-2"><Skeleton className="h-5 w-3/4" /><Skeleton className="h-4 w-1/2" /></div>
                     <Skeleton className="h-6 w-16 rounded-full" />
                   </div>
-                  <div className="flex items-center justify-between pt-3 border-t">
-                    <Skeleton className="h-6 w-24" />
-                    <Skeleton className="h-4 w-20" />
-                  </div>
+                  <div className="flex items-center justify-between pt-3 border-t"><Skeleton className="h-6 w-24" /><Skeleton className="h-4 w-20" /></div>
                 </CardContent>
               </Card>
             ))}
           </div>
-        ) : filteredDeals.length > 0 ? (
-          <div className="flex flex-col gap-4 lg:grid lg:grid-cols-2 lg:gap-5">
-            {filteredDeals.map((deal) => (
-              <Link key={deal.id} href={`/deals/${deal.id}`}>
-                <Card
-                  className="glass-card border hover-elevate active-elevate-2 cursor-pointer rounded-xl shadow-sm"
-                  data-testid={`card-deal-${deal.id}`}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold truncate">{deal.brandName}</p>
-                          {(deal as any).dealType && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-medium border border-primary/20 shrink-0">
-                              {(dealTypeMeta as any)[(deal as any).dealType]?.emoji ?? "·"} {(deal as any).dealType}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground truncate">{deal.dealTitle}</p>
-                      </div>
-                      <StatusBadge status={deal.status} size="compact" />
-                    </div>
-
-                    <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
-                      <Calendar className="w-3.5 h-3.5" />
-                      <span>{formatDate(deal.startDate)} - {formatDate(deal.endDate)}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/10">
-                      <span className="text-lg font-bold text-primary">
-                        ₹{deal.dealAmount.toLocaleString()}
-                      </span>
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <span className="text-xs">
-                          {deal.deliverables.length} deliverable{deal.deliverables.length !== 1 ? "s" : ""}
-                        </span>
-                        <ChevronRight className="w-4 h-4" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        ) : (
+        ) : deals.length === 0 ? (
           <Card className="glass-card border-0">
             <CardContent className="py-12 text-center">
-              <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted mx-auto mb-4">
-                <Briefcase className="w-8 h-8 text-muted-foreground" />
-              </div>
-              {search || filter !== "all" ? (
-                <>
-                  <h3 className="font-semibold mb-1">No matches found</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Try a different search or filter
-                  </p>
-                  <Button
-                    variant="outline"
-                    onClick={() => { setSearch(""); setFilter("all"); }}
-                  >
-                    Clear Filters
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <h3 className="font-semibold mb-1">No deals yet</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Create your first brand deal to get started
-                  </p>
-                  <Link href="/deals/new">
-                    <Button className="gradient-btn text-white" data-testid="button-create-deal-empty">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create Deal
-                    </Button>
-                  </Link>
-                </>
-              )}
+              <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted mx-auto mb-4"><Briefcase className="w-8 h-8 text-muted-foreground" /></div>
+              <h3 className="font-semibold mb-1">No deals yet</h3>
+              <p className="text-sm text-muted-foreground mb-4">Create your first brand deal to get started</p>
+              <Link href="/deals/new">
+                <Button className="gradient-btn text-white" data-testid="button-create-deal-empty"><Plus className="w-4 h-4 mr-2" />Create Deal</Button>
+              </Link>
             </CardContent>
           </Card>
+        ) : (
+          <>
+            {/* ── Desktop: data table ── */}
+            <div className="hidden lg:block">
+              <DataTable
+                columns={columns}
+                data={deals}
+                searchPlaceholder="Search deals..."
+                searchKeys={["brandName", "dealTitle", "dealAmount"]}
+                facetedFilters={[{
+                  columnId: "status",
+                  title: "Status",
+                  options: [
+                    { label: "Pending", value: "Pending" },
+                    { label: "Active", value: "Active" },
+                    { label: "Completed", value: "Completed" },
+                  ],
+                }]}
+                onRowClick={(deal) => setLocation(`/deals/${deal.id}`)}
+                exportFileName="deals"
+                onImport={importDeals}
+                emptyMessage="No deals match your filters."
+              />
+            </div>
+
+            {/* ── Mobile: cards ── */}
+            <div className="lg:hidden">
+              {filteredDeals.length > 0 ? (
+                <div className="flex flex-col gap-4">
+                  {filteredDeals.map((deal) => (
+                    <Link key={deal.id} href={`/deals/${deal.id}`}>
+                      <Card className="glass-card border hover-elevate active-elevate-2 cursor-pointer rounded-xl shadow-sm" data-testid={`card-deal-${deal.id}`}>
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-semibold truncate">{deal.brandName}</p>
+                                {(deal as any).dealType && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-medium border border-primary/20 shrink-0">
+                                    {(dealTypeMeta as any)[(deal as any).dealType]?.emoji ?? "·"} {(deal as any).dealType}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground truncate">{deal.dealTitle}</p>
+                            </div>
+                            <StatusBadge status={deal.status} size="compact" />
+                          </div>
+                          <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
+                            <Calendar className="w-3.5 h-3.5" />
+                            <span>{fmtDate(deal.startDate)} - {fmtDate(deal.endDate)}</span>
+                          </div>
+                          <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/10">
+                            <span className="text-lg font-bold text-primary">₹{deal.dealAmount.toLocaleString()}</span>
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                              <span className="text-xs">{deal.deliverables.length} deliverable{deal.deliverables.length !== 1 ? "s" : ""}</span>
+                              <ChevronRight className="w-4 h-4" />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <Card className="glass-card border-0">
+                  <CardContent className="py-12 text-center">
+                    <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted mx-auto mb-4"><Briefcase className="w-8 h-8 text-muted-foreground" /></div>
+                    <h3 className="font-semibold mb-1">No matches found</h3>
+                    <p className="text-sm text-muted-foreground mb-4">Try a different search or filter</p>
+                    <Button variant="outline" onClick={() => { setSearch(""); setFilter("all"); }}>Clear Filters</Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </>
         )}
       </main>
 
