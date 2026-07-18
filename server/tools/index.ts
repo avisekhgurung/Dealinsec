@@ -6,10 +6,24 @@
  * gets a route, a card on /tools, and an entry in the sitemap automatically.
  */
 import type { Express } from "express";
+import fs from "fs";
+import path from "path";
 import { renderToolPage, esc } from "./layout";
 import { gstInvoicePage, gstInvoiceMeta } from "./gst-invoice";
 import { quotationMakerPage, quotationMakerMeta } from "./quotation-maker";
 import { serviceAgreementPage, serviceAgreementMeta } from "./service-agreement";
+
+// html-to-image UMD bundle (for PNG export), read once and served self-hosted
+// so the tool pages have no external CDN dependency.
+let HTML_TO_IMAGE_JS = "";
+try {
+  HTML_TO_IMAGE_JS = fs.readFileSync(
+    path.join(process.cwd(), "node_modules/html-to-image/dist/html-to-image.js"),
+    "utf8",
+  );
+} catch {
+  /* library missing — PNG/Share export will no-op gracefully */
+}
 
 interface ToolDef {
   slug: string;
@@ -107,6 +121,9 @@ function toolsIndexPage(): string {
 }
 
 export function registerToolPages(app: Express) {
+  app.get("/tools/lib/html-to-image.js", (_req, res) => {
+    res.type("application/javascript").setHeader("Cache-Control", "public, max-age=86400").send(HTML_TO_IMAGE_JS);
+  });
   app.get("/tools", (_req, res) => res.type("html").send(toolsIndexPage()));
   for (const t of TOOLS) {
     app.get(t.path, (_req, res) => res.type("html").send(t.render()));

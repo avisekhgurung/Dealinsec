@@ -148,6 +148,35 @@ const STYLES = `<style>
   .sig-pad{width:100%;height:100px;border:1.5px dashed var(--line);border-radius:12px;background:#fff;touch-action:none;cursor:crosshair;display:block}
   .sig-actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
 
+  /* ── Export panel (download / share) ── */
+  .export-overlay{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);opacity:0;visibility:hidden;transition:opacity .2s ease,visibility .2s ease}
+  .export-overlay.open{opacity:1;visibility:visible}
+  .export-sheet{width:100%;max-width:440px;background:var(--card);border-radius:22px;box-shadow:0 24px 60px rgba(0,0,0,.28);transform:translateY(18px) scale(.97);opacity:0;transition:transform .3s cubic-bezier(.34,1.4,.5,1),opacity .3s ease;overflow:hidden}
+  .export-overlay.open .export-sheet{transform:translateY(0) scale(1);opacity:1}
+  .export-hero{background:linear-gradient(135deg,var(--green),var(--green-d));color:#fff;padding:26px 24px 22px;text-align:center;position:relative}
+  .export-check{width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center;margin:0 auto 12px;animation:eo-pop .45s cubic-bezier(.34,1.56,.64,1) both}
+  .export-hero h3{color:#fff;font-size:19px;margin:0 0 3px;font-weight:800}
+  .export-hero p{color:#DCFCE7;font-size:13px;margin:0}
+  .export-close{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;border:0;background:rgba(255,255,255,.18);color:#fff;font-size:20px;cursor:pointer;line-height:1;display:grid;place-items:center}
+  .export-close:hover{background:rgba(255,255,255,.3)}
+  .export-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:20px}
+  .export-opt{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:15px;border:1.5px solid var(--line);border-radius:16px;background:var(--card);cursor:pointer;text-align:left;transition:transform .15s,border-color .15s,box-shadow .15s;font-family:inherit}
+  .export-opt:hover{transform:translateY(-2px);border-color:var(--green);box-shadow:0 8px 20px rgba(16,24,40,.09)}
+  .export-opt .eo-ico{width:38px;height:38px;border-radius:11px;background:var(--accent-bg);color:var(--green-d);display:grid;place-items:center;margin-bottom:5px}
+  .export-opt .eo-spin{display:none;color:var(--green-d)}
+  .export-opt.busy{opacity:.7;pointer-events:none}
+  .export-opt.busy .eo-glyph{display:none}
+  .export-opt.busy .eo-spin{display:block;animation:eo-spin .8s linear infinite}
+  .export-opt b{font-size:14px;color:var(--ink)}
+  .export-opt small{font-size:11px;color:var(--muted);line-height:1.3}
+  @keyframes eo-pop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.14);opacity:1}100%{transform:scale(1)}}
+  @keyframes eo-spin{to{transform:rotate(360deg)}}
+  @media(max-width:480px){.export-overlay{align-items:flex-end;padding:0}.export-sheet{max-width:100%;border-radius:22px 22px 0 0}}
+
+  /* Documents use a system font stack so PNG/print export renders reliably
+     (no external web-font embedding needed). */
+  .print-doc, .print-doc *{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+
   /* ── Print: show ONLY the document (.print-doc), clean A4 ── */
   @media print{
     @page{size:A4;margin:14mm}
@@ -211,6 +240,31 @@ const SOCIALS = `<div class="socials">
   <a href="mailto:support@dealinsec.com" aria-label="Email"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="m3 6 9 6.5L21 6"/></svg></a>
 </div>`;
 
+const EO = {
+  spin: `<svg class="eo-spin" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></svg>`,
+  pdf: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>`,
+  png: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>`,
+  share: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>`,
+  print: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>`,
+  check: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+};
+const EXPORT_PANEL = `<div id="export-panel" class="export-overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Download or share">
+  <div class="export-sheet">
+    <div class="export-hero">
+      <button class="export-close" id="export-close" aria-label="Close">&times;</button>
+      <div class="export-check">${EO.check}</div>
+      <h3>Your document is ready</h3>
+      <p>Download it, or share it straight to your client</p>
+    </div>
+    <div class="export-grid">
+      <button type="button" class="export-opt" id="exp-pdf"><span class="eo-ico"><span class="eo-glyph">${EO.pdf}</span>${EO.spin}</span><b>Download PDF</b><small>Best for email &amp; print</small></button>
+      <button type="button" class="export-opt" id="exp-png"><span class="eo-ico"><span class="eo-glyph">${EO.png}</span>${EO.spin}</span><b>Download PNG</b><small>Image for chat &amp; social</small></button>
+      <button type="button" class="export-opt" id="exp-share"><span class="eo-ico"><span class="eo-glyph">${EO.share}</span>${EO.spin}</span><b>Share</b><small>WhatsApp, email &amp; more</small></button>
+      <button type="button" class="export-opt" id="exp-print"><span class="eo-ico"><span class="eo-glyph">${EO.print}</span>${EO.spin}</span><b>Print</b><small>Open the print dialog</small></button>
+    </div>
+  </div>
+</div>`;
+
 function footer(): string {
   const y = 2026;
   return `<footer class="site"><div class="wrap">
@@ -258,6 +312,7 @@ export function renderToolPage(o: ToolPageOptions): string {
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<script defer src="/tools/lib/html-to-image.js"></script>
 ${STYLES}
 ${o.headExtra || ""}
 ${ld}
@@ -266,6 +321,7 @@ ${ld}
 ${AMBIENT}
 ${header()}
 <main>${o.bodyHtml}</main>
+${EXPORT_PANEL}
 ${o.hideCtaBand ? "" : ctaBand()}
 ${footer()}
 ${o.bodyEndScripts || ""}

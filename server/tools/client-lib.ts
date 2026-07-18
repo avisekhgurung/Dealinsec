@@ -73,6 +73,66 @@ export const MEDIA_JS = `
   }
 `;
 
+// Export panel wiring. initExport(getEl, getName) opens the shared #export-panel
+// and handles Download PDF (print), Download PNG + Share (via window.htmlToImage,
+// loaded from /tools/lib/html-to-image.js), and Print. Requires COMMON_JS ($).
+export const EXPORT_JS = `
+  function initExport(getEl, getName){
+    var overlay=$('export-panel');
+    if(!overlay) return { open:function(){ window.print(); }, close:function(){} };
+    function open(){ overlay.classList.add('open'); overlay.setAttribute('aria-hidden','false'); }
+    function close(){ overlay.classList.remove('open'); overlay.setAttribute('aria-hidden','true'); }
+    function busy(btn,on){ if(btn) btn.classList[on?'add':'remove']('busy'); }
+    $('export-close').addEventListener('click', close);
+    overlay.addEventListener('click', function(e){ if(e.target===overlay) close(); });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape' && overlay.classList.contains('open')) close(); });
+
+    function toPng(cb, onErr){
+      if(!window.htmlToImage){ onErr('The image tool is still loading — please try again, or use Download PDF.'); return; }
+      var el=getEl(); if(!el){ onErr('Nothing to export yet.'); return; }
+      // html-to-image reads cssRules from every stylesheet; a CROSS-ORIGIN one
+      // (Google Fonts) throws a SecurityError and hangs the render. Detach any
+      // cross-origin stylesheet for the duration, then restore. The document
+      // uses a system font stack, so its appearance is unaffected, and the open
+      // export panel hides any brief flash on the page behind it.
+      var detached=[];
+      [].slice.call(document.querySelectorAll('link[rel="stylesheet"]')).forEach(function(l){
+        if(l.href && l.href.indexOf(location.origin+'/')!==0 && l.parentNode){ detached.push([l, l.nextSibling, l.parentNode]); l.parentNode.removeChild(l); }
+      });
+      function restore(){ detached.forEach(function(x){ if(x[2]) x[2].insertBefore(x[0], x[1]); }); }
+      var done=false;
+      var finish=function(fn, arg){ if(done)return; done=true; clearTimeout(to); restore(); fn(arg); };
+      var to=setTimeout(function(){ finish(onErr, 'Rendering took too long — please use Download PDF instead.'); }, 12000);
+      window.htmlToImage.toPng(el, { pixelRatio:2, backgroundColor:'#ffffff', skipFonts:true })
+        .then(function(d){ finish(cb, d); })
+        .catch(function(){ finish(onErr, 'Could not create the image. Please try Download PDF.'); });
+    }
+    function saveDataUrl(dataUrl){ var a=document.createElement('a'); a.href=dataUrl; a.download=getName()+'.png'; document.body.appendChild(a); a.click(); a.remove(); }
+    function printDoc(){ close(); setTimeout(function(){ window.print(); }, 240); }
+
+    $('exp-pdf').addEventListener('click', printDoc);
+    $('exp-print').addEventListener('click', printDoc);
+    $('exp-png').addEventListener('click', function(){ var btn=this; busy(btn,true);
+      toPng(function(dataUrl){ saveDataUrl(dataUrl); busy(btn,false); close(); },
+            function(msg){ busy(btn,false); alert(msg); });
+    });
+    $('exp-share').addEventListener('click', function(){ var btn=this; busy(btn,true);
+      toPng(function(dataUrl){
+        fetch(dataUrl).then(function(r){return r.blob();}).then(function(blob){
+          var file=new File([blob], getName()+'.png', {type:'image/png'});
+          if(navigator.canShare && navigator.canShare({files:[file]})){
+            navigator.share({ files:[file], title:getName() }).catch(function(){}).finally(function(){ busy(btn,false); close(); });
+          } else {
+            saveDataUrl(dataUrl); busy(btn,false); close();
+            alert('Direct sharing is not available on this device — the image was downloaded so you can attach it.');
+          }
+        }).catch(function(){ busy(btn,false); });
+      }, function(msg){ busy(btn,false); alert(msg); });
+    });
+    return { open:open, close:close };
+  }
+`;
+
 // A reusable description/qty/rate line-item editor bound to an #items container
 // and an #addItem button. Editing a value re-renders only the preview (keeps
 // focus); add/remove rebuild the rows. Requires COMMON_JS ($/esc) first.

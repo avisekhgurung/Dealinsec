@@ -6,7 +6,7 @@
  * turn a quotation into a signed deal + GST invoice inside DealInSec.
  */
 import { renderToolPage, SITE_ORIGIN } from "./layout";
-import { COMMON_JS, ITEMS_JS, MEDIA_JS } from "./client-lib";
+import { COMMON_JS, ITEMS_JS, MEDIA_JS, EXPORT_JS } from "./client-lib";
 import { STANDARD_TERMS } from "@shared/schema";
 
 const PATH = "/tools/quotation-maker";
@@ -151,7 +151,7 @@ const BODY = `
       <input class="f" id="sigName" placeholder="Signatory name (optional)" style="margin-top:8px" />
 
       <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
-        <button class="btn" id="download" type="button">⬇ Download PDF</button>
+        <button class="btn" id="download" type="button">⬇ Download / Share</button>
         <button class="btn ghost" id="reset" type="button">Reset</button>
       </div>
       <p class="muted" style="font-size:13px;margin-top:10px">Tip: in the print dialog choose <b>Save as PDF</b>.</p>
@@ -181,6 +181,7 @@ const PAGE_JS = `
   var IT=initItems(function(){ render(); save(); });
   var LOGO=initLogo('logo-input','logo-preview',function(){ render(); save(); });
   var SIG=initSignature('sig-pad',function(){ render(); save(); });
+  var EX=initExport(function(){ return $('invoice-preview'); }, function(){ return $('quoteNo').value||'Quotation'; });
 
   function collectTerms(){
     var out=[];
@@ -277,7 +278,7 @@ const PAGE_JS = `
     LOGO.clear(); SIG.clear();
     IT.set([]); IT.render(); render(); save();
   });
-  $('download').addEventListener('click',function(){ document.title=($('quoteNo').value||'Quotation'); window.print(); });
+  $('download').addEventListener('click',function(){ document.title=($('quoteNo').value||'Quotation'); EX.open(); });
 
   var saved=null; try{ saved=JSON.parse(localStorage.getItem(STORE)||'null'); }catch(e){}
   if(saved){
@@ -299,7 +300,7 @@ export function quotationMakerPage(): string {
     canonicalPath: PATH,
     jsonLd: jsonLd(),
     bodyHtml: BODY,
-    bodyEndScripts: "<script>(function(){" + COMMON_JS + MEDIA_JS + ITEMS_JS + PAGE_JS + "})();</script>",
+    bodyEndScripts: "<script>(function(){" + COMMON_JS + MEDIA_JS + EXPORT_JS + ITEMS_JS + PAGE_JS + "})();</script>",
   });
 }
 

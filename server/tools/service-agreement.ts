@@ -7,7 +7,7 @@
  * paid e-sign flow: "sign up free to e-sign and get counter-signed proof".
  */
 import { renderToolPage, SITE_ORIGIN } from "./layout";
-import { COMMON_JS, MEDIA_JS } from "./client-lib";
+import { COMMON_JS, MEDIA_JS, EXPORT_JS } from "./client-lib";
 
 const PATH = "/tools/service-agreement-template";
 const TITLE = "Free Service Agreement Template (India) — Download PDF | DealInSec";
@@ -133,7 +133,7 @@ const BODY = `
       </div>
 
       <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
-        <button class="btn" id="download" type="button">⬇ Download PDF</button>
+        <button class="btn" id="download" type="button">⬇ Download / Share</button>
         <button class="btn ghost" id="reset" type="button">Reset</button>
       </div>
       <p class="muted" style="font-size:13px;margin-top:10px">This template is a starting point, not legal advice. In the print dialog choose <b>Save as PDF</b>.</p>
@@ -162,6 +162,7 @@ const PAGE_JS = `
   var STORE='dis_agreement_v1';
   var LOGO=initLogo('logo-input','logo-preview',function(){ render(); save(); });
   var SIG=initSignature('sig-pad',function(){ render(); save(); });
+  var EX=initExport(function(){ return $('doc-preview'); }, function(){ return 'Service Agreement'+($('clName').value?' - '+$('clName').value:''); });
 
   function collect(){
     return {
@@ -230,7 +231,7 @@ const PAGE_JS = `
     ['spName','spAddr','clName','clAddr','effDate','scope','deliverables','startDate','endDate','fee','advancePct','revisions','govState','notes'].forEach(function(id){$(id).value='';});
     $('exclusive').checked=false; LOGO.clear(); SIG.clear(); render(); save();
   });
-  $('download').addEventListener('click',function(){ document.title=('Service Agreement'+($('clName').value?' - '+$('clName').value:'')); window.print(); });
+  $('download').addEventListener('click',function(){ document.title=('Service Agreement'+($('clName').value?' - '+$('clName').value:'')); EX.open(); });
 
   var saved=null; try{ saved=JSON.parse(localStorage.getItem(STORE)||'null'); }catch(e){}
   if(saved){
@@ -249,7 +250,7 @@ export function serviceAgreementPage(): string {
     canonicalPath: PATH,
     jsonLd: jsonLd(),
     bodyHtml: BODY,
-    bodyEndScripts: "<script>(function(){" + COMMON_JS + MEDIA_JS + PAGE_JS + "})();</script>",
+    bodyEndScripts: "<script>(function(){" + COMMON_JS + MEDIA_JS + EXPORT_JS + PAGE_JS + "})();</script>",
   });
 }
 
