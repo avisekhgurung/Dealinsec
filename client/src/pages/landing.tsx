@@ -1988,6 +1988,7 @@ function Footer() {
           <FooterColumn
             title="Resources"
             links={[
+              { label: "Free Tools", href: "/tools" },
               { label: "Cookies", href: "/cookies" },
               { label: "Contact", href: "mailto:support@dealinsec.com" },
             ]}
@@ -2096,7 +2097,10 @@ function FooterColumn({ title, links }: { title: string; links: { label: string;
       <p className="text-xs uppercase tracking-widest font-semibold text-neutral-900 dark:text-white mb-4">{title}</p>
       <ul className="space-y-2.5">
         {links.map((l) => {
-          const isHashOrExternal = l.href.startsWith("#") || l.href.startsWith("mailto:");
+          // /tools/* are server-rendered pages outside the SPA — they need a
+          // real navigation (plain <a>), not wouter client-side routing.
+          const isHashOrExternal =
+            l.href.startsWith("#") || l.href.startsWith("mailto:") || l.href.startsWith("/tools");
           if (isHashOrExternal) {
             return (
               <li key={l.label}>
