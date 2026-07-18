@@ -13,7 +13,7 @@ import {
   UserCircle, MapPin, FileText, PenTool, Landmark, X as XIcon, Sparkles
 } from "lucide-react";
 import {
-  AreaChart, Area, BarChart, Bar, Cell, PieChart, Pie,
+  BarChart, Bar, Cell, PieChart, Pie,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import type { Deal, Contract, Invoice, BrandInvoice } from "@shared/schema";
@@ -167,13 +167,15 @@ const TONE_STYLES: Record<StatTone, { bg: string; text: string }> = {
   slate:   { bg: "bg-slate-100 dark:bg-slate-800/60",     text: "text-slate-600 dark:text-slate-300" },
 };
 
-function StatCard({ title, value, icon: Icon, tone, href, loading }: {
+function StatCard({ title, value, icon: Icon, tone, href, loading, sub, trendUp }: {
   title: string;
   value: number | string;
   icon: any;
   tone: StatTone;
   href: string;
   loading: boolean;
+  sub?: string;
+  trendUp?: boolean;
 }) {
   const t = TONE_STYLES[tone];
   return (
@@ -193,8 +195,14 @@ function StatCard({ title, value, icon: Icon, tone, href, loading }: {
         {loading ? (
           <Skeleton className="h-7 lg:h-10 w-16 lg:w-24" />
         ) : (
-          <p className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl font-bold text-neutral-900 dark:text-white truncate leading-tight tracking-tight">
+          <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-neutral-900 dark:text-white truncate leading-tight tracking-tight">
             {value}
+          </p>
+        )}
+        {!loading && sub && (
+          <p className={`mt-1 lg:mt-1.5 text-[11px] lg:text-xs font-medium flex items-center gap-1 truncate ${trendUp ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-500 dark:text-neutral-400"}`}>
+            {trendUp && <TrendingUp className="w-3 h-3 lg:w-3.5 lg:h-3.5 shrink-0" strokeWidth={2.5} />}
+            {sub}
           </p>
         )}
       </div>
@@ -239,9 +247,18 @@ export default function DashboardPage() {
     .filter(d => d.status === "Pending")
     .reduce((s, d) => s + Number(d.dealAmount), 0);
 
+  // Stat-card sub-metrics (trend lines under each number)
+  const now = new Date();
+  const weekAgo = new Date(now.getTime() - 7 * 86400000);
+  const dealsThisMonth = deals.filter(d => {
+    const dt = new Date(d.startDate);
+    return dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear();
+  }).length;
+  const activeDealsCount = deals.filter(d => d.status === "Active").length;
+  const paidThisWeek = invoices.filter(i => i.status === "Paid" && new Date(i.invoiceDate) >= weekAgo).length;
+  const allSigned = contracts.length > 0 && signedContracts === contracts.length;
+
   // Chart data
-  const dealsOverTime = buildDealsOverTime(deals);
-  const revenueOverTime = buildRevenueOverTime(deals);
   const platformDist = buildPlatformDist(deals);
   const deliverableCompletion = useMemo(() => buildDeliverableCompletion(deals), [deals]);
   const totalDeliverables = deliverableCompletion.reduce((s, d) => s + d.total, 0);
@@ -418,11 +435,16 @@ export default function DashboardPage() {
         {/* ── Stat cards ── */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
           <StatCard title="Deals" value={totalDeals} icon={Briefcase}
-            tone="amber" href="/deals" loading={isLoading} />
+            tone="amber" href="/deals" loading={isLoading}
+            sub={dealsThisMonth > 0 ? `${dealsThisMonth} this month` : totalDeals > 0 ? "in your pipeline" : "none yet"}
+            trendUp={dealsThisMonth > 0} />
           <StatCard title="Agreements" value={signedContracts} icon={FileCheck}
-            tone="blue" href="/contracts" loading={isLoading} />
+            tone="blue" href="/contracts" loading={isLoading}
+            sub={allSigned ? "All signed" : signedContracts > 0 ? `${signedContracts} signed` : "none yet"} />
           <StatCard title="Paid Invoices" value={paidInvoices} icon={Receipt}
-            tone="emerald" href="/invoices" loading={isLoading} />
+            tone="emerald" href="/invoices" loading={isLoading}
+            sub={paidThisWeek > 0 ? `${paidThisWeek} this week` : paidInvoices > 0 ? "all settled" : "none yet"}
+            trendUp={paidThisWeek > 0} />
           <StatCard
             title="Pipeline Value"
             value={isLoading ? "…" : `₹${(totalRevenue + pendingRevenue).toLocaleString("en-IN")}`}
@@ -430,6 +452,7 @@ export default function DashboardPage() {
             tone="slate"
             href="/deals"
             loading={false}
+            sub={`${activeDealsCount} active deal${activeDealsCount !== 1 ? "s" : ""}`}
           />
         </section>
 
@@ -528,67 +551,6 @@ export default function DashboardPage() {
         {/* ── Charts (only shown when there's data) ── */}
         {deals.length > 0 && (
           <>
-            {/* Trend charts — side-by-side on desktop */}
-            <div className="grid lg:grid-cols-2 gap-3 lg:gap-5">
-              {/* Deals over time */}
-              {dealsOverTime.length > 1 && (
-                <Card className="glass-card border-0">
-                  <CardHeader className="pb-2 px-4 pt-4 lg:px-6 lg:pt-6">
-                    <CardTitle className="text-sm lg:text-base font-semibold">Deals Over Time</CardTitle>
-                    <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Monthly count of new deals</p>
-                  </CardHeader>
-                  <CardContent className="px-2 lg:px-4 pb-4 lg:pb-6">
-                    <div className="h-[180px] sm:h-[200px] lg:h-[320px] xl:h-[380px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={dealsOverTime} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="colorDeals" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />
-                              <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                          <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                          <Tooltip content={<CustomTooltip />} />
-                          <Area type="monotone" dataKey="count" name="Deals" stroke="#3B82F6" strokeWidth={2.5} fill="url(#colorDeals)" dot={{ r: 3, fill: "#3B82F6" }} activeDot={{ r: 5 }} />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Revenue over time */}
-              {revenueOverTime.length > 1 && (
-                <Card className="glass-card border-0">
-                  <CardHeader className="pb-2 px-4 pt-4 lg:px-6 lg:pt-6">
-                    <CardTitle className="text-sm lg:text-base font-semibold">Revenue Trend (₹)</CardTitle>
-                    <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Monthly platform-fee revenue</p>
-                  </CardHeader>
-                  <CardContent className="px-2 lg:px-4 pb-4 lg:pb-6">
-                    <div className="h-[180px] sm:h-[200px] lg:h-[320px] xl:h-[380px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={revenueOverTime} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                              <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                          <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false}
-                            tickFormatter={v => v >= 1000 ? `${Math.round(v / 1000)}k` : v} />
-                          <Tooltip content={<CustomTooltip prefix="₹" />} />
-                          <Area type="monotone" dataKey="amount" name="Revenue" stroke="#10b981" strokeWidth={2.5} fill="url(#colorRevenue)" dot={{ r: 3, fill: "#10b981" }} activeDot={{ r: 5 }} />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
 
             {/* Bottom row — Platform bar (wide) + Invoice Money pie (compact) */}
             {(platformDist.length > 0 || brandInvoices.length > 0) && (() => {
