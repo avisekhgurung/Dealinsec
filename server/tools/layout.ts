@@ -54,10 +54,11 @@ const STYLES = `<style>
   .btn.ghost:hover{background:#fff;border-color:var(--green)}
   header.site{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
   header.site .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
-  .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:19px;color:var(--ink);letter-spacing:-.01em}
+  /* Matches <DealinsecLogo size="md"> in the app header exactly. */
+  .brand{display:inline-flex;align-items:center;gap:10px;font-size:18px;font-weight:700;line-height:1;letter-spacing:-.025em;color:#171717}
   .brand:hover{text-decoration:none}
-  .logo{flex-shrink:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,.08))}
-  .brand-text{line-height:1}
+  .logo{flex-shrink:0;filter:drop-shadow(0 1px 1px rgba(0,0,0,.05))}
+  .brand-text{line-height:1;font-weight:700}
   .brand-accent{background:linear-gradient(135deg,#059669 0%,#0D9488 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#0D9488}
   .hero{padding:56px 0 20px;text-align:center}
   .hero h1{font-size:clamp(28px,5vw,44px);font-weight:800;letter-spacing:-.02em}
@@ -91,7 +92,7 @@ const STYLES = `<style>
 // Same mark as the React app's <DealinsecLogo> (client/src/components/
 // dealinsec-logo.tsx) — inlined as SVG so the server-rendered pages match the
 // landing page exactly: emerald gradient tile, geometric "D", gold accent seal.
-const LOGO_SVG = `<svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo" aria-hidden="true">
+const LOGO_SVG = `<svg width="36" height="36" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo" aria-hidden="true">
   <defs>
     <linearGradient id="dls-bg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#10B981"/><stop offset="0.55" stop-color="#059669"/><stop offset="1" stop-color="#0D9488"/></linearGradient>
     <linearGradient id="dls-sheen" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="white" stop-opacity="0.28"/><stop offset="0.5" stop-color="white" stop-opacity="0"/></linearGradient>
