@@ -8,6 +8,8 @@
 import type { Express } from "express";
 import { renderToolPage, esc } from "./layout";
 import { gstInvoicePage, gstInvoiceMeta } from "./gst-invoice";
+import { quotationMakerPage, quotationMakerMeta } from "./quotation-maker";
+import { serviceAgreementPage, serviceAgreementMeta } from "./service-agreement";
 
 interface ToolDef {
   slug: string;
@@ -19,7 +21,8 @@ interface ToolDef {
 
 export const TOOLS: ToolDef[] = [
   { ...gstInvoiceMeta, render: gstInvoicePage },
-  // Phase 2: quotation-maker, service-agreement-template
+  { ...quotationMakerMeta, render: quotationMakerPage },
+  { ...serviceAgreementMeta, render: serviceAgreementPage },
 ];
 
 /** Public paths for the sitemap (the /tools index + each tool). */
@@ -30,7 +33,7 @@ export function toolSitemapPaths(): string[] {
 function toolsIndexPage(): string {
   const cards = TOOLS.map(
     (t) => `<a class="card" href="${esc(t.path)}" style="display:block">
-      <h3 style="font-size:18px;margin-bottom:6px">${esc(t.title)}</h3>
+      <h2 style="font-size:18px;margin-bottom:6px">${esc(t.title)}</h2>
       <p class="muted" style="margin:0">${esc(t.blurb)}</p>
       <div style="margin-top:12px;color:var(--green);font-weight:700">Open tool →</div>
     </a>`,

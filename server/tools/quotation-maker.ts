@@ -1,38 +1,35 @@
 /**
- * Free GST Invoice Generator — the flagship SEO/lead-magnet page.
+ * Free Quotation / Estimate Maker — a lead-magnet SEO page.
  *
- * Fully server-rendered HTML (crawlable content + FAQ + structured data); the
- * invoice builder runs entirely in the browser via inline vanilla JS (no data
- * leaves the device). Funnels into signup for save / send / e-sign.
+ * Server-rendered content + in-browser quotation builder (line items, optional
+ * GST, standard T&Cs, amount in words, PDF via print). Funnels into signup:
+ * turn a quotation into a signed deal + GST invoice inside DealInSec.
  */
 import { renderToolPage, SITE_ORIGIN } from "./layout";
 import { COMMON_JS, ITEMS_JS } from "./client-lib";
+import { STANDARD_TERMS } from "@shared/schema";
 
-const PATH = "/tools/gst-invoice-generator";
-const TITLE = "Free GST Invoice Generator (India) — Download PDF | DealInSec";
+const PATH = "/tools/quotation-maker";
+const TITLE = "Free Quotation Maker (India) — Create & Download PDF | DealInSec";
 const DESC =
-  "Create a professional GST invoice online free. Auto CGST/SGST/IGST split, amount in words, instant PDF — no sign-up. For Indian freelancers, agencies & service businesses.";
+  "Make a professional quotation or estimate online free. Line items, optional GST, standard terms, amount in words, instant PDF — no sign-up. For Indian freelancers & service businesses.";
 
 const FAQ: { q: string; a: string }[] = [
   {
-    q: "Is this GST invoice generator really free?",
-    a: "Yes. You can create and download unlimited GST invoices as PDFs for free, with no sign-up required. The invoice is built right in your browser.",
+    q: "Is this quotation maker free?",
+    a: "Yes. Create and download unlimited quotations as PDFs for free, with no sign-up. Everything runs in your browser.",
   },
   {
-    q: "Do I need a GST number to make an invoice?",
-    a: "No. If you are not GST-registered you can leave the GSTIN fields blank and set the tax type to 'No GST', or simply omit the tax. If you are registered, add your GSTIN and choose CGST+SGST (same state) or IGST (different state).",
+    q: "What should a quotation include?",
+    a: "A good quotation shows your business and client details, a quotation number and date, a validity date, an itemised list of the work with quantities and rates, any applicable GST, the total, and clear terms such as advance payment and revisions.",
   },
   {
-    q: "What is the difference between CGST/SGST and IGST?",
-    a: "For a sale within the same state, GST splits into CGST and SGST (half each). For a sale to a different state, the full rate is charged as IGST. This tool applies the split automatically based on the tax type you pick.",
+    q: "What is the difference between a quotation and an invoice?",
+    a: "A quotation is an offer sent before work begins, showing the estimated price and terms. An invoice is a bill sent to collect payment for work delivered. This tool makes quotations; you can generate the matching GST invoice with our free invoice generator.",
   },
   {
-    q: "Is my data safe?",
-    a: "Everything is calculated in your browser. Your business and client details are never sent to or stored on our servers. Your inputs are saved only in your own browser (local storage) so you don't lose them on refresh.",
-  },
-  {
-    q: "Can I save clients and send invoices directly?",
-    a: "This free tool creates one-off invoices. To save clients, send invoices, set payment reminders, generate quotations and e-sign agreements, create a free DealInSec account.",
+    q: "Can I turn a quotation into a signed deal?",
+    a: "Yes. Create a free DealInSec account to send the quotation, convert it into an e-signable agreement, and raise the GST invoice — all tracked in one place.",
   },
 ];
 
@@ -45,7 +42,7 @@ function jsonLd(): object[] {
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
-      name: "DealInSec GST Invoice Generator",
+      name: "DealInSec Quotation Maker",
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
       offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
@@ -60,28 +57,17 @@ function jsonLd(): object[] {
         acceptedAnswer: { "@type": "Answer", text: f.a },
       })),
     },
-    {
-      "@context": "https://schema.org",
-      "@type": "HowTo",
-      name: "How to create a GST invoice",
-      step: [
-        { "@type": "HowToStep", name: "Add details", text: "Enter your business, client, invoice number and date." },
-        { "@type": "HowToStep", name: "Add items", text: "List each item or service with its quantity and rate." },
-        { "@type": "HowToStep", name: "Set GST", text: "Pick the GST rate and choose CGST+SGST or IGST." },
-        { "@type": "HowToStep", name: "Download PDF", text: "Click download and save the invoice as a PDF." },
-      ],
-    },
   ];
 }
 
 const BODY = `
 <div class="hero"><div class="wrap">
-  <h1>Free GST Invoice Generator</h1>
-  <p class="sub">Create a professional, GST-ready invoice in under a minute. Auto CGST / SGST / IGST calculation, amount in words, and an instant PDF download — no sign-up, no cost.</p>
+  <h1>Free Quotation Maker</h1>
+  <p class="sub">Create a clean, professional quotation in under a minute — line items, optional GST, standard terms and an instant PDF. No sign-up, no cost.</p>
   <div class="chips">
     <span class="chip">100% free</span>
     <span class="chip">No sign-up</span>
-    <span class="chip">Auto GST split</span>
+    <span class="chip">Standard T&amp;Cs built in</span>
     <span class="chip">Instant PDF</span>
     <span class="chip">Made for India</span>
   </div>
@@ -89,26 +75,25 @@ const BODY = `
 
 <section><div class="wrap">
   <div class="grid2">
-    <!-- FORM -->
     <div class="card" id="form-card">
-      <h2 style="font-size:18px">Invoice details</h2>
+      <h2 style="font-size:18px">Quotation details</h2>
 
       <label>Your business name</label>
       <input class="f" id="bizName" placeholder="e.g. Sunrise Studios" />
       <div class="row2">
         <div><label>Your GSTIN (optional)</label><input class="f" id="bizGstin" placeholder="e.g. 07AABCU9603R1ZM" /></div>
-        <div><label>Invoice number</label><input class="f" id="invNo" placeholder="INV-001" /></div>
+        <div><label>Quotation number</label><input class="f" id="quoteNo" placeholder="QUO-001" /></div>
       </div>
       <label>Your address</label>
       <textarea class="f" id="bizAddr" rows="2" placeholder="Street, City, State, PIN"></textarea>
 
       <hr style="border:none;border-top:1px solid var(--line);margin:18px 0" />
 
-      <label>Bill to (client name)</label>
+      <label>Quotation for (client name)</label>
       <input class="f" id="cliName" placeholder="e.g. Nova Coaching Pvt Ltd" />
       <div class="row2">
-        <div><label>Client GSTIN (optional)</label><input class="f" id="cliGstin" placeholder="Client GSTIN" /></div>
-        <div><label>Invoice date</label><input class="f" id="invDate" type="date" /></div>
+        <div><label>Quotation date</label><input class="f" id="quoteDate" type="date" /></div>
+        <div><label>Valid until</label><input class="f" id="validUntil" type="date" /></div>
       </div>
       <label>Client address</label>
       <textarea class="f" id="cliAddr" rows="2" placeholder="Client street, city, state, PIN"></textarea>
@@ -123,10 +108,10 @@ const BODY = `
         <div>
           <label>GST rate</label>
           <select class="f" id="gstRate">
-            <option value="0">No GST (0%)</option>
+            <option value="0" selected>No GST (0%)</option>
             <option value="5">5%</option>
             <option value="12">12%</option>
-            <option value="18" selected>18%</option>
+            <option value="18">18%</option>
             <option value="28">28%</option>
           </select>
         </div>
@@ -139,8 +124,16 @@ const BODY = `
         </div>
       </div>
 
-      <label>Notes / payment terms (optional)</label>
-      <textarea class="f" id="notes" rows="2" placeholder="e.g. Payment due within 7 days. UPI: yourname@upi"></textarea>
+      <label>Terms &amp; conditions</label>
+      <div id="terms" style="display:flex;flex-direction:column;gap:8px">
+        ${STANDARD_TERMS.map(
+          (t) =>
+            `<label style="display:flex;gap:8px;align-items:flex-start;font-weight:400;color:var(--ink);font-size:13px;margin:0"><input type="checkbox" class="tcbox" checked style="margin-top:3px" /> <span>${t.label}</span></label>`,
+        ).join("")}
+      </div>
+
+      <label style="margin-top:12px">Notes (optional)</label>
+      <textarea class="f" id="notes" rows="2" placeholder="e.g. Timelines confirmed on advance receipt."></textarea>
 
       <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
         <button class="btn" id="download" type="button">⬇ Download PDF</button>
@@ -149,26 +142,16 @@ const BODY = `
       <p class="muted" style="font-size:13px;margin-top:10px">Tip: in the print dialog choose <b>Save as PDF</b>.</p>
     </div>
 
-    <!-- PREVIEW -->
-    <div>
-      <div id="invoice-preview" class="card"></div>
-    </div>
+    <div><div id="invoice-preview" class="card"></div></div>
   </div>
 </div></section>
 
 <section><div class="wrap">
-  <h2>How to create a GST invoice</h2>
+  <h2>How to make a quotation</h2>
   <div class="steps">
-    <div class="step"><div class="n">1</div><b>Add details</b><p class="muted">Enter your business, your client, and the invoice number and date.</p></div>
-    <div class="step"><div class="n">2</div><b>Add items &amp; GST</b><p class="muted">List what you're billing for, then pick the GST rate and tax type.</p></div>
-    <div class="step"><div class="n">3</div><b>Download PDF</b><p class="muted">Your invoice updates live. Click download and save it as a PDF.</p></div>
-  </div>
-</div></section>
-
-<section><div class="wrap">
-  <div class="card">
-    <h2>What is a GST invoice?</h2>
-    <p class="muted">A GST invoice is a bill a registered business issues for goods or services, showing the GST charged. In India it typically includes the seller's and buyer's details and GSTIN, an invoice number and date, a description of the goods or services, the taxable value, the GST rate, and the tax split as CGST + SGST (for sales within the same state) or IGST (for inter-state sales). This generator formats all of that for you and totals it automatically.</p>
+    <div class="step"><div class="n">1</div><b>Add details</b><p class="muted">Your business, your client, the quotation number, date and validity.</p></div>
+    <div class="step"><div class="n">2</div><b>Add items &amp; terms</b><p class="muted">List the work with rates, add GST if needed, and pick your terms.</p></div>
+    <div class="step"><div class="n">3</div><b>Download PDF</b><p class="muted">The quotation updates live. Download and send it to your client.</p></div>
   </div>
 </div></section>
 
@@ -179,14 +162,23 @@ const BODY = `
 `;
 
 const PAGE_JS = `
-  var STORE='dis_gst_invoice_v1';
+  var STORE='dis_quote_v1';
   var IT=initItems(function(){ render(); save(); });
+
+  function collectTerms(){
+    var out=[];
+    document.querySelectorAll('.tcbox').forEach(function(cb){
+      if(cb.checked){ var s=cb.parentNode.querySelector('span'); if(s) out.push(s.textContent); }
+    });
+    return out;
+  }
+  function termStates(){ var out=[]; document.querySelectorAll('.tcbox').forEach(function(cb){ out.push(!!cb.checked); }); return out; }
 
   function collect(){
     return {
-      bizName:$('bizName').value, bizGstin:$('bizGstin').value, bizAddr:$('bizAddr').value, invNo:$('invNo').value,
-      cliName:$('cliName').value, cliGstin:$('cliGstin').value, cliAddr:$('cliAddr').value, invDate:$('invDate').value,
-      gstRate:$('gstRate').value, taxType:$('taxType').value, notes:$('notes').value, items:IT.get()
+      bizName:$('bizName').value, bizGstin:$('bizGstin').value, bizAddr:$('bizAddr').value, quoteNo:$('quoteNo').value,
+      cliName:$('cliName').value, cliAddr:$('cliAddr').value, quoteDate:$('quoteDate').value, validUntil:$('validUntil').value,
+      gstRate:$('gstRate').value, taxType:$('taxType').value, notes:$('notes').value, terms:termStates(), items:IT.get()
     };
   }
   function save(){ try{ localStorage.setItem(STORE, JSON.stringify(collect())); }catch(e){} }
@@ -209,26 +201,27 @@ const PAGE_JS = `
       if(taxType==='igst'){
         taxRows='<tr><td colspan="3" style="padding:5px 8px;text-align:right;color:#64748B">IGST ('+rate+'%)</td><td style="padding:5px 8px;text-align:right">'+money(taxTotal)+'</td></tr>';
       }else{
-        // Split so the two halves sum EXACTLY to the rounded tax (columns foot to total).
         var cgst=round2(taxTotal/2), sgst=round2(taxTotal-cgst);
         taxRows='<tr><td colspan="3" style="padding:5px 8px;text-align:right;color:#64748B">CGST ('+(rate/2)+'%)</td><td style="padding:5px 8px;text-align:right">'+money(cgst)+'</td></tr>'+
           '<tr><td colspan="3" style="padding:5px 8px;text-align:right;color:#64748B">SGST ('+(rate/2)+'%)</td><td style="padding:5px 8px;text-align:right">'+money(sgst)+'</td></tr>';
       }
     }
+    var terms=collectTerms();
+    var termsHtml = terms.length ? '<div style="margin-top:14px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;margin-bottom:4px">Terms &amp; conditions</div><ol style="margin:0;padding-left:18px;font-size:12px;color:#475569">'+terms.map(function(t){return '<li style="margin-bottom:3px">'+esc(t)+'</li>';}).join('')+'</ol></div>' : '';
     var bn=$('bizName').value||'Your Business';
     var html=''+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'+
         '<div><div style="font-size:20px;font-weight:800;color:#0F172A">'+esc(bn)+'</div>'+
           ($('bizGstin').value?'<div style="font-size:12px;color:#64748B">GSTIN: '+esc($('bizGstin').value)+'</div>':'')+
           '<div style="font-size:12px;color:#64748B;white-space:pre-line">'+esc($('bizAddr').value)+'</div></div>'+
-        '<div style="text-align:right"><div style="font-size:22px;font-weight:800;letter-spacing:.04em;color:#0E8C5A">INVOICE</div>'+
-          ($('invNo').value?'<div style="font-size:13px;color:#0F172A"># '+esc($('invNo').value)+'</div>':'')+
-          ($('invDate').value?'<div style="font-size:12px;color:#64748B">'+fmtDate($('invDate').value)+'</div>':'')+'</div>'+
+        '<div style="text-align:right"><div style="font-size:22px;font-weight:800;letter-spacing:.04em;color:#0E8C5A">QUOTATION</div>'+
+          ($('quoteNo').value?'<div style="font-size:13px;color:#0F172A"># '+esc($('quoteNo').value)+'</div>':'')+
+          ($('quoteDate').value?'<div style="font-size:12px;color:#64748B">Date: '+fmtDate($('quoteDate').value)+'</div>':'')+
+          ($('validUntil').value?'<div style="font-size:12px;color:#64748B">Valid until: '+fmtDate($('validUntil').value)+'</div>':'')+'</div>'+
       '</div>'+
       '<div style="margin:16px 0 10px;padding:10px 12px;background:#F8FAFC;border-radius:10px">'+
-        '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8">Bill to</div>'+
+        '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8">Quotation for</div>'+
         '<div style="font-weight:700;color:#0F172A">'+esc($('cliName').value||'Client name')+'</div>'+
-        ($('cliGstin').value?'<div style="font-size:12px;color:#64748B">GSTIN: '+esc($('cliGstin').value)+'</div>':'')+
         '<div style="font-size:12px;color:#64748B;white-space:pre-line">'+esc($('cliAddr').value)+'</div>'+
       '</div>'+
       '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:6px">'+
@@ -245,27 +238,29 @@ const PAGE_JS = `
         '</tfoot>'+
       '</table>'+
       '<div style="margin-top:10px;font-size:12px;color:#475569"><b>Amount in words:</b> '+esc(words(total))+'</div>'+
+      termsHtml+
       ($('notes').value?'<div style="margin-top:12px;padding-top:10px;border-top:1px dashed #E2E8F0;font-size:12px;color:#475569;white-space:pre-line"><b>Notes:</b> '+esc($('notes').value)+'</div>':'')+
       '<div style="margin-top:18px;padding-top:10px;border-top:1px solid #EEF2F6;text-align:center;font-size:11px;color:#94A3B8">Made with DealInSec &middot; dealinsec.com</div>';
     $('invoice-preview').innerHTML=html;
   }
 
-  // Re-render on any top-level field change
-  ['bizName','bizGstin','bizAddr','invNo','cliName','cliGstin','cliAddr','invDate','gstRate','taxType','notes'].forEach(function(id){
+  ['bizName','bizGstin','bizAddr','quoteNo','cliName','cliAddr','quoteDate','validUntil','gstRate','taxType','notes'].forEach(function(id){
     $(id).addEventListener('input',function(){ render(); save(); });
   });
+  document.querySelectorAll('.tcbox').forEach(function(cb){ cb.addEventListener('change',function(){ render(); save(); }); });
   $('reset').addEventListener('click',function(){
     try{localStorage.removeItem(STORE);}catch(e){}
-    ['bizName','bizGstin','bizAddr','invNo','cliName','cliGstin','cliAddr','invDate','notes'].forEach(function(id){$(id).value='';});
-    $('gstRate').value='18'; $('taxType').value='cgst_sgst';
+    ['bizName','bizGstin','bizAddr','quoteNo','cliName','cliAddr','quoteDate','validUntil','notes'].forEach(function(id){$(id).value='';});
+    $('gstRate').value='0'; $('taxType').value='cgst_sgst';
+    document.querySelectorAll('.tcbox').forEach(function(cb){ cb.checked=true; });
     IT.set([]); IT.render(); render(); save();
   });
-  $('download').addEventListener('click',function(){ document.title=($('invNo').value||'Invoice'); window.print(); });
+  $('download').addEventListener('click',function(){ document.title=($('quoteNo').value||'Quotation'); window.print(); });
 
-  // Restore saved draft (or seed a default row)
   var saved=null; try{ saved=JSON.parse(localStorage.getItem(STORE)||'null'); }catch(e){}
   if(saved){
-    ['bizName','bizGstin','bizAddr','invNo','cliName','cliGstin','cliAddr','invDate','gstRate','taxType','notes'].forEach(function(id){ if(saved[id]!=null)$(id).value=saved[id]; });
+    ['bizName','bizGstin','bizAddr','quoteNo','cliName','cliAddr','quoteDate','validUntil','gstRate','taxType','notes'].forEach(function(id){ if(saved[id]!=null)$(id).value=saved[id]; });
+    if(saved.terms){ var boxes=document.querySelectorAll('.tcbox'); saved.terms.forEach(function(v,i){ if(boxes[i])boxes[i].checked=!!v; }); }
     IT.set(saved.items);
   }else{
     IT.set([{desc:'',qty:1,rate:0}]);
@@ -282,22 +277,20 @@ const PRINT_STYLE = `<style>
 }
 </style>`;
 
-const CLIENT_JS = "<script>(function(){" + COMMON_JS + ITEMS_JS + PAGE_JS + "})();</script>" + PRINT_STYLE;
-
-export function gstInvoicePage(): string {
+export function quotationMakerPage(): string {
   return renderToolPage({
     title: TITLE,
     description: DESC,
     canonicalPath: PATH,
     jsonLd: jsonLd(),
     bodyHtml: BODY,
-    bodyEndScripts: CLIENT_JS,
+    bodyEndScripts: "<script>(function(){" + COMMON_JS + ITEMS_JS + PAGE_JS + "})();</script>" + PRINT_STYLE,
   });
 }
 
-export const gstInvoiceMeta = {
-  slug: "gst-invoice-generator",
+export const quotationMakerMeta = {
+  slug: "quotation-maker",
   path: PATH,
-  title: "Free GST Invoice Generator",
-  blurb: "Create a professional GST invoice with auto CGST/SGST/IGST and download it as a PDF — free, no sign-up.",
+  title: "Free Quotation Maker",
+  blurb: "Build a professional quotation with line items, GST and standard terms, then download it as a PDF — free, no sign-up.",
 };
