@@ -13,7 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { trackEvent } from "@/lib/analytics";
-import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle, ChevronRight } from "lucide-react";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
 
 export default function DealDetailsPage() {
@@ -274,32 +274,44 @@ export default function DealDetailsPage() {
             {(
               <div className="mt-4 mb-2">
                 <div className="flex items-center justify-between">
-                  {[
-                    { label: "Deal", step: 1 },
-                    { label: "Quote", step: 2 },
-                    { label: "Agreement", step: 3 },
-                    { label: "Invoice", step: 4 },
-                  ].map((s, idx, arr) => {
+                  {([
+                    { label: "Deal", step: 1, href: null as string | null },
+                    { label: "Quote", step: 2, href: quote ? `/deals/${deal.id}/quote` : null },
+                    { label: "Agreement", step: 3, href: contract ? `/contracts/${contract.id}` : null },
+                    { label: "Invoice", step: 4, href: hasInvoice ? `/deals/${deal.id}` : null },
+                  ]).map((s, idx, arr) => {
                     const isDone = s.step < currentStep;
                     const isActive = s.step === currentStep;
+                    const inner = (
+                      <>
+                        <div
+                          className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold transition-all
+                            ${isDone
+                              ? "bg-emerald-500 text-white shadow-sm shadow-emerald-200"
+                              : isActive
+                              ? "bg-amber-400 text-white shadow-sm shadow-amber-200 ring-2 ring-amber-300/50"
+                              : "bg-muted text-muted-foreground"
+                            }`}
+                        >
+                          {isDone ? <CheckCircle2 className="w-3.5 h-3.5" /> : s.step}
+                        </div>
+                        <span className={`text-[10px] font-medium ${isDone ? "text-emerald-600" : isActive ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                          {s.label}
+                        </span>
+                      </>
+                    );
                     return (
                       <div key={s.step} className="flex items-center flex-1">
-                        <div className="flex flex-col items-center gap-0.5">
-                          <div
-                            className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold transition-all
-                              ${isDone
-                                ? "bg-emerald-500 text-white shadow-sm shadow-emerald-200"
-                                : isActive
-                                ? "bg-amber-400 text-white shadow-sm shadow-amber-200 ring-2 ring-amber-300/50"
-                                : "bg-muted text-muted-foreground"
-                              }`}
-                          >
-                            {isDone ? <CheckCircle2 className="w-3.5 h-3.5" /> : s.step}
+                        {/* Reachable stages (quote / agreement) are clickable — the natural way to open a linked doc from the deal. */}
+                        {s.href ? (
+                          <Link href={s.href} className="flex flex-col items-center gap-0.5 cursor-pointer transition-transform hover:-translate-y-0.5 active:translate-y-0" data-testid={`step-link-${s.label.toLowerCase()}`}>
+                            {inner}
+                          </Link>
+                        ) : (
+                          <div className="flex flex-col items-center gap-0.5">
+                            {inner}
                           </div>
-                          <span className={`text-[10px] font-medium ${isDone ? "text-emerald-600" : isActive ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
-                            {s.label}
-                          </span>
-                        </div>
+                        )}
                         {idx < arr.length - 1 && (
                           <div className={`flex-1 h-px mx-0.5 ${s.step < currentStep ? "bg-emerald-400" : isActive && s.step === currentStep - 1 ? "bg-amber-300" : "bg-muted"}`} />
                         )}
@@ -372,13 +384,21 @@ export default function DealDetailsPage() {
                   )
                 )}
 
-                {/* Step 3: Agreement created, prompt to upload proof */}
+                {/* Step 3: Agreement created — tappable to open it, plus upload-proof action */}
                 {hasContract && !hasProof && (
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 flex-1">
-                      <CheckCircle className="w-5 h-5 flex-shrink-0" />
-                      <span className="font-medium text-sm">Agreement Created</span>
-                    </div>
+                    {contract ? (
+                      <Link href={`/contracts/${contract.id}`} className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 flex-1 rounded-lg -m-1 p-1 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors cursor-pointer" data-testid="link-view-agreement">
+                        <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                        <span className="font-medium text-sm flex-1">Agreement Created</span>
+                        <ChevronRight className="w-4 h-4 flex-shrink-0 opacity-70" />
+                      </Link>
+                    ) : (
+                      <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 flex-1">
+                        <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                        <span className="font-medium text-sm">Agreement Created</span>
+                      </div>
+                    )}
                     {contract && (
                       <Link href={`/contracts/${contract.id}`}>
                         <Button variant="outline" size="sm" className="rounded-lg text-xs font-medium">
