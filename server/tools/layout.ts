@@ -87,6 +87,58 @@ const STYLES = `<style>
   footer.site{background:#fff;border-top:1px solid var(--line);padding:34px 0;color:var(--muted);font-size:14px}
   footer.site .links{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px}
   .muted{color:var(--muted)}
+
+  /* ── Ambient decorative backdrop (subtle, behind everything) ── */
+  body{position:relative;overflow-x:hidden}
+  /* Lightweight: soft radial-gradients (no blur filter) + corner dot patches. */
+  .ambient{position:absolute;top:0;left:0;right:0;height:760px;overflow:hidden;pointer-events:none;z-index:0}
+  .ambient .blob{position:absolute;border-radius:50%;opacity:.6}
+  .ambient .b1{width:440px;height:440px;background:radial-gradient(circle,hsl(160 65% 84%),transparent 68%);top:-160px;left:-140px}
+  .ambient .b2{width:480px;height:480px;background:radial-gradient(circle,hsl(174 55% 88%),transparent 68%);top:-80px;right:-180px}
+  .ambient .ring{position:absolute;border:2px solid hsl(160 40% 82% / .5);border-radius:50%}
+  .ambient .r1{width:120px;height:120px;top:240px;left:70px}
+  .ambient .r2{width:70px;height:70px;top:120px;right:120px}
+  .ambient .dotpad{position:absolute;width:170px;height:150px;background-image:radial-gradient(hsl(160 22% 68% / .55) 1.4px,transparent 1.4px);background-size:22px 22px;opacity:.45}
+  .ambient .d1{top:110px;left:24px}
+  .ambient .d2{top:360px;right:40px}
+  header.site,main,.cta-band,footer.site{position:relative;z-index:1}
+
+  /* ── Header nav ── */
+  .nav{display:none;align-items:center;gap:2px}
+  @media(min-width:920px){.nav{display:flex}}
+  .nav a{padding:8px 14px;border-radius:10px;font-size:14px;font-weight:600;color:var(--muted);transition:background .15s,color .15s}
+  .nav a:hover{color:var(--ink);background:hsl(210 20% 93%);text-decoration:none}
+  .nav a.active{color:var(--accent-fg);background:var(--accent-bg)}
+  .btn .ext{width:14px;height:14px;opacity:.85}
+
+  /* ── Hero badge + two-tone headline ── */
+  .badge{display:inline-flex;align-items:center;gap:9px;padding:8px 16px;border-radius:999px;background:var(--card);border:1px solid var(--accent-line);color:var(--accent-fg);font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;box-shadow:0 1px 2px rgba(16,24,40,.05);margin-bottom:20px}
+  .hero .accent{color:var(--green)}
+
+  /* ── Icon tool cards ── */
+  .tool-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  @media(max-width:860px){.tool-grid{grid-template-columns:1fr}}
+  .tool-card{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--card-line);border-radius:18px;padding:24px;box-shadow:0 1px 3px rgba(16,24,40,.05);transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+  .tool-card:hover{transform:translateY(-3px);box-shadow:0 12px 26px rgba(16,24,40,.09);border-color:var(--accent-line);text-decoration:none}
+  .tool-ico{width:54px;height:54px;border-radius:15px;background:var(--accent-bg);color:var(--green-d);display:grid;place-items:center;margin-bottom:16px}
+  .tool-card h2{font-size:18px;margin:0 0 7px;color:var(--ink);letter-spacing:-.01em}
+  .tool-card p{margin:0;color:var(--muted);font-size:14px;line-height:1.55;flex:1}
+  .tool-card .go{margin-top:18px;color:var(--green-d);font-weight:700;font-size:14px;display:inline-flex;align-items:center;gap:6px}
+  .tool-card:hover .go{gap:9px}
+
+  /* ── Enhanced CTA band ── */
+  .cta-band .wrap{display:flex;align-items:center;gap:24px;text-align:left;padding:40px 24px}
+  .cta-ico{width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,.16);display:grid;place-items:center;flex-shrink:0}
+  .cta-copy{flex:1;min-width:260px}
+  .cta-band .btn{background:#fff;color:var(--green-d);white-space:nowrap}
+  .cta-band .btn:hover{background:#F0FDF4}
+  @media(max-width:720px){.cta-band .wrap{flex-direction:column;text-align:center}.cta-copy{min-width:0}}
+
+  /* ── Footer socials ── */
+  .footer-top{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:14px}
+  .socials{display:flex;gap:10px}
+  .socials a{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--muted);transition:color .15s,border-color .15s}
+  .socials a:hover{color:var(--green);border-color:var(--accent-line)}
 </style>`;
 
 // Same mark as the React app's <DealinsecLogo> (client/src/components/
@@ -104,33 +156,57 @@ const LOGO_SVG = `<svg width="36" height="36" viewBox="0 0 48 48" fill="none" xm
   <circle cx="35.5" cy="33.5" r="3.2" fill="url(#dls-accent)" stroke="url(#dls-bg)" stroke-width="1.8"/>
 </svg>`;
 
+const EXT_ICON = `<svg class="ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>`;
+
+// Subtle decorative backdrop echoing the landing page's ambient style.
+const AMBIENT = `<div class="ambient" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="ring r1"></span><span class="ring r2"></span><span class="dotpad d1"></span><span class="dotpad d2"></span></div>`;
+
 function header(): string {
   return `<header class="site"><div class="wrap">
     <a class="brand" href="/" aria-label="DealInSec home">${LOGO_SVG}<span class="brand-text">Deal<span class="brand-accent">insec</span></span></a>
-    <a class="btn" href="${APP_LINK}">Open App</a>
+    <nav class="nav">
+      <a href="/tools" class="active">Free Tools</a>
+      <a href="/tools#how">How it works</a>
+      <a href="/tools#faq">FAQs</a>
+      <a href="mailto:support@dealinsec.com">Contact</a>
+    </nav>
+    <a class="btn" href="${APP_LINK}">Open App ${EXT_ICON}</a>
   </div></header>`;
 }
 
 function ctaBand(): string {
+  const clock = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`;
   return `<div class="cta-band"><div class="wrap">
-    <h2>Get every deal in writing — and get paid on time</h2>
-    <p>DealInSec takes you from quotation to signed agreement to GST invoice in one place. Save your clients, send invoices, track payments, and e-sign contracts. Free to start.</p>
+    <div class="cta-ico">${clock}</div>
+    <div class="cta-copy">
+      <h2>Get every deal in writing — and get paid on time</h2>
+      <p>DealInSec takes you from quotation to signed agreement to GST invoice in one place. Save your clients, send invoices, track payments, and e-sign contracts. Free to start.</p>
+    </div>
     <a class="btn" href="${APP_LINK}">Start free →</a>
   </div></div>`;
 }
 
+const SOCIALS = `<div class="socials">
+  <a href="https://twitter.com/" aria-label="Twitter"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-7.2 8.2L23 22h-6.6l-5.2-6.8L5.3 22H2l7.7-8.8L1.5 2h6.8l4.7 6.2L18.9 2Zm-2.3 18h1.8L7.2 3.9H5.3L16.6 20Z"/></svg></a>
+  <a href="https://www.linkedin.com/" aria-label="LinkedIn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6.94 5a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM3.2 8.5h3.5V21H3.2V8.5Zm5.6 0h3.35v1.7h.05c.47-.85 1.6-1.75 3.3-1.75 3.53 0 4.18 2.2 4.18 5.05V21h-3.5v-5.6c0-1.33-.02-3.05-1.86-3.05-1.86 0-2.15 1.45-2.15 2.95V21H8.8V8.5Z"/></svg></a>
+  <a href="mailto:support@dealinsec.com" aria-label="Email"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="m3 6 9 6.5L21 6"/></svg></a>
+</div>`;
+
 function footer(): string {
   const y = 2026;
   return `<footer class="site"><div class="wrap">
-    <div class="links">
-      <a href="/tools">Free Tools</a>
-      <a href="/tools/gst-invoice-generator">GST Invoice Generator</a>
-      <a href="/">Product</a>
-      <a href="/terms">Terms</a>
-      <a href="/privacy">Privacy</a>
-      <a href="/refund">Refund</a>
+    <div class="footer-top">
+      <div class="links" style="margin-bottom:0">
+        <a href="/tools">Free Tools</a>
+        <a href="/tools/gst-invoice-generator">GST Invoice Generator</a>
+        <a href="/">Product</a>
+        <a href="/terms">Terms</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/refund">Refund</a>
+      </div>
+      ${SOCIALS}
     </div>
-    <div class="muted">© ${y} DealInSec — the deal-management OS for India's service businesses. This free tool creates invoices in your browser; nothing is stored on our servers.</div>
+    <div class="muted">© ${y} DealInSec — the deal-management OS for India's service businesses. These free tools run in your browser; nothing you enter is stored on our servers.</div>
   </div></footer>`;
 }
 
@@ -168,6 +244,7 @@ ${o.headExtra || ""}
 ${ld}
 </head>
 <body>
+${AMBIENT}
 ${header()}
 <main>${o.bodyHtml}</main>
 ${o.hideCtaBand ? "" : ctaBand()}
