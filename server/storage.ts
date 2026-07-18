@@ -58,10 +58,15 @@ export interface IStorage {
   createCreditTransaction(transaction: InsertCreditTransaction): Promise<CreditTransaction>;
   deductCreditIfSufficient(userId: string): Promise<boolean>;
   addCredits(userId: string, amount: number, type: string, paymentAmount?: number): Promise<User | undefined>;
-  
+  activateProPlan(userId: string, days: number): Promise<User | undefined>;
+  revokeProPlan(userId: string, days: number): Promise<User | undefined>;
+
   createPayuOrder(order: InsertPayuOrder): Promise<PayuOrder>;
   getPayuOrder(orderId: string): Promise<PayuOrder | undefined>;
+  getPayuOrderByPaymentId(paymentId: string): Promise<PayuOrder | undefined>;
   updatePayuOrder(orderId: string, updates: Partial<PayuOrder>): Promise<PayuOrder | undefined>;
+  completePayuOrderOnce(orderId: string, updates: Partial<PayuOrder>): Promise<PayuOrder | undefined>;
+  markPayuOrderRefundedOnce(orderId: string): Promise<PayuOrder | undefined>;
 
   createQuote(data: InsertQuote): Promise<Quote>;
   getQuoteByDealId(dealId: number): Promise<Quote | undefined>;
@@ -297,6 +302,46 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async activateProPlan(userId: string, days: number): Promise<User | undefined> {
+    // Atomic in SQL: renewals extend from the current expiry when the plan is
+    // still active, else from now. Computing this in the UPDATE itself (not
+    // read-modify-write in JS) means two concurrent grants both extend — no
+    // lost paid year under the verify/webhook race or double-renewal.
+    const [updated] = await db.update(users)
+      .set({
+        plan: "pro",
+        planExpiresAt: sql`GREATEST(COALESCE(${users.planExpiresAt}, NOW()), NOW()) + make_interval(days => ${days})`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
+  async revokeProPlan(userId: string, days: number): Promise<User | undefined> {
+    // Refund clawback: reverse one term's extension atomically. If the plan
+    // no longer reaches the future after the rollback, downgrade to free.
+    const [updated] = await db.update(users)
+      .set({
+        planExpiresAt: sql`COALESCE(${users.planExpiresAt}, NOW()) - make_interval(days => ${days})`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    if (
+      updated &&
+      updated.plan === "pro" &&
+      (!updated.planExpiresAt || new Date(updated.planExpiresAt).getTime() <= Date.now())
+    ) {
+      const [downgraded] = await db.update(users)
+        .set({ plan: "free", updatedAt: new Date() })
+        .where(eq(users.id, userId))
+        .returning();
+      return downgraded;
+    }
+    return updated;
+  }
+
   async createPayuOrder(order: InsertPayuOrder): Promise<PayuOrder> {
     const [created] = await db.insert(payuOrders).values(order as any).returning();
     return created;
@@ -310,6 +355,33 @@ export class DatabaseStorage implements IStorage {
   async updatePayuOrder(orderId: string, updates: Partial<PayuOrder>): Promise<PayuOrder | undefined> {
     const [updated] = await db.update(payuOrders).set(updates).where(eq(payuOrders.orderId, orderId)).returning();
     return updated;
+  }
+
+  async completePayuOrderOnce(orderId: string, updates: Partial<PayuOrder>): Promise<PayuOrder | undefined> {
+    // Atomic pending→completed claim: the status guard lives in the WHERE
+    // clause, so of N concurrent callers (browser verify + Razorpay webhook)
+    // exactly one gets the row back and performs the grant. Returns undefined
+    // when someone else already completed it.
+    const [updated] = await db.update(payuOrders)
+      .set({ ...updates, status: "completed" })
+      .where(sql`${payuOrders.orderId} = ${orderId} AND ${payuOrders.status} <> 'completed'`)
+      .returning();
+    return updated;
+  }
+
+  async markPayuOrderRefundedOnce(orderId: string): Promise<PayuOrder | undefined> {
+    // Atomic completed→refunded claim — same pattern as completePayuOrderOnce,
+    // so a re-delivered refund webhook can't claw back twice.
+    const [updated] = await db.update(payuOrders)
+      .set({ status: "refunded" })
+      .where(sql`${payuOrders.orderId} = ${orderId} AND ${payuOrders.status} = 'completed'`)
+      .returning();
+    return updated;
+  }
+
+  async getPayuOrderByPaymentId(paymentId: string): Promise<PayuOrder | undefined> {
+    const [order] = await db.select().from(payuOrders).where(eq(payuOrders.payuTxnId, paymentId));
+    return order;
   }
 
   async createQuote(data: InsertQuote): Promise<Quote> {

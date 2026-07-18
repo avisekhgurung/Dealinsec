@@ -70,6 +70,8 @@ export const users = pgTable("users", {
   bankName: varchar("bank_name"),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   contractCredits: integer("contract_credits").notNull().default(3),
+  plan: varchar("plan").notNull().default("free"),
+  planExpiresAt: timestamp("plan_expires_at"),
   referralCode: varchar("referral_code").unique(),
   role: varchar("role").notNull().default("influencer"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -78,6 +80,20 @@ export const users = pgTable("users", {
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+export const planOptions = ["free", "pro"] as const;
+
+// DealInSec Pro: annual plan with unlimited agreements. A user is Pro while
+// `plan` is "pro" and the expiry is in the future. `planExpiresAt` is a Date
+// on the server but an ISO string once serialized over the API, so both are
+// accepted — this helper is shared by server route guards and client UI.
+export function hasActivePro(
+  user?: { plan?: string | null; planExpiresAt?: Date | string | null } | null,
+): boolean {
+  if (!user || user.plan !== "pro" || !user.planExpiresAt) return false;
+  const expires = new Date(user.planExpiresAt).getTime();
+  return Number.isFinite(expires) && expires > Date.now();
+}
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -239,6 +255,8 @@ export const payuOrders = pgTable("payu_orders", {
   orderId: varchar("order_id").notNull().unique(),
   amount: integer("amount").notNull(),
   credits: integer("credits").notNull(),
+  // What the payment buys: "credits" (default) or "pro_plan" (annual Pro).
+  purpose: varchar("purpose").notNull().default("credits"),
   status: varchar("status").notNull().default("pending"),
   payuTxnId: varchar("payu_txn_id"),
   payuHash: varchar("payu_hash"),

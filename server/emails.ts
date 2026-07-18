@@ -200,6 +200,34 @@ export function paymentReceiptEmail(args: {
   return { subject, html };
 }
 
+export function proPlanReceiptEmail(args: {
+  firstName?: string;
+  amount: number;
+  paymentId: string;
+  date: string;
+  expiresOn: string;
+}): { subject: string; html: string } {
+  const subject = "Welcome to DealInSec Pro — unlimited agreements unlocked";
+  const html = layout({
+    preview: `Your payment of ${inr(args.amount)} was successful. DealInSec Pro is now active.`,
+    bodyHtml: `
+      ${heading("You're on Pro 🎉")}
+      ${para(`Hi${args.firstName ? " " + args.firstName : ""}, your DealInSec Pro plan is active. Every agreement you create for the next year is covered — no credits needed.`)}
+      ${infoCard(
+        infoRow("Plan", "DealInSec Pro — 1 year") +
+        infoRow("Agreements", "Unlimited") +
+        infoRow("Amount paid", inr(args.amount)) +
+        (args.expiresOn ? infoRow("Valid until", args.expiresOn) : "") +
+        infoRow("Payment ID", args.paymentId) +
+        infoRow("Date", args.date),
+      )}
+      ${button("Go to dashboard", `${appUrl()}/dashboard`)}
+      ${para("Your existing credits stay safe — they'll be used only after your Pro plan ends. This email is your receipt.")}
+    `,
+  });
+  return { subject, html };
+}
+
 export function contractSignedEmail(args: {
   firstName?: string;
   brandName: string;

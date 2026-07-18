@@ -24,6 +24,8 @@ interface Props {
   show: boolean;
   phase: Phase;
   creditsAfter: number;
+  /** Pro plan covers this agreement — show ₹0 copy, no credit deduction animation. */
+  proMode?: boolean;
 }
 
 // Inline SVG coin (gold circle with ₹)
@@ -92,7 +94,7 @@ function SparkleRing() {
   );
 }
 
-export function CreditAnimationOverlay({ show, phase, creditsAfter }: Props) {
+export function CreditAnimationOverlay({ show, phase, creditsAfter, proMode = false }: Props) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -147,12 +149,32 @@ export function CreditAnimationOverlay({ show, phase, creditsAfter }: Props) {
 
           <div className="px-8 py-10 flex flex-col items-center gap-6 text-center">
 
-            {/* ── Phase 1 & 2: Coin ── */}
+            {/* ── Phase 1 & 2: Coin (credit mode) / Pro badge (pro mode) ── */}
             {!isDone && (
               <>
-                <CreditCoin shrinking={isCoinGone} />
+                {proMode ? (
+                  <div className="relative flex items-center justify-center" style={{ width: 80, height: 80 }}>
+                    <div className="absolute inset-0 rounded-full bg-violet-400/30 animate-ping" />
+                    <div className="absolute inset-2 rounded-full bg-violet-300/20 animate-pulse" />
+                    <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-violet-400 via-violet-500 to-indigo-600 shadow-lg shadow-violet-500/50 flex items-center justify-center border-2 border-violet-300/60">
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M2 20h20M4 20l2-11 4.5 4L12 6l1.5 7L18 9l2 11" fill="none" />
+                      </svg>
+                    </div>
+                  </div>
+                ) : (
+                  <CreditCoin shrinking={isCoinGone} />
+                )}
 
-                {/* Credit counter */}
+                {/* Credit counter (hidden in pro mode — nothing is deducted) */}
+                {proMode ? (
+                  <div className="flex flex-col items-center">
+                    <span className="text-3xl font-black text-white">₹0</span>
+                    <span className="text-xs text-violet-300/80 uppercase tracking-wider mt-0.5">
+                      Covered by Pro
+                    </span>
+                  </div>
+                ) : (
                 <div className="flex items-center gap-3">
                   <div className={`flex flex-col items-center transition-all duration-500
                     ${isCoinGone ? "opacity-50" : "opacity-100"}`}>
@@ -180,12 +202,13 @@ export function CreditAnimationOverlay({ show, phase, creditsAfter }: Props) {
                     </>
                   )}
                 </div>
+                )}
 
                 {/* Label + progress */}
                 <div className="w-full space-y-3">
                   <p className="text-sm font-semibold text-white/80 tracking-wide">
                     {phase === "reserving"
-                      ? "Reserving 1 Agreement Credit…"
+                      ? (proMode ? "Confirming Pro coverage…" : "Reserving 1 Agreement Credit…")
                       : "Creating your Agreement…"}
                   </p>
                   {phase === "creating" && <ProgressBar active />}
@@ -222,7 +245,9 @@ export function CreditAnimationOverlay({ show, phase, creditsAfter }: Props) {
                 <div className="space-y-2">
                   <p className="text-xl font-bold text-white">Agreement Created!</p>
                   <p className="text-sm text-white/60">
-                    1 credit used · {creditsAfter} remaining
+                    {proMode
+                      ? "Covered by Pro · no credit used"
+                      : `1 credit used · ${creditsAfter} remaining`}
                   </p>
                 </div>
 

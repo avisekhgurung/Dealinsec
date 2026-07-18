@@ -8,6 +8,10 @@ interface PaymentResultProps {
   state: PaymentResultState;
   /** Success: credits granted. */
   credits?: number;
+  /** Success: override the default "+N credits" copy (e.g. for a Pro plan purchase). */
+  successMessage?: string;
+  /** Success: override the chip label under the message. */
+  chipLabel?: string;
   /** Error: short reason to show. */
   errorReason?: string;
   /** Optional label for the primary success action (e.g. "Continue to Agreement"). */
@@ -34,6 +38,8 @@ const CONFETTI = Array.from({ length: 28 }).map((_, i) => {
 export function PaymentResult({
   state,
   credits = 1,
+  successMessage,
+  chipLabel,
   errorReason,
   continueLabel,
   onContinue,
@@ -69,6 +75,8 @@ export function PaymentResult({
             {state === "success" ? (
               <SuccessContent
                 credits={credits}
+                successMessage={successMessage}
+                chipLabel={chipLabel}
                 continueLabel={continueLabel}
                 onContinue={onContinue}
                 onClose={onClose}
@@ -85,11 +93,15 @@ export function PaymentResult({
 
 function SuccessContent({
   credits,
+  successMessage,
+  chipLabel,
   continueLabel,
   onContinue,
   onClose,
 }: {
   credits: number;
+  successMessage?: string;
+  chipLabel?: string;
   continueLabel?: string;
   onContinue?: () => void;
   onClose: () => void;
@@ -153,7 +165,7 @@ function SuccessContent({
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.55 }}
         >
-          {credits} contract credit{credits !== 1 ? "s" : ""} added to your account.
+          {successMessage ?? `${credits} contract credit${credits !== 1 ? "s" : ""} added to your account.`}
         </motion.p>
 
         {/* Credit chip */}
@@ -165,7 +177,7 @@ function SuccessContent({
         >
           <Sparkles className="w-4 h-4 text-amber-500" />
           <span className="text-sm font-bold text-amber-700 dark:text-amber-300">
-            +{credits} credit{credits !== 1 ? "s" : ""}
+            {chipLabel ?? `+${credits} credit${credits !== 1 ? "s" : ""}`}
           </span>
         </motion.div>
 

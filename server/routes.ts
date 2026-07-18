@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, newsletterSubscribers, invoiceDocumentCategories } from "@shared/schema";
+import { insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, newsletterSubscribers, invoiceDocumentCategories, hasActivePro } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./auth";
@@ -15,6 +15,8 @@ import {
   isRazorpayConfigured,
   getRazorpayKeyId,
   getCreditPrice,
+  getProPlanPrice,
+  PRO_PLAN_DAYS,
   createRazorpayOrder,
   verifyPaymentSignature,
   verifyWebhookSignature,
@@ -22,6 +24,7 @@ import {
 import {
   sendEmail,
   paymentReceiptEmail,
+  proPlanReceiptEmail,
   contractSignedEmail,
   paymentReceivedEmail,
 } from "./emails";
@@ -285,15 +288,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const creditDeducted = await storage.deductCreditIfSufficient(userId);
-      if (!creditDeducted) {
-        const user = await storage.getUser(userId);
-        return res.status(402).json({ 
-          error: "Insufficient credits",
-          message: "You need at least 1 contract credit to create a contract. Please purchase credits.",
-          creditsRequired: 1,
-          creditsAvailable: user?.contractCredits || 0
-        });
+      // Pro subscribers get unlimited agreements — no credit is touched.
+      // Everyone else pays 1 credit (atomic conditional deduction).
+      const user = await storage.getUser(userId);
+      const proActive = hasActivePro(user);
+      if (!proActive) {
+        const creditDeducted = await storage.deductCreditIfSufficient(userId);
+        if (!creditDeducted) {
+          return res.status(402).json({
+            error: "Insufficient credits",
+            message: "You need at least 1 contract credit to create a contract. Please purchase credits.",
+            creditsRequired: 1,
+            creditsAvailable: user?.contractCredits || 0
+          });
+        }
       }
 
       const contractData = {
@@ -305,15 +313,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.updateDeal(contract.dealId, { status: "Active" });
 
-      const user = await storage.getUser(userId);
       const invoiceNumber = await storage.generateInvoiceNumber();
       const influencerName = user?.firstName && user?.lastName 
         ? `${user.firstName} ${user.lastName}` 
         : user?.email || "Influencer";
 
-      // Credit was consumed above — the invoice is considered Paid via credit.
-      // creditValue: 1 credit = ₹299 platform fee, no extra charge.
-      const creditValue = parseInt(process.env.CREDIT_VALUE ?? "299");
+      // Platform-fee invoice. Credit users: fee = 1 credit (₹CREDIT_VALUE),
+      // already paid via the deduction above. Pro users: ₹0 — the agreement
+      // is covered by their annual plan.
+      const creditValue = proActive ? 0 : parseInt(process.env.CREDIT_VALUE ?? "299");
       await storage.createInvoice({
         userId,
         invoiceNumber,
@@ -325,7 +333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contractFee: creditValue,
         platformFee: 0,
         totalAmount: creditValue,
-        // Paid immediately because the user consumed a credit as payment
+        // Paid immediately: via consumed credit, or covered by the Pro plan
         status: "Paid",
       });
 
@@ -340,7 +348,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         void sendEmail({ to: user.email, subject, html });
       }
 
-      res.status(201).json(contract);
+      // viaProPlan lets the client show truthful copy if its cached Pro state
+      // diverged from the server's decision (e.g. plan expired mid-session).
+      res.status(201).json({ ...contract, viaProPlan: proActive });
     } catch (error) {
       console.error("Contract creation error:", error);
       res.status(500).json({ error: "Failed to create contract" });
@@ -1119,9 +1129,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.redirect("/pricing?error=invalid_transaction");
       }
 
+      // This unauthenticated legacy callback must only ever touch orders the
+      // PayU flow itself created (INFLU_ prefix, credit purchases). Razorpay
+      // orders (order_..., including Pro plans) share the same table and are
+      // completed exclusively by the signature-verified Razorpay paths.
+      if (typeof txnid !== "string" || !txnid.startsWith("INFLU_")) {
+        return res.redirect("/pricing?error=invalid_transaction");
+      }
+
       const order = await storage.getPayuOrder(txnid);
       if (!order) {
         return res.redirect("/pricing?error=order_not_found");
+      }
+
+      if (order.purpose !== "credits") {
+        return res.redirect("/pricing?error=invalid_transaction");
       }
 
       if (order.status === "completed") {
@@ -1139,29 +1161,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.redirect("/pricing?error=amount_mismatch");
       }
 
+      // Hash verification is mandatory — fail closed. An absent hash or an
+      // unconfigured salt must never grant credits.
       const payu = getPayuConfig();
-      if (payu.salt && receivedHash) {
-        const reverseHashString = `${payu.salt}|${status}|||||||||||${req.body.email || ""}|${req.body.firstname || ""}|${req.body.productinfo || ""}|${amount}|${txnid}|${payu.key}`;
-        const calculatedHash = crypto.createHash("sha512").update(reverseHashString).digest("hex");
-        if (calculatedHash !== receivedHash) {
-          console.error("Hash verification failed");
-          await storage.updatePayuOrder(txnid, { status: "failed" });
-          return res.redirect("/pricing?error=verification_failed");
-        }
+      if (!payu.salt || !receivedHash) {
+        console.error("PayU callback rejected: missing salt or hash");
+        return res.redirect("/pricing?error=verification_failed");
+      }
+      const reverseHashString = `${payu.salt}|${status}|||||||||||${req.body.email || ""}|${req.body.firstname || ""}|${req.body.productinfo || ""}|${amount}|${txnid}|${payu.key}`;
+      const calculatedHash = crypto.createHash("sha512").update(reverseHashString).digest("hex");
+      if (calculatedHash !== receivedHash) {
+        console.error("Hash verification failed");
+        await storage.updatePayuOrder(txnid, { status: "failed" });
+        return res.redirect("/pricing?error=verification_failed");
       }
 
       if (status === "success") {
-        const updateResult = await storage.updatePayuOrder(txnid, {
-          status: "completed",
+        // Atomic claim — grants exactly once even under concurrent callbacks.
+        const claimed = await storage.completePayuOrderOnce(txnid, {
           payuTxnId: mihpayid,
           payuHash: receivedHash,
           completedAt: new Date(),
         });
 
-        if (updateResult && updateResult.status === "completed") {
+        if (claimed) {
           await storage.addCredits(order.userId, order.credits, "purchase", order.amount);
         }
-        
+
         res.redirect("/pricing?success=true");
       } else {
         await storage.updatePayuOrder(txnid, { status: "failed" });
@@ -1176,8 +1202,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/payments/failure", async (req, res) => {
     try {
       const { txnid } = req.body;
-      if (txnid) {
-        await storage.updatePayuOrder(txnid, { status: "failed" });
+      // Same scoping as the success callback: only legacy PayU orders, and
+      // never flip an already-completed order to failed.
+      if (typeof txnid === "string" && txnid.startsWith("INFLU_")) {
+        const order = await storage.getPayuOrder(txnid);
+        if (order && order.status === "pending") {
+          await storage.updatePayuOrder(txnid, { status: "failed" });
+        }
       }
       res.redirect("/pricing?error=payment_failed");
     } catch (error) {
@@ -1198,6 +1229,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       creditPrice: price,
       // Marketing anchor only makes sense at real prices; hide for low test values.
       anchorPrice: price >= 100 ? Math.round(price * 2) : null,
+      proPlanPrice: getProPlanPrice(),
+      proPlanDays: PRO_PLAN_DAYS,
       razorpayEnabled: isRazorpayConfigured(),
     });
   });
@@ -1217,15 +1250,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const credits = Math.max(1, parseInt(req.body.credits, 10) || 1);
-      const price = getCreditPrice();
-      const amountInRupees = credits * price;
+      // Two products share this endpoint: credit packs (default) and the
+      // annual Pro plan ({ plan: "pro" } in the body).
+      const isProPlan = req.body.plan === "pro";
+      const credits = isProPlan ? 0 : Math.max(1, parseInt(req.body.credits, 10) || 1);
+      const amountInRupees = isProPlan ? getProPlanPrice() : credits * getCreditPrice();
       const receipt = `DIS_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 
       const order = await createRazorpayOrder({
         amountInRupees,
         receipt,
-        notes: { userId, credits: String(credits) },
+        notes: isProPlan
+          ? { userId, plan: "pro" }
+          : { userId, credits: String(credits) },
       });
 
       // Persist as pending — orderId column holds the Razorpay order id
@@ -1234,6 +1271,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         orderId: order.id,
         amount: amountInRupees,
         credits,
+        purpose: isProPlan ? "pro_plan" : "credits",
         status: "pending",
       });
 
@@ -1243,8 +1281,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         amount: order.amount,        // paise
         currency: order.currency,
         credits,
+        plan: isProPlan ? "pro" : undefined,
         name: "DealInSec",
-        description: `${credits} Contract Credit${credits > 1 ? "s" : ""}`,
+        description: isProPlan
+          ? "DealInSec Pro — 1 year, unlimited agreements"
+          : `${credits} Contract Credit${credits > 1 ? "s" : ""}`,
         prefill: {
           name: [user.firstName, user.lastName].filter(Boolean).join(" ") || undefined,
           email: user.email || undefined,
@@ -1296,26 +1337,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Signature verification failed" });
       }
 
-      const updated = await storage.updatePayuOrder(razorpay_order_id, {
-        status: "completed",
+      // Atomic pending→completed claim: if the webhook got here first this
+      // returns undefined and we skip the grant — no double credit / 732-day
+      // Pro term from one payment.
+      const updated = await storage.completePayuOrderOnce(razorpay_order_id, {
         payuTxnId: razorpay_payment_id,
         payuHash: razorpay_signature,
         completedAt: new Date(),
       });
 
-      if (updated && updated.status === "completed") {
-        await storage.addCredits(order.userId, order.credits, "purchase", order.amount);
+      if (updated) {
+        const isProPlan = updated.purpose === "pro_plan";
+        let proUser;
+        if (isProPlan) {
+          proUser = await storage.activateProPlan(order.userId, PRO_PLAN_DAYS);
+        } else {
+          await storage.addCredits(order.userId, order.credits, "purchase", order.amount);
+        }
 
         // Payment receipt email — best-effort
         const buyer = await storage.getUser(order.userId);
         if (buyer?.email) {
-          const { subject, html } = paymentReceiptEmail({
-            firstName: buyer.firstName || undefined,
-            credits: order.credits,
-            amount: order.amount,
-            paymentId: razorpay_payment_id,
-            date: new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }),
-          });
+          const date = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+          const { subject, html } = isProPlan
+            ? proPlanReceiptEmail({
+                firstName: buyer.firstName || undefined,
+                amount: order.amount,
+                paymentId: razorpay_payment_id,
+                date,
+                expiresOn: proUser?.planExpiresAt
+                  ? new Date(proUser.planExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                  : "",
+              })
+            : paymentReceiptEmail({
+                firstName: buyer.firstName || undefined,
+                credits: order.credits,
+                amount: order.amount,
+                paymentId: razorpay_payment_id,
+                date,
+              });
           void sendEmail({ to: buyer.email, subject, html });
         }
       }
@@ -1349,14 +1409,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const paymentId = entity?.id;
           if (orderId) {
             const order = await storage.getPayuOrder(orderId);
-            if (order && order.status !== "completed") {
-              const updated = await storage.updatePayuOrder(orderId, {
-                status: "completed",
+            if (order) {
+              // Atomic claim — loses gracefully to the browser verify path.
+              const updated = await storage.completePayuOrderOnce(orderId, {
                 payuTxnId: paymentId,
                 completedAt: new Date(),
               });
-              if (updated && updated.status === "completed") {
-                await storage.addCredits(order.userId, order.credits, "purchase", order.amount);
+              if (updated) {
+                if (updated.purpose === "pro_plan") {
+                  await storage.activateProPlan(order.userId, PRO_PLAN_DAYS);
+                } else {
+                  await storage.addCredits(order.userId, order.credits, "purchase", order.amount);
+                }
+              }
+            }
+          }
+        }
+
+        // Refunds (issued from the Razorpay dashboard) — claw back what the
+        // payment bought. Atomic completed→refunded claim guards re-delivery.
+        if (event.event === "refund.processed" || event.event === "payment.refunded") {
+          const refundEntity = event.payload?.refund?.entity;
+          const paymentId = refundEntity?.payment_id
+            || event.payload?.payment?.entity?.id;
+          if (paymentId) {
+            const order = await storage.getPayuOrderByPaymentId(paymentId);
+            if (order) {
+              const claimed = await storage.markPayuOrderRefundedOnce(order.orderId);
+              if (claimed) {
+                if (claimed.purpose === "pro_plan") {
+                  await storage.revokeProPlan(order.userId, PRO_PLAN_DAYS);
+                } else if (order.credits > 0) {
+                  await storage.addCredits(order.userId, -order.credits, "refund", order.amount);
+                }
               }
             }
           }

@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, CreditCard, Check, Loader2, Zap, ArrowRight, Shield, Lock, Sparkles, TrendingUp, Users, Star } from "lucide-react";
+import { ArrowLeft, CreditCard, Check, Loader2, Zap, ArrowRight, Shield, Lock, Sparkles, TrendingUp, Users, Star, Crown, Infinity as InfinityIcon } from "lucide-react";
+import { hasActivePro } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
 import { BottomNav } from "@/components/bottom-nav";
 import { queryClient } from "@/lib/queryClient";
+import { trackEvent } from "@/lib/analytics";
 import { PaymentResult } from "@/components/payment-result";
 
 const REDIRECT_KEY = "postPaymentRedirect";
@@ -45,9 +47,12 @@ export default function PricingPage() {
   const [paymentErrorReason, setPaymentErrorReason] = useState<string>("");
   const [redirectAfter, setRedirectAfter] = useState<string | null>(null);
 
-  // Live pricing — driven by server CREDIT_VALUE env var (set to 1 for testing)
+  // Live pricing — driven by server CREDIT_VALUE / PRO_PLAN_PRICE env vars
   const [creditPrice, setCreditPrice] = useState<number>(299);
   const [anchorPrice, setAnchorPrice] = useState<number | null>(599);
+  const [proPlanPrice, setProPlanPrice] = useState<number>(2999);
+  // Which product the in-flight purchase is for — drives success copy.
+  const [purchaseKind, setPurchaseKind] = useState<"credit" | "pro">("credit");
   useEffect(() => {
     fetch("/api/payments/config", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
@@ -56,11 +61,21 @@ export default function PricingPage() {
           setCreditPrice(cfg.creditPrice);
           setAnchorPrice(cfg.anchorPrice ?? null);
         }
+        if (cfg?.proPlanPrice) setProPlanPrice(cfg.proPlanPrice);
       })
       .catch(() => {});
   }, []);
   const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
   const savings = anchorPrice ? anchorPrice - creditPrice : 0;
+
+  const proActive = hasActivePro(user);
+  const proExpiry = user?.planExpiresAt ? new Date(user.planExpiresAt) : null;
+  const proExpiryLabel = proExpiry
+    ? proExpiry.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : null;
+  // "Pays for itself" break-even vs single credits
+  const breakEven = Math.max(2, Math.ceil(proPlanPrice / Math.max(1, creditPrice)));
+  const proMonthly = Math.round(proPlanPrice / 12);
 
   // On mount: persist ?redirect= param and detect PayU callback
   useEffect(() => {
@@ -97,7 +112,8 @@ export default function PricingPage() {
   // Redirect-after-success is now handled by the PaymentResult overlay's
   // "Continue to Agreement" button (manual, no auto-navigate).
 
-  const handlePurchase = async () => {
+  const handlePurchase = async (kind: "credit" | "pro" = "credit") => {
+    setPurchaseKind(kind);
     setIsLoading(true);
     try {
       // 1. Load Razorpay Checkout script
@@ -110,7 +126,7 @@ export default function PricingPage() {
       const res = await fetch("/api/payments/razorpay/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credits: 1 }),
+        body: JSON.stringify(kind === "pro" ? { plan: "pro" } : { credits: 1 }),
         credentials: "include",
       });
       if (!res.ok) {
@@ -145,10 +161,24 @@ export default function PricingPage() {
             });
             if (!verifyRes.ok) throw new Error("Verification failed");
 
+            // GA4 standard ecommerce purchase event — one of the key
+            // conversions. value/currency let GA compute revenue.
+            trackEvent("purchase", {
+              currency: "INR",
+              value: kind === "pro" ? proPlanPrice : creditPrice,
+              item: kind === "pro" ? "pro_annual" : "contract_credit",
+            });
+
             setPaymentStatus("success");
             await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
             await queryClient.invalidateQueries({ queryKey: ["/api/credits/balance"] });
-            toast({ title: "Payment successful!", description: "Your credit has been added.", variant: "success" as any });
+            toast({
+              title: "Payment successful!",
+              description: kind === "pro"
+                ? "DealInSec Pro is active — unlimited agreements for 1 year."
+                : "Your credit has been added.",
+              variant: "success" as any,
+            });
 
             const savedRedirect = localStorage.getItem(REDIRECT_KEY);
             if (savedRedirect) {
@@ -158,7 +188,9 @@ export default function PricingPage() {
           } catch {
             toast({
               title: "Verification pending",
-              description: "Payment received — credit will reflect shortly. Refresh in a moment.",
+              description: kind === "pro"
+                ? "Payment received — your Pro plan will activate shortly. Refresh in a moment."
+                : "Payment received — credit will reflect shortly. Refresh in a moment.",
               variant: "destructive",
             });
           } finally {
@@ -209,12 +241,16 @@ export default function PricingPage() {
       <PaymentResult
         state={paymentStatus}
         credits={1}
+        successMessage={purchaseKind === "pro"
+          ? "DealInSec Pro is active — every agreement is covered for 1 year."
+          : undefined}
+        chipLabel={purchaseKind === "pro" ? "Pro · Unlimited agreements" : undefined}
         errorReason={paymentErrorReason}
         continueLabel={redirectAfter ? "Continue to Agreement" : undefined}
         onContinue={redirectAfter ? () => setLocation(redirectAfter) : undefined}
         onRetry={() => {
           setPaymentStatus(null);
-          handlePurchase();
+          handlePurchase(purchaseKind);
         }}
         onClose={() => setPaymentStatus(null)}
       />
@@ -246,6 +282,134 @@ export default function PricingPage() {
             </div>
           </div>
         </div>
+
+        {/* ── DealInSec Pro — annual plan, unlimited agreements ── */}
+        <Card className="glass-card border-violet-400/40 dark:border-violet-500/30 relative overflow-hidden shadow-xl shadow-violet-500/[0.1]">
+          <div className="absolute inset-0 bg-gradient-to-br from-violet-500/[0.08] via-transparent to-indigo-500/[0.06] pointer-events-none" />
+
+          {/* Best-value ribbon */}
+          <div className="relative bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2 text-center">
+            <div className="flex items-center justify-center gap-2 text-xs lg:text-sm font-bold uppercase tracking-wider">
+              <Crown className="w-3.5 h-3.5" />
+              {proActive ? "Your Plan · Active" : "Best Value · For Regular Dealmakers"}
+              <Crown className="w-3.5 h-3.5" />
+            </div>
+          </div>
+
+          <div className="relative p-5 lg:p-7">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <p className="text-[11px] lg:text-xs uppercase tracking-[0.1em] font-bold text-violet-600 dark:text-violet-400 mb-1">
+                  DealInSec Pro
+                </p>
+                <h3 className="text-xl lg:text-2xl font-bold text-foreground flex items-center gap-2">
+                  Unlimited agreements
+                  <InfinityIcon className="w-5 h-5 text-violet-500" />
+                </h3>
+              </div>
+              <span className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] lg:text-xs font-bold bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">
+                <Zap className="w-3 h-3" />
+                1 YEAR
+              </span>
+            </div>
+
+            <div className="flex items-end gap-3 mb-2">
+              <div className="flex items-baseline gap-1">
+                <span className="text-5xl lg:text-6xl font-black text-foreground leading-none tracking-tight">
+                  {fmt(proPlanPrice)}
+                </span>
+                <span className="text-sm lg:text-base text-muted-foreground font-medium">/ year</span>
+              </div>
+            </div>
+
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 text-xs font-semibold mb-5">
+              <TrendingUp className="w-3.5 h-3.5" />
+              Just {fmt(proMonthly)}/month — pays for itself in {breakEven} agreements
+            </div>
+
+            <ul className="space-y-2.5 mb-6">
+              {[
+                "Unlimited signed agreements — no credits needed",
+                "Everything in the free plan, forever",
+                "Your existing credits stay safe for later",
+                "One payment, no auto-debit, renew when you want",
+                "Priority support on WhatsApp",
+              ].map((feature) => (
+                <li key={feature} className="flex items-start gap-2.5 text-sm lg:text-[15px]">
+                  <div className="flex-shrink-0 w-5 h-5 rounded-full bg-violet-500/15 flex items-center justify-center mt-px">
+                    <Check className="w-3 h-3 text-violet-600 dark:text-violet-400" strokeWidth={3} />
+                  </div>
+                  <span className="text-foreground">{feature}</span>
+                </li>
+              ))}
+            </ul>
+
+            {proActive ? (
+              <div className="space-y-3">
+                <div className="rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 px-4 py-3 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+                    <Check className="w-5 h-5 text-emerald-600 dark:text-emerald-400" strokeWidth={3} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">Pro is active</p>
+                    {proExpiryLabel && (
+                      <p className="text-xs text-emerald-700/70 dark:text-emerald-400/70">
+                        Valid until {proExpiryLabel} · renewing adds another year
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full h-11 border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 font-semibold"
+                  onClick={() => handlePurchase("pro")}
+                  disabled={isLoading}
+                  data-testid="button-renew-pro"
+                >
+                  {isLoading && purchaseKind === "pro" ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Crown className="h-4 w-4 mr-2" />
+                  )}
+                  Renew for {fmt(proPlanPrice)} — extend 1 year
+                </Button>
+              </div>
+            ) : (
+              <Button
+                className="w-full text-white h-12 lg:h-14 text-base lg:text-lg font-bold rounded-xl shadow-lg shadow-violet-500/30 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+                size="lg"
+                onClick={() => handlePurchase("pro")}
+                disabled={isLoading}
+                data-testid="button-buy-pro"
+              >
+                {isLoading && purchaseKind === "pro" ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    Opening secure checkout…
+                  </>
+                ) : (
+                  <>
+                    <Crown className="h-5 w-5 mr-2" />
+                    Go Pro — {fmt(proPlanPrice)}/year
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </>
+                )}
+              </Button>
+            )}
+
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 mt-4 text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <Shield className="w-3 h-3 text-violet-500" /> 7-day refund
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <Lock className="w-3 h-3 text-violet-500" /> One-time payment
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <Check className="w-3 h-3 text-violet-500" /> No auto-debit
+              </span>
+            </div>
+          </div>
+        </Card>
 
         {/* ── Pricing hero card with anchor pricing + tactics ── */}
         <Card className="glass-card border-primary/30 relative overflow-hidden shadow-xl shadow-primary/[0.08]">
@@ -348,11 +512,11 @@ export default function PricingPage() {
             <Button
               className="gradient-btn w-full text-white h-12 lg:h-14 text-base lg:text-lg font-bold rounded-xl shadow-lg shadow-primary/30"
               size="lg"
-              onClick={handlePurchase}
+              onClick={() => handlePurchase("credit")}
               disabled={isLoading}
               data-testid="button-buy-credit"
             >
-              {isLoading ? (
+              {isLoading && purchaseKind === "credit" ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin mr-2" />
                   Opening secure checkout…

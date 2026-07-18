@@ -28,6 +28,14 @@ export function getCreditPrice(): number {
   return parseInt(process.env.CREDIT_VALUE ?? "299", 10);
 }
 
+// DealInSec Pro — annual plan, unlimited agreements. Sold like Vyapar's
+// licenses: a one-time payment for a 366-day term, no auto-debit mandate.
+export const PRO_PLAN_DAYS = 366;
+
+export function getProPlanPrice(): number {
+  return parseInt(process.env.PRO_PLAN_PRICE ?? "2999", 10);
+}
+
 function getClient(): Razorpay {
   if (_client) return _client;
   if (!isRazorpayConfigured()) {

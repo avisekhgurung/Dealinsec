@@ -9,10 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Shield, AlertTriangle, PenLine, Loader2, CreditCard, CheckCircle, Upload, FileText, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Shield, AlertTriangle, PenLine, Loader2, CreditCard, CheckCircle, Upload, FileText, Plus, Trash2, Crown } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { CreditAnimationOverlay } from "@/components/credit-animation-overlay";
-import { STANDARD_TERMS } from "@shared/schema";
+import { trackEvent } from "@/lib/analytics";
+import { STANDARD_TERMS, hasActivePro } from "@shared/schema";
 import type { Deal, Contract } from "@shared/schema";
 
 type Phase = "reserving" | "creating" | "done";
@@ -39,7 +40,9 @@ export default function ContractConfirmationPage() {
   const [termsInitialized, setTermsInitialized] = useState(false);
 
   const credits = user?.contractCredits ?? 0;
-  const hasCredits = credits >= 1;
+  const proActive = hasActivePro(user);
+  // Pro subscribers create agreements without credits; others need ≥1.
+  const hasCredits = proActive || credits >= 1;
   const needsBillingAddress = !user?.billingAddress;
   const needsPan = !user?.panNumber;
   const needsSignature = !user?.digitalSignature;
@@ -154,10 +157,24 @@ export default function ContractConfirmationPage() {
       return res.json();
     },
     onSuccess: (contract) => {
+      // Key conversion event: an agreement was signed (the monetized action).
+      trackEvent("sign_agreement", {
+        via_pro_plan: contract?.viaProPlan === true,
+        contract_value: contract?.contractValue,
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+
+      // Server is the authority on how this was paid. If the UI promised Pro
+      // coverage but the plan had lapsed server-side, tell the user honestly.
+      if (proActive && contract.viaProPlan === false) {
+        toast({
+          title: "Note: 1 credit was used",
+          description: "Your Pro plan had expired, so this agreement used a credit instead.",
+        });
+      }
 
       // Phase 3: done!
       setOverlayPhase("done");
@@ -292,11 +309,12 @@ export default function ContractConfirmationPage() {
 
   return (
     <>
-      {/* Credit consumption overlay */}
+      {/* Credit consumption overlay — Pro users spend nothing */}
       <CreditAnimationOverlay
         show={showOverlay}
         phase={overlayPhase}
-        creditsAfter={Math.max(0, credits - 1)}
+        creditsAfter={proActive ? credits : Math.max(0, credits - 1)}
+        proMode={proActive}
       />
 
       <div className="min-h-screen bg-background">
@@ -312,14 +330,21 @@ export default function ContractConfirmationPage() {
             </Button>
             <h1 className="text-xl font-bold">Create Agreement</h1>
 
-            {/* Credit pill in header */}
-            <div className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
-              <span className="text-sm font-black text-amber-500">₹</span>
-              <span className="text-sm font-bold text-amber-700 dark:text-amber-300">{credits}</span>
-              <span className="text-xs text-amber-600/70 dark:text-amber-400/70">
-                {credits === 1 ? "credit" : "credits"}
-              </span>
-            </div>
+            {/* Credit / Pro pill in header */}
+            {proActive ? (
+              <div className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800">
+                <Crown className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+                <span className="text-sm font-bold text-violet-700 dark:text-violet-300">Pro</span>
+              </div>
+            ) : (
+              <div className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
+                <span className="text-sm font-black text-amber-500">₹</span>
+                <span className="text-sm font-bold text-amber-700 dark:text-amber-300">{credits}</span>
+                <span className="text-xs text-amber-600/70 dark:text-amber-400/70">
+                  {credits === 1 ? "credit" : "credits"}
+                </span>
+              </div>
+            )}
           </div>
         </header>
 
@@ -360,7 +385,33 @@ export default function ContractConfirmationPage() {
             </div>
           </div>
 
-          {/* Credit usage card */}
+          {/* Credit usage card — Pro users see a "covered" card instead */}
+          {proActive ? (
+            <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-violet-800/40">
+              <div className="dark:hidden absolute inset-0" style={{ background: "linear-gradient(135deg, hsl(255 100% 98%) 0%, hsl(245 90% 95%) 100%)" }} />
+              <div className="hidden dark:block absolute inset-0" style={{ background: "linear-gradient(135deg, hsl(255 25% 12%) 0%, hsl(245 20% 9%) 100%)" }} />
+              <div className="relative px-5 py-4 flex items-center gap-4">
+                <div className="relative flex-shrink-0">
+                  <div className="absolute inset-0 rounded-full bg-violet-300/40 animate-ping" style={{ animationDuration: "2s" }} />
+                  <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-violet-400 via-violet-500 to-indigo-600 shadow-md shadow-violet-400/40 flex items-center justify-center border border-violet-300/60">
+                    <Crown className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-base font-bold text-violet-800 dark:text-violet-300">
+                    Covered by DealInSec Pro
+                  </p>
+                  <p className="text-xs text-violet-700/70 dark:text-violet-400/60 mt-0.5">
+                    Unlimited agreements — no credit will be used
+                  </p>
+                </div>
+                <div className="flex-shrink-0 text-right">
+                  <div className="text-xs font-semibold text-violet-600 dark:text-violet-400">cost</div>
+                  <div className="text-lg font-black text-violet-700 dark:text-violet-300">₹0</div>
+                </div>
+              </div>
+            </div>
+          ) : (
           <div className="relative overflow-hidden rounded-2xl border border-amber-200/60 dark:border-amber-800/40"
             style={{ background: "linear-gradient(135deg, hsl(45 100% 97%) 0%, hsl(35 100% 94%) 100%)" }}>
             <div className="dark:hidden absolute inset-0" style={{ background: "linear-gradient(135deg, hsl(45 100% 97%) 0%, hsl(35 100% 94%) 100%)" }} />
@@ -397,6 +448,7 @@ export default function ContractConfirmationPage() {
               </div>
             </div>
           </div>
+          )}
 
           <div className="text-center space-y-3">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mx-auto">
@@ -689,7 +741,9 @@ export default function ContractConfirmationPage() {
             </Button>
 
             <p className="text-center text-xs text-muted-foreground">
-              1 credit will be deducted · ₹299 value · non-refundable
+              {proActive
+                ? "Covered by your Pro plan · no credit used"
+                : "1 credit will be deducted · ₹299 value · non-refundable"}
             </p>
           </div>
         </main>
