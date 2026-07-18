@@ -139,6 +139,25 @@ const STYLES = `<style>
   .socials{display:flex;gap:10px}
   .socials a{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--muted);transition:color .15s,border-color .15s}
   .socials a:hover{color:var(--green);border-color:var(--accent-line)}
+
+  /* ── Logo + signature controls ── */
+  .file-btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--green-d);cursor:pointer;padding:9px 13px;border:1.5px solid var(--line);border-radius:10px;background:#fff}
+  .file-btn:hover{border-color:var(--green)}
+  .file-btn input[type=file]{display:none}
+  .logo-preview{margin:6px 0}
+  .sig-pad{width:100%;height:100px;border:1.5px dashed var(--line);border-radius:12px;background:#fff;touch-action:none;cursor:crosshair;display:block}
+  .sig-actions{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+
+  /* ── Print: show ONLY the document (.print-doc), clean A4 ── */
+  @media print{
+    @page{size:A4;margin:14mm}
+    html,body{background:#fff!important}
+    body *{visibility:hidden!important}
+    .print-doc,.print-doc *{visibility:visible!important}
+    .print-doc{position:absolute!important;left:0;top:0;width:100%!important;max-width:100%!important;margin:0!important;padding:0!important;border:none!important;box-shadow:none!important}
+    .ambient,header.site,footer.site,.cta-band{display:none!important}
+    .no-print{display:none!important}
+  }
 </style>`;
 
 // Same mark as the React app's <DealinsecLogo> (client/src/components/

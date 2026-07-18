@@ -6,7 +6,7 @@
  * turn a quotation into a signed deal + GST invoice inside DealInSec.
  */
 import { renderToolPage, SITE_ORIGIN } from "./layout";
-import { COMMON_JS, ITEMS_JS } from "./client-lib";
+import { COMMON_JS, ITEMS_JS, MEDIA_JS } from "./client-lib";
 import { STANDARD_TERMS } from "@shared/schema";
 
 const PATH = "/tools/quotation-maker";
@@ -87,6 +87,13 @@ const BODY = `
       <label>Your address</label>
       <textarea class="f" id="bizAddr" rows="2" placeholder="Street, City, State, PIN"></textarea>
 
+      <label>Business logo (optional)</label>
+      <div class="logo-preview" id="logo-preview" style="display:none"></div>
+      <div class="sig-actions">
+        <label class="file-btn">Upload logo<input type="file" id="logo-input" accept="image/*" /></label>
+        <button type="button" class="file-btn" id="logo-input-clear">Remove</button>
+      </div>
+
       <hr style="border:none;border-top:1px solid var(--line);margin:18px 0" />
 
       <label>Quotation for (client name)</label>
@@ -135,6 +142,14 @@ const BODY = `
       <label style="margin-top:12px">Notes (optional)</label>
       <textarea class="f" id="notes" rows="2" placeholder="e.g. Timelines confirmed on advance receipt."></textarea>
 
+      <label>Signature (optional) — draw below or upload an image</label>
+      <canvas id="sig-pad" class="sig-pad"></canvas>
+      <div class="sig-actions">
+        <button type="button" class="file-btn" id="sig-clear">Clear</button>
+        <label class="file-btn">Upload image<input type="file" id="sig-upload" accept="image/*" /></label>
+      </div>
+      <input class="f" id="sigName" placeholder="Signatory name (optional)" style="margin-top:8px" />
+
       <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
         <button class="btn" id="download" type="button">⬇ Download PDF</button>
         <button class="btn ghost" id="reset" type="button">Reset</button>
@@ -142,7 +157,7 @@ const BODY = `
       <p class="muted" style="font-size:13px;margin-top:10px">Tip: in the print dialog choose <b>Save as PDF</b>.</p>
     </div>
 
-    <div><div id="invoice-preview" class="card"></div></div>
+    <div><div id="invoice-preview" class="card print-doc"></div></div>
   </div>
 </div></section>
 
@@ -164,6 +179,8 @@ const BODY = `
 const PAGE_JS = `
   var STORE='dis_quote_v1';
   var IT=initItems(function(){ render(); save(); });
+  var LOGO=initLogo('logo-input','logo-preview',function(){ render(); save(); });
+  var SIG=initSignature('sig-pad',function(){ render(); save(); });
 
   function collectTerms(){
     var out=[];
@@ -178,7 +195,8 @@ const PAGE_JS = `
     return {
       bizName:$('bizName').value, bizGstin:$('bizGstin').value, bizAddr:$('bizAddr').value, quoteNo:$('quoteNo').value,
       cliName:$('cliName').value, cliAddr:$('cliAddr').value, quoteDate:$('quoteDate').value, validUntil:$('validUntil').value,
-      gstRate:$('gstRate').value, taxType:$('taxType').value, notes:$('notes').value, terms:termStates(), items:IT.get()
+      gstRate:$('gstRate').value, taxType:$('taxType').value, notes:$('notes').value, terms:termStates(), items:IT.get(),
+      logo:LOGO.get(), sig:SIG.get(), sigName:$('sigName').value
     };
   }
   function save(){ try{ localStorage.setItem(STORE, JSON.stringify(collect())); }catch(e){} }
@@ -211,7 +229,7 @@ const PAGE_JS = `
     var bn=$('bizName').value||'Your Business';
     var html=''+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'+
-        '<div><div style="font-size:20px;font-weight:800;color:#0F172A">'+esc(bn)+'</div>'+
+        '<div>'+(LOGO.get()?'<img src="'+LOGO.get()+'" alt="" style="max-height:50px;max-width:180px;object-fit:contain;margin-bottom:8px;display:block" />':'')+'<div style="font-size:20px;font-weight:800;color:#0F172A">'+esc(bn)+'</div>'+
           ($('bizGstin').value?'<div style="font-size:12px;color:#64748B">GSTIN: '+esc($('bizGstin').value)+'</div>':'')+
           '<div style="font-size:12px;color:#64748B;white-space:pre-line">'+esc($('bizAddr').value)+'</div></div>'+
         '<div style="text-align:right"><div style="font-size:22px;font-weight:800;letter-spacing:.04em;color:#0E8C5A">QUOTATION</div>'+
@@ -240,42 +258,39 @@ const PAGE_JS = `
       '<div style="margin-top:10px;font-size:12px;color:#475569"><b>Amount in words:</b> '+esc(words(total))+'</div>'+
       termsHtml+
       ($('notes').value?'<div style="margin-top:12px;padding-top:10px;border-top:1px dashed #E2E8F0;font-size:12px;color:#475569;white-space:pre-line"><b>Notes:</b> '+esc($('notes').value)+'</div>':'')+
+      (SIG.get()?'<div style="margin-top:26px;display:flex;justify-content:flex-end"><div style="text-align:center;min-width:180px"><img src="'+SIG.get()+'" alt="signature" style="max-height:58px;max-width:190px;object-fit:contain" /><div style="border-top:1px solid #94A3B8;margin-top:2px;padding-top:4px;font-size:12px;font-weight:600;color:#0F172A">'+esc($('sigName').value||bn)+'</div><div style="font-size:10px;color:#94A3B8">Authorised Signatory</div></div></div>':'')+
       '<div style="margin-top:18px;padding-top:10px;border-top:1px solid #EEF2F6;text-align:center;font-size:11px;color:#94A3B8">Made with DealInSec &middot; dealinsec.com</div>';
     $('invoice-preview').innerHTML=html;
   }
 
-  ['bizName','bizGstin','bizAddr','quoteNo','cliName','cliAddr','quoteDate','validUntil','gstRate','taxType','notes'].forEach(function(id){
+  ['bizName','bizGstin','bizAddr','quoteNo','cliName','cliAddr','quoteDate','validUntil','gstRate','taxType','notes','sigName'].forEach(function(id){
     $(id).addEventListener('input',function(){ render(); save(); });
   });
   document.querySelectorAll('.tcbox').forEach(function(cb){ cb.addEventListener('change',function(){ render(); save(); }); });
+  $('sig-upload').addEventListener('change',function(e){ SIG.upload(e.target.files && e.target.files[0]); e.target.value=''; });
+  $('sig-clear').addEventListener('click',function(){ SIG.clear(); });
   $('reset').addEventListener('click',function(){
     try{localStorage.removeItem(STORE);}catch(e){}
-    ['bizName','bizGstin','bizAddr','quoteNo','cliName','cliAddr','quoteDate','validUntil','notes'].forEach(function(id){$(id).value='';});
+    ['bizName','bizGstin','bizAddr','quoteNo','cliName','cliAddr','quoteDate','validUntil','notes','sigName'].forEach(function(id){$(id).value='';});
     $('gstRate').value='0'; $('taxType').value='cgst_sgst';
     document.querySelectorAll('.tcbox').forEach(function(cb){ cb.checked=true; });
+    LOGO.clear(); SIG.clear();
     IT.set([]); IT.render(); render(); save();
   });
   $('download').addEventListener('click',function(){ document.title=($('quoteNo').value||'Quotation'); window.print(); });
 
   var saved=null; try{ saved=JSON.parse(localStorage.getItem(STORE)||'null'); }catch(e){}
   if(saved){
-    ['bizName','bizGstin','bizAddr','quoteNo','cliName','cliAddr','quoteDate','validUntil','gstRate','taxType','notes'].forEach(function(id){ if(saved[id]!=null)$(id).value=saved[id]; });
+    ['bizName','bizGstin','bizAddr','quoteNo','cliName','cliAddr','quoteDate','validUntil','gstRate','taxType','notes','sigName'].forEach(function(id){ if(saved[id]!=null)$(id).value=saved[id]; });
     if(saved.terms){ var boxes=document.querySelectorAll('.tcbox'); saved.terms.forEach(function(v,i){ if(boxes[i])boxes[i].checked=!!v; }); }
+    if(saved.logo)LOGO.set(saved.logo);
+    if(saved.sig)SIG.set(saved.sig);
     IT.set(saved.items);
   }else{
     IT.set([{desc:'',qty:1,rate:0}]);
   }
   IT.render(); render();
 `;
-
-const PRINT_STYLE = `<style>
-@media print{
-  header.site,footer.site,.cta-band,#form-card,.hero,section:not(#print-only){display:none!important}
-  body{background:#fff}
-  #invoice-preview{border:none!important;padding:0!important;max-width:720px;margin:0 auto}
-  .grid2{display:block!important}
-}
-</style>`;
 
 export function quotationMakerPage(): string {
   return renderToolPage({
@@ -284,7 +299,7 @@ export function quotationMakerPage(): string {
     canonicalPath: PATH,
     jsonLd: jsonLd(),
     bodyHtml: BODY,
-    bodyEndScripts: "<script>(function(){" + COMMON_JS + ITEMS_JS + PAGE_JS + "})();</script>" + PRINT_STYLE,
+    bodyEndScripts: "<script>(function(){" + COMMON_JS + MEDIA_JS + ITEMS_JS + PAGE_JS + "})();</script>",
   });
 }
 

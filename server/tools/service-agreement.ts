@@ -7,7 +7,7 @@
  * paid e-sign flow: "sign up free to e-sign and get counter-signed proof".
  */
 import { renderToolPage, SITE_ORIGIN } from "./layout";
-import { COMMON_JS } from "./client-lib";
+import { COMMON_JS, MEDIA_JS } from "./client-lib";
 
 const PATH = "/tools/service-agreement-template";
 const TITLE = "Free Service Agreement Template (India) — Download PDF | DealInSec";
@@ -116,6 +116,22 @@ const BODY = `
       <label style="margin-top:12px">Extra clauses / notes (optional)</label>
       <textarea class="f" id="notes" rows="2" placeholder="Anything else to add."></textarea>
 
+      <hr style="border:none;border-top:1px solid var(--line);margin:18px 0" />
+
+      <label>Business logo (optional)</label>
+      <div class="logo-preview" id="logo-preview" style="display:none"></div>
+      <div class="sig-actions">
+        <label class="file-btn">Upload logo<input type="file" id="logo-input" accept="image/*" /></label>
+        <button type="button" class="file-btn" id="logo-input-clear">Remove</button>
+      </div>
+
+      <label style="margin-top:14px">Your signature (optional) — draw below or upload an image</label>
+      <canvas id="sig-pad" class="sig-pad"></canvas>
+      <div class="sig-actions">
+        <button type="button" class="file-btn" id="sig-clear">Clear</button>
+        <label class="file-btn">Upload image<input type="file" id="sig-upload" accept="image/*" /></label>
+      </div>
+
       <div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">
         <button class="btn" id="download" type="button">⬇ Download PDF</button>
         <button class="btn ghost" id="reset" type="button">Reset</button>
@@ -123,7 +139,7 @@ const BODY = `
       <p class="muted" style="font-size:13px;margin-top:10px">This template is a starting point, not legal advice. In the print dialog choose <b>Save as PDF</b>.</p>
     </div>
 
-    <div><div id="doc-preview" class="card"></div></div>
+    <div><div id="doc-preview" class="card print-doc"></div></div>
   </div>
 </div></section>
 
@@ -144,13 +160,16 @@ const BODY = `
 
 const PAGE_JS = `
   var STORE='dis_agreement_v1';
+  var LOGO=initLogo('logo-input','logo-preview',function(){ render(); save(); });
+  var SIG=initSignature('sig-pad',function(){ render(); save(); });
 
   function collect(){
     return {
       spName:$('spName').value, spAddr:$('spAddr').value, clName:$('clName').value, clAddr:$('clAddr').value,
       effDate:$('effDate').value, scope:$('scope').value, deliverables:$('deliverables').value,
       startDate:$('startDate').value, endDate:$('endDate').value, fee:$('fee').value, advancePct:$('advancePct').value,
-      revisions:$('revisions').value, govState:$('govState').value, exclusive:$('exclusive').checked, notes:$('notes').value
+      revisions:$('revisions').value, govState:$('govState').value, exclusive:$('exclusive').checked, notes:$('notes').value,
+      logo:LOGO.get(), sig:SIG.get()
     };
   }
   function save(){ try{ localStorage.setItem(STORE, JSON.stringify(collect())); }catch(e){} }
@@ -187,13 +206,14 @@ const PAGE_JS = `
     body+=clause(++n,'Governing Law', para('This Agreement is governed by the laws of '+esc(gov)+', India, and the courts there will have jurisdiction.'));
     if($('notes').value){ body+=clause(++n,'Additional Terms', '<div style="font-size:12.5px;color:#334155;white-space:pre-line">'+esc($('notes').value)+'</div>'); }
 
+    var spSignInk = SIG.get() ? '<img src="'+SIG.get()+'" alt="signature" style="max-height:42px;max-width:170px;object-fit:contain" />' : '';
     var sign='<div style="margin-top:22px;display:flex;gap:24px">'+
-      '<div style="flex:1"><div style="height:34px;border-bottom:1px solid #94A3B8"></div><div style="font-size:11px;color:#64748B;margin-top:4px">Service Provider</div><div style="font-size:12px;font-weight:600;color:#0F172A">'+esc(sp)+'</div><div style="font-size:11px;color:#94A3B8">Signature / Date</div></div>'+
-      '<div style="flex:1"><div style="height:34px;border-bottom:1px solid #94A3B8"></div><div style="font-size:11px;color:#64748B;margin-top:4px">Client</div><div style="font-size:12px;font-weight:600;color:#0F172A">'+esc(cl)+'</div><div style="font-size:11px;color:#94A3B8">Signature / Date</div></div>'+
+      '<div style="flex:1"><div style="min-height:36px;border-bottom:1px solid #94A3B8;display:flex;align-items:flex-end">'+spSignInk+'</div><div style="font-size:11px;color:#64748B;margin-top:4px">Service Provider</div><div style="font-size:12px;font-weight:600;color:#0F172A">'+esc(sp)+'</div><div style="font-size:11px;color:#94A3B8">Signature / Date</div></div>'+
+      '<div style="flex:1"><div style="min-height:36px;border-bottom:1px solid #94A3B8"></div><div style="font-size:11px;color:#64748B;margin-top:4px">Client</div><div style="font-size:12px;font-weight:600;color:#0F172A">'+esc(cl)+'</div><div style="font-size:11px;color:#94A3B8">Signature / Date</div></div>'+
     '</div>';
 
     var html=''+
-      '<div style="text-align:center;border-bottom:2px solid #0E8C5A;padding-bottom:8px;margin-bottom:6px"><div style="font-size:19px;font-weight:800;letter-spacing:.03em;color:#0F172A">SERVICE AGREEMENT</div></div>'+
+      '<div style="text-align:center;border-bottom:2px solid #0E8C5A;padding-bottom:8px;margin-bottom:6px">'+(LOGO.get()?'<img src="'+LOGO.get()+'" alt="" style="max-height:46px;max-width:180px;object-fit:contain;margin:0 auto 6px;display:block" />':'')+'<div style="font-size:19px;font-weight:800;letter-spacing:.03em;color:#0F172A">SERVICE AGREEMENT</div></div>'+
       body+sign+
       '<div style="margin-top:16px;padding-top:8px;border-top:1px solid #EEF2F6;text-align:center;font-size:11px;color:#94A3B8">Made with DealInSec &middot; dealinsec.com</div>';
     $('doc-preview').innerHTML=html;
@@ -203,10 +223,12 @@ const PAGE_JS = `
     $(id).addEventListener('input',function(){ render(); save(); });
   });
   $('exclusive').addEventListener('change',function(){ render(); save(); });
+  $('sig-upload').addEventListener('change',function(e){ SIG.upload(e.target.files && e.target.files[0]); e.target.value=''; });
+  $('sig-clear').addEventListener('click',function(){ SIG.clear(); });
   $('reset').addEventListener('click',function(){
     try{localStorage.removeItem(STORE);}catch(e){}
     ['spName','spAddr','clName','clAddr','effDate','scope','deliverables','startDate','endDate','fee','advancePct','revisions','govState','notes'].forEach(function(id){$(id).value='';});
-    $('exclusive').checked=false; render(); save();
+    $('exclusive').checked=false; LOGO.clear(); SIG.clear(); render(); save();
   });
   $('download').addEventListener('click',function(){ document.title=('Service Agreement'+($('clName').value?' - '+$('clName').value:'')); window.print(); });
 
@@ -214,18 +236,11 @@ const PAGE_JS = `
   if(saved){
     ['spName','spAddr','clName','clAddr','effDate','scope','deliverables','startDate','endDate','fee','advancePct','revisions','govState','notes'].forEach(function(id){ if(saved[id]!=null)$(id).value=saved[id]; });
     if(saved.exclusive)$('exclusive').checked=true;
+    if(saved.logo)LOGO.set(saved.logo);
+    if(saved.sig)SIG.set(saved.sig);
   }
   render();
 `;
-
-const PRINT_STYLE = `<style>
-@media print{
-  header.site,footer.site,.cta-band,#form-card,.hero,section:not(#print-only){display:none!important}
-  body{background:#fff}
-  #doc-preview{border:none!important;padding:0!important;max-width:720px;margin:0 auto}
-  .grid2{display:block!important}
-}
-</style>`;
 
 export function serviceAgreementPage(): string {
   return renderToolPage({
@@ -234,7 +249,7 @@ export function serviceAgreementPage(): string {
     canonicalPath: PATH,
     jsonLd: jsonLd(),
     bodyHtml: BODY,
-    bodyEndScripts: "<script>(function(){" + COMMON_JS + PAGE_JS + "})();</script>" + PRINT_STYLE,
+    bodyEndScripts: "<script>(function(){" + COMMON_JS + MEDIA_JS + PAGE_JS + "})();</script>",
   });
 }
 
