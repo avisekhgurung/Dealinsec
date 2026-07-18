@@ -53,10 +53,11 @@ const STYLES = `<style>
   .btn.ghost:hover{background:#fff;border-color:var(--green)}
   header.site{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
   header.site .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
-  .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:19px;color:var(--ink)}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:19px;color:var(--ink);letter-spacing:-.01em}
   .brand:hover{text-decoration:none}
-  .logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--green),#12b981);color:#fff;display:grid;place-items:center;font-weight:800}
-  .brand b{color:var(--green)}
+  .logo{flex-shrink:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,.08))}
+  .brand-text{line-height:1}
+  .brand-accent{background:linear-gradient(135deg,#059669 0%,#0D9488 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#0D9488}
   .hero{padding:56px 0 20px;text-align:center}
   .hero h1{font-size:clamp(28px,5vw,44px);font-weight:800;letter-spacing:-.02em}
   .hero p.sub{font-size:clamp(16px,2.2vw,20px);color:var(--muted);max-width:660px;margin:0 auto}
@@ -86,9 +87,24 @@ const STYLES = `<style>
   .muted{color:var(--muted)}
 </style>`;
 
+// Same mark as the React app's <DealinsecLogo> (client/src/components/
+// dealinsec-logo.tsx) — inlined as SVG so the server-rendered pages match the
+// landing page exactly: emerald gradient tile, geometric "D", gold accent seal.
+const LOGO_SVG = `<svg width="32" height="32" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo" aria-hidden="true">
+  <defs>
+    <linearGradient id="dls-bg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#10B981"/><stop offset="0.55" stop-color="#059669"/><stop offset="1" stop-color="#0D9488"/></linearGradient>
+    <linearGradient id="dls-sheen" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="white" stop-opacity="0.28"/><stop offset="0.5" stop-color="white" stop-opacity="0"/></linearGradient>
+    <linearGradient id="dls-accent" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FBBF24"/><stop offset="1" stop-color="#F59E0B"/></linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="13" fill="url(#dls-bg)"/>
+  <rect width="48" height="48" rx="13" fill="url(#dls-sheen)"/>
+  <path d="M13.5 12 H22.5 C29.9558 12 34 16.9249 34 24 C34 31.0751 29.9558 36 22.5 36 H13.5 V12 Z M18.5 17 V31 H22.3 C26.6 31 29 28.4 29 24 C29 19.6 26.6 17 22.3 17 H18.5 Z" fill="white" fill-rule="evenodd"/>
+  <circle cx="35.5" cy="33.5" r="3.2" fill="url(#dls-accent)" stroke="url(#dls-bg)" stroke-width="1.8"/>
+</svg>`;
+
 function header(): string {
   return `<header class="site"><div class="wrap">
-    <a class="brand" href="/"><span class="logo">D</span>Deal<b>insec</b></a>
+    <a class="brand" href="/" aria-label="DealInSec home">${LOGO_SVG}<span class="brand-text">Deal<span class="brand-accent">insec</span></span></a>
     <a class="btn" href="${APP_LINK}">Open App</a>
   </div></header>`;
 }
