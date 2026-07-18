@@ -10,6 +10,7 @@ import { WebhookHandlers } from './webhookHandlers';
 import { setupGoogleAuth } from './googleAuth';
 import { getSession } from './auth';
 import { storage } from './storage';
+import { registerToolPages, toolSitemapPaths } from './tools';
 
 const app = express();
 
@@ -120,7 +121,7 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
   // auth and intentionally excluded).
   app.get("/sitemap.xml", (_req, res) => {
     const base = `https://${CANONICAL_HOST}`;
-    const paths = ["/", "/pitch", "/terms", "/privacy", "/cookies", "/refund"];
+    const paths = ["/", "/pitch", "/terms", "/privacy", "/cookies", "/refund", ...toolSitemapPaths()];
     const urls = paths
       .map((p) => `  <url>\n    <loc>${base}${p}</loc>\n    <changefreq>weekly</changefreq>\n  </url>`)
       .join("\n");
@@ -254,6 +255,11 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
   const httpServer = await registerRoutes(app);
+
+  // Public server-rendered SEO/tool pages — MUST be registered before the SPA
+  // catch-all (serveStatic / setupVite) so /tools/* returns real crawlable HTML
+  // instead of the SPA shell.
+  registerToolPages(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
