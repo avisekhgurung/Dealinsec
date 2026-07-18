@@ -40,9 +40,10 @@ export function esc(s: unknown): string {
 
 const STYLES = `<style>
   *,*::before,*::after{box-sizing:border-box}
-  :root{--green:#0E8C5A;--green-d:#0a6e46;--ink:#0F172A;--muted:#64748B;--line:#E2E8F0;--bg:#F8FAFC;--card:#fff}
+  /* Tokens mirror the landing page's light theme (client/src/index.css). */
+  :root{--green:hsl(160 84% 30%);--green-d:hsl(160 84% 23%);--ink:hsl(222 47% 11%);--muted:hsl(215 16% 47%);--line:hsl(215 20% 88%);--card-line:hsl(215 20% 92%);--bg:hsl(210 20% 98%);--card:hsl(0 0% 100%);--accent-bg:hsl(160 60% 95%);--accent-fg:hsl(160 55% 22%);--accent-line:hsl(160 40% 85%)}
   html{-webkit-text-size-adjust:100%}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6}
+  body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
   a{color:var(--green);text-decoration:none}
   a:hover{text-decoration:underline}
   h1,h2,h3{line-height:1.2;margin:0 0 .5em}
@@ -62,9 +63,9 @@ const STYLES = `<style>
   .hero h1{font-size:clamp(28px,5vw,44px);font-weight:800;letter-spacing:-.02em}
   .hero p.sub{font-size:clamp(16px,2.2vw,20px);color:var(--muted);max-width:660px;margin:0 auto}
   .chips{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:20px 0 0}
-  .chip{font-size:13px;font-weight:600;color:var(--green-d);background:#E7F6EF;border:1px solid #BFE6D4;border-radius:999px;padding:6px 12px}
+  .chip{font-size:13px;font-weight:600;color:var(--accent-fg);background:var(--accent-bg);border:1px solid var(--accent-line);border-radius:999px;padding:6px 12px}
   section{padding:28px 0}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px}
+  .card{background:var(--card);border:1px solid var(--card-line);border-radius:16px;padding:22px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
   @media(max-width:860px){.grid2{grid-template-columns:1fr}}
   label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:12px 0 5px}
@@ -73,7 +74,7 @@ const STYLES = `<style>
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
   @media(max-width:760px){.steps{grid-template-columns:1fr}}
-  .step .n{width:34px;height:34px;border-radius:50%;background:#E7F6EF;color:var(--green-d);font-weight:800;display:grid;place-items:center;margin-bottom:8px}
+  .step .n{width:34px;height:34px;border-radius:50%;background:var(--accent-bg);color:var(--accent-fg);font-weight:800;display:grid;place-items:center;margin-bottom:8px}
   .faq h3{font-size:17px;margin-top:18px}
   .faq p{color:var(--muted);margin:.3em 0 0}
   .cta-band{background:linear-gradient(135deg,var(--green),#0a6e46);color:#fff;margin-top:24px}
@@ -158,6 +159,9 @@ export function renderToolPage(o: ToolPageOptions): string {
 <meta name="twitter:description" content="${esc(o.description)}" />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="icon" href="/favicon.ico" sizes="any" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 ${STYLES}
 ${o.headExtra || ""}
 ${ld}
