@@ -31,12 +31,21 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
-        // Don't precache the giant index — let navigations hit network first
-        navigateFallbackDenylist: [/^\/api\//],
+        // Server-rendered routes that live OUTSIDE the React SPA must NOT be
+        // shadowed by the navigation fallback (index.html) — otherwise the SW
+        // serves the SPA shell and /tools etc. render the landing page.
+        navigateFallbackDenylist: [
+          /^\/api\//,
+          /^\/tools(\/|$)/,
+          /^\/sitemap\.xml$/,
+          /^\/robots\.txt$/,
+        ],
         runtimeCaching: [
           {
-            // App shell — network first so users get fresh deploys
-            urlPattern: ({ request }) => request.mode === "navigate",
+            // App shell — network first so users get fresh deploys. Exclude the
+            // server-rendered /tools/* pages so the SW never caches/handles them.
+            urlPattern: ({ request, url }) =>
+              request.mode === "navigate" && !url.pathname.startsWith("/tools"),
             handler: "NetworkFirst",
             options: { cacheName: "pages", networkTimeoutSeconds: 3 },
           },
