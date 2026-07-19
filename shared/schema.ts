@@ -306,3 +306,40 @@ export const newsletterSubscribers = pgTable("newsletter_subscribers", {
 export const insertNewsletterSchema = createInsertSchema(newsletterSubscribers).omit({ id: true, createdAt: true });
 export type InsertNewsletterSubscriber = z.infer<typeof insertNewsletterSchema>;
 export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect;
+
+// Documents saved from the public free tools (invoice, quotation, proforma,
+// purchase order, service agreement). Standalone artifacts — NOT tied to a deal
+// or credits — that a signed-in user chose to keep. `payload` holds the full
+// in-browser form state so the document can be re-rendered/edited later.
+export const TOOL_DOCUMENT_TYPES = [
+  "invoice",
+  "quotation",
+  "proforma",
+  "purchase_order",
+  "agreement",
+] as const;
+export type ToolDocumentType = (typeof TOOL_DOCUMENT_TYPES)[number];
+
+export const toolDocuments = pgTable("tool_documents", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  type: varchar("type").notNull(),
+  title: varchar("title"),
+  docNumber: varchar("doc_number"),
+  partyName: varchar("party_name"),
+  total: integer("total"),
+  currency: varchar("currency").notNull().default("INR"),
+  payload: jsonb("payload").notNull(),
+  source: varchar("source").notNull().default("free_tool"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertToolDocumentSchema = createInsertSchema(toolDocuments).omit({
+  id: true,
+  userId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertToolDocument = z.infer<typeof insertToolDocumentSchema>;
+export type ToolDocument = typeof toolDocuments.$inferSelect;

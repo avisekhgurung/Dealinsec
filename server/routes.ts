@@ -1475,6 +1475,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── Documents saved from the public free tools (invoice/quotation/etc.) ──
+  // Standalone artifacts a signed-in user chose to keep; not tied to a deal or credits.
+  const TOOL_DOC_TYPES = ["invoice", "quotation", "proforma", "purchase_order", "agreement"];
+
+  app.post("/api/documents", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const b = req.body || {};
+      const type = String(b.type || "");
+      if (!TOOL_DOC_TYPES.includes(type)) {
+        return res.status(400).json({ error: "Invalid document type" });
+      }
+      if (b.payload == null || typeof b.payload !== "object" || Array.isArray(b.payload)) {
+        return res.status(400).json({ error: "Missing document data" });
+      }
+      // Guard against oversized payloads (localStorage docs are tiny; images are data URLs).
+      if (JSON.stringify(b.payload).length > 500_000) {
+        return res.status(413).json({ error: "Document is too large to save" });
+      }
+      const totalNum = Number(b.total);
+      const created = await storage.createToolDocument({
+        userId,
+        type,
+        title: b.title ? String(b.title).slice(0, 200) : null,
+        docNumber: b.docNumber ? String(b.docNumber).slice(0, 60) : null,
+        partyName: b.partyName ? String(b.partyName).slice(0, 200) : null,
+        total: Number.isFinite(totalNum) ? Math.round(totalNum) : null,
+        currency: String(b.currency || "INR").slice(0, 8),
+        payload: b.payload,
+        source: String(b.source || "free_tool").slice(0, 40),
+      });
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("Save tool document error:", error);
+      res.status(500).json({ error: "Could not save the document" });
+    }
+  });
+
+  app.get("/api/documents", isAuthenticated, async (req: any, res) => {
+    try {
+      const docs = await storage.getToolDocuments(req.user.id);
+      // List view doesn't need the heavy payload
+      res.json(docs.map(({ payload, ...meta }) => meta));
+    } catch (error) {
+      console.error("List tool documents error:", error);
+      res.status(500).json({ error: "Could not load your documents" });
+    }
+  });
+
+  app.get("/api/documents/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const doc = await storage.getToolDocument(parseInt(req.params.id, 10));
+      if (!doc) return res.status(404).json({ error: "Document not found" });
+      if (doc.userId !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      res.json(doc);
+    } catch (error) {
+      console.error("Get tool document error:", error);
+      res.status(500).json({ error: "Could not load the document" });
+    }
+  });
+
+  app.delete("/api/documents/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const doc = await storage.getToolDocument(parseInt(req.params.id, 10));
+      if (!doc) return res.status(404).json({ error: "Document not found" });
+      if (doc.userId !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      await storage.deleteToolDocument(doc.id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete tool document error:", error);
+      res.status(500).json({ error: "Could not delete the document" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
