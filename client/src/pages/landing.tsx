@@ -244,6 +244,18 @@ const stagger = {
   visible: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
 };
 
+// Above-the-fold HERO variants: opacity stays 1 so the LCP hero text paints
+// immediately (good for Core Web Vitals) and is never blank if animations are
+// paused (crawlers, reduced-motion, backgrounded tab). Only a subtle slide-up.
+const heroStagger = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.06, delayChildren: 0.03 } },
+};
+const heroFadeUp = {
+  hidden: { y: 14 },
+  visible: { y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
+};
+
 // ────────────────────────────────────────────────────────────────────────────
 // Main component
 // ────────────────────────────────────────────────────────────────────────────
@@ -766,12 +778,12 @@ function Hero({
 
         <div className="text-center max-w-4xl mx-auto">
           <motion.div
-            variants={stagger}
+            variants={heroStagger}
             initial="hidden"
             animate="visible"
             className="space-y-6"
           >
-            <motion.div variants={fadeUp} className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm border border-emerald-200/70 dark:border-emerald-800/40 shadow-sm">
+            <motion.div variants={heroFadeUp} className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm border border-emerald-200/70 dark:border-emerald-800/40 shadow-sm">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
@@ -782,7 +794,7 @@ function Hero({
             </motion.div>
 
             <motion.h1
-              variants={fadeUp}
+              variants={heroFadeUp}
               className="text-[2.5rem] sm:text-5xl lg:text-[4.5rem] font-bold tracking-tight leading-[1.02]"
             >
               Get every deal in writing.
@@ -807,13 +819,13 @@ function Hero({
               </span>
             </motion.h1>
 
-            <motion.p variants={fadeUp} className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
+            <motion.p variants={heroFadeUp} className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
               One simple workflow — quotation, agreement, invoice, payment —{" "}
               <span className="font-semibold text-neutral-900 dark:text-white">so you look professional, never chase a client, and get paid on time.</span>{" "}
               Built for India.
             </motion.p>
 
-            <motion.div variants={fadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <motion.div variants={heroFadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
               <Button
                 onClick={onPrimaryClick}
                 className="h-12 px-6 text-sm font-semibold text-white border-0 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all w-full sm:w-auto"
@@ -832,7 +844,7 @@ function Hero({
               </a>
             </motion.div>
 
-            <motion.div variants={fadeUp} className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 pt-3 text-xs text-neutral-500">
+            <motion.div variants={heroFadeUp} className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 pt-3 text-xs text-neutral-500">
               <span className="flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5 text-emerald-500" /> 3 free credits on signup
               </span>
