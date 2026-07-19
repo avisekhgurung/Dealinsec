@@ -422,6 +422,14 @@ const STYLES = `<style>
   }
   html{max-width:100%; overflow-x:hidden}
 
+  /* Inputs must be able to shrink inside grid/flex cells (grid items default to
+     min-width:auto, which lets a date input's intrinsic width overflow its cell). */
+  input.f,textarea.f,select.f{min-width:0; max-width:100%}
+  .row2>*{min-width:0}
+  /* Phones: one field per row so date pickers and text inputs get full width and
+     never overflow / squish. Two-up returns on larger phones & tablets where it fits. */
+  @media(max-width:600px){ .row2{grid-template-columns:1fr} }
+
   /* Fallback: no backdrop-filter (older Firefox/Android) → solid-ish surfaces. */
   @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
     header.site,.tool-switch,.export-sheet{background:rgba(255,255,255,.96)}
