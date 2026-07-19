@@ -175,12 +175,16 @@ const PAGE_JS = `
 `;
 
 const STYLE = `<style>
-  .seg{display:flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:4px;margin-top:6px}
-  .seg-btn{flex:1;padding:9px;border:0;background:transparent;border-radius:9px;font:inherit;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer}
-  .seg-btn.active{background:var(--card);color:var(--green-d);box-shadow:0 1px 3px rgba(16,24,40,.08)}
+  .seg{display:flex;gap:3px;background:hsl(210 24% 92% / .7);-webkit-backdrop-filter:saturate(160%) blur(12px);backdrop-filter:saturate(160%) blur(12px);border:1px solid hsl(215 25% 88% / .7);border-radius:14px;padding:4px;margin-top:6px}
+  .seg-btn{flex:1;min-height:44px;padding:0 14px;border:0;background:transparent;border-radius:11px;font:inherit;font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;transition:background .16s ease,color .16s ease,box-shadow .16s ease,transform .1s ease}
+  .seg-btn:hover{color:var(--ink)}
+  .seg-btn:active{transform:scale(.96)}
+  .seg-btn.active{background:#fff;color:var(--green-d);box-shadow:0 2px 6px -1px rgba(16,24,40,.18),inset 0 1px 0 rgba(255,255,255,.9)}
   .rate-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
-  .rate-pill{padding:9px 16px;border:1.5px solid var(--line);border-radius:11px;background:var(--card);font:inherit;font-size:14px;font-weight:700;color:var(--ink);cursor:pointer}
-  .rate-pill.active{background:var(--green);border-color:var(--green);color:#fff}
+  .rate-pill{min-height:44px;padding:0 16px;display:inline-flex;align-items:center;border:1.5px solid hsl(215 25% 88% / .7);border-radius:999px;background:rgba(255,255,255,.62);-webkit-backdrop-filter:saturate(160%) blur(12px);backdrop-filter:saturate(160%) blur(12px);font:inherit;font-size:14px;font-weight:700;color:var(--ink);cursor:pointer;transition:transform .1s ease,border-color .16s ease,background .16s ease,box-shadow .16s ease}
+  .rate-pill:hover{border-color:hsl(160 35% 76%)}
+  .rate-pill:active{transform:scale(.95)}
+  .rate-pill.active{background:linear-gradient(180deg,hsl(160 84% 34%),var(--green-d));border-color:transparent;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 6px 14px -6px hsl(160 84% 22% / .7)}
   .result-card{background:linear-gradient(135deg,var(--accent-bg),var(--card));border-color:var(--accent-line)}
   .res-head{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
   .res-big{font-size:34px;font-weight:800;color:var(--ink);letter-spacing:-.02em;margin:2px 0 14px}

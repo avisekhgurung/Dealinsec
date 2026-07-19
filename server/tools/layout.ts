@@ -187,6 +187,266 @@ const STYLES = `<style>
     .ambient,header.site,footer.site,.cta-band{display:none!important}
     .no-print{display:none!important}
   }
+
+  /* ============================================================================
+     DEALINSEC · LIQUID-GLASS REFRESH (iOS-26 material). Appended last so these
+     rules win on source order and the .print-doc paper-guard lands after .card.
+     ============================================================================ */
+  :root{
+    --hdr-h:64px;                                 /* single source of truth for both sticky bars */
+    --glass:rgba(255,255,255,.66);
+    --glass-strong:rgba(255,255,255,.78);
+    --glass-line:hsl(215 25% 88% / .7);
+    --glass-hair:rgba(255,255,255,.85);
+    --glass-edge-lo:hsl(160 30% 60% / .30);
+    --glass-inset:inset 0 1px 0 rgba(255,255,255,.72), inset 0 0 0 1px rgba(255,255,255,.14);
+    --glass-shadow:0 12px 34px -14px hsl(160 45% 16% / .30);
+    --shadow-green:0 10px 30px -8px hsl(160 60% 30% / .26), 0 2px 8px hsl(160 40% 20% / .08);
+    --shadow-green-lg:0 22px 50px -14px hsl(160 60% 28% / .34);
+    --blur:saturate(180%) blur(20px);
+    --blur-lite:saturate(160%) blur(12px);
+  }
+  /* Soft green mesh so the frosted surfaces have real light to refract.
+     background-attachment:scroll — fixed is janky/repaint-heavy on iOS. */
+  body{
+    background:
+      radial-gradient(1100px 620px at 12% -8%, hsl(160 70% 90% / .55), transparent 60%),
+      radial-gradient(900px 560px at 108% 4%,  hsl(174 62% 90% / .50), transparent 58%),
+      radial-gradient(760px 720px at 50% 118%, hsl(160 55% 92% / .45), transparent 62%),
+      var(--bg);
+    background-attachment:scroll;
+    background-repeat:no-repeat;
+  }
+  header.site{
+    background:var(--glass-strong);
+    -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
+    border-bottom:1px solid hsl(160 25% 80% / .5);
+    box-shadow:0 1px 0 rgba(255,255,255,.6), 0 10px 26px -20px hsl(160 45% 16% / .6);
+  }
+  header.site .wrap{height:var(--hdr-h)}
+
+  /* Cross-tool switcher: frosted sticky sub-bar under the header, horizontal scroll. */
+  .tool-switch{
+    position:sticky; top:var(--hdr-h); z-index:19;
+    background:var(--glass-strong);
+    -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
+    border-bottom:1px solid hsl(160 25% 80% / .45);
+    box-shadow:0 1px 0 rgba(255,255,255,.5);
+  }
+  .tool-switch .wrap{position:relative;padding-top:0;padding-bottom:0}
+  .ts-track{
+    display:flex; gap:6px; align-items:center;
+    overflow-x:auto; overflow-y:hidden;
+    padding:9px 0; margin:0 -2px;
+    scroll-snap-type:x proximity; scroll-behavior:smooth;
+    -webkit-overflow-scrolling:touch; scrollbar-width:none;
+  }
+  .ts-track::-webkit-scrollbar{display:none}
+  .ts-pill{
+    flex:0 0 auto; scroll-snap-align:start;
+    display:inline-flex; align-items:center;
+    min-height:38px; padding:8px 15px; border-radius:12px;
+    font-size:14px; font-weight:650; letter-spacing:-.01em; white-space:nowrap;
+    color:var(--muted); border:1px solid transparent;
+    transition:color .18s ease, background .18s ease, box-shadow .18s ease, transform .12s ease;
+  }
+  .ts-pill:hover{color:var(--ink); background:rgba(255,255,255,.55); text-decoration:none}
+  .ts-pill:active{transform:scale(.96)}
+  .ts-pill.active{                                /* raised white "selected segment" */
+    color:var(--green-d); font-weight:700;
+    background:#fff; border-color:var(--glass-line);
+    box-shadow:0 2px 8px -2px rgba(16,24,40,.18), 0 0 0 1px hsl(160 40% 85% / .6);
+  }
+  .ts-pill:focus-visible{outline:2px solid var(--green); outline-offset:2px}
+  .tool-switch .wrap::after{                      /* fade hint that more tools scroll off-screen */
+    content:""; position:absolute; top:0; right:0; bottom:0; width:34px;
+    pointer-events:none; background:linear-gradient(90deg, transparent, var(--glass-strong));
+  }
+  @media(min-width:980px){                         /* full set fits on desktop → no fade, wrap-pack */
+    .tool-switch .wrap::after{display:none}
+    .ts-track{overflow-x:visible; flex-wrap:wrap; row-gap:6px}
+  }
+
+  /* Frosted form/info surfaces with a masked specular top hairline. */
+  .card{
+    position:relative;
+    background:var(--glass);
+    -webkit-backdrop-filter:var(--blur-lite); backdrop-filter:var(--blur-lite);
+    border:1px solid var(--glass-edge-lo);
+    border-radius:20px;
+    box-shadow:var(--glass-shadow), var(--glass-inset);
+  }
+  .card::before{
+    content:""; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+    border-top:1px solid var(--glass-hair);
+    -webkit-mask:linear-gradient(180deg,#000, transparent 42%);
+            mask:linear-gradient(180deg,#000, transparent 42%);
+  }
+  .chip{
+    background:rgba(255,255,255,.55);
+    -webkit-backdrop-filter:saturate(160%) blur(10px); backdrop-filter:saturate(160%) blur(10px);
+    border:1px solid rgba(255,255,255,.6); color:var(--accent-fg);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 2px 8px -4px hsl(160 40% 20% / .26);
+  }
+  .badge{
+    background:var(--glass-strong);
+    -webkit-backdrop-filter:saturate(160%) blur(10px); backdrop-filter:saturate(160%) blur(10px);
+    border:1px solid rgba(255,255,255,.6);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 6px 16px -8px hsl(160 50% 30% / .3);
+  }
+  .tool-card{
+    background:var(--glass);
+    -webkit-backdrop-filter:var(--blur-lite); backdrop-filter:var(--blur-lite);
+    border:1px solid var(--glass-edge-lo);
+    box-shadow:var(--glass-shadow), var(--glass-inset);
+  }
+  .tool-card:hover{
+    box-shadow:var(--shadow-green-lg), var(--glass-inset);
+    border-color:rgba(255,255,255,.6);
+  }
+  .tool-ico{
+    background:linear-gradient(135deg, hsl(160 60% 92%), hsl(174 55% 90%));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.85);
+  }
+
+  /* "More free tools" related section (per-tool footer nav). */
+  .related{padding:28px 0}
+  .rt-title{font-size:18px;font-weight:800;letter-spacing:-.01em;margin:0 0 14px}
+  .rt-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:860px){.rt-grid{grid-template-columns:1fr 1fr}}
+  .rt-card{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    min-height:52px;padding:12px 16px;border-radius:14px;
+    background:var(--glass);
+    -webkit-backdrop-filter:var(--blur-lite); backdrop-filter:var(--blur-lite);
+    border:1px solid var(--glass-edge-lo);
+    box-shadow:var(--glass-inset);
+    color:var(--ink);font-weight:650;font-size:14px;
+    transition:transform .14s ease, box-shadow .16s ease, border-color .16s ease;
+  }
+  .rt-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-green),var(--glass-inset);border-color:rgba(255,255,255,.6);text-decoration:none}
+  .rt-card .rt-go{color:var(--green-d);font-weight:800;transition:transform .16s ease}
+  .rt-card:hover .rt-go{transform:translateX(3px)}
+
+  /* Export panel → frosted scrim + floating sheet. */
+  .export-overlay{
+    background:hsl(222 32% 12% / .42);
+    -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px);
+  }
+  .export-sheet{
+    background:var(--glass-strong);
+    -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
+    border:1px solid rgba(255,255,255,.5);
+    box-shadow:0 30px 72px -20px hsl(222 45% 8% / .6), var(--glass-inset);
+  }
+  .export-opt{
+    background:rgba(255,255,255,.55);
+    -webkit-backdrop-filter:var(--blur-lite); backdrop-filter:var(--blur-lite);
+    border:1px solid rgba(255,255,255,.55);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+  }
+  .export-opt:hover{border-color:var(--green);box-shadow:var(--shadow-green)}
+
+  /* Fields: iOS rounded, inset well, soft green focus ring. */
+  label{font-weight:600;letter-spacing:.01em}
+  input.f,textarea.f,select.f{
+    min-height:46px;
+    background:rgba(255,255,255,.72);
+    -webkit-backdrop-filter:saturate(140%) blur(6px); backdrop-filter:saturate(140%) blur(6px);
+    border:1.5px solid var(--glass-line);
+    border-radius:13px;
+    padding:12px 14px;
+    box-shadow:inset 0 1px 2px hsl(215 25% 40% / .06);
+    transition:border-color .18s ease, box-shadow .18s ease, background .18s ease;
+  }
+  input.f::placeholder,textarea.f::placeholder{color:hsl(215 16% 42%)}
+  input.f:hover,textarea.f:hover,select.f:hover{border-color:hsl(160 30% 78%)}
+  input.f:focus,textarea.f:focus,select.f:focus{
+    outline:none; border-color:var(--green); background:#fff;
+    box-shadow:0 0 0 4px hsl(160 84% 30% / .16);
+  }
+  select.f{cursor:pointer}
+
+  /* Primary button: dimensional green capsule. */
+  .btn{
+    min-height:46px; border-radius:14px;
+    background:linear-gradient(180deg, hsl(160 84% 34%), var(--green-d));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.28), 0 8px 20px -8px hsl(160 84% 20% / .6);
+    transition:transform .12s ease, box-shadow .12s ease, filter .12s ease;
+  }
+  /* No color here — base .btn:hover already whitens primary buttons, and
+     re-declaring color:#fff would override .cta-band .btn's green-d label. */
+  .btn:hover{filter:brightness(1.05); background:linear-gradient(180deg, hsl(160 84% 34%), var(--green-d))}
+  .btn:active{transform:scale(.97); box-shadow:inset 0 1px 3px hsl(160 84% 16% / .5)}
+  .btn:focus-visible{outline:2px solid var(--green-d); outline-offset:2px}
+  .btn.ghost{
+    color:var(--green-d);
+    background:rgba(255,255,255,.55);
+    -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+    border:1.5px solid rgba(255,255,255,.6);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 4px 12px -6px hsl(160 40% 20% / .3);
+  }
+  .btn.ghost:hover{background:rgba(255,255,255,.72); border-color:var(--accent-line); color:var(--green-d)}
+  .btn.ghost:active{transform:scale(.97)}
+  .file-btn{
+    min-height:42px; border-radius:12px;
+    background:rgba(255,255,255,.65);
+    -webkit-backdrop-filter:var(--blur-lite); backdrop-filter:var(--blur-lite);
+    border:1.5px solid var(--glass-line);
+    transition:border-color .16s ease, background .16s ease;
+  }
+  .file-btn:hover{border-color:var(--green); background:#fff}
+
+  /* HARD GUARD: the export node is <div class="card print-doc"> — it carries BOTH
+     classes, so force it back to opaque white paper and strip the sheen. After .card. */
+  .print-doc, .print-doc *{
+    -webkit-backdrop-filter:none!important; backdrop-filter:none!important;
+  }
+  .print-doc{
+    background:#fff!important;
+    border:1px solid var(--card-line)!important;
+    box-shadow:0 1px 2px rgba(16,24,40,.06)!important;
+  }
+  .print-doc::before{content:none!important}
+
+  /* Mobile "app feel": >=44px targets, 16px inputs (no iOS zoom), shorter bars.
+     Full-width buttons scoped to main so the header "Open App" button is untouched. */
+  @media(max-width:760px){
+    :root{--hdr-h:56px}
+    input.f,textarea.f,select.f{min-height:48px; font-size:16px}
+    main .btn{width:100%; justify-content:center}
+    .btn{min-height:48px}
+    .ts-pill{min-height:44px; padding:10px 16px}
+    .card{border-radius:18px; padding:18px}
+    .hero{padding:34px 0 12px}
+  }
+  html{max-width:100%; overflow-x:hidden}
+
+  /* Fallback: no backdrop-filter (older Firefox/Android) → solid-ish surfaces. */
+  @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+    header.site,.tool-switch,.export-sheet{background:rgba(255,255,255,.96)}
+    .card,.tool-card,.rt-card,.export-opt{background:#fff}
+    .chip,.badge{background:#fff}
+    .btn.ghost,.file-btn{background:#fff}
+  }
+  /* Reduced-transparency (OS accessibility) → near-opaque, no blur. */
+  @media (prefers-reduced-transparency:reduce){
+    header.site,.tool-switch,.card,.tool-card,.rt-card,.export-sheet,.export-opt,.chip,.badge{
+      background:rgba(255,255,255,.97)!important;
+      -webkit-backdrop-filter:none!important; backdrop-filter:none!important;
+    }
+  }
+  /* Reduced-motion → kill transforms/animation (incl. export keyframes). */
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{
+      animation-duration:.001ms!important; animation-iteration-count:1!important;
+      transition-duration:.001ms!important; scroll-behavior:auto!important;
+    }
+    .btn:active,.btn.ghost:active,.ts-pill:active,.tool-card:hover,.rt-card:hover{transform:none!important}
+  }
+  /* Re-assert the clean-A4 reset AFTER the .print-doc glass guard so the PDF
+     (window.print) stays borderless — the guard's border/box-shadow are for screen only. */
+  @media print{ body{background:#fff!important} .tool-switch,.related{display:none!important} .print-doc{border:none!important;box-shadow:none!important} }
 </style>`;
 
 // Same mark as the React app's <DealinsecLogo> (client/src/components/
@@ -208,6 +468,40 @@ const EXT_ICON = `<svg class="ext" viewBox="0 0 24 24" fill="none" stroke="curre
 
 // Subtle decorative backdrop echoing the landing page's ambient style.
 const AMBIENT = `<div class="ambient" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="ring r1"></span><span class="ring r2"></span><span class="dotpad d1"></span><span class="dotpad d2"></span></div>`;
+
+// Cross-tool navigation source of truth (label order = display order).
+const TOOL_LINKS: [string, string][] = [
+  ["/tools", "All tools"],
+  ["/tools/gst-invoice-generator", "GST Invoice"],
+  ["/tools/quotation-maker", "Quotation"],
+  ["/tools/service-agreement-template", "Agreement"],
+  ["/tools/gst-calculator", "GST Calculator"],
+  ["/tools/proforma-invoice-generator", "Proforma"],
+  ["/tools/purchase-order-generator", "Purchase Order"],
+];
+
+/** Sticky frosted sub-bar so users can hop between tools; marks the active one. */
+function toolSwitch(active = ""): string {
+  const pills = TOOL_LINKS.map(([href, label]) => {
+    const on = href === active;
+    return `<a class="ts-pill${on ? " active" : ""}" href="${esc(href)}"${on ? ' aria-current="page"' : ""}>${esc(label)}</a>`;
+  }).join("");
+  return `<nav class="tool-switch" aria-label="Free tools"><div class="wrap"><div class="ts-track" role="list">${pills}</div></div></nav>`;
+}
+
+/** "More free tools" cards for the bottom of each tool page (hides the current tool + the hub). */
+function relatedTools(current = ""): string {
+  const cards = TOOL_LINKS
+    .filter(([href]) => href !== "/tools" && href !== current)
+    .map(([href, label]) =>
+      `<a class="rt-card" href="${esc(href)}"><span class="rt-label">${esc(label)}</span><span class="rt-go" aria-hidden="true">→</span></a>`,
+    )
+    .join("");
+  return `<section class="related no-print" aria-label="More free tools"><div class="wrap">
+    <h2 class="rt-title">More free tools</h2>
+    <div class="rt-grid">${cards}</div>
+  </div></section>`;
+}
 
 function header(): string {
   return `<header class="site"><div class="wrap">
@@ -320,7 +614,9 @@ ${ld}
 <body>
 ${AMBIENT}
 ${header()}
+${toolSwitch(o.canonicalPath)}
 <main>${o.bodyHtml}</main>
+${o.canonicalPath === "/tools" ? "" : relatedTools(o.canonicalPath)}
 ${EXPORT_PANEL}
 ${o.hideCtaBand ? "" : ctaBand()}
 ${footer()}
