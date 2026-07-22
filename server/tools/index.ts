@@ -15,6 +15,7 @@ import { serviceAgreementPage, serviceAgreementMeta } from "./service-agreement"
 import { gstCalculatorPage, gstCalculatorMeta } from "./gst-calculator";
 import { proformaInvoicePage, proformaInvoiceMeta } from "./proforma-invoice";
 import { purchaseOrderPage, purchaseOrderMeta } from "./purchase-order";
+import { registerProgrammaticPages, programmaticSitemapPaths } from "./programmatic";
 
 // html-to-image UMD bundle (for PNG export), read once and served self-hosted
 // so the tool pages have no external CDN dependency.
@@ -47,7 +48,7 @@ export const TOOLS: ToolDef[] = [
 
 /** Public paths for the sitemap (the /tools index + each tool). */
 export function toolSitemapPaths(): string[] {
-  return ["/tools", ...TOOLS.map((t) => t.path)];
+  return ["/tools", ...TOOLS.map((t) => t.path), ...programmaticSitemapPaths()];
 }
 
 // Distinct line icons per tool (lucide-style), rendered inside the card badge.
@@ -137,4 +138,6 @@ export function registerToolPages(app: Express) {
   for (const t of TOOLS) {
     app.get(t.path, (_req, res) => res.type("html").send(t.render()));
   }
+  // Programmatic "{Profession} Invoice Format" long-tail SEO pages.
+  registerProgrammaticPages(app);
 }

@@ -8,6 +8,7 @@
 import { renderToolPage, SITE_ORIGIN } from "./layout";
 import { COMMON_JS, ITEMS_JS, MEDIA_JS, EXPORT_JS } from "./client-lib";
 import { aiEnabled } from "../ai";
+import { professionLinksSection } from "./programmatic";
 
 // Highlighted "make it with AI" box — injected at render time only when a
 // DeepSeek key is configured (so it vanishes if AI is turned off / out of credits).
@@ -196,6 +197,8 @@ const BODY = `
     <p class="muted">A GST invoice is a bill a registered business issues for goods or services, showing the GST charged. In India it typically includes the seller's and buyer's details and GSTIN, an invoice number and date, a description of the goods or services, the taxable value, the GST rate, and the tax split as CGST + SGST (for sales within the same state) or IGST (for inter-state sales). This generator formats all of that for you and totals it automatically.</p>
   </div>
 </div></section>
+
+${professionLinksSection()}
 
 <section><div class="wrap faq">
   <h2>Frequently asked questions</h2>
