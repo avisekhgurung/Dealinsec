@@ -37,6 +37,7 @@ import {
   PenTool,
   Calculator,
   ClipboardList,
+  Infinity as InfinityIcon,
 } from "lucide-react";
 import { SiGoogle, SiInstagram, SiYoutube, SiX, SiFacebook, SiLinkedin } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
@@ -1746,14 +1747,21 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
     "Credits never expire",
     "Secure payments via PayU",
   ];
+  const proPerks = [
+    "Unlimited legally-worded agreements",
+    "Unlimited digital signatures",
+    "Everything in the free tier",
+    "One full year of coverage",
+    "No per-agreement credits to buy",
+  ];
 
   return (
     <section id="pricing" className="py-20 sm:py-28 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/20 scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
-          eyebrow="Pay only for what you use"
-          title="Pay-per-agreement. No subscriptions."
-          subtitle="Deals, quotes and invoices are always free. Only pay a one-time credit when you're ready to lock in a legally-signed agreement."
+          eyebrow="Simple pricing"
+          title="Start free. Pay as you go — or go unlimited."
+          subtitle="Deals, quotes and invoices are always free. Pay ₹299 per agreement, or go Pro for unlimited agreements all year."
         />
 
         <motion.div
@@ -1761,7 +1769,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-80px" }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-14 max-w-4xl mx-auto"
+          className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-14 max-w-6xl mx-auto"
         >
           {/* Free tier */}
           <motion.div
@@ -1885,6 +1893,47 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                 </span>
               </div>
             </div>
+          </motion.div>
+
+          {/* Pro annual — best value, unlimited agreements */}
+          <motion.div
+            variants={fadeUp}
+            className="relative rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-7 flex flex-col"
+          >
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center">
+                  <InfinityIcon className="w-4 h-4 text-amber-600" />
+                </div>
+                <p className="text-sm font-semibold">Pro · Annual</p>
+              </div>
+              <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                Best value
+              </span>
+            </div>
+            <div className="mt-4 flex items-baseline gap-1">
+              <span className="text-4xl font-bold tracking-tight">₹2,999</span>
+              <span className="text-sm text-neutral-500">/ year</span>
+            </div>
+            <p className="text-xs text-neutral-500 mt-1">One payment, not auto-renewing — cheaper than ~10 credits.</p>
+            <ul className="mt-5 space-y-2.5 flex-1">
+              {proPerks.map((f) => (
+                <li key={f} className="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+                  <Check className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+            <Button
+              onClick={onCTA}
+              className="w-full mt-6 h-11 text-sm font-bold text-white border-0 shadow-md shadow-amber-500/30"
+              style={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" }}
+              data-testid="button-go-pro"
+            >
+              Go Pro — ₹2,999/year
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+            <p className="text-[11px] text-neutral-500 text-center mt-3">Best if you sign more than ~10 agreements a year.</p>
           </motion.div>
         </motion.div>
 
