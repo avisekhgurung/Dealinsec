@@ -113,28 +113,34 @@ export default function DocumentsPage() {
                 .join(" · ");
               return (
                 <Card key={doc.id} className="glass-card border rounded-xl hover-elevate">
-                  <CardContent className="p-4 flex items-center gap-4">
-                    <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 grid place-items-center flex-shrink-0">
+                  <CardContent className="p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 grid place-items-center flex-shrink-0">
                       <FileText className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                        <span className="text-[11px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 whitespace-nowrap">
                           {meta.label}
                         </span>
                         {doc.docNumber && <span className="text-sm font-semibold truncate">{doc.docNumber}</span>}
                       </div>
-                      <div className="text-sm text-muted-foreground truncate mt-0.5">{sub || "Saved document"}</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground truncate mt-0.5">{sub || "Saved document"}</div>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <Button size="sm" variant="outline" onClick={() => openDoc(doc)} data-testid={`open-doc-${doc.id}`}>
-                        <ExternalLink className="w-4 h-4 mr-1.5" />
-                        Open
-                      </Button>
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       <Button
                         size="sm"
+                        variant="outline"
+                        className="px-2.5 sm:px-3"
+                        onClick={() => openDoc(doc)}
+                        data-testid={`open-doc-${doc.id}`}
+                      >
+                        <ExternalLink className="w-4 h-4 sm:mr-1.5" />
+                        <span className="hidden sm:inline">Open</span>
+                      </Button>
+                      <Button
+                        size="icon"
                         variant="ghost"
-                        className="text-muted-foreground"
+                        className="h-9 w-9 text-muted-foreground"
                         aria-label="Delete document"
                         onClick={() => {
                           if (window.confirm("Delete this saved document? This can’t be undone.")) del.mutate(doc.id);
