@@ -820,9 +820,9 @@ function Hero({
             </motion.h1>
 
             <motion.p variants={heroFadeUp} className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
-              One simple workflow — quotation, agreement, invoice, payment —{" "}
+              One simple workflow — quotation, e-signed agreement, GST invoice, payment —{" "}
               <span className="font-semibold text-neutral-900 dark:text-white">so you look professional, never chase a client, and get paid on time.</span>{" "}
-              Built for India.
+              Built for India's freelancers, agencies &amp; consultants.
             </motion.p>
 
             <motion.div variants={heroFadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
@@ -1161,7 +1161,7 @@ function FeatureGrid() {
               </span>
             </>
           }
-          subtitle="From the first handshake to final payment — manage it all from a single, powerful dashboard."
+          subtitle="From quotation to e-signed service agreement to GST invoice — manage every deal from one dashboard, and get paid on time."
         />
 
         <motion.div
