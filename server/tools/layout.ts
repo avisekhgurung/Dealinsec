@@ -177,15 +177,25 @@ const STYLES = `<style>
      (no external web-font embedding needed). */
   .print-doc, .print-doc *{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 
-  /* ── Print: show ONLY the document (.print-doc), clean A4 ── */
+  /* ── Print / PDF: show ONLY the document (.print-doc), in normal flow, so it
+     paginates correctly with NO blank trailing pages. The blank pages came from
+     visibility:hidden, which hides content but STILL reserves its full height
+     (the tall form + marketing sections spilled onto page after page). Using
+     display:none instead means the hidden content takes no space at all. ── */
   @media print{
     @page{size:A4;margin:14mm}
-    html,body{background:#fff!important}
-    body *{visibility:hidden!important}
-    .print-doc,.print-doc *{visibility:visible!important}
-    .print-doc{position:absolute!important;left:0;top:0;width:100%!important;max-width:100%!important;margin:0!important;padding:0!important;border:none!important;box-shadow:none!important}
-    .ambient,header.site,footer.site,.cta-band{display:none!important}
-    .no-print{display:none!important}
+    html,body{background:#fff!important;margin:0!important;padding:0!important}
+    /* Chrome, hero, the form column and every non-document section take no space. */
+    .ambient,header.site,footer.site,.cta-band,.tool-switch,.related,.hero,#form-card,.no-print{display:none!important}
+    main>section:not(:has(.print-doc)),
+    .wrap>*:not(:has(.print-doc)),
+    .grid2>*:not(:has(.print-doc)){display:none!important}
+    /* Flatten the wrappers so the document starts at the top edge. */
+    main,main>section,main>section>.wrap,.grid2{display:block!important;margin:0!important;padding:0!important;max-width:none!important}
+    /* The document itself: normal flow, full width, clean (no glass sheen). */
+    .print-doc{position:static!important;width:100%!important;max-width:100%!important;margin:0!important;border:none!important;box-shadow:none!important}
+    .print-doc,.print-doc *{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+    .print-doc::before{content:none!important}
   }
 
   /* ============================================================================
@@ -454,7 +464,6 @@ const STYLES = `<style>
   }
   /* Re-assert the clean-A4 reset AFTER the .print-doc glass guard so the PDF
      (window.print) stays borderless — the guard's border/box-shadow are for screen only. */
-  @media print{ body{background:#fff!important} .tool-switch,.related{display:none!important} .print-doc{border:none!important;box-shadow:none!important} }
 </style>`;
 
 // Same mark as the React app's <DealinsecLogo> (client/src/components/
