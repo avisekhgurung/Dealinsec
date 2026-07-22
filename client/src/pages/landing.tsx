@@ -35,6 +35,8 @@ import {
   Lightbulb,
   Camera,
   PenTool,
+  Calculator,
+  ClipboardList,
 } from "lucide-react";
 import { SiGoogle, SiInstagram, SiYoutube, SiX, SiFacebook, SiLinkedin } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +51,7 @@ import { DealinsecLogo } from "@/components/dealinsec-logo";
 // ────────────────────────────────────────────────────────────────────────────
 
 const NAV_LINKS = [
+  { label: "Free Tools", href: "/tools" },
   { label: "Who it's for", href: "#who" },
   { label: "Features", href: "#features" },
   { label: "How it works", href: "#how" },
@@ -362,6 +365,7 @@ export default function LandingPage() {
         />
         <TrustStrip />
         <WhoWeServeSection />
+        <FreeToolsSection />
         <FeatureGrid />
         <WorkflowSection />
         <ProductShowcase />
@@ -728,8 +732,11 @@ function Header({
 }
 
 function NavItem({ href, label }: { href: string; label: string }) {
-  const isHash = href.startsWith("#");
-  if (isHash) {
+  // Hash anchors AND the server-rendered /tools/* pages must be real <a> links
+  // (a wouter <Link> would client-route /tools into the SPA, which has no such
+  // route, and fall through to the landing page).
+  const isPlainAnchor = href.startsWith("#") || href.startsWith("/tools") || href.startsWith("mailto:");
+  if (isPlainAnchor) {
     return (
       <a
         href={href}
@@ -1142,6 +1149,63 @@ function WhoWeServeSection() {
             Every deal-led business. Whether you're a solo creator or a 50-person agency — same workflow, same simple pricing.
           </p>
         </motion.div>
+      </div>
+    </section>
+  );
+}
+
+const FREE_TOOLS = [
+  { name: "GST Invoice Generator", href: "/tools/gst-invoice-generator", desc: "Auto CGST/SGST/IGST, amount in words, instant PDF.", icon: Receipt },
+  { name: "Quotation Maker", href: "/tools/quotation-maker", desc: "Professional quotations with line items, GST & terms.", icon: FileText },
+  { name: "GST Calculator", href: "/tools/gst-calculator", desc: "Add or remove GST with the CGST/SGST or IGST split.", icon: Calculator },
+  { name: "Service Agreement", href: "/tools/service-agreement-template", desc: "A ready-to-sign contract — scope, fees, editable clauses.", icon: FileSignature },
+  { name: "Proforma Invoice", href: "/tools/proforma-invoice-generator", desc: "Confirm price & terms before the sale.", icon: FileCheck },
+  { name: "Purchase Order", href: "/tools/purchase-order-generator", desc: "Raise a clean PO for your vendor in a minute.", icon: ClipboardList },
+];
+
+function FreeToolsSection() {
+  return (
+    <section id="free-tools" className="py-20 sm:py-28 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionHeader
+          eyebrow="Free tools · No sign-up"
+          title={
+            <>
+              Try it free —{" "}
+              <span style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                no account needed
+              </span>
+            </>
+          }
+          subtitle="Create GST invoices, quotations and agreements right in your browser — free, instant, no sign-up. Then save your work with a free account and pick up where the tools leave off."
+        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5 mt-14">
+          {FREE_TOOLS.map((t) => (
+            <a
+              key={t.href}
+              href={t.href}
+              data-testid={`landing-tool-${t.href}`}
+              className="group rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-6 hover:border-emerald-300 dark:hover:border-emerald-700/70 hover:shadow-xl hover:shadow-emerald-500/10 transition-all duration-300 flex flex-col"
+            >
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 bg-emerald-50 dark:bg-emerald-950/40 group-hover:scale-110 transition-transform">
+                <t.icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <h3 className="text-base font-semibold mb-1.5">{t.name}</h3>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed flex-1">{t.desc}</p>
+              <span className="mt-4 text-sm font-semibold text-emerald-700 dark:text-emerald-400 inline-flex items-center gap-1 group-hover:gap-2 transition-all">
+                Open tool <ArrowRight className="w-3.5 h-3.5" />
+              </span>
+            </a>
+          ))}
+        </div>
+        <div className="mt-10 text-center">
+          <a
+            href="/tools"
+            className="inline-flex items-center gap-2 h-12 px-6 rounded-md text-sm font-semibold border border-neutral-300 dark:border-neutral-700 hover:bg-white dark:hover:bg-neutral-900 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors"
+          >
+            See all free tools <ArrowRight className="w-4 h-4" />
+          </a>
+        </div>
       </div>
     </section>
   );
