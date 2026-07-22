@@ -7,6 +7,16 @@
  */
 import { renderToolPage, SITE_ORIGIN } from "./layout";
 import { COMMON_JS, ITEMS_JS, MEDIA_JS, EXPORT_JS } from "./client-lib";
+import { aiEnabled } from "../ai";
+
+// Highlighted "make it with AI" box — injected at render time only when a
+// DeepSeek key is configured (so it vanishes if AI is turned off / out of credits).
+const AI_BOX = `<div class="ai-box">
+  <div class="ai-head">✨ Make it with AI</div>
+  <textarea class="f" id="ai-input" rows="2" placeholder="Describe it — e.g. Bill Nova Coaching ₹40,000 for a 2-day brand workshop and ₹25,000 for logo design, 18% GST"></textarea>
+  <button class="btn" id="ai-go" type="button" style="margin-top:8px">✨ Generate invoice</button>
+  <p class="muted" id="ai-hint" style="font-size:12px;margin:8px 0 0">AI fills the invoice for you — then tweak anything. Free, no sign-up.</p>
+</div>`;
 
 const PATH = "/tools/gst-invoice-generator";
 const TITLE = "Free GST Invoice Generator (India) — Download PDF | DealInSec";
@@ -91,6 +101,7 @@ const BODY = `
   <div class="grid2">
     <!-- FORM -->
     <div class="card" id="form-card">
+      <!--AI_BOX-->
       <h2 style="font-size:18px">Invoice details</h2>
 
       <label>Your business name</label>
@@ -132,9 +143,8 @@ const BODY = `
           <select class="f" id="gstRate">
             <option value="0">No GST (0%)</option>
             <option value="5">5%</option>
-            <option value="12">12%</option>
             <option value="18" selected>18%</option>
-            <option value="28">28%</option>
+            <option value="40">40%</option>
           </select>
         </div>
         <div>
@@ -301,6 +311,31 @@ const PAGE_JS = `
     IT.set([{desc:'',qty:1,rate:0}]);
   }
   IT.render(); render();
+
+  // ── AI: describe → invoice (calls our server, which calls DeepSeek) ──
+  if($('ai-go')){
+    $('ai-go').addEventListener('click', function(){
+      var btn=this, text=($('ai-input').value||'').trim();
+      if(text.length<4){ $('ai-hint').textContent='Please describe your invoice first.'; return; }
+      btn.disabled=true; var old=btn.innerHTML; btn.innerHTML='Generating\\u2026'; $('ai-hint').textContent='Thinking\\u2026';
+      fetch('/api/ai/invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:text})})
+        .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); })
+        .then(function(x){
+          btn.disabled=false; btn.innerHTML=old;
+          if(!x.ok){ $('ai-hint').textContent=(x.j&&x.j.error)||'Could not generate \\u2014 please try again.'; return; }
+          var d=x.j||{};
+          if(d.bizName)$('bizName').value=d.bizName;
+          if(d.cliName)$('cliName').value=d.cliName;
+          if(d.gstRate && $('gstRate').querySelector('option[value="'+d.gstRate+'"]'))$('gstRate').value=d.gstRate;
+          if(d.taxType)$('taxType').value=d.taxType;
+          if(d.notes)$('notes').value=d.notes;
+          if(d.items&&d.items.length){ IT.set(d.items); IT.render(); }
+          render(); save();
+          $('ai-hint').textContent='Done \\u2014 review and tweak anything below.';
+        })
+        .catch(function(){ btn.disabled=false; btn.innerHTML=old; $('ai-hint').textContent='Something went wrong \\u2014 please try again.'; });
+    });
+  }
 `;
 
 // Print styling is shared (layout.ts) — the preview carries the .print-doc class.
@@ -312,7 +347,7 @@ export function gstInvoicePage(): string {
     description: DESC,
     canonicalPath: PATH,
     jsonLd: jsonLd(),
-    bodyHtml: BODY,
+    bodyHtml: BODY.replace("<!--AI_BOX-->", aiEnabled() ? AI_BOX : ""),
     bodyEndScripts: CLIENT_JS,
   });
 }

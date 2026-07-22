@@ -5,6 +5,7 @@ import { insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesT
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./auth";
+import { aiEnabled, reserve, refund, extractInvoice } from "./ai";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import multer from "multer";
 import path from "path";
@@ -1546,6 +1547,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Delete tool document error:", error);
       res.status(500).json({ error: "Could not delete the document" });
+    }
+  });
+
+  // ── AI: "describe → invoice" for the free GST invoice tool (DeepSeek) ──
+  // Public (no login) but rate-limited per IP + a global daily cap so the
+  // owner's API credits can't be drained. The DeepSeek key stays server-side.
+  app.post("/api/ai/invoice", async (req: any, res) => {
+    let reservedIp: string | null = null;
+    try {
+      if (!aiEnabled()) return res.status(503).json({ error: "AI is unavailable right now." });
+      const text = String(req.body?.text || "").trim();
+      if (text.length < 4) return res.status(400).json({ error: "Please describe your invoice in a sentence." });
+      if (text.length > 600) return res.status(400).json({ error: "That's a bit long — keep it to a sentence or two." });
+      // True per-user IP: behind Cloudflare, CF-Connecting-IP is set by Cloudflare
+      // and CANNOT be spoofed by the client (unlike the leftmost X-Forwarded-For).
+      const cf = req.headers["cf-connecting-ip"];
+      const xff = String(req.headers["x-forwarded-for"] || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+      const ip = (cf ? String(cf) : xff.length ? xff[xff.length - 1] : req.ip || "unknown").trim() || "unknown";
+      // Reserve the slot BEFORE the paid call so concurrent bursts can't bypass the caps.
+      const rl = reserve(ip);
+      if (!rl.ok) {
+        return res.status(429).json({
+          error:
+            rl.reason === "ip"
+              ? "You've used your free AI generations for today. Create a free account for more."
+              : "AI is busy right now — please try again in a bit.",
+          reason: rl.reason,
+        });
+      }
+      reservedIp = ip;
+      const result = await extractInvoice(text);
+      res.json(result);
+    } catch (error: any) {
+      // Refund the slot ONLY when DeepSeek didn't bill us (network error / non-2xx).
+      if (reservedIp && !error?.billed) refund(reservedIp);
+      console.error("AI invoice error:", error?.message || error);
+      res.status(502).json({ error: "Couldn't generate that — please try again, or fill it in manually." });
     }
   });
 

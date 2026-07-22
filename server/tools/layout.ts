@@ -424,6 +424,10 @@ const STYLES = `<style>
   .save-toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);z-index:140;background:var(--ink);color:#fff;font-size:13.5px;font-weight:600;padding:12px 18px;border-radius:12px;box-shadow:0 12px 30px rgba(16,24,40,.35);opacity:0;visibility:hidden;transition:opacity .25s ease,transform .25s ease,visibility .25s ease;max-width:90vw}
   .save-toast.show{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0)}
   .save-toast a{color:#7CE0B8;font-weight:700;margin-left:6px}
+  /* "Make it with AI" box on the invoice tool. */
+  .ai-box{background:linear-gradient(135deg,var(--accent-bg),rgba(255,255,255,.55));border:1px solid var(--accent-line);border-radius:14px;padding:14px 16px;margin-bottom:18px}
+  .ai-head{font-size:14px;font-weight:800;color:var(--green-d);margin-bottom:8px}
+  .ai-box textarea.f{background:rgba(255,255,255,.85)}
 
   /* HARD GUARD: the export node is <div class="card print-doc"> — it carries BOTH
      classes, so force it back to opaque white paper and strip the sheen. After .card. */
