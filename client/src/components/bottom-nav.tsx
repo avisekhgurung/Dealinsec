@@ -1,5 +1,5 @@
 import { useLocation, Link } from "wouter";
-import { Home, Briefcase, FileCheck, Receipt, UserCircle } from "lucide-react";
+import { Home, Briefcase, FileCheck, Receipt, FileText, UserCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
@@ -7,6 +7,7 @@ const navItems = [
   { path: "/deals", label: "Deals", icon: Briefcase },
   { path: "/contracts", label: "Agreements", icon: FileCheck },
   { path: "/invoices", label: "Invoices", icon: Receipt },
+  { path: "/documents", label: "Docs", icon: FileText },
   { path: "/profile", label: "Profile", icon: UserCircle, showCredits: true },
 ];
 

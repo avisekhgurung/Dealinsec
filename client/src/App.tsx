@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Switch, Route, Redirect } from "wouter";
-import { queryClient } from "./lib/queryClient";
+import { queryClient, apiRequest } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -32,6 +32,7 @@ const BillingPage             = lazy(() => import("@/pages/billing"));
 const InvoiceDetailsPage      = lazy(() => import("@/pages/invoice-details"));
 const PaymentSuccessPage      = lazy(() => import("@/pages/payment-success"));
 const BrandInvoiceDetailsPage = lazy(() => import("@/pages/brand-invoice-details"));
+const DocumentsPage           = lazy(() => import("@/pages/documents"));
 const ProfilePage             = lazy(() => import("@/pages/profile"));
 const PricingPage             = lazy(() => import("@/pages/pricing"));
 const PitchPage               = lazy(() => import("@/pages/pitch"));
@@ -61,7 +62,7 @@ function isFullBleedRoute(pathname: string) {
 
 function Router() {
   const { isAuthenticated, isLoading, user } = useAuth();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
 
   // Fire a GA4 page_view on every SPA route change (and on first render).
   // The gtag config in index.html has send_page_view:false, so this is the
@@ -69,6 +70,25 @@ function Router() {
   useEffect(() => {
     trackPageView(location);
   }, [location]);
+
+  // After sign-up/login, persist any document the user stashed from a free tool
+  // ("Save to account" / remove-branding) and drop them on their Documents.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let raw: string | null = null;
+    try { raw = localStorage.getItem("dis_pending_doc"); } catch {}
+    if (!raw) return;
+    try { localStorage.removeItem("dis_pending_doc"); } catch {}
+    let doc: any;
+    try { doc = JSON.parse(raw); } catch { return; }
+    if (!doc || !doc.type || !doc.payload) return;
+    apiRequest("POST", "/api/documents", doc)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
+        setLocation("/documents");
+      })
+      .catch(() => { /* ignore — the user can re-save from the tool */ });
+  }, [isAuthenticated, setLocation]);
 
   // Initial app load (auth check) → full branded splash, shown once per session
   if (isLoading) {
@@ -142,6 +162,7 @@ function Router() {
             <Route path="/invoices/:id" component={InvoiceDetailsPage} />
             <Route path="/invoices" component={BillingPage} />
             <Route path="/brand-invoices/:id" component={BrandInvoiceDetailsPage} />
+            <Route path="/documents" component={DocumentsPage} />
             <Route path="/profile" component={ProfilePage} />
             <Route path="/pricing" component={PricingPage} />
             <Route path="/pitch" component={PitchPage} />
