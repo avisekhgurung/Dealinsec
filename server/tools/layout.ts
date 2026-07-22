@@ -411,6 +411,11 @@ const STYLES = `<style>
   .nobrand-row{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;color:var(--muted);margin-top:14px;cursor:pointer;user-select:none}
   .nobrand-row input{width:18px;height:18px;accent-color:var(--green);cursor:pointer;flex-shrink:0}
   .nobrand-row:hover{color:var(--ink)}
+  /* Benefit checklist in the sign-up-to-remove-branding modal. */
+  .bm-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px}
+  .bm-list li{position:relative;padding-left:29px;font-size:13.5px;color:var(--ink);line-height:1.45}
+  .bm-list li b{font-weight:700}
+  .bm-list li::before{content:"✓";position:absolute;left:0;top:0;width:20px;height:20px;border-radius:50%;background:var(--accent-bg);color:var(--green-d);font-size:12px;font-weight:800;display:grid;place-items:center}
 
   /* HARD GUARD: the export node is <div class="card print-doc"> — it carries BOTH
      classes, so force it back to opaque white paper and strip the sheen. After .card. */
@@ -607,12 +612,16 @@ function brandModal(): string {
       <div class="export-hero">
         <button class="export-close" data-close aria-label="Close">&times;</button>
         <div class="export-check">${shield}</div>
-        <h3>Download without the branding</h3>
-        <p>Create a free account to remove the DealInSec footer</p>
+        <h3>Sign up free &amp; keep this document</h3>
+        <p>Remove the footer — and save it to your account for later</p>
       </div>
       <div style="padding:20px">
-        <p class="muted" style="font-size:13.5px;margin:0 0 16px;line-height:1.55">A free DealInSec account lets you download clean, unbranded documents — plus save your clients, send invoices, track payments and e-sign agreements, all in one place.</p>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <ul class="bm-list">
+          <li>Remove the &ldquo;Made with DealInSec&rdquo; footer</li>
+          <li><b>This document is saved to your account</b> — open it anytime for later reference</li>
+          <li>Reuse &amp; edit it, send to clients, track payments and e-sign</li>
+        </ul>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
           <a class="btn" href="${APP_SIGNUP}" style="flex:1;min-width:150px;justify-content:center">Sign up free →</a>
           <button type="button" class="btn ghost" data-close>Maybe later</button>
         </div>
