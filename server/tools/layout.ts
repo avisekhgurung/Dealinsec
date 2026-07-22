@@ -416,6 +416,14 @@ const STYLES = `<style>
   .bm-list li{position:relative;padding-left:29px;font-size:13.5px;color:var(--ink);line-height:1.45}
   .bm-list li b{font-weight:700}
   .bm-list li::before{content:"✓";position:absolute;left:0;top:0;width:20px;height:20px;border-radius:50%;background:var(--accent-bg);color:var(--green-d);font-size:12px;font-weight:800;display:grid;place-items:center}
+  /* "Save to account" — the primary (highlighted) export option. */
+  .export-opt.eo-primary{background:linear-gradient(180deg,hsl(160 60% 96%),hsl(160 55% 93%));border-color:var(--accent-line)}
+  .export-opt.eo-primary .eo-ico{background:var(--green);color:#fff}
+  .export-opt.eo-primary:hover{border-color:var(--green);box-shadow:var(--shadow-green)}
+  /* Save confirmation toast. */
+  .save-toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);z-index:140;background:var(--ink);color:#fff;font-size:13.5px;font-weight:600;padding:12px 18px;border-radius:12px;box-shadow:0 12px 30px rgba(16,24,40,.35);opacity:0;visibility:hidden;transition:opacity .25s ease,transform .25s ease,visibility .25s ease;max-width:90vw}
+  .save-toast.show{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0)}
+  .save-toast a{color:#7CE0B8;font-weight:700;margin-left:6px}
 
   /* HARD GUARD: the export node is <div class="card print-doc"> — it carries BOTH
      classes, so force it back to opaque white paper and strip the sheen. After .card. */
@@ -568,6 +576,7 @@ const EO = {
   share: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>`,
   print: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>`,
   check: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  save: `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>`,
 };
 const EXPORT_PANEL = `<div id="export-panel" class="export-overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-label="Download or share">
   <div class="export-sheet">
@@ -578,6 +587,7 @@ const EXPORT_PANEL = `<div id="export-panel" class="export-overlay" aria-hidden=
       <p>Download it, or share it straight to your client</p>
     </div>
     <div class="export-grid">
+      <button type="button" class="export-opt eo-primary" id="exp-save"><span class="eo-ico"><span class="eo-glyph">${EO.save}</span>${EO.spin}</span><b>Save to account</b><small>Keep &amp; open it anytime</small></button>
       <button type="button" class="export-opt" id="exp-pdf"><span class="eo-ico"><span class="eo-glyph">${EO.pdf}</span>${EO.spin}</span><b>Download PDF</b><small>Print or save as PDF</small></button>
       <button type="button" class="export-opt" id="exp-png"><span class="eo-ico"><span class="eo-glyph">${EO.png}</span>${EO.spin}</span><b>Download PNG</b><small>Image for chat &amp; social</small></button>
       <button type="button" class="export-opt" id="exp-share"><span class="eo-ico"><span class="eo-glyph">${EO.share}</span>${EO.spin}</span><b>Share</b><small>WhatsApp, email &amp; more</small></button>
@@ -622,7 +632,7 @@ function brandModal(): string {
           <li>Reuse &amp; edit it, send to clients, track payments and e-sign</li>
         </ul>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
-          <a class="btn" href="${APP_SIGNUP}" style="flex:1;min-width:150px;justify-content:center">Sign up free →</a>
+          <a class="btn" href="${APP_SIGNUP}" data-stash-save style="flex:1;min-width:150px;justify-content:center">Sign up free →</a>
           <button type="button" class="btn ghost" data-close>Maybe later</button>
         </div>
       </div>
@@ -672,6 +682,7 @@ ${toolSwitch(o.canonicalPath)}
 ${o.canonicalPath === "/tools" ? "" : relatedTools(o.canonicalPath)}
 ${EXPORT_PANEL}
 ${brandModal()}
+<div id="save-toast" class="save-toast no-print" role="status" aria-live="polite"></div>
 ${o.hideCtaBand ? "" : ctaBand()}
 ${footer()}
 ${o.bodyEndScripts || ""}

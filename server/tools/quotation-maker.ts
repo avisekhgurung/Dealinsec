@@ -183,6 +183,9 @@ const PAGE_JS = `
   var SIG=initSignature('sig-pad',function(){ render(); save(); });
   var EX=initExport(function(){ return $('invoice-preview'); }, function(){ return $('quoteNo').value||'Quotation'; });
   initBranding(function(){ render(); });
+  var LASTTOTAL=0;
+  function saveData(){ return { type:'quotation', docNumber:$('quoteNo').value, partyName:$('cliName').value, total:LASTTOTAL, payload:collect() }; }
+  initSave(saveData);
 
   function collectTerms(){
     var out=[];
@@ -216,6 +219,7 @@ const PAGE_JS = `
     var rate=num($('gstRate').value), taxType=$('taxType').value;
     var taxTotal=round2(subtotal*rate/100);
     var total=round2(subtotal+taxTotal);
+    LASTTOTAL=total;
     var taxRows='';
     if(rate>0){
       if(taxType==='igst'){

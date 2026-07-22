@@ -194,6 +194,9 @@ const PAGE_JS = `
   var SIG=initSignature('sig-pad',function(){ render(); save(); });
   var EX=initExport(function(){ return $('doc-preview'); }, function(){ return 'Service Agreement'+($('clName').value?' - '+$('clName').value:''); });
   initBranding(function(){ render(); });
+  var LASTTOTAL=0;
+  function saveData(){ return { type:'agreement', docNumber:'', partyName:$('clName').value, total:LASTTOTAL, payload:collect() }; }
+  initSave(saveData);
 
   var FIELDS=['spName','spAddr','clName','clAddr','effDate','scope','deliverables','startDate','endDate','fee','advancePct'];
 
@@ -297,6 +300,7 @@ const PAGE_JS = `
     var sp=$('spName').value||'the Service Provider';
     var cl=$('clName').value||'the Client';
     var fee=round2(num($('fee').value));
+    LASTTOTAL=fee;
     var pct=Math.max(0,Math.min(100,num($('advancePct').value)));
     var adv=round2(fee*pct/100);
     var bal=round2(fee-adv);

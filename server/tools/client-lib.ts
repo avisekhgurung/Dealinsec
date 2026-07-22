@@ -168,6 +168,30 @@ export const EXPORT_JS = `
     if(want){ checkAuth().then(function(ok){ if(ok) apply(true); else { try{localStorage.removeItem(KEY);}catch(e){} } }); }
     return { enabled:function(){ return !!window.__disNoBrand; } };
   }
+
+  // "Save to account" — POST the current document to /api/documents for a signed-in
+  // user; otherwise stash it (localStorage) and show the sign-up modal so the app
+  // can save it right after sign-up. getData() returns {type,docNumber,partyName,total,payload}.
+  function initSave(getData){
+    window.__disGetDoc=getData;
+    var authed=null, saving=false;
+    var toast=$('save-toast'), modal=$('brand-modal'), panel=$('export-panel');
+    function checkAuth(){ if(authed!==null) return Promise.resolve(authed); return fetch('/api/auth/user',{credentials:'include'}).then(function(r){authed=r.ok;return authed;}).catch(function(){authed=false;return false;}); }
+    function showToast(msg,link){ if(!toast)return; toast.innerHTML=esc(msg)+(link?' <a href="'+link+'">View</a>':''); toast.classList.add('show'); clearTimeout(showToast._t); showToast._t=setTimeout(function(){ toast.classList.remove('show'); },5000); }
+    function stash(){ try{ localStorage.setItem('dis_pending_doc', JSON.stringify(getData())); }catch(e){} }
+    function doSave(btn){
+      if(saving)return; saving=true; if(btn)btn.classList.add('busy');
+      fetch('/api/documents',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(getData())})
+        .then(function(r){ if(!r.ok) throw 0; return r.json(); })
+        .then(function(){ saving=false; if(btn)btn.classList.remove('busy'); if(panel)panel.classList.remove('open'); showToast('Saved to your account','/documents'); })
+        .catch(function(){ saving=false; if(btn)btn.classList.remove('busy'); showToast('Could not save \\u2014 please try again',''); });
+    }
+    function save(btn){ checkAuth().then(function(ok){ if(ok){ doSave(btn); } else { stash(); if(panel)panel.classList.remove('open'); if(modal){ modal.classList.add('open'); modal.setAttribute('aria-hidden','false'); } } }); }
+    var btn=$('exp-save'); if(btn) btn.addEventListener('click', function(){ save(btn); });
+    // Stash the doc when an anon user proceeds to sign up from any modal (branding or save).
+    document.addEventListener('click', function(e){ var a=e.target.closest?e.target.closest('[data-stash-save]'):null; if(a) stash(); });
+    return { save:save };
+  }
 `;
 
 // A reusable description/qty/rate line-item editor bound to an #items container
