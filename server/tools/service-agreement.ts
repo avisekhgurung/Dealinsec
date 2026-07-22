@@ -193,6 +193,7 @@ const PAGE_JS = `
   var LOGO=initLogo('logo-input','logo-preview',function(){ render(); save(); });
   var SIG=initSignature('sig-pad',function(){ render(); save(); });
   var EX=initExport(function(){ return $('doc-preview'); }, function(){ return 'Service Agreement'+($('clName').value?' - '+$('clName').value:''); });
+  initBranding(function(){ render(); });
 
   var FIELDS=['spName','spAddr','clName','clAddr','effDate','scope','deliverables','startDate','endDate','fee','advancePct'];
 
@@ -322,7 +323,7 @@ const PAGE_JS = `
     var html=''+
       '<div style="text-align:center;border-bottom:2px solid #0E8C5A;padding-bottom:8px;margin-bottom:6px">'+(LOGO.get()?'<img src="'+LOGO.get()+'" alt="" style="max-height:46px;max-width:180px;object-fit:contain;margin:0 auto 6px;display:block" />':'')+'<div style="font-size:19px;font-weight:800;letter-spacing:.03em;color:#0F172A">SERVICE AGREEMENT</div></div>'+
       body+sign+
-      '<div style="margin-top:16px;padding-top:8px;border-top:1px solid #EEF2F6;text-align:center;font-size:11px;color:#94A3B8">Made with DealInSec &middot; dealinsec.com</div>';
+      brandFooter();
     $('doc-preview').innerHTML=html;
   }
 

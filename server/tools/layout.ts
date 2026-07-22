@@ -28,6 +28,7 @@ export interface ToolPageOptions {
 
 export const SITE_ORIGIN = "https://www.dealinsec.com";
 const APP_LINK = "/?utm_source=tools&utm_medium=seo_page";
+const APP_SIGNUP = "/?utm_source=tools&utm_medium=remove_brand";
 
 /** HTML-escape untrusted/dynamic text before it goes into markup. */
 export function esc(s: unknown): string {
@@ -406,6 +407,10 @@ const STYLES = `<style>
     transition:border-color .16s ease, background .16s ease;
   }
   .file-btn:hover{border-color:var(--green); background:#fff}
+  /* "Remove branding" toggle (injected next to the download button). */
+  .nobrand-row{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;color:var(--muted);margin-top:14px;cursor:pointer;user-select:none}
+  .nobrand-row input{width:18px;height:18px;accent-color:var(--green);cursor:pointer;flex-shrink:0}
+  .nobrand-row:hover{color:var(--ink)}
 
   /* HARD GUARD: the export node is <div class="card print-doc"> — it carries BOTH
      classes, so force it back to opaque white paper and strip the sheen. After .card. */
@@ -568,10 +573,9 @@ const EXPORT_PANEL = `<div id="export-panel" class="export-overlay" aria-hidden=
       <p>Download it, or share it straight to your client</p>
     </div>
     <div class="export-grid">
-      <button type="button" class="export-opt" id="exp-pdf"><span class="eo-ico"><span class="eo-glyph">${EO.pdf}</span>${EO.spin}</span><b>Download PDF</b><small>Best for email &amp; print</small></button>
+      <button type="button" class="export-opt" id="exp-pdf"><span class="eo-ico"><span class="eo-glyph">${EO.pdf}</span>${EO.spin}</span><b>Download PDF</b><small>Print or save as PDF</small></button>
       <button type="button" class="export-opt" id="exp-png"><span class="eo-ico"><span class="eo-glyph">${EO.png}</span>${EO.spin}</span><b>Download PNG</b><small>Image for chat &amp; social</small></button>
       <button type="button" class="export-opt" id="exp-share"><span class="eo-ico"><span class="eo-glyph">${EO.share}</span>${EO.spin}</span><b>Share</b><small>WhatsApp, email &amp; more</small></button>
-      <button type="button" class="export-opt" id="exp-print"><span class="eo-ico"><span class="eo-glyph">${EO.print}</span>${EO.spin}</span><b>Print</b><small>Open the print dialog</small></button>
     </div>
   </div>
 </div>`;
@@ -592,6 +596,29 @@ function footer(): string {
     </div>
     <div class="muted">© ${y} DealInSec — the deal-management OS for India's service businesses. These free tools run in your browser; nothing you enter is stored on our servers.</div>
   </div></footer>`;
+}
+
+// Sign-up prompt shown when an anonymous user tries to remove the branding.
+// Reuses the export panel's frosted-sheet styling for a consistent feel.
+function brandModal(): string {
+  const shield = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 8.5 8 10 4.6-1.5 8-5 8-10V5l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>`;
+  return `<div id="brand-modal" class="export-overlay no-print" role="dialog" aria-modal="true" aria-hidden="true" aria-label="Remove DealInSec branding">
+    <div class="export-sheet">
+      <div class="export-hero">
+        <button class="export-close" data-close aria-label="Close">&times;</button>
+        <div class="export-check">${shield}</div>
+        <h3>Download without the branding</h3>
+        <p>Create a free account to remove the DealInSec footer</p>
+      </div>
+      <div style="padding:20px">
+        <p class="muted" style="font-size:13.5px;margin:0 0 16px;line-height:1.55">A free DealInSec account lets you download clean, unbranded documents — plus save your clients, send invoices, track payments and e-sign agreements, all in one place.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a class="btn" href="${APP_SIGNUP}" style="flex:1;min-width:150px;justify-content:center">Sign up free →</a>
+          <button type="button" class="btn ghost" data-close>Maybe later</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
 }
 
 export function renderToolPage(o: ToolPageOptions): string {
@@ -635,6 +662,7 @@ ${toolSwitch(o.canonicalPath)}
 <main>${o.bodyHtml}</main>
 ${o.canonicalPath === "/tools" ? "" : relatedTools(o.canonicalPath)}
 ${EXPORT_PANEL}
+${brandModal()}
 ${o.hideCtaBand ? "" : ctaBand()}
 ${footer()}
 ${o.bodyEndScripts || ""}

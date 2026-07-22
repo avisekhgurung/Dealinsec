@@ -24,6 +24,9 @@ export const COMMON_JS = `
   function wordsInt(n){n=Math.floor(n);if(n===0)return 'Zero';var out='';var cr=Math.floor(n/10000000);n=n%10000000;var la=Math.floor(n/100000);n=n%100000;var th=Math.floor(n/1000);n=n%1000;if(cr)out+=(cr>99?wordsInt(cr):two(cr))+' Crore ';if(la)out+=two(la)+' Lakh ';if(th)out+=two(th)+' Thousand ';if(n)out+=three(n);return out.replace(/\\s+/g,' ').trim();}
   function words(x){var v=round2(x);var rup=Math.floor(v);var pai=Math.round((v-rup)*100);var w=wordsInt(rup)+' Rupees';if(pai>0)w+=' and '+wordsInt(pai)+' Paise';return w+' Only';}
   function fmtDate(s){if(!s)return '';var p=String(s).split('-');return p.length===3?(p[2]+'/'+p[1]+'/'+p[0]):s;}
+  // "Made with DealInSec" footer — omitted when a signed-in user has opted out
+  // (window.__disNoBrand is set by initBranding). Single source of truth.
+  function brandFooter(){ return window.__disNoBrand ? '' : '<div style="margin-top:18px;padding-top:10px;border-top:1px solid #EEF2F6;text-align:center;font-size:11px;color:#94A3B8">Made with DealInSec &middot; dealinsec.com</div>'; }
 `;
 
 // Logo + signature helpers. Requires COMMON_JS ($) first.
@@ -111,7 +114,6 @@ export const EXPORT_JS = `
     function printDoc(){ close(); setTimeout(function(){ window.print(); }, 240); }
 
     $('exp-pdf').addEventListener('click', printDoc);
-    $('exp-print').addEventListener('click', printDoc);
     $('exp-png').addEventListener('click', function(){ var btn=this; busy(btn,true);
       toPng(function(dataUrl){ saveDataUrl(dataUrl); busy(btn,false); close(); },
             function(msg){ busy(btn,false); alert(msg); });
@@ -130,6 +132,41 @@ export const EXPORT_JS = `
       }, function(msg){ busy(btn,false); alert(msg); });
     });
     return { open:open, close:close };
+  }
+
+  // "Remove DealInSec branding" toggle. Injects a checkbox next to the download
+  // button; enabling it requires a signed-in account (checked via /api/auth/user,
+  // same-origin session) — otherwise a sign-up modal (#brand-modal) is shown.
+  // Signed-in + enabled sets window.__disNoBrand so brandFooter() omits the line.
+  function initBranding(cb){
+    var KEY='dis_nobrand', authed=null, chk=null;
+    var modal=$('brand-modal');
+    var dl=$('download');
+    if(dl && dl.parentNode && dl.parentNode.parentNode){
+      var row=document.createElement('label');
+      row.className='nobrand-row';
+      row.innerHTML='<input type="checkbox" id="no-brand" /><span>Remove the \\u201CMade with DealInSec\\u201D footer</span>';
+      dl.parentNode.parentNode.insertBefore(row, dl.parentNode.nextSibling);
+      chk=$('no-brand');
+    }
+    function openModal(){ if(modal){ modal.classList.add('open'); modal.setAttribute('aria-hidden','false'); } }
+    function closeModal(){ if(modal){ modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); } }
+    function checkAuth(){ if(authed!==null) return Promise.resolve(authed); return fetch('/api/auth/user',{credentials:'include'}).then(function(r){ authed=r.ok; return authed; }).catch(function(){ authed=false; return false; }); }
+    function apply(v){ window.__disNoBrand=v; if(chk) chk.checked=v; cb&&cb(); }
+    if(chk){
+      chk.addEventListener('change', function(){
+        if(chk.checked){
+          checkAuth().then(function(ok){ if(ok){ try{localStorage.setItem(KEY,'1');}catch(e){} apply(true); } else { chk.checked=false; window.__disNoBrand=false; openModal(); } });
+        } else { try{localStorage.removeItem(KEY);}catch(e){} apply(false); }
+      });
+    }
+    if(modal){
+      modal.addEventListener('click', function(e){ if(e.target===modal || (e.target.closest && e.target.closest('[data-close]'))) closeModal(); });
+      document.addEventListener('keydown', function(e){ if(e.key==='Escape' && modal.classList.contains('open')) closeModal(); });
+    }
+    var want=false; try{ want=localStorage.getItem(KEY)==='1'; }catch(e){}
+    if(want){ checkAuth().then(function(ok){ if(ok) apply(true); else { try{localStorage.removeItem(KEY);}catch(e){} } }); }
+    return { enabled:function(){ return !!window.__disNoBrand; } };
   }
 `;
 
