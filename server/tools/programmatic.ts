@@ -461,7 +461,7 @@ export const PROFESSION_SPECS: ProfessionSpec[] = [
     "name": "Video Editing",
     "who": "a freelance video editor / videographer",
     "sacCode": "998386 / 998383",
-    "sacDescription": "998386 (Photographic and videographic processing services) correctly covers only the post-production/editing work — video editing, colour grading, for",
+    "sacDescription": "Photographic and videographic processing services (post-production, editing and colour grading)",
     "gstRate": 18,
     "intro": "A video editor's invoice in India should clearly list each deliverable (edited film, reels, colour grade, motion graphics), state SAC code 998386 for videographic processing services, and apply 18% GST if you are GST-registered. Because most editing work is quoted per project or per finished minute — often with a 40-50% advance and revision limits — spell out the scope, number of included revisions, and rate for extra changes so scope-creep doesn't eat your margin. Always add your PAN and, for clients who deduct TDS, note that editing falls under Section 194J professional/technical services.",
     "sampleItems": [
@@ -760,6 +760,738 @@ export const PROFESSION_SPECS: ProfessionSpec[] = [
       }
     ],
     "metaDescription": "Free tutoring & coaching invoice format for India with the correct SAC code 999293, 18% GST, sample fee line items, advance/monthly billing norms and tutor GST FAQs."
+  },
+  {
+    "slug": "architects",
+    "name": "Architecture",
+    "who": "an architect / architecture firm",
+    "sacCode": "998322",
+    "sacDescription": "Architectural services for residential building projects",
+    "gstRate": 18,
+    "intro": "Architectural services in India are professional services taxed at the standard 18% GST — there is no concessional rate or exemption, so your invoice must carry the correct SAC code and full CGST/SGST (or IGST) breakup. Building-design work sits under SAC group 99832: use 998321 for pure advisory/consultancy, 998322 for residential building projects, and 998323 for non-residential/commercial projects. Because clients often claim input tax credit, a clean invoice with your GSTIN, SAC, stage-wise fees and RERA/COA registration details protects both sides.",
+    "sampleItems": [
+      {
+        "desc": "Concept design & schematic drawings (per sq.ft of built-up area)",
+        "unit": "per sq.ft",
+        "typicalRate": 45
+      },
+      {
+        "desc": "Full architectural design & consultancy — % of project cost",
+        "unit": "% of construction cost",
+        "typicalRate": 8
+      },
+      {
+        "desc": "Working drawings & GFC (Good for Construction) set",
+        "unit": "per project",
+        "typicalRate": 85000
+      },
+      {
+        "desc": "Site supervision & periodic construction inspection visit",
+        "unit": "per visit",
+        "typicalRate": 6000
+      },
+      {
+        "desc": "3D visualization / photorealistic render",
+        "unit": "per view",
+        "typicalRate": 4500
+      },
+      {
+        "desc": "Municipal / RERA drawing sanction & liaison",
+        "unit": "per project",
+        "typicalRate": 40000
+      }
+    ],
+    "paymentNorm": "Architects typically bill in stages tied to project milestones — commonly 10% on concept, 25% on schematic/design development, 40% on working drawings/GFC, and the balance across construction and completion. A retainer or mobilisation advance of 10-15% at signing is standard, and fees are often structured as a percentage of construction cost (roughly 5-10% for residential) or a per-sq.ft rate. Net 15-30 day payment terms per stage invoice are usual.",
+    "faq": [
+      {
+        "q": "What GST rate and SAC code apply to an architect's invoice?",
+        "a": "Architectural services attract 18% GST — there is no lower rate or exemption. Use SAC 998321 for advisory/consultancy, 998322 for residential building design, and 998323 for non-residential/commercial projects (all at 18%). Split it as 9% CGST + 9% SGST for in-state clients, or 18% IGST for out-of-state."
+      },
+      {
+        "q": "Do I need GST registration to invoice as an architect?",
+        "a": "Registration is mandatory once your aggregate turnover crosses Rs 20 lakh (Rs 10 lakh in special-category states). Below that you can invoice without charging GST, but you also cannot collect it or claim input tax credit. Many architects register voluntarily because corporate and builder clients prefer a GST invoice they can claim ITC on."
+      },
+      {
+        "q": "Should GST be charged on reimbursements like sanction fees or printing?",
+        "a": "Genuine pure-agent reimbursements — municipal sanction fees, RERA charges, statutory payments made on the client's behalf at actual cost with supporting receipts — can be excluded from the taxable value and billed separately without GST. But your professional fee, printing, travel and any marked-up expenses are part of the service value and attract 18% GST."
+      },
+      {
+        "q": "How should percentage-of-cost fees be shown on the invoice?",
+        "a": "State the basis clearly — e.g. '8% of estimated construction cost of Rs 60,00,000 = Rs 4,80,000' — then apply 18% GST on that professional fee. For stage-wise billing, invoice only the milestone percentage due, reference the stage, and show cumulative fees billed to date so the client can reconcile against the total contract."
+      }
+    ],
+    "metaDescription": "Free architecture invoice format for Indian architects and firms. Correct SAC code (998321/998322), 18% GST breakup, stage-wise fees, sample line items and RERA-ready FAQs."
+  },
+  {
+    "slug": "chartered-accountants",
+    "name": "CA & Accounting",
+    "who": "a chartered accountant / accounting firm",
+    "sacCode": "998222",
+    "sacDescription": "Accounting and bookkeeping services",
+    "gstRate": 18,
+    "intro": "For a chartered accountant or accounting firm in India, a compliant invoice is more than a bill — it doubles as a professional record that clients rely on to claim input tax credit (ITC). Accounting, bookkeeping and auditing services fall under SAC heading 9982 and attract 18% GST, so every tax invoice you raise must carry your GSTIN, the correct SAC code, and a clear CGST/SGST or IGST split. Since your clients are usually GST-registered businesses, accuracy on the SAC and place-of-supply directly affects whether they can reclaim the tax you charge.",
+    "sampleItems": [
+      {
+        "desc": "Monthly bookkeeping & accounts maintenance (retainer)",
+        "unit": "per month",
+        "typicalRate": 8000
+      },
+      {
+        "desc": "GST return filing (GSTR-1 & GSTR-3B)",
+        "unit": "per month",
+        "typicalRate": 2500
+      },
+      {
+        "desc": "Income tax return filing — individual/proprietor",
+        "unit": "per return",
+        "typicalRate": 3000
+      },
+      {
+        "desc": "Statutory / tax audit under the Income Tax Act",
+        "unit": "per audit",
+        "typicalRate": 25000
+      },
+      {
+        "desc": "Company annual ROC filing & compliance (MCA)",
+        "unit": "per year",
+        "typicalRate": 12000
+      },
+      {
+        "desc": "TDS return filing (quarterly)",
+        "unit": "per quarter",
+        "typicalRate": 2000
+      }
+    ],
+    "paymentNorm": "Retainer/compliance work is usually billed monthly or on completion, with net 7-15 day terms; audit and project engagements are commonly split into an advance (30-50%) on engagement and the balance on delivery of the signed report.",
+    "faq": [
+      {
+        "q": "Which SAC code should a CA put on the invoice — 998222 or 998221?",
+        "a": "Use 998222 for accounting and bookkeeping work, and 998221 for financial and statutory auditing. Both sit under heading 9982 and are taxed at 18%. If a single invoice mixes both, list each service line with its own SAC so your client can map the ITC correctly."
+      },
+      {
+        "q": "Do CA services attract reverse charge (RCM) like advocate/legal services?",
+        "a": "No. Unlike an advocate or a firm of advocates (whose fees to business clients fall under reverse charge), a chartered accountant charges GST on a forward-charge basis. You collect 18% GST from the client and deposit it yourself — the client does not pay tax under RCM for your CA services."
+      },
+      {
+        "q": "Do I need to register for GST and charge 18% on every invoice?",
+        "a": "GST registration is mandatory once your aggregate turnover crosses Rs. 20 lakh (Rs. 10 lakh in special-category states). Below that you can invoice without GST as an unregistered supplier. Once registered, you must issue a tax invoice with your GSTIN and charge 18% — CAs cannot opt for the composition scheme, as it is not available to service providers of this kind."
+      },
+      {
+        "q": "Is it CGST+SGST or IGST on my invoice?",
+        "a": "It depends on place of supply. If your client is in the same state as your firm, split the 18% as 9% CGST + 9% SGST. If the client is registered in another state, charge 18% IGST instead. Always capture the client's GSTIN and state so the split — and their input tax credit — is correct."
+      }
+    ],
+    "metaDescription": "Free CA & accounting invoice format for India with the correct SAC code (998222), 18% GST, sample line items, payment terms and FAQs on RCM, ITC and CGST/SGST split."
+  },
+  {
+    "slug": "lawyers",
+    "name": "Legal",
+    "who": "a lawyer / advocate / law firm",
+    "sacCode": "998212",
+    "sacDescription": "Legal advisory and representation services (other fields of law)",
+    "gstRate": 18,
+    "intro": "In India, legal services supplied by an individual advocate or a firm of advocates to a business entity are almost always taxed under the Reverse Charge Mechanism (RCM) — meaning your business client pays the 18% GST directly to the government, not you. Your invoice therefore usually shows the fee only and carries the note \"GST payable by recipient under reverse charge (RCM).\" Services to individuals/non-business clients, and to business entities with turnover below the GST registration threshold, are exempt.",
+    "sampleItems": [
+      {
+        "desc": "Legal consultation / opinion (per hour)",
+        "unit": "hour",
+        "typicalRate": 3000
+      },
+      {
+        "desc": "Drafting of agreement, contract or legal notice",
+        "unit": "document",
+        "typicalRate": 5000
+      },
+      {
+        "desc": "Court appearance / representation (per hearing)",
+        "unit": "appearance",
+        "typicalRate": 10000
+      },
+      {
+        "desc": "Retainer fee (monthly)",
+        "unit": "month",
+        "typicalRate": 25000
+      },
+      {
+        "desc": "Case handling / litigation (lump-sum brief fee)",
+        "unit": "case",
+        "typicalRate": 50000
+      },
+      {
+        "desc": "Due diligence / legal vetting report",
+        "unit": "report",
+        "typicalRate": 15000
+      }
+    ],
+    "paymentNorm": "Advocates commonly bill a retainer or advance up front, with the balance on hearing dates or case milestones; retainer clients are invoiced monthly. Net 15-30 days is typical for corporate clients, and out-of-pocket disbursements (court fees, stamp duty, travel) are billed at actuals.",
+    "faq": [
+      {
+        "q": "Do I charge GST on my invoice as an advocate?",
+        "a": "Usually no. Legal services from an individual advocate or firm of advocates to a business entity fall under Reverse Charge Mechanism (RCM), so the client pays the 18% GST directly to the government. You raise the invoice for your fee only and add the note: 'Tax payable on reverse charge basis by the recipient.' You do not collect the tax yourself."
+      },
+      {
+        "q": "When are my legal services fully exempt from GST?",
+        "a": "Services to an individual/non-business client are exempt, as are services to a business entity whose aggregate turnover in the preceding year was below the GST registration threshold (Rs. 20 lakh, or Rs. 10 lakh in special-category states). Representation before any court or tribunal is also exempt. In these cases no GST applies under RCM or otherwise."
+      },
+      {
+        "q": "Do I even need GST registration as a lawyer?",
+        "a": "Often not. Because most of your outward supplies are covered by RCM (client pays) or are exempt, many advocates and law firms are not required to register for GST. Register only if you cross the threshold on non-RCM taxable supplies or opt in voluntarily. If unregistered, simply omit any GSTIN and issue a plain professional fee invoice with the RCM note."
+      },
+      {
+        "q": "What SAC code and rate should I mention?",
+        "a": "Use SAC 998212 for legal advisory and representation services (998211 for criminal-law matters). The applicable rate is 18%. Even when the tax is paid by the client under RCM, quoting the SAC code and the 18% RCM note on your invoice keeps it compliant and audit-ready."
+      }
+    ],
+    "metaDescription": "Free legal invoice format for Indian advocates, lawyers and law firms. Correct SAC code 998212, 18% GST under reverse charge (RCM), sample fee items and billing FAQs."
+  },
+  {
+    "slug": "translators",
+    "name": "Translation",
+    "who": "a freelance translator",
+    "sacCode": "998395",
+    "sacDescription": "Translation and interpretation services",
+    "gstRate": 18,
+    "intro": "Freelance translators and interpreters in India bill under SAC 998395 (\"Translation and interpretation services\"), taxed at 18% GST once your turnover crosses the Rs. 20 lakh registration threshold (Rs. 10 lakh in special-category states). A big share of translation work is for overseas clients, and here the invoice rules change: when you translate for a client abroad and are paid in convertible foreign currency, it counts as an export of service (zero-rated) — you charge no GST but must invoice under a LUT or claim a refund. This page gives you a clean, GST-ready translation invoice for both domestic and export work.",
+    "sampleItems": [
+      {
+        "desc": "Document translation (general), English to Hindi — per word of source text",
+        "unit": "per word",
+        "typicalRate": 1.5
+      },
+      {
+        "desc": "Technical/legal/medical translation (specialised) — per word of source text",
+        "unit": "per word",
+        "typicalRate": 3
+      },
+      {
+        "desc": "Certified translation with translator's declaration/stamp (per standard page ~250 words)",
+        "unit": "per page",
+        "typicalRate": 600
+      },
+      {
+        "desc": "Proofreading & editing of existing translation — per word",
+        "unit": "per word",
+        "typicalRate": 0.75
+      },
+      {
+        "desc": "Consecutive interpretation (conference/court/business meeting)",
+        "unit": "per day",
+        "typicalRate": 8000
+      },
+      {
+        "desc": "Urgent / same-day turnaround surcharge",
+        "unit": "percentage",
+        "typicalRate": 25
+      }
+    ],
+    "paymentNorm": "Domestic clients typically pay Net 15-30 days from invoice; agencies often run 30-45 day cycles. For direct and overseas clients, a 30-50% advance before starting a large project is standard, with the balance on delivery. Foreign-client payments arrive via bank wire, Wise, or PayPal in foreign currency — retain the FIRC/FIRA as proof of export.",
+    "faq": [
+      {
+        "q": "What GST rate and SAC code do I put on a translation invoice?",
+        "a": "Use SAC 998395 (Translation and interpretation services) and charge 18% GST — split as 9% CGST + 9% SGST when the client is in your state, or 18% IGST when the client is in another state. This same rate covers document translation, subtitling, and interpretation."
+      },
+      {
+        "q": "Do I charge GST when I translate for a client outside India?",
+        "a": "No — if the client is located abroad and you are paid in convertible foreign currency, it is an export of service and is zero-rated (0% GST). You can either invoice under a Letter of Undertaking (LUT) without charging GST, or pay IGST and claim a refund. Keep the FIRC/bank realisation certificate as export proof, and still show SAC 998395 on the invoice."
+      },
+      {
+        "q": "Do I even need GST registration as a freelance translator?",
+        "a": "Only once your aggregate turnover crosses Rs. 20 lakh in a financial year (Rs. 10 lakh in special-category/North-Eastern states). Below that you can invoice without GST. Note: export of services counts toward turnover, and many translators register voluntarily to file LUTs and claim input-tax refunds on export work."
+      },
+      {
+        "q": "Should I bill per word, per page, or per hour?",
+        "a": "Per word of the source text is the industry standard for translation (typically Rs. 1-3/word depending on language pair and subject), while certified work is often per standard page and interpretation is charged per hour or per day. Always state the rate basis and word/page count on the invoice so the client can verify the total."
+      }
+    ],
+    "metaDescription": "Free GST-ready translation invoice format for Indian freelance translators & interpreters. Correct SAC code 998395, 18% GST, export-of-service (zero-rated) rules, sample per-word rates and payment terms."
+  },
+  {
+    "slug": "real-estate-agents",
+    "name": "Real Estate",
+    "who": "a real estate agent / property broker",
+    "sacCode": "997222",
+    "sacDescription": "Building sales on a fee/commission or contract basis",
+    "gstRate": 18,
+    "intro": "Real estate agents and property brokers in India bill clients for brokerage on property sales, rentals, and related advisory work — not the property value itself, only your commission. Your service is taxed at 18% GST under SAC 9972 (997222 for building sales, 997223 for land, 997221 for property/rental management). GST registration is mandatory once your annual commission income crosses Rs 20 lakh (Rs 10 lakh in special-category states), and a proper tax invoice with your SAC code is what lets developer and corporate clients claim input credit.",
+    "sampleItems": [
+      {
+        "desc": "Brokerage on residential property sale (typically 1-2% of deal value)",
+        "unit": "% of sale value",
+        "typicalRate": 100000
+      },
+      {
+        "desc": "Rental brokerage / tenant sourcing (usually 1 month's rent)",
+        "unit": "per deal",
+        "typicalRate": 25000
+      },
+      {
+        "desc": "Commercial property sale brokerage",
+        "unit": "% of sale value",
+        "typicalRate": 200000
+      },
+      {
+        "desc": "Property management / rent collection service",
+        "unit": "per month",
+        "typicalRate": 5000
+      },
+      {
+        "desc": "Property advisory & site visit / consultation",
+        "unit": "per session",
+        "typicalRate": 2000
+      },
+      {
+        "desc": "Documentation & agreement drafting assistance",
+        "unit": "per deal",
+        "typicalRate": 5000
+      }
+    ],
+    "paymentNorm": "Brokerage is customarily due on successful closure — at agreement-to-sale or token/registration for sales, and on signing the lease for rentals. Standard residential brokerage is 1-2% of deal value from each side (buyer and seller) or one month's rent for rentals; commercial deals often carry higher slabs. Invoice immediately on closure with payment expected within 7-15 days.",
+    "faq": [
+      {
+        "q": "What GST rate and SAC code do I put on a real estate brokerage invoice?",
+        "a": "Charge 18% GST under SAC 9972. Use 997222 for brokerage on building/flat sales, 997223 for land sales, and 997221 for property/rental management. GST applies only to your commission, never to the property's sale value."
+      },
+      {
+        "q": "Do I need GST registration as a property broker?",
+        "a": "Yes, once your total commission income in a financial year exceeds Rs 20 lakh (Rs 10 lakh in special-category states). Below that you can invoice without GST, but many developers and corporate clients prefer a GST-registered broker so they can claim input tax credit on your brokerage."
+      },
+      {
+        "q": "Is GST charged on the property price or only my commission?",
+        "a": "Only on your commission/brokerage. The property's sale consideration is a separate transaction (with its own stamp duty and, for under-construction property, its own GST paid by the buyer to the developer). As the agent you raise a tax invoice solely for your service fee plus 18% GST."
+      },
+      {
+        "q": "Can I collect brokerage from both the buyer and the seller?",
+        "a": "Yes — dual brokerage is common in Indian real estate, but you must raise a separate GST invoice to each party for the amount they pay, each charged at 18% GST under SAC 9972. Disclose the arrangement to avoid disputes over your commission."
+      }
+    ],
+    "metaDescription": "Free real estate invoice format for Indian property agents and brokers. Correct GST rate (18%), SAC code 9972/997222, sample brokerage line items, and FAQs on commission invoicing."
+  },
+  {
+    "slug": "makeup-artists",
+    "name": "Makeup Artistry",
+    "who": "a freelance makeup artist",
+    "sacCode": "999729",
+    "sacDescription": "Other beauty treatment services n.e.c. (under Group 99972 - Beauty and physical well-being services)",
+    "gstRate": 5,
+    "intro": "As a freelance makeup artist in India, a clean invoice does more than get you paid — it locks in bridal dates with an advance, itemises trials, draping and outstation travel, and keeps you GST-ready. Since the GST 2.0 reforms of 22 September 2025, beauty and personal-care services (including makeup) attract just 5% GST without input tax credit, down from the earlier 18%. Use this format to bill weddings, shoots and events professionally and transparently.",
+    "sampleItems": [
+      {
+        "desc": "Bridal makeup (HD / airbrush) with hairstyling — wedding day",
+        "unit": "per event",
+        "typicalRate": 20000
+      },
+      {
+        "desc": "Engagement / reception makeup look",
+        "unit": "per event",
+        "typicalRate": 10000
+      },
+      {
+        "desc": "Party or family-member guest makeup",
+        "unit": "per person",
+        "typicalRate": 3000
+      },
+      {
+        "desc": "Pre-wedding / editorial shoot makeup",
+        "unit": "per look",
+        "typicalRate": 6000
+      },
+      {
+        "desc": "Trial makeup session (bridal)",
+        "unit": "per session",
+        "typicalRate": 3500
+      },
+      {
+        "desc": "Outstation / travel & accommodation charges",
+        "unit": "per day",
+        "typicalRate": 2500
+      }
+    ],
+    "paymentNorm": "A non-refundable booking advance of 30–50% is standard to block the date, with the balance due on or before the event day. Peak-season and outstation weddings are usually paid fully in advance; UPI and bank transfer are the norm.",
+    "faq": [
+      {
+        "q": "What GST rate do I charge on makeup services?",
+        "a": "Since 22 September 2025, makeup and beauty services are taxed at 5% GST without input tax credit (ITC) — down from the earlier 18%. The trade-off is that you can no longer claim ITC on the GST you pay for kit, cosmetics, rent or utilities, so factor those costs into your service rate rather than expecting to offset them."
+      },
+      {
+        "q": "Do I even need to register for GST as a freelance makeup artist?",
+        "a": "Only if your annual service turnover crosses ₹20 lakh (₹10 lakh in special-category states). Below that you invoice without GST and simply don't add any tax line. Many freelance artists operate under this threshold, but once you're registered you must charge 5% and quote SAC code 999721 on every invoice."
+      },
+      {
+        "q": "How do I show the advance / booking deposit on the invoice?",
+        "a": "Raise a receipt-cum-invoice for the advance when you take it, charging GST on that amount at the time of receipt (advances for services are taxable). On the final invoice, list the full service value, apply 5% GST, then deduct the advance already received to show the balance payable — this keeps your date-blocking deposit fully accounted for."
+      },
+      {
+        "q": "Can I bill trials, draping and outstation travel separately?",
+        "a": "Yes — trial sessions, saree/dupatta draping, extra guest looks and outstation travel or stay are best shown as separate line items rather than bundled into one 'bridal package' figure. It makes your pricing transparent for the client and, if you're GST-registered, the same 5% rate applies uniformly across all these beauty-service line items."
+      }
+    ],
+    "metaDescription": "Free Makeup Artistry Invoice Format for Indian freelance makeup artists — correct GST SAC code 999721, the new 5% GST rate, bridal & event sample line items, advance-payment norms and FAQs."
+  },
+  {
+    "slug": "fitness-trainers",
+    "name": "Fitness Training",
+    "who": "a personal trainer / fitness coach",
+    "sacCode": "999723",
+    "sacDescription": "Physical well-being services including health club and fitness centre",
+    "gstRate": 18,
+    "intro": "As a personal trainer or fitness coach in India, your services fall under SAC 999723 (\"physical well-being services including health club and fitness centre\") and attract 18% GST. Unlike medical or healthcare services (which are GST-exempt), fitness coaching is fully taxable, so once your annual turnover crosses Rs. 20 lakh (Rs. 10 lakh in special-category states) you must register for GST and charge it on every invoice. A clean, GST-compliant invoice with your SAC code, session details, and clear payment terms keeps your training practice audit-ready.",
+    "sampleItems": [
+      {
+        "desc": "Personal training session (1-on-1, 60 min)",
+        "unit": "per session",
+        "typicalRate": 800
+      },
+      {
+        "desc": "Monthly personal training package (12 sessions)",
+        "unit": "per month",
+        "typicalRate": 8000
+      },
+      {
+        "desc": "Online / virtual coaching (monthly)",
+        "unit": "per month",
+        "typicalRate": 4000
+      },
+      {
+        "desc": "Customised diet and nutrition plan",
+        "unit": "per plan",
+        "typicalRate": 2500
+      },
+      {
+        "desc": "Group fitness / bootcamp class",
+        "unit": "per person / month",
+        "typicalRate": 3000
+      },
+      {
+        "desc": "Fitness assessment and goal-setting consultation",
+        "unit": "per session",
+        "typicalRate": 1000
+      }
+    ],
+    "paymentNorm": "Personal training is almost always billed upfront — clients pay for a monthly package or a block of sessions before training begins, typically via UPI, bank transfer, or in-app payment. One-off sessions are usually collected on the day. Package fees are commonly non-refundable for unused sessions unless your policy states otherwise, so spell this out on the invoice.",
+    "faq": [
+      {
+        "q": "What GST rate and SAC code do I use as a personal trainer?",
+        "a": "Fitness and personal training services fall under SAC 999723 (\"physical well-being services including health club and fitness centre\") and are taxed at 18% GST (9% CGST + 9% SGST within a state, or 18% IGST across states). This is a standard-rated service, not exempt."
+      },
+      {
+        "q": "Is fitness coaching GST-exempt like healthcare or yoga?",
+        "a": "No. Only clinical healthcare by recognised medical practitioners is exempt, and charitable yoga by registered entities gets a separate exemption. Commercial personal training, gym coaching, and paid fitness classes are fully taxable at 18% — do not mark them exempt on your invoice."
+      },
+      {
+        "q": "Do I have to register for GST as an independent trainer?",
+        "a": "Only once your aggregate annual turnover exceeds Rs. 20 lakh (Rs. 10 lakh in special-category states). Below that you can invoice without charging GST, but you must not show a GSTIN or collect tax. Once registered, charge 18% and quote your GSTIN and SAC 999723 on every invoice."
+      },
+      {
+        "q": "How should I invoice a multi-session package versus single sessions?",
+        "a": "For packages, describe the block clearly (e.g. \"12 personal training sessions - valid 30 days\") with the total fee, then apply 18% GST on that amount. Issue the tax invoice when payment is received. For pay-as-you-go clients, raise a separate invoice per session or a monthly consolidated invoice listing each session date."
+      }
+    ],
+    "metaDescription": "Free GST-ready fitness training invoice format for Indian personal trainers and coaches. Includes SAC code 999723, correct 18% GST rate, sample line items, and rates."
+  },
+  {
+    "slug": "astrologers",
+    "name": "Astrology",
+    "who": "an astrologer / astrology consultant",
+    "sacCode": "999799",
+    "sacDescription": "Other services nowhere else classified",
+    "gstRate": 18,
+    "intro": "Whether you consult on kundli matching, muhurat selection, or run monthly gemstone and remedy sessions, a clean invoice keeps your astrology practice professional and audit-ready. In India, astrology and consultation services attract 18% GST under SAC 999799, and unlike healthcare or education there is no exemption — so if you are registered, you must charge it. This format is built for Indian astrologers billing individual clients and corporate/event bookings alike.",
+    "sampleItems": [
+      {
+        "desc": "Detailed birth chart (kundli) analysis with written report",
+        "unit": "per report",
+        "typicalRate": 1500
+      },
+      {
+        "desc": "Kundli matching / horoscope compatibility (guna milan)",
+        "unit": "per pair",
+        "typicalRate": 2100
+      },
+      {
+        "desc": "Personal consultation call (astrology reading)",
+        "unit": "per 45-min session",
+        "typicalRate": 1100
+      },
+      {
+        "desc": "Muhurat / auspicious date selection",
+        "unit": "per event",
+        "typicalRate": 1100
+      },
+      {
+        "desc": "Gemstone & remedy recommendation report",
+        "unit": "per report",
+        "typicalRate": 900
+      },
+      {
+        "desc": "Annual varshphal (yearly prediction) report",
+        "unit": "per report",
+        "typicalRate": 2500
+      }
+    ],
+    "paymentNorm": "Astrology consultations are almost always prepaid — full payment is collected before the session or before a written report is delivered, typically via UPI, bank transfer, or a payment link. Corporate, wedding, and event muhurat bookings may run on 50% advance with the balance on delivery. Since the service is delivered instantly, credit terms are rare.",
+    "faq": [
+      {
+        "q": "What GST rate and SAC code apply to astrology services?",
+        "a": "Astrology and consultation services fall under SAC 999799 (\"Other services nowhere else classified\") and attract 18% GST. Some practitioners also use SAC 998399 (other professional/technical services) — both carry 18%. There is no exemption for astrology, so if you are GST-registered you must charge 18% on every invoice."
+      },
+      {
+        "q": "Do I even need to register for GST as an astrologer?",
+        "a": "Only if your annual turnover crosses the service threshold of ₹20 lakh (₹10 lakh in special-category states). Below that you are not required to register and should not charge GST. If you sell online across state borders through an e-commerce or aggregator platform, registration may be required regardless of turnover — check with a CA."
+      },
+      {
+        "q": "How do I invoice foreign clients who pay in dollars?",
+        "a": "Services to a client located outside India, paid in convertible foreign exchange, generally qualify as an export of services and are zero-rated under GST — meaning no 18% is charged. You must still raise a proper invoice, mention it is an export of service, and ideally file a LUT (Letter of Undertaking) so you can export without paying tax. Confirm eligibility with your accountant."
+      },
+      {
+        "q": "Do I need to charge GST on gemstones I sell alongside a reading?",
+        "a": "Yes, but separately. A consultation is a service (SAC 999799, 18%), while a physical gemstone is goods with its own HSN code and GST rate. List them as distinct line items so the correct rate applies to each — do not bundle the stone into the consultation charge."
+      }
+    ],
+    "metaDescription": "Free astrology invoice format for Indian astrologers and consultants. Correct GST (18%, SAC 999799), sample line items, payment norms, and FAQs on export of services."
+  },
+  {
+    "slug": "tour-operators",
+    "name": "Travel & Tours",
+    "who": "a travel agent / tour operator",
+    "sacCode": "998555",
+    "sacDescription": "Tour operator services",
+    "gstRate": 5,
+    "intro": "As a travel agent or tour operator in India, your invoices sit under SAC 998552 with a special GST treatment: most packaged tours are taxed at just 5% GST (without input tax credit) rather than the usual 18%. Your invoice must clearly show the gross package amount inclusive of accommodation and transport, and note that ITC is not being claimed. This format helps you bill domestic and international packages, ticketing commissions, and add-on services cleanly and GST-compliantly.",
+    "sampleItems": [
+      {
+        "desc": "Domestic tour package (per person, 3N/4D — hotel, transfers, sightseeing)",
+        "unit": "per person",
+        "typicalRate": 18000
+      },
+      {
+        "desc": "International tour package (per person, land + air, all-inclusive)",
+        "unit": "per person",
+        "typicalRate": 85000
+      },
+      {
+        "desc": "Air ticket booking / handling charge (service fee)",
+        "unit": "per ticket",
+        "typicalRate": 500
+      },
+      {
+        "desc": "Hotel booking arrangement fee",
+        "unit": "per booking",
+        "typicalRate": 750
+      },
+      {
+        "desc": "Private cab / airport transfer (per day)",
+        "unit": "per day",
+        "typicalRate": 3500
+      },
+      {
+        "desc": "Visa assistance & documentation fee",
+        "unit": "per applicant",
+        "typicalRate": 2000
+      }
+    ],
+    "paymentNorm": "Tour operators typically collect a 25-50% advance at booking to block hotels and flights, with the balance due 15-30 days before departure. Air-ticket and visa components are usually paid in full upfront since they are non-refundable.",
+    "faq": [
+      {
+        "q": "What GST rate should a tour operator charge — 5% or 18%?",
+        "a": "For a packaged tour (accommodation + transport bundled), the standard rate is 5% GST without input tax credit (ITC) under SAC 998552. You may instead opt for 18% with full ITC, but you must apply your chosen model consistently across all invoices, books and GST returns. Most operators use 5% without ITC as it keeps package prices competitive."
+      },
+      {
+        "q": "What must my invoice specifically state to qualify for the 5% rate?",
+        "a": "The invoice must show the gross amount charged and clearly indicate that it is inclusive of accommodation and transportation charges, and that no ITC has been claimed on hotels, air tickets or similar inputs. Without this declaration you cannot avail the concessional 5% rate."
+      },
+      {
+        "q": "How is a pure commission (agent) service taxed differently from a package?",
+        "a": "When you act only as an agent — earning commission on air tickets, rail, or hotel bookings rather than selling a bundled package — that commission is a separate support service taxed at 18% GST with ITC. So a single business can have 5% package invoices and 18% commission invoices; keep them distinct."
+      },
+      {
+        "q": "Can I claim input tax credit on my costs under the 5% scheme?",
+        "a": "No. Under the 5% without-ITC model you cannot claim credit on hotel stays, airfare or other inputs — the one exception is ITC on tour operator services bought from another tour operator. If claiming full ITC on your rent, software and other costs matters more to you, choose the 18% option instead."
+      }
+    ],
+    "metaDescription": "Free Travel & Tours invoice format for Indian tour operators. Correct SAC code 998552, the special 5% GST (no ITC) treatment, sample line items, payment norms and FAQs."
+  },
+  {
+    "slug": "caterers",
+    "name": "Catering",
+    "who": "a caterer / catering business",
+    "sacCode": "996334",
+    "sacDescription": "Catering services at events, marriage halls and outdoor/indoor functions",
+    "gstRate": 5,
+    "intro": "A catering invoice (or \"bill\") is the tax document you hand a client after a wedding, corporate event, or private function — it lists the menu packages, guest count (per-plate), service charges, and GST. For most caterers in India the correct classification is SAC 996334, and outdoor/event catering is taxed at 5% GST without input tax credit, not the 18% many assume. A clean, GST-ready invoice speeds up payment from banquet halls, event planners, and corporate clients who need it for their own books.",
+    "sampleItems": [
+      {
+        "desc": "Standard veg plate menu (per guest)",
+        "unit": "plate",
+        "typicalRate": 450
+      },
+      {
+        "desc": "Premium/deluxe menu with live counters (per guest)",
+        "unit": "plate",
+        "typicalRate": 850
+      },
+      {
+        "desc": "Non-veg buffet menu (per guest)",
+        "unit": "plate",
+        "typicalRate": 650
+      },
+      {
+        "desc": "Welcome drinks & starters counter",
+        "unit": "counter",
+        "typicalRate": 8000
+      },
+      {
+        "desc": "Service staff / waiters (bearers)",
+        "unit": "person/day",
+        "typicalRate": 900
+      },
+      {
+        "desc": "Crockery, cutlery & setup charges",
+        "unit": "event",
+        "typicalRate": 15000
+      }
+    ],
+    "paymentNorm": "Caterers typically collect a 30-50% advance to confirm the booking, with the balance due on or within a few days of the event. Final guest count (and per-plate billing) is locked 24-48 hours before the function. Corporate and banquet-tie-up clients often pay on 15-30 day credit terms.",
+    "faq": [
+      {
+        "q": "What GST rate should a caterer charge — 5% or 18%?",
+        "a": "For outdoor and event catering (weddings, parties, functions in marriage/banquet halls) the rate is 5% GST without input tax credit under SAC 996334. The 18% rate with ITC only applies when catering is supplied inside 'specified premises' — a hotel where any room tariff is Rs 7,500 or more per day. Most standalone caterers fall in the 5% bracket."
+      },
+      {
+        "q": "Which SAC code do I put on a catering invoice?",
+        "a": "Use SAC 996334 — 'catering services in exhibition halls, events, marriage halls and other outdoor/indoor functions'. If you run a contract/canteen food service (e.g. office canteens on a contract), SAC 996337 may apply instead."
+      },
+      {
+        "q": "Can I claim input tax credit on my catering purchases?",
+        "a": "No. Because outdoor catering is taxed at the concessional 5% rate, you cannot claim ITC on your inputs (raw material, rentals, staff, etc.). If your business genuinely operates from specified premises and charges 18%, ITC becomes available — but that is the exception, not the norm."
+      },
+      {
+        "q": "Do I need GST registration to run a catering business?",
+        "a": "GST registration is mandatory once your annual turnover crosses Rs 20 lakh (Rs 10 lakh in special-category states). Below that you can invoice without charging GST, but many corporate and banquet clients prefer a GST-registered caterer so they get a proper tax invoice."
+      }
+    ],
+    "metaDescription": "Free catering invoice format for Indian caterers with correct GST (SAC 996334, 5% without ITC), sample per-plate line items, payment terms and FAQs."
+  },
+  {
+    "slug": "dj-services",
+    "name": "DJ & Events",
+    "who": "a DJ / event entertainment service",
+    "sacCode": "999631",
+    "sacDescription": "Services of performing artists including musicians, singers, band players, DJs and entertainers",
+    "gstRate": 18,
+    "intro": "DJs and event entertainment providers in India bill their gigs under SAC 998596, which covers organisation and support services for events, functions and shows, and attracts GST at 18%. Because most bookings mix a service fee with hired equipment, sound, and lighting, a clear itemised invoice — with your GSTIN, the SAC code, and an advance-vs-balance breakup — protects both you and the client. Use the format below to bill weddings, corporate parties, club nights and private events cleanly.",
+    "sampleItems": [
+      {
+        "desc": "DJ performance (per event / up to 4 hours)",
+        "unit": "event",
+        "typicalRate": 25000
+      },
+      {
+        "desc": "Additional performance hours beyond package",
+        "unit": "hour",
+        "typicalRate": 4000
+      },
+      {
+        "desc": "Sound system & speakers rental (per day)",
+        "unit": "day",
+        "typicalRate": 15000
+      },
+      {
+        "desc": "DJ console, mixer & lighting / LED setup",
+        "unit": "day",
+        "typicalRate": 12000
+      },
+      {
+        "desc": "Smoke machine, effects & special FX",
+        "unit": "unit",
+        "typicalRate": 3500
+      },
+      {
+        "desc": "Technician / setup & teardown crew",
+        "unit": "person",
+        "typicalRate": 2000
+      }
+    ],
+    "paymentNorm": "Most DJs take a 40-50% non-refundable advance to block the date at the time of booking, with the balance due on or before the event day (commonly before the set starts). Peak wedding-season and weekend dates are usually locked only against advance. Overtime beyond the agreed hours is billed at the per-hour rate on the invoice.",
+    "faq": [
+      {
+        "q": "What SAC code and GST rate should a DJ put on an invoice?",
+        "a": "Use SAC 998596 (event organisation and support services) with GST at 18% — split as 9% CGST + 9% SGST for a client in your own state, or 18% IGST for an out-of-state client. Registration is only mandatory once your annual turnover crosses Rs 20 lakh (Rs 10 lakh in special-category states); below that you can invoice without charging GST."
+      },
+      {
+        "q": "Should equipment rental and the DJ fee be billed at the same GST rate?",
+        "a": "When you offer sound, lighting and DJ performance together as one booking, it is treated as a composite/bundled event service and the whole invoice is taxed at 18% under SAC 998596 — the equipment does not need a separate goods-rental rate. Keep the line items itemised for transparency, but apply one 18% GST on the total."
+      },
+      {
+        "q": "Do I need to charge GST on the advance I collect for a booking?",
+        "a": "Yes. For services, GST is payable on advances at the time you receive them, so raise a receipt voucher and account for 18% GST on the booking advance. Adjust it against the final tax invoice on the event date; if a booking is cancelled you can issue a refund voucher for the tax."
+      },
+      {
+        "q": "Can a company deduct TDS on my DJ booking payment?",
+        "a": "Yes — corporate and business clients often deduct TDS at 2% under Section 194C (contractor/entertainment services) if the single payment exceeds Rs 30,000 or annual payments cross Rs 1 lakh. This TDS is on the base amount, is separate from GST, and you can claim it back against your income tax. Give the client your PAN so they don't deduct at the higher 20% rate."
+      }
+    ],
+    "metaDescription": "Free DJ & event entertainment invoice format for India with the correct SAC code 998596, 18% GST, sample line items, booking-advance norms and DJ-specific tax FAQs."
+  },
+  {
+    "slug": "voice-over-artists",
+    "name": "Voice-over",
+    "who": "a freelance voice-over artist",
+    "sacCode": "999631",
+    "sacDescription": "Services of performing artists (including readers/narrators)",
+    "gstRate": 18,
+    "intro": "As a freelance voice-over artist in India, your work falls under SAC 999631 — \"services of performing artists,\" which explicitly covers readers and narrators — and is taxed at 18% GST once you cross the ₹20 lakh registration threshold (₹10 lakh in special-category states). A clear voice-over invoice should separate the recording fee from usage/broadcast rights and spell out how retakes and pickups are billed, since production houses and ad agencies routinely deduct 10% TDS under Section 194J before paying you.",
+    "sampleItems": [
+      {
+        "desc": "Corporate/explainer video narration (finished audio)",
+        "unit": "per finished minute",
+        "typicalRate": 1200
+      },
+      {
+        "desc": "E-learning / instructional module narration",
+        "unit": "per finished minute",
+        "typicalRate": 800
+      },
+      {
+        "desc": "TV/radio commercial voice-over (up to 30 sec spot)",
+        "unit": "per spot",
+        "typicalRate": 5000
+      },
+      {
+        "desc": "IVR / on-hold phone prompts",
+        "unit": "per prompt/line",
+        "typicalRate": 250
+      },
+      {
+        "desc": "Audiobook / long-form narration",
+        "unit": "per finished hour",
+        "typicalRate": 3500
+      },
+      {
+        "desc": "Broadcast/digital usage (buyout) rights",
+        "unit": "per campaign",
+        "typicalRate": 8000
+      }
+    ],
+    "paymentNorm": "Standard practice is 50% advance to lock studio dates and 50% on delivery of final approved audio; agencies and production houses usually pay net 30–45 days and deduct 10% TDS under Section 194J. Include one or two rounds of minor retakes in the base fee and bill additional pickups or script changes separately.",
+    "faq": [
+      {
+        "q": "What GST rate and SAC code do I put on a voice-over invoice?",
+        "a": "Use SAC 999631 (services of performing artists, which covers readers/narrators) and charge 18% GST. Split it as 9% CGST + 9% SGST for clients in your own state, or 18% IGST for out-of-state and export clients. You only need to register and charge GST once your annual turnover crosses ₹20 lakh (₹10 lakh in special-category states)."
+      },
+      {
+        "q": "Should I charge separately for usage or broadcast rights?",
+        "a": "Yes. The recording fee pays for your time in the booth; usage/buyout is a separate line for where and how long the audio airs (TV, radio, digital, or in-perpetuity). A voice for a national ad campaign commands a much higher usage fee than an internal training video, so list the recording fee and the usage/rights fee as distinct line items — both attract 18% GST under 999631."
+      },
+      {
+        "q": "How do I bill retakes, pickups and script changes?",
+        "a": "State clearly on the invoice what is included — typically one or two rounds of minor corrections. Charge pickups caused by client-side script edits, added lines, or a change of tone/pace as a separate line item (often a per-word, per-line, or half-session studio rate), so scope creep does not eat into your original quote."
+      },
+      {
+        "q": "Why is 10% TDS deducted from my payment, and can I recover it?",
+        "a": "Voice-over is treated as a professional service, so companies deduct 10% TDS under Section 194J on the fee (they deduct on the base amount, not the GST). It is not a loss — it is credited against your income tax. Reconcile it in your Form 26AS/AIS and claim it when filing your return; mentioning your PAN on the invoice ensures the credit reaches you."
+      }
+    ],
+    "metaDescription": "Free voice-over artist invoice format for India with the correct GST SAC code (999631, 18%), sample line items with realistic rates, usage-rights billing, TDS guidance, and FAQs."
   }
 ];
 
