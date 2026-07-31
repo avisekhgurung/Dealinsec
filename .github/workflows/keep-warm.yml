@@ -1,0 +1,36 @@
+name: Keep warm
+
+# Render's free tier spins the web service down after ~15 min idle, and the next
+# request then eats a ~50s cold start. That hurts Googlebot (it can time out and
+# crawl/index less) and real first-visits (a 50s blank screen = instant bounce).
+# This pings a lightweight liveness endpoint on a schedule to keep the instance
+# awake. Free + unlimited on this public repo, and staying awake ~24/7 fits
+# inside Render's 750 free instance-hours/month.
+#
+# Note: GitHub can delay scheduled runs under load, so if you want tighter
+# coverage, also add an external pinger (cron-job.org / UptimeRobot, both free)
+# pointed at https://www.dealinsec.com/healthz every 5 minutes.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # every ~10 minutes
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+# Never let overlapping runs pile up.
+concurrency:
+  group: keep-warm
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /healthz (wakes the instance)
+        run: |
+          # --max-time 90 covers a full cold start; --retry rides out transients.
+          code=$(curl -sS -o /dev/null -w '%{http_code}' \
+            --max-time 90 --retry 2 --retry-delay 10 --retry-all-errors \
+            https://www.dealinsec.com/healthz || echo "000")
+          echo "healthz -> $code"
+          # Don't fail the job on a bad code (avoids email noise on a slow cold
+          # start); use an external monitor for real uptime alerting.

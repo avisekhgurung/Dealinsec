@@ -109,6 +109,15 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
 
   app.use(canonicalRedirect);
 
+  // Liveness probe. Deliberately dependency-free (no DB, session or auth) and
+  // registered first, so it returns instantly and an external uptime pinger can
+  // keep the Render free-tier instance from spinning down (~50s cold start
+  // otherwise, which hurts crawling + first-visit UX). See keep-warm workflow /
+  // cron-job.org. Not linked publicly, so it stays out of the sitemap.
+  app.get("/healthz", (_req, res) => {
+    res.set("Cache-Control", "no-store").type("text/plain").send("ok");
+  });
+
   // robots.txt — allow crawling, point at the sitemap. App/API routes are not
   // linked publicly, so we don't need to disallow them for SEO.
   app.get("/robots.txt", (_req, res) => {
