@@ -126,7 +126,7 @@ function Router() {
   return (
     <>
       {showShell && <DesktopSidebar />}
-      <div className={showShell ? "lg:pl-72" : ""}>
+      <div className={showShell ? "app-shell lg:pl-72" : ""}>
         <Suspense fallback={<RouteLoader />}>
           <Switch>
             {/* Authenticated users hitting `/` go straight to the dashboard

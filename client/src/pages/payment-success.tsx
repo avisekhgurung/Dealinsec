@@ -56,7 +56,7 @@ export default function PaymentSuccessPage() {
           <Card className="glass-card w-full max-w-md border-0">
             <CardContent className="p-8 text-center space-y-4">
               <Loader2 className="w-12 h-12 mx-auto animate-spin text-primary" />
-              <h1 className="text-xl font-bold">Confirming Payment</h1>
+              <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Confirming Payment</h1>
               <p className="text-muted-foreground">
                 Please wait while we verify your payment...
               </p>

@@ -22,7 +22,7 @@ export default function BrandDealsPage() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
           </Link>
-          <h1 className="text-xl font-bold">Your Deals</h1>
+          <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Your Deals</h1>
         </div>
       </header>
 

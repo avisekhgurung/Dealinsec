@@ -87,7 +87,7 @@ export default function BrandInvoiceDetailsPage() {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="glass-header sticky top-0 z-40 print:hidden">
-          <div className="flex items-center gap-3 px-4 py-4">
+          <div className="flex items-center gap-3 px-4 py-4 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-3.5">
             <Skeleton className="h-9 w-9" />
             <Skeleton className="h-6 w-32" />
           </div>
@@ -105,11 +105,11 @@ export default function BrandInvoiceDetailsPage() {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="glass-header sticky top-0 z-40 print:hidden">
-          <div className="flex items-center gap-3 px-4 py-4">
+          <div className="flex items-center gap-3 px-4 py-4 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-3.5">
             <Button variant="ghost" size="icon" onClick={() => setLocation("/invoices")}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-xl font-bold">Invoice Not Found</h1>
+            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Invoice Not Found</h1>
           </div>
         </header>
         <BottomNav />
@@ -146,7 +146,7 @@ export default function BrandInvoiceDetailsPage() {
               <Button variant="ghost" size="icon" onClick={() => setLocation("/invoices")}>
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              <h1 className="text-xl font-bold">Invoice</h1>
+              <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Invoice</h1>
             </div>
             <Button onClick={() => window.print()} className="gradient-btn text-white">
               <Download className="w-4 h-4 mr-2" />

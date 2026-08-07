@@ -102,13 +102,13 @@ export default function QuotePreviewPage() {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="glass-header sticky top-0 z-40">
-          <div className="flex items-center gap-3 px-4 py-4">
+          <div className="flex items-center gap-3 px-4 py-4 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-3.5">
             <Link href={`/deals/${params.id}`}>
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             </Link>
-            <h1 className="text-xl font-bold">Quote Preview</h1>
+            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Quote Preview</h1>
           </div>
         </header>
         <main className="px-4 py-12 text-center">
@@ -138,7 +138,7 @@ export default function QuotePreviewPage() {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             </Link>
-            <h1 className="text-xl font-bold">Quote Preview</h1>
+            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Quote Preview</h1>
           </div>
           <Button
             variant="outline"

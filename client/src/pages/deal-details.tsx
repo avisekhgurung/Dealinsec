@@ -167,7 +167,7 @@ export default function DealDetailsPage() {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="glass-header sticky top-0 z-40">
-          <div className="flex items-center gap-3 px-4 py-4">
+          <div className="flex items-center gap-3 px-4 py-4 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-3.5">
             <Button variant="ghost" size="icon" onClick={() => setLocation(backPath)}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
@@ -195,11 +195,11 @@ export default function DealDetailsPage() {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="glass-header sticky top-0 z-40">
-          <div className="flex items-center gap-3 px-4 py-4">
+          <div className="flex items-center gap-3 px-4 py-4 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-3.5">
             <Button variant="ghost" size="icon" onClick={() => setLocation(backPath)}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-xl font-bold">Deal Details</h1>
+            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Deal Details</h1>
           </div>
         </header>
         <main className="px-4 py-12 text-center">
@@ -218,7 +218,7 @@ export default function DealDetailsPage() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="glass-header sticky top-0 z-40">
-        <div className="flex items-center gap-3 px-4 py-4">
+        <div className="flex items-center gap-3 px-4 py-4 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-3.5">
           <Button
             variant="ghost"
             size="icon"

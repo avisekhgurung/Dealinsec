@@ -30,18 +30,18 @@ function TeamSeatsCard() {
   if (!org || org.seatLimit <= 1) return null; // solo free orgs skip the strip
   return (
     <Card className="glass-card" data-testid="team-seats-card">
-      <CardContent className="p-4 lg:p-5 flex items-center gap-4">
-        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <Users2 className="w-5 h-5 text-primary" />
+      <CardContent className="p-4 lg:p-3.5 flex items-center gap-3.5">
+        <div className="w-10 h-10 lg:w-8 lg:h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <Users2 className="w-5 h-5 lg:w-4 lg:h-4 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-sm lg:text-base">
+          <p className="font-semibold text-sm">
             Team · <span className="text-primary">{org.seatsUsed} / {org.seatLimit}</span> seats
             {org.pendingInvites > 0 && (
               <span className="text-muted-foreground font-medium"> · {org.pendingInvites} invited</span>
             )}
           </p>
-          <p className="text-xs lg:text-sm text-muted-foreground truncate">{org.name}</p>
+          <p className="text-xs text-muted-foreground truncate">{org.name}</p>
         </div>
         <Link href="/settings">
           <Button variant="outline" size="sm" className="flex-shrink-0" data-testid="dashboard-invite-member">
@@ -69,13 +69,13 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
     return (
       <Card className="glass-card border-violet-300/40 dark:border-violet-800/40 relative overflow-hidden" data-testid="subscription-card">
         <div className="absolute inset-0 bg-gradient-to-r from-violet-500/[0.07] to-indigo-500/[0.05] pointer-events-none" />
-        <CardContent className="relative p-4 lg:p-5 flex items-center gap-4">
-          <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-violet-500/30">
-            <Crown className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
+        <CardContent className="relative p-4 lg:p-3.5 flex items-center gap-3.5">
+          <div className="w-10 h-10 lg:w-8 lg:h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm shadow-violet-500/25">
+            <Crown className="w-5 h-5 lg:w-4 lg:h-4 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-sm lg:text-base">DealInSec Pro · {tier}</p>
-            <p className="text-xs lg:text-sm text-muted-foreground">
+            <p className="font-semibold text-sm">DealInSec Pro · {tier}</p>
+            <p className="text-xs text-muted-foreground">
               Unlimited workflow{user?.planExpiresAt ? ` · valid until ${fmtDate(user.planExpiresAt)}` : ""}
             </p>
           </div>
@@ -91,13 +91,13 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
     return (
       <Card className="glass-card border-emerald-300/40 dark:border-emerald-800/40 relative overflow-hidden" data-testid="subscription-card">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/[0.07] to-teal-500/[0.05] pointer-events-none" />
-        <CardContent className="relative p-4 lg:p-5 flex items-center gap-4">
-          <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-500/30">
-            <Rocket className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
+        <CardContent className="relative p-4 lg:p-3.5 flex items-center gap-3.5">
+          <div className="w-10 h-10 lg:w-8 lg:h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-sm shadow-emerald-500/25">
+            <Rocket className="w-5 h-5 lg:w-4 lg:h-4 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-sm lg:text-base">Deal Boost active</p>
-            <p className="text-xs lg:text-sm text-muted-foreground">
+            <p className="font-semibold text-sm">Deal Boost active</p>
+            <p className="text-xs text-muted-foreground">
               Unlimited deals &amp; quotations
               {user?.dealBoostExpiresAt ? ` · until ${fmtDate(user.dealBoostExpiresAt)}` : ""}
               {" · agreements & invoices need Pro"}
@@ -116,13 +116,13 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
   // server-side and surfaces through the upgrade modal when it's reached.
   return (
     <Card className="glass-card relative overflow-hidden" data-testid="subscription-card">
-      <CardContent className="p-4 lg:p-5 flex items-center gap-4">
-        <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <Sparkles className="w-5 h-5 lg:w-6 lg:h-6 text-primary" />
+      <CardContent className="p-4 lg:p-3.5 flex items-center gap-3.5">
+        <div className="w-10 h-10 lg:w-8 lg:h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <Sparkles className="w-5 h-5 lg:w-4 lg:h-4 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-sm lg:text-base">Free plan</p>
-          <p className="text-xs lg:text-sm text-muted-foreground">
+          <p className="font-semibold text-sm">Free plan</p>
+          <p className="text-xs text-muted-foreground">
             Upgrade for unlimited deals, signed agreements, invoices &amp; payment tracking
           </p>
         </div>
@@ -300,27 +300,28 @@ function StatCard({ title, value, icon: Icon, tone, href, loading, sub, trendUp 
   return (
     <Link href={href}>
       <div
-        className="group rounded-2xl p-3 sm:p-4 lg:p-5 cursor-pointer overflow-hidden bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 hover:border-primary/40 dark:hover:border-primary/40 hover:shadow-lg hover:shadow-primary/[0.04] transition-all duration-200"
+        className="group rounded-2xl lg:rounded-xl p-3 sm:p-4 lg:p-4 cursor-pointer overflow-hidden bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 hover:border-primary/40 dark:hover:border-primary/40 hover:shadow-md hover:shadow-primary/[0.04] transition-all duration-200"
       >
-        <div className="flex items-start justify-between gap-2 mb-2 sm:mb-3 lg:mb-4">
-          <div className={`flex items-center justify-center w-9 h-9 lg:w-11 lg:h-11 rounded-xl shrink-0 ${t.bg} group-hover:scale-105 transition-transform`}>
-            <Icon className={`w-4 h-4 lg:w-5 lg:h-5 ${t.text}`} strokeWidth={2.2} />
+        {/* Label row: small caps label + muted icon (KPI tiles lead with the
+            number, not the chrome) */}
+        <div className="flex items-center justify-between gap-2 mb-2 lg:mb-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 truncate">
+            {title}
+          </p>
+          <div className={`flex items-center justify-center w-8 h-8 lg:w-7 lg:h-7 rounded-lg shrink-0 ${t.bg}`}>
+            <Icon className={`w-4 h-4 lg:w-3.5 lg:h-3.5 ${t.text}`} strokeWidth={2.2} />
           </div>
-          <ChevronRight className="w-4 h-4 lg:w-5 lg:h-5 text-neutral-400 dark:text-neutral-600 shrink-0 mt-1 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
         </div>
-        <p className="text-[11px] lg:text-xs font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400 truncate mb-0.5 lg:mb-1">
-          {title}
-        </p>
         {loading ? (
-          <Skeleton className="h-7 lg:h-10 w-16 lg:w-24" />
+          <Skeleton className="h-7 lg:h-8 w-16 lg:w-24" />
         ) : (
-          <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-neutral-900 dark:text-white truncate leading-tight tracking-tight">
+          <p className="text-xl sm:text-2xl lg:text-[26px] font-semibold text-neutral-900 dark:text-white truncate leading-none tracking-tight tabular-nums">
             {value}
           </p>
         )}
         {!loading && sub && (
-          <p className={`mt-1 lg:mt-1.5 text-[11px] lg:text-xs font-medium flex items-center gap-1 truncate ${trendUp ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-500 dark:text-neutral-400"}`}>
-            {trendUp && <TrendingUp className="w-3 h-3 lg:w-3.5 lg:h-3.5 shrink-0" strokeWidth={2.5} />}
+          <p className={`mt-1.5 text-[11px] lg:text-[11.5px] font-medium flex items-center gap-1 truncate ${trendUp ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-500 dark:text-neutral-400"}`}>
+            {trendUp && <TrendingUp className="w-3 h-3 shrink-0" strokeWidth={2.5} />}
             {sub}
           </p>
         )}
@@ -425,9 +426,9 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background pb-24 lg:pb-12">
       {/* Header — compact on mobile, generous on desktop SaaS-style */}
       <header className="glass-header sticky top-0 z-40 lg:border-b lg:border-neutral-200/60 dark:lg:border-neutral-800/60">
-        <div className="flex items-center justify-between gap-4 px-4 py-4 lg:max-w-7xl lg:mx-auto lg:px-8 lg:py-6 xl:px-12">
+        <div className="flex items-center justify-between gap-4 px-4 py-4 lg:max-w-7xl lg:mx-auto lg:px-8 lg:py-5 xl:px-10">
           <div>
-            <p className="text-xs lg:text-sm text-muted-foreground">Welcome back,</p>
+            <p className="text-xs text-muted-foreground">Welcome back,</p>
             <h1 className="text-lg lg:text-2xl font-bold tracking-tight">{displayName}</h1>
           </div>
           <div className="flex items-center gap-2">
@@ -448,7 +449,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="px-4 py-5 space-y-6 animate-fade-in lg:max-w-7xl lg:mx-auto lg:px-8 lg:py-8 lg:space-y-8 xl:px-12">
+      <main className="px-4 py-5 space-y-6 animate-fade-in lg:max-w-7xl lg:mx-auto lg:px-8 lg:py-6 lg:space-y-5 xl:px-10">
 
         {/* ── Profile completion nudge — top priority before any action ── */}
         {showProfileNudge && (
@@ -556,7 +557,7 @@ export default function DashboardPage() {
         <TeamSeatsCard />
 
         {/* ── Stat cards ── */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
           <StatCard title="Deals" value={totalDeals} icon={Briefcase}
             tone="amber" href="/deals" loading={isLoading}
             sub={dealsThisMonth > 0 ? `${dealsThisMonth} this month` : totalDeals > 0 ? "in your pipeline" : "none yet"}
@@ -702,7 +703,7 @@ export default function DashboardPage() {
                         <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Deliverables across platforms / categories</p>
                       </CardHeader>
                       <CardContent className="px-2 pb-4 lg:px-4 lg:pb-6">
-                        <div className="h-[180px] sm:h-[200px] lg:h-[300px] xl:h-[340px]">
+                        <div className="h-[180px] sm:h-[200px] lg:h-[220px] xl:h-[240px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={platformDist} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
@@ -733,7 +734,7 @@ export default function DashboardPage() {
                         </p>
                       </CardHeader>
                       <CardContent className="px-2 pb-4 lg:px-4 lg:pb-6">
-                        <div className="relative h-[180px] sm:h-[200px] lg:h-[260px] xl:h-[280px]">
+                        <div className="relative h-[180px] sm:h-[200px] lg:h-[210px] xl:h-[230px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                               <Pie

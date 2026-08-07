@@ -175,7 +175,7 @@ export default function CreateDealPage() {
   return (
     <div className="min-h-screen bg-background pb-8">
       <header className="glass-header sticky top-0 z-40">
-        <div className="flex items-center gap-3 px-4 py-4">
+        <div className="flex items-center gap-3 px-4 py-4 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-3.5">
           <Button
             variant="ghost"
             size="icon"
@@ -184,11 +184,11 @@ export default function CreateDealPage() {
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-xl font-bold">Create Deal</h1>
+          <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Create Deal</h1>
         </div>
       </header>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 py-6 space-y-6 animate-fade-in">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 py-6 space-y-6 animate-fade-in lg:max-w-4xl lg:mx-auto lg:px-8 lg:py-7 lg:space-y-5">
         {/* Deal Type — first step, drives downstream taxonomy */}
         <section className="glass-card rounded-xl p-5 sm:p-6 space-y-5">
           <div className="flex items-baseline justify-between gap-3">
@@ -250,7 +250,7 @@ export default function CreateDealPage() {
             Client Details
           </h2>
 
-          <div className="space-y-4">
+          <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-x-5 lg:gap-y-4 lg:space-y-0">
             <div className="space-y-2">
               <Label htmlFor="brandName">{L.who}</Label>
               <Input

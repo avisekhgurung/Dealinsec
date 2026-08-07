@@ -257,7 +257,7 @@ export default function ContractConfirmationPage() {
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-xl font-bold">Create Agreement</h1>
+            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Create Agreement</h1>
           </div>
         </header>
         <main className="px-4 py-8 max-w-lg mx-auto animate-fade-in">
@@ -314,7 +314,7 @@ export default function ContractConfirmationPage() {
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-xl font-bold">Create Agreement</h1>
+            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Create Agreement</h1>
 
             {/* Pro pill in header — agreements are a Pro feature */}
             <div className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800">

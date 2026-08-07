@@ -219,7 +219,7 @@ export default function EditDealPage() {
   return (
     <div className="min-h-screen bg-background pb-24">
       <header className="glass-header sticky top-0 z-40">
-        <div className="flex items-center gap-3 px-4 py-4">
+        <div className="flex items-center gap-3 px-4 py-4 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-3.5">
           <Button
             variant="ghost"
             size="icon"
@@ -228,11 +228,11 @@ export default function EditDealPage() {
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-xl font-bold">Edit Deal</h1>
+          <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Edit Deal</h1>
         </div>
       </header>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 py-6 space-y-6 animate-fade-in">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 py-6 space-y-6 animate-fade-in lg:max-w-4xl lg:mx-auto lg:px-8 lg:py-7 lg:space-y-5">
         {existingQuote && (
           <div className="flex items-start gap-3 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4">
             <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
@@ -302,7 +302,7 @@ export default function EditDealPage() {
             {dealType === "Creator" ? "Brand Details" : "Client Details"}
           </h2>
 
-          <div className="space-y-4">
+          <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-x-5 lg:gap-y-4 lg:space-y-0">
             <div className="space-y-2">
               <Label htmlFor="brandName">{L.who}</Label>
               <Input

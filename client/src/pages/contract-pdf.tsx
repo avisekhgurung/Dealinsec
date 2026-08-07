@@ -87,7 +87,7 @@ export default function ContractPdfPage() {
             <Button variant="ghost" size="icon" onClick={() => setLocation(contractsPath)} data-testid="button-back">
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-xl font-bold">Agreement Not Found</h1>
+            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Agreement Not Found</h1>
           </div>
         </header>
       </div>
@@ -105,7 +105,7 @@ export default function ContractPdfPage() {
               <Button variant="ghost" size="icon" onClick={() => setLocation(backPath)} data-testid="button-back">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              <h1 className="text-xl font-bold">Agreement Document</h1>
+              <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Agreement Document</h1>
             </div>
             <Button onClick={handlePrint} className="gradient-btn text-white" data-testid="button-export-pdf">
               <Printer className="w-4 h-4 mr-2" />

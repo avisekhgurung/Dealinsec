@@ -29,7 +29,7 @@ export default function BrandBillingPage() {
               <ArrowLeft className="w-5 h-5" />
             </button>
           </Link>
-          <h1 className="text-xl font-bold">Billing</h1>
+          <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Billing</h1>
         </div>
       </header>
 

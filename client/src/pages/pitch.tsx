@@ -42,7 +42,7 @@ export default function PitchPage() {
       <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 print:bg-white">
         <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border print:hidden">
           <div className="flex items-center justify-between gap-3 px-4 py-4 max-w-6xl mx-auto">
-            <h1 className="text-xl font-bold">DealInSec Pitch</h1>
+            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">DealInSec Pitch</h1>
             <Button onClick={handleExportPDF} data-testid="button-export-pdf">
               <Download className="w-4 h-4 mr-2" />
               Export PDF
