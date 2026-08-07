@@ -83,7 +83,7 @@ function toolsIndexPage(): string {
   <div class="hero"><div class="wrap">
     <span class="badge">🎁 100% Free · No sign-up · Instant download</span>
     <h1>Free tools for Indian<br /><span class="accent">service businesses</span></h1>
-    <p class="sub">Practical, no-sign-up tools for freelancers, agencies, consultants and service vendors — invoices, quotations and agreements, done in your browser.</p>
+    <p class="sub">Practical, no-sign-up tools for real estate consultants, interior designers, architects, agencies, contractors and every service business — invoices, quotations and agreements, done in your browser.</p>
   </div></div>
 
   <section><div class="wrap">

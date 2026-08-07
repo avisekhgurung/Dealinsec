@@ -1492,6 +1492,67 @@ export const PROFESSION_SPECS: ProfessionSpec[] = [
       }
     ],
     "metaDescription": "Free voice-over artist invoice format for India with the correct GST SAC code (999631, 18%), sample line items with realistic rates, usage-rights billing, TDS guidance, and FAQs."
+  },
+  {
+    "slug": "construction-contractors",
+    "name": "Construction",
+    "who": "a construction contractor / works contractor",
+    "sacCode": "9954",
+    "sacDescription": "Construction services (works contract)",
+    "gstRate": 18,
+    "intro": "A construction contractor's invoice is really a works contract bill: GST treats the entire contract — material plus labour — as a single composite supply of construction services under SAC 9954 (995411 for residential buildings, 995414 for commercial, 995419 for renovation/repair work), taxed at a flat 18% with full input tax credit on your cement, steel, tiles and fittings. Because the place of supply for construction is where the site is located, charge CGST+SGST for a site in your own state and IGST when the site is in another state — regardless of where the client's office is registered. A proper construction invoice also carries the work order/agreement reference, RA bill number, gross value of work certified, deductions for mobilisation advance recovered and retention held, and the net amount payable, so your bill reconciles line-by-line with the client's or architect's certified measurements.",
+    "sampleItems": [
+      {
+        "desc": "Turnkey construction of residential building — material + labour, structure to finishes (built-up area)",
+        "unit": "per sq ft",
+        "typicalRate": 1850
+      },
+      {
+        "desc": "Brickwork in cement mortar 1:6, 230 mm thick walls, incl. bricks and scaffolding (BOQ item rate)",
+        "unit": "per cu m",
+        "typicalRate": 6500
+      },
+      {
+        "desc": "Internal cement plastering, 12 mm thick in CM 1:4, finished smooth",
+        "unit": "per sq ft",
+        "typicalRate": 42
+      },
+      {
+        "desc": "Vitrified tile flooring 600x600 mm, incl. tiles, adhesive and laying",
+        "unit": "per sq ft",
+        "typicalRate": 130
+      },
+      {
+        "desc": "Labour-only contract for civil structure work — all labour excl. materials",
+        "unit": "per sq ft",
+        "typicalRate": 300
+      },
+      {
+        "desc": "Bathroom renovation — demolition, waterproofing, tiling, plumbing and CP fittings installation",
+        "unit": "per bathroom",
+        "typicalRate": 85000
+      }
+    ],
+    "paymentNorm": "Construction billing runs on a mobilisation advance (typically 5-10% of contract value) followed by stage payments claimed through RA (running account) bills tied to milestones — plinth, slab castings, brickwork, finishes — with the client usually holding 5-10% retention from each bill, released only after the defect liability period (commonly 6-12 months after handover).",
+    "faq": [
+      {
+        "q": "How do I raise RA (running account) bills under GST?",
+        "a": "Construction is a 'continuous supply of services' under GST, so every RA bill must be a proper tax invoice, not just a measurement statement. Number them sequentially against the same work order (RA-01, RA-02...), show cumulative value of work done, less previous RA bills, less mobilisation advance recovered and retention held, to arrive at the net payable — and charge 18% GST on the value of work certified in that bill. Where the contract fixes payment due dates or milestones, the invoice must be issued on or before that due date or milestone completion; GST is also payable on any advance in the month you receive it, against a receipt voucher."
+      },
+      {
+        "q": "My client holds 5-10% retention money on every bill — do I pay GST on it now or when it is released?",
+        "a": "You pay GST now. Tax is due on the full certified value of each RA bill including the retention portion, because retention is only a delayed payment, not a reduction in taxable value. When the retention is released after the defect liability period, no fresh invoice or GST arises. If the client permanently deducts part of the retention for defects or liquidated damages, issue a GST credit note for that amount to reduce your tax liability. Show 'retention held' as a deduction below the taxable value on the invoice — never reduce the GST base by it."
+      },
+      {
+        "q": "Do I charge GST separately on materials (cement, steel) and labour?",
+        "a": "No. A works contract is a composite supply taxed as a service — one 18% rate on the entire bill value, whatever the material-to-labour split, and you claim input tax credit on cement, steel, tiles and fittings you purchase. The quirks: pure labour contracts for constructing a single residential unit (not part of a complex) and pure labour work under PMAY are fully exempt, while other pure labour contracts are 18%. Government works contracts enjoyed 12% only until 18 July 2022 — since 22 September 2025 the 12% slab has been scrapped altogether, so effectively all works contracts are 18% today. Also note the regular 1% composition scheme is not available for works contract services; contractors under Rs. 50 lakh turnover can opt for the 6% service-composition scheme, but then cannot charge GST on invoices or claim ITC."
+      },
+      {
+        "q": "How does TDS under Section 194C affect my contractor payments?",
+        "a": "Business clients — companies, firms, and individuals/HUFs covered by tax audit — must deduct TDS under Section 194C when a single bill exceeds Rs. 30,000 or annual payments exceed Rs. 1,00,000: 1% if you bill as an individual/HUF, 2% if as a firm or company. TDS is deducted on the taxable value excluding GST, provided GST is shown separately on the invoice (CBDT Circular 23/2017) — one more reason to always break out GST as a separate line. On government/PSU contracts above Rs. 2.5 lakh, a separate GST-TDS of 2% is also deducted, which flows to your GST cash ledger and can be used to pay your output tax."
+      }
+    ],
+    "metaDescription": "Construction invoice format for India: SAC 9954, 18% GST on works contracts, RA bills, retention money, TDS 194C, plus realistic turnkey, BOQ and labour-rate line items."
   }
 ];
 

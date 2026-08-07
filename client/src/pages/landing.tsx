@@ -1212,6 +1212,27 @@ function FreeToolsSection() {
             See all free tools <ArrowRight className="w-4 h-4" />
           </a>
         </div>
+
+        {/* Sector bridge: invoice-format guides for the Phase-1 ICP (also
+            internal links that help Google connect the landing to the SEO pages) */}
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-x-2 gap-y-2 text-xs text-neutral-500">
+          <span className="font-semibold uppercase tracking-wider text-[10px]">Invoice formats for your sector:</span>
+          {[
+            { label: "Real Estate", href: "/tools/invoice-format/for-real-estate-agents" },
+            { label: "Interior Design", href: "/tools/invoice-format/for-interior-designers" },
+            { label: "Architecture", href: "/tools/invoice-format/for-architects" },
+            { label: "Agencies", href: "/tools/invoice-format/for-digital-marketing-agencies" },
+            { label: "Construction", href: "/tools/invoice-format/for-construction-contractors" },
+          ].map((s) => (
+            <a
+              key={s.href}
+              href={s.href}
+              className="px-2.5 py-1 rounded-full border border-neutral-200 dark:border-neutral-800 hover:border-emerald-300 dark:hover:border-emerald-700 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
+            >
+              {s.label}
+            </a>
+          ))}
+        </div>
       </div>
     </section>
   );
