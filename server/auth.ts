@@ -8,6 +8,13 @@ import { sendEmail, welcomeEmail } from "./emails";
 
 const SALT_ROUNDS = 10;
 
+export function generateOrgSlug(base: string): string {
+  return (
+    base.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) +
+    "-" + crypto.randomBytes(3).toString("hex")
+  );
+}
+
 function generateReferralCode(email: string): string {
   const prefix = email.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, "X");
   const suffix = crypto.randomBytes(3).toString("hex").substring(0, 5).toUpperCase();
@@ -64,8 +71,12 @@ export async function setupAuth(app: Express) {
 
       const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
-      // New-model signup: column defaults grant 4 monthly Deal Credits and 0
-      // purchased — no explicit credit grant needed.
+      // Every account belongs to an organization: signup creates one and the
+      // user becomes its OWNER. Column defaults grant the org's 4 monthly Deal
+      // Credits (billing lives on the owner's row).
+      const orgBase = (firstName || email.split("@")[0] || "My").trim();
+      const org = await storage.createOrganization(`${orgBase}'s Workspace`, generateOrgSlug(orgBase));
+
       const user = await storage.createUser({
         email,
         password: hashedPassword,
@@ -74,7 +85,11 @@ export async function setupAuth(app: Express) {
         role: "influencer",
         onboardingComplete: false,
         referralCode: generateReferralCode(email),
-      });
+        organizationId: org.id,
+        orgRole: "OWNER",
+        memberStatus: "active",
+        joinedAt: new Date(),
+      } as any);
 
       (req.session as any).userId = user.id;
 
@@ -141,6 +156,11 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = await storage.getUser(userId);
   if (!user) {
     return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  // Members removed from their organization lose access immediately.
+  if ((user as any).memberStatus === "removed") {
+    return res.status(401).json({ message: "Your access to this organization was removed" });
   }
 
   (req as any).user = user;

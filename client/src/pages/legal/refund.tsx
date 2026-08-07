@@ -72,11 +72,11 @@ export default function RefundPolicy() {
           <li>Process a full refund to your original payment method within 5–7 business days.</li>
         </ul>
 
-        <h2>3. Free Monthly Deal Credits</h2>
+        <h2>3. Free Plan Allowance</h2>
         <p>
-          The free plan's 4 monthly Deal Credits (and any bonus credits) are
-          granted at no charge, are non-refundable, have no monetary value, and cannot be
-          exchanged for cash. Unused monthly credits do not roll over.
+          The free plan's monthly allowance of 4 deals is granted at no charge, is
+          non-refundable, has no monetary value, and cannot be exchanged for cash.
+          Unused monthly allowance does not roll over.
         </p>
 
         <h2>4. How to Request a Refund</h2>

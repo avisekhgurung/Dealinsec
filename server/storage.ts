@@ -2,6 +2,7 @@ import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
 import {
   users, deals, contracts, invoices, brandInvoices, invoiceAttachments, creditTransactions, payuOrders, quotes, referrals,
+  organizations, invitations, activityLogs,
   type User, type UpsertUser,
   type Deal, type InsertDeal,
   type Contract, type InsertContract,
@@ -11,7 +12,9 @@ import {
   type CreditTransaction, type InsertCreditTransaction,
   type PayuOrder, type InsertPayuOrder,
   type Quote, type InsertQuote,
-  type Referral, type InsertReferral
+  type Referral, type InsertReferral,
+  type Organization, type Invitation, type InsertInvitation,
+  type ActivityLog, type InsertActivityLog
 } from "@shared/schema";
 
 export interface IStorage {
@@ -79,10 +82,31 @@ export interface IStorage {
   updateQuote(id: number, updates: Partial<Quote>): Promise<Quote | undefined>;
 
   getBrandInvoicesByDealId(dealId: number): Promise<BrandInvoice[]>;
+  getBrandInvoicesByDealIdForOrg(dealId: number, orgId: string, userId?: string): Promise<BrandInvoice[]>;
 
   getUserByReferralCode(code: string): Promise<User | undefined>;
   createReferral(data: InsertReferral): Promise<Referral>;
   getReferralsByUser(userId: string): Promise<Referral[]>;
+
+  // ── Organizations, team, invitations, activity ──
+  createOrganization(name: string, slug: string): Promise<Organization>;
+  getOrganization(id: string): Promise<Organization | undefined>;
+  updateOrganization(id: string, updates: Partial<Organization>): Promise<Organization | undefined>;
+  getOrgMembers(orgId: string): Promise<User[]>;
+  getOrgOwner(orgId: string): Promise<User | undefined>;
+  countActiveMembers(orgId: string): Promise<number>;
+  getDealsByOrg(orgId: string, userId?: string): Promise<Deal[]>;
+  getContractsByOrg(orgId: string, userId?: string): Promise<Contract[]>;
+  getInvoicesByOrg(orgId: string, userId?: string): Promise<Invoice[]>;
+  getBrandInvoicesByOrg(orgId: string, userId?: string): Promise<BrandInvoice[]>;
+  createInvitation(data: InsertInvitation): Promise<Invitation>;
+  getInvitationByToken(token: string): Promise<Invitation | undefined>;
+  getPendingInvitations(orgId: string): Promise<Invitation[]>;
+  updateInvitation(id: number, updates: Partial<Invitation>): Promise<Invitation | undefined>;
+  logActivity(entry: InsertActivityLog): Promise<void>;
+  getActivityLogs(orgId: string, limit?: number): Promise<ActivityLog[]>;
+  activateExtraSeats(orgId: string, qty: number, days: number): Promise<Organization | undefined>;
+  revokeExtraSeats(orgId: string, qty: number): Promise<Organization | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -495,6 +519,14 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async getBrandInvoicesByDealIdForOrg(dealId: number, orgId: string, userId?: string): Promise<BrandInvoice[]> {
+    // Deal-scoped read, still fenced by organization so a row planted with
+    // another org's dealId can never surface in this org's deal view.
+    return db.select().from(brandInvoices).where(
+      sql`${brandInvoices.dealId} = ${dealId} AND (${brandInvoices.organizationId} = ${orgId} OR (${brandInvoices.organizationId} IS NULL AND ${brandInvoices.userId} = ${userId ?? null}))`,
+    );
+  }
+
   async getBrandInvoicesByDealId(dealId: number): Promise<BrandInvoice[]> {
     return db.select().from(brandInvoices).where(eq(brandInvoices.dealId, dealId));
   }
@@ -513,7 +545,146 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(referrals).where(eq(referrals.referrerId, userId)).orderBy(desc(referrals.createdAt));
   }
 
-  // ── Documents saved from the public free tools ──
+  // ── Organizations, team, invitations, activity ──
+
+  async createOrganization(name: string, slug: string): Promise<Organization> {
+    const [org] = await db.insert(organizations).values({ name, slug }).returning();
+    return org;
+  }
+
+  async getOrganization(id: string): Promise<Organization | undefined> {
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, id));
+    return org;
+  }
+
+  async updateOrganization(id: string, updates: Partial<Organization>): Promise<Organization | undefined> {
+    const [org] = await db.update(organizations)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(organizations.id, id))
+      .returning();
+    return org;
+  }
+
+  async getOrgMembers(orgId: string): Promise<User[]> {
+    return db.select().from(users)
+      .where(sql`${users.organizationId} = ${orgId} AND ${users.memberStatus} = 'active'`)
+      .orderBy(users.joinedAt);
+  }
+
+  async getOrgOwner(orgId: string): Promise<User | undefined> {
+    const [owner] = await db.select().from(users)
+      .where(sql`${users.organizationId} = ${orgId} AND ${users.orgRole} = 'OWNER' AND ${users.memberStatus} = 'active'`)
+      .limit(1);
+    return owner;
+  }
+
+  async countActiveMembers(orgId: string): Promise<number> {
+    const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(users)
+      .where(sql`${users.organizationId} = ${orgId} AND ${users.memberStatus} = 'active'`);
+    return row?.n ?? 0;
+  }
+
+  // Org lists mirror the routes' inOrg() rule exactly: rows belonging to the
+  // organization, PLUS the caller's own rows that predate the org migration
+  // (organization_id IS NULL) — otherwise a legacy row stays reachable by its
+  // detail route but silently vanishes from every list.
+  async getDealsByOrg(orgId: string, userId?: string): Promise<Deal[]> {
+    return db.select().from(deals).where(
+      sql`${deals.organizationId} = ${orgId} OR (${deals.organizationId} IS NULL AND ${deals.userId} = ${userId ?? null})`,
+    );
+  }
+
+  async getContractsByOrg(orgId: string, userId?: string): Promise<Contract[]> {
+    return db.select().from(contracts).where(
+      sql`${contracts.organizationId} = ${orgId} OR (${contracts.organizationId} IS NULL AND ${contracts.userId} = ${userId ?? null})`,
+    );
+  }
+
+  async getInvoicesByOrg(orgId: string, userId?: string): Promise<Invoice[]> {
+    return db.select().from(invoices).where(
+      sql`${invoices.organizationId} = ${orgId} OR (${invoices.organizationId} IS NULL AND ${invoices.userId} = ${userId ?? null})`,
+    );
+  }
+
+  async getBrandInvoicesByOrg(orgId: string, userId?: string): Promise<BrandInvoice[]> {
+    return db.select().from(brandInvoices).where(
+      sql`${brandInvoices.organizationId} = ${orgId} OR (${brandInvoices.organizationId} IS NULL AND ${brandInvoices.userId} = ${userId ?? null})`,
+    ).orderBy(desc(brandInvoices.id));
+  }
+
+  async createInvitation(data: InsertInvitation): Promise<Invitation> {
+    const [inv] = await db.insert(invitations).values(data as any).returning();
+    return inv;
+  }
+
+  async getInvitationByToken(token: string): Promise<Invitation | undefined> {
+    const [inv] = await db.select().from(invitations).where(eq(invitations.token, token));
+    return inv;
+  }
+
+  async getPendingInvitations(orgId: string): Promise<Invitation[]> {
+    // Only LIVE invitations: an expired one can no longer be accepted, so it
+    // must not keep occupying a seat in the limit check (nor clutter the UI).
+    return db.select().from(invitations)
+      .where(sql`${invitations.organizationId} = ${orgId} AND ${invitations.status} = 'pending' AND ${invitations.expiresAt} > now()`)
+      .orderBy(desc(invitations.createdAt));
+  }
+
+  async updateInvitation(id: number, updates: Partial<Invitation>): Promise<Invitation | undefined> {
+    const [inv] = await db.update(invitations).set(updates).where(eq(invitations.id, id)).returning();
+    return inv;
+  }
+
+  async logActivity(entry: InsertActivityLog): Promise<void> {
+    // Best-effort audit trail — never let a logging failure break the action.
+    try {
+      await db.insert(activityLogs).values(entry as any);
+    } catch (err) {
+      console.error("activity log failed:", err);
+    }
+  }
+
+  async getActivityLogs(orgId: string, limit = 50): Promise<ActivityLog[]> {
+    return db.select().from(activityLogs)
+      .where(eq(activityLogs.organizationId, orgId))
+      .orderBy(desc(activityLogs.createdAt))
+      .limit(limit);
+  }
+
+  async activateExtraSeats(orgId: string, qty: number, days: number): Promise<Organization | undefined> {
+    // Seat pack: if the current pack lapsed, the new purchase REPLACES it;
+    // if still active, the qty adds on and shares the existing expiry
+    // (the whole pack renews together). Atomic in SQL like the plan grants.
+    const [org] = await db.update(organizations)
+      .set({
+        extraSeats: sql`CASE
+          WHEN ${organizations.extraSeatsExpiresAt} IS NULL OR ${organizations.extraSeatsExpiresAt} <= now()
+            THEN ${qty}
+          ELSE ${organizations.extraSeats} + ${qty}
+        END`,
+        extraSeatsExpiresAt: sql`CASE
+          WHEN ${organizations.extraSeatsExpiresAt} IS NULL OR ${organizations.extraSeatsExpiresAt} <= now()
+            THEN now() + make_interval(days => ${days})
+          ELSE ${organizations.extraSeatsExpiresAt}
+        END`,
+        updatedAt: new Date(),
+      })
+      .where(eq(organizations.id, orgId))
+      .returning();
+    return org;
+  }
+
+  async revokeExtraSeats(orgId: string, qty: number): Promise<Organization | undefined> {
+    // Refund clawback — never below zero.
+    const [org] = await db.update(organizations)
+      .set({
+        extraSeats: sql`GREATEST(${organizations.extraSeats} - ${qty}, 0)`,
+        updatedAt: new Date(),
+      })
+      .where(eq(organizations.id, orgId))
+      .returning();
+    return org;
+  }
 }
 
 export const storage = new DatabaseStorage();

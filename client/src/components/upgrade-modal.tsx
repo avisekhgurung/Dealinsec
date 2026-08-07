@@ -45,7 +45,7 @@ export function useUpgradeModal(): UpgradeModalContextValue {
 }
 
 const FEATURE_COPY: Record<UpgradeFeature, string> = {
-  deals: "You've used all 4 free Deal Credits for this month.",
+  deals: "Your free plan covers 4 deals a month — you've used them all.",
   agreements: "Creating signed agreements is a Pro feature.",
   invoices: "Generating invoices is a Pro feature.",
   payment_tracking: "Payment tracking is a Pro feature.",
@@ -72,7 +72,7 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // The boost only lifts the deal/quotation limit — for Pro-only features it
-  // would be a dead-end purchase, so it's only offered on the credits path.
+  // would be a dead-end purchase, so it's only offered on the deal-limit path.
   const boostApplies = feature === "deals";
 
   const buyBoost = () =>

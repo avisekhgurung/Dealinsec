@@ -152,6 +152,28 @@ function infoCard(rows: string): string {
 // Templates
 // ───────────────────────────────────────────────────────────────────────
 
+export function inviteEmail(args: {
+  orgName: string;
+  inviterName: string;
+  roleLabel: string;
+  token: string;
+}): { subject: string; html: string } {
+  const acceptUrl = `${appUrl()}/invite/${args.token}`;
+  const subject = `You've been invited to join ${args.orgName} on DealInSec`;
+  const html = layout({
+    preview: `${args.inviterName} invited you to join ${args.orgName} as ${args.roleLabel}.`,
+    bodyHtml: `
+      ${heading(`Join ${args.orgName} on DealInSec`)}
+      ${para(`<strong>${args.inviterName}</strong> has invited you to join <strong>${args.orgName}</strong> as <strong>${args.roleLabel}</strong>.`)}
+      ${para("DealInSec is where the team runs its deals — quotations, e-signed agreements, GST invoices and payment tracking in one workflow.")}
+      ${button("Accept Invitation", acceptUrl)}
+      ${para("You'll set a password and land right inside the organization. This invitation expires in 7 days.")}
+      ${para("Didn't expect this? You can safely ignore this email.")}
+    `,
+  });
+  return { subject, html };
+}
+
 export function welcomeEmail(args: { firstName?: string }): { subject: string; html: string } {
   const name = args.firstName ? `, ${args.firstName}` : "";
   const subject = "Welcome to DealInSec — your free plan is ready 🎉";

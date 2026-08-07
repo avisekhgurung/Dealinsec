@@ -177,7 +177,7 @@ const FAQS = [
   },
   {
     q: "Is Dealinsec free to use?",
-    a: "Yes — the free plan includes 4 Deal Credits every month, and each credit covers creating a deal plus its quotation. Signed agreements, invoices and payment tracking are part of DealInSec Pro (₹999/month or ₹9,999/year). There are no platform fees on your deal value.",
+    a: "Yes — the free plan covers 4 deals every month, each with a professional quotation. Signed agreements, invoices and payment tracking are part of DealInSec Pro (₹999/month or ₹9,999/year). There are no platform fees on your deal value.",
   },
   {
     q: "Do agreements generated here hold up legally?",
@@ -388,7 +388,7 @@ export default function LandingPage() {
                 {authTab === "signup" ? "Create your account" : "Welcome back"}
               </h2>
               <p className="text-sm text-neutral-500 mt-1">
-                {authTab === "signup" ? "No credit card. 4 free Deal Credits every month." : "Sign in to continue"}
+                {authTab === "signup" ? "No credit card. 4 free deals every month." : "Sign in to continue"}
               </p>
             </div>
 
@@ -822,7 +822,7 @@ function Hero({
 
             <motion.div variants={heroFadeUp} className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 pt-3 text-xs text-neutral-500">
               <span className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500" /> 4 free Deal Credits every month
+                <Check className="w-3.5 h-3.5 text-emerald-500" /> 4 free deals every month
               </span>
               <span className="flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5 text-emerald-500" /> ₹0 platform fee
@@ -1672,8 +1672,8 @@ function MadeInIndiaSection() {
 
 function PricingPreview({ onCTA }: { onCTA: () => void }) {
   const freePerks = [
-    "4 Deal Credits every month",
-    "1 credit = 1 deal + its quotation",
+    "4 deals every month",
+    "A professional quotation with each deal",
     "Dashboard & payment overview",
     "Professional quotation PDFs",
   ];
@@ -1697,7 +1697,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
         <SectionHeader
           eyebrow="Simple pricing"
           title="Start free. Upgrade for the full workflow."
-          subtitle="Start free with 4 Deal Credits every month. Go Pro for unlimited deals, quotations, agreements, invoices and payment tracking."
+          subtitle="Start free with 4 deals every month. Go Pro for unlimited deals, quotations, agreements, invoices and payment tracking."
         />
 
         <motion.div
@@ -1737,7 +1737,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
             >
               Start free
             </Button>
-            <p className="text-[11px] text-neutral-500 text-center mt-3">Credits reset every month. No credit card needed.</p>
+            <p className="text-[11px] text-neutral-500 text-center mt-3">Resets every month. No credit card needed.</p>
           </motion.div>
 
           {/* Pro Monthly — recommended */}

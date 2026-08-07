@@ -93,6 +93,12 @@ export const users = pgTable("users", {
   // Never unlocks Pro features (agreements/invoices/payment tracking).
   dealBoostExpiresAt: timestamp("deal_boost_expires_at"),
   referralCode: varchar("referral_code").unique(),
+  // ── Organization membership (single org per user) ──
+  organizationId: varchar("organization_id"),
+  orgRole: varchar("org_role").notNull().default("OWNER"), // OWNER | ADMIN | SALES | ACCOUNTS
+  memberStatus: varchar("member_status").notNull().default("active"), // active | removed
+  invitedBy: varchar("invited_by"),
+  joinedAt: timestamp("joined_at"),
   role: varchar("role").notNull().default("influencer"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -100,6 +106,62 @@ export const users = pgTable("users", {
 
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+// ───────────────────────────────────────────────────────────────────────
+// Organizations — every account belongs to one. All business data (deals,
+// quotations, agreements, invoices) is owned by the organization; users are
+// members with a role. Billing deliberately stays on the OWNER's user row
+// (plan/planTerm/planExpiresAt/credits) so the hardened payment paths are
+// untouched — the org resolves its entitlements through its owner.
+// ───────────────────────────────────────────────────────────────────────
+
+export const organizations = pgTable("organizations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  slug: varchar("slug").unique(),
+  logo: varchar("logo"),
+  industry: varchar("industry"),
+  // Extra seats purchased beyond the plan's included seats (₹199/seat/month).
+  // One shared expiry: rebuying resets the pack. Included seats are derived
+  // from the owner's plan (free = 1, Pro = 5) via getSeatLimit().
+  extraSeats: integer("extra_seats").notNull().default(0),
+  extraSeatsExpiresAt: timestamp("extra_seats_expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type Organization = typeof organizations.$inferSelect;
+export type InsertOrganization = typeof organizations.$inferInsert;
+
+export const invitations = pgTable("invitations", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  email: varchar("email").notNull(),
+  orgRole: varchar("org_role").notNull().default("SALES"),
+  token: varchar("token").notNull().unique(),
+  invitedBy: varchar("invited_by").references(() => users.id),
+  status: varchar("status").notNull().default("pending"), // pending | accepted | revoked
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type Invitation = typeof invitations.$inferSelect;
+export type InsertInvitation = typeof invitations.$inferInsert;
+
+export const activityLogs = pgTable("activity_logs", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  userId: varchar("user_id").references(() => users.id),
+  userName: varchar("user_name"),
+  action: varchar("action").notNull(),       // e.g. "created", "updated", "removed"
+  entityType: varchar("entity_type").notNull(), // "deal" | "quotation" | "agreement" | "invoice" | "member" | ...
+  entityId: varchar("entity_id"),
+  detail: varchar("detail"),                 // human line, e.g. "Deal: Sharma Residence"
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type ActivityLog = typeof activityLogs.$inferSelect;
+export type InsertActivityLog = typeof activityLogs.$inferInsert;
 
 export const planOptions = ["free", "pro"] as const;
 export const planTermOptions = ["monthly", "yearly"] as const;
@@ -165,6 +227,7 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export const deals = pgTable("deals", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
+  organizationId: varchar("organization_id"),
   brandUserId: varchar("brand_user_id").references(() => users.id),
   brandName: text("brand_name").notNull(),
   dealTitle: text("deal_title").notNull(),
@@ -199,6 +262,7 @@ export type StandardTermId = typeof STANDARD_TERMS[number]["id"];
 export const contracts = pgTable("contracts", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
+  organizationId: varchar("organization_id"),
   dealId: integer("deal_id").notNull().references(() => deals.id),
   contractName: text("contract_name").notNull(),
   brandName: text("brand_name").notNull(),
@@ -218,6 +282,7 @@ export const contracts = pgTable("contracts", {
 export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
+  organizationId: varchar("organization_id"),
   invoiceNumber: text("invoice_number").notNull().unique(),
   invoiceDate: text("invoice_date").notNull(),
   contractId: integer("contract_id").notNull().references(() => contracts.id),
@@ -245,6 +310,7 @@ export type Invoice = typeof invoices.$inferSelect;
 export const brandInvoices = pgTable("brand_invoices", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
+  organizationId: varchar("organization_id"),
   invoiceNumber: text("invoice_number").notNull().unique(),
   invoiceDate: text("invoice_date").notNull(),
   dueDate: text("due_date"),
@@ -335,6 +401,7 @@ export type PayuOrder = typeof payuOrders.$inferSelect;
 export const quotes = pgTable("quotes", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
+  organizationId: varchar("organization_id"),
   dealId: integer("deal_id").notNull().references(() => deals.id),
   status: varchar("status").notNull().default("draft"),
   version: integer("version").notNull().default(1),

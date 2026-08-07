@@ -1,0 +1,96 @@
+/**
+ * Role-based access control for organizations.
+ *
+ * Permissions are DATA, not code: a role is just a named set of permission
+ * strings, so adding a future role (Project Manager, Viewer, HR, custom) is
+ * one entry in ROLE_PERMISSIONS — no route changes needed.
+ *
+ * Reads are org-scoped for every active member (everyone in the org can SEE
+ * the org's deals/quotes/agreements/invoices). Permissions gate WRITES and
+ * sensitive areas, matching the product spec:
+ *   OWNER    — everything, incl. billing and org deletion
+ *   ADMIN    — all business operations + team, but no billing / org deletion
+ *   SALES    — deals, quotations, clients
+ *   ACCOUNTS — invoices, payments; views agreements
+ *
+ * Shared by server middleware (requireOrgPermission) and client UI (hide
+ * buttons the member can't use — the server remains the authority).
+ */
+
+export const orgRoleOptions = ["OWNER", "ADMIN", "SALES", "ACCOUNTS"] as const;
+export type OrgRole = (typeof orgRoleOptions)[number];
+
+export type Permission =
+  | "deals.create"
+  | "deals.edit"
+  | "quotations.create"
+  | "clients.manage"
+  | "agreements.create"
+  | "invoices.create"
+  | "payments.manage"
+  | "team.invite"
+  | "team.manage"      // change roles, remove members
+  | "org.settings"     // edit org profile
+  | "org.delete"
+  | "billing.manage"   // subscription, seats, purchases
+  | "activity.view";
+
+const ALL: Permission[] = [
+  "deals.create", "deals.edit", "quotations.create", "clients.manage",
+  "agreements.create", "invoices.create", "payments.manage",
+  "team.invite", "team.manage", "org.settings", "org.delete",
+  "billing.manage", "activity.view",
+];
+
+export const ROLE_PERMISSIONS: Record<OrgRole, Permission[]> = {
+  OWNER: ALL,
+  ADMIN: [
+    "deals.create", "deals.edit", "quotations.create", "clients.manage",
+    "agreements.create", "invoices.create", "payments.manage",
+    "team.invite", "team.manage", "org.settings", "activity.view",
+  ],
+  SALES: [
+    "deals.create", "deals.edit", "quotations.create", "clients.manage",
+  ],
+  ACCOUNTS: [
+    "invoices.create", "payments.manage",
+  ],
+};
+
+export function hasPermission(role: string | null | undefined, permission: Permission): boolean {
+  if (!role) return false;
+  const perms = ROLE_PERMISSIONS[role as OrgRole];
+  return !!perms && perms.includes(permission);
+}
+
+/** Human labels for the team UI. */
+export const ROLE_META: Record<OrgRole, { label: string; description: string }> = {
+  OWNER: { label: "Owner", description: "Full access — billing, team, settings, everything." },
+  ADMIN: { label: "Admin", description: "Runs the business + team. No billing or org deletion." },
+  SALES: { label: "Sales", description: "Creates and edits deals, quotations and clients." },
+  ACCOUNTS: { label: "Accounts", description: "Generates invoices and manages payments." },
+};
+
+/** Roles an inviter may assign (nobody invites a second OWNER). */
+export const INVITABLE_ROLES: OrgRole[] = ["ADMIN", "SALES", "ACCOUNTS"];
+
+// ── Seats ──────────────────────────────────────────────────────────────
+// Free plan: 1 user. Pro (monthly or annual): 5 included. Extra seats are
+// purchased (₹199/seat/month) and live on the organization with one shared
+// expiry. `owner` is the org owner's user row (billing lives there).
+
+export const PRO_INCLUDED_SEATS = 5;
+
+export function getSeatLimit(
+  owner: { plan?: string | null; planExpiresAt?: Date | string | null } | null | undefined,
+  org?: { extraSeats?: number | null; extraSeatsExpiresAt?: Date | string | null } | null,
+): number {
+  const proActive = !!owner && owner.plan === "pro" && !!owner.planExpiresAt &&
+    new Date(owner.planExpiresAt).getTime() > Date.now();
+  let seats = proActive ? PRO_INCLUDED_SEATS : 1;
+  if (org?.extraSeats && org.extraSeatsExpiresAt &&
+      new Date(org.extraSeatsExpiresAt).getTime() > Date.now()) {
+    seats += org.extraSeats;
+  }
+  return seats;
+}

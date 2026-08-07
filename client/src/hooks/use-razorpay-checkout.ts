@@ -35,7 +35,7 @@ function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
-export type CheckoutPlan = "pro_monthly" | "pro_yearly" | "deal_boost";
+export type CheckoutPlan = "pro_monthly" | "pro_yearly" | "deal_boost" | "extra_seat";
 
 export interface CheckoutCallbacks {
   onSuccess?: () => void;
@@ -51,7 +51,7 @@ export function useRazorpayCheckout() {
   const [isLoading, setIsLoading] = useState(false);
   const [activePlan, setActivePlan] = useState<CheckoutPlan | null>(null);
 
-  const checkout = useCallback(async (plan: CheckoutPlan, cbs: CheckoutCallbacks = {}) => {
+  const checkout = useCallback(async (plan: CheckoutPlan, cbs: CheckoutCallbacks = {}, extraBody: Record<string, unknown> = {}) => {
     setActivePlan(plan);
     setIsLoading(true);
     try {
@@ -63,7 +63,7 @@ export function useRazorpayCheckout() {
       const res = await fetch("/api/payments/razorpay/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, ...extraBody }),
         credentials: "include",
       });
       if (!res.ok) {

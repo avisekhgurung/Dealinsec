@@ -5,7 +5,8 @@ import { insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesT
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./auth";
-import { requirePro } from "./entitlements";
+import { requirePro, requireOrgPermission, withOrg, getBillingUser, logOrgActivity } from "./entitlements";
+import { getSeatLimit, INVITABLE_ROLES, hasPermission as hasOrgPermission, orgRoleOptions } from "@shared/permissions";
 import { aiEnabled, reserve, refund, extractInvoice } from "./ai";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import multer from "multer";
@@ -19,9 +20,11 @@ import {
   getProMonthlyPrice,
   getProYearlyPrice,
   getDealBoostPrice,
+  getExtraSeatPrice,
   PRO_MONTHLY_DAYS,
   PRO_YEARLY_DAYS,
   DEAL_BOOST_DAYS,
+  EXTRA_SEAT_DAYS,
   createRazorpayOrder,
   verifyPaymentSignature,
   verifyWebhookSignature,
@@ -32,6 +35,7 @@ import {
   proPlanReceiptEmail,
   contractSignedEmail,
   paymentReceivedEmail,
+  inviteEmail,
 } from "./emails";
 
 // Deliver what a completed payment order bought. Shared by the browser verify
@@ -41,6 +45,7 @@ import {
 type GrantResult =
   | { kind: "pro"; term: "monthly" | "yearly"; user?: import("@shared/schema").User }
   | { kind: "boost"; user?: import("@shared/schema").User }
+  | { kind: "seats"; qty: number }
   | { kind: "credits" };
 
 async function grantPurchase(
@@ -61,6 +66,18 @@ async function grantPurchase(
     case "deal_boost": {
       const user = await storage.activateDealBoost(userId, DEAL_BOOST_DAYS);
       return { kind: "boost", user };
+    }
+    case "extra_seat": {
+      const buyer = await storage.getUser(userId);
+      const qty = Math.max(1, legacyOrder?.credits ?? 1);
+      if (!buyer?.organizationId) {
+        // Paid-but-undeliverable: throw so the caller reopens the order claim
+        // and a retry (or the webhook) can deliver once the org exists —
+        // never silently pocket the money.
+        throw new Error(`extra_seat grant: user ${userId} has no organization`);
+      }
+      await storage.activateExtraSeats(buyer.organizationId, qty, EXTRA_SEAT_DAYS);
+      return { kind: "seats", qty };
     }
     default: { // legacy "credits" orders in flight at deploy time
       if (legacyOrder && legacyOrder.credits > 0) {
@@ -109,12 +126,27 @@ const upload = multer({
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
 
+  // Org-scoped access check: a resource is visible to every active member of
+  // its organization. Rows created before the org migration (or by an old
+  // build during a deploy) may lack organization_id — fall back to creator.
+  const inOrg = (
+    resource: { organizationId?: string | null; userId?: string | null } | null | undefined,
+    user: any,
+  ): boolean => {
+    if (!resource) return false;
+    if (resource.organizationId) return resource.organizationId === user.organizationId;
+    return resource.userId === user.id;
+  };
+
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      // Lazy monthly credit reset: every page load hits this endpoint, so the
-      // displayed Deal Credit balance is always current without any cron.
-      const refreshed = await storage.ensureMonthlyCredits(req.user.id);
-      const { password: _, ...userWithoutPassword } = refreshed ?? req.user;
+      // Lazy monthly credit reset on the ORG's billing pool (the owner's row):
+      // every page load hits this endpoint, so the balance stays current
+      // without any cron — whichever member shows up first triggers it.
+      const billing = await getBillingUser(req.user);
+      const refreshedBilling = await storage.ensureMonthlyCredits(billing.id);
+      const me = billing.id === req.user.id ? (refreshedBilling ?? req.user) : req.user;
+      const { password: _, ...userWithoutPassword } = me;
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Error fetching user:", error);
@@ -142,7 +174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/deals", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const deals = await storage.getDeals(userId);
+      const deals = await storage.getDealsByOrg(req.user.organizationId, req.user.id);
       res.json(deals);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch deals" });
@@ -156,9 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!deal) {
         return res.status(404).json({ error: "Deal not found" });
       }
-      const isOwner = deal.userId === userId;
-      const isBrandUser = deal.brandUserId === userId;
-      if (!isOwner && !isBrandUser) {
+      if (!inOrg(deal, req.user) && deal.brandUserId !== userId) {
         return res.status(403).json({ error: "Access denied" });
       }
       res.json(deal);
@@ -167,32 +197,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/deals", isAuthenticated, async (req: any, res) => {
+  app.post("/api/deals", isAuthenticated, requireOrgPermission("deals.create"), async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const parsed = insertDealSchema.safeParse({ ...req.body, userId });
+      const parsed = insertDealSchema.safeParse({
+        ...req.body,
+        userId,
+        organizationId: req.user.organizationId,
+      });
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors });
       }
 
-      // Free plan: 1 Deal Credit = this deal + its quotation. Pro and Deal
-      // Boost are unlimited. Spend happens AFTER validation so a 400 never
-      // burns a credit; the reset runs first so a stale month can't block.
+      // The ORG's plan and credit pool live on its OWNER's user row. Free
+      // plan: 1 Deal Credit = this deal + its quotation; Pro and Deal Boost
+      // are unlimited for every member. Spend happens AFTER validation so a
+      // 400 never burns a credit.
+      const billing = await getBillingUser(req.user);
       let creditSpent = false;
-      if (!hasActivePro(req.user) && !hasActiveDealBoost(req.user)) {
-        await storage.ensureMonthlyCredits(userId);
-        const spend = await storage.spendDealCredit(userId);
+      if (!hasActivePro(billing) && !hasActiveDealBoost(billing)) {
+        await storage.ensureMonthlyCredits(billing.id);
+        const spend = await storage.spendDealCredit(billing.id);
         if (!spend.ok) {
-          const user = await storage.getUser(userId);
-          const credits = getDealCredits(user);
+          const fresh = await storage.getUser(billing.id);
+          const credits = getDealCredits(fresh);
           return res.status(402).json({
             code: "NO_CREDITS",
             feature: "deals",
-            error: "You've used all your Deal Credits for this month",
+            error: "Your organization has used all its Deal Credits for this month",
             credits: {
               monthly: credits.monthly,
               purchased: credits.purchased,
-              resetsAt: user?.monthlyCreditsResetAt ?? null,
+              resetsAt: fresh?.monthlyCreditsResetAt ?? null,
             },
           });
         }
@@ -201,10 +237,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         const deal = await storage.createDeal(parsed.data);
+        logOrgActivity(req.user, "created", "deal", deal.id, `Deal: ${deal.dealTitle || deal.brandName}`);
         res.status(201).json(deal);
       } catch (insertError) {
         // Rare compensation path: the credit was taken but the insert failed.
-        if (creditSpent) await storage.regrantDealCredit(userId).catch(() => {});
+        if (creditSpent) await storage.regrantDealCredit(billing.id).catch(() => {});
         throw insertError;
       }
     } catch (error) {
@@ -214,12 +251,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Edit a deal (only Pending deals)
-  app.patch("/api/deals/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/deals/:id", isAuthenticated, requireOrgPermission("deals.edit"), async (req: any, res) => {
     try {
       const dealId = parseInt(req.params.id);
       const deal = await storage.getDeal(dealId);
       if (!deal) return res.status(404).json({ error: "Deal not found" });
-      if (deal.userId !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      if (!inOrg(deal, req.user)) return res.status(403).json({ error: "Not authorized" });
       if (deal.status !== "Pending") {
         return res.status(400).json({ error: "Only pending deals can be edited" });
       }
@@ -253,12 +290,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Generate or get quote for a deal (supports revision flow)
-  app.post("/api/deals/:id/quote", isAuthenticated, async (req: any, res) => {
+  app.post("/api/deals/:id/quote", isAuthenticated, requireOrgPermission("quotations.create"), async (req: any, res) => {
     try {
       const dealId = parseInt(req.params.id);
       const deal = await storage.getDeal(dealId);
       if (!deal) return res.status(404).json({ error: "Deal not found" });
-      if (deal.userId !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      if (!inOrg(deal, req.user)) return res.status(403).json({ error: "Not authorized" });
 
       const existing = await storage.getQuoteByDealId(dealId);
 
@@ -271,10 +308,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newVersion = existing ? (existing.version || 1) + 1 : 1;
       const quote = await storage.createQuote({
         userId: req.user.id,
+        organizationId: req.user.organizationId,
         dealId,
         status: "draft",
         version: newVersion,
       });
+      logOrgActivity(req.user, "generated", "quotation", quote.id, `Quotation for: ${deal.dealTitle || deal.brandName}`);
       res.status(201).json(quote);
     } catch (error) {
       res.status(500).json({ error: "Failed to create quote" });
@@ -286,7 +325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dealId = parseInt(req.params.id);
       const deal = await storage.getDeal(dealId);
       if (!deal) return res.status(404).json({ error: "Deal not found" });
-      if (deal.userId !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      if (!inOrg(deal, req.user)) return res.status(403).json({ error: "Not authorized" });
 
       const quote = await storage.getQuoteByDealId(dealId);
       if (!quote) return res.status(404).json({ error: "Quote not found" });
@@ -297,12 +336,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Mark deal as completed
-  app.patch("/api/deals/:id/complete", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/deals/:id/complete", isAuthenticated, requireOrgPermission("deals.edit"), async (req: any, res) => {
     try {
       const dealId = parseInt(req.params.id);
       const deal = await storage.getDeal(dealId);
       if (!deal) return res.status(404).json({ error: "Deal not found" });
-      if (deal.userId !== req.user.id && deal.brandUserId !== req.user.id) {
+      if (!inOrg(deal, req.user) && deal.brandUserId !== req.user.id) {
         return res.status(403).json({ error: "Not authorized" });
       }
       if (deal.status !== "Active") {
@@ -318,7 +357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/contracts", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const contracts = await storage.getContracts(userId);
+      const contracts = await storage.getContractsByOrg(req.user.organizationId, req.user.id);
       res.json(contracts);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch contracts" });
@@ -332,10 +371,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!contract) {
         return res.status(404).json({ error: "Contract not found" });
       }
-      const isOwner = contract.userId === userId;
       const deal = await storage.getDeal(contract.dealId);
-      const isBrandUser = deal?.brandUserId === userId;
-      if (!isOwner && !isBrandUser) {
+      if (!inOrg(contract, req.user) && deal?.brandUserId !== userId) {
         return res.status(403).json({ error: "Access denied" });
       }
       res.json(contract);
@@ -344,13 +381,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/contracts", isAuthenticated, requirePro("agreements"), async (req: any, res) => {
+  app.post("/api/contracts", isAuthenticated, requirePro("agreements"), requireOrgPermission("agreements.create"), async (req: any, res) => {
     try {
       const userId = req.user.id;
 
-      const parsed = insertContractSchema.safeParse({ ...req.body, userId });
+      const parsed = insertContractSchema.safeParse({
+        ...req.body,
+        userId,
+        organizationId: req.user.organizationId,
+      });
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors });
+      }
+
+      // The deal being contracted must belong to the caller's organization.
+      const parentDeal = await storage.getDeal(parsed.data.dealId);
+      if (!parentDeal || !inOrg(parentDeal, req.user)) {
+        return res.status(403).json({ error: "Not authorized" });
       }
 
       // One deal → one agreement. Guard against duplicates (e.g. the user hits
@@ -371,6 +418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         signedByInfluencerDate: new Date().toISOString(),
       };
       const contract = await storage.createContract(contractData);
+      logOrgActivity(req.user, "created", "agreement", contract.id, `Agreement: ${contract.brandName}`);
 
       await storage.updateDeal(contract.dealId, { status: "Active" });
 
@@ -392,13 +440,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/contracts/:id/proof", isAuthenticated, upload.single("proof"), async (req: any, res) => {
+  app.post("/api/contracts/:id/proof", isAuthenticated, requireOrgPermission("agreements.create"), upload.single("proof"), async (req: any, res) => {
     try {
       const contract = await storage.getContract(parseInt(req.params.id));
       if (!contract) {
         return res.status(404).json({ error: "Contract not found" });
       }
-      if (contract.userId !== req.user.id) {
+      if (!inOrg(contract, req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -438,7 +486,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const contract = await storage.getContract(parseInt(req.params.id));
       if (!contract) return res.status(404).json({ error: "Contract not found" });
-      if (contract.userId !== req.user.id) return res.status(403).json({ error: "Access denied" });
+      if (!inOrg(contract, req.user)) return res.status(403).json({ error: "Access denied" });
       if (!contract.proofFilePath) return res.status(404).json({ error: "No proof uploaded" });
 
       if (/^https?:\/\//.test(contract.proofFilePath)) {
@@ -454,7 +502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/invoices", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const invoices = await storage.getInvoices(userId);
+      const invoices = await storage.getInvoicesByOrg(req.user.organizationId, req.user.id);
       res.json(invoices);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch invoices" });
@@ -467,7 +515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!invoice) {
         return res.status(404).json({ error: "Invoice not found" });
       }
-      if (invoice.userId !== req.user.id) {
+      if (!inOrg(invoice, req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
       res.json(invoice);
@@ -482,7 +530,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!invoice) {
         return res.status(404).json({ error: "Invoice not found" });
       }
-      if (invoice.userId !== req.user.id) {
+      if (!inOrg(invoice, req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -645,7 +693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/brand-invoices", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
-      const invoices = await storage.getBrandInvoices(userId);
+      const invoices = await storage.getBrandInvoicesByOrg(req.user.organizationId, req.user.id);
       res.json(invoices);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch brand invoices" });
@@ -658,7 +706,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!invoice) {
         return res.status(404).json({ error: "Invoice not found" });
       }
-      if (invoice.userId !== req.user.id) {
+      if (!inOrg(invoice, req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
       res.json(invoice);
@@ -667,9 +715,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/brand-invoices", isAuthenticated, requirePro("invoices"), async (req: any, res) => {
+  app.post("/api/brand-invoices", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.create"), async (req: any, res) => {
     try {
       const userId = req.user.id;
+
+      // The parent deal (and contract, if given) must belong to the caller's
+      // organization — otherwise an invoice could be planted in another org's
+      // deal view, which reads by dealId.
+      const parentDealId = parseInt(req.body?.dealId, 10);
+      if (!Number.isFinite(parentDealId)) {
+        return res.status(400).json({ error: "A valid dealId is required" });
+      }
+      const parentDeal = await storage.getDeal(parentDealId);
+      if (!parentDeal || !inOrg(parentDeal, req.user)) {
+        return res.status(403).json({ error: "Not authorized for this deal" });
+      }
+      if (req.body?.contractId) {
+        const parentContract = await storage.getContract(parseInt(req.body.contractId, 10));
+        if (!parentContract || !inOrg(parentContract, req.user)) {
+          return res.status(403).json({ error: "Not authorized for this agreement" });
+        }
+      }
+
       const user = await storage.getUser(userId);
       const invoiceNumber = await storage.generateBrandInvoiceNumber();
       
@@ -679,7 +746,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const invoiceData = {
         ...req.body,
+        dealId: parentDealId,
         userId,
+        organizationId: req.user.organizationId,
         invoiceNumber,
         invoiceDate: req.body.invoiceDate || new Date().toISOString().split("T")[0],
         influencerName,
@@ -688,6 +757,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const invoice = await storage.createBrandInvoice(invoiceData);
+      logOrgActivity(req.user, "created", "invoice", invoice.id, `Invoice ${invoice.invoiceNumber}: ${invoice.brandName}`);
       res.status(201).json(invoice);
     } catch (error) {
       console.error("Brand invoice creation error:", error);
@@ -695,13 +765,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/brand-invoices/:id", isAuthenticated, requirePro("payment_tracking"), async (req: any, res) => {
+  app.patch("/api/brand-invoices/:id", isAuthenticated, requirePro("payment_tracking"), requireOrgPermission("payments.manage"), async (req: any, res) => {
     try {
       const invoice = await storage.getBrandInvoice(parseInt(req.params.id));
       if (!invoice) {
         return res.status(404).json({ error: "Invoice not found" });
       }
-      if (invoice.userId !== req.user.id) {
+      if (!inOrg(invoice, req.user)) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -715,8 +785,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Coerce dealAmount to int if provided as string
-      const updates: any = { ...req.body };
+      // Explicit allowlist — never spread req.body. Tenancy keys (id, userId,
+      // organizationId) and identity fields (invoiceNumber, dealId, contractId)
+      // must not be client-writable: setting organizationId would move the
+      // invoice into another org (or hide it from its own by nulling it).
+      const EDITABLE = [
+        "status", "dealAmount", "notes", "dueDate", "invoiceDate",
+        "brandName", "brandEmail", "invoiceType", "splitPercentage",
+      ] as const;
+      const updates: any = {};
+      for (const k of EDITABLE) {
+        if (req.body[k] !== undefined) updates[k] = req.body[k];
+      }
+      if (!Object.keys(updates).length) {
+        return res.status(400).json({ error: "Nothing to update" });
+      }
       if (updates.dealAmount !== undefined) {
         const n = typeof updates.dealAmount === "string" ? parseInt(updates.dealAmount, 10) : updates.dealAmount;
         if (!Number.isFinite(n) || n < 1) {
@@ -747,11 +830,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/brand-invoices/:id", isAuthenticated, requirePro("invoices"), async (req: any, res) => {
+  app.delete("/api/brand-invoices/:id", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.create"), async (req: any, res) => {
     try {
       const invoice = await storage.getBrandInvoice(parseInt(req.params.id));
       if (!invoice) return res.status(404).json({ error: "Invoice not found" });
-      if (invoice.userId !== req.user.id) return res.status(403).json({ error: "Access denied" });
+      if (!inOrg(invoice, req.user)) return res.status(403).json({ error: "Access denied" });
       if (invoice.status === "Paid") {
         return res.status(400).json({ error: "Paid invoices cannot be deleted" });
       }
@@ -769,7 +852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const invoice = await storage.getBrandInvoice(parseInt(req.params.id));
       if (!invoice) return res.status(404).json({ error: "Invoice not found" });
-      if (invoice.userId !== req.user.id) return res.status(403).json({ error: "Access denied" });
+      if (!inOrg(invoice, req.user)) return res.status(403).json({ error: "Access denied" });
       const attachments = await storage.getInvoiceAttachments(invoice.id);
       res.json(attachments);
     } catch (error) {
@@ -778,11 +861,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/brand-invoices/:id/attachments", isAuthenticated, requirePro("invoices"), upload.single("file"), async (req: any, res) => {
+  app.post("/api/brand-invoices/:id/attachments", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.create"), upload.single("file"), async (req: any, res) => {
     try {
       const invoice = await storage.getBrandInvoice(parseInt(req.params.id));
       if (!invoice) return res.status(404).json({ error: "Invoice not found" });
-      if (invoice.userId !== req.user.id) return res.status(403).json({ error: "Access denied" });
+      if (!inOrg(invoice, req.user)) return res.status(403).json({ error: "Access denied" });
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
       const category = invoiceDocumentCategories.includes(req.body.category)
@@ -832,7 +915,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const attachment = await storage.getInvoiceAttachment(parseInt(req.params.id));
       if (!attachment) return res.status(404).json({ error: "Document not found" });
-      if (attachment.userId !== req.user.id) return res.status(403).json({ error: "Access denied" });
+      const parentInvoice = await storage.getBrandInvoice(attachment.brandInvoiceId);
+      if (!inOrg(parentInvoice, req.user)) return res.status(403).json({ error: "Access denied" });
       if (/^https?:\/\//.test(attachment.fileUrl)) {
         return res.redirect(attachment.fileUrl);
       }
@@ -843,11 +927,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/attachments/:id", isAuthenticated, requirePro("invoices"), async (req: any, res) => {
+  app.delete("/api/attachments/:id", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.create"), async (req: any, res) => {
     try {
       const attachment = await storage.getInvoiceAttachment(parseInt(req.params.id));
       if (!attachment) return res.status(404).json({ error: "Document not found" });
-      if (attachment.userId !== req.user.id) return res.status(403).json({ error: "Access denied" });
+      const parentInvoice = await storage.getBrandInvoice(attachment.brandInvoiceId);
+      if (!inOrg(parentInvoice, req.user)) return res.status(403).json({ error: "Access denied" });
       if (attachment.fileId) await deleteFromImageKit(attachment.fileId);
       await storage.deleteInvoiceAttachment(attachment.id);
       res.status(204).end();
@@ -863,9 +948,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dealId = parseInt(req.params.id);
       const deal = await storage.getDeal(dealId);
       if (!deal) return res.status(404).json({ error: "Deal not found" });
-      if (deal.userId !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      if (!inOrg(deal, req.user)) return res.status(403).json({ error: "Not authorized" });
 
-      const invoices = await storage.getBrandInvoicesByDealId(dealId);
+      const invoices = await storage.getBrandInvoicesByDealIdForOrg(dealId, req.user.organizationId, req.user.id);
       res.json(invoices);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch invoices" });
@@ -873,12 +958,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Split deal amount into advance + final invoices
-  app.post("/api/deals/:id/split-invoices", isAuthenticated, requirePro("invoices"), async (req: any, res) => {
+  app.post("/api/deals/:id/split-invoices", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.create"), async (req: any, res) => {
     try {
       const dealId = parseInt(req.params.id);
       const deal = await storage.getDeal(dealId);
       if (!deal) return res.status(404).json({ error: "Deal not found" });
-      if (deal.userId !== req.user.id) return res.status(403).json({ error: "Not authorized" });
+      if (!inOrg(deal, req.user)) return res.status(403).json({ error: "Not authorized" });
 
       const { advancePercentage } = req.body;
       if (!advancePercentage || advancePercentage < 1 || advancePercentage > 99) {
@@ -895,12 +980,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const advanceAmount = Math.round(deal.dealAmount * advancePercentage / 100);
       const finalAmount = deal.dealAmount - advanceAmount;
 
-      // Find contractId for this deal
-      const contracts = await storage.getContracts(userId);
-      const contract = contracts.find(c => c.dealId === dealId);
+      // Find contractId for this deal (org-wide — a teammate may have signed it)
+      const contract = await storage.getContractByDealId(dealId);
 
       const baseData = {
         userId,
+        organizationId: req.user.organizationId,
         invoiceDate: new Date().toISOString().split("T")[0],
         dealId,
         contractId: contract?.id || null,
@@ -928,6 +1013,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "Unpaid" as const,
       });
 
+      logOrgActivity(req.user, "created", "invoice", advanceInvoice.id, `Split invoices for: ${deal.brandName}`);
       res.status(201).json([advanceInvoice, finalInvoice]);
     } catch (error) {
       console.error("Split invoice error:", error);
@@ -1054,14 +1140,311 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+  // ─────────────────────────────────────────────────────────────────────
+  // ORGANIZATION, TEAM & INVITATIONS
+  // ─────────────────────────────────────────────────────────────────────
+
+  // Org profile + seat summary — any active member.
+  app.get("/api/org", isAuthenticated, withOrg, async (req: any, res) => {
+    try {
+      const owner = await getBillingUser(req.user);
+      const seatLimit = getSeatLimit(owner, req.org);
+      const seatsUsed = await storage.countActiveMembers(req.org.id);
+      const pending = (await storage.getPendingInvitations(req.org.id)).length;
+      res.json({
+        ...req.org,
+        seatLimit,
+        seatsUsed,
+        pendingInvites: pending,
+        ownerPlan: owner.plan,
+        ownerPlanExpiresAt: owner.planExpiresAt,
+      });
+    } catch (error) {
+      console.error("Org fetch error:", error);
+      res.status(500).json({ error: "Failed to load organization" });
+    }
+  });
+
+  app.patch("/api/org", isAuthenticated, requireOrgPermission("org.settings"), withOrg, async (req: any, res) => {
+    try {
+      const { name, industry, logo } = req.body || {};
+      const updates: any = {};
+      if (typeof name === "string" && name.trim()) updates.name = name.trim().slice(0, 80);
+      if (typeof industry === "string") updates.industry = industry.trim().slice(0, 60) || null;
+      if (typeof logo === "string") updates.logo = logo.trim().slice(0, 500) || null;
+      if (!Object.keys(updates).length) return res.status(400).json({ error: "Nothing to update" });
+      const org = await storage.updateOrganization(req.org.id, updates);
+      logOrgActivity(req.user, "updated", "organization", req.org.id, `Organization settings`);
+      res.json(org);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update organization" });
+    }
+  });
+
+  // Members — any active member can see the team.
+  app.get("/api/org/members", isAuthenticated, withOrg, async (req: any, res) => {
+    try {
+      const members = await storage.getOrgMembers(req.org.id);
+      res.json(members.map((m) => ({
+        id: m.id,
+        firstName: m.firstName,
+        lastName: m.lastName,
+        email: m.email,
+        avatar: m.profileImageUrl,
+        orgRole: m.orgRole,
+        memberStatus: m.memberStatus,
+        joinedAt: m.joinedAt ?? m.createdAt,
+      })));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to load members" });
+    }
+  });
+
+  // Change a member's role. Never the OWNER's, never to OWNER, never your own.
+  app.patch("/api/org/members/:id", isAuthenticated, requireOrgPermission("team.manage"), withOrg, async (req: any, res) => {
+    try {
+      const { orgRole } = req.body || {};
+      if (!INVITABLE_ROLES.includes(orgRole)) {
+        return res.status(400).json({ error: "Invalid role" });
+      }
+      const member = await storage.getUser(req.params.id);
+      if (!member || member.organizationId !== req.org.id) {
+        return res.status(404).json({ error: "Member not found" });
+      }
+      if (member.orgRole === "OWNER") return res.status(403).json({ error: "The owner's role can't be changed" });
+      if (member.id === req.user.id) return res.status(403).json({ error: "You can't change your own role" });
+      await storage.updateUser(member.id, { orgRole } as any);
+      logOrgActivity(req.user, "changed role of", "member", member.id, `${member.email} → ${orgRole}`);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update role" });
+    }
+  });
+
+  // Remove a member (soft — memberStatus 'removed' kills their access; their
+  // created records stay with the organization).
+  app.delete("/api/org/members/:id", isAuthenticated, requireOrgPermission("team.manage"), withOrg, async (req: any, res) => {
+    try {
+      const member = await storage.getUser(req.params.id);
+      if (!member || member.organizationId !== req.org.id) {
+        return res.status(404).json({ error: "Member not found" });
+      }
+      if (member.orgRole === "OWNER") return res.status(403).json({ error: "The owner can't be removed" });
+      if (member.id === req.user.id) return res.status(403).json({ error: "You can't remove yourself" });
+      await storage.updateUser(member.id, { memberStatus: "removed" } as any);
+      logOrgActivity(req.user, "removed", "member", member.id, `${member.email}`);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove member" });
+    }
+  });
+
+  // Invitations
+  app.get("/api/org/invitations", isAuthenticated, requireOrgPermission("team.invite"), withOrg, async (req: any, res) => {
+    try {
+      res.json(await storage.getPendingInvitations(req.org.id));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to load invitations" });
+    }
+  });
+
+  app.post("/api/org/invitations", isAuthenticated, requireOrgPermission("team.invite"), withOrg, async (req: any, res) => {
+    try {
+      const email = String(req.body?.email || "").trim().toLowerCase();
+      const orgRole = req.body?.orgRole;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: "Please enter a valid email" });
+      }
+      if (!INVITABLE_ROLES.includes(orgRole)) {
+        return res.status(400).json({ error: "Invalid role" });
+      }
+
+      // Seat validation: active members + live pending invites vs the limit.
+      // This read-then-insert isn't transactional, so concurrent invites can
+      // over-create pending rows — harmless because ACCEPT re-checks seats and
+      // is the authoritative gate (an extra invite simply can't be redeemed).
+      const owner = await getBillingUser(req.user);
+      const seatLimit = getSeatLimit(owner, req.org);
+      const used = await storage.countActiveMembers(req.org.id);
+      const pending = (await storage.getPendingInvitations(req.org.id)).length;
+      if (used + pending >= seatLimit) {
+        return res.status(403).json({
+          code: "SEAT_LIMIT",
+          error: `Your current plan allows ${seatLimit} team member${seatLimit === 1 ? "" : "s"}. Upgrade your plan or purchase additional seats.`,
+          seats: { used, pending, limit: seatLimit },
+        });
+      }
+
+      const existing = await storage.getUserByEmail(email);
+      if (existing) {
+        return res.status(409).json({ error: "This email already has a DealInSec account" });
+      }
+      const dup = (await storage.getPendingInvitations(req.org.id)).find((i) => i.email === email);
+      if (dup) {
+        return res.status(409).json({ error: "This email already has a pending invitation" });
+      }
+
+      const token = crypto.randomBytes(24).toString("hex");
+      const inv = await storage.createInvitation({
+        organizationId: req.org.id,
+        email,
+        orgRole,
+        token,
+        invitedBy: req.user.id,
+        status: "pending",
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      });
+
+      const inviterName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.email || "A teammate";
+      const { subject, html } = inviteEmail({
+        orgName: req.org.name,
+        inviterName,
+        roleLabel: orgRole.charAt(0) + orgRole.slice(1).toLowerCase(),
+        token,
+      });
+      void sendEmail({ to: email, subject, html });
+
+      logOrgActivity(req.user, "invited", "member", null, `${email} as ${orgRole}`);
+      res.status(201).json(inv);
+    } catch (error) {
+      console.error("Invitation error:", error);
+      res.status(500).json({ error: "Failed to send invitation" });
+    }
+  });
+
+  app.post("/api/org/invitations/:id/resend", isAuthenticated, requireOrgPermission("team.invite"), withOrg, async (req: any, res) => {
+    try {
+      const pending = await storage.getPendingInvitations(req.org.id);
+      const inv = pending.find((i) => i.id === parseInt(req.params.id));
+      if (!inv) return res.status(404).json({ error: "Invitation not found" });
+      // Refresh expiry on resend
+      await storage.updateInvitation(inv.id, { expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) });
+      const inviterName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.email || "A teammate";
+      const { subject, html } = inviteEmail({
+        orgName: req.org.name,
+        inviterName,
+        roleLabel: inv.orgRole.charAt(0) + inv.orgRole.slice(1).toLowerCase(),
+        token: inv.token,
+      });
+      void sendEmail({ to: inv.email, subject, html });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to resend invitation" });
+    }
+  });
+
+  app.delete("/api/org/invitations/:id", isAuthenticated, requireOrgPermission("team.invite"), withOrg, async (req: any, res) => {
+    try {
+      const pending = await storage.getPendingInvitations(req.org.id);
+      const inv = pending.find((i) => i.id === parseInt(req.params.id));
+      if (!inv) return res.status(404).json({ error: "Invitation not found" });
+      await storage.updateInvitation(inv.id, { status: "revoked" });
+      logOrgActivity(req.user, "revoked invitation for", "member", null, inv.email);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to revoke invitation" });
+    }
+  });
+
+  // Activity feed
+  app.get("/api/org/activity", isAuthenticated, requireOrgPermission("activity.view"), withOrg, async (req: any, res) => {
+    try {
+      res.json(await storage.getActivityLogs(req.org.id, 100));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to load activity" });
+    }
+  });
+
+  // ── Public invitation acceptance (no auth — token is the credential) ──
+  app.get("/api/invitations/:token", async (req, res) => {
+    try {
+      const inv = await storage.getInvitationByToken(req.params.token);
+      if (!inv || inv.status !== "pending" || new Date(inv.expiresAt).getTime() < Date.now()) {
+        return res.status(404).json({ error: "This invitation is invalid or has expired" });
+      }
+      const org = await storage.getOrganization(inv.organizationId);
+      res.json({ email: inv.email, orgRole: inv.orgRole, orgName: org?.name || "an organization" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to load invitation" });
+    }
+  });
+
+  app.post("/api/invitations/:token/accept", async (req: any, res) => {
+    try {
+      const inv = await storage.getInvitationByToken(req.params.token);
+      if (!inv || inv.status !== "pending" || new Date(inv.expiresAt).getTime() < Date.now()) {
+        return res.status(404).json({ error: "This invitation is invalid or has expired" });
+      }
+      const { password, firstName, lastName } = req.body || {};
+      if (!password || String(password).length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+      const existing = await storage.getUserByEmail(inv.email);
+      if (existing) {
+        return res.status(409).json({ error: "This email already has an account. Please contact your organization owner." });
+      }
+
+      // Re-check seats AT ACCEPT TIME: the invite passed the limit when it was
+      // sent, but the org's plan may have lapsed (Pro 5 seats -> free 1) or
+      // other invitations may have been accepted since. Without this, stale
+      // invites would let an org exceed the seats it currently pays for.
+      const org = await storage.getOrganization(inv.organizationId);
+      const orgOwner = await storage.getOrgOwner(inv.organizationId);
+      const limit = getSeatLimit(orgOwner, org);
+      const activeNow = await storage.countActiveMembers(inv.organizationId);
+      if (activeNow >= limit) {
+        return res.status(403).json({
+          code: "SEAT_LIMIT",
+          error: "This organization has no seats available right now. Please ask the owner to upgrade or free a seat.",
+        });
+      }
+
+      const bcrypt = await import("bcrypt");
+      const hashed = await bcrypt.hash(String(password), 10);
+      const member = await storage.createUser({
+        email: inv.email,
+        password: hashed,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        role: "influencer",
+        onboardingComplete: true,
+        organizationId: inv.organizationId,
+        orgRole: inv.orgRole,
+        memberStatus: "active",
+        invitedBy: inv.invitedBy,
+        joinedAt: new Date(),
+      } as any);
+      await storage.updateInvitation(inv.id, { status: "accepted" });
+
+      void storage.logActivity({
+        organizationId: inv.organizationId,
+        userId: member.id,
+        userName: [member.firstName, member.lastName].filter(Boolean).join(" ") || member.email || "New member",
+        action: "joined",
+        entityType: "member",
+        entityId: member.id,
+        detail: `${member.email} joined as ${inv.orgRole}`,
+      });
+
+      (req.session as any).userId = member.id;
+      const { password: _, ...userWithoutPassword } = member;
+      res.status(201).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Invitation accept error:", error);
+      res.status(500).json({ error: "Failed to accept invitation" });
+    }
+  });
+
   app.get("/api/credits/balance", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
-      // Lazy reset first so a stale month never shows 0.
-      const refreshed = await storage.ensureMonthlyCredits(userId);
-      const user = refreshed ?? (await storage.getUser(userId));
+      // The org's credit pool lives on its owner's row. Lazy-reset first so a
+      // stale month never shows 0.
+      const billing = await getBillingUser(req.user);
+      const refreshed = await storage.ensureMonthlyCredits(billing.id);
+      const user = refreshed ?? (await storage.getUser(billing.id));
       const credits = getDealCredits(user);
-      const transactions = await storage.getCreditTransactions(userId);
+      const transactions = await storage.getCreditTransactions(billing.id);
       res.json({
         monthly: credits.monthly,
         purchased: credits.purchased,
@@ -1186,6 +1569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       proMonthlyPrice: getProMonthlyPrice(),
       proYearlyPrice: getProYearlyPrice(),
       dealBoostPrice: getDealBoostPrice(),
+      extraSeatPrice: getExtraSeatPrice(),
       // Legacy alias for stale pre-deploy tabs: the old client renders Pro's
       // price from this key (its {plan:"pro"} order maps to pro_yearly), so
       // keeping it prevents an old tab showing one price and being charged
@@ -1204,7 +1588,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   //   { plan: "deal_boost" }  — ₹99, unlimited deals+quotations for 1 month
   // Legacy bodies from cached clients are mapped: {plan:"pro"} → pro_yearly,
   // {credits:n} → deal_boost.
-  app.post("/api/payments/razorpay/order", isAuthenticated, async (req: any, res) => {
+  app.post("/api/payments/razorpay/order", isAuthenticated, requireOrgPermission("billing.manage"), async (req: any, res) => {
     try {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
@@ -1217,26 +1601,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      let sku: "pro_monthly" | "pro_yearly" | "deal_boost";
+      let sku: "pro_monthly" | "pro_yearly" | "deal_boost" | "extra_seat";
       switch (req.body.plan) {
         case "pro_monthly": sku = "pro_monthly"; break;
         case "pro_yearly": sku = "pro_yearly"; break;
         case "deal_boost": sku = "deal_boost"; break;
+        case "extra_seat": sku = "extra_seat"; break;
         case "pro": sku = "pro_yearly"; break;          // legacy cached client
         default:
           if (req.body.credits) { sku = "deal_boost"; break; } // legacy cached client
           return res.status(400).json({ error: "Unknown plan" });
       }
 
+      // Seat purchases carry a quantity (1–20); stored in the order's credits
+      // column so the grant/refund paths know how many seats to apply.
+      const seatQty = sku === "extra_seat"
+        ? Math.min(20, Math.max(1, parseInt(req.body.qty, 10) || 1))
+        : 0;
+
       const PRICES: Record<typeof sku, number> = {
         pro_monthly: getProMonthlyPrice(),
         pro_yearly: getProYearlyPrice(),
         deal_boost: getDealBoostPrice(),
+        extra_seat: getExtraSeatPrice() * seatQty,
       };
       const DESCRIPTIONS: Record<typeof sku, string> = {
         pro_monthly: "DealInSec Pro — Monthly (unlimited workflow)",
         pro_yearly: "DealInSec Pro — 1 Year (unlimited workflow)",
         deal_boost: "Deal Boost — unlimited deals & quotations for 1 month",
+        extra_seat: `${seatQty} extra team seat${seatQty > 1 ? "s" : ""} — 1 month`,
       };
       const amountInRupees = PRICES[sku];
       const receipt = `DIS_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -1252,7 +1645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId,
         orderId: order.id,
         amount: amountInRupees,
-        credits: 0,
+        credits: seatQty,
         purpose: sku,
         status: "pending",
       });
@@ -1369,6 +1762,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 paymentId: razorpay_payment_id,
                 date,
               })
+            : granted.kind === "seats"
+            ? paymentReceiptEmail({
+                firstName: buyer.firstName || undefined,
+                product: `${granted.qty} extra team seat${granted.qty > 1 ? "s" : ""} — 1 month`,
+                amount: order.amount,
+                paymentId: razorpay_payment_id,
+                date,
+              })
             : paymentReceiptEmail({
                 firstName: buyer.firstName || undefined,
                 product: `${order.credits} Deal Credit${order.credits > 1 ? "s" : ""}`,
@@ -1450,12 +1851,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   pro_yearly: PRO_YEARLY_DAYS,
                   pro_plan: PRO_YEARLY_DAYS,
                   deal_boost: DEAL_BOOST_DAYS,
+                  extra_seat: EXTRA_SEAT_DAYS,
                 };
                 const days = termDays[claimed.purpose];
-                const grantLapsed =
+                let grantLapsed =
                   days != null &&
                   claimed.completedAt != null &&
                   Date.now() - new Date(claimed.completedAt).getTime() > days * 86_400_000;
+
+                // Seat packs share ONE expiry (a top-up inherits the pack's
+                // existing end date), so purchase-age is the wrong signal —
+                // ask the organization when its current pack actually ends.
+                if (claimed.purpose === "extra_seat") {
+                  const seatBuyer = await storage.getUser(order.userId);
+                  const seatOrg = seatBuyer?.organizationId
+                    ? await storage.getOrganization(seatBuyer.organizationId)
+                    : null;
+                  grantLapsed = !seatOrg?.extraSeatsExpiresAt ||
+                    new Date(seatOrg.extraSeatsExpiresAt).getTime() <= Date.now();
+                }
 
                 if (grantLapsed) {
                   console.log(`Refund for ${order.orderId} (${claimed.purpose}): granted term already lapsed — no clawback`);
@@ -1471,6 +1885,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     case "deal_boost":
                       await storage.revokeDealBoost(order.userId, DEAL_BOOST_DAYS);
                       break;
+                    case "extra_seat": {
+                      const buyer = await storage.getUser(order.userId);
+                      if (buyer?.organizationId && order.credits > 0) {
+                        await storage.revokeExtraSeats(buyer.organizationId, order.credits);
+                      }
+                      break;
+                    }
                     default: // legacy "credits" orders
                       if (order.credits > 0) {
                         await storage.addPurchasedCredits(order.userId, -order.credits, "refund", order.amount);

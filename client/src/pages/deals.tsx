@@ -173,8 +173,8 @@ export default function DealsPage() {
     await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     if (outOfCredits > 0) {
       toast({
-        title: `Imported ${ok} deal${ok !== 1 ? "s" : ""} — out of Deal Credits`,
-        description: `${outOfCredits} row${outOfCredits !== 1 ? "s" : ""} not imported: your free monthly credits ran out.`,
+        title: `Imported ${ok} deal${ok !== 1 ? "s" : ""} — monthly limit reached`,
+        description: `${outOfCredits} row${outOfCredits !== 1 ? "s" : ""} not imported: your free plan covers 4 deals a month.`,
         variant: "destructive",
       });
       openUpgradeModal({ feature: "deals" });

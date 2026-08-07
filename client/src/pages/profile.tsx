@@ -11,7 +11,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
 import { BottomNav } from "@/components/bottom-nav";
-import { hasActivePro, getDealCredits } from "@shared/schema";
+import { hasActivePro } from "@shared/schema";
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -701,7 +701,8 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {/* Plan / Deal Credits Card */}
+            {/* Plan card — plan only; deal limits are enforced server-side
+                and explained by the upgrade modal, not counted in the UI. */}
             <div
               className="rounded-2xl p-5 border-0 relative overflow-hidden"
               style={{
@@ -715,33 +716,19 @@ export default function ProfilePage() {
               <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-3">
                   <Sparkles className="h-4 w-4 text-white/80" />
-                  <h3 className="font-semibold text-white/90">
-                    {hasActivePro(user) ? "DealInSec Pro" : "Deal Credits"}
-                  </h3>
+                  <h3 className="font-semibold text-white/90">Your plan</h3>
                 </div>
                 <div className="flex items-end justify-between">
-                  {hasActivePro(user) ? (
-                    <div>
-                      <p className="text-4xl font-bold text-white" data-testid="text-credits">∞</p>
-                      <p className="text-sm text-white/60 mt-1">
-                        Unlimited workflow
-                        {user?.planExpiresAt
-                          ? ` · until ${new Date(user.planExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`
-                          : ""}
-                      </p>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="text-4xl font-bold text-white" data-testid="text-credits">
-                        {getDealCredits(user).total}
-                      </p>
-                      <p className="text-sm text-white/60 mt-1">
-                        {getDealCredits(user).monthly} monthly
-                        {getDealCredits(user).purchased > 0 ? ` + ${getDealCredits(user).purchased} extra` : ""}
-                        {" · 1 credit = deal + quotation"}
-                      </p>
-                    </div>
-                  )}
+                  <div>
+                    <p className="text-3xl font-bold text-white" data-testid="text-plan">
+                      {hasActivePro(user) ? "DealInSec Pro" : "Free"}
+                    </p>
+                    <p className="text-sm text-white/60 mt-1">
+                      {hasActivePro(user)
+                        ? `Unlimited workflow${user?.planExpiresAt ? ` · until ${new Date(user.planExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : ""}`
+                        : "Deals & quotations · upgrade for agreements and invoices"}
+                    </p>
+                  </div>
                   <Link href="/pricing">
                     <Button
                       size="sm"
@@ -755,7 +742,6 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
-
           </div>
         )}
       </main>

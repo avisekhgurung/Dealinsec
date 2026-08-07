@@ -11,16 +11,48 @@ import {
   Plus, Briefcase, FileCheck, Receipt, ChevronRight, LogOut,
   TrendingUp, IndianRupee, Clock, CheckCircle2,
   UserCircle, MapPin, FileText, PenTool, Landmark, X as XIcon, Sparkles,
-  Crown, Rocket
+  Crown, Rocket, Users2, UserPlus2
 } from "lucide-react";
 import {
   BarChart, Bar, Cell, PieChart, Pie,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import {
-  hasActivePro, hasActiveDealBoost, getDealCredits, getSubscriptionType,
+  hasActivePro, hasActiveDealBoost, getSubscriptionType,
 } from "@shared/schema";
 import type { Deal, Contract, Invoice, BrandInvoice, User } from "@shared/schema";
+
+// ─── Team seats strip ────────────────────────────────────────────────────────
+function TeamSeatsCard() {
+  const { data: org } = useQuery<{
+    name: string; seatLimit: number; seatsUsed: number; pendingInvites: number; ownerPlan: string;
+  }>({ queryKey: ["/api/org"] });
+  if (!org || org.seatLimit <= 1) return null; // solo free orgs skip the strip
+  return (
+    <Card className="glass-card" data-testid="team-seats-card">
+      <CardContent className="p-4 lg:p-5 flex items-center gap-4">
+        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <Users2 className="w-5 h-5 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-sm lg:text-base">
+            Team · <span className="text-primary">{org.seatsUsed} / {org.seatLimit}</span> seats
+            {org.pendingInvites > 0 && (
+              <span className="text-muted-foreground font-medium"> · {org.pendingInvites} invited</span>
+            )}
+          </p>
+          <p className="text-xs lg:text-sm text-muted-foreground truncate">{org.name}</p>
+        </div>
+        <Link href="/settings">
+          <Button variant="outline" size="sm" className="flex-shrink-0" data-testid="dashboard-invite-member">
+            <UserPlus2 className="w-3.5 h-3.5 mr-1.5" />
+            Invite Member
+          </Button>
+        </Link>
+      </CardContent>
+    </Card>
+  );
+}
 
 // ─── Subscription / Deal Credits card ───────────────────────────────────────
 // Free → monthly Deal Credit usage + reset date + upgrade CTA.
@@ -29,7 +61,6 @@ import type { Deal, Contract, Invoice, BrandInvoice, User } from "@shared/schema
 function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | null }) | null | undefined }) {
   const proActive = hasActivePro(user);
   const boostActive = hasActiveDealBoost(user);
-  const credits = getDealCredits(user);
   const fmtDate = (d: Date | string | null | undefined) =>
     d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null;
 
@@ -80,40 +111,27 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
     );
   }
 
-  const used = Math.max(0, 4 - credits.monthly);
+  // Free plan: no credit counters in the UI (they confused users) — just the
+  // plan and an upgrade path. The 4-deals-a-month limit is enforced
+  // server-side and surfaces through the upgrade modal when it's reached.
   return (
     <Card className="glass-card relative overflow-hidden" data-testid="subscription-card">
-      <CardContent className="p-4 lg:p-5">
-        <div className="flex items-center gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-baseline justify-between gap-2 mb-1.5">
-              <p className="font-bold text-sm lg:text-base">
-                Deal Credits · <span className="text-primary">{credits.monthly} of 4</span> left this month
-                {credits.purchased > 0 && (
-                  <span className="text-muted-foreground font-medium"> +{credits.purchased} extra</span>
-                )}
-              </p>
-              <span className="text-[11px] text-muted-foreground flex-shrink-0">Free plan</span>
-            </div>
-            {/* Usage bar */}
-            <div className="h-2 rounded-full bg-muted overflow-hidden mb-1.5">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-500 transition-all"
-                style={{ width: `${(credits.monthly / 4) * 100}%` }}
-              />
-            </div>
-            <p className="text-[11px] lg:text-xs text-muted-foreground">
-              {used} used · 1 credit = 1 deal + its quotation
-              {user?.monthlyCreditsResetAt ? ` · resets ${fmtDate(user.monthlyCreditsResetAt)}` : ""}
-            </p>
-          </div>
-          <Link href="/pricing">
-            <Button size="sm" className="flex-shrink-0 text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700" data-testid="dashboard-upgrade-cta">
-              <Crown className="w-3.5 h-3.5 mr-1.5" />
-              Upgrade
-            </Button>
-          </Link>
+      <CardContent className="p-4 lg:p-5 flex items-center gap-4">
+        <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+          <Sparkles className="w-5 h-5 lg:w-6 lg:h-6 text-primary" />
         </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-sm lg:text-base">Free plan</p>
+          <p className="text-xs lg:text-sm text-muted-foreground">
+            Upgrade for unlimited deals, signed agreements, invoices &amp; payment tracking
+          </p>
+        </div>
+        <Link href="/pricing">
+          <Button size="sm" className="flex-shrink-0 text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700" data-testid="dashboard-upgrade-cta">
+            <Crown className="w-3.5 h-3.5 mr-1.5" />
+            Upgrade
+          </Button>
+        </Link>
       </CardContent>
     </Card>
   );
@@ -533,8 +551,9 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* ── Subscription / Deal Credits ── */}
+        {/* ── Plan ── */}
         <SubscriptionCard user={user} />
+        <TeamSeatsCard />
 
         {/* ── Stat cards ── */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">

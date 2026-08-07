@@ -3,6 +3,7 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import crypto from "crypto";
 import { storage } from "./storage";
 import { sendEmail, welcomeEmail } from "./emails";
+import { generateOrgSlug } from "./auth";
 
 function generateReferralCode(email: string): string {
   const prefix = email.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, "X");
@@ -35,7 +36,9 @@ export function setupGoogleAuth() {
           let user = await storage.getUserByEmail(email);
 
           if (!user) {
-            // Column defaults grant 4 monthly Deal Credits (new model).
+            // Signup creates the user's organization; they become its OWNER.
+            const first = profile.name?.givenName || profile.displayName || email.split("@")[0];
+            const org = await storage.createOrganization(`${first}'s Workspace`, generateOrgSlug(first));
             user = await storage.createUser({
               email,
               firstName: profile.name?.givenName || profile.displayName,
@@ -44,7 +47,11 @@ export function setupGoogleAuth() {
               role: "influencer",
               onboardingComplete: false,
               referralCode: generateReferralCode(email),
-            });
+              organizationId: org.id,
+              orgRole: "OWNER",
+              memberStatus: "active",
+              joinedAt: new Date(),
+            } as any);
 
             // Welcome email for new Google sign-ups — best-effort
             const { subject, html } = welcomeEmail({ firstName: user.firstName || undefined });

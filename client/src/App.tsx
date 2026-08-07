@@ -40,6 +40,8 @@ const TermsPage               = lazy(() => import("@/pages/legal/terms"));
 const PrivacyPage             = lazy(() => import("@/pages/legal/privacy"));
 const CookiePage              = lazy(() => import("@/pages/legal/cookies"));
 const RefundPage              = lazy(() => import("@/pages/legal/refund"));
+const SettingsPage            = lazy(() => import("@/pages/settings"));
+const AcceptInvitePage        = lazy(() => import("@/pages/accept-invite"));
 
 // Routes where the desktop sidebar + content offset should NOT apply
 // (full-bleed marketing / auth / standalone routes).
@@ -55,6 +57,7 @@ const FULL_BLEED_ROUTES = new Set([
 
 function isFullBleedRoute(pathname: string) {
   if (FULL_BLEED_ROUTES.has(pathname)) return true;
+  if (pathname.startsWith("/invite/")) return true;
   // Contract PDF print-friendly view also goes full-bleed
   if (pathname.match(/^\/contracts\/[^/]+\/export$/)) return true;
   return false;
@@ -95,6 +98,7 @@ function Router() {
           <Route path="/privacy" component={PrivacyPage} />
           <Route path="/cookies" component={CookiePage} />
           <Route path="/refund" component={RefundPage} />
+          <Route path="/invite/:token" component={AcceptInvitePage} />
           {/* Any protected/unknown route while logged out (e.g. the PWA
               opening at its start_url /dashboard) → bounce to landing so the
               user can log in, instead of a dead 404. */}
@@ -145,6 +149,8 @@ function Router() {
             <Route path="/invoices" component={BillingPage} />
             <Route path="/brand-invoices/:id" component={BrandInvoiceDetailsPage} />
             <Route path="/profile" component={ProfilePage} />
+            <Route path="/settings" component={SettingsPage} />
+            <Route path="/invite/:token" component={AcceptInvitePage} />
             <Route path="/pricing" component={PricingPage} />
             <Route path="/pitch" component={PitchPage} />
             <Route path="/terms" component={TermsPage} />

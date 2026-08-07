@@ -46,6 +46,13 @@ export function getDealBoostPrice(): number {
   return parseInt(process.env.DEAL_BOOST_PRICE ?? "99", 10);
 }
 
+// Extra team seats beyond the plan's included 5 (Pro): ₹199/seat/month.
+export const EXTRA_SEAT_DAYS = 31;
+
+export function getExtraSeatPrice(): number {
+  return parseInt(process.env.EXTRA_SEAT_PRICE ?? "199", 10);
+}
+
 function getClient(): Razorpay {
   if (_client) return _client;
   if (!isRazorpayConfigured()) {

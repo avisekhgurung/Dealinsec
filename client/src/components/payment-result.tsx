@@ -165,7 +165,7 @@ function SuccessContent({
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.55 }}
         >
-          {successMessage ?? `${credits} contract credit${credits !== 1 ? "s" : ""} added to your account.`}
+          {successMessage ?? "Your purchase is active."}
         </motion.p>
 
         {/* Credit chip */}
