@@ -17,9 +17,6 @@ export default function ProfilePage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { data: referralData } = useQuery<{ referralCode: string; referrals: any[]; totalCreditsEarned: number }>({
-    queryKey: ["/api/referrals"],
-  });
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -759,77 +756,6 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Referral Card */}
-            <div className="glass-card rounded-2xl p-5 border-0" style={{ background: "linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.8) 100%)" }}>
-              <div className="flex items-center gap-2 mb-2">
-                <Share2 className="h-4 w-4 text-primary" />
-                <h3 className="font-semibold">Referral Program</h3>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Share your referral code with friends. You earn a free Deal Credit for every friend who signs up!
-              </p>
-
-              {referralData?.referralCode && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 bg-muted rounded-lg px-4 py-3 font-mono text-lg font-bold tracking-wider text-center">
-                      {referralData.referralCode}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => {
-                        navigator.clipboard.writeText(referralData.referralCode);
-                        toast({ title: "Copied!", description: "Referral code copied to clipboard" });
-                      }}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1 text-xs"
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/?ref=${referralData.referralCode}`);
-                        toast({ title: "Link copied!", description: "Referral link copied to clipboard" });
-                      }}
-                    >
-                      <Copy className="w-3 h-3 mr-1" />
-                      Copy Link
-                    </Button>
-                    <Button
-                      className="flex-1 text-xs gradient-btn text-white"
-                      onClick={() => {
-                        const url = `${window.location.origin}/?ref=${referralData.referralCode}`;
-                        const text = `Join DealInSec and manage your brand deals like a pro! Sign up using my referral link and we both get free credits 🎉`;
-                        if (navigator.share) {
-                          navigator.share({ title: "Join DealInSec", text, url }).catch(() => {});
-                        } else {
-                          navigator.clipboard.writeText(`${text}\n${url}`);
-                          toast({ title: "Copied!", description: "Share text copied to clipboard" });
-                        }
-                      }}
-                    >
-                      <Share2 className="w-3 h-3 mr-1" />
-                      Share
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/10">
-                    <div className="text-center rounded-xl bg-primary/10 py-3">
-                      <p className="text-2xl font-bold text-primary">{referralData.referrals?.length || 0}</p>
-                      <p className="text-xs text-muted-foreground">Referrals</p>
-                    </div>
-                    <div className="text-center rounded-xl bg-emerald-500/10 py-3">
-                      <p className="text-2xl font-bold text-emerald-500">{referralData.totalCreditsEarned || 0}</p>
-                      <p className="text-xs text-muted-foreground">Credits Earned</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         )}
       </main>

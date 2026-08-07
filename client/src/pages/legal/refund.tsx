@@ -74,7 +74,7 @@ export default function RefundPolicy() {
 
         <h2>3. Free Monthly Deal Credits</h2>
         <p>
-          The free plan's 4 monthly Deal Credits (and any referral bonus credits) are
+          The free plan's 4 monthly Deal Credits (and any bonus credits) are
           granted at no charge, are non-refundable, have no monetary value, and cannot be
           exchanged for cash. Unused monthly credits do not roll over.
         </p>

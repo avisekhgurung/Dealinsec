@@ -187,9 +187,7 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
   app.use(passport.session());
 
   app.get("/api/auth/google", (req: any, res, next) => {
-    // Pass referral code via OAuth state parameter so it survives the redirect
-    const state = req.query.ref ? JSON.stringify({ ref: req.query.ref }) : undefined;
-    passport.authenticate("google", { scope: ["profile", "email"], state })(req, res, next);
+    passport.authenticate("google", { scope: ["profile", "email"] })(req, res, next);
   });
   app.get(
     "/api/auth/google/callback",
@@ -197,38 +195,6 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
     async (req: any, res) => {
       if (req.user) {
         (req.session as any).userId = req.user.id;
-
-        // Process referral code from OAuth state parameter
-        let referralCode: string | null = null;
-        try {
-          if (req.query.state) {
-            const state = JSON.parse(req.query.state as string);
-            referralCode = state.ref || null;
-          }
-        } catch {}
-
-        if (referralCode) {
-          try {
-            const referrer = await storage.getUserByReferralCode(referralCode);
-            if (referrer && referrer.id !== req.user.id) {
-              // Check if referral already exists to prevent duplicates
-              const existingReferrals = await storage.getReferralsByUser(referrer.id);
-              const alreadyReferred = existingReferrals.some((r: any) => r.referredUserId === req.user.id);
-              if (!alreadyReferred) {
-                const creditsToAward = parseInt(process.env.REFERRAL_CREDITS ?? '1');
-                await storage.addPurchasedCredits(referrer.id, creditsToAward, 'referral');
-                await storage.createReferral({
-                  referrerId: referrer.id,
-                  referredUserId: req.user.id,
-                  creditAwarded: creditsToAward,
-                });
-                console.log(`Referral credit awarded to ${referrer.email} from ${req.user.email}`);
-              }
-            }
-          } catch (err) {
-            console.error("Referral processing error:", err);
-          }
-        }
       }
       res.redirect("/");
     }

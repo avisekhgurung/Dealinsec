@@ -43,7 +43,7 @@ export async function setupAuth(app: Express) {
 
   app.post("/api/auth/signup", async (req, res) => {
     try {
-      const { email, password, firstName, lastName, role, referralCode } = req.body;
+      const { email, password, firstName, lastName, role } = req.body;
 
       if (!email || !password) {
         return res.status(400).json({ message: "Email and password are required" });
@@ -75,21 +75,6 @@ export async function setupAuth(app: Express) {
         onboardingComplete: false,
         referralCode: generateReferralCode(email),
       });
-
-      // Award referral credits if a valid referral code was provided (these go
-      // to the never-expiring purchased bucket)
-      if (referralCode) {
-        const referrer = await storage.getUserByReferralCode(referralCode);
-        if (referrer && referrer.id !== user.id) {
-          const creditsToAward = parseInt(process.env.REFERRAL_CREDITS ?? '1');
-          await storage.addPurchasedCredits(referrer.id, creditsToAward, 'referral');
-          await storage.createReferral({
-            referrerId: referrer.id,
-            referredUserId: user.id,
-            creditAwarded: creditsToAward,
-          });
-        }
-      }
 
       (req.session as any).userId = user.id;
 

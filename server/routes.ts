@@ -935,24 +935,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get referral info for authenticated user
-  app.get("/api/referrals", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const user = await storage.getUser(userId);
-      const referralsList = await storage.getReferralsByUser(userId);
-      const totalCreditsEarned = referralsList.reduce((sum, r) => sum + (r.creditAwarded || 0), 0);
-
-      res.json({
-        referralCode: user?.referralCode || null,
-        referrals: referralsList,
-        totalCreditsEarned,
-      });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch referral info" });
-    }
-  });
-
   app.patch("/api/profile", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;

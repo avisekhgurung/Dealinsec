@@ -192,10 +192,6 @@ const FAQS = [
     a: "Your banking details (account number, IFSC, PAN) live in your profile and are auto-populated into every invoice you send. Brands pay you directly.",
   },
   {
-    q: "How does the referral program work?",
-    a: "Every account gets a unique referral code in Profile. When a friend signs up with your code, you earn a bonus Deal Credit — no cap, and referral credits never expire.",
-  },
-  {
     q: "Is my data secure?",
     a: "All data is encrypted in transit and at rest. Sessions are secured, and we never share your information with third parties.",
   },
@@ -285,13 +281,6 @@ export default function LandingPage() {
   const [signupPassword, setSignupPassword] = useState("");
   const [signupFirstName, setSignupFirstName] = useState("");
   const [signupLastName, setSignupLastName] = useState("");
-  const [referralCode, setReferralCode] = useState("");
-
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const ref = urlParams.get("ref");
-    if (ref) setReferralCode(ref);
-  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -332,9 +321,8 @@ export default function LandingPage() {
         password: signupPassword,
         firstName: signupFirstName,
         lastName: signupLastName,
-        referralCode: referralCode || undefined,
       });
-      trackEvent("sign_up", { method: "email", referred: !!referralCode });
+      trackEvent("sign_up", { method: "email" });
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       setAuthModalOpen(false);
       setLocation("/dashboard");
@@ -365,7 +353,6 @@ export default function LandingPage() {
 
       <main className="relative z-[1]">
         <Hero
-          referralCode={referralCode}
           isAuthenticated={isAuthenticated}
           onPrimaryClick={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
         />
@@ -377,7 +364,6 @@ export default function LandingPage() {
         <ProductShowcase />
         <StatsSection />
         {/* Testimonials hidden until we have real users. Re-enable <Testimonials /> once you have genuine quotes. */}
-        <ReferralSection onCTA={() => (isAuthenticated ? setLocation("/profile") : openAuth("signup"))} />
         <PricingPreview onCTA={() => (isAuthenticated ? setLocation("/pricing") : openAuth("signup"))} />
         <FAQSection />
         <FinalCTA
@@ -405,15 +391,6 @@ export default function LandingPage() {
               </p>
             </div>
 
-            {referralCode && (
-              <div className="mb-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 rounded-xl px-3.5 py-2.5 flex items-center gap-2.5">
-                <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-                <p className="text-xs text-emerald-800 dark:text-emerald-300">
-                  You've been invited by a friend.
-                </p>
-              </div>
-            )}
-
             <Tabs value={authTab} onValueChange={(v) => setAuthTab(v as "signup" | "login")} className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-5 bg-neutral-100 dark:bg-neutral-800 p-1 h-9">
                 <TabsTrigger value="signup" data-testid="tab-signup" className="text-xs data-[state=active]:bg-white dark:data-[state=active]:bg-neutral-900">
@@ -425,7 +402,7 @@ export default function LandingPage() {
               </TabsList>
 
               <TabsContent value="signup" className="mt-0">
-                <GoogleButton referralCode={referralCode} />
+                <GoogleButton />
                 <OrDivider />
                 <form onSubmit={handleSignup} className="space-y-3.5">
                   <div className="grid grid-cols-2 gap-3">
@@ -500,7 +477,7 @@ export default function LandingPage() {
               </TabsContent>
 
               <TabsContent value="login" className="mt-0">
-                <GoogleButton referralCode={referralCode} />
+                <GoogleButton />
                 <OrDivider />
                 <form onSubmit={handleLogin} className="space-y-3.5">
                   <FieldGroup id="login-email" label="Email">
@@ -760,11 +737,9 @@ function NavItem({ href, label }: { href: string; label: string }) {
 }
 
 function Hero({
-  referralCode,
   isAuthenticated,
   onPrimaryClick,
 }: {
-  referralCode: string;
   isAuthenticated: boolean;
   onPrimaryClick: () => void;
 }) {
@@ -776,19 +751,6 @@ function Hero({
   return (
     <section ref={heroRef} className="relative pt-12 sm:pt-20 lg:pt-28 pb-16 lg:pb-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {referralCode && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6 mx-auto max-w-md bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 rounded-full px-4 py-2 flex items-center gap-2.5"
-          >
-            <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-            <p className="text-xs font-medium text-emerald-800 dark:text-emerald-300">
-              You've been invited by a friend. Sign up to claim.
-            </p>
-          </motion.div>
-        )}
-
         <div className="text-center max-w-4xl mx-auto">
           <motion.div
             variants={heroStagger}
@@ -1650,115 +1612,6 @@ function Testimonials() {
   );
 }
 
-function ReferralSection({ onCTA }: { onCTA: () => void }) {
-  return (
-    <section className="py-20 sm:py-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          className="relative rounded-3xl overflow-hidden p-8 sm:p-12 lg:p-14"
-          style={{ background: "linear-gradient(135deg, #ECFDF5 0%, #F0FDFA 50%, #FEF3C7 100%)" }}
-        >
-          {/* Accents */}
-          <div className="absolute -top-24 -right-20 w-80 h-80 rounded-full blur-3xl opacity-60" style={{ background: "radial-gradient(circle, #FBBF24, transparent)" }} />
-          <div className="absolute -bottom-20 -left-24 w-80 h-80 rounded-full blur-3xl opacity-50" style={{ background: "radial-gradient(circle, #10B981, transparent)" }} />
-
-          <div className="relative grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/80 backdrop-blur-sm border border-amber-300/60 shadow-sm mb-4">
-                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                <span className="text-xs font-semibold text-amber-900">Refer &amp; earn — bonus Deal Credits</span>
-              </div>
-
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-neutral-900 leading-[1.08] mb-4">
-                Share a link.{" "}
-                <span
-                  style={{
-                    background: "linear-gradient(135deg, #D97706 0%, #059669 100%)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                  }}
-                >
-                  Earn Deal Credits.
-                </span>
-              </h2>
-
-              <p className="text-base text-neutral-700 leading-relaxed mb-6 max-w-lg">
-                Every account gets a unique referral code in the profile. When a friend signs up with your code,{" "}
-                <span className="font-semibold text-neutral-900">you earn a bonus Deal Credit.</span> No cap, no expiry — stack them up.
-              </p>
-
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                <Button
-                  onClick={onCTA}
-                  className="h-11 px-5 text-sm font-semibold text-white border-0 shadow-lg shadow-emerald-500/25"
-                  style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
-                  data-testid="button-referral-cta"
-                >
-                  Get your referral code
-                  <ArrowRight className="w-4 h-4 ml-1.5" />
-                </Button>
-                <span className="text-xs text-neutral-600">Live in your Profile after signup.</span>
-              </div>
-            </div>
-
-            {/* Visual: referral card mockup */}
-            <div className="relative">
-              <div className="rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-amber-900/10 p-5 max-w-sm mx-auto">
-                <div className="flex items-center gap-2 mb-4">
-                  <div
-                    className="w-9 h-9 rounded-lg flex items-center justify-center"
-                    style={{ background: "linear-gradient(135deg, #FBBF24, #F59E0B)" }}
-                  >
-                    <Sparkles className="w-4 h-4 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold">Your referral code</p>
-                    <p className="text-[10px] text-neutral-500">Share with businesses you know</p>
-                  </div>
-                </div>
-
-                <div className="rounded-xl bg-gradient-to-br from-amber-50 to-emerald-50 border border-amber-200/70 px-4 py-3 mb-3">
-                  <p className="text-center font-mono text-xl font-black tracking-[0.3em] text-neutral-900">DEAL-AK42</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  <div className="rounded-lg bg-emerald-50 border border-emerald-200/60 p-2.5 text-center">
-                    <p className="text-xl font-bold text-emerald-700">7</p>
-                    <p className="text-[10px] text-neutral-500">Friends joined</p>
-                  </div>
-                  <div className="rounded-lg bg-amber-50 border border-amber-200/60 p-2.5 text-center">
-                    <p className="text-xl font-bold text-amber-700">7</p>
-                    <p className="text-[10px] text-neutral-500">Credits earned</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-1 text-[11px] text-neutral-500 pt-2 border-t border-neutral-100">
-                  <Check className="w-3 h-3 text-emerald-500" />
-                  <span>No cap · referral credits never expire</span>
-                </div>
-              </div>
-
-              {/* Floating chip */}
-              <motion.div
-                animate={{ y: [0, -8, 0] }}
-                transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
-                className="hidden sm:flex absolute -top-3 -right-3 items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold text-white shadow-lg"
-                style={{ background: "linear-gradient(135deg, #10B981, #059669)" }}
-              >
-                <Sparkles className="w-3 h-3" /> +1 credit
-              </motion.div>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
 function PricingPreview({ onCTA }: { onCTA: () => void }) {
   const freePerks = [
     "4 Deal Credits every month",
@@ -1976,9 +1829,6 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
           </div>
         </motion.div>
 
-        <p className="text-center text-xs text-neutral-500 mt-6">
-          Invite a friend with your referral code and earn bonus Deal Credits.
-        </p>
       </div>
     </section>
   );
@@ -2304,12 +2154,12 @@ function FieldGroup({ id, label, children }: { id: string; label: string; childr
   );
 }
 
-function GoogleButton({ referralCode }: { referralCode: string }) {
+function GoogleButton() {
   return (
     <button
       type="button"
       onClick={() => {
-        window.location.href = referralCode ? `/api/auth/google?ref=${referralCode}` : "/api/auth/google";
+        window.location.href = "/api/auth/google";
       }}
       className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors text-sm font-medium"
     >
