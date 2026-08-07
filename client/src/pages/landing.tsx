@@ -77,13 +77,13 @@ const FEATURES = [
   {
     icon: Briefcase,
     title: "Deal Management",
-    desc: "Log every collaboration with deliverables, timelines, and pricing in one clean dashboard.",
+    desc: "Track every mandate, project and retainer — scope, timelines and pricing in one clean dashboard.",
     tint: "emerald",
   },
   {
     icon: FileText,
     title: "Instant Quotations",
-    desc: "Generate professional quotes in under 60 seconds. Your own terms, your own brand.",
+    desc: "Per sq ft, milestone or retainer — professional quotes in under 60 seconds, on your terms.",
     tint: "teal",
   },
   {
@@ -95,7 +95,7 @@ const FEATURES = [
   {
     icon: Receipt,
     title: "Smart Invoices",
-    desc: "Advance & final invoices with your banking details baked in. Track every rupee.",
+    desc: "Advance & final invoices with your banking details baked in. Track every rupee of every milestone.",
     tint: "indigo",
   },
   {
@@ -117,7 +117,7 @@ const WORKFLOW_STEPS = [
     step: "01",
     icon: Briefcase,
     title: "Create Deal",
-    desc: "Set up the collaboration — brand, deliverables, timeline, payment terms.",
+    desc: "Set up the deal — client, scope, timeline, payment terms.",
   },
   {
     step: "02",
@@ -835,7 +835,7 @@ function Hero({
             <motion.p variants={heroFadeUp} className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
               One simple workflow — quotation, e-signed agreement, GST invoice, payment —{" "}
               <span className="font-semibold text-neutral-900 dark:text-white">so you look professional, never chase a client, and get paid on time.</span>{" "}
-              Built for India's freelancers, agencies &amp; consultants.
+              Built for India's real estate consultants, interior designers, architects, agencies &amp; contractors.
             </motion.p>
 
             <motion.div variants={heroFadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
@@ -911,7 +911,7 @@ function ProductPreview() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <p className="text-xs text-neutral-500">Welcome back,</p>
-              <h3 className="text-lg sm:text-xl font-bold">Aanya Kapoor</h3>
+              <h3 className="text-lg sm:text-xl font-bold">Meera Nair</h3>
             </div>
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold">
               <Sparkles className="w-3 h-3" />
@@ -959,9 +959,9 @@ function ProductPreview() {
               <p className="text-xs font-semibold mb-3">Recent deals</p>
               <div className="space-y-2.5">
                 {[
-                  { name: "Nykaa · Summer Reel", status: "Paid", amount: "₹45K" },
-                  { name: "boAt · YouTube Integ", status: "Signed", amount: "₹1.2L" },
-                  { name: "Mamaearth · Story", status: "Quote", amount: "₹28K" },
+                  { name: "Sharma Residence · 3BHK Interiors", status: "Paid", amount: "₹4.5L" },
+                  { name: "Skyline Devs · Office Fit-out", status: "Signed", amount: "₹12L" },
+                  { name: "Café Aroma · Design + Execution", status: "Quote", amount: "₹2.8L" },
                 ].map((d) => (
                   <div key={d.name} className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
@@ -988,7 +988,7 @@ function ProductPreview() {
         </div>
         <div>
           <p className="text-[10px] text-neutral-500">Agreement signed</p>
-          <p className="text-xs font-semibold">Mamaearth Pvt Ltd</p>
+          <p className="text-xs font-semibold">Skyline Developers LLP</p>
         </div>
       </motion.div>
 
@@ -1002,7 +1002,7 @@ function ProductPreview() {
         </div>
         <div>
           <p className="text-[10px] text-neutral-500">Payment received</p>
-          <p className="text-xs font-semibold">₹45,000</p>
+          <p className="text-xs font-semibold">₹2,25,000</p>
         </div>
       </motion.div>
     </div>
@@ -1066,15 +1066,15 @@ function TrustStrip() {
           viewport={{ once: true }}
           className="text-center text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-6"
         >
-          Built for deals across every platform
+          Built for India's deal-led service sectors
         </motion.p>
         <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-5 opacity-70">
           {[
-            { Icon: SiInstagram, name: "Instagram" },
-            { Icon: SiYoutube, name: "YouTube" },
-            { Icon: SiX, name: "X" },
-            { Icon: SiFacebook, name: "Facebook" },
-            { Icon: SiLinkedin, name: "LinkedIn" },
+            { Icon: Building2, name: "Real Estate" },
+            { Icon: Sofa, name: "Interior Design" },
+            { Icon: DraftingCompass, name: "Architecture" },
+            { Icon: Megaphone, name: "Agencies" },
+            { Icon: HardHat, name: "Construction" },
           ].map(({ Icon, name }, i) => (
             <motion.div
               key={name}
@@ -1274,7 +1274,7 @@ function WorkflowSection() {
         <SectionHeader
           eyebrow="How it works"
           title="From handshake to payment in 4 steps"
-          subtitle="Every collaboration moves cleanly through the Dealinsec pipeline — no follow-ups, no lost threads."
+          subtitle="Every client deal moves cleanly through the Dealinsec pipeline — no follow-ups, no lost threads."
         />
 
         <div className="mt-16 relative">
@@ -1318,7 +1318,7 @@ function ProductShowcase() {
     {
       eyebrow: "Quotations",
       title: "Professional quotes in 60 seconds",
-      desc: "Send out quotations with standard or custom terms. Brands see a polished, branded PDF they can approve or pay instantly.",
+      desc: "Send out quotations with standard or custom terms. Clients see a polished, branded PDF they can approve or pay instantly.",
       bullets: [
         "Selectable standard T&Cs (30-day validity, 50% advance, etc.)",
         "Custom terms — add your own clauses",
@@ -1438,7 +1438,7 @@ function QuoteMockup() {
       <div className="space-y-3">
         <div className="flex justify-between text-xs">
           <span className="text-neutral-500">To</span>
-          <span className="font-semibold">Nykaa Pvt Ltd</span>
+          <span className="font-semibold">Skyline Developers LLP</span>
         </div>
         <div className="flex justify-between text-xs">
           <span className="text-neutral-500">Deliverable</span>
@@ -1478,7 +1478,7 @@ function AgreementMockup() {
         </div>
         <div>
           <p className="text-sm font-bold">Collaboration Agreement</p>
-          <p className="text-[10px] text-neutral-500">Between Aanya Kapoor and Nykaa Pvt Ltd</p>
+          <p className="text-[10px] text-neutral-500">Between Meera Nair and Skyline Developers LLP</p>
         </div>
       </div>
 
@@ -1491,7 +1491,7 @@ function AgreementMockup() {
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/50 dark:bg-emerald-950/20 p-3">
           <p className="text-[9px] uppercase tracking-widest text-neutral-500 mb-1">Provider</p>
-          <p className="text-xs font-bold italic text-emerald-700 dark:text-emerald-300" style={{ fontFamily: "Georgia, serif" }}>Aanya K.</p>
+          <p className="text-xs font-bold italic text-emerald-700 dark:text-emerald-300" style={{ fontFamily: "Georgia, serif" }}>Meera N.</p>
           <div className="flex items-center gap-1 mt-1.5">
             <Check className="w-3 h-3 text-emerald-600" />
             <p className="text-[9px] text-emerald-700 dark:text-emerald-400 font-semibold">Signed · 22 Apr</p>
@@ -1536,7 +1536,7 @@ function InvoiceMockup() {
 
       <div className="space-y-2 text-[11px]">
         <p className="text-[10px] uppercase tracking-widest text-neutral-500 font-semibold mb-1">Paid to</p>
-        <div className="flex justify-between"><span className="text-neutral-500">Account holder</span><span className="font-semibold">Aanya Kapoor</span></div>
+        <div className="flex justify-between"><span className="text-neutral-500">Account holder</span><span className="font-semibold">Meera Nair</span></div>
         <div className="flex justify-between"><span className="text-neutral-500">Account number</span><span className="font-semibold font-mono">XXXX 4521</span></div>
         <div className="flex justify-between"><span className="text-neutral-500">IFSC</span><span className="font-semibold font-mono">HDFC0001234</span></div>
         <div className="flex justify-between"><span className="text-neutral-500">PAN</span><span className="font-semibold font-mono">ABCDE1234F</span></div>
@@ -2025,7 +2025,7 @@ function FinalCTA({ isAuthenticated, onCTA }: { isAuthenticated: boolean; onCTA:
               Deals in seconds.<br />Secured for life.
             </h2>
             <p className="text-base sm:text-lg text-emerald-100/90 max-w-xl mx-auto mb-8">
-              Join service businesses closing professional deals — quoted, signed, invoiced and paid. Free to start, no credit card required.
+              Join brokers, designers, architects, agencies and contractors closing professional deals — quoted, signed, invoiced and paid. Free to start, no credit card required.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Button
@@ -2061,7 +2061,7 @@ function Footer() {
           <div className="col-span-2 md:col-span-1">
             <DealinsecLogo size="md" withText />
             <p className="text-xs text-neutral-500 mt-4 leading-relaxed max-w-[240px]">
-              The deal-management OS for every business — track, sign, and bill every client or brand deal in one workflow.
+              The deal-management OS for India's service sectors — real estate, interiors, architecture, agencies and construction. Quote, sign, bill and get paid in one workflow.
             </p>
             <div className="flex items-center gap-3 mt-5">
               {[
