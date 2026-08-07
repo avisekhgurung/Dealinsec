@@ -150,7 +150,7 @@ export default function DealsPage() {
         await apiRequest("POST", "/api/deals", {
           brandName,
           dealTitle,
-          dealType: unguardCell((r["Type"] ?? r["dealType"] ?? "Creator").trim()) || "Creator",
+          dealType: unguardCell((r["Type"] ?? r["dealType"] ?? "Custom").trim()) || "Custom",
           dealAmount: Number.isFinite(amount) ? amount : 0,
           startDate: unguardCell((r["Start"] ?? r["startDate"] ?? today).trim()) || today,
           endDate: unguardCell((r["End"] ?? r["endDate"] ?? today).trim()) || today,

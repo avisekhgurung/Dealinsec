@@ -13,17 +13,68 @@
  *  - client/src/pages/deal-details.tsx & deals.tsx (display)
  */
 
+// Phase-1 ICP: B2B service sectors. These are the ONLY selectable types for
+// new deals. Legacy types (Creator/Freelance/Consulting/Service Vendor) are no
+// longer offered but stay fully supported for existing deals — display,
+// editing, quotes and agreement PDFs all keep their original wording.
 export const dealTypeOptions = [
+  "Real Estate",
+  "Interior Design",
+  "Architecture",
+  "Agency",
+  "Construction",
+  "Custom",
+] as const;
+
+export const legacyDealTypeOptions = [
   "Creator",
   "Freelance",
   "Consulting",
   "Service Vendor",
-  "Custom",
 ] as const;
 
 export type DealType = (typeof dealTypeOptions)[number];
+export type LegacyDealType = (typeof legacyDealTypeOptions)[number];
+export type AnyDealType = DealType | LegacyDealType;
 
-export const dealTypeMeta: Record<DealType, { label: string; description: string; emoji: string; tint: string }> = {
+export const dealTypeMeta: Record<AnyDealType, { label: string; description: string; emoji: string; tint: string }> = {
+  "Real Estate": {
+    label: "Real Estate",
+    description: "Sales, rentals, leasing & property services — brokerage and advisory.",
+    emoji: "🏢",
+    tint: "emerald",
+  },
+  "Interior Design": {
+    label: "Interior Design",
+    description: "Home & commercial interiors, modular kitchens, turnkey fit-outs.",
+    emoji: "🛋️",
+    tint: "teal",
+  },
+  Architecture: {
+    label: "Architecture",
+    description: "Building design, drawings, approvals, supervision & PMC.",
+    emoji: "📐",
+    tint: "indigo",
+  },
+  Agency: {
+    label: "Agency",
+    description: "Marketing, creative, digital & web services for client brands.",
+    emoji: "🚀",
+    tint: "amber",
+  },
+  Construction: {
+    label: "Construction",
+    description: "Civil work, turnkey contracting, renovation & trade contracts.",
+    emoji: "🏗️",
+    tint: "slate",
+  },
+  Custom: {
+    label: "Custom",
+    description: "Anything else — free-form deal not covered above.",
+    emoji: "⚙️",
+    tint: "slate",
+  },
+  // ── Legacy types (existing deals only, not selectable) ──
   Creator: {
     label: "Creator",
     description: "Brand deals, sponsored content, paid posts on social platforms.",
@@ -47,12 +98,6 @@ export const dealTypeMeta: Record<DealType, { label: string; description: string
     description: "Event-based, on-site services — photography, training, wellness, home services.",
     emoji: "🎯",
     tint: "amber",
-  },
-  Custom: {
-    label: "Custom",
-    description: "Anything else — free-form deal not covered above.",
-    emoji: "⚙️",
-    tint: "slate",
   },
 };
 
@@ -580,6 +625,306 @@ const serviceVendorTaxonomy: TaxonomyEntry = {
 };
 
 // ===================================================================
+// REAL ESTATE — Phase 1
+// ===================================================================
+const realEstateTaxonomy: TaxonomyEntry = {
+  categories: [
+    {
+      group: "Residential",
+      options: [
+        "Flat / Apartment sale",
+        "Independent house / Villa sale",
+        "Residential rental / lease",
+        "Plot / Land sale",
+        "Farmhouse / Second home",
+        "Resale transaction",
+      ],
+    },
+    {
+      group: "Commercial",
+      options: [
+        "Office space sale",
+        "Office leasing",
+        "Retail / Shop leasing",
+        "Warehouse / Industrial",
+        "Co-working space",
+        "Land for development",
+      ],
+    },
+    {
+      group: "Services",
+      options: [
+        "Property management",
+        "Tenant sourcing",
+        "Property valuation",
+        "Home staging",
+        "Title / Documentation assistance",
+        "Home loan assistance",
+        "Society transfer / Registration support",
+        "Vastu consultation",
+      ],
+    },
+  ],
+  outputs: [
+    {
+      group: "Brokerage",
+      options: [
+        "Brokerage — % of sale value",
+        "Brokerage — 1 month rent",
+        "Brokerage — 2 months rent",
+        "Fixed brokerage fee",
+      ],
+    },
+    {
+      group: "Retainers",
+      options: ["Monthly property management fee", "Annual maintenance contract"],
+    },
+    {
+      group: "Per-service",
+      options: ["Consultation fee", "Per valuation report", "Per documentation service", "Per site visit"],
+    },
+  ],
+};
+
+// ===================================================================
+// INTERIOR DESIGN — Phase 1
+// ===================================================================
+const interiorDesignTaxonomy: TaxonomyEntry = {
+  categories: [
+    {
+      group: "Residential",
+      options: [
+        "Full home interiors",
+        "Modular kitchen",
+        "Wardrobes / Storage",
+        "Living room",
+        "Bedroom",
+        "Bathroom renovation",
+        "Balcony / Terrace",
+        "Pooja room",
+      ],
+    },
+    {
+      group: "Commercial",
+      options: [
+        "Office interiors",
+        "Retail store design",
+        "Restaurant / Café design",
+        "Clinic / Hospital interiors",
+        "Salon / Spa design",
+        "Showroom design",
+        "Hotel / Hospitality",
+      ],
+    },
+    {
+      group: "Services",
+      options: [
+        "Turnkey execution",
+        "Design consultation",
+        "3D visualization / Renders",
+        "Space planning",
+        "Custom furniture design",
+        "Decor & styling",
+        "Lighting design",
+        "False ceiling",
+        "Painting & wall finishes",
+        "Civil + interior renovation",
+      ],
+    },
+  ],
+  outputs: [
+    {
+      group: "Area-based",
+      options: ["Per sq ft — design only", "Per sq ft — with execution"],
+    },
+    {
+      group: "Project-based",
+      options: ["Lump-sum project fee", "Turnkey package", "Room-wise package", "Milestone-based"],
+    },
+    {
+      group: "Service-based",
+      options: ["Design consultation fee", "Per 3D render", "Monthly retainer", "Per supervision visit"],
+    },
+  ],
+};
+
+// ===================================================================
+// ARCHITECTURE — Phase 1
+// ===================================================================
+const architectureTaxonomy: TaxonomyEntry = {
+  categories: [
+    {
+      group: "Design",
+      options: [
+        "Residential building design",
+        "Commercial building design",
+        "Industrial / Warehouse design",
+        "Institutional (school / hospital)",
+        "Landscape design",
+        "Interior architecture",
+        "Vastu-compliant design",
+      ],
+    },
+    {
+      group: "Drawings & Approvals",
+      options: [
+        "Concept & schematic design",
+        "Working drawings (GFC)",
+        "Structural drawings",
+        "MEP coordination",
+        "Municipal sanction / Liaison",
+        "RERA documentation",
+        "As-built drawings",
+      ],
+    },
+    {
+      group: "Services",
+      options: [
+        "3D visualization",
+        "Site supervision",
+        "Project management (PMC)",
+        "Renovation / Retrofit design",
+        "Estimation & BOQ",
+      ],
+    },
+  ],
+  outputs: [
+    {
+      group: "Fee models",
+      options: [
+        "% of construction cost",
+        "Per sq ft design fee",
+        "Lump-sum design fee",
+        "Stage-wise / milestone billing",
+      ],
+    },
+    {
+      group: "Per-service",
+      options: ["Per drawing set", "Per 3D view", "Per site visit", "Monthly PMC retainer"],
+    },
+  ],
+};
+
+// ===================================================================
+// AGENCY — Phase 1 (marketing / creative / digital / web)
+// ===================================================================
+const agencyTaxonomy: TaxonomyEntry = {
+  categories: [
+    {
+      group: "Digital marketing",
+      options: [
+        "SEO",
+        "Performance marketing (Google / Meta ads)",
+        "Social media management",
+        "Content marketing",
+        "Email / WhatsApp marketing",
+        "Influencer campaign management",
+        "Marketplace management (Amazon / Flipkart)",
+      ],
+    },
+    {
+      group: "Creative & Brand",
+      options: [
+        "Brand identity / Logo",
+        "Graphic design",
+        "Packaging design",
+        "Ad films / Video production",
+        "Product photography",
+        "Copywriting",
+      ],
+    },
+    {
+      group: "Web & Tech",
+      options: [
+        "Website design & development",
+        "E-commerce store",
+        "Mobile app development",
+        "Landing pages / Funnels",
+        "CRM / Automation setup",
+        "AI chatbot / Automation",
+      ],
+    },
+    {
+      group: "PR & Events",
+      options: ["Public relations", "Media buying", "Event marketing", "Exhibition / Trade show"],
+    },
+  ],
+  outputs: [
+    {
+      group: "Recurring",
+      options: ["Monthly retainer", "Quarterly retainer", "% of ad spend"],
+    },
+    {
+      group: "Project-based",
+      options: ["Per campaign", "Per project", "Per deliverable / asset", "One-time setup fee"],
+    },
+    {
+      group: "Performance",
+      options: ["Per lead", "Per sale / conversion", "Hybrid (retainer + performance)"],
+    },
+  ],
+};
+
+// ===================================================================
+// CONSTRUCTION — Phase 1
+// ===================================================================
+const constructionTaxonomy: TaxonomyEntry = {
+  categories: [
+    {
+      group: "Building",
+      options: [
+        "New residential construction",
+        "Commercial construction",
+        "Villa / Bungalow construction",
+        "Building renovation",
+        "Structure repair / Retrofitting",
+        "Extension / Additional floor",
+      ],
+    },
+    {
+      group: "Contracting",
+      options: [
+        "Turnkey (with material)",
+        "Labour contract",
+        "Item-rate contract",
+        "Civil works",
+        "RCC / Structural work",
+        "Masonry / Plastering",
+      ],
+    },
+    {
+      group: "Trades",
+      options: [
+        "Electrical contracting",
+        "Plumbing contracting",
+        "Painting",
+        "Waterproofing",
+        "Flooring / Tiling",
+        "Fabrication (MS / SS)",
+        "Aluminium / Glass work",
+        "Carpentry / Woodwork",
+        "POP / False ceiling",
+        "Landscaping / Paving",
+      ],
+    },
+  ],
+  outputs: [
+    {
+      group: "Area-based",
+      options: ["Per sq ft — with material (turnkey)", "Per sq ft — labour only"],
+    },
+    {
+      group: "Contract-based",
+      options: ["Item-rate (BOQ)", "Lump-sum contract", "RA bills / milestone billing"],
+    },
+    {
+      group: "Time & maintenance",
+      options: ["Per day labour", "AMC / maintenance contract"],
+    },
+  ],
+};
+
+// ===================================================================
 // CUSTOM — free-form
 // ===================================================================
 const customTaxonomy: TaxonomyEntry = {
@@ -601,17 +946,23 @@ const customTaxonomy: TaxonomyEntry = {
 // Public API
 // ───────────────────────────────────────────────────────────────────────
 
-export const TAXONOMY: Record<DealType, TaxonomyEntry> = {
+export const TAXONOMY: Record<AnyDealType, TaxonomyEntry> = {
+  "Real Estate": realEstateTaxonomy,
+  "Interior Design": interiorDesignTaxonomy,
+  Architecture: architectureTaxonomy,
+  Agency: agencyTaxonomy,
+  Construction: constructionTaxonomy,
+  Custom: customTaxonomy,
+  // Legacy (existing deals only)
   Creator: creatorTaxonomy,
   Freelance: freelanceTaxonomy,
   Consulting: consultingTaxonomy,
   "Service Vendor": serviceVendorTaxonomy,
-  Custom: customTaxonomy,
 };
 
 /** Flat list of all category options for a given dealType (for searchable dropdowns). */
-export function getCategoryOptions(dealType: DealType): { group: string; option: string }[] {
-  const entry = TAXONOMY[dealType];
+export function getCategoryOptions(dealType: AnyDealType): { group: string; option: string }[] {
+  const entry = TAXONOMY[dealType] ?? TAXONOMY.Custom;
   const flat: { group: string; option: string }[] = [];
   for (const g of entry.categories) {
     for (const opt of g.options) {
@@ -622,8 +973,8 @@ export function getCategoryOptions(dealType: DealType): { group: string; option:
 }
 
 /** Flat list of all output options for a given dealType. */
-export function getOutputOptions(dealType: DealType): { group: string; option: string }[] {
-  const entry = TAXONOMY[dealType];
+export function getOutputOptions(dealType: AnyDealType): { group: string; option: string }[] {
+  const entry = TAXONOMY[dealType] ?? TAXONOMY.Custom;
   const flat: { group: string; option: string }[] = [];
   for (const g of entry.outputs) {
     for (const opt of g.options) {
@@ -664,7 +1015,97 @@ export interface AgreementCopy {
   nonExclusiveText: string;
 }
 
-const AGREEMENT_COPY: Record<DealType, AgreementCopy> = {
+const AGREEMENT_COPY: Record<AnyDealType, AgreementCopy> = {
+  "Real Estate": {
+    title: "Real Estate Services Agreement",
+    providerRole: "Broker / Real Estate Consultant",
+    providerNoun: "Consultant",
+    clientRole: "Client",
+    clientNoun: "Client",
+    clientFieldLabel: "Client Name",
+    serviceDescription: "real estate brokerage and advisory services",
+    complianceNote:
+      "All services shall be rendered professionally and in compliance with applicable laws, including the Real Estate (Regulation and Development) Act, 2016 (RERA) where applicable.",
+    rightsHeading: "Brokerage & Disclosure",
+    rightsText:
+      "The brokerage/fee becomes payable as per the agreed billing basis upon successful closure of the transaction or completion of the agreed service. The Consultant shall share property information in good faith based on details available from owners/developers, and does not guarantee closure of any transaction. Each party shall keep the other's commercial information confidential.",
+    exclusiveText:
+      "This Agreement is EXCLUSIVE. During the Agreement period, the Client shall route the sale, purchase or leasing of the subject property exclusively through the Consultant, and shall not engage another broker or conclude a direct transaction for the same property without the Consultant's prior written consent.",
+    nonExclusiveText:
+      "This Agreement is NON-EXCLUSIVE. The Client may engage other brokers or channels for the same requirement, and brokerage shall be payable only on a transaction concluded through the Consultant.",
+  },
+  "Interior Design": {
+    title: "Interior Design Services Agreement",
+    providerRole: "Interior Designer / Design Studio",
+    providerNoun: "Designer",
+    clientRole: "Client",
+    clientNoun: "Client",
+    clientFieldLabel: "Client Name",
+    serviceDescription: "interior design and execution services",
+    complianceNote:
+      "All work shall be executed with professional workmanship, using materials of the agreed specification, and in compliance with applicable safety and quality standards.",
+    rightsHeading: "Design Ownership & Usage",
+    rightsText:
+      "All designs, drawings and renders remain the intellectual property of the Designer until full and final payment, after which the Client receives the right to use them for the subject property. Designs may not be reused on other sites without the Designer's written consent. The Designer may photograph the completed work for portfolio and promotional use unless the Client declines in writing.",
+    exclusiveText:
+      "This Agreement is EXCLUSIVE for its scope. During the Agreement period, the Client shall not engage another designer or contractor for the same scope of work without the Designer's prior written consent.",
+    nonExclusiveText:
+      "This Agreement is NON-EXCLUSIVE. The Designer may serve other clients during the period, provided the commitments and timelines under this Agreement are fully honoured.",
+  },
+  Architecture: {
+    title: "Architectural Services Agreement",
+    providerRole: "Architect / Architecture Firm",
+    providerNoun: "Architect",
+    clientRole: "Client",
+    clientNoun: "Client",
+    clientFieldLabel: "Client Name",
+    serviceDescription: "architectural design and consultancy services",
+    complianceNote:
+      "All designs and drawings shall conform to applicable building bye-laws, the National Building Code, and professional standards; statutory approvals remain subject to the concerned authorities.",
+    rightsHeading: "Drawings, IP & Site Decisions",
+    rightsText:
+      "All drawings, designs and documents remain the intellectual property of the Architect. Upon full payment, the Client receives a license to use them solely for the subject project/site; reuse on any other site requires the Architect's written consent. The Client shall not make structural changes to the design during execution without the Architect's concurrence.",
+    exclusiveText:
+      "This Agreement is EXCLUSIVE for its scope. During the Agreement period, the Client shall not engage another architect for the same scope without the Architect's prior written consent.",
+    nonExclusiveText:
+      "This Agreement is NON-EXCLUSIVE. The Architect may take up other projects during the period, provided the commitments under this Agreement are honoured.",
+  },
+  Agency: {
+    title: "Agency Services Agreement",
+    providerRole: "Agency / Service Provider",
+    providerNoun: "Agency",
+    clientRole: "Client / Brand",
+    clientNoun: "Client",
+    clientFieldLabel: "Client Name",
+    serviceDescription: "marketing, creative and digital services",
+    complianceNote:
+      "All work shall be original, professionally produced, and compliant with applicable advertising standards (including ASCI guidelines) and platform policies.",
+    rightsHeading: "Deliverables, IP & Portfolio",
+    rightsText:
+      "Upon full and final payment, the Agency assigns to the Client the rights to the final deliverables produced under this Agreement. The Agency retains ownership of its pre-existing materials, tools, templates and processes, and the right to showcase the work in its portfolio and award entries unless the Client declines in writing. Third-party costs (ad spend, stock assets, licenses) are billed separately unless agreed otherwise.",
+    exclusiveText:
+      "This Agreement is EXCLUSIVE for its scope. During the Agreement period, the Agency shall not provide the same services to a direct competitor of the Client in the same category without prior written consent.",
+    nonExclusiveText:
+      "This Agreement is NON-EXCLUSIVE. The Agency may serve other clients during the period, provided no conflict of interest arises and the commitments under this Agreement are honoured.",
+  },
+  Construction: {
+    title: "Works Contract Agreement",
+    providerRole: "Contractor",
+    providerNoun: "Contractor",
+    clientRole: "Client / Owner",
+    clientNoun: "Client",
+    clientFieldLabel: "Client Name",
+    serviceDescription: "construction and works contract services",
+    complianceNote:
+      "All work shall be executed as per the agreed drawings/specifications and in compliance with applicable building codes, safety standards and labour laws.",
+    rightsHeading: "Materials, Workmanship & Defects",
+    rightsText:
+      "Materials shall conform to the agreed specifications/BOQ, and workmanship shall be of professional standard. The Contractor shall rectify defects attributable to workmanship reported within the agreed defect-liability period at no extra cost. Extra items or changes in scope shall be executed only against written approval and billed at agreed rates. Site safety during execution is the Contractor's responsibility.",
+    exclusiveText:
+      "This Agreement is EXCLUSIVE for its scope. The Contractor commits the agreed resources to the work, and the Client shall not engage a parallel contractor for the same scope during the Agreement period without prior written consent.",
+    nonExclusiveText:
+      "This Agreement is NON-EXCLUSIVE. The Contractor may undertake other projects during the period, provided the agreed manpower, timelines and quality under this Agreement are maintained.",
+  },
   Creator: {
     title: "Influencer Marketing Agreement",
     providerRole: "Creator / Influencer",
@@ -754,13 +1195,14 @@ const AGREEMENT_COPY: Record<DealType, AgreementCopy> = {
 
 /**
  * Returns deal-type-appropriate language for the generated agreement PDF.
- * Falls back to Creator copy for unknown/legacy deal types.
+ * Legacy deal types keep their original wording (existing signed agreements
+ * must re-render identically); unknown types get the generic Custom copy.
  */
 export function getAgreementCopy(dealType?: string | null): AgreementCopy {
   if (dealType && dealType in AGREEMENT_COPY) {
-    return AGREEMENT_COPY[dealType as DealType];
+    return AGREEMENT_COPY[dealType as AnyDealType];
   }
-  return AGREEMENT_COPY.Creator;
+  return AGREEMENT_COPY.Custom;
 }
 
 // ───────────────────────────────────────────────────────────────────────
@@ -779,23 +1221,29 @@ export interface DeliverableLabels {
   who: string;
 }
 
-const DELIVERABLE_LABELS: Record<DealType, DeliverableLabels> = {
+const DELIVERABLE_LABELS: Record<AnyDealType, DeliverableLabels> = {
+  "Real Estate": { category: "Service", type: "Billing Basis", who: "Client Name" },
+  "Interior Design": { category: "Scope / Area", type: "Billing Basis", who: "Client Name" },
+  Architecture: { category: "Service", type: "Billing Basis", who: "Client Name" },
+  Agency: { category: "Service", type: "Billing Model", who: "Client Name" },
+  Construction: { category: "Work / Trade", type: "Billing Basis", who: "Client Name" },
+  Custom: { category: "Category", type: "Output", who: "Client / Brand" },
+  // Legacy (existing deals only)
   Creator: { category: "Platform", type: "Content Type", who: "Brand Name" },
   Freelance: { category: "Category", type: "Output", who: "Client Name" },
   Consulting: { category: "Practice Area", type: "Format", who: "Client Name" },
   "Service Vendor": { category: "Service", type: "Output", who: "Client Name" },
-  Custom: { category: "Category", type: "Output", who: "Client / Brand" },
 };
 
 /**
- * Deal-type-aware labels for the deliverable fields. Falls back to Creator
- * ("Platform" / "Content Type") for unknown/legacy deal types.
+ * Deal-type-aware labels for the deliverable fields. Legacy types keep their
+ * original labels; unknown types fall back to the generic Custom labels.
  */
 export function getDeliverableLabels(dealType?: string | null): DeliverableLabels {
   if (dealType && dealType in DELIVERABLE_LABELS) {
-    return DELIVERABLE_LABELS[dealType as DealType];
+    return DELIVERABLE_LABELS[dealType as AnyDealType];
   }
-  return DELIVERABLE_LABELS.Creator;
+  return DELIVERABLE_LABELS.Custom;
 }
 
 /** Universal frequency options (applies to all deal types). */

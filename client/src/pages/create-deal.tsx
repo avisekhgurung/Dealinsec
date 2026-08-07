@@ -41,7 +41,7 @@ import { trackEvent } from "@/lib/analytics";
 const formSchema = insertDealSchema.omit({ userId: true }).extend({
   brandName: z.string().min(1, "Client / brand name is required"),
   dealTitle: z.string().min(1, "Deal title is required"),
-  dealType: z.enum(dealTypeOptions).default("Creator"),
+  dealType: z.enum(dealTypeOptions).default("Real Estate"),
   dealAmount: z.coerce.number().min(1, "Deal amount must be positive"),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
@@ -77,7 +77,7 @@ export default function CreateDealPage() {
     defaultValues: {
       brandName: "",
       dealTitle: "",
-      dealType: "Creator",
+      dealType: "Real Estate",
       dealAmount: 0,
       startDate: "",
       endDate: "",
@@ -85,8 +85,8 @@ export default function CreateDealPage() {
       deliverables: [
         {
           id: crypto.randomUUID(),
-          platform: "Instagram",
-          contentType: "Reel",
+          platform: "",
+          contentType: "",
           quantity: 1,
           frequency: "One-time",
           notes: "",
@@ -97,7 +97,7 @@ export default function CreateDealPage() {
     },
   });
 
-  const dealType = (form.watch("dealType") as DealType) || "Creator";
+  const dealType = (form.watch("dealType") as DealType) || "Real Estate";
   const taxonomy = TAXONOMY[dealType];
 
   // Itemizable custom terms — stored as newline-joined string in form for
@@ -203,7 +203,7 @@ export default function CreateDealPage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {dealTypeOptions.map((dt) => {
               const meta = dealTypeMeta[dt];
               const selected = dealType === dt;
@@ -247,7 +247,7 @@ export default function CreateDealPage() {
 
         <section className="glass-card rounded-xl p-5 space-y-4">
           <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            {dealType === "Creator" ? "Brand Details" : "Client Details"}
+            Client Details
           </h2>
 
           <div className="space-y-4">
@@ -255,11 +255,7 @@ export default function CreateDealPage() {
               <Label htmlFor="brandName">{L.who}</Label>
               <Input
                 id="brandName"
-                placeholder={
-                  dealType === "Creator"
-                    ? "e.g., Nike, Adidas, Mamaearth"
-                    : "Client / company name"
-                }
+                placeholder="Client / company name"
                 className="h-12"
                 data-testid="input-brand-name"
                 {...form.register("brandName")}
@@ -382,14 +378,7 @@ export default function CreateDealPage() {
                 <CardContent className="p-4 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      {dealType === "Creator" ? (
-                        <PlatformIcon
-                          platform={form.watch(`deliverables.${index}.platform`) || "Instagram"}
-                          size={18}
-                        />
-                      ) : (
-                        <span className="text-lg">{dealTypeMeta[dealType].emoji}</span>
-                      )}
+                      <span className="text-lg">{dealTypeMeta[dealType].emoji}</span>
                       <span className="font-medium text-sm">Deliverable {index + 1}</span>
                     </div>
                     {fields.length > 1 && (

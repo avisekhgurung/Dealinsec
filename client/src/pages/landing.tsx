@@ -37,6 +37,11 @@ import {
   PenTool,
   Calculator,
   ClipboardList,
+  Building2,
+  Sofa,
+  DraftingCompass,
+  Megaphone,
+  HardHat,
   Infinity as InfinityIcon,
 } from "lucide-react";
 import { SiGoogle, SiInstagram, SiYoutube, SiX, SiFacebook, SiLinkedin } from "react-icons/si";
@@ -144,31 +149,31 @@ const STATS = [
 const TESTIMONIALS = [
   {
     quote:
-      "Finally stopped chasing brands for payment. The invoice tracker alone saved me hours every week. This is how creator business should work.",
-    name: "Aanya Kapoor",
-    role: "Lifestyle Creator · 340K followers",
+      "Every client now gets a proper quotation, a signed agreement and a GST invoice. My brokerage looks as professional as a big firm — and payments stopped slipping.",
+    name: "Rajesh Sharma",
+    role: "Real Estate Consultant · Pune",
     rating: 5,
   },
   {
     quote:
-      "The agreement flow is a game changer. Brands take me seriously when I send a proper signed contract. My rates went up 2x.",
-    name: "Rohan Mehta",
-    role: "Tech Creator · YouTube 1.2M",
+      "Clients sign the agreement before we start and every milestone gets invoiced on time. Scope creep basically ended for my studio.",
+    name: "Meera Nair",
+    role: "Interior Designer · Kochi",
     rating: 5,
   },
   {
     quote:
-      "Clean, fast, and actually built for Indian creators. Banking details, GST, PAN — all handled. No more spreadsheets.",
-    name: "Priya Iyer",
-    role: "Fashion Influencer · Instagram 680K",
+      "We run 14 client retainers in one dashboard — quote, contract, invoice, reminder. Ops admin dropped to an hour a week.",
+    name: "Arjun Malhotra",
+    role: "Agency Founder · Gurugram",
     rating: 5,
   },
 ];
 
 const FAQS = [
   {
-    q: "Is this only for creators and influencers?",
-    a: "No. Creators are our beachhead because that's where we have the strongest signal, but the platform works for freelancers, agencies, consultants, photographers, and any service business that closes paid deals with clients or brands. The same workflow — deal → quote → contract → invoice — applies to everyone.",
+    q: "Who is DealInSec built for?",
+    a: "Deal-led service businesses — real estate brokers and consultants, interior designers, architects, marketing and digital agencies, and construction contractors. If you quote, sign and bill clients, the workflow fits: deal → quotation → agreement → invoice → payment.",
   },
   {
     q: "Is Dealinsec free to use?",
@@ -198,38 +203,38 @@ const FAQS = [
 
 const WHO_WE_SERVE = [
   {
-    icon: Sparkles,
-    title: "Creators",
-    tagline: "Beachhead",
-    desc: "Lifestyle, tech, finance, beauty — anyone closing brand deals on Instagram, YouTube, or X.",
+    icon: Building2,
+    title: "Real Estate",
+    tagline: "Sales · Rentals · Leasing",
+    desc: "Brokers and consultants closing property deals with proper mandates, agreements and brokerage invoices.",
     accent: "emerald",
   },
   {
-    icon: PenTool,
-    title: "Freelancers",
-    tagline: "15M+ in India",
-    desc: "Designers, editors, writers, developers shipping work for retainer or per-project clients.",
+    icon: Sofa,
+    title: "Interior Designers",
+    tagline: "Homes · Offices · Retail",
+    desc: "Studios quoting per sq ft or turnkey, signing scope before work starts, and billing by milestone.",
     accent: "teal",
   },
   {
-    icon: Users,
-    title: "Agencies & SMBs",
-    tagline: "6 Cr+ in India",
-    desc: "Boutique studios, marketing teams, and service businesses billing multiple clients each month.",
+    icon: DraftingCompass,
+    title: "Architects",
+    tagline: "Design · Drawings · PMC",
+    desc: "Firms billing stage-wise design fees, protecting drawings with agreements, and tracking every payment.",
     accent: "cyan",
   },
   {
-    icon: Lightbulb,
-    title: "Consultants",
-    tagline: "4M+ in India",
-    desc: "Coaches, advisors, and independent professionals selling hours, workshops, or retainers.",
+    icon: Megaphone,
+    title: "Agencies",
+    tagline: "Marketing · Digital · Web",
+    desc: "Marketing, creative and web agencies running client retainers, campaigns and project billing in one place.",
     accent: "indigo",
   },
   {
-    icon: Camera,
-    title: "Service Vendors",
-    tagline: "10M+ in India",
-    desc: "Photographers, planners, producers, trainers — anyone who closes paid work with a client.",
+    icon: HardHat,
+    title: "Construction",
+    tagline: "Civil · Turnkey · Trades",
+    desc: "Contractors managing works contracts, RA bills and milestone payments without the paperwork chaos.",
     accent: "amber",
   },
 ];
@@ -1104,7 +1109,7 @@ function WhoWeServeSection() {
               that closes deals
             </>
           }
-          subtitle="We started with creators because that's where the pain was loudest. The same workflow powers freelancers, agencies, consultants, and service vendors today."
+          subtitle="Built for the businesses that run on deals — brokers, designers, architects, agencies and contractors. One workflow from first quotation to final payment."
         />
 
         <motion.div
@@ -1147,7 +1152,7 @@ function WhoWeServeSection() {
         >
           <p className="text-sm sm:text-base text-neutral-200 font-medium leading-relaxed">
             <span className="text-emerald-400 font-semibold">One platform.</span>{" "}
-            Every deal-led business. Whether you're a solo creator or a 50-person agency — same workflow, same simple pricing.
+            Every deal-led business. Whether you're a solo consultant or a 50-person agency — same workflow, same simple pricing.
           </p>
         </motion.div>
       </div>
@@ -1351,7 +1356,7 @@ function ProductShowcase() {
         <SectionHeader
           eyebrow="Product showcase"
           title="Built like the tools you already love"
-          subtitle="Opinionated, fast, and designed for how creators actually work."
+          subtitle="Opinionated, fast, and designed for how service businesses actually work."
         />
 
         <div className="mt-16 space-y-20 lg:space-y-28">
@@ -1485,7 +1490,7 @@ function AgreementMockup() {
 
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/50 dark:bg-emerald-950/20 p-3">
-          <p className="text-[9px] uppercase tracking-widest text-neutral-500 mb-1">Creator</p>
+          <p className="text-[9px] uppercase tracking-widest text-neutral-500 mb-1">Provider</p>
           <p className="text-xs font-bold italic text-emerald-700 dark:text-emerald-300" style={{ fontFamily: "Georgia, serif" }}>Aanya K.</p>
           <div className="flex items-center gap-1 mt-1.5">
             <Check className="w-3 h-3 text-emerald-600" />
@@ -1579,9 +1584,9 @@ function Testimonials() {
     <section className="py-20 sm:py-28">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
-          eyebrow="Loved by creators"
+          eyebrow="Loved by service businesses"
           title="Deals closed. Payments secured."
-          subtitle="Real stories from creators who ship brand work through Dealinsec — in seconds, every time."
+          subtitle="Real stories from businesses that quote, sign and bill through Dealinsec — every time, on time."
         />
 
         <motion.div
@@ -1661,7 +1666,7 @@ function ReferralSection({ onCTA }: { onCTA: () => void }) {
               </h2>
 
               <p className="text-base text-neutral-700 leading-relaxed mb-6 max-w-lg">
-                Every creator gets a unique referral code in their profile. When a friend signs up with your code,{" "}
+                Every account gets a unique referral code in the profile. When a friend signs up with your code,{" "}
                 <span className="font-semibold text-neutral-900">you earn a bonus Deal Credit.</span> No cap, no expiry — stack them up.
               </p>
 
@@ -1691,7 +1696,7 @@ function ReferralSection({ onCTA }: { onCTA: () => void }) {
                   </div>
                   <div>
                     <p className="text-xs font-semibold">Your referral code</p>
-                    <p className="text-[10px] text-neutral-500">Share with creators you know</p>
+                    <p className="text-[10px] text-neutral-500">Share with businesses you know</p>
                   </div>
                 </div>
 
@@ -2168,7 +2173,7 @@ function NewsletterStrip() {
           Deal tips, straight to your inbox
         </h3>
         <p className="text-sm text-neutral-500 mt-1">
-          Get practical tips on closing brand deals, pricing your work, and getting paid on time. No spam.
+          Get practical tips on closing client deals, pricing your work, and getting paid on time. No spam.
         </p>
       </div>
       {done ? (

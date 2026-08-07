@@ -29,17 +29,21 @@ import {
 import type { Deal, Deliverable } from "@shared/schema";
 import {
   dealTypeOptions,
+  legacyDealTypeOptions,
   dealTypeMeta,
   TAXONOMY,
   getDeliverableLabels,
   type DealType,
+  type AnyDealType,
 } from "@shared/dealTypeTaxonomy";
 import { TaxonomyCombobox } from "@/components/taxonomy-combobox";
 
 const formSchema = z.object({
   brandName: z.string().min(1, "Client / brand name is required"),
   dealTitle: z.string().min(1, "Deal title is required"),
-  dealType: z.enum(dealTypeOptions).default("Creator"),
+  // Accept legacy types so pre-pivot deals can still be edited; the type
+  // selector grid only offers the Phase-1 sectors.
+  dealType: z.enum([...dealTypeOptions, ...legacyDealTypeOptions] as [string, ...string[]]).default("Custom"),
   dealAmount: z.coerce.number().min(1, "Deal amount must be positive"),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
@@ -91,7 +95,7 @@ export default function EditDealPage() {
     defaultValues: {
       brandName: "",
       dealTitle: "",
-      dealType: "Creator",
+      dealType: "Custom",
       dealAmount: 0,
       startDate: "",
       endDate: "",
@@ -99,8 +103,8 @@ export default function EditDealPage() {
       deliverables: [
         {
           id: crypto.randomUUID(),
-          platform: "Instagram",
-          contentType: "Reel",
+          platform: "",
+          contentType: "",
           quantity: 1,
           frequency: "One-time",
           notes: "",
@@ -111,7 +115,7 @@ export default function EditDealPage() {
     },
   });
 
-  const dealType = (form.watch("dealType") as DealType) || "Creator";
+  const dealType = (form.watch("dealType") as AnyDealType) || "Custom";
   const taxonomy = TAXONOMY[dealType];
   const L = getDeliverableLabels(dealType);
 
@@ -137,7 +141,7 @@ export default function EditDealPage() {
       form.reset({
         brandName: deal.brandName,
         dealTitle: deal.dealTitle,
-        dealType: ((deal as any).dealType as DealType) ?? "Creator",
+        dealType: ((deal as any).dealType as AnyDealType) ?? "Custom",
         dealAmount: deal.dealAmount,
         startDate: deal.startDate,
         endDate: deal.endDate,
@@ -251,7 +255,7 @@ export default function EditDealPage() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {dealTypeOptions.map((dt) => {
               const meta = dealTypeMeta[dt];
               const selected = dealType === dt;

@@ -168,7 +168,7 @@ export const deals = pgTable("deals", {
   brandUserId: varchar("brand_user_id").references(() => users.id),
   brandName: text("brand_name").notNull(),
   dealTitle: text("deal_title").notNull(),
-  dealType: varchar("deal_type").notNull().default("Creator"),
+  dealType: varchar("deal_type").notNull().default("Custom"),
   dealAmount: integer("deal_amount").notNull(),
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),
