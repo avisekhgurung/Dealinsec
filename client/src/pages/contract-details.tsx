@@ -11,6 +11,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useUpgradeModal } from "@/components/upgrade-modal";
+import { parseApiError, isUpgradeError } from "@/lib/api-error";
 import {
   ArrowLeft,
   Calendar,
@@ -40,6 +42,7 @@ export default function ContractDetailsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const confirm = useConfirm();
+  const { openUpgradeModal } = useUpgradeModal();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [showSplitInput, setShowSplitInput] = useState(false);
@@ -143,7 +146,11 @@ export default function ContractDetailsPage() {
       });
       setLocation(`/brand-invoices/${invoice.id}`);
     },
-    onError: () => {
+    onError: (err) => {
+      if (isUpgradeError(parseApiError(err))) {
+        openUpgradeModal({ feature: "invoices" });
+        return;
+      }
       toast({
         title: "Failed to create invoice",
         description: "Could not generate brand invoice. Please try again.",
@@ -165,7 +172,11 @@ export default function ContractDetailsPage() {
       toast({ title: "Invoices created", description: "Advance and final invoices generated." });
       setShowSplitInput(false);
     },
-    onError: () => {
+    onError: (err) => {
+      if (isUpgradeError(parseApiError(err))) {
+        openUpgradeModal({ feature: "invoices" });
+        return;
+      }
       toast({
         title: "Failed to split invoice",
         description: "Could not create split invoices. Please try again.",
@@ -181,8 +192,9 @@ export default function ContractDetailsPage() {
         credentials: "include",
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || "Delete failed");
+        // Standard "STATUS: json" shape so parseApiError can route gate errors.
+        const text = await res.text().catch(() => "");
+        throw new Error(`${res.status}: ${text}`);
       }
     },
     onSuccess: () => {
@@ -191,9 +203,14 @@ export default function ContractDetailsPage() {
       toast({ title: "Invoice deleted" });
     },
     onError: (err: any) => {
+      const parsed = parseApiError(err);
+      if (isUpgradeError(parsed)) {
+        openUpgradeModal({ feature: "invoices" });
+        return;
+      }
       toast({
         title: "Failed to delete invoice",
-        description: err?.message || "Please try again.",
+        description: parsed.error || "Please try again.",
         variant: "destructive",
       });
     },
@@ -212,9 +229,14 @@ export default function ContractDetailsPage() {
       setEditAmount("");
     },
     onError: (err: any) => {
+      const parsed = parseApiError(err);
+      if (isUpgradeError(parsed)) {
+        openUpgradeModal({ feature: "payment_tracking" });
+        return;
+      }
       toast({
         title: "Failed to update amount",
-        description: err?.message || "Please try again.",
+        description: parsed.error || "Please try again.",
         variant: "destructive",
       });
     },

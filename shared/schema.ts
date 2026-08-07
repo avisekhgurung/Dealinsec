@@ -69,9 +69,29 @@ export const users = pgTable("users", {
   ifscCode: varchar("ifsc_code"),
   bankName: varchar("bank_name"),
   onboardingComplete: boolean("onboarding_complete").notNull().default(false),
-  contractCredits: integer("contract_credits").notNull().default(3),
+  // Legacy migration bucket: old paid ₹299 agreement credits became these.
+  // Never expire, cover 1 deal + its quotation each, consumed only after the
+  // monthly allowance runs out. Nothing sells these anymore (referrals still
+  // grant them). NOTE: deliberately still mapped to the legacy "contract_credits"
+  // SQL column — the deployed production build selects that column by name, so
+  // renaming it in the DB would break prod auth. Only the TS property is renamed.
+  purchasedDealCredits: integer("contract_credits").notNull().default(0),
   plan: varchar("plan").notNull().default("free"),
+  // "monthly" | "yearly" — distinguishes PRO_MONTHLY vs PRO_YEARLY while
+  // `plan`/`planExpiresAt` keep working unchanged (incl. hasActivePro).
+  planTerm: varchar("plan_term"),
   planExpiresAt: timestamp("plan_expires_at"),
+  // Free plan: 4 Deal Credits per month (1 credit = create 1 deal + generate
+  // its quotation). Reset lazily: whenever credits are read/spent after
+  // monthlyCreditsResetAt has passed, the balance is SET back to 4 (no
+  // rollover) and the next reset scheduled a month out.
+  monthlyDealCredits: integer("monthly_deal_credits").notNull().default(4),
+  monthlyCreditsResetAt: timestamp("monthly_credits_reset_at")
+    .notNull()
+    .default(sql`now() + interval '1 month'`),
+  // ₹99 Deal Boost: unlimited deals + quotations while this is in the future.
+  // Never unlocks Pro features (agreements/invoices/payment tracking).
+  dealBoostExpiresAt: timestamp("deal_boost_expires_at"),
   referralCode: varchar("referral_code").unique(),
   role: varchar("role").notNull().default("influencer"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -82,17 +102,61 @@ export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
 export const planOptions = ["free", "pro"] as const;
+export const planTermOptions = ["monthly", "yearly"] as const;
 
-// DealInSec Pro: annual plan with unlimited agreements. A user is Pro while
-// `plan` is "pro" and the expiry is in the future. `planExpiresAt` is a Date
-// on the server but an ISO string once serialized over the API, so both are
-// accepted — this helper is shared by server route guards and client UI.
+// DealInSec Pro: subscription with the unlimited full workflow (agreements,
+// invoices, payment tracking). A user is Pro while `plan` is "pro" and the
+// expiry is in the future. `planExpiresAt` is a Date on the server but an ISO
+// string once serialized over the API, so both are accepted — this helper is
+// shared by server route guards and client UI.
 export function hasActivePro(
   user?: { plan?: string | null; planExpiresAt?: Date | string | null } | null,
 ): boolean {
   if (!user || user.plan !== "pro" || !user.planExpiresAt) return false;
   const expires = new Date(user.planExpiresAt).getTime();
   return Number.isFinite(expires) && expires > Date.now();
+}
+
+// ₹99 Deal Boost: unlimited deals + quotations for a month. Same Date|string
+// tolerance as hasActivePro. Does NOT unlock Pro-only features.
+export function hasActiveDealBoost(
+  user?: { dealBoostExpiresAt?: Date | string | null } | null,
+): boolean {
+  if (!user?.dealBoostExpiresAt) return false;
+  const expires = new Date(user.dealBoostExpiresAt).getTime();
+  return Number.isFinite(expires) && expires > Date.now();
+}
+
+export type SubscriptionType = "FREE" | "PRO_MONTHLY" | "PRO_YEARLY";
+export type SubscriptionStatus = "ACTIVE" | "EXPIRED" | "FREE";
+
+type PlanFields = {
+  plan?: string | null;
+  planTerm?: string | null;
+  planExpiresAt?: Date | string | null;
+};
+
+export function getSubscriptionType(user?: PlanFields | null): SubscriptionType {
+  if (!hasActivePro(user)) return "FREE";
+  return user?.planTerm === "monthly" ? "PRO_MONTHLY" : "PRO_YEARLY";
+}
+
+// Derived, not stored: ACTIVE = Pro in force; EXPIRED = was Pro, term lapsed
+// (renew prompt); FREE = never subscribed (or fully reverted).
+export function getSubscriptionStatus(user?: PlanFields | null): SubscriptionStatus {
+  if (hasActivePro(user)) return "ACTIVE";
+  if (user?.plan === "pro") return "EXPIRED";
+  return "FREE";
+}
+
+// Deal Credits as displayed everywhere: the monthly allowance plus any legacy
+// purchased/referral credits (spent only after monthly hits 0).
+export function getDealCredits(
+  user?: { monthlyDealCredits?: number | null; purchasedDealCredits?: number | null } | null,
+): { monthly: number; purchased: number; total: number } {
+  const monthly = user?.monthlyDealCredits ?? 0;
+  const purchased = user?.purchasedDealCredits ?? 0;
+  return { monthly, purchased, total: monthly + purchased };
 }
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });

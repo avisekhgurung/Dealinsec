@@ -57,16 +57,21 @@ export interface IStorage {
   
   getCreditTransactions(userId: string): Promise<CreditTransaction[]>;
   createCreditTransaction(transaction: InsertCreditTransaction): Promise<CreditTransaction>;
-  deductCreditIfSufficient(userId: string): Promise<boolean>;
-  addCredits(userId: string, amount: number, type: string, paymentAmount?: number): Promise<User | undefined>;
-  activateProPlan(userId: string, days: number): Promise<User | undefined>;
+  ensureMonthlyCredits(userId: string): Promise<User | undefined>;
+  spendDealCredit(userId: string): Promise<{ ok: boolean; user?: User }>;
+  regrantDealCredit(userId: string): Promise<void>;
+  addPurchasedCredits(userId: string, amount: number, type: string, paymentAmount?: number): Promise<User | undefined>;
+  activateProPlan(userId: string, days: number, term: "monthly" | "yearly"): Promise<User | undefined>;
   revokeProPlan(userId: string, days: number): Promise<User | undefined>;
+  activateDealBoost(userId: string, days: number): Promise<User | undefined>;
+  revokeDealBoost(userId: string, days: number): Promise<User | undefined>;
 
   createPayuOrder(order: InsertPayuOrder): Promise<PayuOrder>;
   getPayuOrder(orderId: string): Promise<PayuOrder | undefined>;
   getPayuOrderByPaymentId(paymentId: string): Promise<PayuOrder | undefined>;
   updatePayuOrder(orderId: string, updates: Partial<PayuOrder>): Promise<PayuOrder | undefined>;
   completePayuOrderOnce(orderId: string, updates: Partial<PayuOrder>): Promise<PayuOrder | undefined>;
+  markPayuOrderFailedIfPending(orderId: string): Promise<void>;
   markPayuOrderRefundedOnce(orderId: string): Promise<PayuOrder | undefined>;
 
   createQuote(data: InsertQuote): Promise<Quote>;
@@ -267,36 +272,83 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async deductCreditIfSufficient(userId: string): Promise<boolean> {
-    const result = await db.update(users)
-      .set({ 
-        contractCredits: sql`${users.contractCredits} - 1`,
-        updatedAt: new Date()
+  async ensureMonthlyCredits(userId: string): Promise<User | undefined> {
+    // Lazy monthly reset: no cron exists (and the free-tier host sleeps), so
+    // the reset happens on access. Atomic: of N concurrent callers the WHERE
+    // guard lets exactly one row-update through. SET to 4 (not += 4) — unused
+    // monthly credits do not roll over. Next reset is a month from NOW, so an
+    // inactive user doesn't accrue several resets.
+    const [updated] = await db.update(users)
+      .set({
+        monthlyDealCredits: 4,
+        monthlyCreditsResetAt: sql`now() + interval '1 month'`,
+        updatedAt: new Date(),
       })
-      .where(sql`${users.id} = ${userId} AND ${users.contractCredits} > 0`)
+      .where(sql`${users.id} = ${userId} AND ${users.monthlyCreditsResetAt} <= now()`)
       .returning();
-    
-    if (result.length > 0) {
-      await this.createCreditTransaction({
-        userId,
-        delta: -1,
-        type: "usage",
-        metadata: { action: "contract_creation" }
-      });
-      return true;
-    }
-    return false;
+    return updated; // undefined = no reset was due
   }
 
-  async addCredits(userId: string, amount: number, type: string, paymentAmount?: number): Promise<User | undefined> {
+  async spendDealCredit(userId: string): Promise<{ ok: boolean; user?: User }> {
+    // One atomic statement, monthly bucket first then legacy purchased. Both
+    // CASE expressions read the pre-update row, so exactly one bucket loses 1;
+    // the WHERE guard stops the spend at 0/0 (same pattern as the old
+    // deductCreditIfSufficient). The ledger row records the post-spend
+    // balances (RETURNING can't expose pre-update values, so which bucket was
+    // hit is derivable from consecutive ledger entries rather than stored).
+    const [row] = await db.update(users)
+      .set({
+        monthlyDealCredits: sql`CASE WHEN ${users.monthlyDealCredits} > 0 THEN ${users.monthlyDealCredits} - 1 ELSE ${users.monthlyDealCredits} END`,
+        purchasedDealCredits: sql`CASE WHEN ${users.monthlyDealCredits} > 0 THEN ${users.purchasedDealCredits} ELSE ${users.purchasedDealCredits} - 1 END`,
+        updatedAt: new Date(),
+      })
+      .where(sql`${users.id} = ${userId} AND (${users.monthlyDealCredits} > 0 OR ${users.purchasedDealCredits} > 0)`)
+      .returning();
+    if (!row) return { ok: false };
+    await this.createCreditTransaction({
+      userId,
+      delta: -1,
+      type: "usage",
+      metadata: {
+        action: "deal_creation",
+        monthlyAfter: row.monthlyDealCredits,
+        purchasedAfter: row.purchasedDealCredits,
+      },
+    });
+    return { ok: true, user: row };
+  }
+
+  async regrantDealCredit(userId: string): Promise<void> {
+    // Compensation for the rare path where the credit was spent but the deal
+    // insert then failed. We can't tell which bucket spendDealCredit hit
+    // (RETURNING only exposes post-update values), so refund into the
+    // never-expiring purchased bucket: refunding into monthly would let the
+    // next lazy reset (SET monthly = 4, no rollover) silently destroy a paid
+    // legacy credit. Worst case a monthly-bucket spend becomes a permanent
+    // credit — the error favors the user, and the ledger records it.
+    await db.update(users)
+      .set({
+        purchasedDealCredits: sql`${users.purchasedDealCredits} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+    await this.createCreditTransaction({
+      userId,
+      delta: 1,
+      type: "refund",
+      metadata: { action: "deal_creation_failed" },
+    });
+  }
+
+  async addPurchasedCredits(userId: string, amount: number, type: string, paymentAmount?: number): Promise<User | undefined> {
     const [updated] = await db.update(users)
-      .set({ 
-        contractCredits: sql`${users.contractCredits} + ${amount}`,
+      .set({
+        purchasedDealCredits: sql`${users.purchasedDealCredits} + ${amount}`,
         updatedAt: new Date()
       })
       .where(eq(users.id, userId))
       .returning();
-    
+
     if (updated) {
       await this.createCreditTransaction({
         userId,
@@ -309,15 +361,41 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async activateProPlan(userId: string, days: number): Promise<User | undefined> {
+  async activateProPlan(userId: string, days: number, term: "monthly" | "yearly"): Promise<User | undefined> {
     // Atomic in SQL: renewals extend from the current expiry when the plan is
     // still active, else from now. Computing this in the UPDATE itself (not
     // read-modify-write in JS) means two concurrent grants both extend — no
-    // lost paid year under the verify/webhook race or double-renewal.
+    // lost paid term under the verify/webhook race or double-renewal.
     const [updated] = await db.update(users)
       .set({
         plan: "pro",
+        planTerm: term,
         planExpiresAt: sql`GREATEST(COALESCE(${users.planExpiresAt}, NOW()), NOW()) + make_interval(days => ${days})`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
+  async activateDealBoost(userId: string, days: number): Promise<User | undefined> {
+    // ₹99 Deal Boost: unlimited deals + quotations for `days`. Same atomic
+    // GREATEST-extend as Pro, so buying again stacks the expiry.
+    const [updated] = await db.update(users)
+      .set({
+        dealBoostExpiresAt: sql`GREATEST(COALESCE(${users.dealBoostExpiresAt}, NOW()), NOW()) + make_interval(days => ${days})`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
+  }
+
+  async revokeDealBoost(userId: string, days: number): Promise<User | undefined> {
+    // Refund clawback for a boost purchase.
+    const [updated] = await db.update(users)
+      .set({
+        dealBoostExpiresAt: sql`COALESCE(${users.dealBoostExpiresAt}, NOW()) - make_interval(days => ${days})`,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId))
@@ -365,15 +443,29 @@ export class DatabaseStorage implements IStorage {
   }
 
   async completePayuOrderOnce(orderId: string, updates: Partial<PayuOrder>): Promise<PayuOrder | undefined> {
-    // Atomic pending→completed claim: the status guard lives in the WHERE
-    // clause, so of N concurrent callers (browser verify + Razorpay webhook)
-    // exactly one gets the row back and performs the grant. Returns undefined
-    // when someone else already completed it.
+    // Atomic claim: the status guard lives in the WHERE clause, so of N
+    // concurrent callers (browser verify + Razorpay webhook) exactly one gets
+    // the row back and performs the grant. Returns undefined when someone else
+    // already completed it. Only 'pending' and 'failed' are claimable —
+    // 'failed' so a legitimate retry after a transient signature error still
+    // delivers, but 'refunded' is TERMINAL: without that, a buyer could replay
+    // the (forever-valid) verify signature after a refund and re-grant the
+    // entitlement they were just refunded for.
     const [updated] = await db.update(payuOrders)
       .set({ ...updates, status: "completed" })
-      .where(sql`${payuOrders.orderId} = ${orderId} AND ${payuOrders.status} <> 'completed'`)
+      .where(sql`${payuOrders.orderId} = ${orderId} AND ${payuOrders.status} IN ('pending', 'failed')`)
       .returning();
     return updated;
+  }
+
+  async markPayuOrderFailedIfPending(orderId: string): Promise<void> {
+    // Only a pending order may be marked failed. An unguarded write here could
+    // race the webhook (read pending → webhook completes+grants → we stomp
+    // 'failed' over 'completed'), making the order re-claimable for a second
+    // grant and invisible to the refund clawback.
+    await db.update(payuOrders)
+      .set({ status: "failed" })
+      .where(sql`${payuOrders.orderId} = ${orderId} AND ${payuOrders.status} = 'pending'`);
   }
 
   async markPayuOrderRefundedOnce(orderId: string): Promise<PayuOrder | undefined> {

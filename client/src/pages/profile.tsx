@@ -11,6 +11,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
 import { BottomNav } from "@/components/bottom-nav";
+import { hasActivePro, getDealCredits } from "@shared/schema";
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -703,11 +704,13 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {/* Credits Card */}
+            {/* Plan / Deal Credits Card */}
             <div
               className="rounded-2xl p-5 border-0 relative overflow-hidden"
               style={{
-                background: "linear-gradient(135deg, hsl(160 84% 22%) 0%, hsl(160 84% 30%) 50%, hsl(174 77% 36%) 100%)",
+                background: hasActivePro(user)
+                  ? "linear-gradient(135deg, hsl(258 60% 30%) 0%, hsl(258 60% 40%) 50%, hsl(243 60% 45%) 100%)"
+                  : "linear-gradient(135deg, hsl(160 84% 22%) 0%, hsl(160 84% 30%) 50%, hsl(174 77% 36%) 100%)",
               }}
             >
               <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/10 -mr-10 -mt-10" />
@@ -715,23 +718,41 @@ export default function ProfilePage() {
               <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-3">
                   <Sparkles className="h-4 w-4 text-white/80" />
-                  <h3 className="font-semibold text-white/90">Contract Credits</h3>
+                  <h3 className="font-semibold text-white/90">
+                    {hasActivePro(user) ? "DealInSec Pro" : "Deal Credits"}
+                  </h3>
                 </div>
                 <div className="flex items-end justify-between">
-                  <div>
-                    <p className="text-4xl font-bold text-white" data-testid="text-credits">
-                      {user?.contractCredits ?? 0}
-                    </p>
-                    <p className="text-sm text-white/60 mt-1">Available credits</p>
-                  </div>
+                  {hasActivePro(user) ? (
+                    <div>
+                      <p className="text-4xl font-bold text-white" data-testid="text-credits">∞</p>
+                      <p className="text-sm text-white/60 mt-1">
+                        Unlimited workflow
+                        {user?.planExpiresAt
+                          ? ` · until ${new Date(user.planExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`
+                          : ""}
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-4xl font-bold text-white" data-testid="text-credits">
+                        {getDealCredits(user).total}
+                      </p>
+                      <p className="text-sm text-white/60 mt-1">
+                        {getDealCredits(user).monthly} monthly
+                        {getDealCredits(user).purchased > 0 ? ` + ${getDealCredits(user).purchased} extra` : ""}
+                        {" · 1 credit = deal + quotation"}
+                      </p>
+                    </div>
+                  )}
                   <Link href="/pricing">
                     <Button
                       size="sm"
                       className="bg-white/20 hover:bg-white/30 text-white border-0 backdrop-blur-sm"
-                      data-testid="button-buy-credits"
+                      data-testid="button-upgrade"
                     >
                       <CreditCard className="h-4 w-4 mr-2" />
-                      Buy Credits
+                      {hasActivePro(user) ? "Manage Plan" : "Upgrade"}
                     </Button>
                   </Link>
                 </div>
@@ -745,7 +766,7 @@ export default function ProfilePage() {
                 <h3 className="font-semibold">Referral Program</h3>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                Share your referral code with friends. You get a free credit for every friend who signs up!
+                Share your referral code with friends. You earn a free Deal Credit for every friend who signs up!
               </p>
 
               {referralData?.referralCode && (

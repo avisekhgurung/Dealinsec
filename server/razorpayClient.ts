@@ -1,15 +1,18 @@
 /**
  * Razorpay client wrapper.
  *
- * Handles credit-purchase payments (UPI QR / cards / netbanking) for
- * DealInSec. Replaces the legacy PayU integration.
+ * Handles subscription payments (UPI QR / cards / netbanking) for DealInSec.
+ * Replaces the legacy PayU integration.
  *
  * Required env vars:
  *   RAZORPAY_KEY_ID          (public — also sent to the browser checkout)
  *   RAZORPAY_KEY_SECRET      (private — server only)
  *   RAZORPAY_WEBHOOK_SECRET  (private — verifies webhook authenticity)
  *
- * Pricing: CREDIT_VALUE env var (default 299) = ₹ per contract credit.
+ * Pricing (₹, env-overridable for test-mode runs):
+ *   PRO_MONTHLY_PRICE (default 999)   — Pro, 1 month
+ *   PRO_YEARLY_PRICE  (default 9999)  — Pro, 1 year ("Save 2 Months")
+ *   DEAL_BOOST_PRICE  (default 99)    — unlimited deals+quotations, 1 month
  */
 import Razorpay from "razorpay";
 import crypto from "crypto";
@@ -24,16 +27,23 @@ export function getRazorpayKeyId(): string {
   return process.env.RAZORPAY_KEY_ID || "";
 }
 
-export function getCreditPrice(): number {
-  return parseInt(process.env.CREDIT_VALUE ?? "299", 10);
+// Sold like Vyapar's licenses: one-time payments for fixed terms, no
+// auto-debit mandate (true autopay = Razorpay Subscriptions API, future work).
+// 31/366 cover the longest month/leap year so a paid term is never short.
+export const PRO_MONTHLY_DAYS = 31;
+export const PRO_YEARLY_DAYS = 366;
+export const DEAL_BOOST_DAYS = 31;
+
+export function getProMonthlyPrice(): number {
+  return parseInt(process.env.PRO_MONTHLY_PRICE ?? "999", 10);
 }
 
-// DealInSec Pro — annual plan, unlimited agreements. Sold like Vyapar's
-// licenses: a one-time payment for a 366-day term, no auto-debit mandate.
-export const PRO_PLAN_DAYS = 366;
+export function getProYearlyPrice(): number {
+  return parseInt(process.env.PRO_YEARLY_PRICE ?? "9999", 10);
+}
 
-export function getProPlanPrice(): number {
-  return parseInt(process.env.PRO_PLAN_PRICE ?? "2999", 10);
+export function getDealBoostPrice(): number {
+  return parseInt(process.env.DEAL_BOOST_PRICE ?? "99", 10);
 }
 
 function getClient(): Razorpay {

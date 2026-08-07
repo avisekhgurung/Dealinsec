@@ -1,6 +1,7 @@
 import { useLocation, Link } from "wouter";
 import { Home, Briefcase, FileCheck, Receipt, FileText, UserCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { hasActivePro, hasActiveDealBoost, getDealCredits } from "@shared/schema";
 
 const navItems = [
   { path: "/dashboard", label: "Home", icon: Home },
@@ -14,7 +15,9 @@ const navItems = [
 export function BottomNav() {
   const [location] = useLocation();
   const { user } = useAuth();
-  const credits = user?.contractCredits ?? 0;
+  const credits = getDealCredits(user).total;
+  // Pro & Deal Boost users have unlimited deals — no badge needed.
+  const showCreditBadge = !hasActivePro(user) && !hasActiveDealBoost(user);
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-50 safe-area-pb lg:hidden" style={{
@@ -50,8 +53,8 @@ export function BottomNav() {
                     className="relative w-5 h-5 transition-all duration-200"
                     style={{ strokeWidth: isActive ? 2.5 : 1.75 }}
                   />
-                  {/* Credit badge on Profile tab */}
-                  {(item as any).showCredits && (
+                  {/* Deal Credit badge on Profile tab (hidden for Pro/Boost) */}
+                  {(item as any).showCredits && showCreditBadge && (
                     <span
                       className="absolute -top-1.5 -right-2.5 min-w-[16px] h-[16px] flex items-center justify-center rounded-full text-[9px] font-black text-white leading-none px-[3px]"
                       style={{

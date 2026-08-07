@@ -64,6 +64,8 @@ export async function setupAuth(app: Express) {
 
       const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
+      // New-model signup: column defaults grant 4 monthly Deal Credits and 0
+      // purchased — no explicit credit grant needed.
       const user = await storage.createUser({
         email,
         password: hashedPassword,
@@ -71,16 +73,16 @@ export async function setupAuth(app: Express) {
         lastName: lastName || null,
         role: "influencer",
         onboardingComplete: false,
-        contractCredits: parseInt(process.env.SIGNUP_FREE_CREDITS ?? '3'),
         referralCode: generateReferralCode(email),
       });
 
-      // Award referral credits if a valid referral code was provided
+      // Award referral credits if a valid referral code was provided (these go
+      // to the never-expiring purchased bucket)
       if (referralCode) {
         const referrer = await storage.getUserByReferralCode(referralCode);
         if (referrer && referrer.id !== user.id) {
           const creditsToAward = parseInt(process.env.REFERRAL_CREDITS ?? '1');
-          await storage.addCredits(referrer.id, creditsToAward, 'referral');
+          await storage.addPurchasedCredits(referrer.id, creditsToAward, 'referral');
           await storage.createReferral({
             referrerId: referrer.id,
             referredUserId: user.id,

@@ -35,7 +35,7 @@ export function setupGoogleAuth() {
           let user = await storage.getUserByEmail(email);
 
           if (!user) {
-            const signupCredits = parseInt(process.env.SIGNUP_FREE_CREDITS ?? "3");
+            // Column defaults grant 4 monthly Deal Credits (new model).
             user = await storage.createUser({
               email,
               firstName: profile.name?.givenName || profile.displayName,
@@ -43,7 +43,6 @@ export function setupGoogleAuth() {
               profileImageUrl: profile.photos?.[0]?.value || null,
               role: "influencer",
               onboardingComplete: false,
-              contractCredits: signupCredits,
               referralCode: generateReferralCode(email),
             });
 

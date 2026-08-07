@@ -12,6 +12,8 @@ import { DataTable } from "@/components/data-table/data-table";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { unguardCell } from "@/lib/csv";
 import { useToast } from "@/hooks/use-toast";
+import { useUpgradeModal } from "@/components/upgrade-modal";
+import { parseApiError, isUpgradeError } from "@/lib/api-error";
 import { Plus, Briefcase, ChevronRight, Calendar, Search, X } from "lucide-react";
 import { dealTypeMeta } from "@shared/dealTypeTaxonomy";
 import type { Deal } from "@shared/schema";
@@ -99,6 +101,7 @@ export default function DealsPage() {
   const [search, setSearch] = useState("");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { openUpgradeModal } = useUpgradeModal();
 
   const { data: deals = [], isLoading } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
@@ -135,7 +138,7 @@ export default function DealsPage() {
       return;
     }
     const today = new Date().toISOString().split("T")[0];
-    let ok = 0, skipped = 0;
+    let ok = 0, skipped = 0, outOfCredits = 0;
     for (const r of rows) {
       // unguardCell reverses the export's formula-guard apostrophe so a value
       // like "@nike" round-trips cleanly instead of becoming "'@nike".
@@ -156,13 +159,31 @@ export default function DealsPage() {
           standardTermIds: [],
         });
         ok++;
-      } catch { skipped++; }
+      } catch (err) {
+        // Out of Deal Credits → every remaining row would fail the same way;
+        // stop the doomed loop and tell the user the real reason.
+        if (isUpgradeError(parseApiError(err))) {
+          outOfCredits = rows.length - ok - skipped;
+          break;
+        }
+        skipped++;
+      }
     }
     await queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
-    toast({
-      title: `Imported ${ok} deal${ok !== 1 ? "s" : ""}`,
-      description: skipped ? `${skipped} row${skipped !== 1 ? "s" : ""} skipped (missing brand or title).` : "All rows imported.",
-    });
+    await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    if (outOfCredits > 0) {
+      toast({
+        title: `Imported ${ok} deal${ok !== 1 ? "s" : ""} — out of Deal Credits`,
+        description: `${outOfCredits} row${outOfCredits !== 1 ? "s" : ""} not imported: your free monthly credits ran out.`,
+        variant: "destructive",
+      });
+      openUpgradeModal({ feature: "deals" });
+    } else {
+      toast({
+        title: `Imported ${ok} deal${ok !== 1 ? "s" : ""}`,
+        description: skipped ? `${skipped} row${skipped !== 1 ? "s" : ""} skipped (missing brand or title).` : "All rows imported.",
+      });
+    }
   }
 
   return (

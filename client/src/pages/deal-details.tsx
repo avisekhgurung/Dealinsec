@@ -13,14 +13,18 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { trackEvent } from "@/lib/analytics";
-import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle, ChevronRight } from "lucide-react";
+import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle, ChevronRight, Crown } from "lucide-react";
+import { hasActivePro } from "@shared/schema";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
+import { useUpgradeModal } from "@/components/upgrade-modal";
+import { parseApiError, isUpgradeError } from "@/lib/api-error";
 
 export default function DealDetailsPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { openUpgradeModal } = useUpgradeModal();
   const [splitPercentageStr, setSplitPercentageStr] = useState("50");
   const [completedIds, setCompletedIds] = useState<Set<string>>(() => {
     try {
@@ -124,7 +128,12 @@ export default function DealDetailsPage() {
         description: `Advance (${splitPercentage}%) and Final (${100 - splitPercentage}%) invoices generated.`,
       });
     },
-    onError: () => {
+    onError: (err) => {
+      const parsed = parseApiError(err);
+      if (isUpgradeError(parsed)) {
+        openUpgradeModal({ feature: "invoices" });
+        return;
+      }
       toast({
         title: "Error",
         description: "Failed to create split invoices. Please try again.",
@@ -357,20 +366,9 @@ export default function DealDetailsPage() {
                   </Button>
                 )}
 
-                {/* Step 2 → 3: Create Agreement */}
+                {/* Step 2 → 3: Create Agreement (Pro feature) */}
                 {hasQuote && !hasContract && (
-                  (user?.contractCredits ?? 0) < 1 ? (
-                    <Link href={`/pricing?redirect=/deals/${deal.id}/contract`}>
-                      <Button
-                        className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
-                        data-testid="button-buy-credit-for-contract"
-                      >
-                        <CreditCard className="w-5 h-5 mr-2" />
-                        Buy Credit to Create Agreement
-                        <span className="ml-auto text-xs bg-white/20 rounded-full px-2 py-0.5">0 credits</span>
-                      </Button>
-                    </Link>
-                  ) : (
+                  hasActivePro(user) ? (
                     <Link href={`/deals/${deal.id}/contract`}>
                       <Button
                         className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
@@ -378,9 +376,21 @@ export default function DealDetailsPage() {
                       >
                         <FileCheck className="w-5 h-5 mr-2" />
                         Create Agreement
-                        <span className="ml-auto text-xs bg-white/20 rounded-full px-2 py-0.5">1 credit</span>
+                        <span className="ml-auto text-xs bg-white/20 rounded-full px-2 py-0.5">Pro</span>
                       </Button>
                     </Link>
+                  ) : (
+                    <Button
+                      className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
+                      onClick={() => openUpgradeModal({ feature: "agreements" })}
+                      data-testid="button-create-contract-upgrade"
+                    >
+                      <FileCheck className="w-5 h-5 mr-2" />
+                      Create Agreement
+                      <span className="ml-auto flex items-center gap-1 text-xs bg-white/20 rounded-full px-2 py-0.5">
+                        <Crown className="w-3 h-3" /> Pro
+                      </span>
+                    </Button>
                   )
                 )}
 
@@ -409,8 +419,23 @@ export default function DealDetailsPage() {
                   </div>
                 )}
 
-                {/* Step 3 → 4: Generate Invoice for Brand */}
-                {hasContract && hasProof && !hasInvoice && (
+                {/* Step 3 → 4: Generate Invoice for Brand (Pro feature) */}
+                {hasContract && hasProof && !hasInvoice && !hasActivePro(user) && (
+                  <div className="space-y-2">
+                    <Button
+                      className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
+                      onClick={() => openUpgradeModal({ feature: "invoices" })}
+                      data-testid="button-generate-invoice-upgrade"
+                    >
+                      <Receipt className="w-5 h-5 mr-2" />
+                      Generate Invoice
+                      <span className="ml-auto flex items-center gap-1 text-xs bg-white/20 rounded-full px-2 py-0.5">
+                        <Crown className="w-3 h-3" /> Pro
+                      </span>
+                    </Button>
+                  </div>
+                )}
+                {hasContract && hasProof && !hasInvoice && hasActivePro(user) && (
                   <div className="space-y-2">
                     <Link href={contract ? `/contracts/${contract.id}` : "/contracts"}>
                       <Button

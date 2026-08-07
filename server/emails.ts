@@ -154,18 +154,18 @@ function infoCard(rows: string): string {
 
 export function welcomeEmail(args: { firstName?: string }): { subject: string; html: string } {
   const name = args.firstName ? `, ${args.firstName}` : "";
-  const subject = "Welcome to DealInSec — your 3 free credits are ready 🎉";
+  const subject = "Welcome to DealInSec — your free plan is ready 🎉";
   const html = layout({
-    preview: "Your 3 free contract credits are ready. Here's how to close your first deal.",
+    preview: "You get 4 free Deal Credits every month. Here's how to close your first deal.",
     bodyHtml: `
       ${heading(`Welcome aboard${name}!`)}
-      ${para("DealInSec helps you track deals, send quotations, sign contracts, and bill clients — all in one workflow.")}
-      ${para("You've got <strong>3 free contract credits</strong> to start. Here's your first move:")}
+      ${para("DealInSec helps you track deals, send quotations, sign agreements, and bill clients — all in one workflow.")}
+      ${para("Your free plan includes <strong>4 Deal Credits every month</strong> — each covers a deal plus its quotation. Here's your first move:")}
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">
         <tr><td style="padding:6px 0;color:#334155;font-size:14px;">1️⃣ &nbsp;Create your first deal</td></tr>
         <tr><td style="padding:6px 0;color:#334155;font-size:14px;">2️⃣ &nbsp;Send a professional quotation</td></tr>
-        <tr><td style="padding:6px 0;color:#334155;font-size:14px;">3️⃣ &nbsp;Generate a signed agreement (uses 1 credit)</td></tr>
-        <tr><td style="padding:6px 0;color:#334155;font-size:14px;">4️⃣ &nbsp;Invoice your client</td></tr>
+        <tr><td style="padding:6px 0;color:#334155;font-size:14px;">3️⃣ &nbsp;Go Pro to sign agreements &amp; send invoices</td></tr>
+        <tr><td style="padding:6px 0;color:#334155;font-size:14px;">4️⃣ &nbsp;Track payments until you're paid</td></tr>
       </table>
       ${button("Create your first deal", `${appUrl()}/deals/new`)}
       ${para(`Questions? Just reply to this email — we read every one.`)}
@@ -176,20 +176,20 @@ export function welcomeEmail(args: { firstName?: string }): { subject: string; h
 
 export function paymentReceiptEmail(args: {
   firstName?: string;
-  credits: number;
+  product: string;
   amount: number;
   paymentId: string;
   date: string;
 }): { subject: string; html: string } {
-  const subject = `Payment received — ${args.credits} credit${args.credits !== 1 ? "s" : ""} added`;
+  const subject = `Payment received — ${args.product}`;
   const html = layout({
-    preview: `Your payment of ${inr(args.amount)} was successful. ${args.credits} credit(s) added.`,
+    preview: `Your payment of ${inr(args.amount)} was successful.`,
     bodyHtml: `
       ${heading("Payment successful ✅")}
-      ${para(`Hi${args.firstName ? " " + args.firstName : ""}, your purchase is confirmed and your credits are ready to use.`)}
+      ${para(`Hi${args.firstName ? " " + args.firstName : ""}, your purchase is confirmed and ready to use.`)}
       ${infoCard(
+        infoRow("Purchase", args.product) +
         infoRow("Amount paid", inr(args.amount)) +
-        infoRow("Credits added", `+${args.credits}`) +
         infoRow("Payment ID", args.paymentId) +
         infoRow("Date", args.date),
       )}
@@ -205,24 +205,27 @@ export function proPlanReceiptEmail(args: {
   amount: number;
   paymentId: string;
   date: string;
+  term: "monthly" | "yearly";
   expiresOn: string;
 }): { subject: string; html: string } {
-  const subject = "Welcome to DealInSec Pro — unlimited agreements unlocked";
+  const termLabel = args.term === "monthly" ? "Monthly" : "1 year";
+  const covered = args.term === "monthly" ? "this month" : "the next year";
+  const subject = "Welcome to DealInSec Pro — the full workflow is unlocked";
   const html = layout({
     preview: `Your payment of ${inr(args.amount)} was successful. DealInSec Pro is now active.`,
     bodyHtml: `
       ${heading("You're on Pro 🎉")}
-      ${para(`Hi${args.firstName ? " " + args.firstName : ""}, your DealInSec Pro plan is active. Every agreement you create for the next year is covered — no credits needed.`)}
+      ${para(`Hi${args.firstName ? " " + args.firstName : ""}, your DealInSec Pro plan is active. Unlimited deals, quotations, agreements and invoices for ${covered} — plus payment tracking.`)}
       ${infoCard(
-        infoRow("Plan", "DealInSec Pro — 1 year") +
-        infoRow("Agreements", "Unlimited") +
+        infoRow("Plan", `DealInSec Pro — ${termLabel}`) +
+        infoRow("Workflow", "Unlimited") +
         infoRow("Amount paid", inr(args.amount)) +
         (args.expiresOn ? infoRow("Valid until", args.expiresOn) : "") +
         infoRow("Payment ID", args.paymentId) +
         infoRow("Date", args.date),
       )}
       ${button("Go to dashboard", `${appUrl()}/dashboard`)}
-      ${para("Your existing credits stay safe — they'll be used only after your Pro plan ends. This email is your receipt.")}
+      ${para("Plans are one-time payments — nothing auto-renews. This email is your receipt.")}
     `,
   });
   return { subject, html };

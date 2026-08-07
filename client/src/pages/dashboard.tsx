@@ -10,13 +10,114 @@ import { useMemo, useState, useEffect } from "react";
 import {
   Plus, Briefcase, FileCheck, Receipt, ChevronRight, LogOut,
   TrendingUp, IndianRupee, Clock, CheckCircle2,
-  UserCircle, MapPin, FileText, PenTool, Landmark, X as XIcon, Sparkles
+  UserCircle, MapPin, FileText, PenTool, Landmark, X as XIcon, Sparkles,
+  Crown, Rocket
 } from "lucide-react";
 import {
   BarChart, Bar, Cell, PieChart, Pie,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
-import type { Deal, Contract, Invoice, BrandInvoice } from "@shared/schema";
+import {
+  hasActivePro, hasActiveDealBoost, getDealCredits, getSubscriptionType,
+} from "@shared/schema";
+import type { Deal, Contract, Invoice, BrandInvoice, User } from "@shared/schema";
+
+// ─── Subscription / Deal Credits card ───────────────────────────────────────
+// Free → monthly Deal Credit usage + reset date + upgrade CTA.
+// Boost → unlimited deals/quotations until the boost expiry.
+// Pro  → plan tier + renewal date.
+function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | null }) | null | undefined }) {
+  const proActive = hasActivePro(user);
+  const boostActive = hasActiveDealBoost(user);
+  const credits = getDealCredits(user);
+  const fmtDate = (d: Date | string | null | undefined) =>
+    d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null;
+
+  if (proActive) {
+    const tier = getSubscriptionType(user) === "PRO_MONTHLY" ? "Monthly" : "Annual";
+    return (
+      <Card className="glass-card border-violet-300/40 dark:border-violet-800/40 relative overflow-hidden" data-testid="subscription-card">
+        <div className="absolute inset-0 bg-gradient-to-r from-violet-500/[0.07] to-indigo-500/[0.05] pointer-events-none" />
+        <CardContent className="relative p-4 lg:p-5 flex items-center gap-4">
+          <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-violet-500/30">
+            <Crown className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-sm lg:text-base">DealInSec Pro · {tier}</p>
+            <p className="text-xs lg:text-sm text-muted-foreground">
+              Unlimited workflow{user?.planExpiresAt ? ` · valid until ${fmtDate(user.planExpiresAt)}` : ""}
+            </p>
+          </div>
+          <Link href="/pricing">
+            <Button variant="outline" size="sm" className="flex-shrink-0">Manage</Button>
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (boostActive) {
+    return (
+      <Card className="glass-card border-emerald-300/40 dark:border-emerald-800/40 relative overflow-hidden" data-testid="subscription-card">
+        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/[0.07] to-teal-500/[0.05] pointer-events-none" />
+        <CardContent className="relative p-4 lg:p-5 flex items-center gap-4">
+          <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-500/30">
+            <Rocket className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-sm lg:text-base">Deal Boost active</p>
+            <p className="text-xs lg:text-sm text-muted-foreground">
+              Unlimited deals &amp; quotations
+              {user?.dealBoostExpiresAt ? ` · until ${fmtDate(user.dealBoostExpiresAt)}` : ""}
+              {" · agreements & invoices need Pro"}
+            </p>
+          </div>
+          <Link href="/pricing">
+            <Button variant="outline" size="sm" className="flex-shrink-0">Go Pro</Button>
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const used = Math.max(0, 4 - credits.monthly);
+  return (
+    <Card className="glass-card relative overflow-hidden" data-testid="subscription-card">
+      <CardContent className="p-4 lg:p-5">
+        <div className="flex items-center gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline justify-between gap-2 mb-1.5">
+              <p className="font-bold text-sm lg:text-base">
+                Deal Credits · <span className="text-primary">{credits.monthly} of 4</span> left this month
+                {credits.purchased > 0 && (
+                  <span className="text-muted-foreground font-medium"> +{credits.purchased} extra</span>
+                )}
+              </p>
+              <span className="text-[11px] text-muted-foreground flex-shrink-0">Free plan</span>
+            </div>
+            {/* Usage bar */}
+            <div className="h-2 rounded-full bg-muted overflow-hidden mb-1.5">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-primary to-emerald-500 transition-all"
+                style={{ width: `${(credits.monthly / 4) * 100}%` }}
+              />
+            </div>
+            <p className="text-[11px] lg:text-xs text-muted-foreground">
+              {used} used · 1 credit = 1 deal + its quotation
+              {user?.monthlyCreditsResetAt ? ` · resets ${fmtDate(user.monthlyCreditsResetAt)}` : ""}
+            </p>
+          </div>
+          <Link href="/pricing">
+            <Button size="sm" className="flex-shrink-0 text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700" data-testid="dashboard-upgrade-cta">
+              <Crown className="w-3.5 h-3.5 mr-1.5" />
+              Upgrade
+            </Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -431,6 +532,9 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* ── Subscription / Deal Credits ── */}
+        <SubscriptionCard user={user} />
 
         {/* ── Stat cards ── */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-5">

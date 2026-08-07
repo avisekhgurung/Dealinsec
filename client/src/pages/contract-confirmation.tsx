@@ -15,6 +15,8 @@ import { CreditAnimationOverlay } from "@/components/credit-animation-overlay";
 import { trackEvent } from "@/lib/analytics";
 import { STANDARD_TERMS, hasActivePro } from "@shared/schema";
 import type { Deal, Contract } from "@shared/schema";
+import { useUpgradeModal } from "@/components/upgrade-modal";
+import { parseApiError, isUpgradeError } from "@/lib/api-error";
 
 type Phase = "reserving" | "creating" | "done";
 
@@ -23,6 +25,7 @@ export default function ContractConfirmationPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { openUpgradeModal } = useUpgradeModal();
   const [agreed, setAgreed] = useState(false);
   const [billingAddress, setBillingAddress] = useState("");
   const [panNumber, setPanNumber] = useState("");
@@ -39,10 +42,9 @@ export default function ContractConfirmationPage() {
   const [customTermsList, setCustomTermsList] = useState<string[]>([""]);
   const [termsInitialized, setTermsInitialized] = useState(false);
 
-  const credits = user?.contractCredits ?? 0;
+  // Agreements are a Pro feature in the subscription-first model. This page's
+  // entry point (deal-details) is already gated; this is defense-in-depth.
   const proActive = hasActivePro(user);
-  // Pro subscribers create agreements without credits; others need ≥1.
-  const hasCredits = proActive || credits >= 1;
   const needsBillingAddress = !user?.billingAddress;
   const needsPan = !user?.panNumber;
   const needsSignature = !user?.digitalSignature;
@@ -157,9 +159,8 @@ export default function ContractConfirmationPage() {
       return res.json();
     },
     onSuccess: (contract) => {
-      // Key conversion event: an agreement was signed (the monetized action).
+      // Key conversion event: an agreement was signed (a core Pro action).
       trackEvent("sign_agreement", {
-        via_pro_plan: contract?.viaProPlan === true,
         contract_value: contract?.contractValue,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
@@ -167,27 +168,15 @@ export default function ContractConfirmationPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
 
-      // Server is the authority on how this was paid. If the UI promised Pro
-      // coverage but the plan had lapsed server-side, tell the user honestly.
-      if (proActive && contract.viaProPlan === false) {
-        toast({
-          title: "Note: 1 credit was used",
-          description: "Your Pro plan had expired, so this agreement used a credit instead.",
-        });
-      }
-
       // Phase 3: done!
       setOverlayPhase("done");
       setContractId(contract.id);
     },
     onError: async (error: any) => {
       setShowOverlay(false);
-      if (error?.message?.includes("402") || error?.status === 402) {
-        toast({
-          title: "Insufficient Credits",
-          description: "You need at least 1 agreement credit. Please purchase credits.",
-          variant: "destructive",
-        });
+      const parsed = parseApiError(error);
+      if (isUpgradeError(parsed)) {
+        openUpgradeModal({ feature: "agreements" });
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       } else if (error?.message?.includes("409")) {
         // Deal already has an agreement (e.g. created in another tab). No credit
@@ -222,7 +211,7 @@ export default function ContractConfirmationPage() {
   const canSubmit =
     agreed &&
     !createContract.isPending &&
-    hasCredits &&
+    proActive &&
     (!needsBillingAddress || billingAddress.trim().length > 0) &&
     (!needsPan || panNumber.trim().length > 0) &&
     (!needsSignature || !!signatureFile);
@@ -280,8 +269,7 @@ export default function ContractConfirmationPage() {
               <div>
                 <h2 className="text-lg font-bold">Agreement already created</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  This deal already has an agreement. A deal can have only one agreement —
-                  no extra credit is needed.
+                  This deal already has an agreement — a deal can have only one.
                 </p>
               </div>
               <div className="flex flex-col gap-2 pt-2">
@@ -313,8 +301,6 @@ export default function ContractConfirmationPage() {
       <CreditAnimationOverlay
         show={showOverlay}
         phase={overlayPhase}
-        creditsAfter={proActive ? credits : Math.max(0, credits - 1)}
-        proMode={proActive}
       />
 
       <div className="min-h-screen bg-background">
@@ -330,21 +316,11 @@ export default function ContractConfirmationPage() {
             </Button>
             <h1 className="text-xl font-bold">Create Agreement</h1>
 
-            {/* Credit / Pro pill in header */}
-            {proActive ? (
-              <div className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800">
-                <Crown className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
-                <span className="text-sm font-bold text-violet-700 dark:text-violet-300">Pro</span>
-              </div>
-            ) : (
-              <div className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800">
-                <span className="text-sm font-black text-amber-500">₹</span>
-                <span className="text-sm font-bold text-amber-700 dark:text-amber-300">{credits}</span>
-                <span className="text-xs text-amber-600/70 dark:text-amber-400/70">
-                  {credits === 1 ? "credit" : "credits"}
-                </span>
-              </div>
-            )}
+            {/* Pro pill in header — agreements are a Pro feature */}
+            <div className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800">
+              <Crown className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+              <span className="text-sm font-bold text-violet-700 dark:text-violet-300">Pro</span>
+            </div>
           </div>
         </header>
 
@@ -385,8 +361,8 @@ export default function ContractConfirmationPage() {
             </div>
           </div>
 
-          {/* Credit usage card — Pro users see a "covered" card instead */}
-          {proActive ? (
+          {/* Pro coverage card — agreements are included in the subscription */}
+          {proActive && (
             <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-violet-800/40">
               <div className="dark:hidden absolute inset-0" style={{ background: "linear-gradient(135deg, hsl(255 100% 98%) 0%, hsl(245 90% 95%) 100%)" }} />
               <div className="hidden dark:block absolute inset-0" style={{ background: "linear-gradient(135deg, hsl(255 25% 12%) 0%, hsl(245 20% 9%) 100%)" }} />
@@ -399,10 +375,10 @@ export default function ContractConfirmationPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-base font-bold text-violet-800 dark:text-violet-300">
-                    Covered by DealInSec Pro
+                    Included in DealInSec Pro
                   </p>
                   <p className="text-xs text-violet-700/70 dark:text-violet-400/60 mt-0.5">
-                    Unlimited agreements — no credit will be used
+                    Unlimited agreements on your plan
                   </p>
                 </div>
                 <div className="flex-shrink-0 text-right">
@@ -411,43 +387,6 @@ export default function ContractConfirmationPage() {
                 </div>
               </div>
             </div>
-          ) : (
-          <div className="relative overflow-hidden rounded-2xl border border-amber-200/60 dark:border-amber-800/40"
-            style={{ background: "linear-gradient(135deg, hsl(45 100% 97%) 0%, hsl(35 100% 94%) 100%)" }}>
-            <div className="dark:hidden absolute inset-0" style={{ background: "linear-gradient(135deg, hsl(45 100% 97%) 0%, hsl(35 100% 94%) 100%)" }} />
-            <div className="hidden dark:block absolute inset-0" style={{ background: "linear-gradient(135deg, hsl(30 30% 10%) 0%, hsl(25 20% 8%) 100%)" }} />
-            <div className="relative px-5 py-4 flex items-center gap-4">
-              {/* Animated coin */}
-              <div className="relative flex-shrink-0">
-                <div className="absolute inset-0 rounded-full bg-amber-300/40 animate-ping" style={{ animationDuration: "2s" }} />
-                <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 shadow-md shadow-amber-400/40 flex items-center justify-center border border-amber-200/60">
-                  <div className="absolute top-1 left-2 w-3 h-1 rounded-full bg-white/40 rotate-[-30deg]" />
-                  <span className="text-xl font-black text-amber-900">₹</span>
-                </div>
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-black text-amber-700 dark:text-amber-300 tabular-nums">{credits}</span>
-                  <span className="text-sm text-amber-600/70 dark:text-amber-400/60">
-                    {credits === 1 ? "credit available" : "credits available"}
-                  </span>
-                </div>
-                <p className="text-xs text-amber-700/70 dark:text-amber-400/60 mt-0.5">
-                  1 credit will be used to create this agreement
-                </p>
-              </div>
-
-              {/* Arrow indicator */}
-              <div className="flex-shrink-0 text-right">
-                <div className="text-xs font-semibold text-amber-600 dark:text-amber-400">-1</div>
-                <div className="text-lg font-black text-amber-700 dark:text-amber-300 tabular-nums">
-                  {Math.max(0, credits - 1)}
-                </div>
-                <div className="text-[10px] text-amber-500/70 dark:text-amber-500/60">after</div>
-              </div>
-            </div>
-          </div>
           )}
 
           <div className="text-center space-y-3">
@@ -461,22 +400,25 @@ export default function ContractConfirmationPage() {
             </p>
           </div>
 
-          {!hasCredits && (
-            <Card className="border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20">
+          {!proActive && (
+            <Card className="border-violet-200 dark:border-violet-900/50 bg-violet-50/50 dark:bg-violet-950/20">
               <CardContent className="p-4">
                 <div className="flex gap-3">
-                  <CreditCard className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                  <Crown className="w-5 h-5 text-violet-600 dark:text-violet-400 flex-shrink-0 mt-0.5" />
                   <div className="space-y-2">
-                    <p className="font-semibold text-red-900 dark:text-red-200">No Credits Available</p>
-                    <p className="text-sm text-red-800 dark:text-red-300 leading-relaxed">
-                      Purchase at least 1 agreement credit to continue.
+                    <p className="font-semibold text-violet-900 dark:text-violet-200">Agreements are a Pro feature</p>
+                    <p className="text-sm text-violet-800 dark:text-violet-300 leading-relaxed">
+                      Upgrade to DealInSec Pro to create unlimited signed agreements, invoices and payment tracking.
                     </p>
-                    <Link href={`/pricing?redirect=/deals/${params.id}/contract`}>
-                      <Button size="sm" className="mt-1 gradient-btn text-white" data-testid="button-buy-credits">
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        Buy Credits
-                      </Button>
-                    </Link>
+                    <Button
+                      size="sm"
+                      className="mt-1 text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+                      onClick={() => openUpgradeModal({ feature: "agreements" })}
+                      data-testid="button-upgrade-pro"
+                    >
+                      <Crown className="w-4 h-4 mr-2" />
+                      Upgrade to Pro
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -742,8 +684,8 @@ export default function ContractConfirmationPage() {
 
             <p className="text-center text-xs text-muted-foreground">
               {proActive
-                ? "Covered by your Pro plan · no credit used"
-                : "1 credit will be deducted · ₹299 value · non-refundable"}
+                ? "Included in your Pro plan · unlimited agreements"
+                : "Requires DealInSec Pro"}
             </p>
           </div>
         </main>

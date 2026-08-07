@@ -7,9 +7,11 @@ import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Download, CheckCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, CheckCircle, Loader2, BellRing, Crown } from "lucide-react";
 import { InvoiceAttachments } from "@/components/invoice-attachments";
 import type { BrandInvoice, Deal } from "@shared/schema";
+import { useUpgradeModal } from "@/components/upgrade-modal";
+import { parseApiError, isUpgradeError } from "@/lib/api-error";
 
 function slugify(s: string): string {
   return (s || "")
@@ -34,6 +36,7 @@ export default function BrandInvoiceDetailsPage() {
   });
 
   const { toast } = useToast();
+  const { openUpgradeModal } = useUpgradeModal();
 
   const markPaid = useMutation({
     mutationFn: async () => {
@@ -45,7 +48,11 @@ export default function BrandInvoiceDetailsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices", id] });
       toast({ title: "Invoice marked as paid" });
     },
-    onError: () => {
+    onError: (err) => {
+      if (isUpgradeError(parseApiError(err))) {
+        openUpgradeModal({ feature: "payment_tracking" });
+        return;
+      }
       toast({ title: "Failed to update", variant: "destructive" });
     },
   });
@@ -415,7 +422,7 @@ export default function BrandInvoiceDetailsPage() {
         </main>
 
         {/* Mark as Paid / Paid status */}
-        <div className="px-4 pb-6 print:hidden">
+        <div className="px-4 pb-6 print:hidden space-y-2">
           {invoice.status === "Unpaid" ? (
             <Button
               className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
@@ -439,6 +446,23 @@ export default function BrandInvoiceDetailsPage() {
               <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               <span className="font-semibold text-emerald-700 dark:text-emerald-300">Payment Received</span>
             </div>
+          )}
+
+          {/* Payment reminders — Pro feature, gated now, shipping soon */}
+          {invoice.status === "Unpaid" && (
+            <button
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed border-violet-300/60 dark:border-violet-800/50 text-left opacity-80 hover:opacity-100 transition-opacity"
+              onClick={() => openUpgradeModal({ feature: "payment_tracking" })}
+              data-testid="button-payment-reminder"
+            >
+              <BellRing className="w-4 h-4 text-violet-500 flex-shrink-0" />
+              <span className="flex-1 text-sm font-medium text-muted-foreground">
+                Send Payment Reminder
+              </span>
+              <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-400">
+                <Crown className="w-3 h-3" /> Pro · Coming soon
+              </span>
+            </button>
           )}
         </div>
 

@@ -1,18 +1,18 @@
 /**
  * CreditAnimationOverlay
  *
- * Full-screen modal that plays a 3-phase animation when an agreement credit
- * is being consumed:
+ * Full-screen modal that plays a 3-phase animation while an agreement is
+ * created (agreements are a Pro feature in the subscription-first model, so
+ * there is no credit deduction to animate — just a premium progress flow):
  *
- *   Phase 1 — "Reserving Credit"   (coin pulse + shrink)
- *   Phase 2 — "Creating Agreement" (progress bar fill)
- *   Phase 3 — "Agreement Created!" (green burst, auto-dismiss)
+ *   Phase 1 — "Preparing Agreement" (Pro badge pulse)
+ *   Phase 2 — "Creating Agreement"  (progress bar fill)
+ *   Phase 3 — "Agreement Created!"  (green burst, auto-dismiss)
  *
  * Usage:
  *   <CreditAnimationOverlay
  *     show={createContract.isPending || showSuccess}
  *     phase={phase}           // "reserving" | "creating" | "done"
- *     creditsAfter={credits - 1}
  *   />
  */
 
@@ -23,31 +23,6 @@ type Phase = "reserving" | "creating" | "done";
 interface Props {
   show: boolean;
   phase: Phase;
-  creditsAfter: number;
-  /** Pro plan covers this agreement — show ₹0 copy, no credit deduction animation. */
-  proMode?: boolean;
-}
-
-// Inline SVG coin (gold circle with ₹)
-function CreditCoin({ shrinking }: { shrinking: boolean }) {
-  return (
-    <div
-      className={`relative flex items-center justify-center transition-all duration-700 ease-in-out
-        ${shrinking ? "scale-0 opacity-0 -translate-y-8" : "scale-100 opacity-100"}`}
-      style={{ width: 80, height: 80 }}
-    >
-      {/* Outer glow ring */}
-      <div className="absolute inset-0 rounded-full bg-amber-400/30 animate-ping" />
-      <div className="absolute inset-2 rounded-full bg-amber-300/20 animate-pulse" />
-
-      {/* Coin body */}
-      <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 shadow-lg shadow-amber-400/50 flex items-center justify-center border-2 border-amber-200/60">
-        {/* Shine streak */}
-        <div className="absolute top-2 left-3 w-4 h-1.5 rounded-full bg-white/40 rotate-[-30deg]" />
-        <span className="text-2xl font-black text-amber-900 drop-shadow-sm select-none">₹</span>
-      </div>
-    </div>
-  );
 }
 
 // Animated progress bar
@@ -94,7 +69,7 @@ function SparkleRing() {
   );
 }
 
-export function CreditAnimationOverlay({ show, phase, creditsAfter, proMode = false }: Props) {
+export function CreditAnimationOverlay({ show, phase }: Props) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -107,7 +82,6 @@ export function CreditAnimationOverlay({ show, phase, creditsAfter, proMode = fa
 
   if (!visible) return null;
 
-  const isCoinGone = phase === "creating" || phase === "done";
   const isDone = phase === "done";
 
   return (
@@ -122,11 +96,6 @@ export function CreditAnimationOverlay({ show, phase, creditsAfter, proMode = fa
           0%   { transform: scale(0.5); opacity: 0; }
           60%  { transform: scale(1.15); opacity: 1; }
           100% { transform: scale(1); opacity: 1; }
-        }
-        @keyframes credit-cross {
-          0%   { opacity: 1; transform: none; }
-          50%  { opacity: 0.3; transform: scale(0.85); }
-          100% { opacity: 1; transform: none; }
         }
       `}</style>
 
@@ -145,71 +114,34 @@ export function CreditAnimationOverlay({ show, phase, creditsAfter, proMode = fa
           }}
         >
           {/* Top gradient strip */}
-          <div className="h-1 w-full bg-gradient-to-r from-amber-400 via-teal-500 to-emerald-400" />
+          <div className="h-1 w-full bg-gradient-to-r from-violet-400 via-teal-500 to-emerald-400" />
 
           <div className="px-8 py-10 flex flex-col items-center gap-6 text-center">
 
-            {/* ── Phase 1 & 2: Coin (credit mode) / Pro badge (pro mode) ── */}
+            {/* ── Phase 1 & 2: Pro badge + progress ── */}
             {!isDone && (
               <>
-                {proMode ? (
-                  <div className="relative flex items-center justify-center" style={{ width: 80, height: 80 }}>
-                    <div className="absolute inset-0 rounded-full bg-violet-400/30 animate-ping" />
-                    <div className="absolute inset-2 rounded-full bg-violet-300/20 animate-pulse" />
-                    <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-violet-400 via-violet-500 to-indigo-600 shadow-lg shadow-violet-500/50 flex items-center justify-center border-2 border-violet-300/60">
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M2 20h20M4 20l2-11 4.5 4L12 6l1.5 7L18 9l2 11" fill="none" />
-                      </svg>
-                    </div>
+                <div className="relative flex items-center justify-center" style={{ width: 80, height: 80 }}>
+                  <div className="absolute inset-0 rounded-full bg-violet-400/30 animate-ping" />
+                  <div className="absolute inset-2 rounded-full bg-violet-300/20 animate-pulse" />
+                  <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-violet-400 via-violet-500 to-indigo-600 shadow-lg shadow-violet-500/50 flex items-center justify-center border-2 border-violet-300/60">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2 20h20M4 20l2-11 4.5 4L12 6l1.5 7L18 9l2 11" fill="none" />
+                    </svg>
                   </div>
-                ) : (
-                  <CreditCoin shrinking={isCoinGone} />
-                )}
-
-                {/* Credit counter (hidden in pro mode — nothing is deducted) */}
-                {proMode ? (
-                  <div className="flex flex-col items-center">
-                    <span className="text-3xl font-black text-white">₹0</span>
-                    <span className="text-xs text-violet-300/80 uppercase tracking-wider mt-0.5">
-                      Covered by Pro
-                    </span>
-                  </div>
-                ) : (
-                <div className="flex items-center gap-3">
-                  <div className={`flex flex-col items-center transition-all duration-500
-                    ${isCoinGone ? "opacity-50" : "opacity-100"}`}>
-                    <span className="text-4xl font-black text-white tabular-nums"
-                      style={isCoinGone ? { animation: "credit-cross 0.4s ease-in-out" } : {}}>
-                      {isCoinGone ? creditsAfter : creditsAfter + 1}
-                    </span>
-                    <span className="text-xs text-white/50 uppercase tracking-wider mt-0.5">
-                      {(isCoinGone ? creditsAfter : creditsAfter + 1) === 1 ? "Credit" : "Credits"}
-                    </span>
-                  </div>
-
-                  {isCoinGone && (
-                    <>
-                      <span className="text-2xl text-white/30 font-light">→</span>
-                      <div className="flex flex-col items-center">
-                        <span className="text-4xl font-black tabular-nums"
-                          style={{ color: creditsAfter === 0 ? "#f87171" : "#34d399" }}>
-                          {creditsAfter}
-                        </span>
-                        <span className="text-xs text-white/50 uppercase tracking-wider mt-0.5">
-                          {creditsAfter === 1 ? "Credit" : "Credits"}
-                        </span>
-                      </div>
-                    </>
-                  )}
                 </div>
-                )}
+
+                <div className="flex flex-col items-center">
+                  <span className="text-3xl font-black text-white">Pro</span>
+                  <span className="text-xs text-violet-300/80 uppercase tracking-wider mt-0.5">
+                    Unlimited agreements
+                  </span>
+                </div>
 
                 {/* Label + progress */}
                 <div className="w-full space-y-3">
                   <p className="text-sm font-semibold text-white/80 tracking-wide">
-                    {phase === "reserving"
-                      ? (proMode ? "Confirming Pro coverage…" : "Reserving 1 Agreement Credit…")
-                      : "Creating your Agreement…"}
+                    {phase === "reserving" ? "Preparing Agreement…" : "Creating your Agreement…"}
                   </p>
                   {phase === "creating" && <ProgressBar active />}
                   {phase === "reserving" && (
@@ -217,7 +149,7 @@ export function CreditAnimationOverlay({ show, phase, creditsAfter, proMode = fa
                       {[0, 1, 2].map(i => (
                         <div
                           key={i}
-                          className="w-1.5 h-1.5 rounded-full bg-amber-400"
+                          className="w-1.5 h-1.5 rounded-full bg-violet-400"
                           style={{ animation: `pulse 1.2s ease-in-out ${i * 0.2}s infinite` }}
                         />
                       ))}
@@ -244,11 +176,7 @@ export function CreditAnimationOverlay({ show, phase, creditsAfter, proMode = fa
 
                 <div className="space-y-2">
                   <p className="text-xl font-bold text-white">Agreement Created!</p>
-                  <p className="text-sm text-white/60">
-                    {proMode
-                      ? "Covered by Pro · no credit used"
-                      : `1 credit used · ${creditsAfter} remaining`}
-                  </p>
+                  <p className="text-sm text-white/60">Signed &amp; ready to share</p>
                 </div>
 
                 {/* Success bar */}

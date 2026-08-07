@@ -216,7 +216,7 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
               const alreadyReferred = existingReferrals.some((r: any) => r.referredUserId === req.user.id);
               if (!alreadyReferred) {
                 const creditsToAward = parseInt(process.env.REFERRAL_CREDITS ?? '1');
-                await storage.addCredits(referrer.id, creditsToAward, 'referral');
+                await storage.addPurchasedCredits(referrer.id, creditsToAward, 'referral');
                 await storage.createReferral({
                   referrerId: referrer.id,
                   referredUserId: req.user.id,

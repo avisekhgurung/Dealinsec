@@ -15,7 +15,7 @@ export default function RefundPolicy() {
       </header>
 
       <main className="px-4 py-8 max-w-2xl mx-auto prose prose-sm dark:prose-invert animate-fade-in">
-        <p className="text-muted-foreground text-xs">Last updated: 16 April 2026</p>
+        <p className="text-muted-foreground text-xs">Last updated: 24 July 2026</p>
 
         <p>
           This Refund Policy applies to all purchases made on DealInSec ("Platform"),
@@ -24,75 +24,74 @@ export default function RefundPolicy() {
 
         <h2>1. What You Purchase</h2>
         <p>
-          On DealInSec, you purchase <strong>Agreement Credits</strong>. Each credit allows
-          you to generate one exclusive influencer marketing agreement document. Credits are
-          priced at <strong>₹299 per credit</strong> (or as displayed at the time of purchase).
+          DealInSec offers the following paid products (prices as displayed at the time
+          of purchase):
+        </p>
+        <ul>
+          <li><strong>DealInSec Pro — Monthly (₹999)</strong>: the full workflow (unlimited deals, quotations, agreements, invoices and payment tracking) for 1 month.</li>
+          <li><strong>DealInSec Pro — Annual (₹9,999)</strong>: the same, for 1 year.</li>
+          <li><strong>Deal Boost (₹99)</strong>: unlimited deals and quotations for 1 month (does not include agreements, invoices or payment tracking).</li>
+        </ul>
+        <p>
+          All plans are <strong>one-time payments</strong> for a fixed term. Nothing
+          auto-renews and no auto-debit mandate is created.
         </p>
 
         <h2>2. Refund Eligibility</h2>
-
-        <h3>a) Unused Credits</h3>
         <table>
           <thead>
             <tr><th>Scenario</th><th>Refund</th></tr>
           </thead>
           <tbody>
             <tr>
-              <td>Credit purchased but NOT yet used to create an agreement</td>
+              <td>Plan purchased but the paid features have NOT been used (no agreement or invoice generated during the term)</td>
               <td><strong>Full refund</strong> — request within 7 days of purchase</td>
             </tr>
             <tr>
-              <td>Credit purchased but NOT yet used, request after 7 days</td>
-              <td>No refund, but credit remains valid (credits never expire)</td>
+              <td>Plan purchased and paid features have been used</td>
+              <td><strong>No refund</strong> — the service has been consumed</td>
+            </tr>
+            <tr>
+              <td>A document generated with a paid feature contains an error caused by a platform bug</td>
+              <td><strong>Term extension or replacement</strong> granted after verification</td>
             </tr>
           </tbody>
         </table>
-
-        <h3>b) Used Credits</h3>
-        <table>
-          <thead>
-            <tr><th>Scenario</th><th>Refund</th></tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Credit used to generate an agreement</td>
-              <td><strong>No refund</strong> — the digital document has been generated</td>
-            </tr>
-            <tr>
-              <td>Agreement generated but contains an error due to platform bug</td>
-              <td><strong>Free replacement credit</strong> granted after verification</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <h3>c) Failed Payments</h3>
         <p>
-          If money was debited from your account but the credit was not added (e.g., due to
-          a payment gateway error), we will:
+          When a refund is processed, the corresponding plan term (or Deal Boost) is
+          revoked from the account.
+        </p>
+
+        <h3>Failed Payments</h3>
+        <p>
+          If money was debited from your account but your plan was not activated (e.g., due
+          to a payment gateway error), we will:
         </p>
         <ul>
           <li>Automatically reconcile within 24–48 hours, or</li>
           <li>Process a full refund to your original payment method within 5–7 business days.</li>
         </ul>
 
-        <h2>3. Free Signup Credits</h2>
+        <h2>3. Free Monthly Deal Credits</h2>
         <p>
-          Credits granted for free upon signup are non-refundable and have no monetary value.
-          They cannot be exchanged for cash.
+          The free plan's 4 monthly Deal Credits (and any referral bonus credits) are
+          granted at no charge, are non-refundable, have no monetary value, and cannot be
+          exchanged for cash. Unused monthly credits do not roll over.
         </p>
 
         <h2>4. How to Request a Refund</h2>
         <ol>
           <li>Email <strong>support@dealinsec.com</strong> with the subject line "Refund Request".</li>
-          <li>Include your registered email address and PayU transaction ID.</li>
+          <li>Include your registered email address and Razorpay payment ID.</li>
           <li>We will acknowledge your request within 48 hours.</li>
           <li>Approved refunds are processed within <strong>5–7 business days</strong> to your original payment method.</li>
         </ol>
 
         <h2>5. Cancellation</h2>
         <p>
-          DealInSec uses a <strong>pay-per-use model</strong> (not a subscription). There is
-          no recurring billing to cancel. You simply purchase credits when you need them.
+          Plans are <strong>one-time payments for a fixed term</strong> — there is no
+          recurring billing to cancel. Your plan simply ends at the end of its term unless
+          you choose to renew, and your account then returns to the free plan.
         </p>
 
         <h2>6. Chargebacks</h2>

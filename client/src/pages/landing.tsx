@@ -172,7 +172,7 @@ const FAQS = [
   },
   {
     q: "Is Dealinsec free to use?",
-    a: "Deals, quotations, invoices and payment tracking are always free. Agreements cost 1 credit (₹299). Every new account gets 3 free credits on signup, and there are no platform fees on deal value.",
+    a: "Yes — the free plan includes 4 Deal Credits every month, and each credit covers creating a deal plus its quotation. Signed agreements, invoices and payment tracking are part of DealInSec Pro (₹999/month or ₹9,999/year). There are no platform fees on your deal value.",
   },
   {
     q: "Do agreements generated here hold up legally?",
@@ -188,7 +188,7 @@ const FAQS = [
   },
   {
     q: "How does the referral program work?",
-    a: "Every account gets a unique referral code in Profile. When a friend signs up with your code, you both get a free agreement credit — no cap, and credits never expire.",
+    a: "Every account gets a unique referral code in Profile. When a friend signs up with your code, you earn a bonus Deal Credit — no cap, and referral credits never expire.",
   },
   {
     q: "Is my data secure?",
@@ -396,7 +396,7 @@ export default function LandingPage() {
                 {authTab === "signup" ? "Create your account" : "Welcome back"}
               </h2>
               <p className="text-sm text-neutral-500 mt-1">
-                {authTab === "signup" ? "No credit card. 3 free credits on signup." : "Sign in to continue"}
+                {authTab === "signup" ? "No credit card. 4 free Deal Credits every month." : "Sign in to continue"}
               </p>
             </div>
 
@@ -854,7 +854,7 @@ function Hero({
 
             <motion.div variants={heroFadeUp} className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 pt-3 text-xs text-neutral-500">
               <span className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500" /> 3 free credits on signup
+                <Check className="w-3.5 h-3.5 text-emerald-500" /> 4 free Deal Credits every month
               </span>
               <span className="flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5 text-emerald-500" /> ₹0 platform fee
@@ -1643,7 +1643,7 @@ function ReferralSection({ onCTA }: { onCTA: () => void }) {
             <div>
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/80 backdrop-blur-sm border border-amber-300/60 shadow-sm mb-4">
                 <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                <span className="text-xs font-semibold text-amber-900">Refer &amp; earn — free credits</span>
+                <span className="text-xs font-semibold text-amber-900">Refer &amp; earn — bonus Deal Credits</span>
               </div>
 
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-neutral-900 leading-[1.08] mb-4">
@@ -1656,13 +1656,13 @@ function ReferralSection({ onCTA }: { onCTA: () => void }) {
                     backgroundClip: "text",
                   }}
                 >
-                  Earn free credits.
+                  Earn Deal Credits.
                 </span>
               </h2>
 
               <p className="text-base text-neutral-700 leading-relaxed mb-6 max-w-lg">
                 Every creator gets a unique referral code in their profile. When a friend signs up with your code,{" "}
-                <span className="font-semibold text-neutral-900">you both get a free agreement credit.</span> No cap, no expiry — stack them up.
+                <span className="font-semibold text-neutral-900">you earn a bonus Deal Credit.</span> No cap, no expiry — stack them up.
               </p>
 
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
@@ -1712,7 +1712,7 @@ function ReferralSection({ onCTA }: { onCTA: () => void }) {
 
                 <div className="flex items-center justify-center gap-1 text-[11px] text-neutral-500 pt-2 border-t border-neutral-100">
                   <Check className="w-3 h-3 text-emerald-500" />
-                  <span>No cap · credits never expire</span>
+                  <span>No cap · referral credits never expire</span>
                 </div>
               </div>
 
@@ -1735,24 +1735,23 @@ function ReferralSection({ onCTA }: { onCTA: () => void }) {
 
 function PricingPreview({ onCTA }: { onCTA: () => void }) {
   const freePerks = [
-    "Create unlimited deals",
-    "Send unlimited quotations",
-    "Generate unlimited invoices",
-    "Track payments & deliverables",
+    "4 Deal Credits every month",
+    "1 credit = 1 deal + its quotation",
+    "Dashboard & payment overview",
+    "Professional quotation PDFs",
   ];
-  const creditPerks = [
-    "1 credit = 1 legally-worded agreement PDF",
-    "Digital signatures from both parties",
-    "Auto-populated bank details & PAN",
-    "Credits never expire",
-    "Secure payments via PayU",
+  const proMonthlyPerks = [
+    "Unlimited deals & quotations",
+    "Unlimited signed agreements with e-signature",
+    "Unlimited GST-ready invoices",
+    "Payment tracking & reminders",
+    "Custom branding · Priority support",
   ];
-  const proPerks = [
-    "Unlimited legally-worded agreements",
-    "Unlimited digital signatures",
-    "Everything in the free tier",
-    "One full year of coverage",
-    "No per-agreement credits to buy",
+  const proAnnualPerks = [
+    "Everything in Pro Monthly",
+    "Unlimited workflow for a full year",
+    "One payment — no monthly renewals",
+    "Lock today's price for 12 months",
   ];
 
   return (
@@ -1760,8 +1759,8 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
           eyebrow="Simple pricing"
-          title="Start free. Pay as you go — or go unlimited."
-          subtitle="Deals, quotes and invoices are always free. Pay ₹299 per agreement, or go Pro for unlimited agreements all year."
+          title="Start free. Upgrade for the full workflow."
+          subtitle="Start free with 4 Deal Credits every month. Go Pro for unlimited deals, quotations, agreements, invoices and payment tracking."
         />
 
         <motion.div
@@ -1780,13 +1779,13 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
               <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-emerald-600" />
               </div>
-              <p className="text-sm font-semibold">Free forever</p>
+              <p className="text-sm font-semibold">Free</p>
             </div>
             <div className="mt-4 flex items-baseline gap-1">
               <span className="text-4xl font-bold tracking-tight">₹0</span>
-              <span className="text-sm text-neutral-500">/ ever</span>
+              <span className="text-sm text-neutral-500">/ forever</span>
             </div>
-            <p className="text-xs text-neutral-500 mt-1">Everything you need to run deals — minus the agreement.</p>
+            <p className="text-xs text-neutral-500 mt-1">Run your pipeline professionally — deals and quotations included.</p>
             <ul className="mt-5 space-y-2.5">
               {freePerks.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">
@@ -1801,21 +1800,21 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
             >
               Start free
             </Button>
-            <p className="text-[11px] text-neutral-500 text-center mt-3">3 free credits included on signup.</p>
+            <p className="text-[11px] text-neutral-500 text-center mt-3">Credits reset every month. No credit card needed.</p>
           </motion.div>
 
-          {/* Agreement credit — conversion-optimized with anchor pricing */}
+          {/* Pro Monthly — recommended */}
           <motion.div
             variants={fadeUp}
-            className="relative rounded-2xl border border-emerald-500 bg-white dark:bg-neutral-900 shadow-xl shadow-emerald-500/15 scale-[1.02] overflow-hidden"
+            className="relative rounded-2xl border border-violet-500 bg-white dark:bg-neutral-900 shadow-xl shadow-violet-500/15 scale-[1.02] overflow-hidden"
           >
             {/* Promo bar */}
             <div
               className="px-4 py-2 text-center text-white text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-1.5"
-              style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
+              style={{ background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)" }}
             >
               <Sparkles className="w-3 h-3" />
-              Launch Offer · Save ₹300
+              Recommended
               <Sparkles className="w-3 h-3" />
             </div>
 
@@ -1824,48 +1823,34 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                 <div className="flex items-center gap-2">
                   <div
                     className="w-8 h-8 rounded-lg flex items-center justify-center"
-                    style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
+                    style={{ background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)" }}
                   >
                     <FileSignature className="w-4 h-4 text-white" />
                   </div>
-                  <p className="text-sm font-semibold">Agreement credit</p>
-                </div>
-                <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                  <Zap className="w-2.5 h-2.5" />
-                  50% OFF
-                </span>
-              </div>
-
-              {/* Anchor pricing */}
-              <div className="mt-4 flex items-end gap-2">
-                <span className="text-base text-neutral-400 line-through decoration-2 decoration-rose-400/60">
-                  ₹599
-                </span>
-                <div className="flex items-baseline gap-1">
-                  <span
-                    className="text-4xl font-bold tracking-tight"
-                    style={{
-                      background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      backgroundClip: "text",
-                    }}
-                  >
-                    ₹299
-                  </span>
-                  <span className="text-sm text-neutral-500">/ credit</span>
+                  <p className="text-sm font-semibold">Pro · Monthly</p>
                 </div>
               </div>
 
-              {/* Loss-aversion savings pill */}
-              <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold">
-                You save ₹300 · pay once, use anytime
+              <div className="mt-4 flex items-baseline gap-1">
+                <span
+                  className="text-4xl font-bold tracking-tight"
+                  style={{
+                    background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                  }}
+                >
+                  ₹999
+                </span>
+                <span className="text-sm text-neutral-500">/ month</span>
               </div>
+              <p className="text-xs text-neutral-500 mt-1">The complete Lead → Deal → Quote → Agreement → Invoice → Payment workflow.</p>
 
               <ul className="mt-5 space-y-2.5">
-                {creditPerks.map((f) => (
+                {proMonthlyPerks.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-                    <Check className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                    <Check className="w-4 h-4 text-violet-600 flex-shrink-0 mt-0.5" />
                     <span>{f}</span>
                   </li>
                 ))}
@@ -1873,10 +1858,11 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
 
               <Button
                 onClick={onCTA}
-                className="w-full mt-6 h-11 text-sm font-bold text-white border-0 shadow-md shadow-emerald-500/30"
-                style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
+                className="w-full mt-6 h-11 text-sm font-bold text-white border-0 shadow-md shadow-violet-500/30"
+                style={{ background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)" }}
+                data-testid="button-go-pro-monthly"
               >
-                Get 1 Credit for ₹299
+                Go Pro — ₹999/month
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
 
@@ -1886,7 +1872,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                   <Shield className="w-2.5 h-2.5 text-emerald-500" /> 7-day refund
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <Lock className="w-2.5 h-2.5 text-emerald-500" /> Encrypted
+                  <Lock className="w-2.5 h-2.5 text-emerald-500" /> No auto-debit
                 </span>
                 <span className="inline-flex items-center gap-1">
                   <Check className="w-2.5 h-2.5 text-emerald-500" /> UPI · Cards · NetBanking
@@ -1895,7 +1881,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
             </div>
           </motion.div>
 
-          {/* Pro annual — best value, unlimited agreements */}
+          {/* Pro Annual — save 2 months */}
           <motion.div
             variants={fadeUp}
             className="relative rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-7 flex flex-col"
@@ -1908,16 +1894,16 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                 <p className="text-sm font-semibold">Pro · Annual</p>
               </div>
               <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                Best value
+                Save 2 Months
               </span>
             </div>
             <div className="mt-4 flex items-baseline gap-1">
-              <span className="text-4xl font-bold tracking-tight">₹2,999</span>
+              <span className="text-4xl font-bold tracking-tight">₹9,999</span>
               <span className="text-sm text-neutral-500">/ year</span>
             </div>
-            <p className="text-xs text-neutral-500 mt-1">One payment, not auto-renewing — cheaper than ~10 credits.</p>
+            <p className="text-xs text-neutral-500 mt-1">≈ ₹833/month — two months free vs paying monthly.</p>
             <ul className="mt-5 space-y-2.5 flex-1">
-              {proPerks.map((f) => (
+              {proAnnualPerks.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">
                   <Check className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                   <span>{f}</span>
@@ -1930,10 +1916,10 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
               style={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" }}
               data-testid="button-go-pro"
             >
-              Go Pro — ₹2,999/year
+              Go Annual — ₹9,999/year
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-            <p className="text-[11px] text-neutral-500 text-center mt-3">Best if you sign more than ~10 agreements a year.</p>
+            <p className="text-[11px] text-neutral-500 text-center mt-3">One payment, not auto-renewing.</p>
           </motion.div>
         </motion.div>
 
@@ -1946,10 +1932,10 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
         >
           <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-neutral-200 dark:divide-neutral-800">
             {[
-              { step: "1", title: "Create Deal", cost: "Free", icon: Briefcase },
-              { step: "2", title: "Send Quote", cost: "Free", icon: FileText },
-              { step: "3", title: "Sign Agreement", cost: "1 credit", icon: FileSignature, highlight: true },
-              { step: "4", title: "Send Invoice", cost: "Free", icon: Receipt },
+              { step: "1", title: "Create Deal", cost: "Free · 4/mo", icon: Briefcase },
+              { step: "2", title: "Send Quote", cost: "Included", icon: FileText },
+              { step: "3", title: "Sign Agreement", cost: "Pro", icon: FileSignature, highlight: true },
+              { step: "4", title: "Invoice & get paid", cost: "Pro", icon: Receipt, highlight: true },
             ].map((s) => (
               <div key={s.step} className={`p-4 text-center ${s.highlight ? "bg-emerald-50/70 dark:bg-emerald-950/20" : ""}`}>
                 <div className={`w-9 h-9 mx-auto rounded-lg flex items-center justify-center mb-2 ${s.highlight ? "bg-emerald-600 text-white" : "bg-neutral-100 dark:bg-neutral-800 text-emerald-600"}`}>
@@ -1965,7 +1951,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
         </motion.div>
 
         <p className="text-center text-xs text-neutral-500 mt-6">
-          Invite a friend with your referral code and earn free credits — they get one too.
+          Invite a friend with your referral code and earn bonus Deal Credits.
         </p>
       </div>
     </section>
@@ -2034,7 +2020,7 @@ function FinalCTA({ isAuthenticated, onCTA }: { isAuthenticated: boolean; onCTA:
               Deals in seconds.<br />Secured for life.
             </h2>
             <p className="text-base sm:text-lg text-emerald-100/90 max-w-xl mx-auto mb-8">
-              Join 10,000+ creators closing professional deals — quoted, signed, invoiced and paid. Free to start, no credit card required.
+              Join service businesses closing professional deals — quoted, signed, invoiced and paid. Free to start, no credit card required.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Button
@@ -2126,7 +2112,7 @@ function Footer() {
             { Icon: Shield, text: "256-bit encrypted" },
             { Icon: Lock, text: "Secure payments via Razorpay" },
             { Icon: Check, text: "UPI · Cards · NetBanking" },
-            { Icon: Zap, text: "No subscription · Pay per agreement" },
+            { Icon: Zap, text: "Free plan included · Pro from ₹999/month" },
           ].map(({ Icon, text }) => (
             <span key={text} className="inline-flex items-center gap-1.5 text-[11px] text-neutral-500">
               <Icon className="w-3.5 h-3.5 text-emerald-600" />

@@ -11,6 +11,8 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { queryClient } from "@/lib/queryClient";
+import { useUpgradeModal } from "@/components/upgrade-modal";
+import { parseApiError, isUpgradeError } from "@/lib/api-error";
 import {
   invoiceDocumentCategories,
   type InvoiceAttachment,
@@ -56,6 +58,7 @@ const categoryStyle: Record<string, string> = {
 export function InvoiceAttachments({ invoiceId }: { invoiceId: number | string }) {
   const { toast } = useToast();
   const confirm = useConfirm();
+  const { openUpgradeModal } = useUpgradeModal();
   const fileRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState<InvoiceDocumentCategory>("GST Invoice");
 
@@ -76,15 +79,9 @@ export function InvoiceAttachments({ invoiceId }: { invoiceId: number | string }
         credentials: "include",
       });
       if (!res.ok) {
-        // Prefer the server's structured reason; fall back to a generic hint.
-        let msg = "";
-        try {
-          const body = await res.json();
-          msg = body?.error || body?.reason || "";
-        } catch {
-          msg = (await res.text().catch(() => "")) || "";
-        }
-        throw new Error(msg || `Upload failed (${res.status})`);
+        // Standard "STATUS: json" shape so parseApiError can route gate errors.
+        const text = await res.text().catch(() => "");
+        throw new Error(`${res.status}: ${text}`);
       }
       return res.json();
     },
@@ -93,9 +90,14 @@ export function InvoiceAttachments({ invoiceId }: { invoiceId: number | string }
       toast({ title: "Document attached", description: `${category} saved to this invoice.` });
     },
     onError: (err: any) => {
+      const parsed = parseApiError(err);
+      if (isUpgradeError(parsed)) {
+        openUpgradeModal({ feature: "invoices" });
+        return;
+      }
       toast({
         title: "Upload failed",
-        description: err?.message || "Use a PDF or image under 5 MB and try again.",
+        description: parsed.error || "Use a PDF or image under 5 MB and try again.",
         variant: "destructive",
       });
     },
@@ -107,13 +109,21 @@ export function InvoiceAttachments({ invoiceId }: { invoiceId: number | string }
         method: "DELETE",
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Delete failed");
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`${res.status}: ${text}`);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: listKey });
       toast({ title: "Document removed" });
     },
-    onError: () => {
+    onError: (err: any) => {
+      const parsed = parseApiError(err);
+      if (isUpgradeError(parsed)) {
+        openUpgradeModal({ feature: "invoices" });
+        return;
+      }
       toast({ title: "Failed to remove document", variant: "destructive" });
     },
   });

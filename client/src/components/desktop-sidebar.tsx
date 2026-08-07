@@ -10,11 +10,13 @@ import {
   LogOut,
   Sparkles,
   ChevronRight,
+  Crown,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
+import { hasActivePro, hasActiveDealBoost, getDealCredits } from "@shared/schema";
 
 interface NavItem {
   path: string;
@@ -44,7 +46,12 @@ export function DesktopSidebar() {
   // Hide sidebar entirely if not logged in (landing/onboarding/marketing routes)
   if (!isAuthenticated) return null;
 
-  const credits = user?.contractCredits ?? 0;
+  const proActive = hasActivePro(user);
+  const boostActive = hasActiveDealBoost(user);
+  const credits = getDealCredits(user);
+  const resetsLabel = user?.monthlyCreditsResetAt
+    ? new Date(user.monthlyCreditsResetAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+    : null;
   const firstName = user?.firstName ?? "";
   const lastName = user?.lastName ?? "";
   const displayName = [firstName, lastName].filter(Boolean).join(" ") || user?.email || "User";
@@ -77,26 +84,48 @@ export function DesktopSidebar() {
         </Link>
       </div>
 
-      {/* ── Credit balance card ── */}
+      {/* ── Plan / Deal Credits card ── */}
       <div className="px-4 pt-5">
         <Link href="/pricing">
           <button className="w-full group">
-            <div className="rounded-xl border border-sidebar-border bg-gradient-to-br from-primary/[0.06] via-background to-background p-3.5 hover:border-primary/40 hover:shadow-sm transition-all">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
-                  Contract Credits
-                </span>
-                <Sparkles className="w-3.5 h-3.5 text-primary" />
+            {proActive ? (
+              <div className="rounded-xl border border-violet-300/50 dark:border-violet-800/50 bg-gradient-to-br from-violet-500/[0.08] via-background to-background p-3.5 hover:border-violet-400/60 hover:shadow-sm transition-all">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-violet-600 dark:text-violet-400">
+                    DealInSec Pro
+                  </span>
+                  <Crown className="w-3.5 h-3.5 text-violet-500" />
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold text-foreground">Unlimited</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-[11px] text-violet-600 dark:text-violet-400 font-medium">
+                  <span>Manage plan</span>
+                  <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                </div>
               </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-foreground">{credits}</span>
-                <span className="text-xs text-muted-foreground">available</span>
+            ) : (
+              <div className="rounded-xl border border-sidebar-border bg-gradient-to-br from-primary/[0.06] via-background to-background p-3.5 hover:border-primary/40 hover:shadow-sm transition-all">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                    Deal Credits
+                  </span>
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold text-foreground">
+                    {boostActive ? "∞" : credits.total}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {boostActive ? "Deal Boost active" : resetsLabel ? `resets ${resetsLabel}` : "available"}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-[11px] text-primary font-medium group-hover:text-primary/80">
+                  <span>Upgrade</span>
+                  <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                </div>
               </div>
-              <div className="mt-2 flex items-center justify-between text-[11px] text-primary font-medium group-hover:text-primary/80">
-                <span>Buy more</span>
-                <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </div>
-            </div>
+            )}
           </button>
         </Link>
       </div>

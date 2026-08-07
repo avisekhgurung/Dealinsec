@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useUpgradeModal } from "@/components/upgrade-modal";
+import { parseApiError, isUpgradeError } from "@/lib/api-error";
 import { PlatformIcon } from "@/components/platform-icon";
 import { TaxonomyCombobox } from "@/components/taxonomy-combobox";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -64,6 +66,7 @@ type FormData = z.infer<typeof formSchema>;
 export default function CreateDealPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { openUpgradeModal } = useUpgradeModal();
 
   const { data: brands = [] } = useQuery<BrandOption[]>({
     queryKey: ["/api/brands"],
@@ -124,7 +127,14 @@ export default function CreateDealPage() {
       });
       setLocation(`/deals/${deal.id}`);
     },
-    onError: () => {
+    onError: (err) => {
+      const parsed = parseApiError(err);
+      if (isUpgradeError(parsed)) {
+        // Out of monthly Deal Credits — offer Pro or the ₹99 Deal Boost.
+        openUpgradeModal({ feature: "deals" });
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        return;
+      }
       toast({
         title: "Error",
         description: "Failed to create deal. Please try again.",

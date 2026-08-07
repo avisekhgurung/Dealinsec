@@ -40,20 +40,21 @@ export default function TermsOfService() {
         </ul>
 
         <h2>4. Platform Services</h2>
-        <p>DealInSec provides influencer deal management tools including:</p>
+        <p>DealInSec provides deal management tools including:</p>
         <ul>
-          <li><strong>Deal Management</strong> — Create and track brand collaboration deals.</li>
-          <li><strong>Quotation Generation</strong> — Generate professional quotations (free).</li>
-          <li><strong>Agreement Generation</strong> — Create legally formatted exclusive agreements (requires 1 credit per agreement).</li>
-          <li><strong>Invoice Generation</strong> — Generate professional invoices for brands (free).</li>
+          <li><strong>Deal Management</strong> — Create and track client deals (free plan: 4 Deal Credits per month; 1 credit = 1 deal + its quotation).</li>
+          <li><strong>Quotation Generation</strong> — Generate professional quotations (included with the deal's credit).</li>
+          <li><strong>Agreement Generation</strong> — Create legally formatted agreements (requires an active DealInSec Pro subscription).</li>
+          <li><strong>Invoice Generation &amp; Payment Tracking</strong> — Generate professional invoices and track payments (requires DealInSec Pro).</li>
         </ul>
 
-        <h2>5. Credits & Payments</h2>
+        <h2>5. Plans, Credits &amp; Payments</h2>
         <ul>
-          <li>Agreement credits can be purchased via our integrated PayU payment gateway.</li>
-          <li>Each credit allows the creation of one exclusive agreement document.</li>
-          <li>Credits are non-transferable and tied to your account.</li>
-          <li>Credits do not expire.</li>
+          <li>The free plan includes 4 Deal Credits each month. Unused monthly credits do not roll over.</li>
+          <li><strong>DealInSec Pro</strong> (₹999/month or ₹9,999/year) unlocks unlimited deals, quotations, agreements, invoices and payment tracking for the paid term.</li>
+          <li><strong>Deal Boost</strong> (₹99) provides unlimited deals and quotations for 1 month; it does not include Pro features.</li>
+          <li>All plans are one-time payments for a fixed term processed via our integrated Razorpay payment gateway — nothing auto-renews.</li>
+          <li>Plans and credits are non-transferable and tied to your account.</li>
           <li>All prices are listed in Indian Rupees (INR) and inclusive of applicable taxes.</li>
         </ul>
 
@@ -96,7 +97,7 @@ export default function TermsOfService() {
             We may suspend or terminate your account if you violate these Terms, engage in
             fraudulent activity, or if required by law.
           </li>
-          <li>Upon termination, unused credits are forfeited and non-refundable.</li>
+          <li>Upon termination, any remaining plan term or unused credits are forfeited and non-refundable.</li>
         </ul>
 
         <h2>10. Dispute Resolution</h2>

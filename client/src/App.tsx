@@ -9,6 +9,7 @@ import { AppLoader, RouteLoader } from "@/components/app-loader";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { InstallPrompt } from "@/components/install-prompt";
 import { ConfirmProvider } from "@/components/confirm-dialog";
+import { UpgradeModalProvider } from "@/components/upgrade-modal";
 import { trackPageView } from "@/lib/analytics";
 import { useLocation } from "wouter";
 
@@ -183,11 +184,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ConfirmProvider>
-          <div className="min-h-screen bg-background text-foreground">
-            <Router />
-          </div>
-          <InstallPrompt />
-          <Toaster />
+          <UpgradeModalProvider>
+            <div className="min-h-screen bg-background text-foreground">
+              <Router />
+            </div>
+            <InstallPrompt />
+            <Toaster />
+          </UpgradeModalProvider>
         </ConfirmProvider>
       </TooltipProvider>
     </QueryClientProvider>
