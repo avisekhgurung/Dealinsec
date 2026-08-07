@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
+import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
 import { useMemo, useState, useEffect } from "react";
 import {
@@ -436,6 +437,8 @@ export default function DashboardPage() {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               All systems operational
             </span>
+            {/* Desktop keeps the bell in the sidebar; mobile needs it in the header. */}
+            <NotificationBell className="lg:hidden" />
             <Button
               variant="ghost"
               size="icon"

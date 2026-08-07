@@ -25,6 +25,7 @@ const CreateDealPage          = lazy(() => import("@/pages/create-deal"));
 const EditDealPage            = lazy(() => import("@/pages/edit-deal"));
 const DealDetailsPage         = lazy(() => import("@/pages/deal-details"));
 const QuotePreviewPage        = lazy(() => import("@/pages/quote-preview"));
+const QuotationsPage          = lazy(() => import("@/pages/quotations"));
 const ContractConfirmationPage = lazy(() => import("@/pages/contract-confirmation"));
 const ContractsPage           = lazy(() => import("@/pages/contracts"));
 const ContractDetailsPage     = lazy(() => import("@/pages/contract-details"));
@@ -141,6 +142,7 @@ function Router() {
             <Route path="/deals/:id/edit" component={EditDealPage} />
             <Route path="/deals/:id/contract" component={ContractConfirmationPage} />
             <Route path="/deals/:id" component={DealDetailsPage} />
+            <Route path="/quotations" component={QuotationsPage} />
             <Route path="/contracts" component={ContractsPage} />
             <Route path="/contracts/:id/export" component={ContractPdfPage} />
             <Route path="/contracts/:id" component={ContractDetailsPage} />

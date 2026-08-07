@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
+import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table/data-table";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -192,17 +193,20 @@ export default function DealsPage() {
         <div className="px-4 py-4 space-y-3 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-6 lg:space-y-0">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h1 className="text-xl lg:text-3xl font-bold tracking-tight">Deals</h1>
+              <h1 className="text-xl lg:text-2xl font-bold tracking-tight">Deals</h1>
               <p className="hidden lg:block text-sm text-muted-foreground mt-0.5">
                 {deals.length} {deals.length === 1 ? "deal" : "deals"} total
               </p>
             </div>
+            <div className="flex items-center gap-1.5">
+            <NotificationBell className="lg:hidden" />
             <Link href="/deals/new">
               <Button size="sm" className="gradient-btn text-white lg:h-10 lg:px-5 lg:text-sm" data-testid="button-new-deal">
                 <Plus className="w-4 h-4 mr-1 lg:mr-2" />
                 <span className="lg:inline">New</span><span className="hidden lg:inline">&nbsp;Deal</span>
               </Button>
             </Link>
+            </div>
           </div>
 
           {/* Mobile-only search + status chips (desktop uses the table toolbar) */}

@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { BottomNav } from "@/components/bottom-nav";
+import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table/data-table";
 import { Receipt, Calendar, ChevronRight, Briefcase, Search, X } from "lucide-react";
@@ -134,10 +135,15 @@ export default function BillingPage() {
     <div className="min-h-screen bg-background pb-20 lg:pb-12">
       <header className="glass-header sticky top-0 z-40 lg:border-b lg:border-neutral-200/60 dark:lg:border-neutral-800/60">
         <div className="px-4 py-4 space-y-3 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-6 lg:space-y-0">
-          <h1 className="text-xl lg:text-3xl font-bold tracking-tight">Invoices</h1>
-          <p className="hidden lg:block text-sm text-muted-foreground mt-0.5">
-            {brandInvoices.length} {brandInvoices.length === 1 ? "invoice" : "invoices"} total
-          </p>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h1 className="text-xl lg:text-2xl font-bold tracking-tight">Invoices</h1>
+              <p className="hidden lg:block text-sm text-muted-foreground mt-0.5">
+                {brandInvoices.length} {brandInvoices.length === 1 ? "invoice" : "invoices"} total
+              </p>
+            </div>
+            <NotificationBell className="lg:hidden" />
+          </div>
 
           {/* Mobile-only search + chips */}
           <div className="flex flex-col gap-3 lg:hidden">

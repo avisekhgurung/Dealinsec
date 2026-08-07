@@ -348,9 +348,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Only active deals can be completed" });
       }
       const updated = await storage.updateDeal(dealId, { status: "Completed" });
+      logOrgActivity(req.user, "completed", "deal", req.params.id, deal?.dealTitle || deal?.brandName || "");
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to complete deal" });
+    }
+  });
+
+  // Quotation register — every quotation in the organization.
+  app.get("/api/quotes", isAuthenticated, async (req: any, res) => {
+    try {
+      const rows = await storage.getQuotesByOrg(req.user.organizationId, req.user.id);
+      res.json(rows);
+    } catch (error) {
+      console.error("Quotes list error:", error);
+      res.status(500).json({ error: "Failed to fetch quotations" });
     }
   });
 
@@ -472,6 +484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         signedDate: new Date().toISOString(),
       });
 
+      logOrgActivity(req.user, "uploaded signed proof for", "agreement", req.params.id, contract.brandName);
       res.json(updated);
     } catch (error) {
       console.error("Proof upload error:", error);
@@ -809,6 +822,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updated = await storage.updateBrandInvoice(parseInt(req.params.id), updates);
+
+      if (invoice.status !== "Paid" && updates.status === "Paid" && updated) {
+        logOrgActivity(req.user, "recorded payment for", "invoice", invoice.id,
+          `₹${Number(updated.dealAmount || 0).toLocaleString("en-IN")} from ${invoice.brandName}`);
+      }
 
       // "Payment received" email — only when transitioning Unpaid -> Paid
       if (invoice.status !== "Paid" && updates.status === "Paid" && updated) {

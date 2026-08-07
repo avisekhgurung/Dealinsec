@@ -99,6 +99,7 @@ export interface IStorage {
   getContractsByOrg(orgId: string, userId?: string): Promise<Contract[]>;
   getInvoicesByOrg(orgId: string, userId?: string): Promise<Invoice[]>;
   getBrandInvoicesByOrg(orgId: string, userId?: string): Promise<BrandInvoice[]>;
+  getQuotesByOrg(orgId: string, userId?: string): Promise<(Quote & { deal: Deal | null })[]>;
   createInvitation(data: InsertInvitation): Promise<Invitation>;
   getInvitationByToken(token: string): Promise<Invitation | undefined>;
   getPendingInvitations(orgId: string): Promise<Invitation[]>;
@@ -610,6 +611,17 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(brandInvoices).where(
       sql`${brandInvoices.organizationId} = ${orgId} OR (${brandInvoices.organizationId} IS NULL AND ${brandInvoices.userId} = ${userId ?? null})`,
     ).orderBy(desc(brandInvoices.id));
+  }
+
+  async getQuotesByOrg(orgId: string, userId?: string): Promise<(Quote & { deal: Deal | null })[]> {
+    // Quotation register: every quote in the org with its parent deal, newest
+    // first. Same org-or-legacy-own rule as the other list queries.
+    const rows = await db.select({ quote: quotes, deal: deals })
+      .from(quotes)
+      .leftJoin(deals, eq(quotes.dealId, deals.id))
+      .where(sql`${quotes.organizationId} = ${orgId} OR (${quotes.organizationId} IS NULL AND ${quotes.userId} = ${userId ?? null})`)
+      .orderBy(desc(quotes.createdAt));
+    return rows.map((r) => ({ ...r.quote, deal: r.deal ?? null }));
   }
 
   async createInvitation(data: InsertInvitation): Promise<Invitation> {

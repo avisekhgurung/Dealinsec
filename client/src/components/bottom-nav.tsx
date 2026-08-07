@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 const navItems = [
   { path: "/dashboard", label: "Home", icon: Home },
   { path: "/deals", label: "Deals", icon: Briefcase },
+  { path: "/quotations", label: "Quotes", icon: FileText },
   { path: "/contracts", label: "Agreements", icon: FileCheck },
   { path: "/invoices", label: "Invoices", icon: Receipt },
   { path: "/profile", label: "Profile", icon: UserCircle },
@@ -22,7 +23,7 @@ export function BottomNav() {
       borderTop: "1px solid rgba(255,255,255,0.35)",
       boxShadow: "0 -4px 24px rgba(0,0,0,0.06)",
     }}>
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
+      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-1">
         {navItems.map((item) => {
           const isActive = location === item.path ||
             (item.path !== "/" && location.startsWith(item.path));
@@ -32,7 +33,7 @@ export function BottomNav() {
             <Link key={item.path} href={item.path}>
               <button
                 data-testid={`nav-${item.label.toLowerCase()}`}
-                className="relative flex flex-col items-center justify-center gap-0.5 w-14 h-14 rounded-2xl transition-all duration-200"
+                className="relative flex flex-col items-center justify-center gap-0.5 w-[58px] h-14 rounded-2xl transition-all duration-200"
                 style={{
                   color: isActive ? "hsl(160 84% 30%)" : "hsl(215 16% 47%)",
                 }}
@@ -49,7 +50,7 @@ export function BottomNav() {
                     style={{ strokeWidth: isActive ? 2.5 : 1.75 }}
                   />
                 </div>
-                <span className={`relative text-[10px] transition-all duration-200 ${isActive ? "font-bold" : "font-medium"}`}>
+                <span className={`relative text-[9px] leading-tight tracking-tight max-w-full truncate transition-all duration-200 ${isActive ? "font-bold" : "font-medium"}`}>
                   {item.label}
                 </span>
               </button>

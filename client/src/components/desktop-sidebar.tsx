@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
+import { NotificationBell } from "@/components/notification-bell";
 import { hasActivePro, hasActiveDealBoost } from "@shared/schema";
 
 interface NavItem {
@@ -28,7 +29,8 @@ interface NavItem {
 
 const PRIMARY_NAV: NavItem[] = [
   { path: "/dashboard", label: "Dashboard", icon: Home, description: "Overview & KPIs" },
-  { path: "/deals", label: "Deals", icon: Briefcase, description: "Pipeline & quotations" },
+  { path: "/deals", label: "Deals", icon: Briefcase, description: "Pipeline & clients" },
+  { path: "/quotations", label: "Quotations", icon: FileText, description: "Issued quotes" },
   { path: "/contracts", label: "Agreements", icon: FileCheck, description: "Signed contracts" },
   { path: "/invoices", label: "Invoices", icon: Receipt, description: "Billing & payments" },
 ];
@@ -72,13 +74,14 @@ export function DesktopSidebar() {
       aria-label="Primary navigation"
       className="hidden lg:flex fixed inset-y-0 left-0 z-30 w-72 flex-col bg-sidebar border-r border-sidebar-border"
     >
-      {/* ── Logo ── */}
-      <div className="h-16 flex items-center px-5 border-b border-sidebar-border">
+      {/* ── Logo + notifications ── */}
+      <div className="h-16 flex items-center justify-between gap-2 pl-5 pr-3 border-b border-sidebar-border">
         <Link href="/dashboard">
           <button className="group outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-md">
             <DealinsecLogo size="sm" />
           </button>
         </Link>
+        <NotificationBell />
       </div>
 
       {/* ── Plan card ── */}
