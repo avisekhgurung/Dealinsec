@@ -196,7 +196,6 @@ const PAGE_JS = `
   initBranding(function(){ render(); });
   var LASTTOTAL=0;
   function saveData(){ return { type:'agreement', docNumber:'', partyName:$('clName').value, total:LASTTOTAL, payload:collect() }; }
-  initSave(saveData);
 
   var FIELDS=['spName','spAddr','clName','clAddr','effDate','scope','deliverables','startDate','endDate','fee','advancePct'];
 

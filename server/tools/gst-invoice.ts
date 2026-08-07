@@ -215,7 +215,6 @@ const PAGE_JS = `
   initBranding(function(){ render(); });
   var LASTTOTAL=0;
   function saveData(){ return { type:'invoice', docNumber:$('invNo').value, partyName:$('cliName').value, total:LASTTOTAL, payload:collect() }; }
-  initSave(saveData);
 
   function collect(){
     return {

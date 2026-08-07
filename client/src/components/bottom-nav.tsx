@@ -8,7 +8,6 @@ const navItems = [
   { path: "/deals", label: "Deals", icon: Briefcase },
   { path: "/contracts", label: "Agreements", icon: FileCheck },
   { path: "/invoices", label: "Invoices", icon: Receipt },
-  { path: "/documents", label: "Docs", icon: FileText },
   { path: "/profile", label: "Profile", icon: UserCircle, showCredits: true },
 ];
 

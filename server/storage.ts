@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
 import {
-  users, deals, contracts, invoices, brandInvoices, invoiceAttachments, creditTransactions, payuOrders, quotes, referrals, toolDocuments,
+  users, deals, contracts, invoices, brandInvoices, invoiceAttachments, creditTransactions, payuOrders, quotes, referrals,
   type User, type UpsertUser,
   type Deal, type InsertDeal,
   type Contract, type InsertContract,
@@ -11,8 +11,7 @@ import {
   type CreditTransaction, type InsertCreditTransaction,
   type PayuOrder, type InsertPayuOrder,
   type Quote, type InsertQuote,
-  type Referral, type InsertReferral,
-  type ToolDocument, type InsertToolDocument
+  type Referral, type InsertReferral
 } from "@shared/schema";
 
 export interface IStorage {
@@ -84,12 +83,6 @@ export interface IStorage {
   getUserByReferralCode(code: string): Promise<User | undefined>;
   createReferral(data: InsertReferral): Promise<Referral>;
   getReferralsByUser(userId: string): Promise<Referral[]>;
-
-  // Documents saved from the public free tools
-  getToolDocuments(userId: string): Promise<ToolDocument[]>;
-  getToolDocument(id: number): Promise<ToolDocument | undefined>;
-  createToolDocument(doc: InsertToolDocument & { userId: string }): Promise<ToolDocument>;
-  deleteToolDocument(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -521,23 +514,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ── Documents saved from the public free tools ──
-  async getToolDocuments(userId: string): Promise<ToolDocument[]> {
-    return db.select().from(toolDocuments).where(eq(toolDocuments.userId, userId)).orderBy(desc(toolDocuments.createdAt));
-  }
-
-  async getToolDocument(id: number): Promise<ToolDocument | undefined> {
-    const [doc] = await db.select().from(toolDocuments).where(eq(toolDocuments.id, id));
-    return doc;
-  }
-
-  async createToolDocument(doc: InsertToolDocument & { userId: string }): Promise<ToolDocument> {
-    const [created] = await db.insert(toolDocuments).values(doc as any).returning();
-    return created;
-  }
-
-  async deleteToolDocument(id: number): Promise<void> {
-    await db.delete(toolDocuments).where(eq(toolDocuments.id, id));
-  }
 }
 
 export const storage = new DatabaseStorage();

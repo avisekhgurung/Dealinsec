@@ -192,7 +192,6 @@ const PAGE_JS = `
   initBranding(function(){ render(); });
   var LASTTOTAL=0;
   function saveData(){ return { type:'purchase_order', docNumber:$('poNo').value, partyName:$('venName').value, total:LASTTOTAL, payload:collect() }; }
-  initSave(saveData);
 
   var FIELDS=['bizName','bizGstin','bizAddr','poNo','venName','venGstin','venAddr','poDate','delDate','shipAddr','gstRate','taxType','notes','sigName'];
 

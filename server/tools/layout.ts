@@ -416,14 +416,10 @@ const STYLES = `<style>
   .bm-list li{position:relative;padding-left:29px;font-size:13.5px;color:var(--ink);line-height:1.45}
   .bm-list li b{font-weight:700}
   .bm-list li::before{content:"✓";position:absolute;left:0;top:0;width:20px;height:20px;border-radius:50%;background:var(--accent-bg);color:var(--green-d);font-size:12px;font-weight:800;display:grid;place-items:center}
-  /* "Save to account" — the primary (highlighted) export option. */
   .export-opt.eo-primary{background:linear-gradient(180deg,hsl(160 60% 96%),hsl(160 55% 93%));border-color:var(--accent-line)}
   .export-opt.eo-primary .eo-ico{background:var(--green);color:#fff}
   .export-opt.eo-primary:hover{border-color:var(--green);box-shadow:var(--shadow-green)}
   /* Save confirmation toast. */
-  .save-toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);z-index:140;background:var(--ink);color:#fff;font-size:13.5px;font-weight:600;padding:12px 18px;border-radius:12px;box-shadow:0 12px 30px rgba(16,24,40,.35);opacity:0;visibility:hidden;transition:opacity .25s ease,transform .25s ease,visibility .25s ease;max-width:90vw}
-  .save-toast.show{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0)}
-  .save-toast a{color:#7CE0B8;font-weight:700;margin-left:6px}
   /* "Make it with AI" box on the invoice tool. */
   .ai-box{background:linear-gradient(135deg,var(--accent-bg),rgba(255,255,255,.55));border:1px solid var(--accent-line);border-radius:14px;padding:14px 16px;margin-bottom:18px}
   .ai-head{font-size:14px;font-weight:800;color:var(--green-d);margin-bottom:8px}
@@ -591,7 +587,6 @@ const EXPORT_PANEL = `<div id="export-panel" class="export-overlay" aria-hidden=
       <p>Download it, or share it straight to your client</p>
     </div>
     <div class="export-grid">
-      <button type="button" class="export-opt eo-primary" id="exp-save"><span class="eo-ico"><span class="eo-glyph">${EO.save}</span>${EO.spin}</span><b>Save to account</b><small>Keep &amp; open it anytime</small></button>
       <button type="button" class="export-opt" id="exp-pdf"><span class="eo-ico"><span class="eo-glyph">${EO.pdf}</span>${EO.spin}</span><b>Download PDF</b><small>Print or save as PDF</small></button>
       <button type="button" class="export-opt" id="exp-png"><span class="eo-ico"><span class="eo-glyph">${EO.png}</span>${EO.spin}</span><b>Download PNG</b><small>Image for chat &amp; social</small></button>
       <button type="button" class="export-opt" id="exp-share"><span class="eo-ico"><span class="eo-glyph">${EO.share}</span>${EO.spin}</span><b>Share</b><small>WhatsApp, email &amp; more</small></button>
@@ -626,17 +621,17 @@ function brandModal(): string {
       <div class="export-hero">
         <button class="export-close" data-close aria-label="Close">&times;</button>
         <div class="export-check">${shield}</div>
-        <h3>Sign up free &amp; keep this document</h3>
-        <p>Remove the footer — and save it to your account for later</p>
+        <h3>Sign up free to remove the footer</h3>
+        <p>A free DealInSec account unlocks clean, unbranded documents</p>
       </div>
       <div style="padding:20px">
         <ul class="bm-list">
           <li>Remove the &ldquo;Made with DealInSec&rdquo; footer</li>
-          <li><b>This document is saved to your account</b> — open it anytime for later reference</li>
-          <li>Reuse &amp; edit it, send to clients, track payments and e-sign</li>
+          <li><b>4 free Deal Credits every month</b> &mdash; run real deals with quotations</li>
+          <li>Manage clients, send documents, track payments and e-sign with Pro</li>
         </ul>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
-          <a class="btn" href="${APP_SIGNUP}" data-stash-save style="flex:1;min-width:150px;justify-content:center">Sign up free →</a>
+          <a class="btn" href="${APP_SIGNUP}" style="flex:1;min-width:150px;justify-content:center">Sign up free →</a>
           <button type="button" class="btn ghost" data-close>Maybe later</button>
         </div>
       </div>
@@ -686,7 +681,6 @@ ${toolSwitch(o.canonicalPath)}
 ${o.canonicalPath === "/tools" ? "" : relatedTools(o.canonicalPath)}
 ${EXPORT_PANEL}
 ${brandModal()}
-<div id="save-toast" class="save-toast no-print" role="status" aria-live="polite"></div>
 ${o.hideCtaBand ? "" : ctaBand()}
 ${footer()}
 ${o.bodyEndScripts || ""}

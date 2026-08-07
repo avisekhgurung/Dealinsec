@@ -30,7 +30,6 @@ const PRIMARY_NAV: NavItem[] = [
   { path: "/deals", label: "Deals", icon: Briefcase, description: "Pipeline & quotations" },
   { path: "/contracts", label: "Agreements", icon: FileCheck, description: "Signed contracts" },
   { path: "/invoices", label: "Invoices", icon: Receipt, description: "Billing & payments" },
-  { path: "/documents", label: "Documents", icon: FileText, description: "Saved from free tools" },
 ];
 
 const SECONDARY_NAV: NavItem[] = [

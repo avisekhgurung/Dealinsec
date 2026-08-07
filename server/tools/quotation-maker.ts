@@ -185,7 +185,6 @@ const PAGE_JS = `
   initBranding(function(){ render(); });
   var LASTTOTAL=0;
   function saveData(){ return { type:'quotation', docNumber:$('quoteNo').value, partyName:$('cliName').value, total:LASTTOTAL, payload:collect() }; }
-  initSave(saveData);
 
   function collectTerms(){
     var out=[];

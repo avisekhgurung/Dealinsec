@@ -364,6 +364,7 @@ export default function LandingPage() {
         <ProductShowcase />
         <StatsSection />
         {/* Testimonials hidden until we have real users. Re-enable <Testimonials /> once you have genuine quotes. */}
+        <MadeInIndiaSection />
         <PricingPreview onCTA={() => (isAuthenticated ? setLocation("/pricing") : openAuth("signup"))} />
         <FAQSection />
         <FinalCTA
@@ -1145,7 +1146,7 @@ function FreeToolsSection() {
               </span>
             </>
           }
-          subtitle="Create GST invoices, quotations and agreements right in your browser — free, instant, no sign-up. Then save your work with a free account and pick up where the tools leave off."
+          subtitle="Create GST invoices, quotations and agreements right in your browser — free, instant, no sign-up. Our gift to Indian businesses. When you're ready to run whole deals, the app is one click away."
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5 mt-14">
           {FREE_TOOLS.map((t) => (
@@ -1606,6 +1607,63 @@ function Testimonials() {
               </div>
             </motion.div>
           ))}
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+
+function MadeInIndiaSection() {
+  return (
+    <section className="py-20 sm:py-24">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          className="relative rounded-3xl overflow-hidden border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60"
+        >
+          {/* Tricolor ribbon */}
+          <div
+            className="h-1.5 w-full"
+            style={{ background: "linear-gradient(90deg, #FF9933 0%, #FF9933 33%, #FFFFFF 33%, #FFFFFF 66%, #138808 66%, #138808 100%)" }}
+            aria-hidden="true"
+          />
+          <div className="p-8 sm:p-12 text-center">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/40 mb-5">
+              <span className="text-base leading-none">&#127470;&#127475;</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-300">Made in India</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4" style={{ textWrap: "balance" }}>
+              Built in India, for the businesses{" "}
+              <span
+                style={{
+                  background: "linear-gradient(135deg, #FF9933 0%, #E01B6F 50%, #138808 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}
+              >
+                that build India
+              </span>
+            </h2>
+            <p className="text-base sm:text-lg text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed mb-3">
+              The broker closing a family's first home. The designer turning a bare flat into
+              a place someone loves coming back to. The contractor whose RA bill feeds thirty
+              families. The agency putting a local brand on the map.
+            </p>
+            <p className="text-base sm:text-lg text-neutral-700 dark:text-neutral-300 max-w-2xl mx-auto leading-relaxed font-medium">
+              Your work runs on trust and a handshake. DealInSec puts that handshake in
+              writing &mdash; GST-native, &#8377;-first, and made for how Indian business actually runs.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 mt-7 text-xs text-neutral-500">
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> GST &amp; SAC built in</span>
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> PAN, IFSC &amp; UPI native</span>
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> Priced in &#8377;, for India</span>
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> Built by a founder, not a giant</span>
+            </div>
+          </div>
         </motion.div>
       </div>
     </section>

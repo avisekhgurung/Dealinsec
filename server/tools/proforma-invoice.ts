@@ -190,7 +190,6 @@ const PAGE_JS = `
   initBranding(function(){ render(); });
   var LASTTOTAL=0;
   function saveData(){ return { type:'proforma', docNumber:$('invNo').value, partyName:$('cliName').value, total:LASTTOTAL, payload:collect() }; }
-  initSave(saveData);
 
   var FIELDS=['bizName','bizGstin','bizAddr','invNo','cliName','cliGstin','cliAddr','invDate','validUntil','gstRate','taxType','notes','sigName'];
 
