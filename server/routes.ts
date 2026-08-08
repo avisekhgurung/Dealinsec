@@ -1300,6 +1300,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/org/roles", isAuthenticated, requireOrgPermission("team.manage"), withOrg, async (req: any, res) => {
     try {
+      // Lazy one-shot seed for orgs that predate editable default roles —
+      // the latch means a deliberately deleted default never resurrects.
+      if (!req.org.rolesSeeded) await storage.seedDefaultRoles(req.org.id);
       const roles = await storage.getOrgRoles(req.org.id);
       const withUsage = await Promise.all(roles.map(async (r) => ({
         ...r,

@@ -467,7 +467,7 @@ export default function ProfilePage() {
         <p className="text-sm text-muted-foreground" data-testid="text-email">{user?.email || "No email"}</p>
       </div>
 
-      <main className="px-4 space-y-4 max-w-lg mx-auto animate-fade-in lg:max-w-6xl lg:px-8 lg:space-y-6 xl:px-12">
+      <main className="px-4 space-y-4 max-w-lg mx-auto animate-fade-in lg:max-w-[1600px] lg:px-8 lg:space-y-6 xl:px-12">
         <SetupStepper
           steps={[
             { key: "identity",  label: "Personal",      icon: User,     done: Boolean(user?.firstName && user?.phone) },

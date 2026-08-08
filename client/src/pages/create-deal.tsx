@@ -175,7 +175,7 @@ export default function CreateDealPage() {
   return (
     <div className="min-h-screen bg-background pb-8">
       <header className="glass-header sticky top-0 z-40">
-        <div className="flex items-center gap-3 px-4 py-4 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-3.5">
+        <div className="flex items-center gap-3 px-4 py-4 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-3.5">
           <Button
             variant="ghost"
             size="icon"
@@ -188,7 +188,7 @@ export default function CreateDealPage() {
         </div>
       </header>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 py-6 space-y-6 animate-fade-in lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-7 lg:space-y-5">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 py-6 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-7 lg:space-y-5">
         {/* Deal Type — first step, drives downstream taxonomy */}
         <section className="glass-card rounded-xl p-5 sm:p-6 space-y-5">
           <div className="flex items-baseline justify-between gap-3">

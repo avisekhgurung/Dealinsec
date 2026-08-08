@@ -190,7 +190,7 @@ export default function DealsPage() {
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-12">
       <header className="glass-header sticky top-0 z-40 lg:border-b lg:border-neutral-200/60 dark:lg:border-neutral-800/60">
-        <div className="px-4 py-4 space-y-3 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-6 lg:space-y-0">
+        <div className="px-4 py-4 space-y-3 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-6 lg:space-y-0">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h1 className="text-xl lg:text-2xl font-bold tracking-tight">Deals</h1>
@@ -243,7 +243,7 @@ export default function DealsPage() {
         </div>
       </header>
 
-      <main className="px-4 py-6 animate-fade-in lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-8">
+      <main className="px-4 py-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8">
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (

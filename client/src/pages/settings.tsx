@@ -161,7 +161,7 @@ export default function SettingsPage() {
   const [seatDialogOpen, setSeatDialogOpen] = useState(false);
   const [seatMessage, setSeatMessage] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<string>("SALES");
+  const [inviteRole, setInviteRole] = useState<string>("");
   const sendInvite = useMutation({
     mutationFn: async () =>
       (await apiRequest("POST", "/api/org/invitations", {
@@ -238,7 +238,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-12">
-      <header className="glass-header sticky top-0 z-40 px-4 py-3 flex items-center gap-3 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-5">
+      <header className="glass-header sticky top-0 z-40 px-4 py-3 flex items-center gap-3 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-5">
         <Link href="/dashboard">
           <Button variant="ghost" size="icon" data-testid="button-back"><ArrowLeft className="h-5 w-5" /></Button>
         </Link>
@@ -254,7 +254,7 @@ export default function SettingsPage() {
         )}
       </header>
 
-      <main className="p-4 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-6">
+      <main className="p-4 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-6">
         <div className="flex flex-col lg:flex-row gap-5">
           {/* Tab rail */}
           <nav className="flex lg:flex-col gap-1.5 lg:w-56 overflow-x-auto pb-1 lg:pb-0">
@@ -381,16 +381,19 @@ export default function SettingsPage() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {INVITABLE_ROLES.map((r) => (
-                                    <SelectItem key={r} value={r} className="text-xs">{ROLE_META[r].label}</SelectItem>
-                                  ))}
                                   {customRoles.map((r) => (
                                     <SelectItem key={r.id} value={`custom:${r.id}`} className="text-xs">
-                                      <span className="inline-flex items-center gap-1">
-                                        <Shield className="w-3 h-3 text-primary" /> {r.name}
-                                      </span>
+                                      {r.name}
                                     </SelectItem>
                                   ))}
+                                  {/* Legacy literal role (pre-editable-roles member): shown so the
+                                      select reads correctly until the owner reassigns them.
+                                      (This block only renders for non-OWNER rows.) */}
+                                  {!m.customRoleId && (
+                                    <SelectItem value={m.orgRole} className="text-xs">
+                                      {ROLE_META[m.orgRole as OrgRole]?.label ?? m.orgRole} (legacy)
+                                    </SelectItem>
+                                  )}
                                 </SelectContent>
                               </Select>
                               <Button
@@ -461,8 +464,8 @@ export default function SettingsPage() {
                         <div>
                           <h3 className="font-bold">Roles &amp; permissions</h3>
                           <p className="text-sm text-muted-foreground">
-                            Built-in roles cover the common cases — custom roles give you the exact
-                            permission mix you want per member.
+                            Every role is yours to shape — edit the defaults, delete them, or
+                            create your own with the exact permission mix.
                           </p>
                         </div>
                         {isOwner && (
@@ -479,15 +482,6 @@ export default function SettingsPage() {
                       </div>
 
                       <div className="mt-4 grid sm:grid-cols-2 gap-2.5">
-                        {INVITABLE_ROLES.map((r) => (
-                          <div key={r} className="rounded-xl border border-border/60 p-3">
-                            <p className="text-sm font-semibold flex items-center gap-1.5">
-                              {ROLE_META[r].label}
-                              <Badge variant="secondary" className="text-[10px] px-1.5">Built-in</Badge>
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-0.5">{ROLE_META[r].description}</p>
-                          </div>
-                        ))}
                         {customRoles.map((r) => (
                           <div key={r.id} className="rounded-xl border border-primary/30 bg-primary/[0.03] p-3" data-testid={`custom-role-${r.name}`}>
                             <div className="flex items-start justify-between gap-2">
@@ -706,7 +700,7 @@ export default function SettingsPage() {
             </div>
             <Button
               className="w-full gradient-btn text-white"
-              disabled={sendInvite.isPending || !inviteEmail.trim()}
+              disabled={sendInvite.isPending || !inviteEmail.trim() || !inviteRole}
               onClick={() => sendInvite.mutate()}
               data-testid="button-send-invite"
             >

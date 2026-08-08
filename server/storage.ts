@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
 import { canonicalEmail } from "@shared/email";
+import { DEFAULT_ROLE_SEEDS } from "@shared/permissions";
 import {
   users, deals, contracts, invoices, brandInvoices, invoiceAttachments, creditTransactions, payuOrders, quotes, referrals,
   organizations, invitations, activityLogs, orgRoles,
@@ -570,7 +571,24 @@ export class DatabaseStorage implements IStorage {
 
   async createOrganization(name: string, slug: string): Promise<Organization> {
     const [org] = await db.insert(organizations).values({ name, slug }).returning();
+    // Default roles are ordinary editable rows from day one (single choke
+    // point — every org-creation path passes through here).
+    await this.seedDefaultRoles(org.id);
     return org;
+  }
+
+  /** Seed Admin/Sales/Accounts as editable org_roles rows and latch the
+   *  flag. Idempotent via the latch — callers check rolesSeeded first (or
+   *  rely on createOrganization). */
+  async seedDefaultRoles(orgId: string): Promise<void> {
+    for (const seed of DEFAULT_ROLE_SEEDS) {
+      await db.insert(orgRoles)
+        .values({ organizationId: orgId, name: seed.name, permissions: seed.permissions })
+        .onConflictDoNothing();
+    }
+    await db.update(organizations)
+      .set({ rolesSeeded: true, updatedAt: new Date() })
+      .where(eq(organizations.id, orgId));
   }
 
   async getOrganization(id: string): Promise<Organization | undefined> {

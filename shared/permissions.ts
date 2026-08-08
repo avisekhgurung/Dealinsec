@@ -36,8 +36,11 @@ export type Permission =
   | "billing.manage"   // subscription, seats, purchases
   | "activity.view";
 
+// NOTE: clients.manage is deliberately absent — no route checks it (clients
+// are a field on deals, not a module). Kept in the type union only so any
+// stored occurrence stays parseable.
 const ALL: Permission[] = [
-  "deals.create", "deals.edit", "quotations.create", "clients.manage",
+  "deals.create", "deals.edit", "quotations.create",
   "agreements.create", "invoices.create", "invoices.delete", "payments.manage",
   "team.invite", "team.manage", "org.settings", "org.delete",
   "billing.manage", "activity.view",
@@ -46,12 +49,12 @@ const ALL: Permission[] = [
 export const ROLE_PERMISSIONS: Record<OrgRole, Permission[]> = {
   OWNER: ALL,
   ADMIN: [
-    "deals.create", "deals.edit", "quotations.create", "clients.manage",
+    "deals.create", "deals.edit", "quotations.create",
     "agreements.create", "invoices.create", "invoices.delete", "payments.manage",
     "team.invite", "team.manage", "org.settings", "activity.view",
   ],
   SALES: [
-    "deals.create", "deals.edit", "quotations.create", "clients.manage",
+    "deals.create", "deals.edit", "quotations.create",
   ],
   ACCOUNTS: [
     "invoices.create", "invoices.delete", "payments.manage",
@@ -108,18 +111,13 @@ export const PERMISSION_MATRIX: {
   { module: "Quotations", items: [
     { perm: "quotations.create", label: "Generate" },
   ]},
-  { module: "Clients", items: [
-    { perm: "clients.manage", label: "Manage" },
-  ]},
   { module: "Agreements", items: [
     { perm: "agreements.create", label: "Create & sign" },
   ]},
   { module: "Invoices", items: [
     { perm: "invoices.create", label: "Create" },
     { perm: "invoices.delete", label: "Delete" },
-  ]},
-  { module: "Payments", items: [
-    { perm: "payments.manage", label: "Record & track" },
+    { perm: "payments.manage", label: "Mark paid & track" },
   ]},
   { module: "Team", items: [
     { perm: "team.invite", label: "Invite members" },
@@ -131,6 +129,18 @@ export const PERMISSION_MATRIX: {
   { module: "Activity", items: [
     { perm: "activity.view", label: "View log" },
   ]},
+];
+
+// ── Default role seeds ─────────────────────────────────────────────────
+// Admin/Sales/Accounts are seeded into org_roles as ORDINARY editable,
+// deletable rows (new orgs at creation; existing orgs lazily, once, via
+// organizations.roles_seeded). Full flexibility — the owner can reshape or
+// remove them. OWNER stays code-level: an org must always have exactly one
+// root authority that holds billing.
+export const DEFAULT_ROLE_SEEDS: { name: string; permissions: Permission[] }[] = [
+  { name: "Admin",    permissions: ROLE_PERMISSIONS.ADMIN.filter((p) => ASSIGNABLE_PERMISSIONS.includes(p)) },
+  { name: "Sales",    permissions: ROLE_PERMISSIONS.SALES.filter((p) => ASSIGNABLE_PERMISSIONS.includes(p)) },
+  { name: "Accounts", permissions: ROLE_PERMISSIONS.ACCOUNTS.filter((p) => ASSIGNABLE_PERMISSIONS.includes(p)) },
 ];
 
 /** Human labels for the team UI. */

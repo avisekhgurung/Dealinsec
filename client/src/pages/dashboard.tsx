@@ -566,7 +566,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background pb-24 lg:pb-12">
       {/* Header — compact on mobile, generous on desktop SaaS-style */}
       <header className="glass-header sticky top-0 z-40 lg:border-b lg:border-neutral-200/60 dark:lg:border-neutral-800/60">
-        <div className="flex items-center justify-between gap-4 px-4 py-4 lg:max-w-7xl lg:mx-auto lg:px-8 lg:py-5 xl:px-10">
+        <div className="flex items-center justify-between gap-4 px-4 py-4 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-5 xl:px-10">
           <div>
             <p className="text-xs text-muted-foreground">{todayLabel}</p>
             <h1 className="text-lg lg:text-2xl font-bold tracking-tight">
@@ -601,7 +601,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="px-4 py-5 space-y-6 animate-fade-in lg:max-w-7xl lg:mx-auto lg:px-8 lg:py-6 lg:space-y-5 xl:px-10">
+      <main className="px-4 py-5 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-6 lg:space-y-5 xl:px-10">
 
         {/* ── Profile completion nudge — top priority before any action ── */}
         {showProfileNudge && (

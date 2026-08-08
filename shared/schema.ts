@@ -142,6 +142,9 @@ export const organizations = pgTable("organizations", {
   // from the owner's plan (free = 1, Pro = 5) via getSeatLimit().
   extraSeats: integer("extra_seats").notNull().default(0),
   extraSeatsExpiresAt: timestamp("extra_seats_expires_at"),
+  // One-shot latch for seeding the default editable roles (Admin/Sales/
+  // Accounts) into org_roles — a deleted default must never resurrect.
+  rolesSeeded: boolean("roles_seeded").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
