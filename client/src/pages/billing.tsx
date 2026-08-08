@@ -11,7 +11,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table/data-table";
-import { Receipt, Calendar, ChevronRight, Briefcase, Search, X } from "lucide-react";
+import { Receipt, Calendar, ChevronRight, Briefcase, Search, X, Plus } from "lucide-react";
 import type { Deal, BrandInvoice } from "@shared/schema";
 
 type FilterType = "all" | "paid" | "unpaid";
@@ -142,7 +142,16 @@ export default function BillingPage() {
                 {brandInvoices.length} {brandInvoices.length === 1 ? "invoice" : "invoices"} total
               </p>
             </div>
-            <NotificationBell className="lg:hidden" />
+            <div className="flex items-center gap-2">
+              {/* Invoices are generated from a signed agreement — route there */}
+              <Link href="/contracts" className="hidden lg:block">
+                <Button className="gradient-btn text-white lg:h-10 lg:px-5 lg:text-sm font-semibold" data-testid="button-new-invoice">
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  New Invoice
+                </Button>
+              </Link>
+              <NotificationBell className="lg:hidden" />
+            </div>
           </div>
 
           {/* Mobile-only search + chips */}

@@ -1,9 +1,10 @@
-import { Briefcase, FileText, Receipt, type LucideIcon } from "lucide-react";
+import { Briefcase, FileText, FileCheck, Receipt, type LucideIcon } from "lucide-react";
 
 /**
  * Modern branded app loader.
- * Shows the Dealinsec pipeline (Deal → Agreement → Invoice) animating
- * through, giving the user a preview of the product workflow.
+ * Shows the REAL Dealinsec workflow (Deal → Quotation → Agreement →
+ * Invoice) as a traveling wave — each stage fills emerald as the flow
+ * passes through it, a 3-second preview of what the product does.
  */
 export function AppLoader() {
   return (
@@ -103,13 +104,15 @@ export function AppLoader() {
           </p>
         </div>
 
-        {/* Pipeline animation: Deal → Agreement → Invoice */}
-        <div className="flex items-center gap-2 mt-2">
+        {/* Pipeline animation: Deal → Quotation → Agreement → Invoice */}
+        <div className="flex items-center gap-1.5 sm:gap-2 mt-2">
           <PipelineStep icon={Briefcase} delay={0} label="Deal" />
-          <PipelineConnector delay={0.4} />
-          <PipelineStep icon={FileText} delay={0.8} label="Agreement" />
-          <PipelineConnector delay={1.2} />
-          <PipelineStep icon={Receipt} delay={1.6} label="Invoice" />
+          <PipelineConnector delay={0.35} />
+          <PipelineStep icon={FileText} delay={0.7} label="Quotation" />
+          <PipelineConnector delay={1.05} />
+          <PipelineStep icon={FileCheck} delay={1.4} label="Agreement" />
+          <PipelineConnector delay={1.75} />
+          <PipelineStep icon={Receipt} delay={2.1} label="Invoice" />
         </div>
 
         {/* Progress dots */}
@@ -132,9 +135,10 @@ export function AppLoader() {
         @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
         @keyframes bounce-dot { 0%, 80%, 100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-6px); opacity: 1; } }
         @keyframes pipeline-step {
-          0% { transform: scale(0.85); opacity: 0.4; }
-          30% { transform: scale(1.08); opacity: 1; box-shadow: 0 6px 20px -4px rgba(5, 150, 105, 0.5); }
-          100% { transform: scale(1); opacity: 0.85; }
+          0%, 100% { transform: scale(1); opacity: 0.65; background-color: transparent; color: #059669; }
+          12% { transform: scale(1.12); opacity: 1; background-color: #059669; color: #ffffff;
+                box-shadow: 0 8px 22px -4px rgba(5, 150, 105, 0.55); }
+          30% { transform: scale(1); opacity: 0.9; background-color: transparent; color: #059669; }
         }
         @keyframes pipeline-flow {
           0% { background-position: 0% 50%; }
@@ -146,7 +150,12 @@ export function AppLoader() {
         .animate-breathe { animation: breathe 2.5s ease-in-out infinite; }
         .animate-bounce-dot { animation: bounce-dot 1.2s ease-in-out infinite; }
         .animate-pipeline-step {
-          animation: pipeline-step 2.4s ease-in-out infinite;
+          animation: pipeline-step 3.2s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .animate-pipeline-step, .animate-pipeline-flow, .animate-spin-slow,
+          .animate-spin-reverse, .animate-breathe, .animate-bounce-dot,
+          .animate-pulse-slow { animation: none !important; }
         }
         .animate-pipeline-flow {
           background: linear-gradient(90deg, rgba(5, 150, 105, 0.1) 0%, #059669 50%, rgba(13, 148, 136, 0.1) 100%);
@@ -173,7 +182,7 @@ function PipelineStep({
         className="w-10 h-10 rounded-xl flex items-center justify-center bg-white dark:bg-white/10 border border-emerald-200/50 dark:border-emerald-500/20 animate-pipeline-step"
         style={{ animationDelay: `${delay}s` }}
       >
-        <Icon className="w-4 h-4 text-primary" strokeWidth={2.2} />
+        <Icon className="w-4 h-4 text-current" strokeWidth={2.2} />
       </div>
       <span className="text-[10px] font-medium text-muted-foreground tracking-wide">
         {label}

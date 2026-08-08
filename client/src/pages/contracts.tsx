@@ -11,7 +11,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table/data-table";
-import { FileText, Calendar, Shield, ChevronRight, FileCheck, Search, X } from "lucide-react";
+import { FileText, Calendar, Shield, ChevronRight, FileCheck, Search, X, Plus } from "lucide-react";
 import type { Contract, Deal } from "@shared/schema";
 
 type FilterType = "all" | "active" | "completed";
@@ -123,7 +123,16 @@ export default function ContractsPage() {
                 {contracts.length} {contracts.length === 1 ? "agreement" : "agreements"} total
               </p>
             </div>
-            <NotificationBell className="lg:hidden" />
+            <div className="flex items-center gap-2">
+              {/* Agreements start from a deal — the CTA routes there */}
+              <Link href="/deals" className="hidden lg:block">
+                <Button className="gradient-btn text-white lg:h-10 lg:px-5 lg:text-sm font-semibold" data-testid="button-new-agreement">
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  New Agreement
+                </Button>
+              </Link>
+              <NotificationBell className="lg:hidden" />
+            </div>
           </div>
 
           {/* Mobile-only search + chips */}
