@@ -7,7 +7,7 @@ import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./auth";
 import { requirePro, requireOrgPermission, withOrg, getBillingUser, logOrgActivity } from "./entitlements";
 import { maybeStartTrial } from "./trial";
-import { getSeatLimit, INVITABLE_ROLES, hasPermission as hasOrgPermission, orgRoleOptions } from "@shared/permissions";
+import { getSeatLimit, INVITABLE_ROLES, hasPermission as hasOrgPermission, orgRoleOptions, CUSTOM_ROLE, ASSIGNABLE_PERMISSIONS } from "@shared/permissions";
 import { aiEnabled, reserve, refund, extractInvoice } from "./ai";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import multer from "multer";
@@ -865,7 +865,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/brand-invoices/:id", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.create"), async (req: any, res) => {
+  app.delete("/api/brand-invoices/:id", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.delete"), async (req: any, res) => {
     try {
       const invoice = await storage.getBrandInvoice(parseInt(req.params.id));
       if (!invoice) return res.status(404).json({ error: "Invoice not found" });
@@ -962,7 +962,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/attachments/:id", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.create"), async (req: any, res) => {
+  app.delete("/api/attachments/:id", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.delete"), async (req: any, res) => {
     try {
       const attachment = await storage.getInvoiceAttachment(parseInt(req.params.id));
       if (!attachment) return res.status(404).json({ error: "Document not found" });
@@ -1238,6 +1238,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/org/members", isAuthenticated, withOrg, async (req: any, res) => {
     try {
       const members = await storage.getOrgMembers(req.org.id);
+      const roles = await storage.getOrgRoles(req.org.id);
+      const roleName = new Map(roles.map((r) => [r.id, r.name]));
       res.json(members.map((m) => ({
         id: m.id,
         firstName: m.firstName,
@@ -1245,6 +1247,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: m.email,
         avatar: m.profileImageUrl,
         orgRole: m.orgRole,
+        customRoleId: (m as any).customRoleId ?? null,
+        customRoleName: (m as any).customRoleId ? roleName.get((m as any).customRoleId) ?? null : null,
         memberStatus: m.memberStatus,
         joinedAt: m.joinedAt ?? m.createdAt,
       })));
@@ -1256,8 +1260,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Change a member's role. Never the OWNER's, never to OWNER, never your own.
   app.patch("/api/org/members/:id", isAuthenticated, requireOrgPermission("team.manage"), withOrg, async (req: any, res) => {
     try {
-      const { orgRole } = req.body || {};
-      if (!INVITABLE_ROLES.includes(orgRole)) {
+      const { orgRole, customRoleId } = req.body || {};
+      let nextRole: string;
+      let nextCustomId: string | null = null;
+      let roleLabel: string;
+      if (customRoleId) {
+        const role = await storage.getOrgRole(String(customRoleId));
+        if (!role || role.organizationId !== req.org.id) {
+          return res.status(400).json({ error: "Invalid role" });
+        }
+        nextRole = CUSTOM_ROLE;
+        nextCustomId = role.id;
+        roleLabel = role.name;
+      } else if (INVITABLE_ROLES.includes(orgRole)) {
+        nextRole = orgRole;
+        roleLabel = orgRole;
+      } else {
         return res.status(400).json({ error: "Invalid role" });
       }
       const member = await storage.getUser(req.params.id);
@@ -1266,11 +1284,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (member.orgRole === "OWNER") return res.status(403).json({ error: "The owner's role can't be changed" });
       if (member.id === req.user.id) return res.status(403).json({ error: "You can't change your own role" });
-      await storage.updateUser(member.id, { orgRole } as any);
-      logOrgActivity(req.user, "changed role of", "member", member.id, `${member.email} → ${orgRole}`);
+      await storage.updateUser(member.id, { orgRole: nextRole, customRoleId: nextCustomId } as any);
+      logOrgActivity(req.user, "changed role of", "member", member.id, `${member.email} → ${roleLabel}`);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to update role" });
+    }
+  });
+
+  // ── Custom roles: the owner's permission matrix ─────────────────────
+  // Writes are OWNER-only (a role IS a grant of power); the team page's
+  // viewers (team.manage) can list them. Permission arrays are whitelist-
+  // filtered against ASSIGNABLE_PERMISSIONS server-side — org.delete and
+  // billing.manage can never ride in on a crafted request.
+
+  app.get("/api/org/roles", isAuthenticated, requireOrgPermission("team.manage"), withOrg, async (req: any, res) => {
+    try {
+      const roles = await storage.getOrgRoles(req.org.id);
+      const withUsage = await Promise.all(roles.map(async (r) => ({
+        ...r,
+        usage: await storage.countCustomRoleUsage(r.id),
+      })));
+      res.json(withUsage);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to load roles" });
+    }
+  });
+
+  const requireOwner = (req: any, res: any): boolean => {
+    if (req.user?.orgRole === "OWNER") return true;
+    res.status(403).json({ code: "FORBIDDEN", error: "Only the organization owner can manage roles" });
+    return false;
+  };
+
+  const cleanRoleInput = (body: any): { name: string; permissions: string[] } | null => {
+    const name = String(body?.name || "").trim().slice(0, 40);
+    if (name.length < 2) return null;
+    const requested = Array.isArray(body?.permissions) ? body.permissions : [];
+    const permissions = ASSIGNABLE_PERMISSIONS.filter((p) => requested.includes(p));
+    return { name, permissions };
+  };
+
+  app.post("/api/org/roles", isAuthenticated, withOrg, async (req: any, res) => {
+    if (!requireOwner(req, res)) return;
+    try {
+      const input = cleanRoleInput(req.body);
+      if (!input) return res.status(400).json({ error: "Role name must be at least 2 characters" });
+      const role = await storage.createOrgRole(req.org.id, input.name, input.permissions);
+      logOrgActivity(req.user, "created role", "member", role.id, `Role: ${role.name}`);
+      res.status(201).json(role);
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        return res.status(409).json({ error: "A role with this name already exists" });
+      }
+      res.status(500).json({ error: "Failed to create role" });
+    }
+  });
+
+  app.patch("/api/org/roles/:id", isAuthenticated, withOrg, async (req: any, res) => {
+    if (!requireOwner(req, res)) return;
+    try {
+      const existing = await storage.getOrgRole(req.params.id);
+      if (!existing || existing.organizationId !== req.org.id) {
+        return res.status(404).json({ error: "Role not found" });
+      }
+      const input = cleanRoleInput(req.body);
+      if (!input) return res.status(400).json({ error: "Role name must be at least 2 characters" });
+      const role = await storage.updateOrgRole(existing.id, input);
+      logOrgActivity(req.user, "updated role", "member", existing.id, `Role: ${input.name}`);
+      res.json(role);
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        return res.status(409).json({ error: "A role with this name already exists" });
+      }
+      res.status(500).json({ error: "Failed to update role" });
+    }
+  });
+
+  app.delete("/api/org/roles/:id", isAuthenticated, withOrg, async (req: any, res) => {
+    if (!requireOwner(req, res)) return;
+    try {
+      const existing = await storage.getOrgRole(req.params.id);
+      if (!existing || existing.organizationId !== req.org.id) {
+        return res.status(404).json({ error: "Role not found" });
+      }
+      const usage = await storage.countCustomRoleUsage(existing.id);
+      if (usage.members > 0 || usage.invites > 0) {
+        return res.status(409).json({
+          error: `This role is still assigned to ${usage.members} member(s) and ${usage.invites} pending invite(s). Reassign them first.`,
+        });
+      }
+      await storage.deleteOrgRole(existing.id);
+      logOrgActivity(req.user, "deleted role", "member", existing.id, `Role: ${existing.name}`);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete role" });
     }
   });
 
@@ -1304,11 +1412,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/org/invitations", isAuthenticated, requireOrgPermission("team.invite"), withOrg, async (req: any, res) => {
     try {
       const email = String(req.body?.email || "").trim().toLowerCase();
-      const orgRole = req.body?.orgRole;
+      let orgRole = req.body?.orgRole;
+      const customRoleId = req.body?.customRoleId ? String(req.body.customRoleId) : null;
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return res.status(400).json({ error: "Please enter a valid email" });
       }
-      if (!INVITABLE_ROLES.includes(orgRole)) {
+      // Either a built-in invitable role OR one of this org's custom roles —
+      // the custom role must belong to the caller's org (no cross-org grants).
+      if (customRoleId) {
+        const role = await storage.getOrgRole(customRoleId);
+        if (!role || role.organizationId !== req.org.id) {
+          return res.status(400).json({ error: "Invalid role" });
+        }
+        orgRole = CUSTOM_ROLE;
+      } else if (!INVITABLE_ROLES.includes(orgRole)) {
         return res.status(400).json({ error: "Invalid role" });
       }
 
@@ -1342,11 +1459,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         organizationId: req.org.id,
         email,
         orgRole,
+        customRoleId,
         token,
         invitedBy: req.user.id,
         status: "pending",
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      });
+      } as any);
 
       const inviterName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.email || "A teammate";
       const { subject, html } = inviteEmail({
@@ -1463,6 +1581,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         onboardingComplete: true,
         organizationId: inv.organizationId,
         orgRole: inv.orgRole,
+        customRoleId: (inv as any).customRoleId ?? null,
         memberStatus: "active",
         invitedBy: inv.invitedBy,
         joinedAt: new Date(),

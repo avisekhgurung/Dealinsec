@@ -3,7 +3,8 @@ import { eq, desc, sql } from "drizzle-orm";
 import { canonicalEmail } from "@shared/email";
 import {
   users, deals, contracts, invoices, brandInvoices, invoiceAttachments, creditTransactions, payuOrders, quotes, referrals,
-  organizations, invitations, activityLogs,
+  organizations, invitations, activityLogs, orgRoles,
+  type OrgCustomRole,
   type User, type UpsertUser,
   type Deal, type InsertDeal,
   type Contract, type InsertContract,
@@ -589,6 +590,48 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(users)
       .where(sql`${users.organizationId} = ${orgId} AND ${users.memberStatus} = 'active'`)
       .orderBy(users.joinedAt);
+  }
+
+  // ── Custom roles (owner-minted permission sets) ──
+
+  async getOrgRole(id: string): Promise<OrgCustomRole | undefined> {
+    const [role] = await db.select().from(orgRoles).where(eq(orgRoles.id, id));
+    return role;
+  }
+
+  async getOrgRoles(orgId: string): Promise<OrgCustomRole[]> {
+    return db.select().from(orgRoles)
+      .where(eq(orgRoles.organizationId, orgId))
+      .orderBy(orgRoles.createdAt);
+  }
+
+  async createOrgRole(orgId: string, name: string, permissions: string[]): Promise<OrgCustomRole> {
+    const [role] = await db.insert(orgRoles)
+      .values({ organizationId: orgId, name, permissions })
+      .returning();
+    return role;
+  }
+
+  async updateOrgRole(id: string, updates: { name?: string; permissions?: string[] }): Promise<OrgCustomRole | undefined> {
+    const [role] = await db.update(orgRoles)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(orgRoles.id, id))
+      .returning();
+    return role;
+  }
+
+  async deleteOrgRole(id: string): Promise<void> {
+    await db.delete(orgRoles).where(eq(orgRoles.id, id));
+  }
+
+  /** Members + pending invites still pointing at a role — deletion is
+   *  blocked while this is non-zero. */
+  async countCustomRoleUsage(roleId: string): Promise<{ members: number; invites: number }> {
+    const [m] = await db.select({ n: sql<number>`count(*)::int` }).from(users)
+      .where(sql`${users.customRoleId} = ${roleId} AND ${users.memberStatus} = 'active'`);
+    const [i] = await db.select({ n: sql<number>`count(*)::int` }).from(invitations)
+      .where(sql`${invitations.customRoleId} = ${roleId} AND ${invitations.status} = 'pending'`);
+    return { members: m?.n ?? 0, invites: i?.n ?? 0 };
   }
 
   async getOrgOwner(orgId: string): Promise<User | undefined> {

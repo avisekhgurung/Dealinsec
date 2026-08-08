@@ -107,7 +107,11 @@ export const users = pgTable("users", {
   referralCode: varchar("referral_code").unique(),
   // ── Organization membership (single org per user) ──
   organizationId: varchar("organization_id"),
-  orgRole: varchar("org_role").notNull().default("OWNER"), // OWNER | ADMIN | SALES | ACCOUNTS
+  orgRole: varchar("org_role").notNull().default("OWNER"), // OWNER | ADMIN | SALES | ACCOUNTS | CUSTOM
+  // Set when orgRole is "CUSTOM": points at an org_roles row whose
+  // permissions array is this member's whole grant (loaded onto the session
+  // by isAuthenticated). Role deleted ⇒ member degrades to view-only.
+  customRoleId: varchar("custom_role_id"),
   memberStatus: varchar("member_status").notNull().default("active"), // active | removed
   invitedBy: varchar("invited_by"),
   joinedAt: timestamp("joined_at"),
@@ -145,11 +149,25 @@ export const organizations = pgTable("organizations", {
 export type Organization = typeof organizations.$inferSelect;
 export type InsertOrganization = typeof organizations.$inferInsert;
 
+// Owner-minted custom roles: a named subset of ASSIGNABLE_PERMISSIONS
+// (shared/permissions.ts). Members reference one via users.custom_role_id.
+export const orgRoles = pgTable("org_roles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 40 }).notNull(),
+  permissions: json("permissions").$type<string[]>().notNull().default(sql`'[]'::json`),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type OrgCustomRole = typeof orgRoles.$inferSelect;
+
 export const invitations = pgTable("invitations", {
   id: serial("id").primaryKey(),
   organizationId: varchar("organization_id").notNull().references(() => organizations.id),
   email: varchar("email").notNull(),
   orgRole: varchar("org_role").notNull().default("SALES"),
+  customRoleId: varchar("custom_role_id"),
   token: varchar("token").notNull().unique(),
   invitedBy: varchar("invited_by").references(() => users.id),
   status: varchar("status").notNull().default("pending"), // pending | accepted | revoked

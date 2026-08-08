@@ -27,6 +27,7 @@ export type Permission =
   | "clients.manage"
   | "agreements.create"
   | "invoices.create"
+  | "invoices.delete"  // split from invoices.create so custom roles can differ
   | "payments.manage"
   | "team.invite"
   | "team.manage"      // change roles, remove members
@@ -37,7 +38,7 @@ export type Permission =
 
 const ALL: Permission[] = [
   "deals.create", "deals.edit", "quotations.create", "clients.manage",
-  "agreements.create", "invoices.create", "payments.manage",
+  "agreements.create", "invoices.create", "invoices.delete", "payments.manage",
   "team.invite", "team.manage", "org.settings", "org.delete",
   "billing.manage", "activity.view",
 ];
@@ -46,14 +47,14 @@ export const ROLE_PERMISSIONS: Record<OrgRole, Permission[]> = {
   OWNER: ALL,
   ADMIN: [
     "deals.create", "deals.edit", "quotations.create", "clients.manage",
-    "agreements.create", "invoices.create", "payments.manage",
+    "agreements.create", "invoices.create", "invoices.delete", "payments.manage",
     "team.invite", "team.manage", "org.settings", "activity.view",
   ],
   SALES: [
     "deals.create", "deals.edit", "quotations.create", "clients.manage",
   ],
   ACCOUNTS: [
-    "invoices.create", "payments.manage",
+    "invoices.create", "invoices.delete", "payments.manage",
   ],
 };
 
@@ -62,6 +63,75 @@ export function hasPermission(role: string | null | undefined, permission: Permi
   const perms = ROLE_PERMISSIONS[role as OrgRole];
   return !!perms && perms.includes(permission);
 }
+
+// ── Custom roles ───────────────────────────────────────────────────────
+// The owner can mint org-scoped roles with any subset of
+// ASSIGNABLE_PERMISSIONS (a member on one has users.org_role = "CUSTOM" +
+// custom_role_id; their live permission set is attached to the session as
+// customPermissions by isAuthenticated). memberCan() is THE permission
+// check — server middleware and client UI both use it, so a custom role's
+// matrix works everywhere without route changes.
+
+/** Sentinel org_role value for members on a custom role. */
+export const CUSTOM_ROLE = "CUSTOM";
+
+/** What a custom role may be granted. org.delete and billing.manage stay
+ *  owner-only: purchases activate on the payer's own user row, so a member
+ *  with billing power would buy a plan that lands on the wrong account. */
+export const ASSIGNABLE_PERMISSIONS: Permission[] = ALL.filter(
+  (p) => p !== "org.delete" && p !== "billing.manage",
+);
+
+export function memberCan(
+  user: { orgRole?: string | null; customPermissions?: string[] | null } | null | undefined,
+  permission: Permission,
+): boolean {
+  if (!user) return false;
+  if (user.orgRole === CUSTOM_ROLE || Array.isArray(user.customPermissions)) {
+    return !!user.customPermissions?.includes(permission);
+  }
+  return hasPermission(user.orgRole, permission);
+}
+
+/** The permission matrix, module by module, for the role editor UI.
+ *  "view" is not a row: reads are org-scoped for every active member by
+ *  architecture (see file header) — the UI states that instead of faking
+ *  a checkbox. */
+export const PERMISSION_MATRIX: {
+  module: string;
+  items: { perm: Permission; label: string }[];
+}[] = [
+  { module: "Deals", items: [
+    { perm: "deals.create", label: "Create" },
+    { perm: "deals.edit", label: "Edit" },
+  ]},
+  { module: "Quotations", items: [
+    { perm: "quotations.create", label: "Generate" },
+  ]},
+  { module: "Clients", items: [
+    { perm: "clients.manage", label: "Manage" },
+  ]},
+  { module: "Agreements", items: [
+    { perm: "agreements.create", label: "Create & sign" },
+  ]},
+  { module: "Invoices", items: [
+    { perm: "invoices.create", label: "Create" },
+    { perm: "invoices.delete", label: "Delete" },
+  ]},
+  { module: "Payments", items: [
+    { perm: "payments.manage", label: "Record & track" },
+  ]},
+  { module: "Team", items: [
+    { perm: "team.invite", label: "Invite members" },
+    { perm: "team.manage", label: "Manage members" },
+  ]},
+  { module: "Organization", items: [
+    { perm: "org.settings", label: "Edit settings" },
+  ]},
+  { module: "Activity", items: [
+    { perm: "activity.view", label: "View log" },
+  ]},
+];
 
 /** Human labels for the team UI. */
 export const ROLE_META: Record<OrgRole, { label: string; description: string }> = {

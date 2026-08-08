@@ -163,6 +163,17 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return res.status(401).json({ message: "Your access to this organization was removed" });
   }
 
+  // Custom-role members carry their live permission set on the session:
+  // memberCan() (shared/permissions.ts) reads customPermissions here and in
+  // the client. Loaded per request so a matrix edit by the owner applies on
+  // the member's very next request; a deleted role degrades the member to
+  // view-only rather than erroring.
+  if ((user as any).customRoleId) {
+    const role = await storage.getOrgRole((user as any).customRoleId);
+    (user as any).customPermissions =
+      role && role.organizationId === (user as any).organizationId ? role.permissions : [];
+  }
+
   (req as any).user = user;
   next();
 };

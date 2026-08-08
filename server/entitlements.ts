@@ -18,7 +18,7 @@
  */
 import type { RequestHandler } from "express";
 import { hasProAccess, type User } from "@shared/schema";
-import { hasPermission, type Permission } from "@shared/permissions";
+import { memberCan, type Permission } from "@shared/permissions";
 import { storage } from "./storage";
 
 export type GatedFeature = "agreements" | "invoices" | "payment_tracking";
@@ -37,10 +37,12 @@ export async function getBillingUser(reqUser: User): Promise<User> {
   return owner ?? reqUser;
 }
 
-/** Gate a route to a role permission. Runs AFTER isAuthenticated. */
+/** Gate a route to a role permission. Runs AFTER isAuthenticated (which
+ *  attaches customPermissions for custom-role members — memberCan covers
+ *  built-in and custom roles alike). */
 export function requireOrgPermission(permission: Permission): RequestHandler {
   return (req: any, res, next) => {
-    if (hasPermission(req.user?.orgRole, permission)) return next();
+    if (memberCan(req.user, permission)) return next();
     return res.status(403).json({
       code: "FORBIDDEN",
       permission,

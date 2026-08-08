@@ -26,12 +26,16 @@ import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { parseApiError } from "@/lib/api-error";
-import { hasPermission, ROLE_META, INVITABLE_ROLES, type OrgRole } from "@shared/permissions";
+import {
+  memberCan, ROLE_META, INVITABLE_ROLES, PERMISSION_MATRIX,
+  type OrgRole, type Permission,
+} from "@shared/permissions";
 import {
   ArrowLeft, Building2, Users, ScrollText, CreditCard, UserPlus, Crown,
   Mail, RotateCw, Trash2, Loader2, Sparkles, Rocket, Sun, Moon, Monitor,
-  SlidersHorizontal, Check,
+  SlidersHorizontal, Check, Shield, Pencil, Plus,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { getThemePref, setThemePref, type ThemePref } from "@/lib/theme";
 
 type Tab = "organization" | "team" | "activity" | "subscription" | "preferences";
@@ -45,7 +49,12 @@ interface OrgSummary {
 }
 interface Member {
   id: string; firstName: string | null; lastName: string | null; email: string;
-  avatar: string | null; orgRole: OrgRole; memberStatus: string; joinedAt: string | null;
+  avatar: string | null; orgRole: OrgRole | "CUSTOM"; memberStatus: string; joinedAt: string | null;
+  customRoleId: string | null; customRoleName: string | null;
+}
+interface CustomRole {
+  id: string; name: string; permissions: string[];
+  usage: { members: number; invites: number };
 }
 interface Invite {
   id: number; email: string; orgRole: OrgRole; createdAt: string; expiresAt: string;
@@ -71,11 +80,13 @@ export default function SettingsPage() {
   };
 
   const myRole = (user as any)?.orgRole as OrgRole | undefined;
-  const canInvite = hasPermission(myRole, "team.invite");
-  const canManageTeam = hasPermission(myRole, "team.manage");
-  const canEditOrg = hasPermission(myRole, "org.settings");
-  const canBilling = hasPermission(myRole, "billing.manage");
-  const canActivity = hasPermission(myRole, "activity.view");
+  const me = { orgRole: myRole, customPermissions: (user as any)?.customPermissions as string[] | undefined };
+  const isOwner = myRole === "OWNER";
+  const canInvite = memberCan(me, "team.invite");
+  const canManageTeam = memberCan(me, "team.manage");
+  const canEditOrg = memberCan(me, "org.settings");
+  const canBilling = memberCan(me, "billing.manage");
+  const canActivity = memberCan(me, "activity.view");
 
   const { data: org, isLoading: orgLoading } = useQuery<OrgSummary>({ queryKey: ["/api/org"] });
   const { data: members = [] } = useQuery<Member[]>({ queryKey: ["/api/org/members"] });
@@ -86,6 +97,47 @@ export default function SettingsPage() {
   const { data: activity = [] } = useQuery<Activity[]>({
     queryKey: ["/api/org/activity"],
     enabled: canActivity && tab === "activity",
+  });
+  const { data: customRoles = [] } = useQuery<CustomRole[]>({
+    queryKey: ["/api/org/roles"],
+    enabled: canManageTeam,
+  });
+
+  // ── Custom-role editor (owner only) ──
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
+  const [roleName, setRoleName] = useState("");
+  const [rolePerms, setRolePerms] = useState<string[]>([]);
+  const openRoleEditor = (role?: CustomRole) => {
+    setEditingRoleId(role?.id ?? null);
+    setRoleName(role?.name ?? "");
+    setRolePerms(role?.permissions ?? []);
+    setRoleDialogOpen(true);
+  };
+  const togglePerm = (perm: Permission) =>
+    setRolePerms((prev) => (prev.includes(perm) ? prev.filter((x) => x !== perm) : [...prev, perm]));
+  const saveRole = useMutation({
+    mutationFn: async () =>
+      (await apiRequest(
+        editingRoleId ? "PATCH" : "POST",
+        editingRoleId ? `/api/org/roles/${editingRoleId}` : "/api/org/roles",
+        { name: roleName.trim(), permissions: rolePerms },
+      )).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/org/roles"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/org/members"] });
+      setRoleDialogOpen(false);
+      toast({ title: editingRoleId ? "Role updated" : "Role created" });
+    },
+    onError: (err) => toast({ title: "Could not save role", description: parseApiError(err).error || "Please try again.", variant: "destructive" }),
+  });
+  const deleteRole = useMutation({
+    mutationFn: async (id: string) => (await apiRequest("DELETE", `/api/org/roles/${id}`)).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/org/roles"] });
+      toast({ title: "Role deleted" });
+    },
+    onError: (err) => toast({ title: "Could not delete role", description: parseApiError(err).error, variant: "destructive" }),
   });
 
   // ── Org profile edit ──
@@ -109,10 +161,15 @@ export default function SettingsPage() {
   const [seatDialogOpen, setSeatDialogOpen] = useState(false);
   const [seatMessage, setSeatMessage] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<OrgRole>("SALES");
+  const [inviteRole, setInviteRole] = useState<string>("SALES");
   const sendInvite = useMutation({
     mutationFn: async () =>
-      (await apiRequest("POST", "/api/org/invitations", { email: inviteEmail.trim(), orgRole: inviteRole })).json(),
+      (await apiRequest("POST", "/api/org/invitations", {
+        email: inviteEmail.trim(),
+        ...(inviteRole.startsWith("custom:")
+          ? { customRoleId: inviteRole.slice(7) }
+          : { orgRole: inviteRole }),
+      })).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/org/invitations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/org"] });
@@ -149,8 +206,10 @@ export default function SettingsPage() {
 
   // ── Member management ──
   const changeRole = useMutation({
-    mutationFn: async ({ id, orgRole }: { id: string; orgRole: OrgRole }) =>
-      (await apiRequest("PATCH", `/api/org/members/${id}`, { orgRole })).json(),
+    mutationFn: async ({ id, value }: { id: string; value: string }) =>
+      (await apiRequest("PATCH", `/api/org/members/${id}`,
+        value.startsWith("custom:") ? { customRoleId: value.slice(7) } : { orgRole: value },
+      )).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/org/members"] });
       toast({ title: "Role updated" });
@@ -315,15 +374,22 @@ export default function SettingsPage() {
                           {canManageTeam && m.orgRole !== "OWNER" && m.id !== (user as any)?.id ? (
                             <div className="flex items-center gap-1.5 flex-shrink-0">
                               <Select
-                                value={m.orgRole}
-                                onValueChange={(v) => changeRole.mutate({ id: m.id, orgRole: v as OrgRole })}
+                                value={m.customRoleId ? `custom:${m.customRoleId}` : m.orgRole}
+                                onValueChange={(v) => changeRole.mutate({ id: m.id, value: v })}
                               >
-                                <SelectTrigger className="h-8 w-[110px] text-xs" data-testid={`role-select-${m.email}`}>
+                                <SelectTrigger className="h-8 w-[130px] text-xs" data-testid={`role-select-${m.email}`}>
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {INVITABLE_ROLES.map((r) => (
                                     <SelectItem key={r} value={r} className="text-xs">{ROLE_META[r].label}</SelectItem>
+                                  ))}
+                                  {customRoles.map((r) => (
+                                    <SelectItem key={r.id} value={`custom:${r.id}`} className="text-xs">
+                                      <span className="inline-flex items-center gap-1">
+                                        <Shield className="w-3 h-3 text-primary" /> {r.name}
+                                      </span>
+                                    </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>
@@ -343,7 +409,7 @@ export default function SettingsPage() {
                             </div>
                           ) : (
                             <Badge variant="outline" className="flex-shrink-0 text-xs">
-                              {ROLE_META[m.orgRole]?.label ?? m.orgRole}
+                              {m.customRoleName ?? ROLE_META[m.orgRole as OrgRole]?.label ?? m.orgRole}
                             </Badge>
                           )}
                         </div>
@@ -365,7 +431,9 @@ export default function SettingsPage() {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-semibold truncate">{inv.email}</p>
                               <p className="text-xs text-muted-foreground">
-                                {ROLE_META[inv.orgRole]?.label ?? inv.orgRole} · invited {fmtDate(inv.createdAt)} · expires {fmtDate(inv.expiresAt)}
+                                {ROLE_META[inv.orgRole]?.label
+                                  ?? customRoles.find((r) => r.id === (inv as any).customRoleId)?.name
+                                  ?? "Custom role"} · invited {fmtDate(inv.createdAt)} · expires {fmtDate(inv.expiresAt)}
                               </p>
                             </div>
                             <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -378,6 +446,76 @@ export default function SettingsPage() {
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>
                             </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* ── Roles & permissions matrix ── */}
+                {canManageTeam && (
+                  <Card className="glass-card">
+                    <CardContent className="p-5 lg:p-6">
+                      <div className="flex items-center justify-between gap-3 mb-1">
+                        <div>
+                          <h3 className="font-bold">Roles &amp; permissions</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Built-in roles cover the common cases — custom roles give you the exact
+                            permission mix you want per member.
+                          </p>
+                        </div>
+                        {isOwner && (
+                          <Button
+                            variant="outline"
+                            className="flex-shrink-0 font-semibold border-primary/40 text-primary"
+                            onClick={() => openRoleEditor()}
+                            data-testid="button-create-role"
+                          >
+                            <Plus className="w-4 h-4 mr-1.5" />
+                            Create Role
+                          </Button>
+                        )}
+                      </div>
+
+                      <div className="mt-4 grid sm:grid-cols-2 gap-2.5">
+                        {INVITABLE_ROLES.map((r) => (
+                          <div key={r} className="rounded-xl border border-border/60 p-3">
+                            <p className="text-sm font-semibold flex items-center gap-1.5">
+                              {ROLE_META[r].label}
+                              <Badge variant="secondary" className="text-[10px] px-1.5">Built-in</Badge>
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{ROLE_META[r].description}</p>
+                          </div>
+                        ))}
+                        {customRoles.map((r) => (
+                          <div key={r.id} className="rounded-xl border border-primary/30 bg-primary/[0.03] p-3" data-testid={`custom-role-${r.name}`}>
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="text-sm font-semibold flex items-center gap-1.5 min-w-0">
+                                <Shield className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                                <span className="truncate">{r.name}</span>
+                              </p>
+                              {isOwner && (
+                                <span className="flex items-center gap-0.5 flex-shrink-0">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" title="Edit role"
+                                    onClick={() => openRoleEditor(r)} data-testid={`edit-role-${r.name}`}>
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-rose-500" title="Delete role"
+                                    onClick={async () => {
+                                      if (await confirm({ title: `Delete role "${r.name}"?`, description: "Members must be reassigned before a role can be deleted.", destructive: true, confirmText: "Delete" })) {
+                                        deleteRole.mutate(r.id);
+                                      }
+                                    }}>
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </Button>
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {r.permissions.length} permission{r.permissions.length !== 1 ? "s" : ""}
+                              {" · "}{r.usage.members} member{r.usage.members !== 1 ? "s" : ""}
+                            </p>
                           </div>
                         ))}
                       </div>
@@ -555,6 +693,14 @@ export default function SettingsPage() {
                       <span className="text-muted-foreground text-xs"> — {ROLE_META[r].description}</span>
                     </SelectItem>
                   ))}
+                  {customRoles.map((r) => (
+                    <SelectItem key={r.id} value={`custom:${r.id}`}>
+                      <span className="font-semibold inline-flex items-center gap-1.5">
+                        <Shield className="w-3.5 h-3.5 text-primary" /> {r.name}
+                      </span>
+                      <span className="text-muted-foreground text-xs"> — custom · {r.permissions.length} permission{r.permissions.length !== 1 ? "s" : ""}</span>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -566,6 +712,71 @@ export default function SettingsPage() {
             >
               {sendInvite.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Send Invitation
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Custom role editor: the permission matrix ── */}
+      <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto" data-testid="role-dialog">
+          <DialogHeader>
+            <DialogTitle>{editingRoleId ? "Edit role" : "Create a custom role"}</DialogTitle>
+            <DialogDescription>
+              Pick exactly what members with this role can do. Changes apply to every
+              member on the role immediately.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="role-name">Role name</Label>
+              <Input
+                id="role-name"
+                placeholder="e.g. Site Engineer, Junior Sales, Auditor"
+                value={roleName}
+                maxLength={40}
+                onChange={(e) => setRoleName(e.target.value)}
+                data-testid="input-role-name"
+              />
+            </div>
+
+            <div className="rounded-xl border border-border/60 overflow-hidden">
+              <div className="px-3.5 py-2.5 bg-muted/50 flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Permissions</span>
+                <span className="text-xs text-muted-foreground tabular-nums">{rolePerms.length} selected</span>
+              </div>
+              <div className="divide-y divide-border/50">
+                {PERMISSION_MATRIX.map((group) => (
+                  <div key={group.module} className="px-3.5 py-2.5 flex items-start gap-3">
+                    <span className="w-24 lg:w-28 flex-shrink-0 text-sm font-semibold pt-0.5">{group.module}</span>
+                    <div className="flex flex-wrap gap-x-4 gap-y-2 flex-1">
+                      {group.items.map(({ perm, label }) => (
+                        <label key={perm} className="flex items-center gap-1.5 text-sm cursor-pointer select-none" data-testid={`perm-${perm}`}>
+                          <Checkbox
+                            checked={rolePerms.includes(perm)}
+                            onCheckedChange={() => togglePerm(perm)}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="px-3.5 py-2.5 text-[11px] text-muted-foreground bg-muted/30 border-t border-border/50">
+                Every active member can <b>view</b> the organization's records. Billing and
+                org deletion always stay with the owner.
+              </p>
+            </div>
+
+            <Button
+              className="w-full gradient-btn text-white"
+              disabled={saveRole.isPending || roleName.trim().length < 2}
+              onClick={() => saveRole.mutate()}
+              data-testid="button-save-role"
+            >
+              {saveRole.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {editingRoleId ? "Save changes" : "Create role"}
             </Button>
           </div>
         </DialogContent>
