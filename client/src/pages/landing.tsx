@@ -107,7 +107,7 @@ const FEATURES = [
   {
     icon: Lock,
     title: "Bank-Grade Security",
-    desc: "Encrypted storage, secure payments, and session-level data protection.",
+    desc: "Encrypted storage, e-sign audit trails, and session-level data protection.",
     tint: "rose",
   },
 ];
@@ -173,7 +173,7 @@ const TESTIMONIALS = [
 const FAQS = [
   {
     q: "Who is DealInSec built for?",
-    a: "Deal-led service businesses — real estate brokers and consultants, interior designers, architects, marketing and digital agencies, and construction contractors. If you quote, sign and bill clients, the workflow fits: deal → quotation → agreement → invoice → payment.",
+    a: "Deal-led service businesses — real estate brokers and consultants, interior designers, architects, marketing and digital agencies, and construction contractors. If you quote, sign and bill clients, the workflow fits: deal â quotation â agreement â invoice â payment tracking. DealInSec never touches your clients’ money â you record payments, we keep the register.",
   },
   {
     q: "Is Dealinsec free to use?",
@@ -796,7 +796,7 @@ function Hero({
             </motion.h1>
 
             <motion.p variants={heroFadeUp} className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
-              One simple workflow — quotation, e-signed agreement, GST invoice, payment —{" "}
+              One simple workflow — quotation, e-signed agreement, GST invoice, payment tracking —{" "}
               <span className="font-semibold text-neutral-900 dark:text-white">so you look professional, never chase a client, and get paid on time.</span>{" "}
               Built for India's real estate consultants, interior designers, architects, agencies &amp; contractors.
             </motion.p>
@@ -1072,7 +1072,7 @@ function WhoWeServeSection() {
               that closes deals
             </>
           }
-          subtitle="Built for the businesses that run on deals — brokers, designers, architects, agencies and contractors. One workflow from first quotation to final payment."
+          subtitle="Built for the businesses that run on deals — brokers, designers, architects, agencies and contractors. One workflow from first quotation to final invoice — with every payment tracked."
         />
 
         <motion.div
@@ -1257,7 +1257,7 @@ function WorkflowSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
           eyebrow="How it works"
-          title="From handshake to payment in 4 steps"
+          title="From handshake to paid invoice in 4 steps"
           subtitle="Every client deal moves cleanly through the Dealinsec pipeline — no follow-ups, no lost threads."
         />
 
@@ -2044,7 +2044,7 @@ function Footer() {
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pb-6 border-b border-neutral-200 dark:border-neutral-800">
           {[
             { Icon: Shield, text: "256-bit encrypted" },
-            { Icon: Lock, text: "Secure payments via Razorpay" },
+            { Icon: Lock, text: "Pro purchases secured by Razorpay" },
             { Icon: Check, text: "UPI · Cards · NetBanking" },
             { Icon: Zap, text: "7-day Pro trial · Pro from ₹999/month" },
           ].map(({ Icon, text }) => (

@@ -75,19 +75,33 @@ export const ROLE_META: Record<OrgRole, { label: string; description: string }> 
 export const INVITABLE_ROLES: OrgRole[] = ["ADMIN", "SALES", "ACCOUNTS"];
 
 // ── Seats ──────────────────────────────────────────────────────────────
-// Free plan: 1 user. Pro (monthly or annual): 5 included. Extra seats are
-// purchased (₹199/seat/month) and live on the organization with one shared
-// expiry. `owner` is the org owner's user row (billing lives there).
+// Free plan: 1 user. Pro (monthly or annual) AND the 7-day trial: 5
+// included — the trial must sell the team workflow too (owner's call,
+// 2026-08-08). Extra seats are purchased (₹199/seat/month) and live on the
+// organization with one shared expiry. `owner` is the org owner's user row
+// (billing lives there).
+//
+// Day-8 note: when the trial lapses this falls back to 1, which blocks NEW
+// invites and accepts (both re-check the limit). Members who already joined
+// keep their login, but every Pro feature dies with the owner's entitlement
+// (getBillingUser) and deal creation drains the org's single free pool —
+// so a lapsed trial's extra members cost nothing material.
 
 export const PRO_INCLUDED_SEATS = 5;
 
 export function getSeatLimit(
-  owner: { plan?: string | null; planExpiresAt?: Date | string | null } | null | undefined,
+  owner: {
+    plan?: string | null;
+    planExpiresAt?: Date | string | null;
+    trialEndsAt?: Date | string | null;
+  } | null | undefined,
   org?: { extraSeats?: number | null; extraSeatsExpiresAt?: Date | string | null } | null,
 ): number {
   const proActive = !!owner && owner.plan === "pro" && !!owner.planExpiresAt &&
     new Date(owner.planExpiresAt).getTime() > Date.now();
-  let seats = proActive ? PRO_INCLUDED_SEATS : 1;
+  const trialActive = !!owner?.trialEndsAt &&
+    new Date(owner.trialEndsAt).getTime() > Date.now();
+  let seats = proActive || trialActive ? PRO_INCLUDED_SEATS : 1;
   if (org?.extraSeats && org.extraSeatsExpiresAt &&
       new Date(org.extraSeatsExpiresAt).getTime() > Date.now()) {
     seats += org.extraSeats;

@@ -11,12 +11,12 @@
     <meta name="application-name" content="DealInSec" />
     <meta name="description" content="Deal software for India's real estate consultants, interior designers, architects, agencies & contractors: quotations, e-signed agreements, GST invoices and payment tracking in one workflow. Free to start." />
     <meta property="og:title" content="DealInSec — Deal, Agreement & Invoice Software for Real Estate, Interiors, Architects & Agencies" />
-    <meta property="og:description" content="One workflow for India's deal-led service sectors — quotation, e-signed agreement, GST invoice and payment. Look professional, never chase a client, get paid on time." />
+    <meta property="og:description" content="One workflow for India's deal-led service sectors — quotation, e-signed agreement, GST invoice and payment tracking. Look professional, never chase a client, get paid on time." />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="DealInSec" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="DealInSec — Deal, Agreement & Invoice Software for Real Estate, Interiors, Architects & Agencies" />
-    <meta name="twitter:description" content="Quotations, e-signed agreements, GST invoices and payments for India's real estate, interior design, architecture, agency & construction businesses." />
+    <meta name="twitter:description" content="Quotations, e-signed agreements, GST invoices and payment tracking for India's real estate, interior design, architecture, agency & construction businesses." />
     <link rel="canonical" href="https://www.dealinsec.com/" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -48,7 +48,7 @@
         "name": "DealInSec",
         "url": "https://www.dealinsec.com/",
         "logo": "https://www.dealinsec.com/apple-touch-icon.png",
-        "description": "The deal-management OS for India's service sectors — real estate, interiors, architecture, agencies and construction. Quotations, e-signed agreements, GST invoices and payments in one place."
+        "description": "The deal-management OS for India's service sectors — real estate, interiors, architecture, agencies and construction. Quotations, e-signed agreements, GST invoices and payment tracking in one place."
       }
     </script>
     <script type="application/ld+json">
@@ -65,13 +65,16 @@
       gtag('js', new Date());
       gtag('config', 'G-W3VTLRH79B', { send_page_view: false });
     </script>
-    <!-- Sidebar collapse bootstrap: runs before first style resolution so a
-         collapsed sidebar never flashes at full width (and no transition
-         fires on load because the attribute predates the element). -->
+    <!-- Pre-paint bootstraps: sidebar collapse + theme, applied before first
+         style resolution so neither ever flashes. Theme default is LIGHT —
+         "system" only applies when the user chose it in Settings. -->
     <script>
       try {
         if (localStorage.getItem('dis_sidebar_collapsed') === '1')
           document.documentElement.setAttribute('data-sidebar', 'collapsed');
+        var t = localStorage.getItem('dis_theme');
+        if (t === 'dark' || (t === 'system' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches))
+          document.documentElement.classList.add('dark');
       } catch (e) {}
     </script>
   </head>

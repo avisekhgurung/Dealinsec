@@ -7,12 +7,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import {
   Plus, Briefcase, FileCheck, Receipt, ChevronRight, LogOut,
   TrendingUp, IndianRupee, Clock, CheckCircle2,
   UserCircle, MapPin, FileText, PenTool, Landmark, X as XIcon, Sparkles,
-  Crown, Rocket, Users2, UserPlus2
+  Crown, Rocket, Users2, UserPlus2, Settings as SettingsIcon
 } from "lucide-react";
 import {
   BarChart, Bar, Cell, PieChart, Pie,
@@ -22,7 +22,7 @@ import {
   hasActivePro, hasActiveDealBoost, hasActiveTrial, hasLapsedTrial, getSubscriptionType,
 } from "@shared/schema";
 import { TrialCountdown } from "@/components/trial-countdown";
-import type { Deal, Contract, Invoice, BrandInvoice, User } from "@shared/schema";
+import type { Deal, Contract, Invoice, BrandInvoice, Quote, User } from "@shared/schema";
 
 // ─── Team seats strip ────────────────────────────────────────────────────────
 function TeamSeatsCard() {
@@ -160,6 +160,52 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────
+
+/** Ease-out count-up for KPI numerals — makes the dashboard feel alive on
+ *  load without any chart-library weight. Snaps instantly for
+ *  prefers-reduced-motion users and re-animates from the previous value on
+ *  data changes, never from 0. */
+function useCountUp(target: number, duration = 700): number {
+  const [value, setValue] = useState(target);
+  const prevRef = useRef<number | null>(null);
+  useEffect(() => {
+    const reduced =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const from = prevRef.current ?? 0;
+    if (reduced || from === target) {
+      prevRef.current = target;
+      setValue(target);
+      return;
+    }
+    let raf = 0;
+    const t0 = performance.now();
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - t0) / duration);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setValue(Math.round(from + (target - from) * eased));
+      if (p < 1) raf = requestAnimationFrame(tick);
+      else prevRef.current = target;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, duration]);
+  return value;
+}
+
+/** Deterministic avatar tone for a client name — same client, same color. */
+const AVATAR_TONES = [
+  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  "bg-teal-500/15 text-teal-700 dark:text-teal-400",
+  "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  "bg-cyan-500/15 text-cyan-700 dark:text-cyan-400",
+];
+function avatarTone(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return AVATAR_TONES[Math.abs(h) % AVATAR_TONES.length];
+}
 
 function getMonthLabel(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
@@ -308,9 +354,12 @@ const TONE_STYLES: Record<StatTone, { bg: string; text: string }> = {
   slate:   { bg: "bg-slate-100 dark:bg-slate-800/60",     text: "text-slate-600 dark:text-slate-300" },
 };
 
-function StatCard({ title, value, icon: Icon, tone, href, loading, sub, trendUp }: {
+function StatCard({ title, value, format, icon: Icon, tone, href, loading, sub, trendUp }: {
   title: string;
-  value: number | string;
+  value: number;
+  /** Optional numeral formatter (e.g. ₹ + Indian grouping). Applied to the
+   *  animated value each frame, so currency counts up too. */
+  format?: (n: number) => string;
   icon: any;
   tone: StatTone;
   href: string;
@@ -319,10 +368,11 @@ function StatCard({ title, value, icon: Icon, tone, href, loading, sub, trendUp 
   trendUp?: boolean;
 }) {
   const t = TONE_STYLES[tone];
+  const animated = useCountUp(loading ? 0 : value);
   return (
     <Link href={href}>
       <div
-        className="group rounded-2xl lg:rounded-xl p-3 sm:p-4 lg:p-4 cursor-pointer overflow-hidden bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 hover:border-primary/40 dark:hover:border-primary/40 hover:shadow-md hover:shadow-primary/[0.04] transition-all duration-200"
+        className="group rounded-2xl lg:rounded-xl p-3 sm:p-4 lg:p-4 cursor-pointer overflow-hidden bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 hover:border-primary/40 dark:hover:border-primary/40 hover:shadow-md hover:shadow-primary/[0.04] hover:-translate-y-px transition-all duration-200"
       >
         {/* Label row: small caps label + muted icon (KPI tiles lead with the
             number, not the chrome) */}
@@ -330,17 +380,26 @@ function StatCard({ title, value, icon: Icon, tone, href, loading, sub, trendUp 
           <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 truncate">
             {title}
           </p>
-          <div className={`flex items-center justify-center w-8 h-8 lg:w-7 lg:h-7 rounded-lg shrink-0 ${t.bg}`}>
+          <div className={`flex items-center justify-center w-8 h-8 lg:w-7 lg:h-7 rounded-lg shrink-0 transition-transform duration-200 group-hover:scale-110 ${t.bg}`}>
             <Icon className={`w-4 h-4 lg:w-3.5 lg:h-3.5 ${t.text}`} strokeWidth={2.2} />
           </div>
         </div>
         {loading ? (
           <Skeleton className="h-7 lg:h-8 w-16 lg:w-24" />
-        ) : (
-          <p className="text-xl sm:text-2xl lg:text-[26px] font-semibold text-neutral-900 dark:text-white truncate leading-none tracking-tight tabular-nums">
-            {value}
-          </p>
-        )}
+        ) : (() => {
+          const text = format ? format(animated) : String(animated);
+          // Long currency strings step down instead of truncating —
+          // "₹15,50,000" must never render as "₹15,50,0…".
+          const size =
+            text.length > 11 ? "text-base sm:text-lg lg:text-xl"
+            : text.length > 8 ? "text-lg sm:text-xl lg:text-2xl"
+            : "text-xl sm:text-2xl lg:text-[26px]";
+          return (
+            <p className={`${size} font-semibold text-neutral-900 dark:text-white leading-none tracking-tight tabular-nums whitespace-nowrap`}>
+              {text}
+            </p>
+          );
+        })()}
         {!loading && sub && (
           <p className={`mt-1.5 text-[11px] lg:text-[11.5px] font-medium flex items-center gap-1 truncate ${trendUp ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-500 dark:text-neutral-400"}`}>
             {trendUp && <TrendingUp className="w-3 h-3 shrink-0" strokeWidth={2.5} />}
@@ -352,6 +411,47 @@ function StatCard({ title, value, icon: Icon, tone, href, loading, sub, trendUp 
   );
 }
 
+// ─── money tile ──────────────────────────────────────────────────────────────
+// Earned/Pending strip: tinted surface + icon chip + counted-up amount, so the
+// two money numbers read as money at a glance instead of plain glass boxes.
+
+const MONEY_TINTS = {
+  emerald: {
+    card: "border border-emerald-200/60 dark:border-emerald-900/40 bg-gradient-to-br from-emerald-500/[0.08] via-teal-500/[0.04] to-transparent",
+    chip: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+    amount: "text-emerald-600 dark:text-emerald-400",
+  },
+  amber: {
+    card: "border border-amber-200/60 dark:border-amber-900/40 bg-gradient-to-br from-amber-500/[0.08] via-orange-500/[0.04] to-transparent",
+    chip: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+    amount: "text-amber-600 dark:text-amber-400",
+  },
+} as const;
+
+function MoneyTile({ label, amount, icon: Icon, tint }: {
+  label: string;
+  amount: number;
+  icon: any;
+  tint: keyof typeof MONEY_TINTS;
+}) {
+  const t = MONEY_TINTS[tint];
+  const animated = useCountUp(amount);
+  const long = amount.toLocaleString("en-IN").length > 7;
+  return (
+    <div className={`rounded-xl p-3 lg:p-5 overflow-hidden ${t.card}`}>
+      <div className="flex items-center gap-2 mb-1.5 lg:mb-2.5">
+        <span className={`flex items-center justify-center w-6 h-6 lg:w-7 lg:h-7 rounded-md shrink-0 ${t.chip}`}>
+          <Icon className="w-3.5 h-3.5 lg:w-4 lg:h-4" strokeWidth={2.2} />
+        </span>
+        <span className="text-xs lg:text-sm text-muted-foreground uppercase tracking-wider font-semibold">{label}</span>
+      </div>
+      <p className={`font-bold truncate leading-tight tabular-nums ${t.amount} ${long ? "text-base lg:text-2xl" : "text-xl lg:text-3xl"}`}>
+        ₹{animated.toLocaleString("en-IN")}
+      </p>
+    </div>
+  );
+}
+
 // ─── main page ───────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -359,6 +459,14 @@ export default function DashboardPage() {
   const displayName = user?.firstName && user?.lastName
     ? `${user.firstName} ${user.lastName}`
     : user?.email?.split("@")[0] || "Influencer";
+  // Time-of-day greeting + today's date — the header should orient, not
+  // just repeat the name that's already in the sidebar footer.
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const firstNameOnly = user?.firstName || displayName.split(" ")[0];
+  const todayLabel = new Date().toLocaleDateString("en-IN", {
+    weekday: "long", day: "numeric", month: "long",
+  });
 
   const { data: deals = [], isLoading: dealsLoading } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
@@ -374,6 +482,10 @@ export default function DashboardPage() {
 
   const { data: brandInvoices = [] } = useQuery<BrandInvoice[]>({
     queryKey: ["/api/brand-invoices"],
+  });
+
+  const { data: quotes = [] } = useQuery<(Quote & { deal: Deal | null })[]>({
+    queryKey: ["/api/quotes"],
   });
 
   const isLoading = dealsLoading || contractsLoading || invoicesLoading;
@@ -397,6 +509,10 @@ export default function DashboardPage() {
     return dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear();
   }).length;
   const activeDealsCount = deals.filter(d => d.status === "Active").length;
+  const quotesThisMonth = quotes.filter(q => {
+    const d = q.createdAt ? new Date(q.createdAt) : null;
+    return d && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
   const paidThisWeek = invoices.filter(i => i.status === "Paid" && new Date(i.invoiceDate) >= weekAgo).length;
   const allSigned = contracts.length > 0 && signedContracts === contracts.length;
 
@@ -412,10 +528,12 @@ export default function DashboardPage() {
   // Compute which profile fields are still missing so we can prompt the user
   // to finish their setup before they get blocked at contract/invoice time.
   const profileChecklist = useMemo(() => [
-    { key: "billingAddress",     label: "Billing address",  icon: MapPin,      done: Boolean(user?.billingAddress),     href: "/profile",  hint: "Appears on every invoice" },
-    { key: "panNumber",          label: "PAN number",       icon: FileText,    done: Boolean(user?.panNumber),          href: "/profile",  hint: "Required for contracts & GST" },
-    { key: "digitalSignature",   label: "Digital signature",icon: PenTool,     done: Boolean(user?.digitalSignature),   href: "/profile",  hint: "Auto-applied on agreements" },
-    { key: "bank",               label: "Bank details",     icon: Landmark,    done: Boolean(user?.accountNumber && user?.ifscCode && user?.accountHolderName), href: "/profile", hint: "So brands can pay you" },
+    // Deep links land straight in EDIT mode on the right section — never on
+    // the read-only page with an Edit button to hunt for.
+    { key: "billingAddress",     label: "Billing address",  icon: MapPin,      done: Boolean(user?.billingAddress),     href: "/profile?edit=1&section=business",  hint: "Appears on every invoice" },
+    { key: "panNumber",          label: "PAN number",       icon: FileText,    done: Boolean(user?.panNumber),          href: "/profile?edit=1&section=business",  hint: "Required for contracts & GST" },
+    { key: "digitalSignature",   label: "Digital signature",icon: PenTool,     done: Boolean(user?.digitalSignature),   href: "/profile?edit=1&section=signature", hint: "Auto-applied on agreements" },
+    { key: "bank",               label: "Bank details",     icon: Landmark,    done: Boolean(user?.accountNumber && user?.ifscCode && user?.accountHolderName), href: "/profile?edit=1&section=bank", hint: "So brands can pay you" },
   ], [user?.billingAddress, user?.panNumber, user?.digitalSignature, user?.accountNumber, user?.ifscCode, user?.accountHolderName]);
 
   const profileDone = profileChecklist.filter(i => i.done).length;
@@ -450,16 +568,26 @@ export default function DashboardPage() {
       <header className="glass-header sticky top-0 z-40 lg:border-b lg:border-neutral-200/60 dark:lg:border-neutral-800/60">
         <div className="flex items-center justify-between gap-4 px-4 py-4 lg:max-w-7xl lg:mx-auto lg:px-8 lg:py-5 xl:px-10">
           <div>
-            <p className="text-xs text-muted-foreground">Welcome back,</p>
-            <h1 className="text-lg lg:text-2xl font-bold tracking-tight">{displayName}</h1>
+            <p className="text-xs text-muted-foreground">{todayLabel}</p>
+            <h1 className="text-lg lg:text-2xl font-bold tracking-tight">
+              {greeting}, {firstNameOnly}
+            </h1>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="hidden lg:inline-flex items-center gap-2 rounded-full bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              All systems operational
-            </span>
-            {/* Desktop keeps the bell in the sidebar; mobile needs it in the header. */}
+          <div className="flex items-center gap-2 lg:gap-3">
+            <Link href="/deals/new" className="hidden lg:block">
+              <Button size="sm" className="gradient-btn text-white font-semibold" data-testid="header-new-deal">
+                <Plus className="w-4 h-4 mr-1.5" />
+                New Deal
+              </Button>
+            </Link>
+            {/* Desktop keeps the bell + settings in the sidebar; mobile
+                needs them here (settings isn't in the bottom nav). */}
             <NotificationBell className="lg:hidden" />
+            <Link href="/settings" className="lg:hidden">
+              <Button variant="ghost" size="icon" aria-label="Settings" data-testid="header-settings">
+                <SettingsIcon className="w-5 h-5" />
+              </Button>
+            </Link>
             <Button
               variant="ghost"
               size="icon"
@@ -580,12 +708,17 @@ export default function DashboardPage() {
         <SubscriptionCard user={user} />
         <TeamSeatsCard />
 
-        {/* ── Stat cards ── */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+        {/* ── Stat cards — the funnel, in order: deal → quote → agreement →
+            invoice → money ── */}
+        <section className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4">
           <StatCard title="Deals" value={totalDeals} icon={Briefcase}
             tone="amber" href="/deals" loading={isLoading}
             sub={dealsThisMonth > 0 ? `${dealsThisMonth} this month` : totalDeals > 0 ? "in your pipeline" : "none yet"}
             trendUp={dealsThisMonth > 0} />
+          <StatCard title="Quotations" value={quotes.length} icon={FileText}
+            tone="slate" href="/quotations" loading={isLoading}
+            sub={quotesThisMonth > 0 ? `${quotesThisMonth} this month` : quotes.length > 0 ? "issued so far" : "none yet"}
+            trendUp={quotesThisMonth > 0} />
           <StatCard title="Agreements" value={signedContracts} icon={FileCheck}
             tone="blue" href="/contracts" loading={isLoading}
             sub={allSigned ? "All signed" : signedContracts > 0 ? `${signedContracts} signed` : "none yet"} />
@@ -595,11 +728,12 @@ export default function DashboardPage() {
             trendUp={paidThisWeek > 0} />
           <StatCard
             title="Pipeline Value"
-            value={isLoading ? "…" : `₹${(totalRevenue + pendingRevenue).toLocaleString("en-IN")}`}
+            value={totalRevenue + pendingRevenue}
+            format={(n) => `₹${n.toLocaleString("en-IN")}`}
             icon={IndianRupee}
             tone="slate"
             href="/deals"
-            loading={false}
+            loading={isLoading}
             sub={`${activeDealsCount} active deal${activeDealsCount !== 1 ? "s" : ""}`}
           />
         </section>
@@ -631,13 +765,14 @@ export default function DashboardPage() {
                   </Link>
                 </div>
 
-                {/* Segmented progress bar (always full width, scales naturally) */}
-                <div className="flex w-full h-2.5 lg:h-3 rounded-full overflow-hidden bg-muted">
+                {/* Segmented progress bar — hairline gaps + per-segment
+                    rounding read cleaner than one fused bar */}
+                <div className="flex w-full h-2.5 lg:h-3 gap-[3px]">
                   {segments.map((s) =>
                     s.count > 0 ? (
                       <div
                         key={s.label}
-                        className={`${s.color} transition-all duration-500`}
+                        className={`${s.color} rounded-full transition-all duration-500`}
                         style={{ width: `${(s.count / totalDeals) * 100}%` }}
                         title={`${s.label}: ${s.count}`}
                       />
@@ -672,27 +807,21 @@ export default function DashboardPage() {
           );
         })()}
 
-        {/* ── Revenue summary strip ── */}
+        {/* ── Revenue summary strip — money reads as money: tinted tiles ── */}
         {!isLoading && (totalRevenue > 0 || pendingRevenue > 0) && (
           <div className="grid grid-cols-2 gap-3 lg:gap-5">
-            <div className="glass-card rounded-xl p-3 lg:p-5 border-0 overflow-hidden">
-              <div className="flex items-center gap-2 mb-1 lg:mb-2">
-                <TrendingUp className="w-4 h-4 lg:w-5 lg:h-5 text-emerald-500 shrink-0" />
-                <span className="text-xs lg:text-sm text-muted-foreground uppercase tracking-wider lg:tracking-wide font-medium">Earned</span>
-              </div>
-              <p className={`font-bold text-emerald-600 dark:text-emerald-400 truncate leading-tight ${totalRevenue.toLocaleString("en-IN").length > 7 ? "text-base lg:text-2xl" : "text-xl lg:text-3xl"}`}>
-                ₹{totalRevenue.toLocaleString("en-IN")}
-              </p>
-            </div>
-            <div className="glass-card rounded-xl p-3 lg:p-5 border-0 overflow-hidden">
-              <div className="flex items-center gap-2 mb-1 lg:mb-2">
-                <Clock className="w-4 h-4 lg:w-5 lg:h-5 text-amber-500 shrink-0" />
-                <span className="text-xs lg:text-sm text-muted-foreground uppercase tracking-wider lg:tracking-wide font-medium">Pending</span>
-              </div>
-              <p className={`font-bold text-amber-600 dark:text-amber-400 truncate leading-tight ${pendingRevenue.toLocaleString("en-IN").length > 7 ? "text-base lg:text-2xl" : "text-xl lg:text-3xl"}`}>
-                ₹{pendingRevenue.toLocaleString("en-IN")}
-              </p>
-            </div>
+            <MoneyTile
+              label="Earned"
+              amount={totalRevenue}
+              icon={TrendingUp}
+              tint="emerald"
+            />
+            <MoneyTile
+              label="Pending"
+              amount={pendingRevenue}
+              icon={Clock}
+              tint="amber"
+            />
           </div>
         )}
 
@@ -730,7 +859,8 @@ export default function DashboardPage() {
                         <div className="h-[180px] sm:h-[200px] lg:h-[220px] xl:h-[240px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={platformDist} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                              {/* theme-aware grid — a white grid is invisible on the light theme */}
+                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.6)" vertical={false} />
                               <XAxis dataKey="platform" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                                 axisLine={false} tickLine={false} />
                               <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
@@ -888,43 +1018,50 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* ── Recent Deals ── */}
+        {/* ── Recent Deals — one divided list, not three stacked cards ── */}
         {recentDeals.length > 0 && (
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Recent Deals</h2>
+          <Card className="glass-card border-0 overflow-hidden">
+            <div className="flex items-center justify-between px-4 pt-4 pb-2 lg:px-5 lg:pt-5">
+              <div>
+                <h2 className="text-sm lg:text-base font-semibold text-foreground">Recent Deals</h2>
+                <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Your latest pipeline activity</p>
+              </div>
               <Link href="/deals">
-                <Button variant="ghost" size="sm" className="text-primary text-xs h-7">View All</Button>
+                <Button variant="ghost" size="sm" className="text-primary text-xs lg:text-sm h-7 lg:h-8 hover:text-primary">
+                  View all <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
+                </Button>
               </Link>
             </div>
-            <div className="flex flex-col gap-4">
+            <div className="divide-y divide-border/50 mt-1">
               {recentDeals.map((deal) => (
                 <Link key={deal.id} href={`/deals/${deal.id}`}>
-                  <Card className="glass-card border hover-elevate active-elevate-2 cursor-pointer rounded-xl shadow-sm">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold truncate text-sm" data-testid={`text-deal-title-${deal.id}`}>
-                            {deal.dealTitle}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">{deal.brandName}</p>
-                        </div>
-                        <StatusBadge status={deal.status} size="compact" />
-                      </div>
-                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/10">
-                        <span className="text-base font-bold text-primary">
-                          ₹{Number(deal.dealAmount).toLocaleString("en-IN")}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {deal.deliverables.length} deliverable{deal.deliverables.length !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div className="group flex items-center gap-3 lg:gap-3.5 px-4 py-3 lg:px-5 lg:py-3.5 cursor-pointer hover:bg-muted/40 transition-colors">
+                    <span
+                      className={`flex items-center justify-center w-9 h-9 lg:w-10 lg:h-10 rounded-xl font-bold text-sm shrink-0 ${avatarTone(deal.brandName)}`}
+                      aria-hidden="true"
+                    >
+                      {deal.brandName.trim().slice(0, 1).toUpperCase()}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate text-sm" data-testid={`text-deal-title-${deal.id}`}>
+                        {deal.dealTitle}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {deal.brandName} · {deal.deliverables.length} deliverable{deal.deliverables.length !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2.5 lg:gap-3.5 shrink-0">
+                      <span className="text-sm lg:text-base font-bold text-foreground tabular-nums">
+                        ₹{Number(deal.dealAmount).toLocaleString("en-IN")}
+                      </span>
+                      <StatusBadge status={deal.status} size="compact" />
+                      <ChevronRight className="hidden lg:block w-4 h-4 text-muted-foreground/50 group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />
+                    </div>
+                  </div>
                 </Link>
               ))}
             </div>
-          </section>
+          </Card>
         )}
 
         {/* ── Empty state ── */}

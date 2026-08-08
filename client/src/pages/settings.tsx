@@ -29,10 +29,12 @@ import { parseApiError } from "@/lib/api-error";
 import { hasPermission, ROLE_META, INVITABLE_ROLES, type OrgRole } from "@shared/permissions";
 import {
   ArrowLeft, Building2, Users, ScrollText, CreditCard, UserPlus, Crown,
-  Mail, RotateCw, Trash2, Loader2, Sparkles, Rocket,
+  Mail, RotateCw, Trash2, Loader2, Sparkles, Rocket, Sun, Moon, Monitor,
+  SlidersHorizontal, Check,
 } from "lucide-react";
+import { getThemePref, setThemePref, type ThemePref } from "@/lib/theme";
 
-type Tab = "organization" | "team" | "activity" | "subscription";
+type Tab = "organization" | "team" | "activity" | "subscription" | "preferences";
 
 interface OrgSummary {
   id: string; name: string; slug: string | null; industry: string | null;
@@ -61,6 +63,12 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const confirm = useConfirm();
   const [tab, setTab] = useState<Tab>("organization");
+  // Theme is a per-device preference (localStorage), not an account setting.
+  const [themePref, setThemePrefState] = useState<ThemePref>(() => getThemePref());
+  const chooseTheme = (t: ThemePref) => {
+    setThemePref(t);
+    setThemePrefState(t);
+  };
 
   const myRole = (user as any)?.orgRole as OrgRole | undefined;
   const canInvite = hasPermission(myRole, "team.invite");
@@ -164,6 +172,7 @@ export default function SettingsPage() {
     { key: "team", label: "Team Members", icon: Users, show: true },
     { key: "activity", label: "Activity Logs", icon: ScrollText, show: canActivity },
     { key: "subscription", label: "Subscription", icon: CreditCard, show: true },
+    { key: "preferences", label: "Preferences", icon: SlidersHorizontal, show: true },
   ];
 
   const seatsFree = org ? Math.max(0, org.seatLimit - org.seatsUsed - org.pendingInvites) : 0;
@@ -408,6 +417,56 @@ export default function SettingsPage() {
               </Card>
             )}
 
+            {/* ── Preferences (per-device) ── */}
+            {tab === "preferences" && (
+              <Card className="glass-card">
+                <CardContent className="p-5 lg:p-6 space-y-5">
+                  <div>
+                    <h2 className="font-bold text-lg">Appearance</h2>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      How DealInSec looks on this device.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3 max-w-md" role="radiogroup" aria-label="Theme">
+                    {([
+                      { key: "light" as ThemePref, label: "Light", desc: "Bright & clean", Icon: Sun },
+                      { key: "dark" as ThemePref, label: "Dark", desc: "Easy on the eyes", Icon: Moon },
+                      { key: "system" as ThemePref, label: "System", desc: "Match your OS", Icon: Monitor },
+                    ]).map(({ key, label, desc, Icon }) => {
+                      const active = themePref === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          role="radio"
+                          aria-checked={active}
+                          onClick={() => chooseTheme(key)}
+                          data-testid={`theme-${key}`}
+                          className={`relative rounded-xl border-2 p-3.5 text-left transition-all ${
+                            active
+                              ? "border-primary bg-primary/[0.06] shadow-sm"
+                              : "border-border hover:border-primary/40 hover:bg-muted/40"
+                          }`}
+                        >
+                          {active && (
+                            <span className="absolute top-2 right-2 flex items-center justify-center w-4.5 h-4.5 w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground">
+                              <Check className="w-3 h-3" strokeWidth={3} />
+                            </span>
+                          )}
+                          <Icon className={`w-5 h-5 mb-2 ${active ? "text-primary" : "text-muted-foreground"}`} />
+                          <p className="text-sm font-semibold">{label}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Saved on this device only — teammates and your other devices keep their own choice.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
             {/* ── Subscription ── */}
             {tab === "subscription" && org && (
               <Card className="glass-card">
@@ -440,8 +499,8 @@ export default function SettingsPage() {
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground max-w-md">
-                    Free plan includes 1 user. Pro includes 5 team members — need more? Extra seats are
-                    ₹199/seat per month.
+                    Free plan includes 1 user. Pro — and your free trial — includes 5 team members.
+                    Need more? Extra seats are ₹199/seat per month.
                   </p>
                   {canBilling ? (
                     <div className="flex flex-wrap gap-2">

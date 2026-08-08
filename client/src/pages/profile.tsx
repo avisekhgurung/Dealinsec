@@ -1,17 +1,91 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, ArrowLeft, Edit, LogOut, CreditCard, Copy, Share2, User, Mail, Phone, FileText, Building, MapPin, PenTool, Sparkles, Landmark, Hash, Camera, Crown } from "lucide-react";
+import { Loader2, Upload, ArrowLeft, Edit, LogOut, CreditCard, Copy, Share2, User, Mail, Phone, FileText, Building, MapPin, PenTool, Sparkles, Landmark, Hash, Camera, Crown, Check, Settings as SettingsIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
 import { BottomNav } from "@/components/bottom-nav";
 import { hasActivePro, hasActiveTrial, hasLapsedTrial, getTrialDaysLeft } from "@shared/schema";
+
+// ─── Account-setup stepper ───────────────────────────────────────────────────
+// Clickable progress: each step jumps STRAIGHT into edit mode at its section.
+// This is the "travel anywhere" navigation — no hunting for an Edit button.
+function SetupStepper({ steps, onStepClick }: {
+  steps: { key: string; label: string; icon: any; done: boolean }[];
+  onStepClick: (key: string) => void;
+}) {
+  const doneCount = steps.filter((s) => s.done).length;
+  const pct = Math.round((doneCount / steps.length) * 100);
+  return (
+    <div className="glass-card rounded-2xl border-0 p-4 lg:p-5" data-testid="profile-stepper">
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="text-sm lg:text-base font-semibold">Account setup</h3>
+        <span className="text-xs font-medium text-muted-foreground tabular-nums">
+          {doneCount}/{steps.length} complete
+        </span>
+      </div>
+      <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden mb-4">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-700"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="flex items-start gap-1 lg:gap-2">
+        {steps.map((step, i) => {
+          const Icon = step.icon;
+          return (
+            <Fragment key={step.key}>
+              {i > 0 && (
+                <span
+                  aria-hidden="true"
+                  className={`flex-1 h-0.5 rounded-full mt-[18px] ${
+                    steps[i - 1].done && step.done
+                      ? "bg-emerald-500"
+                      : steps[i - 1].done
+                        ? "bg-emerald-500/40"
+                        : "bg-border"
+                  }`}
+                />
+              )}
+              <button
+                type="button"
+                onClick={() => onStepClick(step.key)}
+                className="group flex flex-col items-center gap-1.5 w-[72px] lg:w-24 shrink-0 rounded-lg focus-visible:outline-primary"
+                aria-label={`${step.label}${step.done ? " — complete, click to edit" : " — click to add"}`}
+                data-testid={`stepper-${step.key}`}
+              >
+                <span
+                  className={`flex items-center justify-center w-9 h-9 rounded-full border-2 transition-all duration-150 group-hover:scale-105 ${
+                    step.done
+                      ? "bg-emerald-500 border-emerald-500 text-white shadow-sm shadow-emerald-500/30"
+                      : "border-border bg-background text-muted-foreground group-hover:border-primary group-hover:text-primary"
+                  }`}
+                >
+                  {step.done ? <Check className="w-4 h-4" strokeWidth={3} /> : <Icon className="w-4 h-4" />}
+                </span>
+                <span
+                  className={`text-[10px] lg:text-[11px] font-semibold text-center leading-tight w-full ${
+                    step.done
+                      ? "text-emerald-700 dark:text-emerald-400"
+                      : "text-muted-foreground group-hover:text-foreground"
+                  }`}
+                >
+                  {step.label}
+                </span>
+              </button>
+            </Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -37,6 +111,46 @@ export default function ProfilePage() {
   const [bankName, setBankName] = useState((user as any)?.bankName || "");
   const [signaturePreview, setSignaturePreview] = useState<string | null>(user?.digitalSignature || null);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
+
+  // Deep links (/profile?edit=1&section=bank etc. — used by the dashboard
+  // checklist and the stepper) land straight in edit mode at the right
+  // section. The user never lands on the read-only page hunting for Edit.
+  // The scroll is driven by React lifecycle (not a blind timeout): it fires
+  // only after the edit form has committed, with a late corrective pass for
+  // layout shifts (cover image, entrance animation) on cold loads.
+  const [pendingSection, setPendingSection] = useState<string | null>(null);
+  const openEditor = (section?: string) => {
+    setIsEditing(true);
+    if (section) setPendingSection(section);
+  };
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("edit") === "1") openEditor(params.get("section") || undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!isEditing || !pendingSection) return;
+    const target = () => document.getElementById(`profile-section-${pendingSection}`);
+    // First pass: smooth, right after the edit form commits.
+    const raf = requestAnimationFrame(() =>
+      requestAnimationFrame(() => target()?.scrollIntoView({ behavior: "smooth", block: "start" })),
+    );
+    // Corrective pass: if the smooth scroll didn't land (layout shift, or an
+    // environment that ignores smooth scrolling), jump. Must be "instant" —
+    // "auto" defers to the html { scroll-behavior: smooth } rule and would
+    // just restart the same smooth scroll that failed.
+    const t = setTimeout(() => {
+      const el = target();
+      if (el && Math.abs(el.getBoundingClientRect().top - 96) > 120) {
+        el.scrollIntoView({ behavior: "instant" as ScrollBehavior, block: "start" });
+      }
+      setPendingSection(null);
+    }, 700);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t);
+    };
+  }, [isEditing, pendingSection]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -234,24 +348,36 @@ export default function ProfilePage() {
             {!isEditing && (
               <Button
                 variant="ghost"
-                size="icon"
-                onClick={() => setIsEditing(true)}
-                className="text-white bg-black/20 hover:bg-black/40 backdrop-blur-sm rounded-full h-9 w-9"
+                size="sm"
+                onClick={() => openEditor()}
+                className="text-white bg-black/25 hover:bg-black/45 backdrop-blur-sm rounded-full h-9 px-3.5 font-semibold"
                 data-testid="button-edit-profile"
-                aria-label="Edit profile"
               >
-                <Edit className="h-4 w-4" />
+                <Edit className="h-4 w-4 mr-1.5" />
+                Edit Profile
               </Button>
             )}
+            <Link href="/settings">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-white bg-black/25 hover:bg-black/45 backdrop-blur-sm rounded-full h-9 px-3.5 font-semibold"
+                data-testid="button-settings"
+              >
+                <SettingsIcon className="h-4 w-4 mr-1.5" />
+                Settings
+              </Button>
+            </Link>
             <Button
               variant="ghost"
-              size="icon"
-              className="text-white bg-black/20 hover:bg-black/40 backdrop-blur-sm rounded-full h-9 w-9"
+              size="sm"
+              className="text-white bg-black/25 hover:bg-black/45 backdrop-blur-sm rounded-full h-9 px-3.5 font-semibold"
               onClick={handleLogout}
               data-testid="button-logout"
               aria-label="Sign out"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-4 w-4 sm:mr-1.5" />
+              <span className="hidden sm:inline">Sign out</span>
             </Button>
           </div>
         </div>
@@ -342,6 +468,15 @@ export default function ProfilePage() {
       </div>
 
       <main className="px-4 space-y-4 max-w-lg mx-auto animate-fade-in lg:max-w-6xl lg:px-8 lg:space-y-6 xl:px-12">
+        <SetupStepper
+          steps={[
+            { key: "identity",  label: "Personal",      icon: User,     done: Boolean(user?.firstName && user?.phone) },
+            { key: "business",  label: "Business info", icon: Building, done: Boolean(user?.panNumber && (user as any)?.billingAddress) },
+            { key: "bank",      label: "Bank details",  icon: Landmark, done: Boolean((user as any)?.accountNumber && (user as any)?.ifscCode && (user as any)?.accountHolderName) },
+            { key: "signature", label: "Signature",     icon: PenTool,  done: Boolean(user?.digitalSignature) },
+          ]}
+          onStepClick={(k) => openEditor(k)}
+        />
         {isEditing ? (
           /* ---- Edit Mode (form readable width even on wide screens) ---- */
           <div className="glass-card rounded-2xl p-5 lg:p-7 space-y-5 lg:max-w-3xl lg:mx-auto" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border) / 0.5)" }}>
@@ -351,6 +486,11 @@ export default function ProfilePage() {
             </div>
             <p className="text-sm text-muted-foreground -mt-3">Update your profile information</p>
 
+            <section id="profile-section-identity" className="scroll-mt-24 space-y-4">
+              <div className="flex items-center gap-2 pt-1">
+                <User className="h-4 w-4 text-primary" />
+                <h4 className="font-semibold text-sm">Personal</h4>
+              </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstName">First Name</Label>
@@ -383,7 +523,16 @@ export default function ProfilePage() {
                 data-testid="input-phone"
               />
             </div>
+            </section>
 
+            <section id="profile-section-business" className="scroll-mt-24 space-y-4">
+              <div className="flex items-center gap-2 pt-1">
+                <Building className="h-4 w-4 text-primary" />
+                <div>
+                  <h4 className="font-semibold text-sm">Business info</h4>
+                  <p className="text-xs text-muted-foreground">PAN &amp; billing address go on your agreements and GST invoices.</p>
+                </div>
+              </div>
             <div className="space-y-2">
               <Label htmlFor="panNumber">PAN Number</Label>
               <Input
@@ -419,8 +568,9 @@ export default function ProfilePage() {
                 data-testid="input-billing-address"
               />
             </div>
+            </section>
 
-            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-4">
+            <div id="profile-section-bank" className="scroll-mt-24 rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-4">
               <div className="flex items-center gap-2">
                 <Landmark className="h-4 w-4 text-primary" />
                 <div>
@@ -477,9 +627,15 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Digital Signature</Label>
-              <div className="border-2 border-dashed border-white/20 rounded-xl p-4">
+            <section id="profile-section-signature" className="scroll-mt-24 space-y-2">
+              <div className="flex items-center gap-2 pt-1">
+                <PenTool className="h-4 w-4 text-primary" />
+                <div>
+                  <h4 className="font-semibold text-sm">Digital Signature</h4>
+                  <p className="text-xs text-muted-foreground">Auto-applied to every agreement you create.</p>
+                </div>
+              </div>
+              <div className="border-2 border-dashed border-border rounded-xl p-4">
                 {signaturePreview ? (
                   <div className="space-y-2">
                     <img
@@ -524,7 +680,7 @@ export default function ProfilePage() {
                   </div>
                 )}
               </div>
-            </div>
+            </section>
 
             <div className="flex gap-3 pt-2">
               <Button
