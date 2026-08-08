@@ -201,6 +201,28 @@ export function welcomeEmail(args: { firstName?: string }): { subject: string; h
   return { subject, html };
 }
 
+export function passwordResetEmail(args: {
+  firstName?: string;
+  email: string;
+  token: string;
+}): { subject: string; html: string } {
+  const name = args.firstName ? `, ${args.firstName}` : "";
+  const resetUrl = `${appUrl()}/reset-password?email=${encodeURIComponent(args.email)}&token=${encodeURIComponent(args.token)}`;
+  const subject = "Reset your DealInSec password";
+  const html = layout({
+    preview: "Set a new password — this link is valid for 30 minutes.",
+    bodyHtml: `
+      ${heading(`Reset your password${name}`)}
+      ${para("We received a request to reset the password for your DealInSec account. Click below to set a new one — the link is valid for <strong>30 minutes</strong>.")}
+      ${button("Set a new password", resetUrl)}
+      ${para("If the button doesn't work, copy this link into your browser:")}
+      ${para(`<a href="${resetUrl}" style="color:#059669;word-break:break-all;">${resetUrl}</a>`)}
+      ${para("Didn't request this? You can safely ignore this email — your password stays unchanged.")}
+    `,
+  });
+  return { subject, html };
+}
+
 export function paymentReceiptEmail(args: {
   firstName?: string;
   product: string;

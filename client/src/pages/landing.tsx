@@ -43,6 +43,9 @@ import {
   Megaphone,
   HardHat,
   Infinity as InfinityIcon,
+  UserPlus,
+  ShieldCheck,
+  ScrollText,
 } from "lucide-react";
 import { SiGoogle, SiInstagram, SiYoutube, SiX, SiFacebook, SiLinkedin } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
@@ -288,9 +291,11 @@ export default function LandingPage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // The auth experience is a dedicated page now (professional split-screen
+  // + forgot-password flow) — the popup stays only as dead markup until a
+  // future cleanup pass.
   const openAuth = (tab: "signup" | "login") => {
-    setAuthTab(tab);
-    setAuthModalOpen(true);
+    setLocation(tab === "login" ? "/auth?mode=signin" : "/auth?mode=signup");
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -363,6 +368,7 @@ export default function LandingPage() {
         <WorkflowSection />
         <ProductShowcase />
         <StatsSection />
+        <TeamSection />
         {/* Testimonials hidden until we have real users. Re-enable <Testimonials /> once you have genuine quotes. */}
         <MadeInIndiaSection />
         <PricingPreview onCTA={() => (isAuthenticated ? setLocation("/pricing") : openAuth("signup"))} />
@@ -1682,6 +1688,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
     "Unlimited signed agreements with e-signature",
     "Unlimited GST-ready invoices",
     "Payment tracking & reminders",
+    "5 team seats · custom roles & permissions",
     "Custom branding · Priority support",
   ];
   const proAnnualPerks = [
@@ -2165,6 +2172,96 @@ function FooterColumn({ title, links }: { title: string; links: { label: string;
         })}
       </ul>
     </div>
+  );
+}
+
+// ── Team & roles — the multiplayer pitch ────────────────────────────────────
+function TeamSection() {
+  const MATRIX_ROWS = [
+    { module: "Deals", site: true, jr: true, acc: false },
+    { module: "Agreements", site: false, jr: false, acc: false },
+    { module: "Invoices", site: false, jr: false, acc: true },
+    { module: "Payments", site: false, jr: false, acc: true },
+  ];
+  const cell = (on: boolean, key: string) => (
+    <td key={key} className="text-center py-1.5">
+      <span className={`inline-flex items-center justify-center w-4 h-4 rounded ${on ? "bg-emerald-500/15" : "bg-neutral-200/60 dark:bg-neutral-800"}`}>
+        {on
+          ? <Check className="w-2.5 h-2.5 text-emerald-600" strokeWidth={3.5} />
+          : <X className="w-2.5 h-2.5 text-neutral-400" strokeWidth={3} />}
+      </span>
+    </td>
+  );
+  return (
+    <section className="py-20 sm:py-28 border-t border-neutral-200 dark:border-neutral-800 scroll-mt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionHeader
+          eyebrow="Built for teams"
+          title="Your whole team. You decide who does what."
+          subtitle="Invite your site engineers, junior sales and accountant — everyone works in one workspace, and you control exactly what each person can see and do."
+        />
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-80px" }}
+          className="grid md:grid-cols-3 gap-5 mt-14 max-w-6xl mx-auto"
+        >
+          <motion.div variants={fadeUp} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-6">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center mb-4">
+              <UserPlus className="w-5 h-5 text-emerald-600" />
+            </div>
+            <h3 className="font-semibold text-lg">Invite your team</h3>
+            <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1.5 leading-relaxed">
+              5 team seats on Pro — included in your free trial too. Everyone sees the
+              organization's deals, quotes and invoices in one place.
+            </p>
+          </motion.div>
+          <motion.div variants={fadeUp} className="rounded-2xl border border-emerald-300/50 dark:border-emerald-800/50 bg-white dark:bg-neutral-900/50 p-6 shadow-lg shadow-emerald-500/[0.06]">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center mb-4">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
+            </div>
+            <h3 className="font-semibold text-lg">Control every permission</h3>
+            <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1.5 leading-relaxed mb-4">
+              Use the ready-made roles or create your own — a full permission matrix
+              decides who can create, edit or delete in every module.
+            </p>
+            <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden text-[11px]">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-neutral-50 dark:bg-neutral-900 text-neutral-500">
+                    <th className="text-left font-semibold px-2.5 py-1.5">Module</th>
+                    <th className="font-semibold px-1 py-1.5">Site Eng.</th>
+                    <th className="font-semibold px-1 py-1.5">Jr. Sales</th>
+                    <th className="font-semibold px-1 py-1.5">Accounts</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                  {MATRIX_ROWS.map((r) => (
+                    <tr key={r.module}>
+                      <td className="px-2.5 py-1.5 font-medium text-neutral-700 dark:text-neutral-300">{r.module}</td>
+                      {cell(r.site, r.module + "-s")}
+                      {cell(r.jr, r.module + "-j")}
+                      {cell(r.acc, r.module + "-a")}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+          <motion.div variants={fadeUp} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-6">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center mb-4">
+              <ScrollText className="w-5 h-5 text-emerald-600" />
+            </div>
+            <h3 className="font-semibold text-lg">Every action logged</h3>
+            <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1.5 leading-relaxed">
+              Deals created, agreements signed, payments recorded — the activity log
+              shows who did what and when, across your whole organization.
+            </p>
+          </motion.div>
+        </motion.div>
+      </div>
+    </section>
   );
 }
 

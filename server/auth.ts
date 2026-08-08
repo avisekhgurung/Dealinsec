@@ -4,7 +4,7 @@ import connectPg from "connect-pg-simple";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { storage } from "./storage";
-import { sendEmail, welcomeEmail } from "./emails";
+import { sendEmail, welcomeEmail, passwordResetEmail } from "./emails";
 
 const SALT_ROUNDS = 10;
 
@@ -132,6 +132,83 @@ export async function setupAuth(app: Express) {
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ message: "Failed to login" });
+    }
+  });
+
+  // ── Password reset ───────────────────────────────────────────────────
+  // Request: ALWAYS 200 (no account enumeration). The raw token lives only
+  // in the email; we store its bcrypt hash + a 30-minute expiry. A 5-minute
+  // cooldown between emails per account keeps the endpoint from being a
+  // mail cannon.
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const email = String(req.body?.email || "").trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ message: "Please enter a valid email" });
+      }
+      const user = await storage.getUserByEmail(email);
+      if (user && user.email) {
+        const existingExpiry = (user as any).resetTokenExpiresAt
+          ? new Date((user as any).resetTokenExpiresAt).getTime()
+          : 0;
+        // Issued less than 5 minutes ago (expiry is issue+30m) → skip resend.
+        const issuedRecently = existingExpiry - Date.now() > 25 * 60 * 1000;
+        if (!issuedRecently) {
+          const token = crypto.randomBytes(32).toString("hex");
+          const hash = await bcrypt.hash(token, SALT_ROUNDS);
+          await storage.updateUser(user.id, {
+            resetTokenHash: hash,
+            resetTokenExpiresAt: new Date(Date.now() + 30 * 60 * 1000),
+          } as any);
+          const { subject, html } = passwordResetEmail({
+            firstName: user.firstName || undefined,
+            email: user.email,
+            token,
+          });
+          void sendEmail({ to: user.email, subject, html });
+        }
+      }
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Forgot-password error:", error);
+      // Still generic — the caller learns nothing about accounts.
+      res.json({ ok: true });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const email = String(req.body?.email || "").trim().toLowerCase();
+      const token = String(req.body?.token || "");
+      const password = String(req.body?.password || "");
+      if (password.length < 6) {
+        return res.status(400).json({ message: "Password must be at least 6 characters" });
+      }
+      const user = await storage.getUserByEmail(email);
+      const hash = (user as any)?.resetTokenHash as string | undefined;
+      const expires = (user as any)?.resetTokenExpiresAt
+        ? new Date((user as any).resetTokenExpiresAt).getTime()
+        : 0;
+      const valid = !!user && !!hash && !!token && expires > Date.now() &&
+        (await bcrypt.compare(token, hash!));
+      if (!valid) {
+        return res.status(400).json({
+          code: "RESET_INVALID",
+          message: "This reset link is invalid or has expired. Request a new one.",
+        });
+      }
+      const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+      await storage.updateUser(user!.id, {
+        password: hashedPassword,
+        resetTokenHash: null,
+        resetTokenExpiresAt: null,
+      } as any);
+      // Sign them straight in — the reset email already proved mailbox control.
+      (req.session as any).userId = user!.id;
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Reset-password error:", error);
+      res.status(500).json({ message: "Could not reset password" });
     }
   });
 

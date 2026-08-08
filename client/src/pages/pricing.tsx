@@ -133,6 +133,7 @@ export default function PricingPage() {
     "Unlimited signed agreements with e-signature",
     "Unlimited GST-ready invoices",
     "Payment tracking — know who owes you",
+    "5 team seats · custom roles & permissions",
     "Payment reminders (coming soon)",
     "Custom branding (coming soon)",
     "Priority support on WhatsApp",

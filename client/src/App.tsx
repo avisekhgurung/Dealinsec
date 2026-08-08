@@ -43,6 +43,9 @@ const CookiePage              = lazy(() => import("@/pages/legal/cookies"));
 const RefundPage              = lazy(() => import("@/pages/legal/refund"));
 const SettingsPage            = lazy(() => import("@/pages/settings"));
 const AcceptInvitePage        = lazy(() => import("@/pages/accept-invite"));
+const AuthPage                = lazy(() => import("@/pages/auth"));
+const ForgotPasswordPage      = lazy(() => import("@/pages/forgot-password"));
+const ResetPasswordPage       = lazy(() => import("@/pages/reset-password"));
 
 // Routes where the desktop sidebar + content offset should NOT apply
 // (full-bleed marketing / auth / standalone routes).
@@ -91,6 +94,9 @@ function Router() {
       <Suspense fallback={<RouteLoader />}>
         <Switch>
           <Route path="/" component={LandingPage} />
+          <Route path="/auth" component={AuthPage} />
+          <Route path="/forgot-password" component={ForgotPasswordPage} />
+          <Route path="/reset-password" component={ResetPasswordPage} />
           {/* /pricing is intentionally NOT here — it's the in-app credit
               purchase page, secured to logged-in users only. Public pricing
               info lives in the LandingPage's #pricing section. */}
@@ -138,6 +144,9 @@ function Router() {
             <Route path="/">
               <Redirect to="/dashboard" />
             </Route>
+            <Route path="/auth"><Redirect to="/dashboard" /></Route>
+            <Route path="/forgot-password"><Redirect to="/dashboard" /></Route>
+            <Route path="/reset-password"><Redirect to="/dashboard" /></Route>
             <Route path="/dashboard" component={DashboardPage} />
             <Route path="/deals" component={DealsPage} />
             <Route path="/deals/new" component={CreateDealPage} />

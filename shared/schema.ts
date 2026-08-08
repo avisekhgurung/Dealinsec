@@ -104,6 +104,10 @@ export const users = pgTable("users", {
   // Canonical mailbox (shared/email.ts) — one trial per real mailbox.
   // Indexed, NOT unique; login always uses the real `email`.
   emailCanonical: varchar("email_canonical", { length: 255 }),
+  // Password reset: bcrypt hash of the emailed token + 30-min expiry.
+  // Cleared on successful reset. Never store or log the raw token.
+  resetTokenHash: varchar("reset_token_hash"),
+  resetTokenExpiresAt: timestamp("reset_token_expires_at"),
   referralCode: varchar("referral_code").unique(),
   // ── Organization membership (single org per user) ──
   organizationId: varchar("organization_id"),
