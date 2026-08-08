@@ -668,6 +668,67 @@ button:not(:disabled):active,
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+   COLLAPSIBLE SIDEBAR
+   Width lives in one CSS var read by both the <aside> and the content
+   offset (.app-shell), so they tween in lockstep. The `collapsed` value
+   is stamped on <html> by the inline bootstrap in index.html BEFORE first
+   paint — never read localStorage from the component; read the DOM.
+   The min-width wrapper is mandatory: the aside is hidden below lg, so
+   the content padding must stay 0 there.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root { --dis-sidebar-w: 18rem; }
+:root[data-sidebar="collapsed"] { --dis-sidebar-w: 4.5rem; }
+
+@media (min-width: 1024px) {
+  .app-shell {
+    padding-left: var(--dis-sidebar-w);
+    transition: padding-left 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* Brand-washed sidebar surface: a whisper of emerald radiating from the
+   logo corner over the neutral panel — brand presence without noise. */
+.dis-sidebar {
+  background-color: hsl(var(--sidebar));
+  background-image:
+    radial-gradient(120% 55% at 0% 0%, hsl(160 84% 30% / 0.10) 0%, transparent 62%),
+    linear-gradient(180deg, hsl(160 55% 97%) 0%, hsl(210 20% 98%) 45%, hsl(210 20% 96%) 100%);
+  border-right: 1px solid hsl(var(--sidebar-border));
+  box-shadow: inset -1px 0 0 hsl(160 84% 30% / 0.05);
+}
+.dark .dis-sidebar {
+  background-image:
+    radial-gradient(120% 55% at 0% 0%, hsl(160 70% 45% / 0.11) 0%, transparent 62%),
+    linear-gradient(180deg, hsl(160 25% 11%) 0%, hsl(215 28% 9%) 45%, hsl(215 28% 8%) 100%);
+  box-shadow: inset -1px 0 0 hsl(160 70% 45% / 0.07);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dis-sidebar, .app-shell { transition: none !important; }
+}
+
+/* Slow light sweep across the trial countdown card — alive, not shouty. */
+.dis-shimmer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.10), transparent);
+  transform: translateX(-110%) skewX(-12deg);
+  animation: dis-shimmer 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes dis-shimmer {
+  0%   { transform: translateX(-110%) skewX(-12deg); }
+  55%, 100% { transform: translateX(280%) skewX(-12deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dis-shimmer::after { animation: none; opacity: 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    DESKTOP DENSITY LAYER
    The app is mobile-first, so touch-sized controls (h-12/h-14 buttons,
    large radii, generous rhythm) get scaled UP on desktop — the opposite of

@@ -19,8 +19,9 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import {
-  hasActivePro, hasActiveDealBoost, getSubscriptionType,
+  hasActivePro, hasActiveDealBoost, hasActiveTrial, hasLapsedTrial, getSubscriptionType,
 } from "@shared/schema";
+import { TrialCountdown } from "@/components/trial-countdown";
 import type { Deal, Contract, Invoice, BrandInvoice, User } from "@shared/schema";
 
 // ─── Team seats strip ────────────────────────────────────────────────────────
@@ -56,23 +57,26 @@ function TeamSeatsCard() {
 }
 
 // ─── Subscription / Deal Credits card ───────────────────────────────────────
-// Free → monthly Deal Credit usage + reset date + upgrade CTA.
+// Free  → plan + upgrade CTA (no credit counters, ever).
+// Trial → animated countdown card (before Boost: a trialing account with a
+//         leftover boost should read as the trial).
 // Boost → unlimited deals/quotations until the boost expiry.
-// Pro  → plan tier + renewal date.
+// Pro   → plan tier + renewal date. Checked FIRST — paid always wins.
 function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | null }) | null | undefined }) {
   const proActive = hasActivePro(user);
   const boostActive = hasActiveDealBoost(user);
+  const trialActive = hasActiveTrial(user);
   const fmtDate = (d: Date | string | null | undefined) =>
     d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null;
 
   if (proActive) {
     const tier = getSubscriptionType(user) === "PRO_MONTHLY" ? "Monthly" : "Annual";
     return (
-      <Card className="glass-card border-violet-300/40 dark:border-violet-800/40 relative overflow-hidden" data-testid="subscription-card">
-        <div className="absolute inset-0 bg-gradient-to-r from-violet-500/[0.07] to-indigo-500/[0.05] pointer-events-none" />
+      <Card className="glass-card border-emerald-300/40 dark:border-emerald-800/40 relative overflow-hidden" data-testid="subscription-card">
+        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/[0.07] to-teal-500/[0.05] pointer-events-none" />
         <CardContent className="relative p-4 lg:p-3.5 flex items-center gap-3.5">
-          <div className="w-10 h-10 lg:w-8 lg:h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm shadow-violet-500/25">
-            <Crown className="w-5 h-5 lg:w-4 lg:h-4 text-white" />
+          <div className="w-10 h-10 lg:w-8 lg:h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-sm shadow-emerald-500/25">
+            <Crown className="w-5 h-5 lg:w-4 lg:h-4 text-amber-300" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm">DealInSec Pro · {tier}</p>
@@ -86,6 +90,10 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
         </CardContent>
       </Card>
     );
+  }
+
+  if (trialActive && user?.trialEndsAt) {
+    return <TrialCountdown trialEndsAt={user.trialEndsAt} />;
   }
 
   if (boostActive) {
@@ -115,21 +123,34 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
   // Free plan: no credit counters in the UI (they confused users) — just the
   // plan and an upgrade path. The 4-deals-a-month limit is enforced
   // server-side and surfaces through the upgrade modal when it's reached.
+  // A lapsed trial gets its own framing: the user has SEEN the full
+  // workflow, so speak to what they're missing, not what's included.
+  const trialEnded = hasLapsedTrial(user);
   return (
-    <Card className="glass-card relative overflow-hidden" data-testid="subscription-card">
-      <CardContent className="p-4 lg:p-3.5 flex items-center gap-3.5">
-        <div className="w-10 h-10 lg:w-8 lg:h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <Sparkles className="w-5 h-5 lg:w-4 lg:h-4 text-primary" />
+    <Card
+      className={`glass-card relative overflow-hidden ${trialEnded ? "border-rose-300/40 dark:border-rose-900/40" : ""}`}
+      data-testid="subscription-card"
+    >
+      {trialEnded && (
+        <div className="absolute inset-0 bg-gradient-to-r from-rose-500/[0.05] to-transparent pointer-events-none" />
+      )}
+      <CardContent className="relative p-4 lg:p-3.5 flex items-center gap-3.5">
+        <div className={`w-10 h-10 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${trialEnded ? "bg-rose-500/10" : "bg-primary/10"}`}>
+          <Sparkles className={`w-5 h-5 lg:w-4 lg:h-4 ${trialEnded ? "text-rose-500" : "text-primary"}`} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm">Free plan</p>
+          <p className="font-semibold text-sm">
+            {trialEnded ? "Your Pro trial has ended" : "Free plan"}
+          </p>
           <p className="text-xs text-muted-foreground">
-            Upgrade for unlimited deals, signed agreements, invoices &amp; payment tracking
+            {trialEnded
+              ? "Your deals and documents are safe — upgrade to keep creating agreements & invoices"
+              : "Upgrade for unlimited deals, signed agreements, invoices & payment tracking"}
           </p>
         </div>
         <Link href="/pricing">
-          <Button size="sm" className="flex-shrink-0 text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700" data-testid="dashboard-upgrade-cta">
-            <Crown className="w-3.5 h-3.5 mr-1.5" />
+          <Button size="sm" className="flex-shrink-0 text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700" data-testid="dashboard-upgrade-cta">
+            <Crown className="w-3.5 h-3.5 mr-1.5 text-amber-300" />
             Upgrade
           </Button>
         </Link>

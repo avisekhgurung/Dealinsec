@@ -206,7 +206,7 @@ export default function QuotePreviewPage() {
         </div>
       )}
 
-      <main className="px-4 py-4 space-y-6 animate-fade-in">
+      <main className="px-4 py-4 space-y-6 animate-fade-in lg:max-w-4xl lg:mx-auto lg:px-8 lg:py-6">
         {/* Professional Quote Document */}
         <div className="glass-card rounded-2xl overflow-hidden border border-white/10 print:shadow-none print:border print:border-gray-200">
           {/* Document header */}

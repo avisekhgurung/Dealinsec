@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { trackEvent } from "@/lib/analytics";
 import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle, ChevronRight, Crown } from "lucide-react";
-import { hasActivePro } from "@shared/schema";
+import { hasProAccess } from "@shared/schema";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { parseApiError, isUpgradeError } from "@/lib/api-error";
@@ -368,7 +368,7 @@ export default function DealDetailsPage() {
 
                 {/* Step 2 → 3: Create Agreement (Pro feature) */}
                 {hasQuote && !hasContract && (
-                  hasActivePro(user) ? (
+                  hasProAccess(user) ? (
                     <Link href={`/deals/${deal.id}/contract`}>
                       <Button
                         className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
@@ -420,7 +420,7 @@ export default function DealDetailsPage() {
                 )}
 
                 {/* Step 3 → 4: Generate Invoice for Brand (Pro feature) */}
-                {hasContract && hasProof && !hasInvoice && !hasActivePro(user) && (
+                {hasContract && hasProof && !hasInvoice && !hasProAccess(user) && (
                   <div className="space-y-2">
                     <Button
                       className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
@@ -435,7 +435,7 @@ export default function DealDetailsPage() {
                     </Button>
                   </div>
                 )}
-                {hasContract && hasProof && !hasInvoice && hasActivePro(user) && (
+                {hasContract && hasProof && !hasInvoice && hasProAccess(user) && (
                   <div className="space-y-2">
                     <Link href={contract ? `/contracts/${contract.id}` : "/contracts"}>
                       <Button

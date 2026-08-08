@@ -5,13 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, ArrowLeft, Edit, LogOut, CreditCard, Copy, Share2, User, Mail, Phone, FileText, Building, MapPin, PenTool, Sparkles, Landmark, Hash, Camera } from "lucide-react";
+import { Loader2, Upload, ArrowLeft, Edit, LogOut, CreditCard, Copy, Share2, User, Mail, Phone, FileText, Building, MapPin, PenTool, Sparkles, Landmark, Hash, Camera, Crown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
 import { BottomNav } from "@/components/bottom-nav";
-import { hasActivePro } from "@shared/schema";
+import { hasActivePro, hasActiveTrial, hasLapsedTrial, getTrialDaysLeft } from "@shared/schema";
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -702,31 +702,43 @@ export default function ProfilePage() {
             )}
 
             {/* Plan card — plan only; deal limits are enforced server-side
-                and explained by the upgrade modal, not counted in the UI. */}
+                and explained by the upgrade modal, not counted in the UI.
+                Pro wears the brand's own pairing (emerald tile + gold seal,
+                like the logo); trial is the same family so it FEELS like Pro
+                but reads distinctly; free/lapsed goes neutral graphite. Paid
+                Pro is checked first — a Pro buyer mid-trial sees "Pro". */}
             <div
               className="rounded-2xl p-5 border-0 relative overflow-hidden"
               style={{
                 background: hasActivePro(user)
-                  ? "linear-gradient(135deg, hsl(258 60% 30%) 0%, hsl(258 60% 40%) 50%, hsl(243 60% 45%) 100%)"
-                  : "linear-gradient(135deg, hsl(160 84% 22%) 0%, hsl(160 84% 30%) 50%, hsl(174 77% 36%) 100%)",
+                  ? "linear-gradient(135deg, hsl(160 84% 14%) 0%, hsl(160 84% 22%) 50%, hsl(174 77% 26%) 100%)"
+                  : hasActiveTrial(user)
+                    ? "linear-gradient(135deg, hsl(160 84% 22%) 0%, hsl(160 84% 30%) 50%, hsl(174 77% 36%) 100%)"
+                    : "linear-gradient(135deg, hsl(215 28% 17%) 0%, hsl(215 25% 24%) 50%, hsl(210 20% 30%) 100%)",
               }}
             >
               <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/10 -mr-10 -mt-10" />
               <div className="absolute bottom-0 left-0 w-20 h-20 rounded-full bg-white/5 -ml-6 -mb-6" />
               <div className="relative z-10">
                 <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="h-4 w-4 text-white/80" />
+                  {hasActivePro(user)
+                    ? <Crown className="h-4 w-4 text-amber-400" />
+                    : <Sparkles className="h-4 w-4 text-white/80" />}
                   <h3 className="font-semibold text-white/90">Your plan</h3>
                 </div>
                 <div className="flex items-end justify-between">
                   <div>
                     <p className="text-3xl font-bold text-white" data-testid="text-plan">
-                      {hasActivePro(user) ? "DealInSec Pro" : "Free"}
+                      {hasActivePro(user) ? "DealInSec Pro" : hasActiveTrial(user) ? "Pro trial" : "Free"}
                     </p>
                     <p className="text-sm text-white/60 mt-1">
                       {hasActivePro(user)
                         ? `Unlimited workflow${user?.planExpiresAt ? ` · until ${new Date(user.planExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : ""}`
-                        : "Deals & quotations · upgrade for agreements and invoices"}
+                        : hasActiveTrial(user)
+                          ? `${getTrialDaysLeft(user) === 1 ? "Last day" : `${getTrialDaysLeft(user)} days left`} · everything unlocked`
+                          : hasLapsedTrial(user)
+                            ? "Trial ended · your documents stay yours"
+                            : "Deals & quotations · upgrade for agreements and invoices"}
                     </p>
                   </div>
                   <Link href="/pricing">

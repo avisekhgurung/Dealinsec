@@ -38,6 +38,7 @@ interface OrgSummary {
   id: string; name: string; slug: string | null; industry: string | null;
   seatLimit: number; seatsUsed: number; pendingInvites: number;
   ownerPlan: string; ownerPlanExpiresAt: string | null;
+  ownerOnTrial?: boolean; ownerTrialEndsAt?: string | null;
   extraSeats: number; extraSeatsExpiresAt: string | null;
 }
 interface Member {
@@ -297,7 +298,7 @@ export default function SettingsPage() {
                               <p className="text-sm font-semibold truncate">
                                 {[m.firstName, m.lastName].filter(Boolean).join(" ") || m.email}
                               </p>
-                              {m.orgRole === "OWNER" && <Crown className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />}
+                              {m.orgRole === "OWNER" && <Crown className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />}
                               {m.id === (user as any)?.id && <Badge variant="secondary" className="text-[10px] px-1.5">You</Badge>}
                             </div>
                             <p className="text-xs text-muted-foreground truncate">{m.email} · joined {fmtDate(m.joinedAt)}</p>
@@ -416,11 +417,17 @@ export default function SettingsPage() {
                     <div className="rounded-xl border border-border/60 p-3.5">
                       <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">Plan</p>
                       <p className="text-xl font-bold mt-0.5 flex items-center gap-1.5">
-                        {org.ownerPlan === "pro" ? <><Crown className="w-4 h-4 text-violet-500" /> Pro</> : "Free"}
+                        {org.ownerPlan === "pro"
+                          ? <><Crown className="w-4 h-4 text-amber-500" /> Pro</>
+                          : org.ownerOnTrial
+                            ? <><Sparkles className="w-4 h-4 text-emerald-500" /> Pro trial</>
+                            : "Free"}
                       </p>
-                      {org.ownerPlanExpiresAt && (
+                      {org.ownerPlan === "pro" && org.ownerPlanExpiresAt ? (
                         <p className="text-[11px] text-muted-foreground">until {fmtDate(org.ownerPlanExpiresAt)}</p>
-                      )}
+                      ) : org.ownerOnTrial && org.ownerTrialEndsAt ? (
+                        <p className="text-[11px] text-muted-foreground">until {fmtDate(org.ownerTrialEndsAt)}</p>
+                      ) : null}
                     </div>
                     <div className="rounded-xl border border-border/60 p-3.5">
                       <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">Seats</p>

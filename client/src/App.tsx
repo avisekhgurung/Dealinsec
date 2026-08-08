@@ -127,7 +127,10 @@ function Router() {
   return (
     <>
       {showShell && <DesktopSidebar />}
-      <div className={showShell ? "app-shell lg:pl-72" : ""}>
+      {/* Content offset tracks the sidebar width via --dis-sidebar-w
+          (see .app-shell in index.css) so the collapsible rail and the
+          content stay in lockstep. */}
+      <div className={showShell ? "app-shell" : ""}>
         <Suspense fallback={<RouteLoader />}>
           <Switch>
             {/* Authenticated users hitting `/` go straight to the dashboard

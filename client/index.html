@@ -65,6 +65,15 @@
       gtag('js', new Date());
       gtag('config', 'G-W3VTLRH79B', { send_page_view: false });
     </script>
+    <!-- Sidebar collapse bootstrap: runs before first style resolution so a
+         collapsed sidebar never flashes at full width (and no transition
+         fires on load because the attribute predates the element). -->
+    <script>
+      try {
+        if (localStorage.getItem('dis_sidebar_collapsed') === '1')
+          document.documentElement.setAttribute('data-sidebar', 'collapsed');
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

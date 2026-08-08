@@ -1,11 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, newsletterSubscribers, invoiceDocumentCategories, hasActivePro, hasActiveDealBoost, getDealCredits } from "@shared/schema";
+import { insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, newsletterSubscribers, invoiceDocumentCategories, hasActivePro, hasActiveDealBoost, hasProAccess, hasActiveTrial, getTrialDaysLeft, getDealCredits } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./auth";
 import { requirePro, requireOrgPermission, withOrg, getBillingUser, logOrgActivity } from "./entitlements";
+import { maybeStartTrial } from "./trial";
 import { getSeatLimit, INVITABLE_ROLES, hasPermission as hasOrgPermission, orgRoleOptions } from "@shared/permissions";
 import { aiEnabled, reserve, refund, extractInvoice } from "./ai";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
@@ -147,7 +148,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const refreshedBilling = await storage.ensureMonthlyCredits(billing.id);
       const me = billing.id === req.user.id ? (refreshedBilling ?? req.user) : req.user;
       const { password: _, ...userWithoutPassword } = me;
-      res.json(userWithoutPassword);
+      // Additive `entitlements`: computed from the ORG's billing owner, so a
+      // member of a Pro/trialing org doesn't read as "Free" while every
+      // feature works. Display data only — server gates re-derive their own.
+      const billingFresh = refreshedBilling ?? billing;
+      res.json({
+        ...userWithoutPassword,
+        entitlements: {
+          pro: hasActivePro(billingFresh),
+          trial: hasActiveTrial(billingFresh),
+          trialEndsAt: billingFresh.trialEndsAt ?? null,
+          trialDaysLeft: getTrialDaysLeft(billingFresh),
+          proExpiresAt: billingFresh.planExpiresAt ?? null,
+          isOwner: billing.id === req.user.id,
+        },
+      });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -210,12 +225,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // The ORG's plan and credit pool live on its OWNER's user row. Free
-      // plan: 1 Deal Credit = this deal + its quotation; Pro and Deal Boost
-      // are unlimited for every member. Spend happens AFTER validation so a
-      // 400 never burns a credit.
+      // plan: 1 Deal Credit = this deal + its quotation; Pro (paid OR
+      // trial — hasProAccess) and Deal Boost are unlimited for every
+      // member. A trialist must NOT burn monthly credits: they'd hit 402
+      // mid-trial and face day 8 at zero with a ~23-day wait. Spend
+      // happens AFTER validation so a 400 never burns a credit.
       const billing = await getBillingUser(req.user);
       let creditSpent = false;
-      if (!hasActivePro(billing) && !hasActiveDealBoost(billing)) {
+      if (!hasProAccess(billing) && !hasActiveDealBoost(billing)) {
         await storage.ensureMonthlyCredits(billing.id);
         const spend = await storage.spendDealCredit(billing.id);
         if (!spend.ok) {
@@ -1068,16 +1085,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (digitalSignature !== undefined) updates.digitalSignature = digitalSignature;
       if (profileImageUrl !== undefined) updates.profileImageUrl = profileImageUrl;
       if (coverImageUrl !== undefined) updates.coverImageUrl = coverImageUrl;
-      if (onboardingComplete !== undefined) updates.onboardingComplete = onboardingComplete;
+      // One-way latch: the client may only ever set onboardingComplete to
+      // TRUE, and only once a first name exists. Never back to false — the
+      // trial grant hangs off this transition, and the grant's own guards
+      // (one-shot trial_started_at, atomic UPDATE in server/trial.ts) are
+      // what make a replayed PATCH harmless.
+      if (onboardingComplete === true && (firstName ?? req.user.firstName)) {
+        updates.onboardingComplete = true;
+      }
       if (billingAddress !== undefined) updates.billingAddress = billingAddress;
       if (accountHolderName !== undefined) updates.accountHolderName = accountHolderName;
       if (accountNumber !== undefined) updates.accountNumber = accountNumber;
       if (ifscCode !== undefined) updates.ifscCode = ifscCode ? ifscCode.toUpperCase() : ifscCode;
       if (bankName !== undefined) updates.bankName = bankName;
 
-      const user = await storage.updateUser(userId, updates);
+      const wasOnboarded = !!req.user.onboardingComplete;
+      let user = await storage.updateUser(userId, updates);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
+      }
+      // Finishing onboarding is the trial's grant point. maybeStartTrial is
+      // one atomic guarded UPDATE (one-shot per owner + canonical-email
+      // dedupe), so calling it on a replay grants nothing.
+      if (!wasOnboarded && user.onboardingComplete) {
+        const granted = await maybeStartTrial(userId);
+        if (granted) user = granted;
       }
       const { password: _, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
@@ -1177,6 +1209,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pendingInvites: pending,
         ownerPlan: owner.plan,
         ownerPlanExpiresAt: owner.planExpiresAt,
+        ownerOnTrial: hasActiveTrial(owner),
+        ownerTrialEndsAt: owner.trialEndsAt ?? null,
       });
     } catch (error) {
       console.error("Org fetch error:", error);
@@ -1468,6 +1502,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         purchased: credits.purchased,
         total: credits.total,
         resetsAt: user?.monthlyCreditsResetAt ?? null,
+        // True while paid Pro OR trial is in force — the balance above is
+        // irrelevant to deal creation while this is set.
+        unlimited: hasProAccess(user),
         transactions: transactions.slice(0, 10),
       });
     } catch (error) {

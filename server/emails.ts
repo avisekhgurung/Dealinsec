@@ -175,18 +175,23 @@ export function inviteEmail(args: {
 }
 
 export function welcomeEmail(args: { firstName?: string }): { subject: string; html: string } {
+  // Fires at SIGNUP — before onboarding finishes, i.e. before the 7-day
+  // trial is granted — so the copy has to work for both outcomes: it sells
+  // the trial ("finish setup to unlock") without promising it
+  // unconditionally, and never mentions credit counts (invited members and
+  // trial-ineligible accounts see this too).
   const name = args.firstName ? `, ${args.firstName}` : "";
-  const subject = "Welcome to DealInSec — your free plan is ready 🎉";
+  const subject = "Welcome to DealInSec — let's close your first deal 🎉";
   const html = layout({
-    preview: "You get 4 free Deal Credits every month. Here's how to close your first deal.",
+    preview: "Finish setting up and every Pro feature is unlocked free for 7 days.",
     bodyHtml: `
       ${heading(`Welcome aboard${name}!`)}
       ${para("DealInSec helps you track deals, send quotations, sign agreements, and bill clients — all in one workflow.")}
-      ${para("Your free plan includes <strong>4 Deal Credits every month</strong> — each covers a deal plus its quotation. Here's your first move:")}
+      ${para("Finish setting up your account and you'll get a <strong>7-day Pro trial</strong> — agreements, GST invoices and payment tracking, all unlocked. Here's your first move:")}
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">
         <tr><td style="padding:6px 0;color:#334155;font-size:14px;">1️⃣ &nbsp;Create your first deal</td></tr>
         <tr><td style="padding:6px 0;color:#334155;font-size:14px;">2️⃣ &nbsp;Send a professional quotation</td></tr>
-        <tr><td style="padding:6px 0;color:#334155;font-size:14px;">3️⃣ &nbsp;Go Pro to sign agreements &amp; send invoices</td></tr>
+        <tr><td style="padding:6px 0;color:#334155;font-size:14px;">3️⃣ &nbsp;Sign the agreement &amp; raise the invoice</td></tr>
         <tr><td style="padding:6px 0;color:#334155;font-size:14px;">4️⃣ &nbsp;Track payments until you're paid</td></tr>
       </table>
       ${button("Create your first deal", `${appUrl()}/deals/new`)}

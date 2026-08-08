@@ -177,7 +177,7 @@ const FAQS = [
   },
   {
     q: "Is Dealinsec free to use?",
-    a: "Yes — the free plan covers 4 deals every month, each with a professional quotation. Signed agreements, invoices and payment tracking are part of DealInSec Pro (₹999/month or ₹9,999/year). There are no platform fees on your deal value.",
+    a: "Yes — every new account starts with a 7-day Pro trial: everything unlocked, no card needed. After that the free plan covers 4 deals every month, each with a professional quotation. Signed agreements, invoices and payment tracking are part of DealInSec Pro (₹999/month or ₹9,999/year). There are no platform fees on your deal value.",
   },
   {
     q: "Do agreements generated here hold up legally?",
@@ -388,7 +388,7 @@ export default function LandingPage() {
                 {authTab === "signup" ? "Create your account" : "Welcome back"}
               </h2>
               <p className="text-sm text-neutral-500 mt-1">
-                {authTab === "signup" ? "No credit card. 4 free deals every month." : "Sign in to continue"}
+                {authTab === "signup" ? "No credit card. Every Pro feature free for 7 days." : "Sign in to continue"}
               </p>
             </div>
 
@@ -1696,8 +1696,8 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
           eyebrow="Simple pricing"
-          title="Start free. Upgrade for the full workflow."
-          subtitle="Start free with 4 deals every month. Go Pro for unlimited deals, quotations, agreements, invoices and payment tracking."
+          title="Try everything free for 7 days."
+          subtitle="Every new account starts with a 7-day Pro trial — the full workflow, unlocked. After that, stay free with 4 deals a month or go Pro for unlimited everything."
         />
 
         <motion.div
@@ -1737,7 +1737,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
             >
               Start free
             </Button>
-            <p className="text-[11px] text-neutral-500 text-center mt-3">Resets every month. No credit card needed.</p>
+            <p className="text-[11px] text-neutral-500 text-center mt-3">Starts with a 7-day Pro trial. No credit card needed.</p>
           </motion.div>
 
           {/* Pro Monthly — recommended */}
@@ -2046,7 +2046,7 @@ function Footer() {
             { Icon: Shield, text: "256-bit encrypted" },
             { Icon: Lock, text: "Secure payments via Razorpay" },
             { Icon: Check, text: "UPI · Cards · NetBanking" },
-            { Icon: Zap, text: "Free plan included · Pro from ₹999/month" },
+            { Icon: Zap, text: "7-day Pro trial · Pro from ₹999/month" },
           ].map(({ Icon, text }) => (
             <span key={text} className="inline-flex items-center gap-1.5 text-[11px] text-neutral-500">
               <Icon className="w-3.5 h-3.5 text-emerald-600" />

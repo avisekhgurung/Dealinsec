@@ -232,7 +232,7 @@ export default function EditDealPage() {
         </div>
       </header>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 py-6 space-y-6 animate-fade-in lg:max-w-4xl lg:mx-auto lg:px-8 lg:py-7 lg:space-y-5">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 py-6 space-y-6 animate-fade-in lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-7 lg:space-y-5">
         {existingQuote && (
           <div className="flex items-start gap-3 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4">
             <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />

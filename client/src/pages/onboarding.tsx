@@ -68,6 +68,12 @@ export default function OnboardingPage() {
           <CardDescription>
             Just 3 quick details to start. We'll ask for the rest right when you need them.
           </CardDescription>
+          <div className="mx-auto mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+            <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+              Finishing this starts your 7-day Pro trial — everything unlocked
+            </span>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">

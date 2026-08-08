@@ -24,6 +24,8 @@ import { Button } from "@/components/ui/button";
 import { Check, Crown, Loader2, Rocket, Sparkles } from "lucide-react";
 import { useRazorpayCheckout } from "@/hooks/use-razorpay-checkout";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { hasActiveTrial, hasLapsedTrial } from "@shared/schema";
 import { trackEvent } from "@/lib/analytics";
 
 export type UpgradeFeature = "deals" | "agreements" | "invoices" | "payment_tracking";
@@ -48,7 +50,7 @@ const FEATURE_COPY: Record<UpgradeFeature, string> = {
   deals: "Your free plan covers 4 deals a month — you've used them all.",
   agreements: "Creating signed agreements is a Pro feature.",
   invoices: "Generating invoices is a Pro feature.",
-  payment_tracking: "Payment tracking is a Pro feature.",
+  payment_tracking: "Payment tracking — recording payments and marking invoices Paid — is a Pro feature.",
 };
 
 const PRO_FEATURES = [
@@ -64,6 +66,10 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
   const [, setLocation] = useLocation();
   const { checkout, isLoading } = useRazorpayCheckout();
   const { toast } = useToast();
+  // Lapsed trialists get their own framing: they've SEEN the full workflow,
+  // so the modal speaks to what they're losing, not what they'd gain.
+  const { user } = useAuth();
+  const trialEnded = hasLapsedTrial(user);
 
   const openUpgradeModal = useCallback((options: UpgradeModalOptions = {}) => {
     setFeature(options.feature ?? "deals");
@@ -73,7 +79,9 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
 
   // The boost only lifts the deal/quotation limit — for Pro-only features it
   // would be a dead-end purchase, so it's only offered on the deal-limit path.
-  const boostApplies = feature === "deals";
+  // Never during an active trial either: a boost bought mid-trial overlaps
+  // days that are already unlimited (guaranteed refund request).
+  const boostApplies = feature === "deals" && !hasActiveTrial(user);
 
   const buyBoost = () =>
     checkout("deal_boost", {
@@ -100,23 +108,24 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md" data-testid="upgrade-modal">
           <DialogHeader>
-            <div className="mx-auto w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center mb-2 shadow-lg shadow-violet-500/30">
-              <Crown className="w-6 h-6 text-white" />
+            <div className="mx-auto w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mb-2 shadow-lg shadow-emerald-500/30">
+              <Crown className="w-6 h-6 text-amber-300" />
             </div>
             <DialogTitle className="text-center text-xl">
-              Upgrade to Continue Closing Deals
+              {trialEnded ? "Your 7-day trial has ended" : "Upgrade to Continue Closing Deals"}
             </DialogTitle>
             <DialogDescription className="text-center">
-              {FEATURE_COPY[feature]} You've reached your free monthly limit or this
-              feature requires a Pro subscription.
+              {trialEnded
+                ? `${FEATURE_COPY[feature]} Your deals and documents are safe — upgrade to keep the full workflow you've been using.`
+                : `${FEATURE_COPY[feature]} You've reached your free monthly limit or this feature requires a Pro subscription.`}
             </DialogDescription>
           </DialogHeader>
 
           <ul className="space-y-2 my-1">
             {PRO_FEATURES.map((f) => (
               <li key={f} className="flex items-start gap-2.5 text-sm">
-                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-violet-500/15 flex items-center justify-center mt-px">
-                  <Check className="w-3 h-3 text-violet-600 dark:text-violet-400" strokeWidth={3} />
+                <div className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center mt-px">
+                  <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" strokeWidth={3} />
                 </div>
                 <span>{f}</span>
               </li>
@@ -125,14 +134,14 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
 
           <div className="space-y-2.5 mt-1">
             <Button
-              className="w-full h-12 text-base font-bold rounded-xl text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-lg shadow-violet-500/30 relative"
+              className="w-full h-12 text-base font-bold rounded-xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-500/30 relative"
               onClick={() => {
                 setOpen(false);
                 setLocation("/pricing");
               }}
               data-testid="upgrade-modal-pro"
             >
-              <Crown className="w-4 h-4 mr-2" />
+              <Crown className="w-4 h-4 mr-2 text-amber-300" />
               Upgrade to Pro — ₹999/month
               <span className="absolute -top-2 right-3 px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 text-[9px] font-black uppercase tracking-wide flex items-center gap-0.5">
                 <Sparkles className="w-2.5 h-2.5" /> Recommended

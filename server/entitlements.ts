@@ -17,7 +17,7 @@
  *   402 { code: "NO_CREDITS", feature: "deals" } — org's free limit hit
  */
 import type { RequestHandler } from "express";
-import { hasActivePro, type User } from "@shared/schema";
+import { hasProAccess, type User } from "@shared/schema";
 import { hasPermission, type Permission } from "@shared/permissions";
 import { storage } from "./storage";
 
@@ -49,13 +49,15 @@ export function requireOrgPermission(permission: Permission): RequestHandler {
   };
 }
 
-/** Gate a route to orgs whose OWNER has an active Pro subscription.
- *  Must run AFTER isAuthenticated. Reads never go through this. */
+/** Gate a route to orgs whose OWNER has Pro ACCESS — a paid subscription
+ *  OR an active 7-day trial (hasProAccess is the one entitlement helper;
+ *  display code is what keeps them looking different). Must run AFTER
+ *  isAuthenticated. Reads never go through this. */
 export function requirePro(feature: GatedFeature): RequestHandler {
   return async (req: any, res, next) => {
     try {
       const billing = await getBillingUser(req.user);
-      if (hasActivePro(billing)) return next();
+      if (hasProAccess(billing)) return next();
       return res.status(403).json({
         code: "UPGRADE_REQUIRED",
         feature,

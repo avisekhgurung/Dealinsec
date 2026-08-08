@@ -15,7 +15,14 @@ import {
   Users,
   Infinity as InfinityIcon,
 } from "lucide-react";
-import { hasActivePro, hasActiveDealBoost, getSubscriptionType } from "@shared/schema";
+import {
+  hasActivePro,
+  hasActiveDealBoost,
+  hasActiveTrial,
+  hasLapsedTrial,
+  getTrialDaysLeft,
+  getSubscriptionType,
+} from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
@@ -57,6 +64,13 @@ export default function PricingPage() {
 
   const proActive = hasActivePro(user);
   const boostActive = hasActiveDealBoost(user);
+  // Display only — a trialist still sees every buy button (that's the point
+  // of the trial); what changes is the "current plan" framing and the Deal
+  // Boost card (hidden: a ₹99 boost bought mid-trial overlaps useless days
+  // and generates a guaranteed refund request).
+  const trialActive = hasActiveTrial(user);
+  const trialDaysLeft = getTrialDaysLeft(user);
+  const trialLapsed = hasLapsedTrial(user);
   const subType = getSubscriptionType(user);
   const proExpiryLabel = user?.planExpiresAt
     ? new Date(user.planExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
@@ -143,11 +157,16 @@ export default function PricingPage() {
           </Button>
         </Link>
         <h1 className="text-xl lg:text-2xl font-semibold flex-1">Plans &amp; Billing</h1>
-        {/* Plan pill */}
+        {/* Plan pill — Pro wears the brand pairing: emerald + gold crown */}
         {proActive ? (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800">
-            <Crown className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
-            <span className="text-sm font-bold text-violet-700 dark:text-violet-300">Pro</span>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+            <Crown className="w-3.5 h-3.5 text-amber-500" />
+            <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">Pro</span>
+          </div>
+        ) : trialActive ? (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+            <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">Pro trial</span>
           </div>
         ) : (
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
@@ -181,26 +200,42 @@ export default function PricingPage() {
 
         {/* ── Current plan strip ── */}
         {proActive ? (
-          <div className="rounded-2xl border border-violet-200/60 dark:border-violet-800/40 bg-violet-50/50 dark:bg-violet-950/20 px-5 py-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
-              <Crown className="w-5 h-5 text-white" />
+          <div className="rounded-2xl border border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/50 dark:bg-emerald-950/20 px-5 py-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0">
+              <Crown className="w-5 h-5 text-amber-300" />
             </div>
             <div className="flex-1">
-              <p className="font-bold text-sm text-violet-900 dark:text-violet-200">
+              <p className="font-bold text-sm text-emerald-900 dark:text-emerald-200">
                 DealInSec Pro · {subType === "PRO_MONTHLY" ? "Monthly" : "Annual"}
               </p>
               {proExpiryLabel && (
-                <p className="text-xs text-violet-700/70 dark:text-violet-400/70">
+                <p className="text-xs text-emerald-700/70 dark:text-emerald-400/70">
                   Valid until {proExpiryLabel} · renewing extends your term
                 </p>
               )}
+            </div>
+          </div>
+        ) : trialActive ? (
+          <div className="rounded-2xl border border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/50 dark:bg-emerald-950/20 px-5 py-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-sm text-emerald-900 dark:text-emerald-200">
+                Pro trial · {trialDaysLeft === 1 ? "last day" : `${trialDaysLeft} days left`}
+              </p>
+              <p className="text-xs text-emerald-700/70 dark:text-emerald-400/70">
+                Everything is unlocked. Upgrade below to keep the full workflow when your trial ends.
+              </p>
             </div>
           </div>
         ) : (
           <div className="rounded-2xl border border-border/60 bg-card/50 px-5 py-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="font-bold text-sm">You're on the Free plan</p>
+                <p className="font-bold text-sm">
+                  {trialLapsed ? "Your Pro trial has ended — you're on the Free plan" : "You're on the Free plan"}
+                </p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
                   4 deals a month with quotations · agreements, invoices &amp; payment tracking need Pro
                 </p>
@@ -240,23 +275,23 @@ export default function PricingPage() {
                 </li>
               ))}
             </ul>
-            {!proActive && (
+            {!proActive && !trialActive && (
               <div className="rounded-lg bg-muted/60 text-center py-2.5 text-sm font-semibold text-muted-foreground">
                 Your current plan
               </div>
             )}
           </Card>
 
-          {/* Pro Monthly — recommended */}
-          <Card className="glass-card border-violet-400/40 dark:border-violet-500/30 relative overflow-hidden flex flex-col shadow-xl shadow-violet-500/[0.1]">
-            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/[0.08] via-transparent to-indigo-500/[0.06] pointer-events-none" />
-            <div className="relative bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-1.5 text-center">
+          {/* Pro Monthly — recommended. Emerald + gold, the logo's own pairing */}
+          <Card className="glass-card border-emerald-400/40 dark:border-emerald-500/30 relative overflow-hidden flex flex-col shadow-xl shadow-emerald-500/[0.1]">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/[0.08] via-transparent to-teal-500/[0.06] pointer-events-none" />
+            <div className="relative bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-4 py-1.5 text-center">
               <span className="text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3" /> Recommended
+                <Sparkles className="w-3 h-3 text-amber-300" /> Recommended
               </span>
             </div>
             <div className="relative p-5 lg:p-6 flex flex-col flex-1">
-              <p className="text-[11px] uppercase tracking-[0.1em] font-bold text-violet-600 dark:text-violet-400 mb-1">
+              <p className="text-[11px] uppercase tracking-[0.1em] font-bold text-emerald-600 dark:text-emerald-400 mb-1">
                 Pro · Monthly
               </p>
               <div className="flex items-baseline gap-1 mb-1">
@@ -269,15 +304,15 @@ export default function PricingPage() {
               <ul className="space-y-2.5 mb-6 flex-1">
                 {PRO_FEATURES.map((f) => (
                   <li key={f} className="flex items-start gap-2.5 text-sm">
-                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-violet-500/15 flex items-center justify-center mt-px">
-                      <Check className="w-3 h-3 text-violet-600 dark:text-violet-400" strokeWidth={3} />
+                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center mt-px">
+                      <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" strokeWidth={3} />
                     </div>
                     <span>{f}</span>
                   </li>
                 ))}
               </ul>
               <Button
-                className="w-full text-white h-12 text-base font-bold rounded-xl shadow-lg shadow-violet-500/30 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+                className="w-full text-white h-12 text-base font-bold rounded-xl shadow-lg shadow-emerald-500/30 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
                 onClick={() => handlePurchase("pro_monthly")}
                 disabled={isLoading}
                 data-testid="button-buy-pro-monthly"
@@ -289,7 +324,7 @@ export default function PricingPage() {
                   </>
                 ) : (
                   <>
-                    <Crown className="h-5 w-5 mr-2" />
+                    <Crown className="h-5 w-5 mr-2 text-amber-300" />
                     {proActive ? `Extend 1 month — ${fmt(proMonthlyPrice)}` : `Go Pro — ${fmt(proMonthlyPrice)}/month`}
                   </>
                 )}
@@ -357,8 +392,10 @@ export default function PricingPage() {
           </Card>
         </div>
 
-        {/* ── Deal Boost — the ₹99 bridge ── */}
-        {!proActive && (
+        {/* ── Deal Boost — the ₹99 bridge. Hidden during a trial: a boost
+            bought mid-trial overlaps days that are already unlimited and
+            generates a guaranteed refund request. ── */}
+        {!proActive && !trialActive && (
           <Card className="glass-card border-emerald-300/40 dark:border-emerald-800/40 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/[0.06] to-teal-500/[0.04] pointer-events-none" />
             <div className="relative p-4 lg:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
@@ -458,6 +495,9 @@ export default function PricingPage() {
               </div>
             ))}
           </div>
+          <p className="text-[11px] text-muted-foreground pt-1 border-t border-border/50">
+            Every new account starts with a 7-day Pro trial — the full workflow, unlocked. One trial per account.
+          </p>
         </div>
 
         {/* Trust signals row */}

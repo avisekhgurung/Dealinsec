@@ -13,7 +13,7 @@ import { ArrowLeft, Shield, AlertTriangle, PenLine, Loader2, CreditCard, CheckCi
 import { useAuth } from "@/hooks/useAuth";
 import { CreditAnimationOverlay } from "@/components/credit-animation-overlay";
 import { trackEvent } from "@/lib/analytics";
-import { STANDARD_TERMS, hasActivePro } from "@shared/schema";
+import { STANDARD_TERMS, hasActivePro, hasProAccess, hasActiveTrial } from "@shared/schema";
 import type { Deal, Contract } from "@shared/schema";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { parseApiError, isUpgradeError } from "@/lib/api-error";
@@ -44,7 +44,14 @@ export default function ContractConfirmationPage() {
 
   // Agreements are a Pro feature in the subscription-first model. This page's
   // entry point (deal-details) is already gated; this is defense-in-depth.
-  const proActive = hasActivePro(user);
+  // ENTITLEMENT vs DISPLAY — deliberately split. canCreate mirrors the
+  // server's requirePro gate (paid Pro OR active trial): it drives the
+  // submit button, so a trialist is never left staring at a disabled
+  // "Create Agreement" that would actually succeed. isPaidPro drives copy
+  // only — a trialist sees trial framing, never "your Pro plan".
+  const canCreate = hasProAccess(user);
+  const isPaidPro = hasActivePro(user);
+  const onTrial = hasActiveTrial(user);
   const needsBillingAddress = !user?.billingAddress;
   const needsPan = !user?.panNumber;
   const needsSignature = !user?.digitalSignature;
@@ -211,7 +218,7 @@ export default function ContractConfirmationPage() {
   const canSubmit =
     agreed &&
     !createContract.isPending &&
-    proActive &&
+    canCreate &&
     (!needsBillingAddress || billingAddress.trim().length > 0) &&
     (!needsPan || panNumber.trim().length > 0) &&
     (!needsSignature || !!signatureFile);
@@ -260,7 +267,7 @@ export default function ContractConfirmationPage() {
             <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Create Agreement</h1>
           </div>
         </header>
-        <main className="px-4 py-8 max-w-lg mx-auto animate-fade-in">
+        <main className="px-4 py-8 max-w-lg mx-auto animate-fade-in lg:max-w-4xl lg:px-8">
           <Card className="glass-card border-0">
             <CardContent className="p-6 text-center space-y-4">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 mx-auto">
@@ -316,15 +323,18 @@ export default function ContractConfirmationPage() {
             </Button>
             <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Create Agreement</h1>
 
-            {/* Pro pill in header — agreements are a Pro feature */}
-            <div className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800">
-              <Crown className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
-              <span className="text-sm font-bold text-violet-700 dark:text-violet-300">Pro</span>
+            {/* Pro pill in header — agreements are a Pro feature. Trialists
+                see "Trial" so paid and trial never look the same. */}
+            <div className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+              <Crown className="w-3.5 h-3.5 text-amber-500" />
+              <span className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                {!isPaidPro && onTrial ? "Trial" : "Pro"}
+              </span>
             </div>
           </div>
         </header>
 
-        <main className="px-4 py-8 space-y-6 max-w-lg mx-auto animate-fade-in">
+        <main className="px-4 py-8 space-y-6 max-w-lg mx-auto animate-fade-in lg:max-w-4xl lg:px-8">
 
           {/* 4-step timeline */}
           <div className="flex items-center justify-between px-2">
@@ -361,29 +371,30 @@ export default function ContractConfirmationPage() {
             </div>
           </div>
 
-          {/* Pro coverage card — agreements are included in the subscription */}
-          {proActive && (
-            <div className="relative overflow-hidden rounded-2xl border border-violet-200/60 dark:border-violet-800/40">
-              <div className="dark:hidden absolute inset-0" style={{ background: "linear-gradient(135deg, hsl(255 100% 98%) 0%, hsl(245 90% 95%) 100%)" }} />
-              <div className="hidden dark:block absolute inset-0" style={{ background: "linear-gradient(135deg, hsl(255 25% 12%) 0%, hsl(245 20% 9%) 100%)" }} />
+          {/* Coverage card — agreements are included in the subscription
+              (or, distinctly framed, in the free trial) */}
+          {canCreate && (
+            <div className="relative overflow-hidden rounded-2xl border border-emerald-200/60 dark:border-emerald-800/40">
+              <div className="dark:hidden absolute inset-0" style={{ background: "linear-gradient(135deg, hsl(160 60% 98%) 0%, hsl(160 55% 94%) 100%)" }} />
+              <div className="hidden dark:block absolute inset-0" style={{ background: "linear-gradient(135deg, hsl(160 25% 12%) 0%, hsl(174 20% 9%) 100%)" }} />
               <div className="relative px-5 py-4 flex items-center gap-4">
                 <div className="relative flex-shrink-0">
-                  <div className="absolute inset-0 rounded-full bg-violet-300/40 animate-ping" style={{ animationDuration: "2s" }} />
-                  <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-violet-400 via-violet-500 to-indigo-600 shadow-md shadow-violet-400/40 flex items-center justify-center border border-violet-300/60">
-                    <Crown className="w-6 h-6 text-white" />
+                  <div className="absolute inset-0 rounded-full bg-emerald-300/40 animate-ping" style={{ animationDuration: "2s" }} />
+                  <div className="relative w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-600 shadow-md shadow-emerald-400/40 flex items-center justify-center border border-emerald-300/60">
+                    <Crown className="w-6 h-6 text-amber-300" />
                   </div>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-base font-bold text-violet-800 dark:text-violet-300">
-                    Included in DealInSec Pro
+                  <p className="text-base font-bold text-emerald-800 dark:text-emerald-300">
+                    {isPaidPro ? "Included in DealInSec Pro" : "Included in your free trial"}
                   </p>
-                  <p className="text-xs text-violet-700/70 dark:text-violet-400/60 mt-0.5">
-                    Unlimited agreements on your plan
+                  <p className="text-xs text-emerald-700/70 dark:text-emerald-400/60 mt-0.5">
+                    {isPaidPro ? "Unlimited agreements on your plan" : "Unlimited agreements while your trial is active"}
                   </p>
                 </div>
                 <div className="flex-shrink-0 text-right">
-                  <div className="text-xs font-semibold text-violet-600 dark:text-violet-400">cost</div>
-                  <div className="text-lg font-black text-violet-700 dark:text-violet-300">₹0</div>
+                  <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">cost</div>
+                  <div className="text-lg font-black text-emerald-700 dark:text-emerald-300">₹0</div>
                 </div>
               </div>
             </div>
@@ -400,23 +411,23 @@ export default function ContractConfirmationPage() {
             </p>
           </div>
 
-          {!proActive && (
-            <Card className="border-violet-200 dark:border-violet-900/50 bg-violet-50/50 dark:bg-violet-950/20">
+          {!canCreate && (
+            <Card className="border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/50 dark:bg-emerald-950/20">
               <CardContent className="p-4">
                 <div className="flex gap-3">
-                  <Crown className="w-5 h-5 text-violet-600 dark:text-violet-400 flex-shrink-0 mt-0.5" />
+                  <Crown className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                   <div className="space-y-2">
-                    <p className="font-semibold text-violet-900 dark:text-violet-200">Agreements are a Pro feature</p>
-                    <p className="text-sm text-violet-800 dark:text-violet-300 leading-relaxed">
+                    <p className="font-semibold text-emerald-900 dark:text-emerald-200">Agreements are a Pro feature</p>
+                    <p className="text-sm text-emerald-800 dark:text-emerald-300 leading-relaxed">
                       Upgrade to DealInSec Pro to create unlimited signed agreements, invoices and payment tracking.
                     </p>
                     <Button
                       size="sm"
-                      className="mt-1 text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+                      className="mt-1 text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
                       onClick={() => openUpgradeModal({ feature: "agreements" })}
                       data-testid="button-upgrade-pro"
                     >
-                      <Crown className="w-4 h-4 mr-2" />
+                      <Crown className="w-4 h-4 mr-2 text-amber-300" />
                       Upgrade to Pro
                     </Button>
                   </div>
@@ -683,9 +694,11 @@ export default function ContractConfirmationPage() {
             </Button>
 
             <p className="text-center text-xs text-muted-foreground">
-              {proActive
+              {isPaidPro
                 ? "Included in your Pro plan · unlimited agreements"
-                : "Requires DealInSec Pro"}
+                : onTrial
+                  ? "Included in your free trial · unlimited agreements"
+                  : "Requires DealInSec Pro"}
             </p>
           </div>
         </main>

@@ -92,6 +92,18 @@ export const users = pgTable("users", {
   // ₹99 Deal Boost: unlimited deals + quotations while this is in the future.
   // Never unlocks Pro features (agreements/invoices/payment tracking).
   dealBoostExpiresAt: timestamp("deal_boost_expires_at"),
+  // ── 7-day Pro trial ──
+  // trial_started_at doubles as the permanent "has consumed a trial" flag —
+  // NEVER cleared, and trial_ends_at is immutable after the grant. Refund
+  // paths (revokeProPlan / revokeDealBoost) must never touch these columns.
+  // The ONLY writer is maybeStartTrial() in server/trial.ts (one atomic
+  // guarded UPDATE). Both nullable, no default: the deployed createUser
+  // doesn't supply them.
+  trialStartedAt: timestamp("trial_started_at"),
+  trialEndsAt: timestamp("trial_ends_at"),
+  // Canonical mailbox (shared/email.ts) — one trial per real mailbox.
+  // Indexed, NOT unique; login always uses the real `email`.
+  emailCanonical: varchar("email_canonical", { length: 255 }),
   referralCode: varchar("referral_code").unique(),
   // ── Organization membership (single org per user) ──
   organizationId: varchar("organization_id"),
@@ -189,25 +201,78 @@ export function hasActiveDealBoost(
   return Number.isFinite(expires) && expires > Date.now();
 }
 
-export type SubscriptionType = "FREE" | "PRO_MONTHLY" | "PRO_YEARLY";
-export type SubscriptionStatus = "ACTIVE" | "EXPIRED" | "FREE";
+// ── 7-day Pro trial ────────────────────────────────────────────────────
+// All Pro features unlocked for TRIAL_DAYS after onboarding. Granted once
+// per owner, ever, by server/trial.ts. Same Date|string tolerance as above.
+
+export const TRIAL_DAYS = 7;
+
+export function hasActiveTrial(
+  user?: { trialEndsAt?: Date | string | null } | null,
+): boolean {
+  if (!user?.trialEndsAt) return false;
+  const ends = new Date(user.trialEndsAt).getTime();
+  return Number.isFinite(ends) && ends > Date.now();
+}
+
+/** THE entitlement helper. Every server gate and every client "can I do X"
+ *  check uses this. Display code must NOT — it has to tell paid Pro and
+ *  trial apart (a trialist never sees the same card as a paying customer). */
+export function hasProAccess(
+  user?: {
+    plan?: string | null;
+    planExpiresAt?: Date | string | null;
+    trialEndsAt?: Date | string | null;
+  } | null,
+): boolean {
+  return hasActivePro(user) || hasActiveTrial(user);
+}
+
+/** 0 when no active trial; otherwise 1..TRIAL_DAYS. UI renders 1 as
+ *  "Last day", never "1 day left". */
+export function getTrialDaysLeft(
+  user?: { trialEndsAt?: Date | string | null } | null,
+): number {
+  if (!hasActiveTrial(user)) return 0;
+  const d = Math.ceil((new Date(user!.trialEndsAt as any).getTime() - Date.now()) / 86_400_000);
+  return Math.min(TRIAL_DAYS, Math.max(1, d));
+}
+
+export type SubscriptionType = "FREE" | "PRO_MONTHLY" | "PRO_YEARLY" | "TRIAL";
+export type SubscriptionStatus = "ACTIVE" | "EXPIRED" | "FREE" | "TRIAL" | "TRIAL_EXPIRED";
 
 type PlanFields = {
   plan?: string | null;
   planTerm?: string | null;
   planExpiresAt?: Date | string | null;
+  trialStartedAt?: Date | string | null;
+  trialEndsAt?: Date | string | null;
 };
 
+// Display only — never derive an entitlement from this (use hasProAccess).
+// Paid Pro is checked FIRST so a Pro purchase mid-trial reads "Pro".
 export function getSubscriptionType(user?: PlanFields | null): SubscriptionType {
-  if (!hasActivePro(user)) return "FREE";
-  return user?.planTerm === "monthly" ? "PRO_MONTHLY" : "PRO_YEARLY";
+  if (hasActivePro(user)) return user?.planTerm === "monthly" ? "PRO_MONTHLY" : "PRO_YEARLY";
+  if (hasActiveTrial(user)) return "TRIAL";
+  return "FREE";
+}
+
+/** True only for accounts that actually LIVED a trial and let it lapse.
+ *  Migrated accounts were marked trial-consumed with started == ends, so the
+ *  strict `>` keeps them plain FREE, never TRIAL_EXPIRED. */
+export function hasLapsedTrial(user?: PlanFields | null): boolean {
+  if (!user?.trialStartedAt || !user?.trialEndsAt || hasActiveTrial(user)) return false;
+  return new Date(user.trialEndsAt).getTime() > new Date(user.trialStartedAt).getTime();
 }
 
 // Derived, not stored: ACTIVE = Pro in force; EXPIRED = was Pro, term lapsed
-// (renew prompt); FREE = never subscribed (or fully reverted).
+// (renew prompt); TRIAL/TRIAL_EXPIRED = trial in force / lapsed; FREE =
+// never subscribed (or fully reverted). Display only — never an entitlement.
 export function getSubscriptionStatus(user?: PlanFields | null): SubscriptionStatus {
   if (hasActivePro(user)) return "ACTIVE";
   if (user?.plan === "pro") return "EXPIRED";
+  if (hasActiveTrial(user)) return "TRIAL";
+  if (hasLapsedTrial(user)) return "TRIAL_EXPIRED";
   return "FREE";
 }
 

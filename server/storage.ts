@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
+import { canonicalEmail } from "@shared/email";
 import {
   users, deals, contracts, invoices, brandInvoices, invoiceAttachments, creditTransactions, payuOrders, quotes, referrals,
   organizations, invitations, activityLogs,
@@ -124,7 +125,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(userData).returning();
+    // email_canonical is derived here — the single choke point across all
+    // signup paths (email, Google, invite-accept) — so the trial's
+    // one-per-mailbox dedupe can never be skipped by a forgotten call site.
+    const values = {
+      ...userData,
+      emailCanonical: userData.emailCanonical ?? canonicalEmail(userData.email),
+    };
+    const [user] = await db.insert(users).values(values).returning();
     return user;
   }
 
@@ -384,6 +392,12 @@ export class DatabaseStorage implements IStorage {
     // still active, else from now. Computing this in the UPDATE itself (not
     // read-modify-write in JS) means two concurrent grants both extend — no
     // lost paid term under the verify/webhook race or double-renewal.
+    //
+    // TRIAL INVARIANT: this must NOT add remaining trial days to the paid
+    // term (revokeProPlan subtracts a FIXED term, so a refund would leave
+    // free Pro days behind). Buying mid-trial: planExpiresAt is NULL, so
+    // GREATEST gives NOW()+days; the unexpired trial changes no entitlement
+    // (hasProAccess = pro || trial) and trialEndsAt stays untouched.
     const [updated] = await db.update(users)
       .set({
         plan: "pro",
@@ -411,6 +425,8 @@ export class DatabaseStorage implements IStorage {
 
   async revokeDealBoost(userId: string, days: number): Promise<User | undefined> {
     // Refund clawback for a boost purchase.
+    // TRIAL INVARIANT: never touches trial columns — a refund must not
+    // destroy a legitimate remaining trial.
     const [updated] = await db.update(users)
       .set({
         dealBoostExpiresAt: sql`COALESCE(${users.dealBoostExpiresAt}, NOW()) - make_interval(days => ${days})`,
@@ -424,6 +440,9 @@ export class DatabaseStorage implements IStorage {
   async revokeProPlan(userId: string, days: number): Promise<User | undefined> {
     // Refund clawback: reverse one term's extension atomically. If the plan
     // no longer reaches the future after the rollback, downgrade to free.
+    // TRIAL INVARIANT: must never learn about trial columns — a day-5 refund
+    // of a day-3 purchase falls back onto trial days 5-7 (accepted, bounded:
+    // trialEndsAt is immutable after grant, so it can't be farmed).
     const [updated] = await db.update(users)
       .set({
         planExpiresAt: sql`COALESCE(${users.planExpiresAt}, NOW()) - make_interval(days => ${days})`,
