@@ -13,8 +13,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { trackEvent } from "@/lib/analytics";
-import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle, ChevronRight, Crown } from "lucide-react";
-import { hasProAccess } from "@shared/schema";
+import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle, ChevronRight, Crown, Briefcase, ScrollText, ListChecks } from "lucide-react";
+import { hasProAccess, STANDARD_TERMS } from "@shared/schema";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { parseApiError, isUpgradeError } from "@/lib/api-error";
@@ -236,7 +236,11 @@ export default function DealDetailsPage() {
         </div>
       </header>
 
-      <main className="px-4 py-6 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8 lg:space-y-8">
+      <main className="px-4 py-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8">
+        {/* Everything captured at creation is visible here: overview +
+            workflow on the left, deliverables + the exact T&Cs on the right. */}
+        <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-5 xl:grid-cols-3 lg:gap-6 xl:gap-8 lg:items-start">
+        <div className="lg:col-span-3 xl:col-span-2">
         <Card className="glass-card border-0">
           <CardContent className="p-6">
             <div className="flex items-start justify-between gap-3 mb-4">
@@ -258,22 +262,41 @@ export default function DealDetailsPage() {
               <StatusBadge status={deal.status} />
             </div>
 
-            <div className="grid grid-cols-2 gap-4 py-4 border-y border-white/10">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 py-4 border-y border-white/10">
               <div className="flex items-center gap-2">
-                <IndianRupee className="w-5 h-5 text-primary" />
-                <div>
+                <IndianRupee className="w-5 h-5 text-primary shrink-0" />
+                <div className="min-w-0">
                   <p className="text-xs text-muted-foreground">Deal Value</p>
                   <p className="font-bold text-lg" data-testid="text-deal-amount">
-                    ₹{deal.dealAmount.toLocaleString()}
+                    ₹{deal.dealAmount.toLocaleString("en-IN")}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-muted-foreground" />
-                <div>
+                <Calendar className="w-5 h-5 text-muted-foreground shrink-0" />
+                <div className="min-w-0">
                   <p className="text-xs text-muted-foreground">Duration</p>
                   <p className="font-medium text-sm">
                     {formatDate(deal.startDate)} - {formatDate(deal.endDate)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-muted-foreground shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Deal Type</p>
+                  <p className="font-medium text-sm truncate">
+                    {(dealTypeMeta as any)[(deal as any).dealType]?.emoji ?? "·"} {(deal as any).dealType || "Custom"}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <ListChecks className="w-5 h-5 text-muted-foreground shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Deliverables</p>
+                  <p className="font-medium text-sm">
+                    {deal.deliverables.length} item{deal.deliverables.length !== 1 ? "s" : ""}
+                    <span className="text-muted-foreground"> · {(deal as any).deliverableMode === "any_one" ? "client picks one" : "all required"}</span>
                   </p>
                 </div>
               </div>
@@ -549,7 +572,9 @@ export default function DealDetailsPage() {
             )}
           </CardContent>
         </Card>
+        </div>
 
+        <div className="lg:col-span-2 xl:col-span-1 space-y-6">
         <section className="space-y-3">
           <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
             Deliverables ({completedIds.size}/{deal.deliverables.length} Completed)
@@ -617,6 +642,52 @@ export default function DealDetailsPage() {
             })}
           </div>
         </section>
+
+        {/* ── Terms & Conditions — exactly what was selected at creation ── */}
+        {(() => {
+          const termIds = (((deal as any).standardTermIds as string[] | null) ?? []);
+          const standardTerms = STANDARD_TERMS.filter((t) => termIds.includes(t.id));
+          const customTerms = ((((deal as any).customTerms as string | null) ?? ""))
+            .split("\n").map((l) => l.trim()).filter(Boolean);
+          if (!standardTerms.length && !customTerms.length) return null;
+          return (
+            <section className="space-y-3">
+              <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+                <ScrollText className="w-3.5 h-3.5" />
+                Terms &amp; Conditions
+                <span className="normal-case font-normal text-xs text-muted-foreground/80">
+                  ({standardTerms.length + customTerms.length} — applied to quotation &amp; agreement)
+                </span>
+              </h3>
+              <Card className="glass-card border-0">
+                <CardContent className="p-4 lg:p-5">
+                  <ul className="space-y-2.5">
+                    {standardTerms.map((t) => (
+                      <li key={t.id} className="flex items-start gap-2.5 text-sm">
+                        <span className="flex items-center justify-center w-4.5 h-4.5 w-[18px] h-[18px] rounded-full bg-emerald-500/15 shrink-0 mt-0.5">
+                          <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" strokeWidth={3} />
+                        </span>
+                        <span className="text-muted-foreground leading-relaxed">{t.label}</span>
+                      </li>
+                    ))}
+                    {customTerms.map((t, i) => (
+                      <li key={`c-${i}`} className="flex items-start gap-2.5 text-sm">
+                        <span className="flex items-center justify-center w-[18px] h-[18px] rounded-full bg-amber-500/15 shrink-0 mt-0.5">
+                          <Pencil className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400" />
+                        </span>
+                        <span className="text-muted-foreground leading-relaxed">
+                          {t} <span className="text-[10px] uppercase tracking-wide text-amber-600/80 dark:text-amber-400/80 font-semibold ml-1">custom</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            </section>
+          );
+        })()}
+        </div>
+        </div>
       </main>
 
       <BottomNav />
