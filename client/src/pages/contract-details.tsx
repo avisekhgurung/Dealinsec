@@ -400,6 +400,8 @@ export default function ContractDetailsPage() {
           })}
         </div>
 
+        <div className="lg:grid lg:grid-cols-3 lg:gap-6 lg:items-start">
+        <div className="lg:col-span-2 space-y-6">
         <Card className="glass-card border-0">
           <CardContent className="p-6">
             <div className="flex items-start justify-between gap-3 mb-4">
@@ -424,21 +426,24 @@ export default function ContractDetailsPage() {
               )}
             </div>
 
-            <div className="space-y-3 py-4 border-y border-white/10">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  Contract Period
-                </span>
-                <span className="font-medium">
-                  {formatDate(contract.startDate)} - {formatDate(contract.endDate)}
-                </span>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 py-4">
+              <div className="rounded-xl border border-border/60 bg-card/40 p-3.5">
+                <p className="text-xs text-muted-foreground mb-1.5">Contract Value</p>
+                <p className="font-bold text-xl text-primary tabular-nums">₹{contract.contractValue.toLocaleString("en-IN")}</p>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Contract Value</span>
-                <span className="font-bold text-lg text-primary">
-                  ₹{contract.contractValue.toLocaleString()}
-                </span>
+              <div className="rounded-xl border border-border/60 bg-card/40 p-3.5">
+                <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Contract Period</p>
+                <p className="font-semibold text-sm leading-snug">{formatDate(contract.startDate)} – {formatDate(contract.endDate)}</p>
+              </div>
+              <div className="rounded-xl border border-border/60 bg-card/40 p-3.5 col-span-2 lg:col-span-1">
+                <p className="text-xs text-muted-foreground mb-1.5">{contract.signedByBrand ? "Signed On" : "Created For"}</p>
+                <p className="font-semibold text-sm leading-snug flex items-center gap-1.5">
+                  {contract.signedByBrand && contract.signedDate
+                    ? <><CheckCircle className="w-4 h-4 text-emerald-500" /> {formatDate(contract.signedDate)}</>
+                    : deal
+                      ? <Link href={`/deals/${deal.id}`} className="text-primary hover:underline inline-flex items-center gap-1">DL-{deal.id} <ExternalLink className="w-3.5 h-3.5" /></Link>
+                      : "—"}
+                </p>
               </div>
             </div>
 
@@ -504,9 +509,16 @@ export default function ContractDetailsPage() {
             </div>
           </div>
           <CardContent className="p-4 space-y-3">
-            <p className="text-sm text-muted-foreground">
-              A professional agreement document with all deal terms, deliverables, timeline, and signature blocks — ready for the brand to review and sign.
-            </p>
+            {/* Live preview — same-origin full-bleed export route; printing
+                only happens from the full view's own button. */}
+            <div className="rounded-xl border border-border/60 overflow-hidden bg-white">
+              <iframe
+                src={`/contracts/${params.id}/export`}
+                title="Agreement preview"
+                className="w-full h-[380px] lg:h-[440px]"
+                loading="lazy"
+              />
+            </div>
             <Button
               className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
               onClick={() => setLocation(`/contracts/${params.id}/export`)}
@@ -518,77 +530,7 @@ export default function ContractDetailsPage() {
           </CardContent>
         </Card>
 
-        <section className="space-y-3">
-            <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Contract Proof
-            </h3>
-
-            <Card className="glass-card border-0">
-              <CardContent className="p-4 space-y-3">
-                {contract.proofFileName ? (
-                  <>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
-                        <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate" data-testid="text-proof-filename">
-                          {contract.proofFileName}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Signed proof on file</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        className="flex-1 gradient-btn text-white"
-                        onClick={() => { window.location.href = `/api/contracts/${params.id}/proof`; }}
-                        data-testid="button-download-proof"
-                      >
-                        <Download className="w-4 h-4 mr-2" />
-                        Download
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploading}
-                        data-testid="button-replace-proof"
-                      >
-                        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Replace"}
-                      </Button>
-                    </div>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                    className="w-full h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover-elevate active-elevate-2 transition-colors"
-                    data-testid="button-upload-proof"
-                  >
-                    {uploading ? (
-                      <>
-                        <Loader2 className="w-6 h-6 animate-spin" />
-                        <span className="text-sm">Uploading...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-6 h-6" />
-                        <span className="text-sm font-medium">Upload Contract Proof</span>
-                        <span className="text-xs">PDF or Image (max 5MB)</span>
-                      </>
-                    )}
-                  </button>
-                )}
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png,.webp"
-                  className="hidden"
-                  onChange={handleFileSelect}
-                />
-              </CardContent>
-            </Card>
-          </section>
+{/* Contract proof moved to the Files & Proof rail card */}
 
         <section className="space-y-3">
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
@@ -913,6 +855,123 @@ export default function ContractDetailsPage() {
               </CardContent>
             </Card>
           </section>
+        </div>
+
+        {/* ── Right rail: summary · files & proof · activity ── */}
+        <div className="lg:col-span-1 space-y-6 mt-6 lg:mt-0">
+          <Card className="glass-card border-0">
+            <CardContent className="p-5">
+              <h3 className="font-semibold mb-4 pb-2 border-b-2 border-emerald-500/60 inline-block">Agreement Summary</h3>
+              <dl className="space-y-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Status</dt>
+                  <dd><StatusBadge status={contract.status} size="compact" /></dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Contract Value</dt>
+                  <dd className="font-bold tabular-nums">₹{contract.contractValue.toLocaleString("en-IN")}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Contract Period</dt>
+                  <dd className="font-medium text-right">{formatDate(contract.startDate)} – {formatDate(contract.endDate)}</dd>
+                </div>
+                {contract.signedDate && (
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-muted-foreground">Signed On</dt>
+                    <dd className="font-medium">{formatDate(contract.signedDate)}</dd>
+                  </div>
+                )}
+                {deal && (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">Deal Type</dt>
+                      <dd className="font-medium">{(deal as any).dealType || "Custom"}</dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">Deliverables</dt>
+                      <dd className="font-medium">{deal.deliverables.length} item{deal.deliverables.length !== 1 ? "s" : ""}</dd>
+                    </div>
+                  </>
+                )}
+              </dl>
+            </CardContent>
+          </Card>
+
+          <section className="space-y-3">
+            <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+              Files &amp; Proof
+            </h3>
+
+            <Card className="glass-card border-0">
+              <CardContent className="p-4 space-y-3">
+                {contract.proofFileName ? (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                        <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate" data-testid="text-proof-filename">
+                          {contract.proofFileName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Signed proof on file</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        className="flex-1 gradient-btn text-white"
+                        onClick={() => { window.location.href = `/api/contracts/${params.id}/proof`; }}
+                        data-testid="button-download-proof"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Download
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        data-testid="button-replace-proof"
+                      >
+                        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Replace"}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="w-full h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover-elevate active-elevate-2 transition-colors"
+                    data-testid="button-upload-proof"
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                        <span className="text-sm">Uploading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-6 h-6" />
+                        <span className="text-sm font-medium">Upload Files &amp; Proof</span>
+                        <span className="text-xs">PDF or Image (max 5MB)</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+              </CardContent>
+            </Card>
+          </section>
+
+          <ActivityRail contractId={contract.id} />
+        </div>
+        </div>
       </main>
 
       {/* Bank details modal — shown just before first invoice */}
@@ -1031,5 +1090,46 @@ export default function ContractDetailsPage() {
 
       <BottomNav />
     </div>
+  );
+}
+
+
+// ─── Activity timeline rail ──────────────────────────────────────────────────
+// Agreement-scoped slice of the org activity log. Hidden entirely for members
+// whose role lacks activity.view (the query 403s and we render nothing).
+function ActivityRail({ contractId }: { contractId: number }) {
+  const { data: activity = [], isError } = useQuery<{
+    id: number; userName: string | null; action: string; entityType: string;
+    entityId: string | null; createdAt: string;
+  }[]>({ queryKey: ["/api/org/activity"], retry: false });
+  const rows = activity
+    .filter((a) => a.entityType === "agreement" && a.entityId === String(contractId))
+    .slice(0, 5);
+  if (isError || !rows.length) return null;
+  return (
+    <Card className="glass-card border-0">
+      <CardContent className="p-5">
+        <h3 className="font-semibold mb-4">Activity Timeline</h3>
+        <ol className="space-y-3.5">
+          {rows.map((a) => (
+            <li key={a.id} className="flex items-start gap-2.5 text-sm">
+              <span className="mt-1.5 w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="leading-snug">
+                  Agreement {a.action}
+                  <span className="text-muted-foreground"> by {a.userName ?? "someone"}</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {new Date(a.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <Link href="/settings" className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+          View full activity <ExternalLink className="w-3 h-3" />
+        </Link>
+      </CardContent>
+    </Card>
   );
 }
