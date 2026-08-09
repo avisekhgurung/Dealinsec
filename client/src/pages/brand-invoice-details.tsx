@@ -156,7 +156,7 @@ export default function BrandInvoiceDetailsPage() {
         </header>
 
         {/* ─────────────────── INVOICE DOCUMENT ─────────────────── */}
-        <main className="invoice-doc px-4 py-6 max-w-2xl mx-auto animate-fade-in print:max-w-none print:px-0 print:py-0 print:mx-0">
+        <main className="invoice-doc px-4 py-6 max-w-2xl lg:max-w-4xl mx-auto animate-fade-in print:max-w-none print:px-0 print:py-0 print:mx-0">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-md border border-gray-100 dark:border-zinc-800 overflow-hidden print:rounded-none print:shadow-none print:border-0">
 
             {/* ── Top colour band + INVOICE title ────── */}
@@ -422,7 +422,7 @@ export default function BrandInvoiceDetailsPage() {
         </main>
 
         {/* Mark as Paid / Paid status */}
-        <div className="px-4 pb-6 print:hidden space-y-2">
+        <div className="px-4 pb-6 print:hidden space-y-2 max-w-2xl lg:max-w-4xl mx-auto">
           {invoice.status === "Unpaid" ? (
             <Button
               className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
