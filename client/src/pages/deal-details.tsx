@@ -672,6 +672,7 @@ export default function DealDetailsPage() {
         </div>
 
         <div className="lg:col-span-2 xl:col-span-1 space-y-6">
+        <DealIntelCards dealId={deal.id} />
         <section className="space-y-3">
           <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
             Deliverables ({completedIds.size}/{deal.deliverables.length} Completed)
@@ -829,5 +830,63 @@ export default function DealDetailsPage() {
 
       <BottomNav />
     </div>
+  );
+}
+
+
+// ─── Deal intelligence rail cards ────────────────────────────────────────────
+// Health score + next best action from the deterministic server engine
+// (server/copilot/insights.ts) — every point traces to a visible signal.
+function DealIntelCards({ dealId }: { dealId: number }) {
+  const { data } = useQuery<{
+    health: { score: number; grade: string; signals: { label: string; state: "good" | "warn" | "bad"; detail: string }[] };
+    nextAction: { action: string; route: string; urgency: "red" | "yellow" | "green" } | null;
+  }>({ queryKey: [`/api/copilot/deal-intel/${dealId}`], staleTime: 30_000 });
+  if (!data) return null;
+  const { health, nextAction } = data;
+  const scoreCls = health.score >= 80 ? "text-emerald-600 dark:text-emerald-400" : health.score >= 55 ? "text-amber-600 dark:text-amber-400" : "text-rose-600 dark:text-rose-400";
+  const ringCls = health.score >= 80 ? "border-emerald-500/50" : health.score >= 55 ? "border-amber-500/50" : "border-rose-500/50";
+  return (
+    <>
+      {nextAction && (
+        <Card className={`glass-card border ${nextAction.urgency === "red" ? "border-rose-300/50 dark:border-rose-900/50" : nextAction.urgency === "yellow" ? "border-amber-300/50 dark:border-amber-900/50" : "border-emerald-300/50 dark:border-emerald-800/50"}`}>
+          <CardContent className="p-4">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Next best action</p>
+            <p className="text-sm font-semibold mb-2.5">{nextAction.action}</p>
+            <Link href={nextAction.route}>
+              <Button size="sm" className="h-8 text-xs font-bold gradient-btn text-white w-full">
+                Do it now <ChevronRight className="w-3.5 h-3.5 ml-1" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
+      <Card className="glass-card border-0">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3.5 mb-3">
+            <div className={`w-14 h-14 rounded-full border-[3px] ${ringCls} flex flex-col items-center justify-center shrink-0`}>
+              <span className={`text-lg font-black leading-none tabular-nums ${scoreCls}`}>{health.score}</span>
+            </div>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Deal health</p>
+              <p className={`text-sm font-bold ${scoreCls}`}>{health.grade}</p>
+            </div>
+          </div>
+          <ul className="space-y-1.5">
+            {health.signals.map((sig) => (
+              <li key={sig.label} className="flex items-start gap-2 text-xs">
+                <span className={`mt-0.5 shrink-0 ${sig.state === "good" ? "text-emerald-500" : sig.state === "warn" ? "text-amber-500" : "text-rose-500"}`}>
+                  {sig.state === "good" ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : <AlertTriangle className="w-3.5 h-3.5" />}
+                </span>
+                <span className="min-w-0">
+                  <b className="font-semibold">{sig.label}:</b>{" "}
+                  <span className="text-muted-foreground">{sig.detail}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+    </>
   );
 }

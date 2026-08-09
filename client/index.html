@@ -3,10 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
-    <meta name="theme-color" content="#0E8C5A" />
+    <!-- Status-bar tint follows the app theme; the bootstrap below rewrites
+         these to the ACTIVE theme so an explicit Light/Dark choice wins over
+         the OS preference (which is all the media queries can see). -->
+    <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0B1220" media="(prefers-color-scheme: dark)" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="DealInSec" />
     <meta name="application-name" content="DealInSec" />
     <meta name="description" content="Deal software for India's real estate consultants, interior designers, architects, agencies & contractors: quotations, e-signed agreements, GST invoices and payment tracking in one workflow. Free to start." />
@@ -75,6 +79,19 @@
         var t = localStorage.getItem('dis_theme');
         if (t === 'dark' || (t === 'system' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches))
           document.documentElement.classList.add('dark');
+        // Collapse the two media-scoped tags into one that matches the theme
+        // the app actually rendered (an explicit choice can differ from the OS).
+        var applied = document.documentElement.classList.contains('dark');
+        var metas = document.querySelectorAll('meta[name="theme-color"]');
+        for (var i = 0; i < metas.length; i++) metas[i].parentNode.removeChild(metas[i]);
+        var m = document.createElement('meta');
+        m.name = 'theme-color';
+        m.content = applied ? '#0B1220' : '#FFFFFF';
+        document.head.appendChild(m);
+        var s2 = document.createElement('meta');
+        s2.name = 'apple-mobile-web-app-status-bar-style';
+        s2.content = applied ? 'black-translucent' : 'default';
+        document.head.appendChild(s2);
       } catch (e) {}
     </script>
   </head>

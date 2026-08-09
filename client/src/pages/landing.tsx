@@ -46,6 +46,9 @@ import {
   UserPlus,
   ShieldCheck,
   ScrollText,
+  Radar,
+  Navigation,
+  MessageSquare,
 } from "lucide-react";
 import { SiGoogle, SiInstagram, SiYoutube, SiX, SiFacebook, SiLinkedin } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
@@ -368,6 +371,7 @@ export default function LandingPage() {
         <WorkflowSection />
         <ProductShowcase />
         <StatsSection />
+        <WatchesSection />
         <TeamSection />
         {/* Testimonials hidden until we have real users. Re-enable <Testimonials /> once you have genuine quotes. */}
         <MadeInIndiaSection />
@@ -779,7 +783,7 @@ function Hero({
               variants={heroFadeUp}
               className="text-[2.5rem] sm:text-5xl lg:text-[4.5rem] font-bold tracking-tight leading-[1.02]"
             >
-              Get every deal in writing.
+              Your AI deal manager for
               <br />
               <span
                 className="relative inline-block"
@@ -790,7 +794,7 @@ function Hero({
                   backgroundClip: "text",
                 }}
               >
-                And get paid on time.
+                getting paid & staying protected.
                 <motion.span
                   className="absolute -bottom-1 left-0 right-0 h-[6px] rounded-full opacity-40"
                   style={{ background: "linear-gradient(90deg, transparent, #10B981, transparent)" }}
@@ -814,7 +818,7 @@ function Hero({
                 style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
                 data-testid="button-hero-cta"
               >
-                {isAuthenticated ? "Go to Dashboard" : "Start for free"}
+                {isAuthenticated ? "Go to Dashboard" : "Start managing deals"}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
               <a
@@ -828,10 +832,10 @@ function Hero({
 
             <motion.div variants={heroFadeUp} className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 pt-3 text-xs text-neutral-500">
               <span className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500" /> 4 free deals every month
+                <Check className="w-3.5 h-3.5 text-emerald-500" /> 7-day Pro trial
               </span>
               <span className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500" /> ₹0 platform fee
+                <Check className="w-3.5 h-3.5 text-emerald-500" /> ₹0 platform fee on your deals
               </span>
               <span className="flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5 text-emerald-500" /> No credit card required
@@ -2172,6 +2176,70 @@ function FooterColumn({ title, links }: { title: string; links: { label: string;
         })}
       </ul>
     </div>
+  );
+}
+
+// ── The moat: DealInSec doesn't just store deals, it watches them ──
+function WatchesSection() {
+  const CAPABILITIES = [
+    {
+      Icon: Radar,
+      title: "Money Radar",
+      line: "One number for everything you can collect right now — overdue, due this week, and signed work you haven't invoiced yet.",
+      quote: "₹2,84,500 potentially collectible",
+    },
+    {
+      Icon: ShieldCheck,
+      title: "Deal Health",
+      line: "Every deal scored on the signals that actually matter: agreement signed, money invoiced, payment overdue, timeline slipping.",
+      quote: "92 / 100 · Healthy",
+    },
+    {
+      Icon: Navigation,
+      title: "Next Best Action",
+      line: "No more wondering what's pending. Each deal says exactly what to do next, in the order that gets you paid.",
+      quote: "Invoice the remaining ₹40,000",
+    },
+    {
+      Icon: MessageSquare,
+      title: "Payment Chaser",
+      line: "Awkward follow-ups written for you from the real invoice — friendly to firm. You review, copy, send. Never automatic.",
+      quote: "\"Hi Rahul — quick follow-up on INV-1042…\"",
+    },
+  ];
+  return (
+    <section className="py-20 sm:py-28 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SectionHeader
+          eyebrow="Why DealInSec"
+          title="Most tools store your deals. DealInSec watches them."
+          subtitle="Spreadsheets and invoice apps wait for you to remember. DealInSec reviews every active deal and tells you what needs attention, what could cost you money, and what to do next."
+        />
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-80px" }}
+          className="grid sm:grid-cols-2 gap-5 mt-14 max-w-5xl mx-auto"
+        >
+          {CAPABILITIES.map((c) => (
+            <motion.div key={c.title} variants={fadeUp} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-6">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center mb-4">
+                <c.Icon className="w-5 h-5 text-emerald-600" />
+              </div>
+              <h3 className="font-semibold text-lg">{c.title}</h3>
+              <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1.5 leading-relaxed">{c.line}</p>
+              <p className="mt-4 text-sm font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50/70 dark:bg-emerald-950/30 rounded-lg px-3 py-2 tabular-nums">
+                {c.quote}
+              </p>
+            </motion.div>
+          ))}
+        </motion.div>
+        <p className="text-center text-xs text-neutral-500 mt-8 max-w-xl mx-auto">
+          Every figure comes from your own deals — DealInSec never invents numbers, and never messages a client without your approval.
+        </p>
+      </div>
+    </section>
   );
 }
 

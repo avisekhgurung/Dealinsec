@@ -20,6 +20,8 @@ import { aiProvider, copilotConfigured, type ChatMessage } from "./provider";
 import { retrieveKnowledge, AI_KNOWLEDGE_VERSION } from "./knowledge";
 import { TOOL_DEFS, runTool, executeCreateQuotation } from "./tools";
 import { getDealJourney } from "./workflow";
+import { computeBriefing, computeDealIntel } from "./insights";
+import { storage } from "../storage";
 
 const DAILY_PER_USER = 60;
 const usage = new Map<string, { day: string; n: number }>();
@@ -53,6 +55,63 @@ ACTIONS: [{"label":"Open Deal","to":"/deals/12"},{"label":"Generate Quotation","
 export function registerCopilotRoutes(app: Express) {
   app.get("/api/copilot/meta", isAuthenticated, (_req, res) => {
     res.json({ enabled: copilotConfigured(), knowledgeVersion: AI_KNOWLEDGE_VERSION, provider: aiProvider.name });
+  });
+
+  // ── Deal intelligence (DETERMINISTIC — no model, no tokens, no invention) ──
+
+  app.get("/api/copilot/briefing", isAuthenticated, async (req: any, res) => {
+    try {
+      res.json(await computeBriefing(req.user));
+    } catch (err) {
+      console.error("[copilot] briefing error:", err);
+      res.status(500).json({ error: "Couldn't build your briefing right now." });
+    }
+  });
+
+  app.get("/api/copilot/deal-intel/:dealId", isAuthenticated, async (req: any, res) => {
+    try {
+      const intel = await computeDealIntel(parseInt(req.params.dealId), req.user);
+      if (!intel) return res.status(404).json({ error: "Deal not found" });
+      res.json(intel);
+    } catch (err) {
+      console.error("[copilot] deal-intel error:", err);
+      res.status(500).json({ error: "Couldn't analyse this deal right now." });
+    }
+  });
+
+  // ── Payment Chaser: AI drafts the words, the NUMBERS come from the row.
+  //    Never sends anything — the user copies the message themselves. ──
+  app.post("/api/copilot/chaser", isAuthenticated, async (req: any, res) => {
+    try {
+      if (!copilotConfigured()) return res.status(503).json({ error: "Copilot isn't available right now." });
+      if (!takeQuota(req.user.id)) return res.status(429).json({ error: "Daily Copilot limit reached." });
+      const tone = ["Friendly", "Professional", "Firm", "Final reminder"].includes(req.body?.tone)
+        ? req.body.tone : "Professional";
+      const invoice = await storage.getBrandInvoice(Number(req.body?.invoiceId));
+      const owns = invoice && (invoice.organizationId
+        ? invoice.organizationId === req.user.organizationId
+        : invoice.userId === req.user.id);
+      if (!owns) return res.status(404).json({ error: "Invoice not found" });
+      const now = Date.now();
+      const due = invoice!.dueDate ? new Date(invoice!.dueDate as any) : null;
+      const daysOverdue = due ? Math.floor((now - due.getTime()) / 86_400_000) : null;
+      const facts = [
+        `Recipient (address the message TO this client): ${invoice!.brandName}`,
+        `Invoice number: ${invoice!.invoiceNumber}`,
+        `Amount: ₹${Number(invoice!.dealAmount).toLocaleString("en-IN")}`,
+        due ? `Due date: ${due.toLocaleDateString("en-IN", { day: "numeric", month: "long" })}` : "No due date on record",
+        daysOverdue !== null && daysOverdue > 0 ? `Days overdue: ${daysOverdue}` : "Not yet overdue",
+        `Sender (sign off as this person — never greet them): ${req.user.firstName ?? "the business owner"}`,
+      ].join("\n");
+      const result = await aiProvider.chat([
+        { role: "system", content: `You draft short payment follow-up messages for an Indian service business to send a client over WhatsApp or email. Tone: ${tone}. Rules: use ONLY the facts given — never invent amounts, dates or history; greet the RECIPIENT by name and sign off as the sender; 40-90 words; sound human and direct, no corporate filler; include the invoice number and amount; end with a clear ask (expected payment date). Output the message text only.` },
+        { role: "user", content: facts },
+      ], []);
+      res.json({ message: result.content ?? "", tone, invoiceNumber: invoice!.invoiceNumber });
+    } catch (err) {
+      console.error("[copilot] chaser error:", err);
+      res.status(502).json({ error: "Couldn't draft the message right now. Please try again." });
+    }
   });
 
   app.post("/api/copilot/chat", isAuthenticated, async (req: any, res) => {

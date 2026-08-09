@@ -29,6 +29,13 @@ export function getThemePref(): ThemePref {
 function apply(pref: ThemePref) {
   const dark = pref === "dark" || (pref === "system" && mq().matches);
   document.documentElement.classList.toggle("dark", dark);
+  // Keep the mobile status bar / PWA chrome in step with the theme —
+  // otherwise Android shows an emerald bar over a dark app (and iOS keeps a
+  // translucent bar with light text on a white page).
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", dark ? "#0B1220" : "#FFFFFF");
+  const ios = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+  if (ios) ios.setAttribute("content", dark ? "black-translucent" : "default");
 }
 
 export function setThemePref(pref: ThemePref) {

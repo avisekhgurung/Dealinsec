@@ -504,6 +504,55 @@ function MoneyTile({ label, amount, icon: Icon, tint }: {
   );
 }
 
+// ─── Money Radar ─────────────────────────────────────────────────────────────
+// "How much money am I leaving on the table?" — three deterministic buckets
+// from the insights engine; every number clickable, none invented.
+function MoneyRadarCard() {
+  const { data } = useQuery<{
+    radar: {
+      overdue: { total: number; count: number };
+      dueThisWeek: { total: number; count: number };
+      readyToInvoice: { total: number; count: number };
+      collectible: number;
+    };
+  }>({ queryKey: ["/api/copilot/briefing"], staleTime: 60_000 });
+  const radar = data?.radar;
+  if (!radar || radar.collectible <= 0) return null;
+  const inrFmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+  const buckets = [
+    { label: "Overdue", total: radar.overdue.total, count: radar.overdue.count, href: "/invoices", dot: "bg-rose-500", cls: "text-rose-600 dark:text-rose-400" },
+    { label: "Due this week", total: radar.dueThisWeek.total, count: radar.dueThisWeek.count, href: "/invoices", dot: "bg-amber-500", cls: "text-amber-600 dark:text-amber-400" },
+    { label: "Ready to invoice", total: radar.readyToInvoice.total, count: radar.readyToInvoice.count, href: "/contracts", dot: "bg-emerald-500", cls: "text-emerald-600 dark:text-emerald-400" },
+  ].filter((b) => b.total > 0);
+  return (
+    <Card className="glass-card border-emerald-300/40 dark:border-emerald-800/40 relative overflow-hidden" data-testid="money-radar">
+      <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/[0.05] to-transparent pointer-events-none" />
+      <CardContent className="relative p-4 lg:p-5">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Money Radar</p>
+            <p className="text-xl lg:text-2xl font-bold tabular-nums">
+              {inrFmt(radar.collectible)} <span className="text-sm font-medium text-muted-foreground">potentially collectible</span>
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {buckets.map((b) => (
+            <Link key={b.label} href={b.href}>
+              <button type="button" className="w-full text-left rounded-xl border border-border/60 p-3 hover:border-primary/40 hover:shadow-sm transition-all">
+                <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-medium">
+                  <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`} /> {b.label} · {b.count}
+                </p>
+                <p className={`font-bold text-lg tabular-nums mt-0.5 ${b.cls}`}>{inrFmt(b.total)}</p>
+              </button>
+            </Link>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── main page ───────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -788,6 +837,8 @@ export default function DashboardPage() {
             </Link>
           ))}
         </section>
+
+        <MoneyRadarCard />
 
         {/* ── Stat cards — the funnel, in order: deal → quote → agreement →
             invoice → money ── */}

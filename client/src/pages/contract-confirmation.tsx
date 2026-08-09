@@ -400,6 +400,51 @@ export default function ContractConfirmationPage() {
             </div>
           )}
 
+          {/* ── Deal Safety Check — deterministic, fixable in one tap ── */}
+          {(() => {
+            const has = (id: string) => standardTermIds.includes(id);
+            const addTerm = (id: string) => setStandardTermIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+            const checks: { label: string; ok: boolean; fixId?: string }[] = [
+              { label: "Pricing defined", ok: Number(deal.dealAmount) > 0 },
+              { label: "Deliverables defined", ok: deal.deliverables.length > 0 },
+              { label: "Timeline defined", ok: !!deal.startDate && !!deal.endDate },
+              { label: "Advance payment term", ok: has("advance_50"), fixId: "advance_50" },
+              { label: "Final payment due date", ok: has("balance_7d"), fixId: "balance_7d" },
+              { label: "Revision limit", ok: has("revisions_2"), fixId: "revisions_2" },
+              { label: "Cancellation terms", ok: has("cancellation"), fixId: "cancellation" },
+            ];
+            const issues = checks.filter((c) => !c.ok);
+            return (
+              <Card className={`glass-card ${issues.length ? "border-amber-300/60 dark:border-amber-900/50" : "border-emerald-300/50 dark:border-emerald-800/50"}`}>
+                <CardContent className="p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2.5">
+                    Deal Safety Check {issues.length === 0 && "— all clear"}
+                  </p>
+                  <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-1.5 mb-1">
+                    {checks.map((c) => (
+                      <li key={c.label} className="flex items-center gap-2 text-xs">
+                        {c.ok
+                          ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          : <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />}
+                        <span className={c.ok ? "text-muted-foreground" : "font-semibold"}>{c.label}</span>
+                        {!c.ok && c.fixId && (
+                          <button type="button" onClick={() => addTerm(c.fixId!)} className="ml-auto text-[11px] font-bold text-primary hover:underline shrink-0" data-testid={`fix-${c.fixId}`}>
+                            Add it
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  {issues.length > 0 && (
+                    <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-2">
+                      Recommended: fix {issues.length === 1 ? "this" : "these"} before creating — each "Add it" ticks the matching standard term below.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
+
           <div className="text-center space-y-3">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mx-auto">
               <Shield className="w-8 h-8 text-primary" />

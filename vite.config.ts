@@ -16,7 +16,7 @@ export default defineConfig({
         short_name: "DealInSec",
         description:
           "Track, sign, and bill every client or brand deal — in one workflow. Built for India.",
-        theme_color: "#0E8C5A",
+        theme_color: "#FFFFFF",
         background_color: "#0F172A",
         display: "standalone",
         orientation: "portrait",
