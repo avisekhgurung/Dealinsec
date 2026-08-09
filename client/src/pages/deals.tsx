@@ -136,60 +136,7 @@ export default function DealsPage() {
   ];
 
   // Bulk-create deals from an imported CSV (round-trips the export format).
-  async function importDeals(rows: Record<string, string>[]) {
-    if (!rows.length) {
-      toast({ title: "Nothing to import", description: "No rows found in the file.", variant: "destructive" });
-      return;
-    }
-    const today = new Date().toISOString().split("T")[0];
-    let ok = 0, skipped = 0, outOfCredits = 0;
-    for (const r of rows) {
-      // unguardCell reverses the export's formula-guard apostrophe so a value
-      // like "@nike" round-trips cleanly instead of becoming "'@nike".
-      const brandName = unguardCell((r["Brand"] ?? r["brandName"] ?? "").trim());
-      const dealTitle = unguardCell((r["Deal"] ?? r["dealTitle"] ?? "").trim());
-      const amount = parseInt(String(r["Amount"] ?? r["dealAmount"] ?? "").replace(/[^0-9]/g, ""), 10);
-      if (!brandName || !dealTitle) { skipped++; continue; }
-      try {
-        await apiRequest("POST", "/api/deals", {
-          brandName,
-          dealTitle,
-          dealType: unguardCell((r["Type"] ?? r["dealType"] ?? "Custom").trim()) || "Custom",
-          dealAmount: Number.isFinite(amount) ? amount : 0,
-          startDate: unguardCell((r["Start"] ?? r["startDate"] ?? today).trim()) || today,
-          endDate: unguardCell((r["End"] ?? r["endDate"] ?? today).trim()) || today,
-          deliverables: [{ id: uuid(), platform: "General", contentType: "Service", quantity: 1, frequency: "One-time" }],
-          deliverableMode: "all",
-          standardTermIds: [],
-        });
-        ok++;
-      } catch (err) {
-        // Out of Deal Credits → every remaining row would fail the same way;
-        // stop the doomed loop and tell the user the real reason.
-        if (isUpgradeError(parseApiError(err))) {
-          outOfCredits = rows.length - ok - skipped;
-          break;
-        }
-        skipped++;
-      }
-    }
-    await queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
-    await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-    if (outOfCredits > 0) {
-      toast({
-        title: `Imported ${ok} deal${ok !== 1 ? "s" : ""} — monthly limit reached`,
-        description: `${outOfCredits} row${outOfCredits !== 1 ? "s" : ""} not imported: your free plan covers 4 deals a month.`,
-        variant: "destructive",
-      });
-      openUpgradeModal({ feature: "deals" });
-    } else {
-      toast({
-        title: `Imported ${ok} deal${ok !== 1 ? "s" : ""}`,
-        description: skipped ? `${skipped} row${skipped !== 1 ? "s" : ""} skipped (missing brand or title).` : "All rows imported.",
-      });
-    }
-  }
-
+  // CSV import now lives at /deals/import (full-field template + preview).
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-12">
       <header className="glass-header sticky top-0 z-40 lg:border-b lg:border-neutral-200/60 dark:lg:border-neutral-800/60">
@@ -247,7 +194,7 @@ export default function DealsPage() {
       </header>
 
       <main className="px-4 py-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8">
-        <div className="flex justify-end -mb-2 lg:-mb-3">
+        <div className="flex justify-end lg:hidden">
           <DateRangeFilter value={dateRange} onChange={setDateRange} />
         </div>
         {isLoading ? (
@@ -295,7 +242,8 @@ export default function DealsPage() {
                 }]}
                 onRowClick={(deal) => setLocation(`/deals/${deal.id}`)}
                 exportFileName="deals"
-                onImport={importDeals}
+                onImportClick={() => setLocation("/deals/import")}
+                toolbarExtra={<DateRangeFilter value={dateRange} onChange={setDateRange} />}
                 emptyMessage="No deals match your filters."
               />
             </div>

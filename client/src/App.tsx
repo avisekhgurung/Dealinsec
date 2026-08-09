@@ -44,6 +44,7 @@ const CookiePage              = lazy(() => import("@/pages/legal/cookies"));
 const RefundPage              = lazy(() => import("@/pages/legal/refund"));
 const SettingsPage            = lazy(() => import("@/pages/settings"));
 const AcceptInvitePage        = lazy(() => import("@/pages/accept-invite"));
+const DealsImportPage         = lazy(() => import("@/pages/deals-import"));
 const AuthPage                = lazy(() => import("@/pages/auth"));
 const ForgotPasswordPage      = lazy(() => import("@/pages/forgot-password"));
 const ResetPasswordPage       = lazy(() => import("@/pages/reset-password"));
@@ -153,6 +154,7 @@ function Router() {
             <Route path="/dashboard" component={DashboardPage} />
             <Route path="/deals" component={DealsPage} />
             <Route path="/deals/new" component={CreateDealPage} />
+            <Route path="/deals/import" component={DealsImportPage} />
             <Route path="/deals/:id/quote" component={QuotePreviewPage} />
             <Route path="/deals/:id/edit" component={EditDealPage} />
             <Route path="/deals/:id/contract" component={ContractConfirmationPage} />

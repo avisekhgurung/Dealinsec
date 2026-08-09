@@ -158,7 +158,7 @@ export default function ContractsPage() {
       </header>
 
       <main className="px-4 py-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8">
-        <div className="flex justify-end mb-3">
+        <div className="flex justify-end lg:hidden mb-3">
           <DateRangeFilter value={dateRange} onChange={setDateRange} />
         </div>
         {isLoading ? (
@@ -182,6 +182,7 @@ export default function ContractsPage() {
               <DataTable
                 columns={columns}
                 data={filteredContracts}
+                toolbarExtra={<DateRangeFilter value={dateRange} onChange={setDateRange} />}
                 searchPlaceholder="Search agreements..."
                 searchKeys={["contractName", "brandName"]}
                 facetedFilters={[{

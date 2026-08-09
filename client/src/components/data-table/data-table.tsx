@@ -61,6 +61,12 @@ interface DataTableProps<TData> {
   exportFileName?: string;
   /** Enables the Import button; receives parsed CSV rows. */
   onImport?: (rows: Record<string, string>[]) => void | Promise<void>;
+  /** Import button navigates instead of opening a file picker (dedicated
+   *  import pages) — takes precedence over onImport. */
+  onImportClick?: () => void;
+  /** Extra controls rendered inline in the toolbar's right group (e.g. a
+   *  date-range filter) so page filters align with Columns/Import/Export. */
+  toolbarExtra?: React.ReactNode;
   initialPageSize?: number;
   emptyMessage?: string;
 }
@@ -76,6 +82,8 @@ export function DataTable<TData>({
   onRowClick,
   exportFileName,
   onImport,
+  onImportClick,
+  toolbarExtra,
   initialPageSize = 10,
   emptyMessage = "No results.",
 }: DataTableProps<TData>) {
@@ -169,6 +177,7 @@ export function DataTable<TData>({
         )}
 
         <div className="ml-auto flex items-center gap-2">
+          {toolbarExtra}
           {/* Column visibility */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -192,14 +201,18 @@ export function DataTable<TData>({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {onImport && (
+          {onImportClick ? (
+            <Button variant="outline" size="sm" className="h-9" onClick={onImportClick} data-testid="datatable-import">
+              <Upload className="w-4 h-4 mr-2" /> Import
+            </Button>
+          ) : onImport ? (
             <>
               <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImportFile} data-testid="datatable-import-input" />
               <Button variant="outline" size="sm" className="h-9" onClick={() => fileRef.current?.click()}>
                 <Upload className="w-4 h-4 mr-2" /> Import
               </Button>
             </>
-          )}
+          ) : null}
           {exportFileName && (
             <Button variant="outline" size="sm" className="h-9" onClick={handleExport} data-testid="datatable-export">
               <Download className="w-4 h-4 mr-2" /> Export

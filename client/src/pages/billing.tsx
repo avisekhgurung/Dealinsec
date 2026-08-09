@@ -177,7 +177,7 @@ export default function BillingPage() {
       </header>
 
       <main className="px-4 py-6 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8">
-        <div className="flex justify-end -mb-3">
+        <div className="flex justify-end lg:hidden">
           <DateRangeFilter value={dateRange} onChange={setDateRange} />
         </div>
         {/* Paid/unpaid analytics live on the Dashboard — this page is the register. */}
@@ -203,6 +203,7 @@ export default function BillingPage() {
               <DataTable
                 columns={columns}
                 data={filteredInvoices}
+                toolbarExtra={<DateRangeFilter value={dateRange} onChange={setDateRange} />}
                 searchPlaceholder="Search invoices..."
                 searchKeys={["invoiceNumber", "brandName"]}
                 facetedFilters={[{
