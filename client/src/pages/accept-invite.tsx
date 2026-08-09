@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
-import { Users, Loader2, AlertTriangle } from "lucide-react";
+import { Users, Loader2, AlertTriangle, Eye, EyeOff } from "lucide-react";
 
 interface InviteInfo { email: string; orgRole: string; orgName: string; }
 
@@ -25,6 +25,7 @@ export default function AcceptInvitePage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const { data: invite, isLoading, isError } = useQuery<InviteInfo>({
@@ -108,7 +109,14 @@ export default function AcceptInvitePage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="pw">Create a password</Label>
-                  <Input id="pw" type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} required data-testid="input-password" />
+                  <div className="relative">
+                    <Input id="pw" type={showPassword ? "text" : "password"} minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} required data-testid="input-password" className="pr-10" />
+                    <button type="button" onClick={() => setShowPassword((v) => !v)} tabIndex={-1}
+                      aria-label={showPassword ? "Hide password" : "Show password"} data-testid="toggle-password"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
                 <Button type="submit" className="w-full h-11 gradient-btn text-white font-semibold" disabled={submitting} data-testid="button-accept-invite">
                   {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

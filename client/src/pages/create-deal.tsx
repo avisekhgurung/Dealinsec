@@ -125,7 +125,13 @@ export default function CreateDealPage() {
         title: "Deal created",
         description: "Your deal has been created successfully.",
       });
-      setLocation(`/deals/${deal.id}`);
+      // Journey continuation: when the user arrived from a "New quotation /
+      // New agreement" picker, don't park them on deal details — carry them
+      // into the step they actually set out to do.
+      const next = new URLSearchParams(window.location.search).get("next");
+      if (next === "agreement") setLocation(`/deals/${deal.id}/contract`);
+      else if (next === "quotation" || next === "quote") setLocation(`/deals/${deal.id}?generate=quote`);
+      else setLocation(`/deals/${deal.id}`);
     },
     onError: (err) => {
       const parsed = parseApiError(err);

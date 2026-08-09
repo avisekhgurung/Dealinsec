@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
+import { PickParentDialog } from "@/components/pick-parent-dialog";
 import { dealTypeMeta } from "@shared/dealTypeTaxonomy";
 import type { Quote, Deal } from "@shared/schema";
 import { FileText, Search, X, ChevronRight, Plus } from "lucide-react";
@@ -28,6 +29,7 @@ const fmtDate = (s?: string | Date | null) =>
 export default function QuotationsPage() {
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME);
+  const [pickOpen, setPickOpen] = useState(false);
   const { data: quotes = [], isLoading } = useQuery<QuoteRow[]>({ queryKey: ["/api/quotes"] });
 
   const rows = useMemo(() => {
@@ -56,12 +58,10 @@ export default function QuotationsPage() {
             </div>
             <div className="flex items-center gap-2">
               <NotificationBell className="lg:hidden" />
-              <Link href="/deals">
-                <Button size="sm" className="gradient-btn text-white" data-testid="button-new-quotation">
-                  <Plus className="w-4 h-4 mr-1 lg:mr-1.5" />
-                  New<span className="hidden lg:inline">&nbsp;quotation</span>
-                </Button>
-              </Link>
+              <Button size="sm" className="gradient-btn text-white" onClick={() => setPickOpen(true)} data-testid="button-new-quotation">
+                <Plus className="w-4 h-4 mr-1 lg:mr-1.5" />
+                New<span className="hidden lg:inline">&nbsp;quotation</span>
+              </Button>
             </div>
           </div>
         </div>
@@ -116,9 +116,9 @@ export default function QuotationsPage() {
                     : "Open a deal and generate its quotation — it'll appear here for the whole team."}
                 </p>
                 {!search && (
-                  <Link href="/deals">
-                    <Button size="sm" className="mt-4 gradient-btn text-white">Go to deals</Button>
-                  </Link>
+                  <Button size="sm" className="mt-4 gradient-btn text-white" onClick={() => setPickOpen(true)}>
+                    Create a quotation
+                  </Button>
                 )}
               </div>
             ) : (
@@ -176,6 +176,7 @@ export default function QuotationsPage() {
         </Card>
       </main>
 
+      <PickParentDialog kind="quotation" open={pickOpen} onOpenChange={setPickOpen} />
       <BottomNav />
     </div>
   );

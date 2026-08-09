@@ -1419,6 +1419,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const email = String(req.body?.email || "").trim().toLowerCase();
       let orgRole = req.body?.orgRole;
       const customRoleId = req.body?.customRoleId ? String(req.body.customRoleId) : null;
+      // Human-readable role for the invitation email — "CUSTOM" is an internal
+      // sentinel and must never reach the invitee.
+      let roleLabel = String(req.body?.orgRole ?? "");
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return res.status(400).json({ error: "Please enter a valid email" });
       }
@@ -1430,6 +1433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "Invalid role" });
         }
         orgRole = CUSTOM_ROLE;
+        roleLabel = role.name;
       } else if (!INVITABLE_ROLES.includes(orgRole)) {
         return res.status(400).json({ error: "Invalid role" });
       }
@@ -1475,12 +1479,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { subject, html } = inviteEmail({
         orgName: req.org.name,
         inviterName,
-        roleLabel: orgRole.charAt(0) + orgRole.slice(1).toLowerCase(),
+        roleLabel: roleLabel && roleLabel !== CUSTOM_ROLE
+          ? roleLabel
+          : orgRole.charAt(0) + orgRole.slice(1).toLowerCase(),
         token,
       });
       void sendEmail({ to: email, subject, html });
 
-      logOrgActivity(req.user, "invited", "member", null, `${email} as ${orgRole}`);
+      logOrgActivity(req.user, "invited", "member", null, `${email} as ${roleLabel || orgRole}`);
       res.status(201).json(inv);
     } catch (error) {
       console.error("Invitation error:", error);

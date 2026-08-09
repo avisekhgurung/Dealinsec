@@ -9,7 +9,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
+import { recordNo } from "@shared/schema";
+import { RowActions } from "@/components/row-actions";
 import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
+import { PickParentDialog } from "@/components/pick-parent-dialog";
 import { DataTable } from "@/components/data-table/data-table";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { unguardCell } from "@/lib/csv";
@@ -31,6 +34,15 @@ function uuid(): string {
 
 // Desktop table columns.
 const columns: ColumnDef<Deal>[] = [
+  {
+    id: "ref",
+    header: "Ref",
+    meta: { label: "Ref" },
+    accessorFn: (d: Deal) => recordNo("deal", d.id),
+    cell: ({ row }) => (
+      <span className="font-mono text-[11px] text-muted-foreground tabular-nums">{recordNo("deal", row.original.id)}</span>
+    ),
+  },
   {
     accessorKey: "brandName",
     header: "Brand",
@@ -91,10 +103,11 @@ const columns: ColumnDef<Deal>[] = [
   },
   {
     id: "actions",
-    header: "",
+    header: "Actions",
+    meta: { label: "Actions", align: "right" },
     enableSorting: false,
     enableHiding: false,
-    cell: () => <ChevronRight className="w-4 h-4 text-muted-foreground" />,
+    cell: ({ row }) => <RowActions deal={row.original} />,
   },
 ];
 
@@ -102,6 +115,10 @@ export default function DealsPage() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME);
+  // ?pick=agreement — arrived from the invoice picker's "create an agreement".
+  const [pickAgreement, setPickAgreement] = useState(
+    () => new URLSearchParams(window.location.search).get("pick") === "agreement",
+  );
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { openUpgradeModal } = useUpgradeModal();
@@ -301,6 +318,7 @@ export default function DealsPage() {
         )}
       </main>
 
+      <PickParentDialog kind="agreement" open={pickAgreement} onOpenChange={setPickAgreement} />
       <BottomNav />
     </div>
   );

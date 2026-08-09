@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Loader2, Briefcase, FileText, FileCheck, Receipt, Check, ArrowLeft,
+  Loader2, Briefcase, FileText, FileCheck, Receipt, Check, ArrowLeft, Eye, EyeOff,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -58,6 +58,7 @@ export default function AuthPage() {
     }
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -157,7 +158,14 @@ export default function AuthPage() {
                     </Link>
                   )}
                 </div>
-                <Input id="auth-password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={mode === "signup" ? "At least 6 characters" : "Your password"} data-testid="input-password" />
+                <div className="relative">
+                <Input id="auth-password" type={showPassword ? "text" : "password"} required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={mode === "signup" ? "At least 6 characters" : "Your password"} data-testid="input-password" />
+                  <button type="button" onClick={() => setShowPassword((v) => !v)} tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"} data-testid="toggle-password"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
               <Button type="submit" className="w-full h-11 gradient-btn text-white font-bold" disabled={isLoading} data-testid="button-submit">
                 {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

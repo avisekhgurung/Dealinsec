@@ -37,6 +37,25 @@ import {
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getThemePref, setThemePref, type ThemePref } from "@/lib/theme";
+import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
+
+/** Entity tints for the activity table — money events read green, documents
+ *  blue/teal, people violet; everything else stays neutral. */
+const ACTIVITY_TONE: Record<string, string> = {
+  deal: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
+  quotation: "bg-teal-100 text-teal-700 dark:bg-teal-950/40 dark:text-teal-400",
+  agreement: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
+  invoice: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
+  member: "bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400",
+  organization: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300",
+  default: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300",
+};
+const ACTION_TONE = (action: string) => {
+  if (/paid|received|completed|signed/i.test(action)) return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400";
+  if (/removed|deleted|revoked/i.test(action)) return "bg-rose-500/15 text-rose-700 dark:text-rose-400";
+  if (/created|generated|invited/i.test(action)) return "bg-primary/10 text-primary";
+  return "bg-muted text-muted-foreground";
+};
 
 type Tab = "organization" | "team" | "activity" | "subscription" | "preferences";
 
@@ -73,6 +92,7 @@ export default function SettingsPage() {
   const confirm = useConfirm();
   const [tab, setTab] = useState<Tab>("organization");
   // Theme is a per-device preference (localStorage), not an account setting.
+  const [activityRange, setActivityRange] = useState<DateRange>(ALL_TIME);
   const [themePref, setThemePrefState] = useState<ThemePref>(() => getThemePref());
   const chooseTheme = (t: ThemePref) => {
     setThemePref(t);
@@ -523,28 +543,75 @@ export default function SettingsPage() {
             {tab === "activity" && (
               <Card className="glass-card">
                 <CardContent className="p-5 lg:p-6">
-                  <h2 className="font-bold text-lg mb-1">Activity</h2>
-                  <p className="text-sm text-muted-foreground mb-4">Everything your team did, newest first.</p>
-                  {activity.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-6 text-center">No activity yet — it starts recording from today.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {activity.map((a) => (
-                        <div key={a.id} className="flex items-start gap-3 text-sm">
-                          <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p>
-                              <b>{a.userName || "Someone"}</b> {a.action} {a.entityType}
-                              {a.detail ? <span className="text-muted-foreground"> — {a.detail}</span> : null}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(a.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+                  <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+                    <div>
+                      <h2 className="font-bold text-lg">Activity</h2>
+                      <p className="text-sm text-muted-foreground">Everything your team did, newest first.</p>
                     </div>
-                  )}
+                    <DateRangeFilter value={activityRange} onChange={setActivityRange} />
+                  </div>
+                  {(() => {
+                    const rows = activity.filter((a) => inRange(a.createdAt, activityRange));
+                    if (!rows.length) {
+                      return (
+                        <div className="py-10 text-center">
+                          <ScrollText className="w-7 h-7 mx-auto text-muted-foreground/40 mb-2" />
+                          <p className="text-sm font-semibold">
+                            {activity.length ? "Nothing in this date range" : "No activity yet"}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {activity.length ? "Try a wider range." : "It starts recording from today."}
+                          </p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="rounded-xl border border-border/60 overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="bg-muted/40 text-left">
+                                {["Who", "Action", "Record", "Detail", "When"].map((h) => (
+                                  <th key={h} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/50">
+                              {rows.map((a) => {
+                                const tone = ACTIVITY_TONE[a.entityType] ?? ACTIVITY_TONE.default;
+                                return (
+                                  <tr key={a.id} className="hover:bg-muted/30 transition-colors">
+                                    <td className="px-3 py-2.5 whitespace-nowrap">
+                                      <span className="inline-flex items-center gap-2">
+                                        <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center shrink-0">
+                                          {(a.userName ?? "?").slice(0, 1).toUpperCase()}
+                                        </span>
+                                        <span className="font-medium truncate max-w-[140px]">{a.userName || "Someone"}</span>
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2.5 whitespace-nowrap">
+                                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${ACTION_TONE(a.action)}`}>
+                                        {a.action}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2.5 whitespace-nowrap">
+                                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-md ${tone}`}>
+                                        {a.entityType}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-2.5 text-muted-foreground max-w-[280px] truncate">{a.detail || "—"}</td>
+                                    <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap text-xs">
+                                      {new Date(a.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             )}
@@ -681,18 +748,13 @@ export default function SettingsPage() {
               <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as OrgRole)}>
                 <SelectTrigger data-testid="select-invite-role"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {INVITABLE_ROLES.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      <span className="font-semibold">{ROLE_META[r].label}</span>
-                      <span className="text-muted-foreground text-xs"> — {ROLE_META[r].description}</span>
-                    </SelectItem>
-                  ))}
+                  {/* Roles come from the org's own list only — Admin/Sales/
+                      Accounts are seeded rows there, so listing the legacy
+                      constants as well showed every role twice. */}
                   {customRoles.map((r) => (
                     <SelectItem key={r.id} value={`custom:${r.id}`}>
-                      <span className="font-semibold inline-flex items-center gap-1.5">
-                        <Shield className="w-3.5 h-3.5 text-primary" /> {r.name}
-                      </span>
-                      <span className="text-muted-foreground text-xs"> — custom · {r.permissions.length} permission{r.permissions.length !== 1 ? "s" : ""}</span>
+                      <span className="font-semibold">{r.name}</span>
+                      <span className="text-muted-foreground text-xs"> — {r.permissions.length} permission{r.permissions.length !== 1 ? "s" : ""}</span>
                     </SelectItem>
                   ))}
                 </SelectContent>

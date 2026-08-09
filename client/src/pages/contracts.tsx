@@ -8,7 +8,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { BottomNav } from "@/components/bottom-nav";
+import { RowActions } from "@/components/row-actions";
+import { recordNo } from "@shared/schema";
 import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
+import { PickParentDialog } from "@/components/pick-parent-dialog";
 import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table/data-table";
@@ -78,13 +81,15 @@ const columns: ColumnDef<Contract>[] = [
     cell: ({ row }) => <StatusBadge status={row.original.status} size="compact" />,
     filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
   },
-  { id: "actions", header: "", enableSorting: false, enableHiding: false, cell: () => <ChevronRight className="w-4 h-4 text-muted-foreground" /> },
+  { id: "actions", header: "Actions", meta: { label: "Actions", align: "right" }, enableSorting: false, enableHiding: false,
+    cell: ({ row }: any) => <RowActions viewHref={`/contracts/${row.original.id}`} /> },
 ];
 
 export default function ContractsPage() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME);
+  const [pickOpen, setPickOpen] = useState(false);
   const [, setLocation] = useLocation();
 
   const { data: contracts = [], isLoading } = useQuery<Contract[]>({ queryKey: ["/api/contracts"] });
@@ -128,12 +133,10 @@ export default function ContractsPage() {
             </div>
             <div className="flex items-center gap-2">
               {/* Agreements start from a deal — the CTA routes there */}
-              <Link href="/deals" className="hidden lg:block">
-                <Button className="gradient-btn text-white lg:h-10 lg:px-5 lg:text-sm font-semibold" data-testid="button-new-agreement">
-                  <Plus className="w-4 h-4 mr-1.5" />
-                  New Agreement
-                </Button>
-              </Link>
+              <Button className="hidden lg:inline-flex gradient-btn text-white lg:h-10 lg:px-5 lg:text-sm font-semibold" onClick={() => setPickOpen(true)} data-testid="button-new-agreement">
+                <Plus className="w-4 h-4 mr-1.5" />
+                New Agreement
+              </Button>
               <NotificationBell className="lg:hidden" />
             </div>
           </div>
@@ -249,6 +252,7 @@ export default function ContractsPage() {
         )}
       </main>
 
+      <PickParentDialog kind="agreement" open={pickOpen} onOpenChange={setPickOpen} />
       <BottomNav />
     </div>
   );

@@ -564,3 +564,21 @@ export const insertToolDocumentSchema = createInsertSchema(toolDocuments).omit({
 });
 export type InsertToolDocument = z.infer<typeof insertToolDocumentSchema>;
 export type ToolDocument = typeof toolDocuments.$inferSelect;
+
+
+// ── Human-facing record numbers ────────────────────────────────────────
+// Short, unique, sortable identifiers built from each table's own serial id
+// (no migration, no collisions — the id is already unique per record type).
+// Shown everywhere a record is listed or opened so users and their clients
+// can quote a reference: "DL-0042", "QT-0007", "AG-0015".
+export const RECORD_PREFIX = {
+  deal: "DL",
+  quotation: "QT",
+  agreement: "AG",
+  invoice: "IN",
+} as const;
+
+export function recordNo(kind: keyof typeof RECORD_PREFIX, id: number | string): string {
+  const n = Number(id);
+  return `${RECORD_PREFIX[kind]}-${Number.isFinite(n) ? String(n).padStart(4, "0") : id}`;
+}

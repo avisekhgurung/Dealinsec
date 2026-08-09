@@ -8,7 +8,7 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, KeyRound } from "lucide-react";
+import { Loader2, KeyRound, Eye, EyeOff } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
@@ -27,6 +27,7 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const linkBroken = !email || !token;
 
@@ -79,11 +80,25 @@ export default function ResetPasswordPage() {
             <form onSubmit={submit} className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="rp-password">New password</Label>
-                <Input id="rp-password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" data-testid="input-new-password" />
+                <div className="relative">
+                <Input id="rp-password" type={showPassword ? "text" : "password"} required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 6 characters" data-testid="input-new-password" />
+                  <button type="button" onClick={() => setShowPassword((v) => !v)} tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"} data-testid="toggle-password"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="rp-confirm">Confirm password</Label>
-                <Input id="rp-confirm" type="password" required minLength={6} value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Type it again" data-testid="input-confirm-password" />
+                <div className="relative">
+                <Input id="rp-confirm" type={showPassword ? "text" : "password"} required minLength={6} value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Type it again" data-testid="input-confirm-password" />
+                  <button type="button" onClick={() => setShowPassword((v) => !v)} tabIndex={-1}
+                    aria-label={showPassword ? "Hide password" : "Show password"} data-testid="toggle-password"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
               <Button type="submit" className="w-full h-11 gradient-btn text-white font-bold" disabled={isLoading} data-testid="button-reset-password">
                 {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
