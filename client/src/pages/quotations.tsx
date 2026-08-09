@@ -103,8 +103,9 @@ export default function QuotationsPage() {
           ))}
         </section>
 
-        {/* Search */}
-        <div className="relative">
+        {/* Search — capped on desktop; a full-bleed 1500px input reads as a
+            layout bug, not a search box */}
+        <div className="relative lg:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <Input
             placeholder="Search by client, deal or quotation number…"
