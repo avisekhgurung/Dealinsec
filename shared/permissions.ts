@@ -96,6 +96,29 @@ export function memberCan(
   return hasPermission(user.orgRole, permission);
 }
 
+// ── Navigation shaping ─────────────────────────────────────────────────
+// A member on a CUSTOM role should see an app that matches their job: an
+// accounts person with only invoice permissions shouldn't wade past deals
+// and quotations to reach their work. Built-in roles and the owner keep the
+// full nav (their scope is broad by definition). Reads stay allowed
+// server-side either way — this is navigation, not authorisation.
+export const MODULE_PERMISSIONS: Record<string, Permission[]> = {
+  deals: ["deals.create", "deals.edit"],
+  quotations: ["quotations.create", "deals.create", "deals.edit"],
+  agreements: ["agreements.create"],
+  invoices: ["invoices.create", "invoices.delete", "payments.manage"],
+};
+
+export function canSeeModule(
+  user: { orgRole?: string | null; customPermissions?: string[] | null } | null | undefined,
+  moduleKey: keyof typeof MODULE_PERMISSIONS,
+): boolean {
+  if (!user) return false;
+  if (user.orgRole !== CUSTOM_ROLE) return true;
+  const perms = MODULE_PERMISSIONS[moduleKey];
+  return !perms || perms.some((p) => memberCan(user, p));
+}
+
 /** The permission matrix, module by module, for the role editor UI.
  *  "view" is not a row: reads are org-scoped for every active member by
  *  architecture (see file header) — the UI states that instead of faking

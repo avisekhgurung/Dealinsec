@@ -13,6 +13,8 @@ import { recordNo } from "@shared/schema";
 import { RowActions } from "@/components/row-actions";
 import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
 import { PickParentDialog } from "@/components/pick-parent-dialog";
+import { memberCan } from "@shared/permissions";
+import { useAuth } from "@/hooks/useAuth";
 import { DataTable } from "@/components/data-table/data-table";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { unguardCell } from "@/lib/csv";

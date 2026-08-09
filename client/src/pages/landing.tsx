@@ -56,6 +56,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { trackEvent } from "@/lib/analytics";
+import { LandingCopilot } from "@/components/landing-copilot";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -384,6 +385,10 @@ export default function LandingPage() {
       </main>
 
       <Footer />
+
+      {/* Public product guide — answers from the same knowledge base the
+          in-app Copilot uses, so marketing can't drift from the product. */}
+      <LandingCopilot onCta={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))} />
 
       {/* Auth Modal */}
       <Dialog open={authModalOpen} onOpenChange={setAuthModalOpen}>

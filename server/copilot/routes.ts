@@ -52,6 +52,41 @@ ACTIONS: [{"label":"Open Deal","to":"/deals/12"},{"label":"Generate Quotation","
 - "to" = navigation button (use routes from knowledge/tools). "tool" = a proposed action the USER must confirm; the only tool allowed is create_quotation.
 - Offer 1-3 actions max, only when genuinely useful. The line must be valid JSON.`;
 
+
+/** Marketing Copilot — public, unauthenticated, KNOWLEDGE ONLY.
+ *  No tools, no database, no organisation context: it can answer questions
+ *  about the product and nothing else. Its own tight per-IP + global caps
+ *  keep a public AI endpoint from becoming a bill. */
+const PUBLIC_SYSTEM = `You are the DealInSec product guide on the marketing website, talking to a visitor who has NOT signed up.
+
+WHO YOU'RE TALKING TO: Indian freelancers, interior designers, architects, agencies, photographers, consultants and small service businesses. They lose money to scope creep, forgotten invoices and late payments.
+
+HARD RULES:
+- Answer ONLY from the product knowledge below. If it isn't there, say "I'm not sure — the team can confirm at support@dealinsec.com" — NEVER invent features, prices, integrations or claims.
+- No legal or tax advice. For enforceability or GST specifics, say a lawyer/CA should confirm.
+- 2-4 sentences, plain English, ₹ amounts in Indian format. Sound like a helpful founder, not a brochure.
+- Lead with the OUTCOME (getting paid, protected scope), not the technology. Don't oversell "AI".
+- You cannot see anyone's data — you're a product guide. If they ask about their own deals, invite them to start the free trial.
+- End with a natural next step when it fits ("Want to try it on your last 3 deals? The 7-day trial needs no card.").`;
+
+const publicIpHits = new Map<string, { day: string; n: number }>();
+let publicGlobalDay = "";
+let publicGlobalN = 0;
+const PUBLIC_PER_IP = 12;
+const PUBLIC_GLOBAL = 800;
+
+function takePublicQuota(ip: string): boolean {
+  const day = new Date().toISOString().slice(0, 10);
+  if (publicGlobalDay !== day) { publicGlobalDay = day; publicGlobalN = 0; publicIpHits.clear(); }
+  if (publicGlobalN >= PUBLIC_GLOBAL) return false;
+  const hit = publicIpHits.get(ip);
+  if (hit && hit.n >= PUBLIC_PER_IP) return false;
+  if (publicIpHits.size > 5000) publicIpHits.clear();
+  publicIpHits.set(ip, { day, n: (hit?.n ?? 0) + 1 });
+  publicGlobalN++;
+  return true;
+}
+
 export function registerCopilotRoutes(app: Express) {
   app.get("/api/copilot/meta", isAuthenticated, (_req, res) => {
     res.json({ enabled: copilotConfigured(), knowledgeVersion: AI_KNOWLEDGE_VERSION, provider: aiProvider.name });
@@ -111,6 +146,38 @@ export function registerCopilotRoutes(app: Express) {
     } catch (err) {
       console.error("[copilot] chaser error:", err);
       res.status(502).json({ error: "Couldn't draft the message right now. Please try again." });
+    }
+  });
+
+  // ── Public marketing Copilot (no auth — see PUBLIC_SYSTEM) ──
+  app.post("/api/copilot/public", async (req: any, res) => {
+    try {
+      if (!copilotConfigured()) return res.status(503).json({ error: "The assistant is offline right now." });
+      // Same IP resolution the AI tool uses: Cloudflare first, else the
+      // rightmost X-Forwarded-For hop (the left ones are spoofable).
+      const cf = req.headers["cf-connecting-ip"];
+      const xff = String(req.headers["x-forwarded-for"] || "").split(",").map((x: string) => x.trim()).filter(Boolean);
+      const ip = (cf ? String(cf) : xff.length ? xff[xff.length - 1] : req.ip || "unknown").trim() || "unknown";
+      if (!takePublicQuota(ip)) {
+        return res.status(429).json({ error: "That's all the questions I can take right now — start the free trial and the in-app Copilot has no such limit." });
+      }
+      const raw = Array.isArray(req.body?.messages) ? req.body.messages : [];
+      const history: ChatMessage[] = raw
+        .filter((m: any) => (m?.role === "user" || m?.role === "assistant") && typeof m?.content === "string")
+        .slice(-8)
+        .map((m: any) => ({ role: m.role, content: String(m.content).slice(0, 500) }));
+      if (!history.length || history[history.length - 1].role !== "user") {
+        return res.status(400).json({ error: "No message" });
+      }
+      const result = await aiProvider.chat([
+        { role: "system", content: PUBLIC_SYSTEM },
+        { role: "system", content: `PRODUCT KNOWLEDGE (authoritative):\n${retrieveKnowledge(history[history.length - 1].content, 4)}` },
+        ...history,
+      ], []);
+      res.json({ reply: result.content ?? "I'm not sure about that one — support@dealinsec.com can help." });
+    } catch (err) {
+      console.error("[copilot] public chat error:", err);
+      res.status(502).json({ error: "I couldn't answer that right now. Please try again." });
     }
   });
 

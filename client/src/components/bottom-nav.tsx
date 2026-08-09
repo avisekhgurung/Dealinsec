@@ -1,13 +1,14 @@
 import { useLocation, Link } from "wouter";
 import { Home, Briefcase, FileCheck, Receipt, FileText, UserCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { canSeeModule } from "@shared/permissions";
 
 const navItems = [
   { path: "/dashboard", label: "Home", icon: Home },
-  { path: "/deals", label: "Deals", icon: Briefcase },
-  { path: "/quotations", label: "Quotes", icon: FileText },
-  { path: "/contracts", label: "Agreements", icon: FileCheck },
-  { path: "/invoices", label: "Invoices", icon: Receipt },
+  { path: "/deals", label: "Deals", icon: Briefcase, module: "deals" as const },
+  { path: "/quotations", label: "Quotes", icon: FileText, module: "quotations" as const },
+  { path: "/contracts", label: "Agreements", icon: FileCheck, module: "agreements" as const },
+  { path: "/invoices", label: "Invoices", icon: Receipt, module: "invoices" as const },
   { path: "/profile", label: "Profile", icon: UserCircle },
 ];
 
@@ -24,7 +25,9 @@ export function BottomNav() {
       boxShadow: "0 -4px 24px rgba(0,0,0,0.06)",
     }}>
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-1">
-        {navItems.map((item) => {
+        {navItems
+          .filter((item) => !(item as any).module || canSeeModule(user as any, (item as any).module))
+          .map((item) => {
           const onQuoteDoc = /^\/deals\/[^/]+\/quote/.test(location);
           const isActive = onQuoteDoc
             ? item.path === "/quotations"

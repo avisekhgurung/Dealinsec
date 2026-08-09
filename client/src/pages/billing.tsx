@@ -12,6 +12,8 @@ import { RowActions } from "@/components/row-actions";
 import { recordNo } from "@shared/schema";
 import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
 import { PickParentDialog } from "@/components/pick-parent-dialog";
+import { memberCan } from "@shared/permissions";
+import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table/data-table";
@@ -95,6 +97,8 @@ export default function BillingPage() {
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME);
   const [pickOpen, setPickOpen] = useState(false);
+  const { user } = useAuth();
+  const canCreate = memberCan(user as any, "invoices.create");
   const [, setLocation] = useLocation();
 
   const { data: brandInvoices = [], isLoading } = useQuery<BrandInvoice[]>({ queryKey: ["/api/brand-invoices"] });
@@ -152,10 +156,12 @@ export default function BillingPage() {
             </div>
             <div className="flex items-center gap-2">
               {/* Invoices are generated from a signed agreement — route there */}
-              <Button className="hidden lg:inline-flex gradient-btn text-white lg:h-10 lg:px-5 lg:text-sm font-semibold" onClick={() => setPickOpen(true)} data-testid="button-new-invoice">
-                <Plus className="w-4 h-4 mr-1.5" />
-                New Invoice
-              </Button>
+              {canCreate && (
+                <Button className="hidden lg:inline-flex gradient-btn text-white lg:h-10 lg:px-5 lg:text-sm font-semibold" onClick={() => setPickOpen(true)} data-testid="button-new-invoice">
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  New Invoice
+                </Button>
+              )}
               <NotificationBell className="lg:hidden" />
             </div>
           </div>

@@ -44,6 +44,39 @@ export function getSession() {
   });
 }
 
+
+// ── Brute-force protection ────────────────────────────────────────────
+// In-memory sliding counters. Deliberately simple: no dependency, no
+// migration. A deploy resets them, which is acceptable for a throttle (it
+// is not an authorisation control) — the Postgres-backed version is the
+// follow-up in the pre-launch checklist.
+const attempts = new Map<string, { n: number; first: number }>();
+const WINDOW_MS = 15 * 60 * 1000;
+
+function clientIp(req: any): string {
+  const cf = req.headers["cf-connecting-ip"];
+  const xff = String(req.headers["x-forwarded-for"] || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+  return (cf ? String(cf) : xff.length ? xff[xff.length - 1] : req.ip || "unknown").trim() || "unknown";
+}
+
+/** Returns true when the caller is over budget for this key. */
+function throttled(key: string, limit: number): boolean {
+  const now = Date.now();
+  const rec = attempts.get(key);
+  if (!rec || now - rec.first > WINDOW_MS) {
+    if (attempts.size > 10_000) attempts.clear();
+    attempts.set(key, { n: 1, first: now });
+    return false;
+  }
+  rec.n++;
+  return rec.n > limit;
+}
+
+/** Clear a key after a legitimate success so honest users never accumulate. */
+function clearThrottle(key: string) {
+  attempts.delete(key);
+}
+
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
   // Session is registered in index.ts before passport, so we don't register it again here
@@ -62,6 +95,11 @@ export async function setupAuth(app: Express) {
 
       if (role && role !== "influencer") {
         return res.status(400).json({ message: "Only influencer signup is available right now" });
+      }
+
+      // 5 new accounts / 15 min from one IP is far above honest use.
+      if (throttled(`signup:${clientIp(req)}`, 5)) {
+        return res.status(429).json({ message: "Too many sign-up attempts. Please wait a few minutes." });
       }
 
       const existingUser = await storage.getUserByEmail(email);
@@ -115,6 +153,13 @@ export async function setupAuth(app: Express) {
         return res.status(400).json({ message: "Email and password are required" });
       }
 
+      const ip = clientIp(req);
+      // 10 attempts / 15 min per IP, 5 per email — a human typo-ing their
+      // password stays well inside this; credential stuffing does not.
+      if (throttled(`login:ip:${ip}`, 10) || throttled(`login:em:${String(email).toLowerCase()}`, 5)) {
+        return res.status(429).json({ message: "Too many sign-in attempts. Please wait a few minutes and try again." });
+      }
+
       const user = await storage.getUserByEmail(email);
       if (!user || !user.password) {
         return res.status(401).json({ message: "Invalid email or password" });
@@ -125,6 +170,8 @@ export async function setupAuth(app: Express) {
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
+      clearThrottle(`login:ip:${ip}`);
+      clearThrottle(`login:em:${String(email).toLowerCase()}`);
       (req.session as any).userId = user.id;
 
       const { password: _, ...userWithoutPassword } = user;
@@ -142,6 +189,9 @@ export async function setupAuth(app: Express) {
   // mail cannon.
   app.post("/api/auth/forgot-password", async (req, res) => {
     try {
+      if (throttled(`forgot:${clientIp(req)}`, 8)) {
+        return res.json({ ok: true }); // stay generic — no enumeration signal
+      }
       const email = String(req.body?.email || "").trim().toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return res.status(400).json({ message: "Please enter a valid email" });
@@ -178,6 +228,9 @@ export async function setupAuth(app: Express) {
 
   app.post("/api/auth/reset-password", async (req, res) => {
     try {
+      if (throttled(`reset:${clientIp(req)}`, 10)) {
+        return res.status(429).json({ message: "Too many attempts. Please request a fresh reset link." });
+      }
       const email = String(req.body?.email || "").trim().toLowerCase();
       const token = String(req.body?.token || "");
       const password = String(req.body?.password || "");

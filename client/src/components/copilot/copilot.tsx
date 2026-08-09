@@ -209,14 +209,17 @@ export function Copilot() {
 
       {open && (
         <div
-          className="fixed z-50 inset-x-0 bottom-0 top-14 sm:inset-auto sm:bottom-4 sm:right-4 sm:w-[420px] sm:h-[640px] sm:max-h-[calc(100vh-2rem)] flex flex-col rounded-t-2xl sm:rounded-2xl border border-border bg-background shadow-2xl overflow-hidden animate-fade-in"
+          // z-[60] on mobile so the sheet sits ABOVE the fixed bottom nav
+          // (z-50) — otherwise the nav covers the composer and there's
+          // nowhere visible to type.
+          className="fixed z-[60] inset-0 sm:inset-auto sm:bottom-4 sm:right-4 sm:w-[420px] sm:h-[640px] sm:max-h-[calc(100vh-2rem)] flex flex-col sm:rounded-2xl border-0 sm:border sm:border-border bg-background shadow-2xl overflow-hidden animate-fade-in"
           data-testid="copilot-drawer"
           role="dialog"
           aria-label="DealinSec Copilot"
         >
           {/* Header */}
           <div
-            className="flex items-center gap-2.5 px-4 py-3 text-white shrink-0"
+            className="flex items-center gap-2.5 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-3 text-white shrink-0"
             style={{ background: "linear-gradient(135deg, hsl(160 84% 22%) 0%, hsl(174 70% 26%) 100%)" }}
           >
             <span className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center">
@@ -376,7 +379,7 @@ export function Copilot() {
 
           {/* Composer */}
           <form
-            className="flex items-center gap-2 border-t border-border px-3 py-2.5 shrink-0"
+            className="flex items-center gap-2 border-t border-border px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shrink-0 bg-background"
             onSubmit={(e) => { e.preventDefault(); send(input); }}
           >
             <input

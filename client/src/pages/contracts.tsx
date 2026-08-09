@@ -12,6 +12,8 @@ import { RowActions } from "@/components/row-actions";
 import { recordNo } from "@shared/schema";
 import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
 import { PickParentDialog } from "@/components/pick-parent-dialog";
+import { memberCan } from "@shared/permissions";
+import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table/data-table";
@@ -90,6 +92,8 @@ export default function ContractsPage() {
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME);
   const [pickOpen, setPickOpen] = useState(false);
+  const { user } = useAuth();
+  const canCreate = memberCan(user as any, "agreements.create");
   const [, setLocation] = useLocation();
 
   const { data: contracts = [], isLoading } = useQuery<Contract[]>({ queryKey: ["/api/contracts"] });
@@ -133,10 +137,12 @@ export default function ContractsPage() {
             </div>
             <div className="flex items-center gap-2">
               {/* Agreements start from a deal — the CTA routes there */}
-              <Button className="hidden lg:inline-flex gradient-btn text-white lg:h-10 lg:px-5 lg:text-sm font-semibold" onClick={() => setPickOpen(true)} data-testid="button-new-agreement">
-                <Plus className="w-4 h-4 mr-1.5" />
-                New Agreement
-              </Button>
+              {canCreate && (
+                <Button className="hidden lg:inline-flex gradient-btn text-white lg:h-10 lg:px-5 lg:text-sm font-semibold" onClick={() => setPickOpen(true)} data-testid="button-new-agreement">
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  New Agreement
+                </Button>
+              )}
               <NotificationBell className="lg:hidden" />
             </div>
           </div>

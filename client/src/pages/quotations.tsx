@@ -17,6 +17,8 @@ import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
 import { PickParentDialog } from "@/components/pick-parent-dialog";
+import { memberCan } from "@shared/permissions";
+import { useAuth } from "@/hooks/useAuth";
 import { dealTypeMeta } from "@shared/dealTypeTaxonomy";
 import type { Quote, Deal } from "@shared/schema";
 import { FileText, Search, X, ChevronRight, Plus } from "lucide-react";
@@ -30,6 +32,8 @@ export default function QuotationsPage() {
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME);
   const [pickOpen, setPickOpen] = useState(false);
+  const { user } = useAuth();
+  const canCreate = memberCan(user as any, "quotations.create");
   const { data: quotes = [], isLoading } = useQuery<QuoteRow[]>({ queryKey: ["/api/quotes"] });
 
   const rows = useMemo(() => {
@@ -58,10 +62,12 @@ export default function QuotationsPage() {
             </div>
             <div className="flex items-center gap-2">
               <NotificationBell className="lg:hidden" />
+              {canCreate && (
               <Button size="sm" className="gradient-btn text-white" onClick={() => setPickOpen(true)} data-testid="button-new-quotation">
                 <Plus className="w-4 h-4 mr-1 lg:mr-1.5" />
                 New<span className="hidden lg:inline">&nbsp;quotation</span>
               </Button>
+              )}
             </div>
           </div>
         </div>
@@ -115,7 +121,7 @@ export default function QuotationsPage() {
                     ? "Try a different client or deal name."
                     : "Open a deal and generate its quotation — it'll appear here for the whole team."}
                 </p>
-                {!search && (
+                {!search && canCreate && (
                   <Button size="sm" className="mt-4 gradient-btn text-white" onClick={() => setPickOpen(true)}>
                     Create a quotation
                   </Button>

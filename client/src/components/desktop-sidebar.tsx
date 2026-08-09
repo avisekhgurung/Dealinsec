@@ -47,20 +47,23 @@ import {
   getTrialDaysLeft,
   TRIAL_DAYS,
 } from "@shared/schema";
+import { canSeeModule } from "@shared/permissions";
 
 interface NavItem {
   path: string;
   label: string;
   icon: typeof Home;
   description?: string;
+  /** Module key — hidden for custom roles with no permission in it. */
+  module?: "deals" | "quotations" | "agreements" | "invoices";
 }
 
 const PRIMARY_NAV: NavItem[] = [
   { path: "/dashboard", label: "Dashboard", icon: Home, description: "Overview & KPIs" },
-  { path: "/deals", label: "Deals", icon: Briefcase, description: "Pipeline & clients" },
-  { path: "/quotations", label: "Quotations", icon: FileText, description: "Issued quotes" },
-  { path: "/contracts", label: "Agreements", icon: FileCheck, description: "Signed contracts" },
-  { path: "/invoices", label: "Invoices", icon: Receipt, description: "Billing & payments" },
+  { path: "/deals", label: "Deals", icon: Briefcase, description: "Pipeline & clients", module: "deals" },
+  { path: "/quotations", label: "Quotations", icon: FileText, description: "Issued quotes", module: "quotations" },
+  { path: "/contracts", label: "Agreements", icon: FileCheck, description: "Signed contracts", module: "agreements" },
+  { path: "/invoices", label: "Invoices", icon: Receipt, description: "Billing & payments", module: "invoices" },
 ];
 
 const SECONDARY_NAV: NavItem[] = [
@@ -470,7 +473,7 @@ export function DesktopSidebar() {
               </div>
             )}
             <ul className="space-y-0.5">
-              {PRIMARY_NAV.map((item) => renderNavItem(item, true))}
+              {PRIMARY_NAV.filter((i) => !i.module || canSeeModule(user as any, i.module)).map((item) => renderNavItem(item, true))}
             </ul>
           </nav>
 
