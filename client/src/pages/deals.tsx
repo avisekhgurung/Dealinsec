@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
+import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
 import { DataTable } from "@/components/data-table/data-table";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { unguardCell } from "@/lib/csv";
@@ -100,6 +101,7 @@ const columns: ColumnDef<Deal>[] = [
 export default function DealsPage() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [search, setSearch] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { openUpgradeModal } = useUpgradeModal();
@@ -110,6 +112,7 @@ export default function DealsPage() {
 
   const filteredDeals = useMemo(() => {
     return deals.filter((deal) => {
+      if (!inRange(deal.startDate, dateRange)) return false;
       if (filter === "pending" && deal.status !== "Pending") return false;
       if (filter === "active" && deal.status !== "Active") return false;
       if (filter === "completed" && deal.status !== "Completed") return false;
@@ -123,7 +126,7 @@ export default function DealsPage() {
       }
       return true;
     });
-  }, [deals, filter, search]);
+  }, [deals, filter, search, dateRange]);
 
   const filters: { value: FilterType; label: string }[] = [
     { value: "all", label: "All" },
@@ -244,6 +247,9 @@ export default function DealsPage() {
       </header>
 
       <main className="px-4 py-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8">
+        <div className="flex justify-end -mb-2 lg:-mb-3">
+          <DateRangeFilter value={dateRange} onChange={setDateRange} />
+        </div>
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
@@ -275,7 +281,7 @@ export default function DealsPage() {
             <div className="hidden lg:block">
               <DataTable
                 columns={columns}
-                data={deals}
+                data={filteredDeals}
                 searchPlaceholder="Search deals..."
                 searchKeys={["brandName", "dealTitle", "dealAmount"]}
                 facetedFilters={[{

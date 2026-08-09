@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { BottomNav } from "@/components/bottom-nav";
+import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
 import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table/data-table";
@@ -83,6 +84,7 @@ const columns: ColumnDef<Contract>[] = [
 export default function ContractsPage() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [search, setSearch] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME);
   const [, setLocation] = useLocation();
 
   const { data: contracts = [], isLoading } = useQuery<Contract[]>({ queryKey: ["/api/contracts"] });
@@ -91,6 +93,7 @@ export default function ContractsPage() {
 
   const filteredContracts = useMemo(() => {
     return contracts.filter((contract) => {
+      if (!inRange(contract.startDate, dateRange)) return false;
       if (filter === "active" && contract.status !== "Active" && contract.status !== "Signed") return false;
       if (filter === "completed" && contract.status !== "Completed") return false;
       if (search.trim()) {
@@ -104,7 +107,7 @@ export default function ContractsPage() {
       }
       return true;
     });
-  }, [contracts, filter, search, deals]);
+  }, [contracts, filter, search, deals, dateRange]);
 
   const filters: { value: FilterType; label: string }[] = [
     { value: "all", label: "All" },
@@ -155,6 +158,9 @@ export default function ContractsPage() {
       </header>
 
       <main className="px-4 py-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8">
+        <div className="flex justify-end mb-3">
+          <DateRangeFilter value={dateRange} onChange={setDateRange} />
+        </div>
         {isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
@@ -175,7 +181,7 @@ export default function ContractsPage() {
             <div className="hidden lg:block">
               <DataTable
                 columns={columns}
-                data={contracts}
+                data={filteredContracts}
                 searchPlaceholder="Search agreements..."
                 searchKeys={["contractName", "brandName"]}
                 facetedFilters={[{

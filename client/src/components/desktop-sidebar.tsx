@@ -188,8 +188,12 @@ export function DesktopSidebar() {
     : hasLapsedTrial(user) ? "TRIAL_ENDED"
     : "FREE";
 
-  const isActive = (path: string) =>
-    location === path || (path !== "/" && location.startsWith(path));
+  const isActive = (path: string) => {
+    // Quotation documents live at /deals/:id/quote but BELONG to the
+    // Quotations section — highlight that, not Deals.
+    if (/^\/deals\/[^/]+\/quote/.test(location)) return path === "/quotations";
+    return location === path || (path !== "/" && location.startsWith(path));
+  };
 
   const handleLogout = async () => {
     try {

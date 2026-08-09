@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { BottomNav } from "@/components/bottom-nav";
+import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
 import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table/data-table";
@@ -88,6 +89,7 @@ const columns: ColumnDef<BrandInvoice>[] = [
 export default function BillingPage() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [search, setSearch] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME);
   const [, setLocation] = useLocation();
 
   const { data: brandInvoices = [], isLoading } = useQuery<BrandInvoice[]>({ queryKey: ["/api/brand-invoices"] });
@@ -96,6 +98,7 @@ export default function BillingPage() {
 
   const filteredInvoices = useMemo(() => {
     return brandInvoices.filter((invoice) => {
+      if (!inRange(invoice.invoiceDate, dateRange)) return false;
       if (filter === "paid" && invoice.status !== "Paid") return false;
       if (filter === "unpaid" && invoice.status !== "Unpaid") return false;
       if (search.trim()) {
@@ -110,7 +113,7 @@ export default function BillingPage() {
       }
       return true;
     });
-  }, [brandInvoices, filter, search, deals]);
+  }, [brandInvoices, filter, search, deals, dateRange]);
 
   const groupedByDeal = useMemo(() => {
     const groups = new Map<number, BrandInvoice[]>();
@@ -174,18 +177,10 @@ export default function BillingPage() {
       </header>
 
       <main className="px-4 py-6 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8">
-        {!isLoading && brandInvoices.length > 0 && (
-          <div className="grid grid-cols-2 gap-4 lg:max-w-md">
-            <div className="gradient-card-emerald rounded-2xl p-3 sm:p-4 shadow-lg overflow-hidden">
-              <p className="text-[10px] sm:text-xs font-medium text-white/80 mb-1">Total Paid</p>
-              <p className="text-lg sm:text-xl font-bold text-white truncate leading-tight" data-testid="text-total-paid">₹{totalPaid.toLocaleString("en-IN")}</p>
-            </div>
-            <div className="gradient-card-rose rounded-2xl p-3 sm:p-4 shadow-lg overflow-hidden">
-              <p className="text-[10px] sm:text-xs font-medium text-white/80 mb-1">Total Unpaid</p>
-              <p className="text-lg sm:text-xl font-bold text-white truncate leading-tight" data-testid="text-total-unpaid">₹{totalUnpaid.toLocaleString("en-IN")}</p>
-            </div>
-          </div>
-        )}
+        <div className="flex justify-end -mb-3">
+          <DateRangeFilter value={dateRange} onChange={setDateRange} />
+        </div>
+        {/* Paid/unpaid analytics live on the Dashboard — this page is the register. */}
 
         {isLoading ? (
           <div className="space-y-4">
@@ -207,7 +202,7 @@ export default function BillingPage() {
             <div className="hidden lg:block">
               <DataTable
                 columns={columns}
-                data={brandInvoices}
+                data={filteredInvoices}
                 searchPlaceholder="Search invoices..."
                 searchKeys={["invoiceNumber", "brandName"]}
                 facetedFilters={[{

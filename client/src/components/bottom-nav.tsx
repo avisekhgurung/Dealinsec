@@ -25,8 +25,11 @@ export function BottomNav() {
     }}>
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-1">
         {navItems.map((item) => {
-          const isActive = location === item.path ||
-            (item.path !== "/" && location.startsWith(item.path));
+          const onQuoteDoc = /^\/deals\/[^/]+\/quote/.test(location);
+          const isActive = onQuoteDoc
+            ? item.path === "/quotations"
+            : location === item.path ||
+              (item.path !== "/" && location.startsWith(item.path));
           const Icon = item.icon;
 
           return (

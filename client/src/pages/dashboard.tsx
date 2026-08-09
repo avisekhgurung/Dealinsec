@@ -12,10 +12,11 @@ import {
   Plus, Briefcase, FileCheck, Receipt, ChevronRight, LogOut,
   TrendingUp, IndianRupee, Clock, CheckCircle2,
   UserCircle, MapPin, FileText, PenTool, Landmark, X as XIcon, Sparkles,
-  Crown, Rocket, Users2, UserPlus2, Settings as SettingsIcon
+  Crown, Rocket, Users2, UserPlus2, Settings as SettingsIcon,
+  Zap, FileSignature, ArrowUpRight
 } from "lucide-react";
 import {
-  BarChart, Bar, Cell, PieChart, Pie,
+  BarChart, Bar, Cell, PieChart, Pie, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import {
@@ -220,6 +221,35 @@ function buildDealsOverTime(deals: Deal[]) {
   return Object.entries(map).slice(-6).map(([month, count]) => ({ month, count }));
 }
 
+/** Last 6 calendar months, deals started + quotations issued per month —
+ *  two counts, same unit, so they may share one axis (never two scales). */
+function buildMonthlyActivity(deals: Deal[], quotes: { createdAt?: Date | string | null }[]) {
+  const months: { key: string; month: string; deals: number; quotations: number }[] = [];
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({
+      key: `${d.getFullYear()}-${d.getMonth()}`,
+      month: d.toLocaleDateString("en-IN", { month: "short" }),
+      deals: 0,
+      quotations: 0,
+    });
+  }
+  const idx = new Map(months.map((m, i) => [m.key, i]));
+  for (const deal of deals) {
+    const d = new Date(deal.startDate);
+    const i = idx.get(`${d.getFullYear()}-${d.getMonth()}`);
+    if (i !== undefined) months[i].deals++;
+  }
+  for (const q of quotes) {
+    if (!q.createdAt) continue;
+    const d = new Date(q.createdAt);
+    const i = idx.get(`${d.getFullYear()}-${d.getMonth()}`);
+    if (i !== undefined) months[i].quotations++;
+  }
+  return months;
+}
+
 function buildRevenueOverTime(deals: Deal[]) {
   const map: Record<string, number> = {};
   deals.forEach(d => {
@@ -337,6 +367,28 @@ function CustomTooltip({ active, payload, label, prefix = "" }: any) {
           {p.name}: {prefix}{typeof p.value === "number" && prefix === "₹" ? p.value.toLocaleString("en-IN") : p.value}
         </p>
       ))}
+    </div>
+  );
+}
+
+// ─── chart empty state ───────────────────────────────────────────────────────
+// A chart with no data never renders a bare grid — it explains itself and
+// points at the action that creates the data.
+function ChartEmpty({ icon: Icon, title, hint, cta, compact }: {
+  icon: any;
+  title: string;
+  hint: string;
+  cta?: React.ReactNode;
+  compact?: boolean;
+}) {
+  return (
+    <div className={`${compact ? "py-6" : "h-[200px] lg:h-[230px]"} flex flex-col items-center justify-center text-center px-6`}>
+      <div className="w-11 h-11 rounded-2xl bg-muted/70 flex items-center justify-center mb-2.5">
+        <Icon className="w-5 h-5 text-muted-foreground/60" />
+      </div>
+      <p className="text-sm font-semibold">{title}</p>
+      <p className="text-xs text-muted-foreground mt-1 max-w-[260px] leading-relaxed">{hint}</p>
+      {cta && <div className="mt-3">{cta}</div>}
     </div>
   );
 }
@@ -708,6 +760,35 @@ export default function DashboardPage() {
         <SubscriptionCard user={user} />
         <TeamSeatsCard />
 
+        {/* ── Quick Actions — the six most common jumps, one tap away ── */}
+        <section className="grid grid-cols-3 lg:grid-cols-6 gap-2 lg:gap-3" aria-label="Quick actions">
+          {([
+            { label: "New Deal", icon: Plus, href: "/deals/new", chip: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400", primary: true },
+            { label: "Quotation", icon: FileText, href: "/deals", chip: "bg-teal-500/15 text-teal-600 dark:text-teal-400" },
+            { label: "Agreement", icon: FileSignature, href: "/deals", chip: "bg-blue-500/15 text-blue-600 dark:text-blue-400" },
+            { label: "Invoice", icon: Receipt, href: "/contracts", chip: "bg-amber-500/15 text-amber-600 dark:text-amber-400" },
+            { label: "Invite", icon: UserPlus2, href: "/settings", chip: "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400" },
+            { label: "Plan", icon: Crown, href: "/pricing", chip: "bg-slate-500/15 text-slate-600 dark:text-slate-300" },
+          ] as const).map((a) => (
+            <Link key={a.label} href={a.href}>
+              <button
+                type="button"
+                className={`w-full flex flex-col items-center gap-1.5 rounded-2xl lg:rounded-xl border p-3 lg:p-3.5 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md ${
+                  (a as any).primary
+                    ? "border-emerald-300/60 dark:border-emerald-800/60 bg-gradient-to-b from-emerald-500/[0.08] to-transparent hover:border-emerald-400/70"
+                    : "border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 hover:border-primary/40"
+                }`}
+                data-testid={`qa-${a.label.toLowerCase().replace(" ", "-")}`}
+              >
+                <span className={`flex items-center justify-center w-9 h-9 lg:w-8 lg:h-8 rounded-xl ${a.chip}`}>
+                  <a.icon className="w-4 h-4" strokeWidth={2.2} />
+                </span>
+                <span className="text-[11px] lg:text-xs font-semibold text-foreground">{a.label}</span>
+              </button>
+            </Link>
+          ))}
+        </section>
+
         {/* ── Stat cards — the funnel, in order: deal → quote → agreement →
             invoice → money ── */}
         <section className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4">
@@ -824,6 +905,152 @@ export default function DashboardPage() {
             />
           </div>
         )}
+
+        {/* ── Analytics: trend + activity + conversion. Palette
+            #059669/#F59E0B validated (CVD + normal-vision pass); counts
+            share one axis, money gets its own chart — never dual axes. ── */}
+        {!isLoading && (() => {
+          const revenue = buildRevenueOverTime(deals);
+          const activity = buildMonthlyActivity(deals, quotes);
+          const quotedDeals = new Set(quotes.map((q) => q.dealId)).size;
+          const invoicedDeals = new Set(brandInvoices.map((i) => i.dealId)).size;
+          const paidDeals = new Set(brandInvoices.filter((i) => i.status === "Paid").map((i) => i.dealId)).size;
+          const funnel = [
+            { label: "Deals", value: totalDeals },
+            { label: "Quoted", value: quotedDeals },
+            { label: "Agreements", value: contracts.length },
+            { label: "Invoiced", value: invoicedDeals },
+            { label: "Paid", value: paidDeals },
+          ];
+          return (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-5">
+                {/* Revenue trend — single series, the title names it */}
+                <Card className="glass-card border-0 lg:col-span-2">
+                  <CardHeader className="pb-1 px-4 pt-4 lg:px-6 lg:pt-6">
+                    <CardTitle className="text-sm lg:text-base font-semibold">Revenue Trend</CardTitle>
+                    <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Deal value by start month · last 6 months</p>
+                  </CardHeader>
+                  <CardContent className="px-2 pb-4 lg:px-4 lg:pb-6">
+                    {!revenue.some((r) => r.amount > 0) ? (
+                      <ChartEmpty
+                        icon={TrendingUp}
+                        title="No revenue yet"
+                        hint="Your deal values chart here month by month once you create your first deal."
+                        cta={
+                          <Link href="/deals/new">
+                            <Button size="sm" className="gradient-btn text-white h-8 text-xs font-semibold">
+                              <Plus className="w-3.5 h-3.5 mr-1" /> New Deal
+                            </Button>
+                          </Link>
+                        }
+                      />
+                    ) : (
+                    <div className="h-[200px] lg:h-[230px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={revenue} margin={{ top: 10, right: 15, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="dis-rev-fill" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#059669" stopOpacity={0.28} />
+                              <stop offset="100%" stopColor="#059669" stopOpacity={0.02} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.6)" vertical={false} />
+                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                          <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false}
+                            tickFormatter={(v: number) => (v >= 100000 ? `${(v / 100000).toFixed(v % 100000 ? 1 : 0)}L` : v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))} />
+                          <Tooltip content={<CustomTooltip prefix="₹" />} />
+                          <Area type="monotone" dataKey="amount" name="Revenue" stroke="#059669" strokeWidth={2}
+                            fill="url(#dis-rev-fill)" dot={{ r: 3, fill: "#059669", strokeWidth: 2, stroke: "hsl(var(--background))" }}
+                            activeDot={{ r: 5 }} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Monthly activity — two count series, one axis, legend chips */}
+                <Card className="glass-card border-0">
+                  <CardHeader className="pb-1 px-4 pt-4 lg:px-6 lg:pt-6">
+                    <div className="flex items-center justify-between gap-2">
+                      <CardTitle className="text-sm lg:text-base font-semibold">Monthly Activity</CardTitle>
+                      <span className="flex items-center gap-3 text-[10px] font-medium text-muted-foreground">
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-[#059669]" /> Deals</span>
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-[#F59E0B]" /> Quotes</span>
+                      </span>
+                    </div>
+                    <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Created per month · last 6 months</p>
+                  </CardHeader>
+                  <CardContent className="px-2 pb-4 lg:px-4 lg:pb-6">
+                    {!activity.some((m) => m.deals + m.quotations > 0) ? (
+                      <ChartEmpty
+                        icon={Briefcase}
+                        title="Nothing this half-year"
+                        hint="Deals you create and quotations you generate are counted here by month."
+                      />
+                    ) : (
+                    <div className="h-[200px] lg:h-[230px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={activity} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} barGap={2}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.6)" vertical={false} />
+                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                          <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Bar dataKey="deals" name="Deals" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={18} />
+                          <Bar dataKey="quotations" name="Quotations" fill="#F59E0B" radius={[4, 4, 0, 0]} maxBarSize={18} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Pipeline conversion — one hue, width encodes share, direct labels */}
+              <Card className="glass-card border-0">
+                <CardContent className="p-4 lg:p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-sm lg:text-base font-semibold text-foreground">Pipeline Conversion</h3>
+                      <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">How deals progress through the workflow</p>
+                    </div>
+                    <ArrowUpRight className="w-4 h-4 text-muted-foreground/50 hidden lg:block" />
+                  </div>
+                  {totalDeals === 0 ? (
+                    <ChartEmpty
+                      compact
+                      icon={FileCheck}
+                      title="Your pipeline starts with a deal"
+                      hint="Deal → Quotation → Agreement → Invoice → Paid. Conversion between stages shows here."
+                    />
+                  ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 lg:gap-4">
+                    {funnel.map((f, i) => {
+                      const pct = totalDeals > 0 ? Math.round((f.value / totalDeals) * 100) : 0;
+                      const stepPct = i > 0 && funnel[i - 1].value > 0 ? Math.round((f.value / funnel[i - 1].value) * 100) : null;
+                      return (
+                        <div key={f.label} className="min-w-0">
+                          <div className="flex items-baseline justify-between gap-2 mb-1">
+                            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate">{f.label}</span>
+                            {stepPct !== null && (
+                              <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{stepPct}%</span>
+                            )}
+                          </div>
+                          <p className="text-xl lg:text-2xl font-bold tabular-nums leading-none mb-2">{f.value}</p>
+                          <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500" style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          );
+        })()}
 
         {/* ── Charts (only shown when there's data) ── */}
         {deals.length > 0 && (

@@ -15,9 +15,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
+import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
 import { dealTypeMeta } from "@shared/dealTypeTaxonomy";
 import type { Quote, Deal } from "@shared/schema";
-import { FileText, Search, X, ChevronRight, Plus, IndianRupee, CalendarDays } from "lucide-react";
+import { FileText, Search, X, ChevronRight, Plus } from "lucide-react";
 
 type QuoteRow = Quote & { deal: Deal | null };
 
@@ -26,29 +27,21 @@ const fmtDate = (s?: string | Date | null) =>
 
 export default function QuotationsPage() {
   const [search, setSearch] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME);
   const { data: quotes = [], isLoading } = useQuery<QuoteRow[]>({ queryKey: ["/api/quotes"] });
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return quotes;
-    return quotes.filter((r) =>
-      (r.deal?.brandName || "").toLowerCase().includes(q) ||
-      (r.deal?.dealTitle || "").toLowerCase().includes(q) ||
-      String(r.id).includes(q),
-    );
-  }, [quotes, search]);
-
-  const totalValue = useMemo(
-    () => quotes.reduce((sum, r) => sum + Number(r.deal?.dealAmount || 0), 0),
-    [quotes],
-  );
-  const thisMonth = useMemo(() => {
-    const now = new Date();
     return quotes.filter((r) => {
-      const d = r.createdAt ? new Date(r.createdAt) : null;
-      return d && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    }).length;
-  }, [quotes]);
+      if (!inRange(r.createdAt, dateRange)) return false;
+      if (!q) return true;
+      return (
+        (r.deal?.brandName || "").toLowerCase().includes(q) ||
+        (r.deal?.dealTitle || "").toLowerCase().includes(q) ||
+        String(r.id).includes(q)
+      );
+    });
+  }, [quotes, search, dateRange]);
 
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-12">
@@ -75,37 +68,12 @@ export default function QuotationsPage() {
       </header>
 
       <main className="px-4 py-5 space-y-4 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-6 lg:space-y-5">
-        {/* Summary tiles — the register's headline numbers */}
-        <section className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
-          {[
-            { label: "Total issued", value: isLoading ? null : quotes.length, icon: FileText, tint: "bg-teal-50 text-teal-600 dark:bg-teal-950/40 dark:text-teal-400", span: "" },
-            { label: "Quoted value", value: isLoading ? null : `₹${totalValue.toLocaleString("en-IN")}`, icon: IndianRupee, tint: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400", span: "" },
-            // Third tile has no partner on the 2-up mobile grid, so it goes full width there.
-            { label: "This month", value: isLoading ? null : thisMonth, icon: CalendarDays, tint: "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400", span: "col-span-2 lg:col-span-1" },
-          ].map((s) => (
-            <div key={s.label} className={`rounded-2xl lg:rounded-xl p-3 sm:p-4 lg:p-4 bg-white dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 ${s.span}`}>
-              <div className="flex items-center justify-between gap-2 mb-2 lg:mb-2.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 truncate">
-                  {s.label}
-                </p>
-                <div className={`flex items-center justify-center w-8 h-8 lg:w-7 lg:h-7 rounded-lg shrink-0 ${s.tint}`}>
-                  <s.icon className="w-4 h-4 lg:w-3.5 lg:h-3.5" strokeWidth={2.2} />
-                </div>
-              </div>
-              {s.value === null ? (
-                <Skeleton className="h-7 lg:h-8 w-20" />
-              ) : (
-                <p className="text-xl sm:text-2xl lg:text-[26px] font-semibold leading-none tracking-tight tabular-nums truncate">
-                  {s.value}
-                </p>
-              )}
-            </div>
-          ))}
-        </section>
+        {/* Analytics for quotations live on the Dashboard — this page is the register. */}
 
         {/* Search — capped on desktop; a full-bleed 1500px input reads as a
             layout bug, not a search box */}
-        <div className="relative lg:max-w-md">
+        <div className="flex items-center gap-2">
+        <div className="relative flex-1 lg:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <Input
             placeholder="Search by client, deal or quotation number…"
@@ -123,6 +91,8 @@ export default function QuotationsPage() {
               <X className="w-4 h-4" />
             </button>
           )}
+        </div>
+        <DateRangeFilter value={dateRange} onChange={setDateRange} />
         </div>
 
         {/* Register */}
