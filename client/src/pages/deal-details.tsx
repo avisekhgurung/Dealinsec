@@ -13,7 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { trackEvent } from "@/lib/analytics";
-import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle, ChevronRight, Crown, Briefcase, ScrollText, ListChecks } from "lucide-react";
+import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle, ChevronRight, Crown, Briefcase, ScrollText, ListChecks, Copy, Zap } from "lucide-react";
 import { hasProAccess, STANDARD_TERMS } from "@shared/schema";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
 import { useUpgradeModal } from "@/components/upgrade-modal";
@@ -240,7 +240,7 @@ export default function DealDetailsPage() {
         {/* Everything captured at creation is visible here: overview +
             workflow on the left, deliverables + the exact T&Cs on the right. */}
         <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-5 xl:grid-cols-3 lg:gap-6 xl:gap-8 lg:items-start">
-        <div className="lg:col-span-3 xl:col-span-2">
+        <div className="lg:col-span-3 xl:col-span-2 space-y-6">
         <Card className="glass-card border-0">
           <CardContent className="p-6">
             <div className="flex items-start justify-between gap-3 mb-4">
@@ -262,44 +262,23 @@ export default function DealDetailsPage() {
               <StatusBadge status={deal.status} />
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 py-4 border-y border-white/10">
-              <div className="flex items-center gap-2">
-                <IndianRupee className="w-5 h-5 text-primary shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Deal Value</p>
-                  <p className="font-bold text-lg" data-testid="text-deal-amount">
-                    ₹{deal.dealAmount.toLocaleString("en-IN")}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 py-4">
+              {([
+                { label: "Deal Value", icon: IndianRupee, iconCls: "text-primary", value: `₹${deal.dealAmount.toLocaleString("en-IN")}`, big: true, testid: "text-deal-amount" },
+                { label: "Duration", icon: Calendar, iconCls: "text-muted-foreground", value: `${formatDate(deal.startDate)} – ${formatDate(deal.endDate)}` },
+                { label: "Deal Type", icon: Briefcase, iconCls: "text-muted-foreground", value: `${(dealTypeMeta as any)[(deal as any).dealType]?.emoji ?? "·"} ${(deal as any).dealType || "Custom"}` },
+                { label: "Deliverables", icon: ListChecks, iconCls: "text-muted-foreground", value: `${deal.deliverables.length} item${deal.deliverables.length !== 1 ? "s" : ""} · ${(deal as any).deliverableMode === "any_one" ? "any one" : "all required"}` },
+              ] as const).map((f) => (
+                <div key={f.label} className="rounded-xl border border-border/60 bg-card/40 p-3.5 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <p className="text-xs text-muted-foreground">{f.label}</p>
+                    <f.icon className={`w-4 h-4 shrink-0 ${f.iconCls}`} />
+                  </div>
+                  <p className={(f as any).big ? "font-bold text-xl tabular-nums" : "font-semibold text-sm leading-snug"} data-testid={(f as any).testid}>
+                    {f.value}
                   </p>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-muted-foreground shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Duration</p>
-                  <p className="font-medium text-sm">
-                    {formatDate(deal.startDate)} - {formatDate(deal.endDate)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Briefcase className="w-5 h-5 text-muted-foreground shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Deal Type</p>
-                  <p className="font-medium text-sm truncate">
-                    {(dealTypeMeta as any)[(deal as any).dealType]?.emoji ?? "·"} {(deal as any).dealType || "Custom"}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <ListChecks className="w-5 h-5 text-muted-foreground shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Deliverables</p>
-                  <p className="font-medium text-sm">
-                    {deal.deliverables.length} item{deal.deliverables.length !== 1 ? "s" : ""}
-                    <span className="text-muted-foreground"> · {(deal as any).deliverableMode === "any_one" ? "client picks one" : "all required"}</span>
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
 
             {/* Mini step indicator */}
@@ -317,7 +296,7 @@ export default function DealDetailsPage() {
                     const inner = (
                       <>
                         <div
-                          className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold transition-all
+                          className={`flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold transition-all
                             ${isDone
                               ? "bg-emerald-500 text-white shadow-sm shadow-emerald-200"
                               : isActive
@@ -325,9 +304,9 @@ export default function DealDetailsPage() {
                               : "bg-muted text-muted-foreground"
                             }`}
                         >
-                          {isDone ? <CheckCircle2 className="w-3.5 h-3.5" /> : s.step}
+                          {isDone ? <Check className="w-4.5 h-4.5 w-[18px] h-[18px]" strokeWidth={3} /> : s.step}
                         </div>
-                        <span className={`text-[10px] font-medium ${isDone ? "text-emerald-600" : isActive ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                        <span className={`text-[11px] font-semibold ${isDone ? "text-emerald-600" : isActive ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
                           {s.label}
                         </span>
                       </>
@@ -572,6 +551,124 @@ export default function DealDetailsPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* ── Deal Information + Financial Summary (mockup parity, real data only) ── */}
+        <div className="grid sm:grid-cols-2 gap-6">
+          <Card className="glass-card border-0">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">Deal Information</h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(`DL-${deal.id}`).then(
+                      () => toast({ title: "Deal ID copied" }),
+                      () => {},
+                    );
+                  }}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-mono font-semibold text-muted-foreground hover:text-foreground px-2 py-1 rounded-md border border-border/60 transition-colors"
+                  data-testid="copy-deal-id"
+                >
+                  #DL-{deal.id} <Copy className="w-3 h-3" />
+                </button>
+              </div>
+              <dl className="space-y-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Client</dt>
+                  <dd className="font-medium truncate">{deal.brandName}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Category</dt>
+                  <dd>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
+                      {(deal as any).dealType || "Custom"}
+                    </span>
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Start Date</dt>
+                  <dd className="font-medium">{formatDate(deal.startDate)}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">End Date</dt>
+                  <dd className="font-medium">{formatDate(deal.endDate)}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Status</dt>
+                  <dd><StatusBadge status={deal.status} size="compact" /></dd>
+                </div>
+              </dl>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card border-0">
+            <CardContent className="p-5">
+              {(() => {
+                const totalInvoiced = dealBrandInvoices.reduce((sum, i) => sum + Number(i.dealAmount || 0), 0);
+                const paid = dealBrandInvoices.filter((i) => i.status === "Paid").reduce((sum, i) => sum + Number(i.dealAmount || 0), 0);
+                const now = Date.now();
+                const overdue = dealBrandInvoices
+                  .filter((i) => i.status !== "Paid" && i.dueDate && new Date(i.dueDate as any).getTime() < now)
+                  .reduce((sum, i) => sum + Number(i.dealAmount || 0), 0);
+                const pending = totalInvoiced - paid - overdue;
+                const pct = deal.dealAmount > 0 ? Math.min(100, Math.round((totalInvoiced / deal.dealAmount) * 100)) : 0;
+                const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+                return (
+                  <>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold">Financial Summary</h3>
+                      {dealBrandInvoices.length > 0 && (
+                        <Link href="/invoices" className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1">
+                          View Invoices <ChevronRight className="w-3 h-3" />
+                        </Link>
+                      )}
+                    </div>
+                    {dealBrandInvoices.length === 0 ? (
+                      <div className="py-6 text-center">
+                        <Receipt className="w-7 h-7 mx-auto text-muted-foreground/40 mb-2" />
+                        <p className="text-sm text-muted-foreground">No invoices raised yet.</p>
+                        <p className="text-xs text-muted-foreground/80 mt-0.5">Invoices appear here once the agreement is signed.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-end justify-between gap-3 mb-2">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Deal Value</p>
+                            <p className="font-bold text-lg tabular-nums">{inr(deal.dealAmount)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Total Invoiced</p>
+                            <p className="font-bold text-lg tabular-nums">{inr(totalInvoiced)}</p>
+                          </div>
+                          <span className="text-xs font-bold px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 tabular-nums">
+                            {pct}%
+                          </span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-muted overflow-hidden mb-4">
+                          <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500" style={{ width: `${pct}%` }} />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {([
+                            { label: "Paid", value: paid, dot: "bg-emerald-500", cls: "text-emerald-600 dark:text-emerald-400" },
+                            { label: "Pending", value: pending, dot: "bg-amber-500", cls: "text-amber-600 dark:text-amber-400" },
+                            { label: "Overdue", value: overdue, dot: "bg-rose-500", cls: "text-rose-600 dark:text-rose-400" },
+                          ] as const).map((t) => (
+                            <div key={t.label} className="rounded-lg border border-border/60 p-2.5 min-w-0">
+                              <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                <span className={`w-1.5 h-1.5 rounded-full ${t.dot}`} /> {t.label}
+                              </p>
+                              <p className={`font-bold text-sm tabular-nums mt-0.5 truncate ${t.cls}`}>{inr(t.value)}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        </div>
         </div>
 
         <div className="lg:col-span-2 xl:col-span-1 space-y-6">
@@ -686,6 +783,46 @@ export default function DealDetailsPage() {
             </section>
           );
         })()}
+
+        {/* ── Quick Actions — contextual, only what's actually available ── */}
+        <section className="space-y-3">
+          <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+            <Zap className="w-3.5 h-3.5" />
+            Quick Actions
+          </h3>
+          <Card className="glass-card border-0">
+            <CardContent className="p-3 grid grid-cols-2 gap-2">
+              {deal.status === "Pending" && (
+                <Link href={`/deals/${deal.id}/edit`} className="col-span-1">
+                  <Button variant="outline" className="w-full h-10 justify-start font-semibold text-sm" data-testid="qa-edit-deal">
+                    <Pencil className="w-4 h-4 mr-2 text-muted-foreground" /> Edit Deal
+                  </Button>
+                </Link>
+              )}
+              {quote && (
+                <Link href={`/deals/${deal.id}/quote`} className="col-span-1">
+                  <Button variant="outline" className="w-full h-10 justify-start font-semibold text-sm" data-testid="qa-view-quote">
+                    <FileText className="w-4 h-4 mr-2 text-muted-foreground" /> Quotation
+                  </Button>
+                </Link>
+              )}
+              {contract && (
+                <Link href={`/contracts/${contract.id}`} className="col-span-1">
+                  <Button variant="outline" className="w-full h-10 justify-start font-semibold text-sm" data-testid="qa-view-agreement">
+                    <FileCheck className="w-4 h-4 mr-2 text-muted-foreground" /> Agreement
+                  </Button>
+                </Link>
+              )}
+              {dealBrandInvoices.length > 0 && (
+                <Link href={dealBrandInvoices.length === 1 ? `/brand-invoices/${dealBrandInvoices[0].id}` : "/invoices"} className="col-span-1">
+                  <Button variant="outline" className="w-full h-10 justify-start font-semibold text-sm" data-testid="qa-view-invoices">
+                    <Receipt className="w-4 h-4 mr-2 text-muted-foreground" /> Invoice{dealBrandInvoices.length > 1 ? "s" : ""}
+                  </Button>
+                </Link>
+              )}
+            </CardContent>
+          </Card>
+        </section>
         </div>
         </div>
       </main>
