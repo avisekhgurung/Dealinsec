@@ -7,6 +7,7 @@ import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./auth";
 import { requirePro, requireOrgPermission, withOrg, getBillingUser, logOrgActivity } from "./entitlements";
 import { maybeStartTrial } from "./trial";
+import { registerCopilotRoutes } from "./copilot/routes";
 import { getSeatLimit, INVITABLE_ROLES, hasPermission as hasOrgPermission, orgRoleOptions, CUSTOM_ROLE, ASSIGNABLE_PERMISSIONS } from "@shared/permissions";
 import { aiEnabled, reserve, refund, extractInvoice } from "./ai";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
@@ -126,6 +127,7 @@ const upload = multer({
 
 export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
+  registerCopilotRoutes(app);
 
   // Org-scoped access check: a resource is visible to every active member of
   // its organization. Rows created before the org migration (or by an old

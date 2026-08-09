@@ -10,6 +10,7 @@ import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { InstallPrompt } from "@/components/install-prompt";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 import { UpgradeModalProvider } from "@/components/upgrade-modal";
+import { Copilot } from "@/components/copilot/copilot";
 import { trackPageView } from "@/lib/analytics";
 import { useLocation } from "wouter";
 
@@ -133,6 +134,8 @@ function Router() {
   return (
     <>
       {showShell && <DesktopSidebar />}
+      {/* Copilot floats on every authed workspace page (not on print/full-bleed views) */}
+      {showShell && <Copilot />}
       {/* Content offset tracks the sidebar width via --dis-sidebar-w
           (see .app-shell in index.css) so the collapsible rail and the
           content stay in lockstep. */}
