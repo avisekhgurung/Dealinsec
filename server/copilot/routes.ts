@@ -220,12 +220,7 @@ export function registerCopilotRoutes(app: Express) {
       res.json({ reply: reply || "…", actions });
     } catch (err) {
       console.error("[copilot] chat error:", err);
-      // TEMP DIAGNOSTIC: surface the provider's own message (no stack) so a
-      // production-only failure can be identified. Remove after diagnosis.
-      res.status(502).json({
-        error: "I couldn't complete that right now. Please try again.",
-        detail: String((err as any)?.message ?? err).slice(0, 300),
-      });
+      res.status(502).json({ error: "I couldn't complete that right now. Please try again." });
     }
   });
 

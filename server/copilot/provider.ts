@@ -20,6 +20,12 @@ export interface ChatResult {
   toolCalls: { id: string; name: string; arguments: any }[];
 }
 
+/** Full chat-completions URL, tolerant of base-vs-endpoint env values. */
+function endpointUrl(): string {
+  const raw = (process.env.DEEPSEEK_URL || "https://api.deepseek.com").replace(/\/+$/, "");
+  return raw.endsWith("/chat/completions") ? raw : `${raw}/chat/completions`;
+}
+
 export interface AIProvider {
   readonly name: string;
   chat(messages: ChatMessage[], tools: readonly any[]): Promise<ChatResult>;
@@ -37,7 +43,10 @@ class DeepSeekProvider implements AIProvider {
     const timer = setTimeout(() => controller.abort(), 45_000);
     try {
       const res = await fetch(
-        (process.env.DEEPSEEK_URL || "https://api.deepseek.com") + "/chat/completions",
+        // DEEPSEEK_URL is set in production as the FULL endpoint (that's the
+        // convention server/ai.ts established); accept a bare base too, so
+        // either form works and we never double-append the path.
+        endpointUrl(),
         {
           method: "POST",
           signal: controller.signal,
