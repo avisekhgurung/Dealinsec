@@ -117,6 +117,8 @@ export default function DealsPage() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME);
+  const { user } = useAuth();
+  const canCreateDeal = memberCan(user as any, "deals.create");
   // ?pick=agreement — arrived from the invoice picker's "create an agreement".
   const [pickAgreement, setPickAgreement] = useState(
     () => new URLSearchParams(window.location.search).get("pick") === "agreement",
@@ -169,12 +171,14 @@ export default function DealsPage() {
             </div>
             <div className="flex items-center gap-1.5">
             <NotificationBell className="lg:hidden" />
-            <Link href="/deals/new">
-              <Button size="sm" className="gradient-btn text-white lg:h-10 lg:px-5 lg:text-sm" data-testid="button-new-deal">
-                <Plus className="w-4 h-4 mr-1 lg:mr-2" />
-                <span className="lg:inline">New</span><span className="hidden lg:inline">&nbsp;Deal</span>
-              </Button>
-            </Link>
+            {canCreateDeal && (
+              <Link href="/deals/new">
+                <Button size="sm" className="gradient-btn text-white lg:h-10 lg:px-5 lg:text-sm" data-testid="button-new-deal">
+                  <Plus className="w-4 h-4 mr-1 lg:mr-2" />
+                  <span className="lg:inline">New</span><span className="hidden lg:inline">&nbsp;Deal</span>
+                </Button>
+              </Link>
+            )}
             </div>
           </div>
 
@@ -261,7 +265,7 @@ export default function DealsPage() {
                 }]}
                 onRowClick={(deal) => setLocation(`/deals/${deal.id}`)}
                 exportFileName="deals"
-                onImportClick={() => setLocation("/deals/import")}
+                onImportClick={canCreateDeal ? () => setLocation("/deals/import") : undefined}
                 toolbarExtra={<DateRangeFilter value={dateRange} onChange={setDateRange} />}
                 emptyMessage="No deals match your filters."
               />

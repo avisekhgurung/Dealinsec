@@ -23,6 +23,7 @@ import {
   hasActivePro, hasActiveDealBoost, hasActiveTrial, hasLapsedTrial, getSubscriptionType,
 } from "@shared/schema";
 import { TrialCountdown } from "@/components/trial-countdown";
+import { memberCan } from "@shared/permissions";
 import type { Deal, Contract, Invoice, BrandInvoice, Quote, User } from "@shared/schema";
 
 // ─── Team seats strip ────────────────────────────────────────────────────────
@@ -812,13 +813,15 @@ export default function DashboardPage() {
         {/* ── Quick Actions — the six most common jumps, one tap away ── */}
         <section className="grid grid-cols-3 lg:grid-cols-6 gap-2 lg:gap-3" aria-label="Quick actions">
           {([
-            { label: "New Deal", icon: Plus, href: "/deals/new", chip: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400", primary: true },
-            { label: "Quotation", icon: FileText, href: "/deals", chip: "bg-teal-500/15 text-teal-600 dark:text-teal-400" },
-            { label: "Agreement", icon: FileSignature, href: "/deals", chip: "bg-blue-500/15 text-blue-600 dark:text-blue-400" },
-            { label: "Invoice", icon: Receipt, href: "/contracts", chip: "bg-amber-500/15 text-amber-600 dark:text-amber-400" },
-            { label: "Invite", icon: UserPlus2, href: "/settings", chip: "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400" },
-            { label: "Plan", icon: Crown, href: "/pricing", chip: "bg-slate-500/15 text-slate-600 dark:text-slate-300" },
-          ] as const).map((a) => (
+            { label: "New Deal", icon: Plus, href: "/deals/new", chip: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400", primary: true, perm: "deals.create" },
+            { label: "Quotation", icon: FileText, href: "/deals", chip: "bg-teal-500/15 text-teal-600 dark:text-teal-400", perm: "quotations.create" },
+            { label: "Agreement", icon: FileSignature, href: "/deals", chip: "bg-blue-500/15 text-blue-600 dark:text-blue-400", perm: "agreements.create" },
+            { label: "Invoice", icon: Receipt, href: "/contracts", chip: "bg-amber-500/15 text-amber-600 dark:text-amber-400", perm: "invoices.create" },
+            { label: "Invite", icon: UserPlus2, href: "/settings", chip: "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400", perm: "team.invite" },
+            { label: "Plan", icon: Crown, href: "/pricing", chip: "bg-slate-500/15 text-slate-600 dark:text-slate-300", perm: null },
+          ] as const)
+            .filter((a) => !a.perm || memberCan(user as any, a.perm as any))
+            .map((a) => (
             <Link key={a.label} href={a.href}>
               <button
                 type="button"

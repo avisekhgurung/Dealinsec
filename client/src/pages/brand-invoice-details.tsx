@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
+import { memberCan } from "@shared/permissions";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Download, CheckCircle, Loader2, BellRing, Crown } from "lucide-react";
@@ -25,6 +26,7 @@ export default function BrandInvoiceDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const canRecordPayment = memberCan(user as any, "payments.manage");
 
   const { data: invoice, isLoading } = useQuery<BrandInvoice>({
     queryKey: ["/api/brand-invoices", id],
@@ -423,7 +425,11 @@ export default function BrandInvoiceDetailsPage() {
 
         {/* Mark as Paid / Paid status */}
         <div className="px-4 pb-6 print:hidden space-y-2 max-w-2xl lg:max-w-4xl mx-auto">
-          {invoice.status === "Unpaid" ? (
+          {invoice.status === "Unpaid" && !canRecordPayment ? (
+            <p className="text-center text-xs text-muted-foreground py-3">
+              Your role can view this invoice but not record payments.
+            </p>
+          ) : invoice.status === "Unpaid" ? (
             <Button
               className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
               onClick={() => markPaid.mutate()}

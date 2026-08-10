@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/status-badge";
 import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
+import { memberCan } from "@shared/permissions";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -41,6 +42,8 @@ export default function ContractDetailsPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const canInvoice = memberCan(user as any, "invoices.create");
+  const canAgree = memberCan(user as any, "agreements.create");
   const confirm = useConfirm();
   const { openUpgradeModal } = useUpgradeModal();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -670,7 +673,9 @@ export default function ContractDetailsPage() {
               </Card>
             )}
 
-            {/* Generate new — always available while contract is signed */}
+            {/* Generate new — while the contract is signed AND the
+                member's role includes invoice creation. */}
+            {canInvoice && (
             <Card className="glass-card border-0">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3 mb-4">
@@ -854,6 +859,7 @@ export default function ContractDetailsPage() {
                 )}
               </CardContent>
             </Card>
+            )}
           </section>
         </div>
 

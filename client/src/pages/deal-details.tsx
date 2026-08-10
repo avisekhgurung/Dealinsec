@@ -15,6 +15,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { trackEvent } from "@/lib/analytics";
 import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle, ChevronRight, Crown, Briefcase, ScrollText, ListChecks, Copy, Zap } from "lucide-react";
 import { hasProAccess, STANDARD_TERMS } from "@shared/schema";
+import { memberCan } from "@shared/permissions";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { parseApiError, isUpgradeError } from "@/lib/api-error";
@@ -23,6 +24,11 @@ export default function DealDetailsPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  // Role capabilities — the server enforces these too; hiding the button
+  // just stops a member walking into a guaranteed 403.
+  const canQuote = memberCan(user as any, "quotations.create");
+  const canAgree = memberCan(user as any, "agreements.create");
+  const canInvoice = memberCan(user as any, "invoices.create");
   const { toast } = useToast();
   const { openUpgradeModal } = useUpgradeModal();
   const [splitPercentageStr, setSplitPercentageStr] = useState("50");
@@ -347,7 +353,7 @@ export default function DealDetailsPage() {
                 )}
 
                 {/* Step 1 → 2: Generate Quote */}
-                {!hasQuote && (
+                {!hasQuote && canQuote && (
                   <Button
                     className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
                     onClick={() => generateQuote.mutate()}
@@ -369,7 +375,7 @@ export default function DealDetailsPage() {
                 )}
 
                 {/* Step 2 → 3: Create Agreement (Pro feature) */}
-                {hasQuote && !hasContract && (
+                {hasQuote && !hasContract && canAgree && (
                   hasProAccess(user) ? (
                     <Link href={`/deals/${deal.id}/contract`}>
                       <Button
@@ -422,7 +428,7 @@ export default function DealDetailsPage() {
                 )}
 
                 {/* Step 3 → 4: Generate Invoice for Brand (Pro feature) */}
-                {hasContract && hasProof && !hasInvoice && !hasProAccess(user) && (
+                {hasContract && hasProof && !hasInvoice && canInvoice && !hasProAccess(user) && (
                   <div className="space-y-2">
                     <Button
                       className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
@@ -437,7 +443,7 @@ export default function DealDetailsPage() {
                     </Button>
                   </div>
                 )}
-                {hasContract && hasProof && !hasInvoice && hasProAccess(user) && (
+                {hasContract && hasProof && !hasInvoice && canInvoice && hasProAccess(user) && (
                   <div className="space-y-2">
                     <Link href={contract ? `/contracts/${contract.id}` : "/contracts"}>
                       <Button
