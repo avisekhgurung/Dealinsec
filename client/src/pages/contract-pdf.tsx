@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
+import { useIssuer } from "@/hooks/useIssuer";
 import { ArrowLeft, Printer, Shield, Lock } from "lucide-react";
 import type { Contract, Deal } from "@shared/schema";
-import { STANDARD_TERMS } from "@shared/schema";
+import { STANDARD_TERMS, recordNo } from "@shared/schema";
 import { getAgreementCopy, getDeliverableLabels } from "@shared/dealTypeTaxonomy";
 
 function slugify(s: string): string {
@@ -22,12 +23,26 @@ export default function ContractPdfPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const issuer = useIssuer();
   const backPath = `/contracts/${id}`;
   const contractsPath = "/contracts";
 
   const { data: contract, isLoading } = useQuery<Contract>({
     queryKey: ["/api/contracts", id],
   });
+
+  // Authenticity: the document renders the signature and name captured when
+  // the agreement was created — NOT the viewer's profile. Older agreements
+  // were backfilled from their creator by migrate-document-authenticity.ts;
+  // the fallback keeps anything older still rendering.
+  const signatureSrc: string | undefined =
+    ((contract as any)?.signatureUrl as string | null | undefined)
+    ?? issuer.digitalSignature
+    ?? undefined;
+  const signerLabel =
+    (contract as any)?.signerName
+    || issuer.name
+    || "—";
 
   const { data: deal } = useQuery<Deal>({
     queryKey: ["/api/deals", contract?.dealId],
@@ -151,30 +166,36 @@ export default function ContractPdfPage() {
                 <div className="text-sm space-y-1.5">
                   <div>
                     <span className="text-muted-foreground text-xs">Full Name</span>
-                    <p className="font-semibold">{[user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "—"}</p>
+                    <p className="font-semibold">{signerLabel}</p>
                   </div>
-                  {user?.billingAddress && (
+                  {issuer.billingAddress && (
                     <div>
                       <span className="text-muted-foreground text-xs">Address</span>
-                      <p className="font-medium">{user.billingAddress}</p>
+                      <p className="font-medium">{issuer.billingAddress}</p>
                     </div>
                   )}
-                  {user?.panNumber && (
+                  {issuer.panNumber && (
                     <div>
                       <span className="text-muted-foreground text-xs">PAN</span>
-                      <p className="font-medium font-mono">{user.panNumber}</p>
+                      <p className="font-medium font-mono">{issuer.panNumber}</p>
                     </div>
                   )}
-                  {user?.email && (
+                  {issuer.gstNumber && (
+                    <div>
+                      <span className="text-muted-foreground text-xs">GSTIN</span>
+                      <p className="font-medium font-mono">{issuer.gstNumber}</p>
+                    </div>
+                  )}
+                  {issuer.email && (
                     <div>
                       <span className="text-muted-foreground text-xs">Email</span>
-                      <p className="font-medium">{user.email}</p>
+                      <p className="font-medium">{issuer.email}</p>
                     </div>
                   )}
-                  {user?.phone && (
+                  {issuer.phone && (
                     <div>
                       <span className="text-muted-foreground text-xs">Phone</span>
-                      <p className="font-medium">{user.phone}</p>
+                      <p className="font-medium">{issuer.phone}</p>
                     </div>
                   )}
                 </div>
@@ -415,9 +436,9 @@ export default function ContractPdfPage() {
 
                 {/* Signature image or placeholder */}
                 <div className="min-h-[60px] border-2 border-dashed border-white/20 print:border-gray-300 rounded-xl flex items-center justify-center bg-white/5 print:bg-gray-50 overflow-hidden">
-                  {user?.digitalSignature ? (
+                  {signatureSrc ? (
                     <img
-                      src={user.digitalSignature}
+                      src={signatureSrc}
                       alt={`${copy.providerNoun} Signature`}
                       className="h-10 print:h-8 w-auto object-contain p-1"
                     />
@@ -429,11 +450,11 @@ export default function ContractPdfPage() {
                 </div>
 
                 <div className="space-y-3 text-sm">
-                  {!user?.digitalSignature && (
+                  {!signatureSrc && (
                     <div>
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 print:text-gray-500">Printed Name</p>
                       <div className="border-b-2 border-foreground/30 print:border-gray-400 pb-1 font-medium">
-                        {[user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || ""}
+                        {signerLabel}
                       </div>
                     </div>
                   )}
@@ -457,7 +478,8 @@ export default function ContractPdfPage() {
                     <div className="min-h-[100px] border-2 border-dashed border-white/20 print:border-gray-300 rounded-xl flex items-center justify-center bg-white/5 print:bg-gray-50">
                       <div className="text-center">
                         <Shield className="w-6 h-6 text-emerald-500 mx-auto mb-1" />
-                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">Digitally Executed</p>
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">Accepted Electronically</p>
+                        <p className="text-[9px] text-muted-foreground print:text-gray-500 mt-0.5">Signed copy on record</p>
                       </div>
                     </div>
                     <div className="space-y-3 text-sm">
@@ -498,13 +520,49 @@ export default function ContractPdfPage() {
             </div>
           </div>
 
+          {/* ── Execution record ──
+              Honest description of the signing mechanism. Per
+              ESIGN_RECOMMENDATION.md this is electronic acceptance, NOT a
+              Digital Signature Certificate under Section 3 of the IT Act —
+              never describe it as "legally verified" or "CCA certified". */}
+          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-5 print:p-4 mb-3 print:mb-2 print:rounded-none">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 print:text-gray-500">
+              Execution Record
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[11px] mb-3">
+              <div>
+                <p className="text-muted-foreground uppercase tracking-wide print:text-gray-500">Document Ref</p>
+                <p className="font-mono font-semibold">{recordNo("agreement", contract.id)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground uppercase tracking-wide print:text-gray-500">Prepared By</p>
+                <p className="font-semibold">{signerLabel}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground uppercase tracking-wide print:text-gray-500">Effective From</p>
+                <p className="font-semibold">{formatDate(contract.startDate)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground uppercase tracking-wide print:text-gray-500">Status</p>
+                <p className="font-semibold">{contract.status}{contract.signedDate ? ` · ${formatDate(contract.signedDate)}` : ""}</p>
+              </div>
+            </div>
+            <p className="text-[10px] leading-relaxed text-muted-foreground print:text-gray-500">
+              This agreement was prepared and accepted electronically. The signature shown for Party A is the
+              image on file for the named signatory, captured when this document was created. This is an
+              electronic acceptance with an audit record — it is not a Digital Signature Certificate issued
+              under the Information Technology Act, 2000, and no certifying-authority verification is claimed.
+              Parties may additionally execute a physically signed counterpart.
+            </p>
+          </div>
+
           {/* ── Footer (print only) ── */}
           <div className="hidden print:block mt-10 pt-6 border-t border-gray-200 text-center text-xs text-gray-400 space-y-1">
             <p className="font-semibold text-gray-600">End of Agreement</p>
-            <p>Reference: {contract.contractName}</p>
+            <p>Reference: {contract.contractName} · {recordNo("agreement", contract.id)}</p>
             <p>Agreement Period: {formatDate(contract.startDate)} — {formatDate(contract.endDate)}</p>
             <p>Agreement Value: ₹{contract.contractValue.toLocaleString("en-IN")}</p>
-            <p className="mt-2">Generated via Dealinsec Platform · Governed by Indian Contract Act 1872</p>
+            <p className="mt-2">Generated via Dealinsec · Electronic acceptance with audit record · Indian Contract Act, 1872</p>
           </div>
 
           {/* ── Screen action buttons ── */}

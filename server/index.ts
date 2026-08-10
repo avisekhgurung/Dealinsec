@@ -200,6 +200,33 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
     }
   );
 
+  // Keys whose values must never reach a log line. Response bodies routinely
+  // carry customer PII (names, emails, phones, PAN/GST, bank details, signature
+  // URLs, tokens); Render retains stdout, so logging them verbatim would create
+  // a second, unprotected copy of customer data. Matched case-insensitively on
+  // a normalised key so panNumber / pan_number / PAN all hit.
+  const SENSITIVE_KEY = /(password|token|secret|otp|signature|apikey|authorization|cookie|session|pan|gst|aadhaar|account|ifsc|upi|email|phone|mobile|address|dob)/i;
+  const MAX_LOG_CHARS = 400;
+
+  function redact(value: unknown, depth = 0): unknown {
+    if (value === null || value === undefined) return value;
+    if (depth > 4) return "[deep]";
+    if (Array.isArray(value)) {
+      return value.length > 5
+        ? [...value.slice(0, 5).map((v) => redact(v, depth + 1)), `…+${value.length - 5} more`]
+        : value.map((v) => redact(v, depth + 1));
+    }
+    if (typeof value === "object") {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+        out[k] = SENSITIVE_KEY.test(k.replace(/[_\-\s]/g, "")) ? "[redacted]" : redact(v, depth + 1);
+      }
+      return out;
+    }
+    if (typeof value === "string" && value.length > 120) return `${value.slice(0, 120)}…`;
+    return value;
+  }
+
   app.use((req, res, next) => {
     const start = Date.now();
     const path = req.path;
@@ -215,8 +242,17 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
       const duration = Date.now() - start;
       if (path.startsWith("/api")) {
         let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-        if (capturedJsonResponse) {
-          logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        // Only failures carry a (redacted) body — success bodies are pure
+        // customer data and add nothing a status code doesn't already say.
+        if (capturedJsonResponse && res.statusCode >= 400) {
+          let body: string;
+          try {
+            body = JSON.stringify(redact(capturedJsonResponse));
+          } catch {
+            body = "[unserialisable]";
+          }
+          if (body.length > MAX_LOG_CHARS) body = `${body.slice(0, MAX_LOG_CHARS)}…`;
+          logLine += ` :: ${body}`;
         }
 
         log(logLine);
@@ -226,8 +262,18 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
     next();
   });
 
-  // Serve uploaded files (signatures, proofs, etc.)
-  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+  // Serve legacy uploaded files (signatures, payment proofs). New uploads go to
+  // ImageKit; this path only exists for pre-ImageKit files. These are customer
+  // documents, so require a logged-in session — an unguessable filename is not
+  // an access control.
+  app.use(
+    "/uploads",
+    (req, res, next) => {
+      if (req.isAuthenticated?.()) return next();
+      res.status(401).json({ error: "Authentication required" });
+    },
+    express.static(path.join(process.cwd(), "uploads")),
+  );
 
   const httpServer = await registerRoutes(app);
 

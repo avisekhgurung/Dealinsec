@@ -416,8 +416,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
 
+      // Snapshot WHO signs and WITH WHICH signature — the document must
+      // never render the current viewer's profile signature (see
+      // migrate-document-authenticity.ts).
+      const signerName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.email || null;
       const parsed = insertContractSchema.safeParse({
         ...req.body,
+        signerUserId: req.user.id,
+        signerName,
+        signatureUrl: req.user.digitalSignature ?? null,
         userId,
         organizationId: req.user.organizationId,
       });
@@ -770,7 +777,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const user = await storage.getUser(userId);
-      const invoiceNumber = await storage.generateBrandInvoiceNumber();
+      const invoiceNumber = await storage.generateOrgInvoiceNumber(req.user.organizationId);
       
       const influencerName = user?.firstName && user?.lastName 
         ? `${user.firstName} ${user.lastName}` 
@@ -1034,7 +1041,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const advanceInvoice = await storage.createBrandInvoice({
         ...baseData,
-        invoiceNumber: await storage.generateBrandInvoiceNumber(),
+        invoiceNumber: await storage.generateOrgInvoiceNumber(req.user.organizationId),
         dealAmount: advanceAmount,
         invoiceType: "advance",
         splitPercentage: advancePercentage,
@@ -1043,7 +1050,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const finalInvoice = await storage.createBrandInvoice({
         ...baseData,
-        invoiceNumber: await storage.generateBrandInvoiceNumber(),
+        invoiceNumber: await storage.generateOrgInvoiceNumber(req.user.organizationId),
         dealAmount: finalAmount,
         invoiceType: "final",
         splitPercentage: 100 - advancePercentage,
@@ -1217,6 +1224,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Org fetch error:", error);
       res.status(500).json({ error: "Failed to load organization" });
+    }
+  });
+
+  // The identity that ISSUES documents for this organisation — the owner's
+  // billing profile. Documents used to render whichever teammate was *viewing*
+  // them, so the same invoice showed a different supplier name, PAN, bank
+  // account and signature to each member. Returns only fields that legitimately
+  // appear on an invoice or agreement.
+  // No withOrg: a solo account has no organisation and is its own issuer.
+  app.get("/api/org/issuer", isAuthenticated, async (req: any, res) => {
+    try {
+      const owner = await getBillingUser(req.user);
+      res.json({
+        name: [owner.firstName, owner.lastName].filter(Boolean).join(" ") || owner.email || "",
+        email: owner.email ?? "",
+        phone: owner.phone ?? "",
+        panNumber: owner.panNumber ?? "",
+        gstNumber: owner.gstNumber ?? "",
+        billingAddress: owner.billingAddress ?? "",
+        digitalSignature: owner.digitalSignature ?? "",
+        accountHolderName: (owner as any).accountHolderName ?? "",
+        accountNumber: (owner as any).accountNumber ?? "",
+        ifscCode: (owner as any).ifscCode ?? "",
+        bankName: (owner as any).bankName ?? "",
+      });
+    } catch (error) {
+      console.error("Org issuer fetch error:", error);
+      res.status(500).json({ error: "Failed to load issuer details" });
     }
   });
 

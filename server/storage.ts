@@ -4,7 +4,7 @@ import { canonicalEmail } from "@shared/email";
 import { DEFAULT_ROLE_SEEDS } from "@shared/permissions";
 import {
   users, deals, contracts, invoices, brandInvoices, invoiceAttachments, creditTransactions, payuOrders, quotes, referrals,
-  organizations, invitations, activityLogs, orgRoles,
+  organizations, invitations, activityLogs, orgRoles, invoiceCounters, financialYearCode,
   type OrgCustomRole,
   type User, type UpsertUser,
   type Deal, type InsertDeal,
@@ -262,6 +262,23 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBrandInvoice(id: number): Promise<void> {
     await db.delete(brandInvoices).where(eq(brandInvoices.id, id));
+  }
+
+  /** Per-org, per-FY sequential number: INV-2627-0001. Atomic upsert, so two
+   *  simultaneous invoices can never take the same number. Falls back to the
+   *  legacy generator only if the org is unknown. */
+  async generateOrgInvoiceNumber(orgId: string | null | undefined): Promise<string> {
+    if (!orgId) return this.generateBrandInvoiceNumber();
+    const fy = financialYearCode();
+    const [row] = await db
+      .insert(invoiceCounters)
+      .values({ organizationId: orgId, fy, lastNo: 1 })
+      .onConflictDoUpdate({
+        target: [invoiceCounters.organizationId, invoiceCounters.fy],
+        set: { lastNo: sql`${invoiceCounters.lastNo} + 1` },
+      })
+      .returning();
+    return `INV-${fy}-${String(row.lastNo).padStart(4, "0")}`;
   }
 
   async generateBrandInvoiceNumber(): Promise<string> {

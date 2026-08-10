@@ -15,7 +15,7 @@ export default function CookiePolicy() {
       </header>
 
       <main className="px-4 py-8 max-w-2xl mx-auto prose prose-sm dark:prose-invert animate-fade-in">
-        <p className="text-muted-foreground text-xs">Last updated: 16 April 2026</p>
+        <p className="text-muted-foreground text-xs">Last updated: 10 August 2026</p>
 
         <p>
           This Cookie Policy explains how DealInSec Technologies ("we", "us") uses cookies
@@ -72,9 +72,9 @@ export default function CookiePolicy() {
         <h2>3. Third-Party Cookies</h2>
         <ul>
           <li>
-            <strong>PayU (Payment Gateway):</strong> When you are redirected to PayU for
-            payment, PayU may set its own cookies. These are governed by
-            <a href="https://www.payu.in/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-primary"> PayU's Privacy Policy</a>.
+            <strong>Razorpay (Payment Gateway):</strong> When you pay for a plan, Razorpay's
+            checkout may set its own cookies. These are governed by
+            <a href="https://razorpay.com/privacy/" target="_blank" rel="noopener noreferrer" className="text-primary"> Razorpay's Privacy Policy</a>.
           </li>
           <li>
             <strong>Google (OAuth Sign-In):</strong> If you sign in with Google, Google may

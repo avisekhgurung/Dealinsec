@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
+import { useIssuer } from "@/hooks/useIssuer";
 import { memberCan } from "@shared/permissions";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -26,6 +27,7 @@ export default function BrandInvoiceDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const issuer = useIssuer();
   const canRecordPayment = memberCan(user as any, "payments.manage");
 
   const { data: invoice, isLoading } = useQuery<BrandInvoice>({
@@ -122,19 +124,18 @@ export default function BrandInvoiceDetailsPage() {
   /* ── Amount ───────────────────────────── */
   const totalAmount = invoice.dealAmount;
 
-  const influencerName =
-    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
-    invoice.influencerName ||
-    "—";
-  const influencerEmail = user?.email || invoice.influencerEmail || "";
-  const influencerPhone = user?.phone || "";
-  const influencerPan = user?.panNumber || "";
-  const influencerAddress = user?.billingAddress || "";
-  const signatureUrl = user?.digitalSignature || "";
-  const bankAccountHolder = (user as any)?.accountHolderName || "";
-  const bankAccountNumber = (user as any)?.accountNumber || "";
-  const bankIfsc = (user as any)?.ifscCode || "";
-  const bankName = (user as any)?.bankName || "";
+  // Supplier details come from the ORG's issuer, never the viewer — see useIssuer.
+  const influencerName = issuer.name || invoice.influencerName || "—";
+  const influencerEmail = issuer.email || invoice.influencerEmail || "";
+  const influencerPhone = issuer.phone;
+  const influencerPan = issuer.panNumber;
+  const influencerGst = issuer.gstNumber;
+  const influencerAddress = issuer.billingAddress;
+  const signatureUrl = issuer.digitalSignature;
+  const bankAccountHolder = issuer.accountHolderName;
+  const bankAccountNumber = issuer.accountNumber;
+  const bankIfsc = issuer.ifscCode;
+  const bankName = issuer.bankName;
   const hasBankDetails = bankAccountHolder || bankAccountNumber || bankIfsc || bankName;
 
   return (
@@ -231,6 +232,11 @@ export default function BrandInvoiceDetailsPage() {
                 {influencerPan && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     <span className="font-semibold text-gray-600 dark:text-gray-300">PAN:</span> {influencerPan}
+                  </p>
+                )}
+                {influencerGst && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    <span className="font-semibold text-gray-600 dark:text-gray-300">GSTIN:</span> {influencerGst}
                   </p>
                 )}
                 {influencerAddress && (
@@ -412,7 +418,12 @@ export default function BrandInvoiceDetailsPage() {
             {/* ── Footer ──────────────────────────────── */}
             <div className="px-6 py-3 bg-gray-50 dark:bg-zinc-800/40 border-t border-gray-100 dark:border-zinc-700 text-center">
               <p className="text-[10px] text-gray-400">
-                This is a computer-generated invoice. Generated via Dealinsec.
+                Computer-generated invoice — valid without signature. Generated via Dealinsec.
+              </p>
+              <p className="text-[10px] text-gray-400 mt-0.5">
+                Amounts shown are the agreed contract value and do not include a GST tax computation.
+                This is not a tax invoice under Rule 46 of the CGST Rules, 2017. Charge and report GST as
+                applicable to you.
               </p>
             </div>
           </div>

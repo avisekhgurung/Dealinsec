@@ -5,3 +5,21 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz.claude/
+
+# Customer documents (signatures, payment proofs) — never commit these.
+# New uploads go to ImageKit; this dir only holds legacy/local files.
+uploads/
+!uploads/.gitkeep
+
+# Agent worktrees
+.claude/worktrees/
+
+# Internal audit deliverables — this repo is PUBLIC on GitHub. These files
+# enumerate unfixed security/compliance gaps; publishing them hands an attacker
+# a roadmap. Keep them local (or move them to a private repo / drive).
+DATA_PRIVACY_AUDIT.md
+DEALINSEC_COMPLIANCE_AUDIT.md
+DEALINSEC_LEGAL_TECHNICAL_GAP_MATRIX.md
+DEALINSEC_PRE_LAUNCH_CHECKLIST.md
+ESIGN_RECOMMENDATION.md
+GST_COMPLIANCE_NOTES.md

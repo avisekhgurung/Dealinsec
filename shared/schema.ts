@@ -197,6 +197,21 @@ export const activityLogs = pgTable("activity_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Per-organization, per-financial-year invoice sequence (Indian FY starts
+// 1 April). Gives clients INV-2627-0001 instead of an epoch-based string.
+export const invoiceCounters = pgTable("invoice_counters", {
+  organizationId: varchar("organization_id").notNull(),
+  fy: varchar("fy", { length: 9 }).notNull(),
+  lastNo: integer("last_no").notNull().default(0),
+});
+
+/** "2627" for FY 2026-27 — the label that goes in the invoice number. */
+export function financialYearCode(d: Date = new Date()): string {
+  const y = d.getFullYear();
+  const startYear = d.getMonth() >= 3 ? y : y - 1; // April = month 3
+  return `${String(startYear).slice(-2)}${String(startYear + 1).slice(-2)}`;
+}
+
 export type ActivityLog = typeof activityLogs.$inferSelect;
 export type InsertActivityLog = typeof activityLogs.$inferInsert;
 
@@ -363,6 +378,13 @@ export const contracts = pgTable("contracts", {
   exclusive: boolean("exclusive").notNull().default(true),
   proofFileName: text("proof_file_name"),
   proofFilePath: text("proof_file_path"),
+  // Signer snapshot, captured when the agreement is created. The document
+  // must always render the signature of the person who actually signed —
+  // never the profile of whoever happens to be viewing it, and never a
+  // signature the signer changed afterwards.
+  signerUserId: varchar("signer_user_id"),
+  signerName: varchar("signer_name"),
+  signatureUrl: varchar("signature_url"),
   signedByInfluencer: boolean("signed_by_influencer").notNull().default(false),
   signedByInfluencerDate: text("signed_by_influencer_date"),
   signedByBrand: boolean("signed_by_brand").notNull().default(false),

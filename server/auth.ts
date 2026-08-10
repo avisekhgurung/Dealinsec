@@ -22,12 +22,17 @@ function generateReferralCode(email: string): string {
 }
 
 export function getSession() {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000;
+  const SESSION_DAYS = 7;
+  // connect-pg-simple takes SECONDS; express-session cookies take MILLISECONDS.
+  // Feeding the ms value to the store gave rows a ~19-year expiry, so server-side
+  // sessions never actually died — only the cookie did.
+  const sessionTtlSeconds = SESSION_DAYS * 24 * 60 * 60;
+  const sessionTtl = sessionTtlSeconds * 1000;
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
     createTableIfMissing: false,
-    ttl: sessionTtl,
+    ttl: sessionTtlSeconds,
     tableName: "sessions",
   });
   return session({
