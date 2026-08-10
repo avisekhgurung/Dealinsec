@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, newsletterSubscribers, invoiceDocumentCategories, hasActivePro, hasActiveDealBoost, hasProAccess, hasActiveTrial, getTrialDaysLeft, getDealCredits } from "@shared/schema";
+import { insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, newsletterSubscribers, invoiceDocumentCategories, invoiceLineItemSchema, brandInvoiceTypeOptions, hasActivePro, hasActiveDealBoost, hasProAccess, hasActiveTrial, getTrialDaysLeft, getDealCredits } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./auth";
@@ -12,6 +12,7 @@ import { getSeatLimit, INVITABLE_ROLES, hasPermission as hasOrgPermission, orgRo
 import { aiEnabled, reserve, refund, extractInvoice } from "./ai";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import multer from "multer";
+import { z } from "zod";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
@@ -776,26 +777,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const user = await storage.getUser(userId);
+      // The supplier on the document is the ORG's issuer (owner), not whichever
+      // teammate happened to press the button — same rule the PDF follows.
+      const issuer = await getBillingUser(req.user);
+      const influencerName =
+        [issuer.firstName, issuer.lastName].filter(Boolean).join(" ") || issuer.email || "Influencer";
+
+      // Whitelist: never spread req.body into a row. It previously let a client
+      // set any column, including amounts unrelated to the agreement.
+      const amount = Math.round(Number(req.body?.dealAmount));
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return res.status(400).json({ error: "Invoice amount must be greater than zero" });
+      }
+
+      // An invoice may not bill more than its agreement is worth, minus what
+      // has already been invoiced against it. This is the scope-protection
+      // promise applied to money.
+      if (req.body?.contractId) {
+        const contractId = parseInt(req.body.contractId, 10);
+        const parentContract = await storage.getContract(contractId);
+        const existing = await storage.getBrandInvoicesByDealIdForOrg(parentDealId, req.user.organizationId);
+        const alreadyInvoiced = existing
+          .filter((i) => i.contractId === contractId)
+          .reduce((sum, i) => sum + (i.dealAmount || 0), 0);
+        const remaining = Number(parentContract!.contractValue) - alreadyInvoiced;
+        if (amount > remaining) {
+          return res.status(400).json({
+            error:
+              remaining > 0
+                ? `Only ₹${remaining.toLocaleString("en-IN")} is left to invoice on this agreement.`
+                : "This agreement is already fully invoiced.",
+          });
+        }
+      }
+
+      let lineItems: unknown = null;
+      if (Array.isArray(req.body?.lineItems) && req.body.lineItems.length) {
+        const parsed = z.array(invoiceLineItemSchema).min(1).max(50).safeParse(req.body.lineItems);
+        if (!parsed.success) {
+          return res.status(400).json({ error: "Invoice lines are invalid", details: parsed.error.flatten() });
+        }
+        const linesTotal = parsed.data.reduce((sum: number, l) => sum + l.amount, 0);
+        if (linesTotal !== amount) {
+          return res.status(400).json({ error: "Invoice lines must add up to the invoice total" });
+        }
+        lineItems = parsed.data;
+      }
+
       const invoiceNumber = await storage.generateOrgInvoiceNumber(req.user.organizationId);
-      
-      const influencerName = user?.firstName && user?.lastName 
-        ? `${user.firstName} ${user.lastName}` 
-        : user?.email || "Influencer";
 
       const invoiceData = {
-        ...req.body,
         dealId: parentDealId,
+        contractId: req.body?.contractId ? parseInt(req.body.contractId, 10) : null,
+        brandName: String(req.body?.brandName ?? parentDeal.brandName),
+        dealAmount: amount,
+        invoiceType: brandInvoiceTypeOptions.includes(req.body?.invoiceType) ? req.body.invoiceType : "full",
+        splitPercentage: null,
+        dueDate: typeof req.body?.dueDate === "string" && req.body.dueDate ? req.body.dueDate : null,
+        notes: typeof req.body?.notes === "string" ? req.body.notes.slice(0, 2000) || null : null,
+        lineItems,
         userId,
         organizationId: req.user.organizationId,
         invoiceNumber,
         invoiceDate: req.body.invoiceDate || new Date().toISOString().split("T")[0],
         influencerName,
-        influencerEmail: user?.email || null,
+        influencerEmail: issuer.email || null,
         status: "Unpaid",
       };
 
-      const invoice = await storage.createBrandInvoice(invoiceData);
+      const invoice = await storage.createBrandInvoice(invoiceData as any);
       logOrgActivity(req.user, "created", "invoice", invoice.id, `Invoice ${invoice.invoiceNumber}: ${invoice.brandName}`);
       res.status(201).json(invoice);
     } catch (error) {

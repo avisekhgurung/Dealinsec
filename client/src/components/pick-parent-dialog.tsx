@@ -197,7 +197,9 @@ export function PickParentDialog({
             onBack={() => setChosenContract(null)}
             onGo={(mode) => {
               close();
-              setLocation(`/contracts/${chosenContract.id}?invoice=${mode}`);
+              // Land in the invoice composer, not on the agreement page —
+              // creating an invoice belongs to the invoice module.
+              setLocation(`/brand-invoices/new?contractId=${chosenContract.id}&mode=${mode}`);
             }}
           />
         ) : (

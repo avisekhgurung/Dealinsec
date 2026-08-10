@@ -48,25 +48,8 @@ export default function ContractDetailsPage() {
   const { openUpgradeModal } = useUpgradeModal();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
-  const [showSplitInput, setShowSplitInput] = useState(false);
-  const [splitPercentageStr, setSplitPercentageStr] = useState("50");
-  const splitPercentage = Math.min(99, Math.max(1, parseInt(splitPercentageStr) || 50));
-
-  // Custom-amount invoice (partial bills, add-ons, amounts ≠ deal value)
-  const [showCustomInput, setShowCustomInput] = useState(false);
-  const [customAmountStr, setCustomAmountStr] = useState("");
-  const customAmount = parseInt(customAmountStr || "0", 10);
-
-  // Bank details gate before generating brand invoice
-  const hasBankDetails =
-    !!(user as any)?.accountNumber && !!(user as any)?.ifscCode && !!(user as any)?.accountHolderName;
-  const [bankModalOpen, setBankModalOpen] = useState(false);
-  const [bankModalIntent, setBankModalIntent] = useState<"single" | "split" | "custom" | null>(null);
-  const [bAccountHolder, setBAccountHolder] = useState("");
-  const [bAccountNumber, setBAccountNumber] = useState("");
-  const [bIfsc, setBIfsc] = useState("");
-  const [bBankName, setBBankName] = useState("");
-  const [savingBank, setSavingBank] = useState(false);
+  // Invoice amount, split and bank-details capture all moved to the invoice
+  // composer (/brand-invoices/new). This page only links to it now.
 
   // Inline edit of existing invoice amount (post-creation correction only)
   const [editingInvoiceId, setEditingInvoiceId] = useState<number | null>(null);
@@ -124,65 +107,6 @@ export default function ContractDetailsPage() {
       toast({
         title: "Upload failed",
         description: "Failed to upload proof. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const createBrandInvoice = useMutation({
-    mutationFn: async (override?: number) => {
-      const amount = override ?? (deal?.dealAmount || contract?.contractValue || 0);
-      const res = await apiRequest("POST", "/api/brand-invoices", {
-        dealId: contract?.dealId,
-        brandName: contract?.brandName,
-        dealAmount: amount,
-        contractId: parseInt(params.id || "0"),
-      });
-      return res.json();
-    },
-    onSuccess: (invoice) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/deals", contract?.dealId, "brand-invoices"] });
-      toast({
-        title: "Invoice created",
-        description: "Brand invoice has been generated successfully.",
-      });
-      setLocation(`/brand-invoices/${invoice.id}`);
-    },
-    onError: (err) => {
-      if (isUpgradeError(parseApiError(err))) {
-        openUpgradeModal({ feature: "invoices" });
-        return;
-      }
-      toast({
-        title: "Failed to create invoice",
-        description: "Could not generate brand invoice. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const splitInvoices = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/deals/${contract?.dealId}/split-invoices`, {
-        advancePercentage: splitPercentage,
-      });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/deals", contract?.dealId, "brand-invoices"] });
-      toast({ title: "Invoices created", description: "Advance and final invoices generated." });
-      setShowSplitInput(false);
-    },
-    onError: (err) => {
-      if (isUpgradeError(parseApiError(err))) {
-        openUpgradeModal({ feature: "invoices" });
-        return;
-      }
-      toast({
-        title: "Failed to split invoice",
-        description: "Could not create split invoices. Please try again.",
         variant: "destructive",
       });
     },
@@ -694,169 +618,45 @@ export default function ContractDetailsPage() {
                   </div>
                 </div>
 
-                {/* Single invoice — locked to deal amount (no editable override).
-                    If the brand-side amount truly differs, edit the deal itself
-                    or use the split flow. Editable invoice amount on a signed
-                    contract creates legal inconsistency. */}
+                {/* Creation itself lives in the invoice composer
+                    (/brand-invoices/new). This card stays as the shortcut from
+                    the agreement — it just stops being the implementation, so
+                    dates, itemised lines and notes have a real home. */}
                 <div className="mb-3 flex items-center justify-between rounded-lg border border-input/60 bg-muted/30 px-3 py-2.5">
-                  <span className="text-xs text-muted-foreground">Invoice amount (from signed contract)</span>
+                  <span className="text-xs text-muted-foreground">Agreement value</span>
                   <span className="text-sm font-semibold text-foreground">
-                    ₹{deal ? Number(deal.dealAmount).toLocaleString("en-IN") : "—"}
+                    ₹{Number(contract.contractValue).toLocaleString("en-IN")}
                   </span>
                 </div>
                 <Button
                   className="w-full gradient-btn text-white mb-2"
-                  onClick={() => {
-                    if (!hasBankDetails) {
-                      setBankModalIntent("single");
-                      setBankModalOpen(true);
-                      return;
-                    }
-                    createBrandInvoice.mutate(undefined);
-                  }}
-                  disabled={createBrandInvoice.isPending || !contract || !deal || contract.status !== "Signed"}
+                  onClick={() => setLocation(`/brand-invoices/new?contractId=${contract.id}&mode=full`)}
+                  disabled={contract.status !== "Signed"}
                   data-testid="button-generate-brand-invoice"
                 >
-                  {createBrandInvoice.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="w-4 h-4 mr-2" />
-                      {hasInvoice ? "Generate another single invoice" : "Generate Single Invoice"}
-                    </>
-                  )}
+                  <FileText className="w-4 h-4 mr-2" />
+                  {hasInvoice ? "Raise another invoice" : "Raise invoice"}
                 </Button>
-
-                {/* Split invoice toggle */}
-                {!showSplitInput ? (
+                <div className="grid grid-cols-2 gap-2">
                   <Button
                     variant="outline"
-                    className="w-full"
-                    onClick={() => setShowSplitInput(true)}
+                    onClick={() => setLocation(`/brand-invoices/new?contractId=${contract.id}&mode=split`)}
                     disabled={contract.status !== "Signed"}
+                    data-testid="button-split-invoice"
                   >
                     <Scissors className="w-4 h-4 mr-2" />
-                    Split Invoice (Advance + Final)
+                    Advance + final
                   </Button>
-                ) : (
-                  <div className="border border-white/10 rounded-lg p-3 space-y-3">
-                    <p className="text-sm font-medium">Split into Advance + Final</p>
-                    <div className="flex items-center gap-3">
-                      <label className="text-xs text-muted-foreground whitespace-nowrap">Advance %</label>
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        value={splitPercentageStr}
-                        onChange={(e) => setSplitPercentageStr(e.target.value.replace(/[^0-9]/g, ""))}
-                        className="w-20 h-8 text-sm"
-                        placeholder="50"
-                      />
-                      <span className="text-xs text-muted-foreground">
-                        ₹{Math.round((deal?.dealAmount || 0) * splitPercentage / 100).toLocaleString()} + ₹{((deal?.dealAmount || 0) - Math.round((deal?.dealAmount || 0) * splitPercentage / 100)).toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        className="flex-1 gradient-btn text-white"
-                        onClick={() => {
-                          if (!hasBankDetails) {
-                            setBankModalIntent("split");
-                            setBankModalOpen(true);
-                            return;
-                          }
-                          splitInvoices.mutate();
-                        }}
-                        disabled={!deal || splitInvoices.isPending}
-                      >
-                        {splitInvoices.isPending ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Creating...
-                          </>
-                        ) : (
-                          "Create Split Invoices"
-                        )}
-                      </Button>
-                      <Button variant="outline" onClick={() => setShowSplitInput(false)} disabled={splitInvoices.isPending}>Cancel</Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Custom amount invoice — partial bills, add-ons, retainers */}
-                {!showCustomInput ? (
                   <Button
                     variant="outline"
-                    className="w-full mt-2"
-                    onClick={() => setShowCustomInput(true)}
+                    onClick={() => setLocation(`/brand-invoices/new?contractId=${contract.id}&mode=custom`)}
                     disabled={contract.status !== "Signed"}
                     data-testid="button-show-custom-invoice"
                   >
                     <IndianRupee className="w-4 h-4 mr-2" />
-                    Custom Amount Invoice
+                    Custom amount
                   </Button>
-                ) : (
-                  <div className="border border-white/10 rounded-lg p-3 space-y-3 mt-2">
-                    <p className="text-sm font-medium">Custom amount invoice</p>
-                    <p className="text-xs text-muted-foreground">
-                      For partial bills, add-ons or retainers where the amount differs from the deal value.
-                    </p>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        value={customAmountStr}
-                        onChange={(e) => setCustomAmountStr(e.target.value.replace(/\D/g, ""))}
-                        placeholder="Enter amount"
-                        className="pl-7 h-9"
-                        autoFocus
-                        data-testid="input-custom-invoice-amount"
-                      />
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        className="flex-1 gradient-btn text-white"
-                        onClick={() => {
-                          if (!Number.isFinite(customAmount) || customAmount < 1) {
-                            toast({
-                              title: "Enter a valid amount",
-                              description: "Amount must be a positive number.",
-                              variant: "destructive",
-                            });
-                            return;
-                          }
-                          if (!hasBankDetails) {
-                            setBankModalIntent("custom");
-                            setBankModalOpen(true);
-                            return;
-                          }
-                          createBrandInvoice.mutate(customAmount);
-                        }}
-                        disabled={createBrandInvoice.isPending}
-                        data-testid="button-create-custom-invoice"
-                      >
-                        {createBrandInvoice.isPending ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Creating...
-                          </>
-                        ) : (
-                          "Create Custom Invoice"
-                        )}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => { setShowCustomInput(false); setCustomAmountStr(""); }}
-                        disabled={createBrandInvoice.isPending}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                </div>
               </CardContent>
             </Card>
             )}
@@ -980,119 +780,6 @@ export default function ContractDetailsPage() {
         </div>
       </main>
 
-      {/* Bank details modal — shown just before first invoice */}
-      <Dialog open={bankModalOpen} onOpenChange={setBankModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Landmark className="w-4 h-4 text-primary" />
-              </div>
-              <DialogTitle>Add your bank details</DialogTitle>
-            </div>
-            <DialogDescription>
-              These appear on every invoice you send so brands can pay you directly.
-              Saved to your profile — we'll only ask once.
-            </DialogDescription>
-          </DialogHeader>
-
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!bAccountHolder.trim() || !bAccountNumber.trim() || !bIfsc.trim() || !bBankName.trim()) {
-                toast({ title: "Please fill every bank field", variant: "destructive" });
-                return;
-              }
-              if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bIfsc.toUpperCase())) {
-                toast({ title: "Invalid IFSC format", description: "Example: HDFC0001234", variant: "destructive" });
-                return;
-              }
-              setSavingBank(true);
-              try {
-                await apiRequest("PATCH", "/api/profile", {
-                  accountHolderName: bAccountHolder.trim(),
-                  accountNumber: bAccountNumber.replace(/\s/g, ""),
-                  ifscCode: bIfsc.toUpperCase(),
-                  bankName: bBankName.trim(),
-                });
-                await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-                setBankModalOpen(false);
-                // Trigger the original intent
-                if (bankModalIntent === "single") {
-                  createBrandInvoice.mutate(undefined);
-                } else if (bankModalIntent === "split") {
-                  splitInvoices.mutate();
-                } else if (bankModalIntent === "custom") {
-                  createBrandInvoice.mutate(customAmount);
-                }
-              } catch (err: any) {
-                toast({ title: "Failed to save bank details", description: err.message, variant: "destructive" });
-              } finally {
-                setSavingBank(false);
-              }
-            }}
-            className="space-y-3"
-          >
-            <div className="space-y-1.5">
-              <Label htmlFor="bAccountHolder" className="text-xs">Account Holder Name</Label>
-              <Input
-                id="bAccountHolder"
-                value={bAccountHolder}
-                onChange={(e) => setBAccountHolder(e.target.value)}
-                placeholder="As per bank records"
-                data-testid="input-modal-account-holder"
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="bAccountNumber" className="text-xs">Account Number</Label>
-              <Input
-                id="bAccountNumber"
-                value={bAccountNumber}
-                onChange={(e) => setBAccountNumber(e.target.value.replace(/\D/g, ""))}
-                placeholder="XXXXXXXXXXXX"
-                inputMode="numeric"
-                data-testid="input-modal-account-number"
-                required
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="bIfsc" className="text-xs">IFSC</Label>
-                <Input
-                  id="bIfsc"
-                  value={bIfsc}
-                  onChange={(e) => setBIfsc(e.target.value.toUpperCase())}
-                  placeholder="HDFC0001234"
-                  maxLength={11}
-                  data-testid="input-modal-ifsc"
-                  required
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="bBankName" className="text-xs">Bank Name</Label>
-                <Input
-                  id="bBankName"
-                  value={bBankName}
-                  onChange={(e) => setBBankName(e.target.value)}
-                  placeholder="HDFC Bank"
-                  data-testid="input-modal-bank-name"
-                  required
-                />
-              </div>
-            </div>
-
-            <DialogFooter className="gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setBankModalOpen(false)} disabled={savingBank}>
-                Cancel
-              </Button>
-              <Button type="submit" className="gradient-btn text-white" disabled={savingBank} data-testid="button-save-bank-and-generate">
-                {savingBank ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save & generate invoice"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
 
       <BottomNav />
     </div>

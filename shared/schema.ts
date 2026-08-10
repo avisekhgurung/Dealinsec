@@ -435,7 +435,30 @@ export const brandInvoices = pgTable("brand_invoices", {
   invoiceType: varchar("invoice_type").notNull().default("full"),
   splitPercentage: integer("split_percentage"),
   notes: text("notes"),
+  // Itemised lines composed on the invoice screen. Nullable: invoices raised
+  // before the composer existed derive a single line from their deal, and the
+  // detail page still renders those. hsnSac is carried now (optional) so a
+  // Rule 46 GST invoice is a matter of adding tax columns, not a rewrite.
+  lineItems: jsonb("line_items").$type<InvoiceLineItem[]>(),
   status: text("status").notNull().default("Unpaid"),
+});
+
+/** One billable row on an invoice. Amounts are whole rupees, matching
+ *  dealAmount — paise precision arrives with the GST tax build. */
+export interface InvoiceLineItem {
+  description: string;
+  hsnSac?: string;
+  quantity: number;
+  rate: number;
+  amount: number;
+}
+
+export const invoiceLineItemSchema = z.object({
+  description: z.string().trim().min(1, "Description is required").max(300),
+  hsnSac: z.string().trim().max(12).optional(),
+  quantity: z.number().int().positive().max(100000),
+  rate: z.number().int().nonnegative().max(1_000_000_000),
+  amount: z.number().int().nonnegative().max(1_000_000_000),
 });
 
 export const brandInvoiceTypeOptions = ["full", "advance", "final"] as const;

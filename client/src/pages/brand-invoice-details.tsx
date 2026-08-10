@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Download, CheckCircle, Loader2, BellRing, Crown } from "lucide-react";
 import { InvoiceAttachments } from "@/components/invoice-attachments";
-import type { BrandInvoice, Deal } from "@shared/schema";
+import type { BrandInvoice, Deal, InvoiceLineItem } from "@shared/schema";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { parseApiError, isUpgradeError } from "@/lib/api-error";
 
@@ -123,6 +123,7 @@ export default function BrandInvoiceDetailsPage() {
 
   /* ── Amount ───────────────────────────── */
   const totalAmount = invoice.dealAmount;
+  const lineItems: InvoiceLineItem[] = Array.isArray(invoice.lineItems) ? invoice.lineItems : [];
 
   // Supplier details come from the ORG's issuer, never the viewer — see useIssuer.
   const influencerName = issuer.name || invoice.influencerName || "—";
@@ -270,7 +271,30 @@ export default function BrandInvoiceDetailsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Main service line */}
+                  {/* Itemised lines when the invoice was composed with them;
+                      invoices raised before the composer fall back to a single
+                      line derived from the deal, so nothing already sent to a
+                      client changes appearance. */}
+                  {lineItems.length > 0 ? (
+                    lineItems.map((li, idx) => (
+                      <tr key={idx} className="border-b border-gray-100 dark:border-zinc-800">
+                        <td className="py-3 text-gray-600 dark:text-gray-300">{idx + 1}</td>
+                        <td className="py-3">
+                          <p className="font-medium text-gray-900 dark:text-gray-100">{li.description}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {li.hsnSac ? `HSN/SAC ${li.hsnSac} · ` : ""}
+                            {li.quantity} × ₹{Number(li.rate).toLocaleString("en-IN")}
+                          </p>
+                        </td>
+                        <td className="py-3 text-center text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                          {deal ? `${fmtShort(deal.startDate)} – ${fmtShort(deal.endDate)}` : "—"}
+                        </td>
+                        <td className="py-3 text-right font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">
+                          ₹{Number(li.amount).toLocaleString("en-IN")}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
                   <tr className="border-b border-gray-100 dark:border-zinc-800">
                     <td className="py-3 text-gray-600 dark:text-gray-300">1</td>
                     <td className="py-3">
@@ -302,6 +326,7 @@ export default function BrandInvoiceDetailsPage() {
                       ₹{totalAmount.toLocaleString("en-IN")}
                     </td>
                   </tr>
+                  )}
                 </tbody>
 
                 {/* ── Total ───────────────────────── */}
@@ -379,7 +404,11 @@ export default function BrandInvoiceDetailsPage() {
             <div className="px-6 py-4 bg-gray-50 dark:bg-zinc-800/40 border-t border-gray-100 dark:border-zinc-700">
               <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Payment Terms</p>
               <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
-                <li>Payment due within 30 days of invoice date</li>
+                <li>
+                  {invoice.dueDate
+                    ? <>Payment due by <strong>{fmt(invoice.dueDate)}</strong></>
+                    : "Payment due within 30 days of invoice date"}
+                </li>
                 <li>Please reference invoice number <strong>{invoice.invoiceNumber}</strong> with payment</li>
                 <li>All amounts are in Indian Rupees (₹ / INR)</li>
               </ul>

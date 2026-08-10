@@ -35,6 +35,7 @@ const BillingPage             = lazy(() => import("@/pages/billing"));
 const InvoiceDetailsPage      = lazy(() => import("@/pages/invoice-details"));
 const PaymentSuccessPage      = lazy(() => import("@/pages/payment-success"));
 const BrandInvoiceDetailsPage = lazy(() => import("@/pages/brand-invoice-details"));
+const BrandInvoiceNewPage     = lazy(() => import("@/pages/brand-invoice-new"));
 const ProfilePage             = lazy(() => import("@/pages/profile"));
 const PricingPage             = lazy(() => import("@/pages/pricing"));
 const PitchPage               = lazy(() => import("@/pages/pitch"));
@@ -166,6 +167,7 @@ function Router() {
             <Route path="/invoices/success" component={PaymentSuccessPage} />
             <Route path="/invoices/:id" component={InvoiceDetailsPage} />
             <Route path="/invoices" component={BillingPage} />
+            <Route path="/brand-invoices/new" component={BrandInvoiceNewPage} />
             <Route path="/brand-invoices/:id" component={BrandInvoiceDetailsPage} />
             <Route path="/profile" component={ProfilePage} />
             <Route path="/settings" component={SettingsPage} />
