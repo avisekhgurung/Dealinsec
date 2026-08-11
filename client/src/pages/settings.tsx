@@ -114,6 +114,8 @@ export default function SettingsPage() {
     queryKey: ["/api/org/invitations"],
     enabled: canInvite,
   });
+  const [activityPage, setActivityPage] = useState(0);
+  const ACTIVITY_PAGE_SIZE = 20;
   const { data: activity = [] } = useQuery<Activity[]>({
     queryKey: ["/api/org/activity"],
     enabled: canActivity && tab === "activity",
@@ -574,6 +576,9 @@ export default function SettingsPage() {
                   </div>
                   {(() => {
                     const rows = activity.filter((a) => inRange(a.createdAt, activityRange));
+                    const pageCount = Math.max(1, Math.ceil(rows.length / ACTIVITY_PAGE_SIZE));
+                    const page = Math.min(activityPage, pageCount - 1);
+                    const pageRows = rows.slice(page * ACTIVITY_PAGE_SIZE, (page + 1) * ACTIVITY_PAGE_SIZE);
                     if (!rows.length) {
                       return (
                         <div className="py-10 text-center">
@@ -593,16 +598,19 @@ export default function SettingsPage() {
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="bg-muted/40 text-left">
-                                {["Who", "Action", "Record", "Detail", "When"].map((h) => (
+                                {["Sr.", "Who", "Action", "Record", "Detail", "When"].map((h) => (
                                   <th key={h} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">{h}</th>
                                 ))}
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-border/50">
-                              {rows.map((a) => {
+                              {pageRows.map((a, idx) => {
                                 const tone = ACTIVITY_TONE[a.entityType] ?? ACTIVITY_TONE.default;
                                 return (
                                   <tr key={a.id} className="hover:bg-muted/30 transition-colors">
+                                    <td className="px-3 py-2.5 text-xs text-muted-foreground tabular-nums w-[44px]">
+                                      {page * ACTIVITY_PAGE_SIZE + idx + 1}
+                                    </td>
                                     <td className="px-3 py-2.5 whitespace-nowrap">
                                       <span className="inline-flex items-center gap-2">
                                         <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center shrink-0">
@@ -631,6 +639,22 @@ export default function SettingsPage() {
                             </tbody>
                           </table>
                         </div>
+                        {pageCount > 1 && (
+                          <div className="flex items-center justify-between px-3 py-2 border-t border-border/60 bg-muted/20 text-xs">
+                            <span className="text-muted-foreground tabular-nums">
+                              Showing {page * ACTIVITY_PAGE_SIZE + 1}–{Math.min(rows.length, (page + 1) * ACTIVITY_PAGE_SIZE)} of {rows.length}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Button variant="outline" size="sm" className="h-7 px-2"
+                                onClick={() => setActivityPage(Math.max(0, page - 1))} disabled={page === 0}
+                                data-testid="activity-prev">Prev</Button>
+                              <span className="px-2 text-muted-foreground tabular-nums">{page + 1} / {pageCount}</span>
+                              <Button variant="outline" size="sm" className="h-7 px-2"
+                                onClick={() => setActivityPage(Math.min(pageCount - 1, page + 1))} disabled={page >= pageCount - 1}
+                                data-testid="activity-next">Next</Button>
+                            </span>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}

@@ -30,14 +30,14 @@ const typeLabel = (t: string) => (t === "advance" ? "Advance" : t === "final" ? 
 const columns: ColumnDef<BrandInvoice>[] = [
   {
     accessorKey: "invoiceNumber",
-    header: "Invoice #",
-    meta: { label: "Invoice #" },
+    header: "Invoice No.",
+    meta: { label: "Invoice No.", filter: "text", filterPlaceholder: "INV-…" },
     cell: ({ row }) => <span className="font-medium text-foreground">{row.original.invoiceNumber}</span>,
   },
   {
     accessorKey: "brandName",
     header: "Client",
-    meta: { label: "Client" },
+    meta: { label: "Client", filter: "text" },
     cell: ({ row }) => <span className="text-muted-foreground">{row.original.brandName}</span>,
   },
   {
@@ -84,7 +84,7 @@ const columns: ColumnDef<BrandInvoice>[] = [
   {
     accessorKey: "status",
     header: "Status",
-    meta: { label: "Status" },
+    meta: { label: "Status", filter: "select" },
     cell: ({ row }) => <StatusBadge status={row.original.status} size="compact" />,
     filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
   },

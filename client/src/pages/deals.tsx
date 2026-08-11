@@ -37,9 +37,9 @@ function uuid(): string {
 // Desktop table columns.
 const columns: ColumnDef<Deal>[] = [
   {
-    id: "ref",
-    header: "Ref",
-    meta: { label: "Ref" },
+    id: "dealNo",
+    header: "Deal No.",
+    meta: { label: "Deal No.", filter: "text", filterPlaceholder: "DL-…" },
     accessorFn: (d: Deal) => recordNo("deal", d.id),
     cell: ({ row }) => (
       <span className="font-mono text-[11px] text-muted-foreground tabular-nums">{recordNo("deal", row.original.id)}</span>
@@ -48,19 +48,19 @@ const columns: ColumnDef<Deal>[] = [
   {
     accessorKey: "brandName",
     header: "Brand",
-    meta: { label: "Brand" },
+    meta: { label: "Brand", filter: "text" },
     cell: ({ row }) => <span className="font-semibold text-foreground">{row.original.brandName}</span>,
   },
   {
     accessorKey: "dealTitle",
     header: "Deal",
-    meta: { label: "Deal" },
+    meta: { label: "Deal", filter: "text" },
     cell: ({ row }) => <span className="text-muted-foreground">{row.original.dealTitle}</span>,
   },
   {
     accessorKey: "dealType",
     header: "Type",
-    meta: { label: "Type" },
+    meta: { label: "Type", filter: "select" },
     cell: ({ row }) => {
       const t = (row.original as any).dealType as string | undefined;
       return t ? (

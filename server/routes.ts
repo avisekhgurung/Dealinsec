@@ -1758,7 +1758,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Activity feed
   app.get("/api/org/activity", isAuthenticated, requireOrgPermission("activity.view"), withOrg, async (req: any, res) => {
     try {
-      res.json(await storage.getActivityLogs(req.org.id, 100));
+      // 500, not 100: the client paginates locally, and a silent cap makes
+      // "Showing 1–20 of 100" a lie when there are 400 events. 500 covers
+      // months of a small team's history; server-side paging can come later.
+      res.json(await storage.getActivityLogs(req.org.id, 500));
     } catch (error) {
       res.status(500).json({ error: "Failed to load activity" });
     }

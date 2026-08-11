@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
+import { recordNo } from "@shared/schema";
 import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
 import { PickParentDialog } from "@/components/pick-parent-dialog";
 import { memberCan } from "@shared/permissions";
@@ -132,8 +133,8 @@ export default function QuotationsPage() {
             ) : (
               <>
                 {/* Desktop column headers */}
-                <div className="hidden lg:grid grid-cols-[1.4fr_1.6fr_0.9fr_0.7fr_0.9fr_auto] gap-4 px-5 py-2.5 border-b border-border/60 bg-muted/30">
-                  {["Client", "Deal", "Value", "Version", "Issued", ""].map((h, i) => (
+                <div className="hidden lg:grid grid-cols-[0.8fr_1.3fr_1.5fr_0.9fr_0.6fr_0.9fr_auto] gap-4 px-5 py-2.5 border-b border-border/60 bg-muted/30">
+                  {["Quotation No.", "Client", "Deal", "Value", "Version", "Issued", ""].map((h, i) => (
                     <span key={i} className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       {h}
                     </span>
@@ -143,9 +144,14 @@ export default function QuotationsPage() {
                   {rows.map((r) => (
                     <Link key={r.id} href={r.deal ? `/deals/${r.deal.id}/quote` : "/deals"} className="block">
                       <button
-                        className="w-full text-left px-4 lg:px-5 py-3.5 hover:bg-muted/40 transition-colors lg:grid lg:grid-cols-[1.4fr_1.6fr_0.9fr_0.7fr_0.9fr_auto] lg:gap-4 lg:items-center"
+                        className="w-full text-left px-4 lg:px-5 py-3.5 hover:bg-muted/40 transition-colors lg:grid lg:grid-cols-[0.8fr_1.3fr_1.5fr_0.9fr_0.6fr_0.9fr_auto] lg:gap-4 lg:items-center"
                         data-testid={`quotation-row-${r.id}`}
                       >
+                        {/* Quotation number — the permanent identity of this
+                            record, the one to quote on a call. */}
+                        <span className="block font-mono text-[11px] text-muted-foreground tabular-nums mb-0.5 lg:mb-0">
+                          {recordNo("quotation", r.id)}
+                        </span>
                         {/* Client */}
                         <span className="block font-semibold text-sm truncate">
                           {r.deal?.brandName || "—"}

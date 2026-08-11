@@ -27,15 +27,24 @@ const fmtDate = (s: string) =>
 
 const columns: ColumnDef<Contract>[] = [
   {
+    id: "agreementNo",
+    header: "Agreement No.",
+    meta: { label: "Agreement No.", filter: "text", filterPlaceholder: "AG-…" },
+    accessorFn: (c: Contract) => recordNo("agreement", c.id),
+    cell: ({ row }) => (
+      <span className="font-mono text-[11px] text-muted-foreground tabular-nums">{recordNo("agreement", row.original.id)}</span>
+    ),
+  },
+  {
     accessorKey: "contractName",
     header: "Agreement",
-    meta: { label: "Agreement" },
+    meta: { label: "Agreement", filter: "text" },
     cell: ({ row }) => <span className="font-semibold text-foreground">{row.original.contractName}</span>,
   },
   {
     accessorKey: "brandName",
     header: "Brand",
-    meta: { label: "Brand" },
+    meta: { label: "Brand", filter: "text" },
     cell: ({ row }) => <span className="text-muted-foreground">{row.original.brandName}</span>,
   },
   {
@@ -79,7 +88,7 @@ const columns: ColumnDef<Contract>[] = [
   {
     accessorKey: "status",
     header: "Status",
-    meta: { label: "Status" },
+    meta: { label: "Status", filter: "select" },
     cell: ({ row }) => <StatusBadge status={row.original.status} size="compact" />,
     filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
   },
