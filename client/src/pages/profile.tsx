@@ -129,6 +129,14 @@ export default function ProfilePage() {
     if (section) setPendingSection(section);
   };
   useEffect(() => {
+    if (!isEditing) {
+      setSignaturePreview(user?.digitalSignature || null);
+      setSealPreview((user as any)?.companySeal || null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isEditing]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("edit") === "1") openEditor(params.get("section") || undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -922,6 +930,25 @@ export default function ProfilePage() {
                     className="h-24 w-auto object-contain block"
                     style={{ maxWidth: "100%", display: "block", visibility: "visible" }}
                     data-testid="img-signature-view"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Company Stamp Card */}
+            {(user as any)?.companySeal && (
+              <div className="glass-card rounded-2xl p-5 border-0" style={{ background: "linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.8) 100%)" }}>
+                <div className="flex items-center gap-2 mb-4">
+                  <Stamp className="h-4 w-4 text-primary" />
+                  <h3 className="font-semibold">Company Stamp</h3>
+                </div>
+                <div className="rounded-xl bg-white p-4 flex items-center justify-center">
+                  <img
+                    src={(user as any).companySeal}
+                    alt="Company stamp"
+                    className="h-24 w-auto object-contain block"
+                    style={{ maxWidth: "100%", display: "block", visibility: "visible" }}
+                    data-testid="img-seal-view"
                   />
                 </div>
               </div>
