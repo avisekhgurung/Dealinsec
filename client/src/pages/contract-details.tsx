@@ -732,7 +732,17 @@ export default function ContractDetailsPage() {
                 <h3 className="font-semibold mb-1 pb-2 border-b-2 border-emerald-500/60 inline-block">Stamp Duty</h3>
                 <p className="text-xs text-muted-foreground mt-2 mb-4 leading-relaxed">
                   Bought an e-stamp for this agreement? Record its certificate number and it prints on the
-                  document. DealInSec doesn't sell or pay stamp duty — buy it from SHCIL or your state portal.
+                  document. DealInSec doesn't sell or pay stamp duty — buy it from{" "}
+                  <a
+                    href="https://www.shcilestamp.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-primary hover:underline"
+                    data-testid="link-shcil"
+                  >
+                    shcilestamp.com
+                  </a>{" "}
+                  (the government-authorised e-stamping portal) or your state portal.
                 </p>
                 <div className="space-y-3">
                   <div className="space-y-1.5">
