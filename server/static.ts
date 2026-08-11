@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
+import { injectLandingSeo } from "./landing-seo";
 
 export function serveStatic(app: Express) {
   const distPath = path.resolve(__dirname, "public");
@@ -10,10 +11,18 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, { index: false }));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  const indexPath = path.resolve(distPath, "index.html");
+  // Built once at boot: the marketing routes get a crawlable copy of the page
+  // inside #root (React replaces it on mount), every other route gets the bare
+  // shell. See landing-seo.ts.
+  const shell = fs.readFileSync(indexPath, "utf-8");
+  const landingHtml = injectLandingSeo(shell);
+  const CRAWLABLE = new Set(["/", "/index.html"]);
+
+  app.use("*", (req, res) => {
+    const url = req.originalUrl.split("?")[0];
+    res.type("html").send(CRAWLABLE.has(url) ? landingHtml : shell);
   });
 }
