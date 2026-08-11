@@ -19,7 +19,7 @@ export default function RefundPolicy() {
 
         <p>
           This Refund Policy applies to all purchases made on DealInSec ("Platform"),
-          operated by DealInSec Technologies ("Company", "we", "us").
+          operated by DealInSec, a sole proprietorship of Avisekh Gurung ("we", "us").
         </p>
 
         <h2>1. What You Purchase</h2>
@@ -113,7 +113,7 @@ export default function RefundPolicy() {
           For refund-related queries:<br />
           <strong>Email:</strong> support@dealinsec.com<br />
           <strong>Response time:</strong> Within 48 hours<br />
-          <strong>Address:</strong> DealInSec Technologies, Bengaluru, Karnataka, India
+          <strong>Address:</strong> DealInSec (proprietor: Avisekh Gurung), Darjeeling, West Bengal 734101, India
         </p>
       </main>
     </div>

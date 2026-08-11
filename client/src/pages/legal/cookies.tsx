@@ -18,7 +18,7 @@ export default function CookiePolicy() {
         <p className="text-muted-foreground text-xs">Last updated: 10 August 2026</p>
 
         <p>
-          This Cookie Policy explains how DealInSec Technologies ("we", "us") uses cookies
+          This Cookie Policy explains how DealInSec, a sole proprietorship of Avisekh Gurung ("we", "us") uses cookies
           and similar tracking technologies on our platform.
         </p>
 
@@ -105,7 +105,7 @@ export default function CookiePolicy() {
         <p>
           For questions about cookies:<br />
           <strong>Email:</strong> support@dealinsec.com<br />
-          <strong>Address:</strong> DealInSec Technologies, Bengaluru, Karnataka, India
+          <strong>Address:</strong> DealInSec (proprietor: Avisekh Gurung), Darjeeling, West Bengal 734101, India
         </p>
       </main>
     </div>

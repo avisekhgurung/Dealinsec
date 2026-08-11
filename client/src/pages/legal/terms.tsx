@@ -19,9 +19,16 @@ export default function TermsOfService() {
 
         <h2>1. Acceptance of Terms</h2>
         <p>
-          By accessing or using DealInSec ("Platform"), operated by DealInSec Technologies
+          By accessing or using DealInSec ("Platform"), operated by DealInSec, a sole proprietorship of Avisekh Gurung
           ("Company", "we", "us"), you agree to be bound by these Terms of Service. If you
           do not agree, do not use the Platform.
+        </p>
+
+        <p>
+          <strong>Who you are contracting with.</strong> DealInSec is operated as a sole
+          proprietorship by Avisekh Gurung, at Darjeeling, West Bengal 734101, India. It is not a
+          company or LLP, and no separate corporate entity exists behind it. Your contract is with
+          the proprietor personally. Questions: support@dealinsec.com.
         </p>
 
         <h2>2. Eligibility</h2>
@@ -131,7 +138,7 @@ export default function TermsOfService() {
         <h2>9. Intellectual Property</h2>
         <p>
           All content, branding, design, code, and materials on the Platform are owned by
-          DealInSec Technologies and protected under the Copyright Act, 1957 and the
+          Avisekh Gurung, proprietor of DealInSec, and protected under the Copyright Act, 1957 and the
           Trade Marks Act, 1999. You may not copy, reproduce, or distribute any part of
           the Platform without our prior written consent.
         </p>
@@ -163,7 +170,7 @@ export default function TermsOfService() {
         <h2>12. Dispute Resolution</h2>
         <p>
           Any disputes arising from these Terms shall be subject to the exclusive
-          jurisdiction of the courts in Bengaluru, Karnataka, India. Disputes shall first
+          jurisdiction of the courts in Darjeeling, West Bengal, India. Disputes shall first
           be attempted to be resolved through good-faith negotiation for 30 days before
           initiating legal proceedings.
         </p>
@@ -179,7 +186,7 @@ export default function TermsOfService() {
         <p>
           For questions about these Terms, contact us at:<br />
           <strong>Email:</strong> support@dealinsec.com<br />
-          <strong>Address:</strong> DealInSec Technologies, Bengaluru, Karnataka, India
+          <strong>Address:</strong> DealInSec (proprietor: Avisekh Gurung), Darjeeling, West Bengal 734101, India
         </p>
       </main>
     </div>

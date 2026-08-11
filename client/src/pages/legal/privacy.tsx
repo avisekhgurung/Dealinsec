@@ -18,7 +18,7 @@ export default function PrivacyPolicy() {
         <p className="text-muted-foreground text-xs">Last updated: 10 August 2026</p>
 
         <p>
-          This Privacy Policy explains how DealInSec Technologies ("Company", "we", "us")
+          This Privacy Policy explains how DealInSec, a sole proprietorship of Avisekh Gurung ("we", "us")
           collects, uses, stores, and protects your personal data in compliance with the
           Digital Personal Data Protection Act, 2023 (DPDP Act) and the Information
           Technology Act, 2000.
@@ -161,7 +161,7 @@ export default function PrivacyPolicy() {
         <p>
           For privacy-related queries:<br />
           <strong>Email:</strong> support@dealinsec.com<br />
-          <strong>Address:</strong> DealInSec Technologies, Bengaluru, Karnataka, India
+          <strong>Address:</strong> DealInSec (proprietor: Avisekh Gurung), Darjeeling, West Bengal 734101, India
         </p>
       </main>
     </div>
