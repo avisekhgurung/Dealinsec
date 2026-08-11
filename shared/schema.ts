@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, text, integer, boolean, json, serial, varchar, timestamp, index, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, boolean, json, serial, varchar, timestamp, index, jsonb, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { dealTypeOptions as TAXONOMY_DEAL_TYPES } from "./dealTypeTaxonomy";
@@ -395,7 +395,7 @@ export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
   organizationId: varchar("organization_id"),
-  invoiceNumber: text("invoice_number").notNull().unique(),
+  invoiceNumber: text("invoice_number").notNull(),
   invoiceDate: text("invoice_date").notNull(),
   contractId: integer("contract_id").notNull().references(() => contracts.id),
   dealId: integer("deal_id").notNull().references(() => deals.id),
@@ -441,7 +441,12 @@ export const brandInvoices = pgTable("brand_invoices", {
   // Rule 46 GST invoice is a matter of adding tax columns, not a rewrite.
   lineItems: jsonb("line_items").$type<InvoiceLineItem[]>(),
   status: text("status").notNull().default("Unpaid"),
-});
+}, (t) => ({
+  // Per-ORG uniqueness, not global: INV-2627-0001 restarts for every business
+  // each financial year. A global unique meant the second organisation to
+  // raise an invoice collided on its very first one.
+  orgInvoiceNumber: unique("brand_invoices_org_invoice_number_unique").on(t.organizationId, t.invoiceNumber),
+}));
 
 /** One billable row on an invoice. Amounts are whole rupees, matching
  *  dealAmount — paise precision arrives with the GST tax build. */
