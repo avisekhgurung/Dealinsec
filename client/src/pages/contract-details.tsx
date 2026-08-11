@@ -36,6 +36,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Landmark } from "lucide-react";
 import type { Contract, Deal, BrandInvoice } from "@shared/schema";
+import { recordNo } from "@shared/schema";
 
 export default function ContractDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -416,6 +417,39 @@ export default function ContractDetailsPage() {
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* Execution record — mirrors the printable document so the team
+                sees who is bound and what the signature means WITHOUT having to
+                open the export. Wording per ESIGN_RECOMMENDATION.md: this is
+                electronic acceptance, never a Digital Signature Certificate. */}
+            <div className="mt-4 pt-4 border-t border-border">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Execution record
+                </p>
+                <span className="font-mono text-[11px] font-semibold text-muted-foreground">
+                  {recordNo("agreement", contract.id)}
+                </span>
+              </div>
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs mb-3">
+                <div>
+                  <dt className="text-muted-foreground">Signed by</dt>
+                  <dd className="font-semibold">{contract.signerName || "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Signature on document</dt>
+                  <dd className="font-semibold">
+                    {contract.signatureUrl ? "Captured at creation" : "Not captured"}
+                  </dd>
+                </div>
+              </dl>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Accepted electronically with an audit record. This is not a Digital Signature
+                Certificate issued under the Information Technology Act, 2000, and no
+                certifying-authority verification is claimed. Parties may also execute a signed
+                paper counterpart.
+              </p>
             </div>
           </CardContent>
         </Card>

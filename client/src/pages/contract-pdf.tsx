@@ -36,11 +36,11 @@ export default function ContractPdfPage() {
   // were backfilled from their creator by migrate-document-authenticity.ts;
   // the fallback keeps anything older still rendering.
   const signatureSrc: string | undefined =
-    ((contract as any)?.signatureUrl as string | null | undefined)
+    (contract?.signatureUrl as string | null | undefined)
     ?? issuer.digitalSignature
     ?? undefined;
   const signerLabel =
-    (contract as any)?.signerName
+    contract?.signerName
     || issuer.name
     || "—";
 
