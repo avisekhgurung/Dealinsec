@@ -8,8 +8,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { useIssuer } from "@/hooks/useIssuer";
 import { memberCan } from "@shared/permissions";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/confirm-dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Download, CheckCircle, Loader2, BellRing, Crown } from "lucide-react";
+import { ArrowLeft, Download, CheckCircle, Loader2, BellRing, Crown, Undo2 } from "lucide-react";
 import { InvoiceAttachments } from "@/components/invoice-attachments";
 import type { BrandInvoice, Deal, InvoiceLineItem } from "@shared/schema";
 import { useUpgradeModal } from "@/components/upgrade-modal";
@@ -40,7 +41,34 @@ export default function BrandInvoiceDetailsPage() {
   });
 
   const { toast } = useToast();
+  const confirm = useConfirm();
   const { openUpgradeModal } = useUpgradeModal();
+
+  /** Reverse an accidental "Mark as Paid". The API has always allowed the
+   *  status to go back; the screen simply never offered a way, so a mistap
+   *  was a dead end. Confirmed because it moves money figures, and audited
+   *  server-side alongside the original payment. */
+  const markUnpaid = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/brand-invoices/${id}`, { status: "Unpaid" });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices", id] });
+      toast({
+        title: "Payment reversed",
+        description: "The invoice is Unpaid again and back in your outstanding total.",
+      });
+    },
+    onError: (err) => {
+      if (isUpgradeError(parseApiError(err))) {
+        openUpgradeModal({ feature: "payment_tracking" });
+        return;
+      }
+      toast({ title: "Could not reverse the payment", variant: "destructive" });
+    },
+  });
 
   const markPaid = useMutation({
     mutationFn: async () => {
@@ -488,9 +516,43 @@ export default function BrandInvoiceDetailsPage() {
               )}
             </Button>
           ) : (
-            <div className="flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30">
-              <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              <span className="font-semibold text-emerald-700 dark:text-emerald-300">Payment Received</span>
+            <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30">
+              <div className="flex items-center justify-center gap-2 py-3">
+                <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <span className="font-semibold text-emerald-700 dark:text-emerald-300">Payment Received</span>
+              </div>
+              {canRecordPayment && (
+                <div className="px-3 pb-3 text-center">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700/70 dark:text-emerald-300/70 hover:text-emerald-800 dark:hover:text-emerald-200 hover:underline transition-colors disabled:opacity-50"
+                    disabled={markUnpaid.isPending}
+                    data-testid="button-mark-unpaid"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: "Mark this invoice unpaid?",
+                        description: (
+                          <>
+                            {invoice.invoiceNumber} goes back to Unpaid and its
+                            ₹{Number(invoice.dealAmount || 0).toLocaleString("en-IN")} returns to your
+                            outstanding total. Use this if you marked it paid by mistake — the change is
+                            recorded in your activity log either way.
+                          </>
+                        ),
+                        confirmText: "Yes, mark unpaid",
+                        cancelText: "Keep it paid",
+                      });
+                      if (ok) markUnpaid.mutate();
+                    }}
+                  >
+                    {markUnpaid.isPending ? (
+                      <><Loader2 className="w-3 h-3 animate-spin" /> Reversing…</>
+                    ) : (
+                      <><Undo2 className="w-3 h-3" /> Marked paid by mistake? Undo</>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

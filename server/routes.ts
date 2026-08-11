@@ -5,7 +5,7 @@ import { insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesT
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./auth";
-import { requirePro, requireOrgPermission, withOrg, getBillingUser, logOrgActivity } from "./entitlements";
+import { requirePro, requireOrgPermission, withOrg, getBillingUser, logOrgActivity , requireModuleRead, requireLinkedRead} from "./entitlements";
 import { maybeStartTrial } from "./trial";
 import { registerCopilotRoutes } from "./copilot/routes";
 import { getSeatLimit, INVITABLE_ROLES, hasPermission as hasOrgPermission, orgRoleOptions, CUSTOM_ROLE, ASSIGNABLE_PERMISSIONS } from "@shared/permissions";
@@ -189,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/deals", isAuthenticated, async (req: any, res) => {
+  app.get("/api/deals", isAuthenticated, requireModuleRead("deals"), async (req: any, res) => {
     try {
       const userId = req.user.id;
       const deals = await storage.getDealsByOrg(req.user.organizationId, req.user.id);
@@ -199,7 +199,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/deals/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/deals/:id", isAuthenticated, requireLinkedRead, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const deal = await storage.getDeal(parseInt(req.params.id));
@@ -376,7 +376,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Quotation register — every quotation in the organization.
-  app.get("/api/quotes", isAuthenticated, async (req: any, res) => {
+  app.get("/api/quotes", isAuthenticated, requireModuleRead("quotations"), async (req: any, res) => {
     try {
       const rows = await storage.getQuotesByOrg(req.user.organizationId, req.user.id);
       res.json(rows);
@@ -386,7 +386,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/contracts", isAuthenticated, async (req: any, res) => {
+  app.get("/api/contracts", isAuthenticated, requireModuleRead("agreements"), async (req: any, res) => {
     try {
       const userId = req.user.id;
       const contracts = await storage.getContractsByOrg(req.user.organizationId, req.user.id);
@@ -396,7 +396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/contracts/:id", isAuthenticated, async (req: any, res) => {
+  app.get("/api/contracts/:id", isAuthenticated, requireLinkedRead, async (req: any, res) => {
     try {
       const userId = req.user.id;
       const contract = await storage.getContract(parseInt(req.params.id));
@@ -730,7 +730,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Brand invoices (invoices influencers send to brands)
-  app.get("/api/brand-invoices", isAuthenticated, async (req: any, res) => {
+  app.get("/api/brand-invoices", isAuthenticated, requireModuleRead("invoices"), async (req: any, res) => {
     try {
       const userId = req.user.id;
       const invoices = await storage.getBrandInvoicesByOrg(req.user.organizationId, req.user.id);
@@ -902,6 +902,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (invoice.status !== "Paid" && updates.status === "Paid" && updated) {
         logOrgActivity(req.user, "recorded payment for", "invoice", invoice.id,
           `₹${Number(updated.dealAmount || 0).toLocaleString("en-IN")} from ${invoice.brandName}`);
+      }
+
+      // Reversing a payment is a money event too — it must leave the same trail
+      // as recording one, so "who marked this unpaid and when" is answerable.
+      if (invoice.status === "Paid" && updates.status === "Unpaid" && updated) {
+        logOrgActivity(req.user, "reversed the payment on", "invoice", invoice.id,
+          `${updated.invoiceNumber} — back to Unpaid`);
       }
 
       // "Payment received" email — only when transitioning Unpaid -> Paid

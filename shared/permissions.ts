@@ -109,6 +109,49 @@ export const MODULE_PERMISSIONS: Record<string, Permission[]> = {
   invoices: ["invoices.create", "invoices.delete", "payments.manage"],
 };
 
+/**
+ * READ authority per module — the server-side counterpart to MODULE_PERMISSIONS.
+ *
+ * Hiding a nav item was never access control: an invoices-only member could
+ * still GET /api/deals and read every client name and deal value in the
+ * organisation. These lists decide who may READ each module, and they
+ * deliberately include cross-module needs, because the workflow requires them:
+ * you cannot raise an invoice without reading the agreement it comes from, and
+ * you cannot write a quotation without reading its deal.
+ *
+ * Anything NOT listed is denied. Keep it that way.
+ */
+export const MODULE_READ: Record<string, Permission[]> = {
+  // Quoting and agreement work both start from a deal.
+  deals: ["deals.create", "deals.edit", "quotations.create", "agreements.create"],
+  quotations: ["quotations.create", "deals.create", "deals.edit"],
+  // Invoicing starts from an agreement, so invoice permissions grant read here.
+  agreements: ["agreements.create", "invoices.create", "invoices.delete", "payments.manage"],
+  invoices: ["invoices.create", "invoices.delete", "payments.manage"],
+};
+
+/** May this member read the module's records? Owners and built-in roles keep
+ *  their existing scope; only CUSTOM roles are narrowed. */
+export function canReadModule(
+  user: { orgRole?: string | null; customPermissions?: string[] | null } | null | undefined,
+  moduleKey: keyof typeof MODULE_READ,
+): boolean {
+  if (!user) return false;
+  if (user.orgRole !== CUSTOM_ROLE) return true;
+  const perms = MODULE_READ[moduleKey] ?? [];
+  return perms.some((p) => !!user.customPermissions?.includes(p));
+}
+
+/** A single deal/agreement is readable when ANY module that legitimately
+ *  references it is readable — an invoice screen has to name its deal. */
+export function canReadLinkedRecord(
+  user: { orgRole?: string | null; customPermissions?: string[] | null } | null | undefined,
+): boolean {
+  if (!user) return false;
+  if (user.orgRole !== CUSTOM_ROLE) return true;
+  return (["deals", "quotations", "agreements", "invoices"] as const).some((m) => canReadModule(user, m));
+}
+
 export function canSeeModule(
   user: { orgRole?: string | null; customPermissions?: string[] | null } | null | undefined,
   moduleKey: keyof typeof MODULE_PERMISSIONS,

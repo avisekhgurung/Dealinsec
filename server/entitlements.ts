@@ -18,7 +18,7 @@
  */
 import type { RequestHandler } from "express";
 import { hasProAccess, type User } from "@shared/schema";
-import { memberCan, type Permission } from "@shared/permissions";
+import { memberCan, type Permission, canReadModule, canReadLinkedRecord } from "@shared/permissions";
 import { storage } from "./storage";
 
 export type GatedFeature = "agreements" | "invoices" | "payment_tracking";
@@ -50,6 +50,27 @@ export function requireOrgPermission(permission: Permission): RequestHandler {
     });
   };
 }
+
+/** Gate a READ route to members whose role may see that module. Hiding nav was
+ *  never authorisation — without this an invoices-only member could GET
+ *  /api/deals and read the whole pipeline. See MODULE_READ. */
+export function requireModuleRead(moduleKey: "deals" | "quotations" | "agreements" | "invoices"): RequestHandler {
+  return (req: any, res, next) => {
+    if (canReadModule(req.user, moduleKey)) return next();
+    return res.status(403).json({
+      code: "FORBIDDEN",
+      error: `Your role doesn't include access to ${moduleKey}. Ask your organization owner.`,
+    });
+  };
+}
+
+/** Gate a single linked record (a deal or agreement referenced by something the
+ *  member can see). Broader than requireModuleRead on purpose — an invoice
+ *  screen must be able to name its deal. */
+export const requireLinkedRead: RequestHandler = (req: any, res, next) => {
+  if (canReadLinkedRecord(req.user)) return next();
+  return res.status(403).json({ code: "FORBIDDEN", error: "Your role doesn't allow viewing this record." });
+};
 
 /** Gate a route to orgs whose OWNER has Pro ACCESS — a paid subscription
  *  OR an active 7-day trial (hasProAccess is the one entitlement helper;
