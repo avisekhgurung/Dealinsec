@@ -1,8 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, newsletterSubscribers, invoiceDocumentCategories, invoiceLineItemSchema, brandInvoiceTypeOptions, hasActivePro, hasActiveDealBoost, hasProAccess, hasActiveTrial, getTrialDaysLeft, getDealCredits } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { insertFeedbackSchema, feedback, insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, newsletterSubscribers, invoiceDocumentCategories, invoiceLineItemSchema, brandInvoiceTypeOptions, hasActivePro, hasActiveDealBoost, hasProAccess, hasActiveTrial, getTrialDaysLeft, getDealCredits } from "@shared/schema";
+import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./auth";
 import { requirePro, requireOrgPermission, withOrg, getBillingUser, logOrgActivity , requireModuleRead, requireLinkedRead} from "./entitlements";
@@ -1329,6 +1329,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ─────────────────────────────────────────────────────────────────────
 
   // Org profile + seat summary — any active member.
+  /** Product feedback — any signed-in member, no role gate (opinions are not
+   *  a permission). Stored, then emailed to the founder best-effort. Capped at
+   *  5 per user per day so the inbox survives an angry evening. */
+  app.post("/api/feedback", isAuthenticated, async (req: any, res) => {
+    try {
+      const parsed = insertFeedbackSchema.safeParse({
+        rating: Number(req.body?.rating),
+        category: req.body?.category || undefined,
+        message: typeof req.body?.message === "string" && req.body.message.trim() ? req.body.message.trim() : undefined,
+      });
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Pick a rating between 1 and 5." });
+      }
+
+      const [{ n }] = (await db.execute(sql`
+        SELECT count(*)::int AS n FROM feedback
+         WHERE user_id = ${req.user.id} AND created_at > now() - interval '1 day'`)).rows as any[];
+      if (Number(n) >= 5) {
+        return res.status(429).json({ error: "That's plenty for one day — thank you! Try again tomorrow." });
+      }
+
+      const [row] = await db.insert(feedback).values({
+        userId: req.user.id,
+        organizationId: req.user.organizationId ?? null,
+        rating: parsed.data.rating,
+        category: parsed.data.category ?? null,
+        message: parsed.data.message ?? null,
+      }).returning();
+
+      // Founder notification. FEEDBACK_EMAIL overrides; support@ is the default.
+      const to = process.env.FEEDBACK_EMAIL || "support@dealinsec.com";
+      const stars = "★".repeat(parsed.data.rating) + "☆".repeat(5 - parsed.data.rating);
+      void sendEmail({
+        to,
+        subject: `Feedback ${stars} — ${req.user.email}`,
+        html: `<p><strong>${stars}</strong> (${parsed.data.rating}/5)</p>
+<p><strong>Category:</strong> ${parsed.data.category ?? "—"}</p>
+<p><strong>From:</strong> ${[req.user.firstName, req.user.lastName].filter(Boolean).join(" ")} &lt;${req.user.email}&gt;</p>
+<p style="white-space:pre-wrap">${(parsed.data.message ?? "(no message)").replace(/</g, "&lt;")}</p>`,
+      });
+
+      res.status(201).json({ ok: true, id: row.id });
+    } catch (error) {
+      console.error("Feedback error:", error);
+      res.status(500).json({ error: "Could not save your feedback" });
+    }
+  });
+
   // ── DPDP Act rights: access and erasure ────────────────────────────────
   // The privacy policy promises both, so they have to be real controls rather
   // than an email address someone has to trust.

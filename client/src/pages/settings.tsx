@@ -39,6 +39,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { getThemePref, setThemePref, type ThemePref } from "@/lib/theme";
 import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
 import { pageNumbers } from "@/components/data-table/data-table";
+import { FeedbackCard } from "@/components/feedback-card";
 
 /** Entity tints for the activity table — money events read green, documents
  *  blue/teal, people violet; everything else stays neutral. */
@@ -683,7 +684,8 @@ export default function SettingsPage() {
 
             {/* ── Preferences (per-device) ── */}
             {tab === "preferences" && (
-              <Card className="glass-card">
+              <>
+                <Card className="glass-card">
                 <CardContent className="p-5 lg:p-6 space-y-5">
                   <div>
                     <h2 className="font-bold text-lg">Appearance</h2>
@@ -729,6 +731,9 @@ export default function SettingsPage() {
                   </p>
                 </CardContent>
               </Card>
+
+                <FeedbackCard />
+              </>
             )}
 
             {/* ── Subscription ── */}

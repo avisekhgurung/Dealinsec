@@ -203,6 +203,29 @@ export const activityLogs = pgTable("activity_logs", {
 
 // Per-organization, per-financial-year invoice sequence (Indian FY starts
 // 1 April). Gives clients INV-2627-0001 instead of an epoch-based string.
+// ── Product feedback ─────────────────────────────────────────────────────
+// Ratings and suggestions from inside the app. Stored for the record and
+// emailed to the founder — with 9 users there is no dashboard worth building,
+// but every opinion should land in an inbox.
+export const feedback = pgTable("feedback", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  organizationId: varchar("organization_id"),
+  rating: integer("rating").notNull(),
+  category: varchar("category", { length: 24 }),
+  message: text("message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const feedbackCategories = ["suggestion", "bug", "praise", "other"] as const;
+
+export const insertFeedbackSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  category: z.enum(feedbackCategories).optional(),
+  message: z.string().trim().max(2000).optional(),
+});
+export type Feedback = typeof feedback.$inferSelect;
+
 export const invoiceCounters = pgTable("invoice_counters", {
   organizationId: varchar("organization_id").notNull(),
   fy: varchar("fy", { length: 9 }).notNull(),
