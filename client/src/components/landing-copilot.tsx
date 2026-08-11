@@ -23,8 +23,9 @@ const SUGGESTIONS = [
 
 interface Msg { role: "user" | "assistant"; content: string }
 
-export function LandingCopilot({ onCta }: { onCta: () => void }) {
-  const [open, setOpen] = useState(false);
+/** One chat, two placements: the floating bubble and the inline section on the
+ *  landing page. Extracted so the two can never drift apart. */
+function useCopilotChat() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -34,9 +35,6 @@ export function LandingCopilot({ onCta }: { onCta: () => void }) {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, busy]);
-  useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 150);
-  }, [open]);
 
   const send = async (text: string) => {
     const trimmed = text.trim();
@@ -65,6 +63,138 @@ export function LandingCopilot({ onCta }: { onCta: () => void }) {
 
   // After a real conversation, put the trial in front of them.
   const showCta = messages.filter((m) => m.role === "assistant").length >= 2;
+
+  return { messages, input, setInput, busy, send, showCta, scrollRef, inputRef };
+}
+
+/** The message list + suggestion chips + composer. Layout-agnostic. */
+function ChatBody({ chat, onCta, className }: {
+  chat: ReturnType<typeof useCopilotChat>;
+  onCta: () => void;
+  className?: string;
+}) {
+  const { messages, input, setInput, busy, send, showCta, scrollRef, inputRef } = chat;
+  return (
+    <>
+      <div ref={scrollRef} className={`flex-1 overflow-y-auto px-3.5 py-4 space-y-3 ${className ?? ""}`}>
+        <Bubble role="assistant" content={OPENER} />
+        {messages.length === 0 && (
+          <div className="flex flex-wrap gap-1.5 pl-9">
+            {SUGGESTIONS.map((q) => (
+              <button
+                key={q}
+                type="button"
+                onClick={() => send(q)}
+                className="text-xs font-medium px-2.5 py-1.5 rounded-full border border-emerald-300/60 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 transition-colors text-left"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        )}
+        {messages.map((m, i) => <Bubble key={i} role={m.role} content={m.content} />)}
+        {busy && (
+          <div className="flex items-center gap-2 pl-9 text-xs text-muted-foreground">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> thinking…
+          </div>
+        )}
+        {showCta && !busy && (
+          <div className="ml-9 rounded-xl border border-emerald-300/60 dark:border-emerald-800/60 bg-emerald-500/[0.06] p-3">
+            <p className="text-xs text-neutral-700 dark:text-neutral-300 mb-2">
+              The quickest way to see it: put your last 3 deals in. 7-day trial, no card.
+            </p>
+            <Button size="sm" className="h-8 text-xs font-bold gradient-btn text-white" onClick={onCta} data-testid="landing-copilot-cta">
+              Start managing deals <ArrowRight className="w-3 h-3 ml-1" />
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <form
+        className="flex items-center gap-2 border-t border-neutral-200 dark:border-neutral-800 px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shrink-0"
+        onSubmit={(e) => { e.preventDefault(); send(input); }}
+      >
+        <input
+          ref={inputRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Type your question…"
+          maxLength={500}
+          data-testid="landing-copilot-input"
+          className="flex-1 h-10 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+        />
+        <Button type="submit" size="icon" disabled={busy || !input.trim()} aria-label="Send" className="h-10 w-10 rounded-xl gradient-btn text-white shrink-0">
+          <SendHorizonal className="w-4 h-4" />
+        </Button>
+      </form>
+    </>
+  );
+}
+
+/**
+ * Inline section — the chat sits OPEN in the page instead of hiding behind a
+ * button. A visitor who never thinks to click a bubble still sees a live
+ * assistant they can type into, which is the whole point of putting it on a
+ * marketing page.
+ */
+export function LandingCopilotSection({ onCta }: { onCta: () => void }) {
+  const chat = useCopilotChat();
+  return (
+    <section id="ask" className="py-20 sm:py-28 border-t border-neutral-200 dark:border-neutral-800">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-10">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-600 dark:text-emerald-400 mb-3">
+            <span className="relative flex w-2 h-2">
+              <span className="absolute inline-flex w-full h-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+              <span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-500" />
+            </span>
+            Live · answers from the real product
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
+            Not sure it fits how you work? Ask it.
+          </h2>
+          <p className="text-neutral-600 dark:text-neutral-400 mt-3 max-w-xl mx-auto">
+            No sign-up, no email. It answers from the same product knowledge the app uses — so what it
+            tells you here is what you get inside.
+          </p>
+        </div>
+
+        <div className="relative">
+          {/* Soft glow to pull the eye to the one thing on this page you can use right now. */}
+          <div
+            className="absolute -inset-3 rounded-[28px] opacity-40 blur-2xl pointer-events-none animate-pulse"
+            style={{ background: "linear-gradient(135deg, #10B98133, #0D948833)" }}
+            aria-hidden="true"
+          />
+          <div className="relative flex flex-col h-[520px] rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 shadow-2xl shadow-emerald-900/5 overflow-hidden">
+            <div
+              className="flex items-center gap-2.5 px-4 py-3 text-white shrink-0"
+              style={{ background: "linear-gradient(135deg, hsl(160 84% 22%) 0%, hsl(174 70% 26%) 100%)" }}
+            >
+              <span className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-amber-300" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold leading-tight">Ask DealInSec</p>
+                <p className="text-[11px] text-emerald-100/80 leading-tight">Product guide · no account needed</p>
+              </div>
+            </div>
+            <ChatBody chat={chat} onCta={onCta} />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** Floating bubble — stays available everywhere else on the page. */
+export function LandingCopilot({ onCta }: { onCta: () => void }) {
+  const [open, setOpen] = useState(false);
+  const chat = useCopilotChat();
+
+  useEffect(() => {
+    if (open) setTimeout(() => chat.inputRef.current?.focus(), 150);
+  }, [open, chat.inputRef]);
 
   return (
     <>
@@ -104,58 +234,7 @@ export function LandingCopilot({ onCta }: { onCta: () => void }) {
               <X className="w-4 h-4" />
             </button>
           </div>
-
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-3.5 py-4 space-y-3">
-            <Bubble role="assistant" content={OPENER} />
-            {messages.length === 0 && (
-              <div className="flex flex-wrap gap-1.5 pl-9">
-                {SUGGESTIONS.map((q) => (
-                  <button
-                    key={q}
-                    type="button"
-                    onClick={() => send(q)}
-                    className="text-xs font-medium px-2.5 py-1.5 rounded-full border border-emerald-300/60 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 transition-colors text-left"
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            )}
-            {messages.map((m, i) => <Bubble key={i} role={m.role} content={m.content} />)}
-            {busy && (
-              <div className="flex items-center gap-2 pl-9 text-xs text-muted-foreground">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" /> thinking…
-              </div>
-            )}
-            {showCta && !busy && (
-              <div className="ml-9 rounded-xl border border-emerald-300/60 dark:border-emerald-800/60 bg-emerald-500/[0.06] p-3">
-                <p className="text-xs text-neutral-700 dark:text-neutral-300 mb-2">
-                  The quickest way to see it: put your last 3 deals in. 7-day trial, no card.
-                </p>
-                <Button size="sm" className="h-8 text-xs font-bold gradient-btn text-white" onClick={onCta} data-testid="landing-copilot-cta">
-                  Start managing deals <ArrowRight className="w-3 h-3 ml-1" />
-                </Button>
-              </div>
-            )}
-          </div>
-
-          <form
-            className="flex items-center gap-2 border-t border-neutral-200 dark:border-neutral-800 px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shrink-0"
-            onSubmit={(e) => { e.preventDefault(); send(input); }}
-          >
-            <input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your question…"
-              maxLength={500}
-              data-testid="landing-copilot-input"
-              className="flex-1 h-10 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
-            />
-            <Button type="submit" size="icon" disabled={busy || !input.trim()} aria-label="Send" className="h-10 w-10 rounded-xl gradient-btn text-white shrink-0">
-              <SendHorizonal className="w-4 h-4" />
-            </Button>
-          </form>
+          <ChatBody chat={chat} onCta={onCta} />
         </div>
       )}
     </>

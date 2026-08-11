@@ -521,19 +521,6 @@ export function DesktopSidebar() {
                 <p className="text-[11px] text-muted-foreground truncate">{user?.email ?? ""}</p>
               </div>
               <div className="h-px bg-border my-1" aria-hidden="true" />
-              <Link
-                href="/profile"
-                className="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm hover:bg-muted/70 transition-colors"
-              >
-                <UserCircle className="w-4 h-4 text-muted-foreground" /> Profile
-              </Link>
-              <Link
-                href="/settings"
-                className="flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm hover:bg-muted/70 transition-colors"
-              >
-                <Settings className="w-4 h-4 text-muted-foreground" /> Settings
-              </Link>
-              <div className="h-px bg-border my-1" aria-hidden="true" />
               <button
                 onClick={handleLogout}
                 data-testid="sidebar-logout"

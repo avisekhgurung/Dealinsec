@@ -56,7 +56,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { trackEvent } from "@/lib/analytics";
-import { LandingCopilot } from "@/components/landing-copilot";
+import { LandingCopilot, LandingCopilotSection } from "@/components/landing-copilot";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -373,6 +373,12 @@ export default function LandingPage() {
         <ProductShowcase />
         <StatsSection />
         <WatchesSection />
+
+        {/* The chat sits open in the page — a visitor who never clicks a
+            floating bubble still finds something they can use right now. */}
+        <LandingCopilotSection
+          onCta={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
+        />
         <TeamSection />
         {/* Testimonials hidden until we have real users. Re-enable <Testimonials /> once you have genuine quotes. */}
         <MadeInIndiaSection />
@@ -788,7 +794,7 @@ function Hero({
               variants={heroFadeUp}
               className="text-[2.5rem] sm:text-5xl lg:text-[4.5rem] font-bold tracking-tight leading-[1.02]"
             >
-              Your AI deal manager for
+              Your deal manager for
               <br />
               <span
                 className="relative inline-block"
