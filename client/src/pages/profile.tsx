@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Upload, ArrowLeft, Edit, LogOut, CreditCard, Copy, Share2, User, Mail, Phone, FileText, Building, MapPin, PenTool, Sparkles, Landmark, Hash, Camera, Crown, Check, Settings as SettingsIcon } from "lucide-react";
+import { Loader2, Upload, ArrowLeft, Edit, LogOut, CreditCard, Copy, Share2, User, Mail, Phone, FileText, Building, MapPin, PenTool, Sparkles, Landmark, Hash, Camera, Crown, Check, Stamp, Settings as SettingsIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -111,6 +111,11 @@ export default function ProfilePage() {
   const [bankName, setBankName] = useState((user as any)?.bankName || "");
   const [signaturePreview, setSignaturePreview] = useState<string | null>(user?.digitalSignature || null);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
+  // Business rubber stamp — the companion to the signature on Indian
+  // documents. Presentational only; nothing to do with stamp duty.
+  const [sealPreview, setSealPreview] = useState<string | null>((user as any)?.companySeal || null);
+  const [sealFile, setSealFile] = useState<File | null>(null);
+  const sealInputRef = useRef<HTMLInputElement>(null);
 
   // Deep links (/profile?edit=1&section=bank etc. — used by the dashboard
   // checklist and the stepper) land straight in edit mode at the right
@@ -152,6 +157,19 @@ export default function ProfilePage() {
     };
   }, [isEditing, pendingSection]);
 
+  const handleSealUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid File", description: "Please upload an image file (JPG, PNG, etc.)", variant: "destructive" });
+      return;
+    }
+    setSealFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => setSealPreview(event.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -186,6 +204,15 @@ export default function ProfilePage() {
     setIsLoading(true);
     try {
       let digitalSignaturePath = signaturePreview;
+      let companySealPath = sealPreview;
+
+      if (sealFile) {
+        const sealForm = new FormData();
+        sealForm.append("seal", sealFile);
+        const sealRes = await fetch("/api/profile/seal", { method: "POST", body: sealForm, credentials: "include" });
+        if (!sealRes.ok) throw new Error("Failed to upload seal");
+        companySealPath = (await sealRes.json()).path;
+      }
 
       if (signatureFile) {
         const formData = new FormData();
@@ -212,6 +239,7 @@ export default function ProfilePage() {
         ifscCode: ifscCode ? ifscCode.toUpperCase() : null,
         bankName: bankName.trim() || null,
         digitalSignature: digitalSignaturePath,
+        companySeal: companySealPath,
       });
 
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
@@ -680,6 +708,48 @@ export default function ProfilePage() {
                   </div>
                 )}
               </div>
+            </section>
+
+            <section id="profile-section-seal" className="scroll-mt-24 space-y-2">
+              <div className="flex items-center gap-2 pt-1">
+                <Stamp className="h-4 w-4 text-primary" />
+                <div>
+                  <h4 className="font-semibold text-sm">Company Stamp <span className="font-normal text-muted-foreground">(optional)</span></h4>
+                  <p className="text-xs text-muted-foreground">
+                    Your business rubber stamp. Printed beside your signature on agreements and invoices.
+                  </p>
+                </div>
+              </div>
+              <div className="border-2 border-dashed border-border rounded-xl p-4">
+                {sealPreview ? (
+                  <div className="space-y-2">
+                    <img src={sealPreview} alt="Company stamp" className="max-h-24 mx-auto" data-testid="img-seal" />
+                    <Button
+                      type="button" variant="outline" size="sm" className="w-full glass-card"
+                      onClick={() => { setSealPreview(null); setSealFile(null); }}
+                      data-testid="button-remove-seal"
+                    >
+                      Change
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <Button
+                      type="button" variant="outline" className="glass-card"
+                      onClick={() => sealInputRef.current?.click()}
+                      data-testid="button-upload-seal"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Stamp
+                    </Button>
+                    <input ref={sealInputRef} type="file" accept="image/*" onChange={handleSealUpload} className="hidden" />
+                  </div>
+                )}
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                This is your own business stamp — it is not stamp duty. Stamp duty is paid separately to the
+                government; you can record an e-stamp certificate on each agreement.
+              </p>
             </section>
 
             <div className="flex gap-3 pt-2">

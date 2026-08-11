@@ -39,6 +39,10 @@ export default function ContractPdfPage() {
     (contract?.signatureUrl as string | null | undefined)
     ?? issuer.digitalSignature
     ?? undefined;
+  // Company stamp, snapshotted with the signature. Presentational only.
+  const sealSrc: string | undefined =
+    ((contract as any)?.sealUrl as string | null | undefined) ?? issuer.companySeal ?? undefined;
+
   const signerLabel =
     contract?.signerName
     || issuer.name
@@ -449,6 +453,16 @@ export default function ContractPdfPage() {
                   )}
                 </div>
 
+                {sealSrc && (
+                  <div className="flex justify-center pt-1">
+                    <img
+                      src={sealSrc}
+                      alt="Company stamp"
+                      className="h-16 print:h-14 w-auto object-contain opacity-90"
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-3 text-sm">
                   {!signatureSrc && (
                     <div>
@@ -547,12 +561,49 @@ export default function ContractPdfPage() {
                 <p className="font-semibold">{contract.status}{contract.signedDate ? ` · ${formatDate(contract.signedDate)}` : ""}</p>
               </div>
             </div>
+
+            {/* e-Stamp certificate the parties bought themselves. DealInSec
+                neither issues nor satisfies stamp duty — it cites the
+                certificate so the document is complete. */}
+            {(contract as any).estampCertificateNo && (
+              <div className="mb-3 rounded-lg border border-border print:border-gray-300 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground print:text-gray-500 mb-1.5">
+                  Stamp Duty
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
+                  <div>
+                    <p className="text-muted-foreground print:text-gray-500">Certificate No.</p>
+                    <p className="font-mono font-semibold">{(contract as any).estampCertificateNo}</p>
+                  </div>
+                  {(contract as any).estampDate && (
+                    <div>
+                      <p className="text-muted-foreground print:text-gray-500">Dated</p>
+                      <p className="font-semibold">{formatDate((contract as any).estampDate)}</p>
+                    </div>
+                  )}
+                  {(contract as any).estampAmount != null && (
+                    <div>
+                      <p className="text-muted-foreground print:text-gray-500">Duty Paid</p>
+                      <p className="font-semibold">₹{Number((contract as any).estampAmount).toLocaleString("en-IN")}</p>
+                    </div>
+                  )}
+                  {(contract as any).estampAuthority && (
+                    <div>
+                      <p className="text-muted-foreground print:text-gray-500">Issued By</p>
+                      <p className="font-semibold">{(contract as any).estampAuthority}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <p className="text-[10px] leading-relaxed text-muted-foreground print:text-gray-500">
               This agreement was prepared and accepted electronically. The signature shown for Party A is the
               image on file for the named signatory, captured when this document was created. This is an
               electronic acceptance with an audit record — it is not a Digital Signature Certificate issued
               under the Information Technology Act, 2000, and no certifying-authority verification is claimed.
-              Parties may additionally execute a physically signed counterpart.
+              Parties may additionally execute a physically signed counterpart. Stamp duty and
+              registration, where applicable, are the responsibility of the parties — DealInSec does not
+              pay, issue or verify them.
             </p>
           </div>
 

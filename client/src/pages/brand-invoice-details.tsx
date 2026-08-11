@@ -161,6 +161,7 @@ export default function BrandInvoiceDetailsPage() {
   const influencerGst = issuer.gstNumber;
   const influencerAddress = issuer.billingAddress;
   const signatureUrl = issuer.digitalSignature;
+  const sealUrl = issuer.companySeal;
   const bankAccountHolder = issuer.accountHolderName;
   const bankAccountNumber = issuer.accountNumber;
   const bankIfsc = issuer.ifscCode;
@@ -463,6 +464,9 @@ export default function BrandInvoiceDetailsPage() {
                       <div className="h-16 w-48 border-b-2 border-gray-300 dark:border-zinc-600 mb-2" />
                       <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{influencerName}</p>
                     </>
+                  )}
+                  {sealUrl && (
+                    <img src={sealUrl} alt="Company stamp" className="h-14 w-auto object-contain mx-auto mt-1 opacity-90" />
                   )}
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                     Date: {fmt(invoice.invoiceDate)}

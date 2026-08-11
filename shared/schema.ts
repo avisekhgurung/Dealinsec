@@ -63,6 +63,10 @@ export const users = pgTable("users", {
   panNumber: varchar("pan_number"),
   gstNumber: varchar("gst_number"),
   digitalSignature: varchar("digital_signature"),
+  /** Business rubber stamp / seal image. NOT stamp duty — see estamp* on
+   *  contracts for that. Indian documents conventionally carry both a
+   *  signature and a seal. */
+  companySeal: varchar("company_seal"),
   billingAddress: varchar("billing_address"),
   accountHolderName: varchar("account_holder_name"),
   accountNumber: varchar("account_number"),
@@ -385,6 +389,18 @@ export const contracts = pgTable("contracts", {
   signerUserId: varchar("signer_user_id"),
   signerName: varchar("signer_name"),
   signatureUrl: varchar("signature_url"),
+  /** Seal captured at creation, for the same reason as signatureUrl: the
+   *  document must not change when the profile changes. */
+  sealUrl: varchar("seal_url"),
+  // ── e-Stamp certificate ────────────────────────────────────────────────
+  // DealInSec does NOT sell or issue stamp paper. The user buys an e-stamp
+  // certificate themselves (SHCIL / their state portal) and records its
+  // details here so the agreement can cite it. Storing the reference is
+  // honest; generating one would not be.
+  estampCertificateNo: varchar("estamp_certificate_no"),
+  estampDate: varchar("estamp_date"),
+  estampAmount: integer("estamp_amount"),
+  estampAuthority: varchar("estamp_authority"),
   signedByInfluencer: boolean("signed_by_influencer").notNull().default(false),
   signedByInfluencerDate: text("signed_by_influencer_date"),
   signedByBrand: boolean("signed_by_brand").notNull().default(false),

@@ -426,6 +426,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         signerUserId: req.user.id,
         signerName,
         signatureUrl: req.user.digitalSignature ?? null,
+        sealUrl: req.user.companySeal ?? null,
         userId,
         organizationId: req.user.organizationId,
       });
@@ -516,6 +517,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Proof upload error:", error);
       res.status(500).json({ error: "Failed to upload proof" });
+    }
+  });
+
+  /**
+   * Record the e-stamp certificate the user bought themselves.
+   *
+   * DealInSec does not sell, issue or satisfy stamp duty — it stores a
+   * reference so the agreement can cite a real certificate. That is why this
+   * takes a certificate NUMBER and not a file: an uploaded image of stamp
+   * paper is not valid stamping and must never be presented as if it were.
+   */
+  app.patch("/api/contracts/:id/estamp", isAuthenticated, requireOrgPermission("agreements.create"), async (req: any, res) => {
+    try {
+      const contract = await storage.getContract(parseInt(req.params.id));
+      if (!contract) return res.status(404).json({ error: "Agreement not found" });
+      if (!inOrg(contract, req.user)) return res.status(403).json({ error: "Access denied" });
+
+      const certificateNo = String(req.body?.estampCertificateNo ?? "").trim();
+      const clear = certificateNo === "";
+
+      if (!clear && certificateNo.length > 60) {
+        return res.status(400).json({ error: "Certificate number looks too long — check and re-enter it." });
+      }
+      const amountRaw = req.body?.estampAmount;
+      const amount = amountRaw === "" || amountRaw === null || amountRaw === undefined
+        ? null : Math.round(Number(amountRaw));
+      if (amount !== null && (!Number.isFinite(amount) || amount < 0)) {
+        return res.status(400).json({ error: "Stamp duty amount must be a positive number" });
+      }
+
+      const updated = await storage.updateContract(parseInt(req.params.id), {
+        estampCertificateNo: clear ? null : certificateNo,
+        estampDate: clear ? null : (String(req.body?.estampDate ?? "").trim() || null),
+        estampAmount: clear ? null : amount,
+        estampAuthority: clear ? null : (String(req.body?.estampAuthority ?? "").trim().slice(0, 120) || null),
+      } as any);
+
+      logOrgActivity(req.user, clear ? "removed the e-stamp reference from" : "recorded an e-stamp certificate on",
+        "agreement", contract.id, clear ? contract.brandName : `${certificateNo} · ${contract.brandName}`);
+      res.json(updated);
+    } catch (error) {
+      console.error("e-stamp update error:", error);
+      res.status(500).json({ error: "Failed to save the e-stamp details" });
     }
   });
 
@@ -1132,6 +1176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         panNumber,
         gstNumber,
         digitalSignature,
+        companySeal,
         profileImageUrl,
         coverImageUrl,
         onboardingComplete,
@@ -1149,6 +1194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (panNumber !== undefined) updates.panNumber = panNumber;
       if (gstNumber !== undefined) updates.gstNumber = gstNumber;
       if (digitalSignature !== undefined) updates.digitalSignature = digitalSignature;
+      if (companySeal !== undefined) updates.companySeal = companySeal;
       if (profileImageUrl !== undefined) updates.profileImageUrl = profileImageUrl;
       if (coverImageUrl !== undefined) updates.coverImageUrl = coverImageUrl;
       // One-way latch: the client may only ever set onboardingComplete to
@@ -1229,6 +1275,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Cover image upload error:", error);
       res.status(500).json({ error: "Failed to upload cover image" });
+    }
+  });
+
+  // Business rubber stamp / seal. Presentational only — this is NOT stamp duty.
+  app.post("/api/profile/seal", isAuthenticated, upload.single("seal"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+      let filePath: string;
+      if (isImageKitConfigured()) {
+        const uploaded = await uploadFileToImageKit(req.file, {
+          folder: "seals",
+          baseName: `user-${req.user.id}-seal`,
+        });
+        filePath = uploaded.url;
+      } else {
+        filePath = `/uploads/${req.file.filename}`;
+      }
+      res.json({ path: filePath });
+    } catch (error) {
+      console.error("Seal upload error:", error);
+      res.status(500).json({ error: "Failed to upload seal" });
     }
   });
 
@@ -1368,6 +1435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         gstNumber: owner.gstNumber ?? "",
         billingAddress: owner.billingAddress ?? "",
         digitalSignature: owner.digitalSignature ?? "",
+        companySeal: (owner as any).companySeal ?? "",
         accountHolderName: (owner as any).accountHolderName ?? "",
         accountNumber: (owner as any).accountNumber ?? "",
         ifscCode: (owner as any).ifscCode ?? "",

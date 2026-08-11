@@ -20,6 +20,7 @@ export interface Issuer {
   gstNumber: string;
   billingAddress: string;
   digitalSignature: string;
+  companySeal: string;
   accountHolderName: string;
   accountNumber: string;
   ifscCode: string;
@@ -45,6 +46,7 @@ export function useIssuer(): Issuer {
     gstNumber: data?.gstNumber || (user as any)?.gstNumber || "",
     billingAddress: data?.billingAddress || user?.billingAddress || "",
     digitalSignature: data?.digitalSignature || user?.digitalSignature || "",
+    companySeal: data?.companySeal || (user as any)?.companySeal || "",
     accountHolderName: data?.accountHolderName || (user as any)?.accountHolderName || "",
     accountNumber: data?.accountNumber || (user as any)?.accountNumber || "",
     ifscCode: data?.ifscCode || (user as any)?.ifscCode || "",

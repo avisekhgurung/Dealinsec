@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef , useEffect} from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useParams, Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -86,6 +86,43 @@ export default function ContractDetailsPage() {
     },
   });
   const hasQuote = !!dealQuote;
+
+  // e-Stamp certificate reference (not stamp duty itself — see the card below).
+  const [estampNo, setEstampNo] = useState("");
+  const [estampDate, setEstampDate] = useState("");
+  const [estampAmount, setEstampAmount] = useState("");
+  const [estampAuthority, setEstampAuthority] = useState("");
+  useEffect(() => {
+    if (!contract) return;
+    setEstampNo((contract as any).estampCertificateNo || "");
+    setEstampDate((contract as any).estampDate || "");
+    setEstampAmount((contract as any).estampAmount != null ? String((contract as any).estampAmount) : "");
+    setEstampAuthority((contract as any).estampAuthority || "");
+  }, [contract]);
+
+  const saveEstamp = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/contracts/${params.id}/estamp`, {
+        estampCertificateNo: estampNo.trim(),
+        estampDate: estampDate || null,
+        estampAmount: estampAmount === "" ? null : Number(estampAmount),
+        estampAuthority: estampAuthority.trim(),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contracts", params.id] });
+      toast({
+        title: estampNo.trim() ? "Stamp details saved" : "Stamp details cleared",
+        description: estampNo.trim() ? "They now print on the agreement." : undefined,
+      });
+    },
+    onError: (err) => toast({
+      title: "Could not save the stamp details",
+      description: parseApiError(err).error || "Please try again.",
+      variant: "destructive",
+    }),
+  });
 
   const hasInvoice = dealBrandInvoices.length > 0;
   const hasProof = !!contract?.proofFileName;
@@ -686,6 +723,62 @@ export default function ContractDetailsPage() {
 
         {/* ── Right rail: summary · files & proof · activity ── */}
         <div className="lg:col-span-1 space-y-6 mt-6 lg:mt-0">
+          {/* e-Stamp certificate. We record the certificate the user bought;
+              we do not issue, sell or verify stamp duty — and the copy says so,
+              because an uploaded picture of stamp paper is not stamping. */}
+          {canAgree && (
+            <Card className="glass-card border-0">
+              <CardContent className="p-5">
+                <h3 className="font-semibold mb-1 pb-2 border-b-2 border-emerald-500/60 inline-block">Stamp Duty</h3>
+                <p className="text-xs text-muted-foreground mt-2 mb-4 leading-relaxed">
+                  Bought an e-stamp for this agreement? Record its certificate number and it prints on the
+                  document. DealInSec doesn't sell or pay stamp duty — buy it from SHCIL or your state portal.
+                </p>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="estamp-no" className="text-xs">Certificate number</Label>
+                    <Input
+                      id="estamp-no" value={estampNo} onChange={(e) => setEstampNo(e.target.value)}
+                      placeholder="IN-WB12345678901234X" className="h-9 text-sm font-mono"
+                      data-testid="input-estamp-no"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="estamp-date" className="text-xs">Date</Label>
+                      <Input id="estamp-date" type="date" value={estampDate}
+                        onChange={(e) => setEstampDate(e.target.value)} className="h-9 text-sm"
+                        data-testid="input-estamp-date" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="estamp-amt" className="text-xs">Duty paid (₹)</Label>
+                      <Input id="estamp-amt" inputMode="numeric" value={estampAmount}
+                        onChange={(e) => setEstampAmount(e.target.value.replace(/[^\d]/g, ""))}
+                        placeholder="500" className="h-9 text-sm" data-testid="input-estamp-amount" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="estamp-auth" className="text-xs">Issued by</Label>
+                    <Input id="estamp-auth" value={estampAuthority}
+                      onChange={(e) => setEstampAuthority(e.target.value)}
+                      placeholder="SHCIL / State Treasury" className="h-9 text-sm"
+                      data-testid="input-estamp-authority" />
+                  </div>
+                  <Button
+                    className="w-full h-9 text-sm gradient-btn text-white"
+                    onClick={() => saveEstamp.mutate()}
+                    disabled={saveEstamp.isPending}
+                    data-testid="button-save-estamp"
+                  >
+                    {saveEstamp.isPending
+                      ? <><Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> Saving…</>
+                      : estampNo.trim() ? "Save stamp details" : "Clear stamp details"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="glass-card border-0">
             <CardContent className="p-5">
               <h3 className="font-semibold mb-4 pb-2 border-b-2 border-emerald-500/60 inline-block">Agreement Summary</h3>
