@@ -187,6 +187,26 @@ function Router() {
 }
 
 function App() {
+  // Documents must print on white whatever theme the screen uses. Overriding
+  // 128 CSS variables in @media print would drift; stripping the dark class
+  // for the duration of the print flips the entire cascade to light at once.
+  useEffect(() => {
+    let wasDark = false;
+    const before = () => {
+      wasDark = document.documentElement.classList.contains("dark");
+      if (wasDark) document.documentElement.classList.remove("dark");
+    };
+    const after = () => {
+      if (wasDark) document.documentElement.classList.add("dark");
+    };
+    window.addEventListener("beforeprint", before);
+    window.addEventListener("afterprint", after);
+    return () => {
+      window.removeEventListener("beforeprint", before);
+      window.removeEventListener("afterprint", after);
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

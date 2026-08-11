@@ -17,13 +17,10 @@ export function BottomNav() {
   const { user } = useAuth();
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 safe-area-pb lg:hidden" style={{
-      background: "rgba(255,255,255,0.82)",
-      backdropFilter: "blur(28px)",
-      WebkitBackdropFilter: "blur(28px)",
-      borderTop: "1px solid rgba(255,255,255,0.35)",
-      boxShadow: "0 -4px 24px rgba(0,0,0,0.06)",
-    }}>
+    <nav
+      className="fixed bottom-0 inset-x-0 z-50 safe-area-pb lg:hidden border-t border-white/35 dark:border-white/10 bg-white/80 dark:bg-zinc-950/85 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.45)]"
+      style={{ backdropFilter: "blur(28px)", WebkitBackdropFilter: "blur(28px)" }}
+    >
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-1">
         {navItems
           .filter((item) => !(item as any).module || canSeeModule(user as any, (item as any).module))
@@ -39,15 +36,17 @@ export function BottomNav() {
             <Link key={item.path} href={item.path}>
               <button
                 data-testid={`nav-${item.label.toLowerCase()}`}
-                className="relative flex flex-col items-center justify-center gap-0.5 w-[58px] h-14 rounded-2xl transition-all duration-200"
-                style={{
-                  color: isActive ? "hsl(160 84% 30%)" : "hsl(215 16% 47%)",
-                }}
+                className={`relative flex flex-col items-center justify-center gap-0.5 w-[58px] h-14 rounded-2xl transition-all duration-200 ${
+                  isActive
+                    ? "text-emerald-700 dark:text-emerald-400"
+                    : "text-slate-500 dark:text-zinc-400"
+                }`}
+
               >
                 {isActive && (
                   <span
                     className="absolute inset-x-1 top-1 bottom-1 rounded-xl"
-                    style={{ background: "linear-gradient(135deg, hsl(160 84% 30% / 0.12) 0%, hsl(174 77% 36% / 0.08) 100%)" }}
+                    style={{ background: "linear-gradient(135deg, hsl(160 84% 40% / 0.14) 0%, hsl(174 77% 40% / 0.10) 100%)" }}
                   />
                 )}
                 <div className="relative">

@@ -642,6 +642,14 @@ export default function ContractPdfPage() {
 
       <style>{`
         @media print {
+          /* A PDF is A4 whatever screen made it. Tailwind's sm:/md: variants
+             are viewport media queries, so printing from a phone collapsed the
+             two-column layouts to one long column. Force the desktop grid in
+             print regardless of device. */
+          .md\\:grid-cols-2, .sm\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          .md\\:grid-cols-4, .sm\\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+          .max-w-2xl, .lg\\:max-w-4xl { max-width: 100% !important; }
+
           @page { margin: 1.2cm; size: A4; }
 
           /* Reset body */
