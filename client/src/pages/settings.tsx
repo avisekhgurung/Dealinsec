@@ -32,7 +32,7 @@ import {
 } from "@shared/permissions";
 import {
   ArrowLeft, Building2, Users, ScrollText, CreditCard, UserPlus, Crown,
-  Mail, RotateCw, Trash2, Loader2, Sparkles, Rocket, Sun, Moon, Monitor,
+  Mail, RotateCw, Trash2, Loader2, Sparkles, Rocket, Sun, Moon, Monitor, Download,
   SlidersHorizontal, Check, Shield, Pencil, Plus,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -255,6 +255,28 @@ export default function SettingsPage() {
   ];
 
   const seatsFree = org ? Math.max(0, org.seatLimit - org.seatsUsed - org.pendingInvites) : 0;
+
+
+  /** Erasure. The server anonymises the row rather than dropping it, because
+   *  deals and invoices reference it and financial records have a retention
+   *  period — see anonymizeUser in storage.ts. */
+  const deleteAccount = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/account", { confirm: "DELETE" });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Account deleted", description: "Your personal data has been erased." });
+      window.location.href = "/";
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not delete your account",
+        description: parseApiError(err).error || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-12">
@@ -720,6 +742,69 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* ── Your data (DPDP Act rights) ──────────────────────────────
+                The privacy policy promises access and erasure. These are the
+                controls that make those promises real rather than an email
+                address the user has to trust. */}
+            <Card className="glass-card border-0">
+              <CardContent className="p-5 sm:p-6 space-y-4">
+                <div>
+                  <h2 className="font-semibold">Your data</h2>
+                  <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                    Your rights under the Digital Personal Data Protection Act, 2023.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between rounded-xl border border-border p-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Download my data</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Your profile plus every deal, quotation, agreement and invoice your role can see, as JSON.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="shrink-0"
+                    data-testid="button-export-data"
+                    onClick={() => { window.location.href = "/api/account/export"; }}
+                  >
+                    <Download className="w-4 h-4 mr-2" /> Download
+                  </Button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between rounded-xl border border-destructive/30 bg-destructive/[0.04] p-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-destructive">Delete my account</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Erases your personal details and signs you out for good. Financial records are kept for
+                      the statutory period, with your identity removed from them.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10"
+                    disabled={deleteAccount.isPending}
+                    data-testid="button-delete-account"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: "Delete your account?",
+                        description:
+                          "This cannot be undone. Your name, email, PAN, GSTIN, bank details and signature are erased, and you are signed out immediately. Download your data first if you want a copy.",
+                        confirmText: "Delete my account",
+                        cancelText: "Keep my account",
+                        destructive: true,
+                      });
+                      if (ok) deleteAccount.mutate();
+                    }}
+                  >
+                    {deleteAccount.isPending
+                      ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Deleting…</>
+                      : <><Trash2 className="w-4 h-4 mr-2" /> Delete</>}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>

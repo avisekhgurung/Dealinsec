@@ -121,9 +121,9 @@ export default function PrivacyPolicy() {
         <h2>7. Your Rights (under DPDP Act)</h2>
         <p>As a Data Principal, you have the right to:</p>
         <ul>
-          <li><strong>Access:</strong> Request a copy of your personal data.</li>
+          <li><strong>Access:</strong> Download a complete copy of your account data as JSON at any time — Settings → Your data → Download my data.</li>
           <li><strong>Correction:</strong> Request correction of inaccurate data.</li>
-          <li><strong>Erasure:</strong> Request deletion of your data (subject to legal retention requirements).</li>
+          <li><strong>Erasure:</strong> Delete your account and its data from Settings → Your data → Delete my account. Financial records are retained for the statutory period in Section 6.</li>
           <li><strong>Withdraw Consent:</strong> Withdraw consent for data processing at any time.</li>
           <li><strong>Grievance Redressal:</strong> File a complaint with our Grievance Officer (details below).</li>
         </ul>
@@ -152,7 +152,7 @@ export default function PrivacyPolicy() {
         <h2>11. Grievance Officer</h2>
         <p>
           In accordance with Section 13 of the DPDP Act and Rule 5(9) of the IT Rules, 2011:<br />
-          <strong>Name:</strong> Grievance Officer, DealInSec Technologies<br />
+          <strong>Name:</strong> Avisekh Gurung, Grievance Officer<br />
           <strong>Email:</strong> support@dealinsec.com<br />
           <strong>Response time:</strong> Within 72 hours of receiving a complaint.
         </p>

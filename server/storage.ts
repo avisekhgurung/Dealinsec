@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { db } from "./db";
 import { eq, desc, sql } from "drizzle-orm";
 import { canonicalEmail } from "@shared/email";
@@ -97,6 +98,7 @@ export interface IStorage {
   updateOrganization(id: string, updates: Partial<Organization>): Promise<Organization | undefined>;
   getOrgMembers(orgId: string): Promise<User[]>;
   getOrgOwner(orgId: string): Promise<User | undefined>;
+  anonymizeUser(userId: string): Promise<void>;
   countActiveMembers(orgId: string): Promise<number>;
   getDealsByOrg(orgId: string, userId?: string): Promise<Deal[]>;
   getContractsByOrg(orgId: string, userId?: string): Promise<Contract[]>;
@@ -667,6 +669,34 @@ export class DatabaseStorage implements IStorage {
     const [i] = await db.select({ n: sql<number>`count(*)::int` }).from(invitations)
       .where(sql`${invitations.customRoleId} = ${roleId} AND ${invitations.status} = 'pending'`);
     return { members: m?.n ?? 0, invites: i?.n ?? 0 };
+  }
+
+  /** Erasure under the DPDP Act. The row is kept because deals, agreements and
+   *  invoices reference it and financial records carry a statutory retention
+   *  period — but every piece of personal data on it is destroyed and the
+   *  login is disabled, so the person is no longer identifiable. */
+  async anonymizeUser(userId: string): Promise<void> {
+    await db.update(users).set({
+      email: `deleted-${userId}@deleted.invalid`,
+      emailCanonical: `deleted-${userId}@deleted.invalid`,
+      password: randomBytes(32).toString("hex"),
+      firstName: "Deleted",
+      lastName: "User",
+      phone: null,
+      panNumber: null,
+      gstNumber: null,
+      billingAddress: null,
+      digitalSignature: null,
+      profileImageUrl: null,
+      coverImageUrl: null,
+      accountHolderName: null,
+      accountNumber: null,
+      ifscCode: null,
+      bankName: null,
+      resetTokenHash: null,
+      resetTokenExpiresAt: null,
+      memberStatus: "removed",
+    } as any).where(eq(users.id, userId));
   }
 
   async getOrgOwner(orgId: string): Promise<User | undefined> {

@@ -9,7 +9,7 @@
   unlock agreements/invoices/payment tracking. Buying again extends it.
 - **Pro Monthly — ₹999/month** and **Pro Annual — ₹9,999/year** (≈2 months
   free) — the complete workflow unlimited: deals, quotations, e-signed
-  agreements, GST-ready invoices, payment tracking, 5 team seats.
+  agreements, professional invoices, payment tracking, 5 team seats.
 - **Extra seats — ₹199/seat/month**, bought as a pack with one shared expiry.
 Payments via Razorpay (UPI/cards/netbanking). 7-day refund policy. Billing is
 managed by the organization owner at /pricing.

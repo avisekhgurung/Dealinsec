@@ -8,7 +8,7 @@ import { setupAuth, isAuthenticated } from "./auth";
 import { requirePro, requireOrgPermission, withOrg, getBillingUser, logOrgActivity , requireModuleRead, requireLinkedRead} from "./entitlements";
 import { maybeStartTrial } from "./trial";
 import { registerCopilotRoutes } from "./copilot/routes";
-import { getSeatLimit, INVITABLE_ROLES, hasPermission as hasOrgPermission, orgRoleOptions, CUSTOM_ROLE, ASSIGNABLE_PERMISSIONS } from "@shared/permissions";
+import { getSeatLimit, INVITABLE_ROLES, hasPermission as hasOrgPermission, orgRoleOptions, CUSTOM_ROLE, ASSIGNABLE_PERMISSIONS , canReadModule} from "@shared/permissions";
 import { aiEnabled, reserve, refund, extractInvoice } from "./ai";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import multer from "multer";
@@ -1262,6 +1262,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ─────────────────────────────────────────────────────────────────────
 
   // Org profile + seat summary — any active member.
+  // ── DPDP Act rights: access and erasure ────────────────────────────────
+  // The privacy policy promises both, so they have to be real controls rather
+  // than an email address someone has to trust.
+
+  /** Right to access — the caller's own account plus everything their role can
+   *  already see, as one JSON file. No new visibility is granted here. */
+  app.get("/api/account/export", isAuthenticated, async (req: any, res) => {
+    try {
+      const { password: _pw, resetTokenHash: _rt, ...profile } = req.user;
+      const orgId = req.user.organizationId;
+      const uid = req.user.id;
+
+      const canRead = (m: "deals" | "quotations" | "agreements" | "invoices") => canReadModule(req.user, m);
+      const [deals, quotes, contracts, invoices] = await Promise.all([
+        orgId && canRead("deals") ? storage.getDealsByOrg(orgId, uid) : Promise.resolve([]),
+        orgId && canRead("quotations") ? storage.getQuotesByOrg(orgId, uid) : Promise.resolve([]),
+        orgId && canRead("agreements") ? storage.getContractsByOrg(orgId, uid) : Promise.resolve([]),
+        orgId && canRead("invoices") ? storage.getBrandInvoicesByOrg(orgId, uid) : Promise.resolve([]),
+      ]);
+
+      const stamp = new Date().toISOString();
+      res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename="dealinsec-export-${stamp.slice(0, 10)}.json"`);
+      res.send(JSON.stringify({
+        exportedAt: stamp,
+        notice: "Personal data export under the Digital Personal Data Protection Act, 2023.",
+        profile,
+        deals,
+        quotations: quotes,
+        agreements: contracts,
+        invoices,
+      }, null, 2));
+    } catch (error) {
+      console.error("Account export error:", error);
+      res.status(500).json({ error: "Could not build your export" });
+    }
+  });
+
+  /** Right to erasure. An owner with teammates must hand over or remove them
+   *  first — deleting them would silently destroy other people's access and
+   *  the organisation's records. Financial rows are kept per the retention
+   *  period stated in the privacy policy; the person is de-identified. */
+  app.delete("/api/account", isAuthenticated, async (req: any, res) => {
+    try {
+      const uid = req.user.id;
+      const orgId = req.user.organizationId;
+      if (String(req.body?.confirm || "").trim().toUpperCase() !== "DELETE") {
+        return res.status(400).json({ error: 'Type DELETE to confirm.' });
+      }
+      if (orgId && req.user.orgRole === "OWNER") {
+        const members = await storage.countActiveMembers(orgId);
+        if (members > 1) {
+          return res.status(400).json({
+            error: "Remove your team members first — deleting the owner would take their access with it.",
+          });
+        }
+      }
+      await storage.anonymizeUser(uid);
+      req.logout?.(() => {});
+      req.session?.destroy?.(() => {});
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Account deletion error:", error);
+      res.status(500).json({ error: "Could not delete your account" });
+    }
+  });
+
   app.get("/api/org", isAuthenticated, withOrg, async (req: any, res) => {
     try {
       const owner = await getBillingUser(req.user);

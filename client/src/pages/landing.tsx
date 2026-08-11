@@ -150,32 +150,14 @@ const STATS = [
   { value: "5-in-1", label: "One workflow", sub: "Deals · Quotes · Contracts · Invoices · Insights" },
   { value: "60s", label: "To your first invoice", sub: "From signup to sent" },
   { value: "₹0", label: "Platform fee", sub: "On every deal you close" },
-  { value: "GST", label: "Ready invoices", sub: "UPI · PAN · IFSC built in" },
+  { value: "PAN·GSTIN", label: "On your documents", sub: "Bank details built in" },
 ];
 
-const TESTIMONIALS = [
-  {
-    quote:
-      "Every client now gets a proper quotation, a signed agreement and a GST invoice. My brokerage looks as professional as a big firm — and payments stopped slipping.",
-    name: "Rajesh Sharma",
-    role: "Real Estate Consultant · Pune",
-    rating: 5,
-  },
-  {
-    quote:
-      "Clients sign the agreement before we start and every milestone gets invoiced on time. Scope creep basically ended for my studio.",
-    name: "Meera Nair",
-    role: "Interior Designer · Kochi",
-    rating: 5,
-  },
-  {
-    quote:
-      "We run 14 client retainers in one dashboard — quote, contract, invoice, reminder. Ops admin dropped to an hour a week.",
-    name: "Arjun Malhotra",
-    role: "Agency Founder · Gurugram",
-    rating: 5,
-  },
-];
+// Testimonials removed: the named people, cities and 5-star ratings here were
+// invented, and presenting invented reviews as real customers is deceptive
+// under the Consumer Protection Act, 2019. Put them back only with real quotes
+// from real customers who agreed to be named. Until then the section below
+// says something true instead.
 
 const FAQS = [
   {
@@ -817,7 +799,7 @@ function Hero({
             </motion.h1>
 
             <motion.p variants={heroFadeUp} className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
-              One simple workflow — quotation, e-signed agreement, GST invoice, payment tracking —{" "}
+              One simple workflow — quotation, e-signed agreement, professional invoice, payment tracking —{" "}
               <span className="font-semibold text-neutral-900 dark:text-white">so you look professional, never chase a client, and get paid on time.</span>{" "}
               Built for India's real estate consultants, interior designers, architects, agencies &amp; contractors.
             </motion.p>
@@ -1236,7 +1218,7 @@ function FeatureGrid() {
               </span>
             </>
           }
-          subtitle="From quotation to e-signed service agreement to GST invoice — manage every deal from one dashboard, and get paid on time."
+          subtitle="From quotation to e-signed service agreement to invoice — manage every deal from one dashboard, and get paid on time."
         />
 
         <motion.div
@@ -1589,46 +1571,42 @@ function Testimonials() {
     <section className="py-20 sm:py-28">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
-          eyebrow="Loved by service businesses"
-          title="Deals closed. Payments secured."
-          subtitle="Real stories from businesses that quote, sign and bill through Dealinsec — every time, on time."
+          eyebrow="Why this exists"
+          title="Built by someone who got tired of chasing payments."
+          subtitle="DealInSec is new and we are not going to pretend otherwise with invented reviews."
         />
 
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-80px" }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-14"
-        >
-          {TESTIMONIALS.map((t) => (
-            <motion.div
-              key={t.name}
-              variants={fadeUp}
-              className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-6 relative"
-            >
-              <Quote className="absolute top-5 right-5 w-8 h-8 text-emerald-200 dark:text-emerald-900/50" />
-              <div className="flex gap-0.5 mb-3">
-                {Array.from({ length: t.rating }).map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
-                ))}
+        <div className="max-w-3xl mx-auto mt-12">
+          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-7 sm:p-9">
+            <p className="text-[15px] leading-relaxed text-neutral-700 dark:text-neutral-300">
+              Most Indian service businesses lose money in the same three places: work that starts
+              without a written scope, invoices that go out late, and payments nobody follows up on.
+              Not because anyone is careless — because the quotation is in WhatsApp, the agreement is in
+              email, and the invoice is in someone's Downloads folder.
+            </p>
+            <p className="text-[15px] leading-relaxed text-neutral-700 dark:text-neutral-300 mt-4">
+              DealInSec puts those four documents on one thread, so every deal has a quotation, a signed
+              agreement and an invoice that reference each other — and a number on your dashboard telling
+              you what is collectible today.
+            </p>
+            <p className="text-[15px] leading-relaxed text-neutral-700 dark:text-neutral-300 mt-4">
+              We would rather you try it for seven days and decide for yourself than read a testimonial
+              from someone you have never met.
+            </p>
+            <div className="flex items-center gap-3 mt-7 pt-6 border-t border-neutral-200 dark:border-neutral-800">
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+                style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
+              >
+                AG
               </div>
-              <p className="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed mb-5">"{t.quote}"</p>
-              <div className="flex items-center gap-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-                <div
-                  className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold"
-                  style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
-                >
-                  {t.name[0]}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">{t.name}</p>
-                  <p className="text-xs text-neutral-500">{t.role}</p>
-                </div>
+              <div>
+                <p className="text-sm font-semibold">Avisekh Gurung</p>
+                <p className="text-xs text-neutral-500">Founder, DealInSec</p>
               </div>
-            </motion.div>
-          ))}
-        </motion.div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -1701,7 +1679,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
   const proMonthlyPerks = [
     "Unlimited deals & quotations",
     "Unlimited signed agreements with e-signature",
-    "Unlimited GST-ready invoices",
+    "Unlimited professional invoices",
     "Payment tracking & reminders",
     "5 team seats · custom roles & permissions",
     "Custom branding · Priority support",
