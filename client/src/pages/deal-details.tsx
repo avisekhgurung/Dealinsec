@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useParams, Link } from "wouter";
+import { WorkflowStepper } from "@/components/workflow-stepper";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -287,57 +288,28 @@ export default function DealDetailsPage() {
               ))}
             </div>
 
-            {/* Mini step indicator */}
-            {(
-              <div className="mt-4 mb-2">
-                <div className="flex items-center justify-between">
-                  {([
-                    { label: "Deal", step: 1, href: null as string | null },
-                    { label: "Quote", step: 2, href: quote ? `/deals/${deal.id}/quote` : null },
-                    { label: "Agreement", step: 3, href: contract ? `/contracts/${contract.id}` : null },
-                    { label: "Invoice", step: 4, href: hasInvoice ? `/deals/${deal.id}` : null },
-                  ]).map((s, idx, arr) => {
-                    const isDone = s.step < currentStep;
-                    const isActive = s.step === currentStep;
-                    const inner = (
-                      <>
-                        <div
-                          className={`flex items-center justify-center w-9 h-9 rounded-full text-sm font-bold transition-all
-                            ${isDone
-                              ? "bg-emerald-500 text-white shadow-sm shadow-emerald-200"
-                              : isActive
-                              ? "bg-amber-400 text-white shadow-sm shadow-amber-200 ring-2 ring-amber-300/50"
-                              : "bg-muted text-muted-foreground"
-                            }`}
-                        >
-                          {isDone ? <Check className="w-4.5 h-4.5 w-[18px] h-[18px]" strokeWidth={3} /> : s.step}
-                        </div>
-                        <span className={`text-[11px] font-semibold ${isDone ? "text-emerald-600" : isActive ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
-                          {s.label}
-                        </span>
-                      </>
-                    );
-                    return (
-                      <div key={s.step} className="flex items-center flex-1">
-                        {/* Reachable stages (quote / agreement) are clickable — the natural way to open a linked doc from the deal. */}
-                        {s.href ? (
-                          <Link href={s.href} className="flex flex-col items-center gap-0.5 cursor-pointer transition-transform hover:-translate-y-0.5 active:translate-y-0" data-testid={`step-link-${s.label.toLowerCase()}`}>
-                            {inner}
-                          </Link>
-                        ) : (
-                          <div className="flex flex-col items-center gap-0.5">
-                            {inner}
-                          </div>
-                        )}
-                        {idx < arr.length - 1 && (
-                          <div className={`flex-1 h-px mx-0.5 ${s.step < currentStep ? "bg-emerald-400" : isActive && s.step === currentStep - 1 ? "bg-amber-300" : "bg-muted"}`} />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            {/* Mini step indicator — shares WorkflowStepper with the agreement page */}
+            <div className="mt-4 mb-2">
+              <WorkflowStepper
+                currentStep={currentStep}
+                steps={[
+                  { label: "Deal", step: 1, href: null },
+                  { label: "Quote", step: 2, href: quote ? `/deals/${deal.id}/quote` : null },
+                  { label: "Agreement", step: 3, href: contract ? `/contracts/${contract.id}` : null },
+                  {
+                    label: "Invoice",
+                    step: 4,
+                    // Was pointing back at this very page. Send them to the
+                    // invoice itself, or to the composer when one can be raised.
+                    href: dealBrandInvoices.length
+                      ? `/brand-invoices/${dealBrandInvoices[0].id}`
+                      : contract && contract.status === "Signed" && canInvoice
+                      ? `/brand-invoices/new?contractId=${contract.id}&mode=full`
+                      : null,
+                  },
+                ]}
+              />
+            </div>
 
             {/* 4-step action buttons — only shown once quote query resolves */}
             {stepsReady && (

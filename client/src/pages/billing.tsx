@@ -186,7 +186,7 @@ export default function BillingPage() {
       </header>
 
       <main className="px-4 py-6 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8">
-        <div className="flex justify-end lg:hidden">
+        <div className="flex items-center justify-end lg:hidden pt-1 pb-4">
           <DateRangeFilter value={dateRange} onChange={setDateRange} />
         </div>
         {/* Paid/unpaid analytics live on the Dashboard — this page is the register. */}

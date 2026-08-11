@@ -78,7 +78,7 @@ export default function QuotationsPage() {
 
         {/* Search — capped on desktop; a full-bleed 1500px input reads as a
             layout bug, not a search box */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3 mb-4">
         <div className="relative flex-1 lg:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <Input
@@ -98,7 +98,9 @@ export default function QuotationsPage() {
             </button>
           )}
         </div>
-        <DateRangeFilter value={dateRange} onChange={setDateRange} />
+        <div className="flex justify-end sm:justify-start shrink-0">
+          <DateRangeFilter value={dateRange} onChange={setDateRange} />
+        </div>
         </div>
 
         {/* Register */}

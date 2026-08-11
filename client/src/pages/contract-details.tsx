@@ -35,7 +35,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Landmark } from "lucide-react";
-import type { Contract, Deal, BrandInvoice } from "@shared/schema";
+import type { Contract, Deal, BrandInvoice, Quote } from "@shared/schema";
+import { WorkflowStepper } from "@/components/workflow-stepper";
 import { recordNo } from "@shared/schema";
 
 export default function ContractDetailsPage() {
@@ -74,6 +75,17 @@ export default function ContractDetailsPage() {
     },
     enabled: !!contract?.dealId,
   });
+
+  // Only link the Quote step when a quotation actually exists.
+  const { data: dealQuote } = useQuery<Quote | null>({
+    queryKey: ["/api/deals", contract?.dealId, "quote"],
+    enabled: !!contract?.dealId,
+    queryFn: async () => {
+      const res = await fetch(`/api/deals/${contract?.dealId}/quote`, { credentials: "include" });
+      return res.ok ? res.json() : null;
+    },
+  });
+  const hasQuote = !!dealQuote;
 
   const hasInvoice = dealBrandInvoices.length > 0;
   const hasProof = !!contract?.proofFileName;
@@ -284,49 +296,24 @@ export default function ContractDetailsPage() {
 
       <main className="px-4 py-6 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8 lg:space-y-8">
 
-        {/* 4-step workflow timeline */}
-        <div className="flex items-center justify-between px-1">
-          {[
-            { label: "Deal",      step: 1 },
-            { label: "Quote",     step: 2 },
-            { label: "Agreement", step: 3 },
-            { label: "Invoice",   step: 4 },
-          ].map((s, idx, arr) => {
-            const isDone   = s.step < timelineStep || (s.step === 3 && hasInvoice) || (s.step === 4 && hasInvoice);
-            const isActive = s.step === timelineStep && !hasInvoice;
-            return (
-              <div key={s.step} className="flex items-center flex-1">
-                <div className="flex flex-col items-center gap-0.5">
-                  <div
-                    className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-all
-                      ${isDone
-                        ? "bg-emerald-500 text-white shadow-sm shadow-emerald-200 dark:shadow-emerald-900"
-                        : isActive
-                        ? "bg-amber-400 text-white shadow-sm shadow-amber-200 dark:shadow-amber-900 ring-2 ring-amber-300/50"
-                        : "bg-muted text-muted-foreground"
-                      }`}
-                  >
-                    {isDone ? <CheckCircle2 className="w-3.5 h-3.5" /> : s.step}
-                  </div>
-                  <span
-                    className={`text-[10px] font-semibold whitespace-nowrap
-                      ${isDone ? "text-emerald-600 dark:text-emerald-400"
-                        : isActive ? "text-amber-600 dark:text-amber-400"
-                        : "text-muted-foreground"}`}
-                  >
-                    {s.label}
-                  </span>
-                </div>
-                {idx < arr.length - 1 && (
-                  <div
-                    className={`flex-1 h-0.5 mx-1 rounded-full transition-colors
-                      ${s.step < timelineStep ? "bg-emerald-400" : "bg-muted"}`}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
+        {/* 4-step workflow timeline — every step that has a record is a link. */}
+        <WorkflowStepper
+          currentStep={timelineStep}
+          steps={[
+            { label: "Deal", step: 1, href: contract.dealId ? `/deals/${contract.dealId}` : null },
+            { label: "Quote", step: 2, href: hasQuote ? `/deals/${contract.dealId}/quote` : null },
+            { label: "Agreement", step: 3, href: null },
+            {
+              label: "Invoice",
+              step: 4,
+              href: dealBrandInvoices.length
+                ? `/brand-invoices/${dealBrandInvoices[0].id}`
+                : canInvoice && contract.status === "Signed"
+                ? `/brand-invoices/new?contractId=${contract.id}&mode=full`
+                : null,
+            },
+          ]}
+        />
 
         <div className="lg:grid lg:grid-cols-3 lg:gap-6 lg:items-start">
         <div className="lg:col-span-2 space-y-6">
