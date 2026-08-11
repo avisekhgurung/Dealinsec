@@ -1358,8 +1358,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: parsed.data.message ?? null,
       }).returning();
 
-      // Founder notification. FEEDBACK_EMAIL overrides; support@ is the default.
-      const to = process.env.FEEDBACK_EMAIL || "support@dealinsec.com";
+      // Founder notification. FEEDBACK_EMAIL overrides; the founder's business
+      // Gmail is the default — support@dealinsec.com is not a real inbox yet.
+      const to = process.env.FEEDBACK_EMAIL || "dealinsec@gmail.com";
       const stars = "★".repeat(parsed.data.rating) + "☆".repeat(5 - parsed.data.rating);
       void sendEmail({
         to,
