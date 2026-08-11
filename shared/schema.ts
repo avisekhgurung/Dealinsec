@@ -214,6 +214,9 @@ export const feedback = pgTable("feedback", {
   rating: integer("rating").notNull(),
   category: varchar("category", { length: 24 }),
   message: text("message"),
+  /** May this quote be published as a testimonial, with the author's name?
+   *  Only true when the author explicitly ticked the box. */
+  allowTestimonial: boolean("allow_testimonial").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -223,6 +226,7 @@ export const insertFeedbackSchema = z.object({
   rating: z.number().int().min(1).max(5),
   category: z.enum(feedbackCategories).optional(),
   message: z.string().trim().max(2000).optional(),
+  allowTestimonial: z.boolean().optional(),
 });
 export type Feedback = typeof feedback.$inferSelect;
 

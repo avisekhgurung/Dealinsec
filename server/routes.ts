@@ -1338,6 +1338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rating: Number(req.body?.rating),
         category: req.body?.category || undefined,
         message: typeof req.body?.message === "string" && req.body.message.trim() ? req.body.message.trim() : undefined,
+        allowTestimonial: req.body?.allowTestimonial === true,
       });
       if (!parsed.success) {
         return res.status(400).json({ error: "Pick a rating between 1 and 5." });
@@ -1356,6 +1357,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rating: parsed.data.rating,
         category: parsed.data.category ?? null,
         message: parsed.data.message ?? null,
+        // Consent only counts alongside an actual message — a bare rating with
+        // the box ticked gives nothing publishable.
+        allowTestimonial: parsed.data.allowTestimonial === true && !!parsed.data.message,
       }).returning();
 
       // Founder notification. FEEDBACK_EMAIL overrides; the founder's business
@@ -1367,6 +1371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subject: `Feedback ${stars} — ${req.user.email}`,
         html: `<p><strong>${stars}</strong> (${parsed.data.rating}/5)</p>
 <p><strong>Category:</strong> ${parsed.data.category ?? "—"}</p>
+<p><strong>Testimonial use:</strong> ${row.allowTestimonial ? "✅ allowed — may publish with their name" : "❌ NOT allowed — private feedback only"}</p>
 <p><strong>From:</strong> ${[req.user.firstName, req.user.lastName].filter(Boolean).join(" ")} &lt;${req.user.email}&gt;</p>
 <p style="white-space:pre-wrap">${(parsed.data.message ?? "(no message)").replace(/</g, "&lt;")}</p>`,
       });

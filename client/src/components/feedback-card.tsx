@@ -30,6 +30,7 @@ export function FeedbackCard() {
   const [hover, setHover] = useState(0);
   const [category, setCategory] = useState<(typeof feedbackCategories)[number] | null>(null);
   const [message, setMessage] = useState("");
+  const [allowTestimonial, setAllowTestimonial] = useState(false);
   const [sent, setSent] = useState(false);
 
   const submit = useMutation({
@@ -38,6 +39,7 @@ export function FeedbackCard() {
         rating,
         category: category ?? undefined,
         message: message.trim() || undefined,
+        allowTestimonial,
       });
       return res.json();
     },
@@ -67,7 +69,7 @@ export function FeedbackCard() {
           </p>
           <Button
             variant="outline" size="sm" className="mt-4"
-            onClick={() => { setSent(false); setRating(0); setCategory(null); setMessage(""); }}
+            onClick={() => { setSent(false); setRating(0); setCategory(null); setMessage(""); setAllowTestimonial(false); }}
             data-testid="button-feedback-again"
           >
             Send another
@@ -150,6 +152,22 @@ export function FeedbackCard() {
           maxLength={2000}
           data-testid="input-feedback-message"
         />
+
+        {message.trim() && (
+          <label className="flex items-start gap-2.5 cursor-pointer select-none rounded-lg border border-border p-3 hover:border-primary/40 transition-colors">
+            <input
+              type="checkbox"
+              checked={allowTestimonial}
+              onChange={(e) => setAllowTestimonial(e.target.checked)}
+              className="mt-0.5 accent-[hsl(var(--primary))]"
+              data-testid="checkbox-allow-testimonial"
+            />
+            <span className="text-xs leading-relaxed text-muted-foreground">
+              <span className="font-medium text-foreground">DealInSec may publish this as a testimonial</span>{" "}
+              with my name and business type. Leave unticked to keep it private — it reaches the founder either way.
+            </span>
+          </label>
+        )}
 
         <Button
           className="w-full sm:w-auto gradient-btn text-white font-semibold"
