@@ -87,7 +87,7 @@ const alignClass = { left: "text-left", right: "text-right", center: "text-cente
 
 /** Page buttons around the current page, with ellipses — 1 … 4 [5] 6 … 20.
  *  Keeps the control a fixed width however many pages there are. */
-function pageNumbers(current: number, count: number): (number | "…")[] {
+export function pageNumbers(current: number, count: number): (number | "…")[] {
   if (count <= 1) return [];
   if (count <= 7) return Array.from({ length: count }, (_, i) => i);
   const out: (number | "…")[] = [0];

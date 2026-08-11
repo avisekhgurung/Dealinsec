@@ -13,6 +13,8 @@ import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { Deal } from "@shared/schema";
+import { useAuth } from "@/hooks/useAuth";
+import { memberCan } from "@shared/permissions";
 
 function IconLink({ href, label, children, testid }: {
   href: string; label: string; children: React.ReactNode; testid?: string;
@@ -37,14 +39,18 @@ function IconLink({ href, label, children, testid }: {
 
 /** Generic row: view only. */
 export function RowActions({ viewHref, deal }: { viewHref?: string; deal?: Deal }) {
+  // The pencil respects the member's role, not just the deal's state — a
+  // member who can read deals (e.g. quotations-only) may not edit them.
+  const { user } = useAuth();
   if (deal) {
-    const editable = deal.status === "Pending";
+    const mayEdit = memberCan(user as any, "deals.edit");
+    const editable = deal.status === "Pending" && mayEdit;
     return (
       <div className="flex items-center justify-end gap-0.5">
         <IconLink href={`/deals/${deal.id}`} label="View deal" testid={`row-view-${deal.id}`}>
           <Eye className="w-3.5 h-3.5" />
         </IconLink>
-        {editable ? (
+        {!mayEdit ? null : editable ? (
           <IconLink href={`/deals/${deal.id}/edit`} label="Edit deal" testid={`row-edit-${deal.id}`}>
             <Pencil className="w-3.5 h-3.5" />
           </IconLink>

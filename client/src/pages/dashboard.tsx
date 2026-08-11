@@ -558,6 +558,7 @@ function MoneyRadarCard() {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const canCreateDeal = memberCan(user as any, "deals.create");
   const displayName = user?.firstName && user?.lastName
     ? `${user.firstName} ${user.lastName}`
     : user?.email?.split("@")[0] || "Influencer";
@@ -676,12 +677,14 @@ export default function DashboardPage() {
             </h1>
           </div>
           <div className="flex items-center gap-2 lg:gap-3">
-            <Link href="/deals/new" className="hidden lg:block">
-              <Button size="sm" className="gradient-btn text-white font-semibold" data-testid="header-new-deal">
-                <Plus className="w-4 h-4 mr-1.5" />
-                New Deal
-              </Button>
-            </Link>
+            {canCreateDeal && (
+              <Link href="/deals/new" className="hidden lg:block">
+                <Button size="sm" className="gradient-btn text-white font-semibold" data-testid="header-new-deal">
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  New Deal
+                </Button>
+              </Link>
+            )}
             {/* Desktop keeps the bell + settings in the sidebar; mobile
                 needs them here (settings isn't in the bottom nav). */}
             <NotificationBell className="lg:hidden" />
@@ -991,13 +994,13 @@ export default function DashboardPage() {
                         icon={TrendingUp}
                         title="No revenue yet"
                         hint="Your deal values chart here month by month once you create your first deal."
-                        cta={
+                        cta={canCreateDeal ? (
                           <Link href="/deals/new">
                             <Button size="sm" className="gradient-btn text-white h-8 text-xs font-semibold">
                               <Plus className="w-3.5 h-3.5 mr-1" /> New Deal
                             </Button>
                           </Link>
-                        }
+                        ) : undefined}
                       />
                     ) : (
                     <div className="h-[200px] lg:h-[230px]">
@@ -1356,12 +1359,14 @@ export default function DashboardPage() {
               <p className="text-sm text-muted-foreground mb-4">
                 Create your first brand deal to get started
               </p>
-              <Link href="/deals/new">
-                <Button className="gradient-btn" data-testid="button-create-first-deal">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Deal
-                </Button>
-              </Link>
+              {canCreateDeal && (
+                <Link href="/deals/new">
+                  <Button className="gradient-btn" data-testid="button-create-first-deal">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Deal
+                  </Button>
+                </Link>
+              )}
             </CardContent>
           </Card>
         )}

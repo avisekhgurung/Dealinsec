@@ -38,6 +38,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { getThemePref, setThemePref, type ThemePref } from "@/lib/theme";
 import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
+import { pageNumbers } from "@/components/data-table/data-table";
 
 /** Entity tints for the activity table — money events read green, documents
  *  blue/teal, people violet; everything else stays neutral. */
@@ -648,6 +649,24 @@ export default function SettingsPage() {
                               <Button variant="outline" size="sm" className="h-7 px-2"
                                 onClick={() => setActivityPage(Math.max(0, page - 1))} disabled={page === 0}
                                 data-testid="activity-prev">Prev</Button>
+                              {pageNumbers(page, pageCount).map((p, i) =>
+                                p === "…" ? (
+                                  <span key={`gap-${i}`} className="px-1 text-muted-foreground select-none">…</span>
+                                ) : (
+                                  <Button
+                                    key={p}
+                                    variant={p === page ? "default" : "outline"}
+                                    size="icon"
+                                    className={`h-7 w-7 text-xs tabular-nums ${p === page ? "gradient-btn text-white" : ""}`}
+                                    aria-label={`Page ${p + 1}`}
+                                    aria-current={p === page ? "page" : undefined}
+                                    onClick={() => setActivityPage(p)}
+                                    data-testid={`activity-page-${p + 1}`}
+                                  >
+                                    {p + 1}
+                                  </Button>
+                                ),
+                              )}
                               <span className="px-2 text-muted-foreground tabular-nums">{page + 1} / {pageCount}</span>
                               <Button variant="outline" size="sm" className="h-7 px-2"
                                 onClick={() => setActivityPage(Math.min(pageCount - 1, page + 1))} disabled={page >= pageCount - 1}

@@ -240,9 +240,11 @@ export default function DealsPage() {
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted mx-auto mb-4"><Briefcase className="w-8 h-8 text-muted-foreground" /></div>
               <h3 className="font-semibold mb-1">No deals yet</h3>
               <p className="text-sm text-muted-foreground mb-4">Create your first brand deal to get started</p>
-              <Link href="/deals/new">
-                <Button className="gradient-btn text-white" data-testid="button-create-deal-empty"><Plus className="w-4 h-4 mr-2" />Create Deal</Button>
-              </Link>
+              {canCreateDeal && (
+                <Link href="/deals/new">
+                  <Button className="gradient-btn text-white" data-testid="button-create-deal-empty"><Plus className="w-4 h-4 mr-2" />Create Deal</Button>
+                </Link>
+              )}
             </CardContent>
           </Card>
         ) : (
