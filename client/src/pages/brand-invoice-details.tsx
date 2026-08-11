@@ -466,7 +466,7 @@ export default function BrandInvoiceDetailsPage() {
                     </>
                   )}
                   {sealUrl && (
-                    <img src={sealUrl} alt="Company stamp" className="h-14 w-auto object-contain mx-auto mt-1 opacity-90" />
+                    <img src={sealUrl} alt="Company stamp" className="h-14 w-auto object-contain -mt-2 ml-6 opacity-90" />
                   )}
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                     Date: {fmt(invoice.invoiceDate)}
