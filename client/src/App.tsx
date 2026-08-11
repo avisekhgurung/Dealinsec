@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect , Component, type ReactNode} from "react";
 import { Switch, Route, Redirect } from "wouter";
 import { queryClient, apiRequest } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -186,6 +186,39 @@ function Router() {
   );
 }
 
+
+/** Last-resort net: an uncaught render error used to leave a white screen —
+ *  fatal in a demo. Shows a reload card instead. Class component because
+ *  error boundaries still cannot be hooks. */
+class CrashGuard extends Component<{ children: ReactNode }, { crashed: boolean }> {
+  state = { crashed: false };
+  static getDerivedStateFromError() {
+    return { crashed: true };
+  }
+  render() {
+    if (!this.state.crashed) return this.props.children;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background px-6">
+        <div className="text-center max-w-sm">
+          <p className="text-3xl mb-3" aria-hidden="true">😵</p>
+          <h1 className="font-semibold text-lg mb-1">Something went wrong</h1>
+          <p className="text-sm text-muted-foreground mb-5">
+            Your data is safe — this screen just crashed. Reload to continue.
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="h-11 px-6 rounded-xl gradient-btn text-white font-semibold"
+            data-testid="button-crash-reload"
+          >
+            Reload
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
+
 function App() {
   // Documents must print on white whatever theme the screen uses. Overriding
   // 128 CSS variables in @media print would drift; stripping the dark class
@@ -213,7 +246,9 @@ function App() {
         <ConfirmProvider>
           <UpgradeModalProvider>
             <div className="min-h-screen bg-background text-foreground">
-              <Router />
+              <CrashGuard>
+                <Router />
+              </CrashGuard>
             </div>
             <InstallPrompt />
             <Toaster />
