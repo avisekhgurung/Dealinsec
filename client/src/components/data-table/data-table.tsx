@@ -114,7 +114,7 @@ export function DataTable<TData>({
   initialPageSize = 10,
   emptyMessage = "No results.",
   serialNumbers = true,
-  columnFilterRow = true,
+  columnFilterRow = false,
 }: DataTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
