@@ -624,7 +624,7 @@ export default function ContractConfirmationPage() {
               </p>
 
               <div className="space-y-2.5">
-                {STANDARD_TERMS.map((t) => {
+                {STANDARD_TERMS.filter((t) => (t.phases as readonly string[]).includes("agreement")).map((t) => {
                   const checked = standardTermIds.includes(t.id);
                   return (
                     <label

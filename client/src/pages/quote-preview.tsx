@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { BottomNav } from "@/components/bottom-nav";
 import { ArrowLeft, Download, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
 import type { Deal, Quote } from "@shared/schema";
-import { STANDARD_TERMS, recordNo } from "@shared/schema";
+import { STANDARD_TERMS, termsForPhase, recordNo } from "@shared/schema";
 import { getDeliverableLabels } from "@shared/dealTypeTaxonomy";
 import { PagedDocument, type DocBlock } from "@/components/document/paged";
 import {
@@ -201,7 +201,7 @@ export default function QuotePreviewPage() {
     // Terms — numbered, chunked so long lists flow without orphaning the title.
     const selectedIds = ((deal as any).standardTermIds as string[] | null) ?? STANDARD_TERMS.map((t) => t.id);
     const terms: string[] = [
-      ...STANDARD_TERMS.filter((t) => selectedIds.includes(t.id)).map((t) => t.label),
+      ...termsForPhase(selectedIds, "quotation").map((t) => t.label),
       ...((deal as any).customTerms ?? "").split("\n").map((l: string) => l.trim()).filter(Boolean),
     ];
     if (terms.length) {

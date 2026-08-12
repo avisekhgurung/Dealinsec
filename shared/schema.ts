@@ -385,15 +385,29 @@ export const deliverableModeOptions = ["all", "any_one"] as const;
 // type (creators, freelancers, consultants, service vendors), so they avoid
 // creator-only words like "video" or "posting" and use "deliverables/work"
 // instead. IDs are stable; only labels are looked up at render time.
+/**
+ * Standard terms, tagged with the document phases where they belong.
+ * A term about QUOTATION VALIDITY has no business on an executed agreement —
+ * the quotation's validity is spent the moment the agreement exists — so each
+ * document filters to its own phase. `payment: true` marks terms that define
+ * the payment structure: when any of these are selected, the agreement's
+ * Compensation clause defers to them instead of printing its default schedule.
+ */
 export const STANDARD_TERMS = [
-  { id: "validity_30", label: "This quotation is valid for 30 days from the date of issue." },
-  { id: "advance_50", label: "50% advance payment is required to confirm the project." },
-  { id: "balance_7d", label: "The remaining 50% is due within 7 days of final delivery of the agreed deliverables." },
-  { id: "revisions_2", label: "Up to 2 rounds of revisions are included. All change requests must be submitted together at one time." },
-  { id: "cancellation", label: "If the project is cancelled after work has started, the advance payment is non-refundable. If the work has already been delivered, full payment may be required." },
+  { id: "validity_30", label: "This quotation is valid for 30 days from the date of issue.", phases: ["quotation"], payment: false },
+  { id: "advance_50", label: "50% advance payment is required to confirm the project.", phases: ["quotation", "agreement"], payment: true },
+  { id: "balance_7d", label: "The remaining 50% is due within 7 days of final delivery of the agreed deliverables.", phases: ["quotation", "agreement"], payment: true },
+  { id: "revisions_2", label: "Up to 2 rounds of revisions are included. All change requests must be submitted together at one time.", phases: ["quotation", "agreement"], payment: false },
+  { id: "cancellation", label: "If the project is cancelled after work has started, the advance payment is non-refundable. If the work has already been delivered, full payment may be required.", phases: ["quotation", "agreement"], payment: false },
 ] as const;
 
 export type StandardTermId = typeof STANDARD_TERMS[number]["id"];
+export type TermPhase = "quotation" | "agreement";
+
+/** The standard terms that belong on a given document. */
+export function termsForPhase(ids: readonly string[], phase: TermPhase) {
+  return STANDARD_TERMS.filter((t) => ids.includes(t.id) && (t.phases as readonly string[]).includes(phase));
+}
 
 export const contracts = pgTable("contracts", {
   id: serial("id").primaryKey(),

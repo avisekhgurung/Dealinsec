@@ -26,7 +26,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useIssuer } from "@/hooks/useIssuer";
 import { ArrowLeft, Printer } from "lucide-react";
 import type { Contract, Deal, Quote } from "@shared/schema";
-import { STANDARD_TERMS, recordNo } from "@shared/schema";
+import { STANDARD_TERMS, termsForPhase, recordNo } from "@shared/schema";
 import { getAgreementCopy, getDeliverableLabels } from "@shared/dealTypeTaxonomy";
 import { PagedDocument, type DocBlock } from "@/components/document/paged";
 import {
@@ -101,9 +101,16 @@ export default function ContractPdfPage() {
     const c = contract;
     const customTerms = (deal as any)?.customTerms as string | null;
     const selectedIds = ((deal as any)?.standardTermIds as string[] | null) ?? [];
-    const selectedTerms = STANDARD_TERMS.filter((t) => selectedIds.includes(t.id));
+    // Phase filter: quotation-only terms (e.g. "valid for 30 days") make no
+    // sense on an executed agreement and are dropped here.
+    const selectedTerms = termsForPhase(selectedIds, "agreement");
     const customLines = (customTerms ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
-    const hasOwnPaymentTerms = termsMentionPayment(customTerms);
+    // Clause 3 defers to Section 7 when EITHER the custom terms or any
+    // selected standard payment term defines the payment structure —
+    // otherwise the default schedule could contradict Section 7 (the
+    // 30-days-vs-7-days bug via balance_7d).
+    const hasOwnPaymentTerms =
+      termsMentionPayment(customTerms) || selectedTerms.some((t) => t.payment);
     const out: DocBlock[] = [];
 
     out.push({
