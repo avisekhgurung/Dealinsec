@@ -3,6 +3,8 @@ import path from "path";
 import passport from "passport";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 import { createServer } from "http";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from './stripeClient';
@@ -274,6 +276,18 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
     },
     express.static(path.join(process.cwd(), "uploads")),
   );
+
+  // Boot migration: brand_invoices.paid_at. Idempotent and additive, so it is
+  // safe to run on every start. Done here rather than as a pre-push script
+  // because the founder's network sometimes cannot reach the database at all —
+  // the server always can, and the column must exist before the new code
+  // serves its first request. Failure is logged loudly but never blocks boot.
+  try {
+    await db.execute(sql`ALTER TABLE brand_invoices ADD COLUMN IF NOT EXISTS paid_at timestamp`);
+    log("boot migration: brand_invoices.paid_at ready");
+  } catch (err) {
+    console.error("BOOT MIGRATION FAILED (paid_at) — mark-paid will error until this runs:", err);
+  }
 
   const httpServer = await registerRoutes(app);
 

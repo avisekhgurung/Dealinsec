@@ -941,6 +941,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updates.dealAmount = n;
       }
 
+      // paid_at is server-owned: stamp it when the payment is recorded,
+      // clear it when the payment is reversed.
+      if (invoice.status !== "Paid" && updates.status === "Paid") {
+        (updates as any).paidAt = new Date();
+      } else if (invoice.status === "Paid" && updates.status === "Unpaid") {
+        (updates as any).paidAt = null;
+      }
+
       const updated = await storage.updateBrandInvoice(parseInt(req.params.id), updates);
 
       if (invoice.status !== "Paid" && updates.status === "Paid" && updated) {

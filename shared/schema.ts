@@ -484,6 +484,9 @@ export const brandInvoices = pgTable("brand_invoices", {
   // Rule 46 GST invoice is a matter of adding tax columns, not a rewrite.
   lineItems: jsonb("line_items").$type<InvoiceLineItem[]>(),
   status: text("status").notNull().default("Unpaid"),
+  /** Set by the server on Unpaid→Paid, cleared on undo. Never client-writable —
+   *  a paid invoice printing "PAID · date" must reflect a recorded payment. */
+  paidAt: timestamp("paid_at"),
 }, (t) => ({
   // Per-ORG uniqueness, not global: INV-2627-0001 restarts for every business
   // each financial year. A global unique meant the second organisation to

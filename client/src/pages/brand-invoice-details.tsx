@@ -209,7 +209,9 @@ export default function BrandInvoiceDetailsPage() {
           status={invoice.status}
           meta={[
             { label: "Invoice date", value: docDate(invoice.invoiceDate) },
-            { label: "Due", value: invoice.dueDate ? docDate(invoice.dueDate) : "On receipt" },
+            ...(invoice.status === "Paid" && (invoice as any).paidAt
+              ? [{ label: "Paid on", value: docDate((invoice as any).paidAt) }]
+              : [{ label: "Due", value: invoice.dueDate ? docDate(invoice.dueDate) : "On receipt" }]),
             ...(invoice.invoiceType && invoice.invoiceType !== "full"
               ? [{ label: "Type", value: invoice.invoiceType === "advance" ? "Advance" : "Final" }]
               : []),
