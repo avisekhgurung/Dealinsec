@@ -1,36 +1,40 @@
-import { useEffect } from "react";
+/**
+ * Quotation document — built on the DealInSec document system.
+ *
+ * The printable artifact is a PagedDocument of explicit A4 sheets: exact
+ * "Page X of Y", no orphan headings, intentional composition instead of the
+ * old accidental bottom whitespace. Identity: the shared brand band (the
+ * quotation keeps the green that was already its strength), PREPARED BY /
+ * PREPARED FOR, a deliverables table that flows cleanly past one page,
+ * a prominent total, a payment schedule derived ONLY when the deal's terms
+ * state exactly one advance percentage, and numbered terms.
+ *
+ * The quotation number is stable (QT-xxxx from the quote row) rather than the
+ * old date-derived string that changed every day the page was opened.
+ */
+import { useEffect, useMemo } from "react";
 import { useParams, Link } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { getQueryFn, apiRequest } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
+import { getQueryFn } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { useIssuer } from "@/hooks/useIssuer";
 import { Button } from "@/components/ui/button";
 import { BottomNav } from "@/components/bottom-nav";
 import { ArrowLeft, Download, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
-import { SiInstagram, SiYoutube, SiFacebook } from "react-icons/si";
-import { useToast } from "@/hooks/use-toast";
-import type { Deal, User, Quote } from "@shared/schema";
-import { STANDARD_TERMS } from "@shared/schema";
+import type { Deal, Quote } from "@shared/schema";
+import { STANDARD_TERMS, recordNo } from "@shared/schema";
 import { getDeliverableLabels } from "@shared/dealTypeTaxonomy";
+import { PagedDocument, type DocBlock } from "@/components/document/paged";
+import {
+  DocHeader, docFooter, SectionTitle, TwoParties, Party, tableBlocks, TotalBlock,
+  DocWarnings, inr, docDate,
+} from "@/components/document/primitives";
+import {
+  detectPaymentConflicts, deriveSchedule, validateDocData,
+} from "@/components/document/checks";
 
 function slugify(s: string): string {
-  return (s || "")
-    .normalize("NFKD")
-    .replace(/[^\w\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-");
-}
-
-function getPlatformIcon(platform: string) {
-  switch (platform.toLowerCase()) {
-    case "instagram":
-      return <SiInstagram className="w-4 h-4 text-pink-500" />;
-    case "youtube":
-      return <SiYoutube className="w-4 h-4 text-red-500" />;
-    case "facebook":
-      return <SiFacebook className="w-4 h-4 text-blue-500" />;
-    default:
-      return <span className="w-4 h-4 inline-block text-center text-xs font-bold text-muted-foreground">{platform[0]}</span>;
-  }
+  return (s || "").normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
 }
 
 const STEPS = [
@@ -43,53 +47,197 @@ const STEPS = [
 export default function QuotePreviewPage() {
   const params = useParams<{ id: string }>();
   const { user } = useAuth();
-  const { toast } = useToast();
+  const issuer = useIssuer();
 
   const { data: deal, isLoading: dealLoading } = useQuery<Deal>({
     queryKey: ["/api/deals", params.id],
   });
-
-  // Deal-type-aware column labels for the deliverables table.
   const dLabels = getDeliverableLabels(deal?.dealType);
 
-  const { data: authUser } = useQuery<User>({
-    queryKey: ["/api/auth/user"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-  });
-
-  // Fetch quote for this deal without throwing on 404
   const { data: quote } = useQuery<Quote | null>({
     queryKey: ["/api/deals", params.id, "quote"],
     queryFn: async () => {
       const res = await fetch(`/api/deals/${params.id}/quote`, { credentials: "include" });
-      if (res.status === 404) return null;
       if (!res.ok) return null;
       return res.json();
     },
   });
 
   const dealId = parseInt(params.id || "0");
-
-  const today = new Date();
-  const formattedDate = today.toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-  const quoteNumber = `QUO-${dealId}-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+  // Stable identity from the quote row; legacy date-based fallback only when
+  // no quote row exists yet.
+  const quoteNumber = quote
+    ? recordNo("quotation", quote.id)
+    : `QT-D${dealId}`;
+  const issuedOn = quote?.createdAt ? new Date(quote.createdAt) : new Date();
+  const validUntil = new Date(issuedOn.getTime() + 30 * 86400000);
 
   useEffect(() => {
     if (!deal) return;
     const previous = document.title;
-    const brand = slugify(deal.brandName) || "Quote";
-    document.title = `Quote_${brand}_${quoteNumber}`;
+    document.title = `Quote_${slugify(deal.brandName) || "Quote"}_${quoteNumber}`;
     return () => { document.title = previous; };
   }, [deal, quoteNumber]);
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const fullName = issuer.name || `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim() || "—";
 
+  /* ── Document blocks ─────────────────────────────────────────────────── */
+  const blocks = useMemo<DocBlock[]>(() => {
+    if (!deal) return [];
+    const out: DocBlock[] = [];
+
+    out.push({
+      key: "head",
+      keepWithNext: true,
+      node: (
+        <DocHeader
+          docType="Quotation"
+          docNo={quoteNumber}
+          status={quote?.status === "revised" ? "Revised" : undefined}
+          meta={[
+            { label: "Date", value: docDate(issuedOn) },
+            { label: "Valid until", value: docDate(validUntil) },
+            ...(quote && quote.version > 1 ? [{ label: "Version", value: `v${quote.version}` }] : []),
+          ]}
+        />
+      ),
+    });
+
+    out.push({
+      key: "parties",
+      node: (
+        <TwoParties
+          left={
+            <Party
+              heading="Prepared by"
+              name={fullName}
+              lines={[issuer.email, issuer.phone, issuer.panNumber && `PAN: ${issuer.panNumber}`, issuer.gstNumber && `GSTIN: ${issuer.gstNumber}`]}
+            />
+          }
+          right={
+            <Party
+              heading="Prepared for"
+              name={deal.brandName}
+              lines={[deal.dealTitle, `Engagement: ${docDate(deal.startDate)} – ${docDate(deal.endDate)}`]}
+            />
+          }
+        />
+      ),
+    });
+
+    out.push({
+      key: "deliv-title",
+      keepWithNext: true,
+      node: (
+        <div>
+          <SectionTitle>
+            {deal.deliverableMode === "any_one" ? "Deliverable options — client selects one" : "Deliverables & services"}
+          </SectionTitle>
+          {deal.deliverableMode === "any_one" && (
+            <p className="doc-small doc-muted-t">The client may choose one of the following options.</p>
+          )}
+        </div>
+      ),
+    });
+
+    out.push(
+      ...tableBlocks({
+        keyPrefix: "deliv",
+        cols: [
+          { label: "#", width: "8mm", align: "center" },
+          { label: dLabels.category, width: "30mm" },
+          { label: dLabels.type },
+          { label: "Qty", width: "12mm", align: "center" },
+          { label: "Frequency", width: "22mm" },
+          { label: "Notes", width: "48mm" },
+        ],
+        rows: deal.deliverables ?? [],
+        renderCell: (d: any, ci, ri) =>
+          ci === 0 ? <span className="doc-muted-t doc-num">{ri + 1}</span>
+          : ci === 1 ? <span style={{ fontWeight: 600 }}>{d.platform}</span>
+          : ci === 2 ? d.contentType
+          : ci === 3 ? <span style={{ fontWeight: 600 }}>{d.quantity}</span>
+          : ci === 4 ? d.frequency
+          : <span className="doc-small doc-muted-t">{d.notes || "—"}</span>,
+      }),
+    );
+
+    const schedule = deriveSchedule((deal as any).customTerms, deal.dealAmount);
+    out.push({
+      key: "total",
+      node: (
+        <TotalBlock
+          label="Total deal value"
+          amount={deal.dealAmount}
+          note="Subject to applicable taxes · INR"
+        />
+      ),
+    });
+
+    if (schedule) {
+      out.push({
+        key: "schedule",
+        node: (
+          <div>
+            <SectionTitle>Payment schedule</SectionTitle>
+            <table className="doc-table">
+              <tbody>
+                {schedule.map((s) => (
+                  <tr key={s.label}>
+                    <td>{s.label}</td>
+                    <td className="doc-td-r doc-num" style={{ fontWeight: 600, width: "40mm" }}>{inr(s.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="doc-small doc-muted-t" style={{ marginTop: "1.5mm" }}>
+              As per the payment terms below.
+            </p>
+          </div>
+        ),
+      });
+    }
+
+    // Terms — numbered, chunked so long lists flow without orphaning the title.
+    const selectedIds = ((deal as any).standardTermIds as string[] | null) ?? STANDARD_TERMS.map((t) => t.id);
+    const terms: string[] = [
+      ...STANDARD_TERMS.filter((t) => selectedIds.includes(t.id)).map((t) => t.label),
+      ...((deal as any).customTerms ?? "").split("\n").map((l: string) => l.trim()).filter(Boolean),
+    ];
+    if (terms.length) {
+      out.push({
+        key: "terms-title",
+        keepWithNext: true,
+        node: <SectionTitle>Terms &amp; conditions</SectionTitle>,
+      });
+      const CHUNK = 6;
+      for (let i = 0; i < terms.length; i += CHUNK) {
+        out.push({
+          key: `terms-${i}`,
+          node: (
+            <ol className="doc-body" style={{ margin: 0, paddingLeft: "6mm", listStyleType: "decimal", display: "grid", gap: "1.6mm" }} start={i + 1}>
+              {terms.slice(i, i + CHUNK).map((t, j) => (
+                <li key={j} className="doc-muted-t" style={{ paddingLeft: "1mm" }}>{t}</li>
+              ))}
+            </ol>
+          ),
+        });
+      }
+    }
+
+    out.push({
+      key: "closing",
+      node: (
+        <p className="doc-small doc-muted-t" style={{ textAlign: "center" }}>
+          This quotation is an offer, not an invoice. Prices are in Indian Rupees and valid until {docDate(validUntil)}.
+        </p>
+      ),
+    });
+
+    return out;
+  }, [deal, quote, issuer, fullName, quoteNumber]);
+
+  /* ── Screen states ───────────────────────────────────────────────────── */
   if (dealLoading) {
     return (
       <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
@@ -97,62 +245,46 @@ export default function QuotePreviewPage() {
       </div>
     );
   }
-
   if (!deal) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="glass-header sticky top-0 z-40">
-          <div className="flex items-center gap-3 px-4 py-4 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-3.5">
-            <Link href={`/deals/${params.id}`}>
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-            </Link>
-            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Quote Preview</h1>
-          </div>
-        </header>
         <main className="px-4 py-12 text-center">
           <p className="text-muted-foreground">Deal not found</p>
-          <Link href="/deals">
-            <Button variant="outline" className="mt-4">Back to Deals</Button>
-          </Link>
+          <Link href="/deals"><Button variant="outline" className="mt-4">Back to Deals</Button></Link>
         </main>
         <BottomNav />
       </div>
     );
   }
 
-  const influencer = authUser || user;
-  const fullName = influencer
-    ? `${influencer.firstName || ""} ${influencer.lastName || ""}`.trim() || "Influencer"
-    : "Influencer";
+  const warnings = [
+    ...validateDocData({
+      clientName: deal.brandName,
+      sellerName: fullName === "—" ? "" : fullName,
+      amount: deal.dealAmount,
+      startDate: deal.startDate,
+      endDate: deal.endDate,
+    }),
+    ...detectPaymentConflicts((deal as any).customTerms),
+  ];
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* Sticky glass header */}
       <header className="glass-header sticky top-0 z-40 print:hidden">
         <div className="flex items-center justify-between gap-3 px-4 py-4">
           <div className="flex items-center gap-3">
             <Link href={`/deals/${params.id}`}>
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
+              <Button variant="ghost" size="icon"><ArrowLeft className="w-5 h-5" /></Button>
             </Link>
             <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Quote Preview</h1>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handlePrint}
-            className="flex items-center gap-1.5"
-          >
-            <Download className="w-4 h-4" />
-            Download PDF
+          <Button variant="outline" size="sm" onClick={() => window.print()} className="flex items-center gap-1.5">
+            <Download className="w-4 h-4" /> Download PDF
           </Button>
         </div>
       </header>
 
-      {/* 4-Step Timeline */}
+      {/* 4-step timeline (screen only) */}
       <div className="px-4 pt-4 pb-2 print:hidden">
         <div className="flex items-center justify-between">
           {STEPS.map((s, idx) => {
@@ -161,27 +293,12 @@ export default function QuotePreviewPage() {
             return (
               <div key={s.step} className="flex items-center flex-1">
                 <div className="flex flex-col items-center gap-1">
-                  <div
-                    className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold transition-all
-                      ${isCompleted
-                        ? "bg-emerald-500 text-white shadow-sm shadow-emerald-200"
-                        : isActive
-                        ? "bg-amber-400 text-white shadow-sm shadow-amber-200 ring-2 ring-amber-300/50"
-                        : "bg-muted text-muted-foreground"
-                      }`}
-                  >
-                    {isCompleted ? (
-                      <CheckCircle2 className="w-4 h-4" />
-                    ) : isActive ? (
-                      <span className="w-2.5 h-2.5 rounded-full bg-white" />
-                    ) : (
-                      s.step
-                    )}
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold transition-all ${
+                    isCompleted ? "bg-emerald-500 text-white" : isActive ? "bg-amber-400 text-white ring-2 ring-amber-300/50" : "bg-muted text-muted-foreground"}`}>
+                    {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : isActive ? <span className="w-2.5 h-2.5 rounded-full bg-white" /> : s.step}
                   </div>
-                  <span
-                    className={`text-xs font-medium whitespace-nowrap
-                      ${isCompleted ? "text-emerald-600 dark:text-emerald-400" : isActive ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-muted-foreground"}`}
-                  >
+                  <span className={`text-xs font-medium whitespace-nowrap ${
+                    isCompleted ? "text-emerald-600 dark:text-emerald-400" : isActive ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-muted-foreground"}`}>
                     {s.label}
                   </span>
                 </div>
@@ -206,196 +323,27 @@ export default function QuotePreviewPage() {
         </div>
       )}
 
-      <main className="px-4 py-4 space-y-6 animate-fade-in lg:max-w-4xl lg:mx-auto lg:px-8 lg:py-6">
-        {/* Professional Quote Document */}
-        <div className="glass-card rounded-2xl overflow-hidden border border-white/10 print:shadow-none print:border print:border-gray-200">
-          {/* Document header */}
-          <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-6 text-white print:bg-emerald-700">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-3xl font-extrabold tracking-wider mb-1">
-                  QUOTATION{quote?.version && quote.version > 1 ? ` (Revised - v${quote.version})` : ""}
-                </h2>
-                <p className="text-emerald-100 font-mono text-sm">{quoteNumber}</p>
-              </div>
-              <div className="text-right text-sm">
-                <p className="text-emerald-100">Date: <span className="text-white font-medium">{formattedDate}</span></p>
-                <p className="mt-1 bg-white/20 rounded-full px-3 py-0.5 text-xs font-medium">
-                  Valid for 30 days
-                </p>
-              </div>
-            </div>
-          </div>
+      <main className="px-4 py-4 animate-fade-in lg:max-w-4xl lg:mx-auto lg:px-8 lg:py-6">
+        <DocWarnings warnings={warnings} />
 
-          <div className="p-6 space-y-6">
-            {/* FROM / TO section */}
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-1">
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">FROM</p>
-                <p className="font-bold text-base">{fullName}</p>
-                {influencer?.email && (
-                  <p className="text-sm text-muted-foreground">{influencer.email}</p>
-                )}
-                {influencer?.phone && (
-                  <p className="text-sm text-muted-foreground">{influencer.phone}</p>
-                )}
-                {influencer?.panNumber && (
-                  <p className="text-sm text-muted-foreground">PAN: {influencer.panNumber}</p>
-                )}
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">TO</p>
-                <p className="font-bold text-base">{deal.brandName}</p>
-              </div>
-            </div>
+        <PagedDocument
+          blocks={blocks}
+          footer={docFooter(quoteNumber, `Deal ${recordNo("deal", deal.id)}`)}
+        />
 
-            <hr className="border-white/10" />
-
-            {/* Deliverables table */}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-                {deal.deliverableMode === "any_one" ? "Deliverable Options (choose one)" : "Deliverables"}
-              </p>
-              {deal.deliverableMode === "any_one" && (
-                <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2 text-sm text-amber-800 dark:text-amber-300 mb-3">
-                  The brand may choose <strong>one</strong> of the following deliverables.
-                </div>
-              )}
-              <div className="overflow-x-auto rounded-xl border border-white/10">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-muted/50 text-muted-foreground text-xs uppercase tracking-wide">
-                      <th className="text-left px-4 py-3 font-medium">{dLabels.category}</th>
-                      <th className="text-left px-4 py-3 font-medium">{dLabels.type}</th>
-                      <th className="text-center px-4 py-3 font-medium">Qty</th>
-                      <th className="text-left px-4 py-3 font-medium">Frequency</th>
-                      <th className="text-left px-4 py-3 font-medium">Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {deal.deliverables.map((d, idx) => (
-                      <tr
-                        key={d.id}
-                        className={`border-t border-white/10 ${idx % 2 === 0 ? "" : "bg-white/5"}`}
-                      >
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            {getPlatformIcon(d.platform)}
-                            <span className="font-medium">{d.platform}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{d.contentType}</td>
-                        <td className="px-4 py-3 text-center font-bold">{d.quantity}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{d.frequency}</td>
-                        <td className="px-4 py-3 text-muted-foreground italic text-xs">
-                          {d.notes || "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <hr className="border-white/10" />
-
-            {/* Amount section */}
-            <div className="flex items-center justify-between bg-gradient-to-r from-emerald-500/10 to-teal-500/10 rounded-xl px-5 py-4 border border-emerald-400/20">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Total Deal Value</p>
-                <p className="text-3xl font-extrabold text-primary mt-0.5">
-                  ₹{deal.dealAmount.toLocaleString()}
-                </p>
-              </div>
-              <div className="text-right text-xs text-muted-foreground">
-                <p>Subject to applicable taxes</p>
-                <p className="mt-1">INR (Indian Rupees)</p>
-              </div>
-            </div>
-
-            <hr className="border-white/10" />
-
-            {/* Terms & Conditions */}
-            {(() => {
-              const selectedIds = ((deal as any).standardTermIds as string[] | null) ?? STANDARD_TERMS.map((t) => t.id);
-              const selectedTerms = STANDARD_TERMS.filter((t) => selectedIds.includes(t.id));
-              const customTerms = (deal as any).customTerms as string | null;
-              const customLines = (customTerms ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
-              if (selectedTerms.length === 0 && customLines.length === 0) return null;
-              return (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
-                    Terms &amp; Conditions
-                  </p>
-                  <ul className="space-y-2 text-sm text-muted-foreground list-none">
-                    {selectedTerms.map((t) => (
-                      <li key={t.id} className="flex items-start gap-2">
-                        <span className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-primary/60" />
-                        <span>{t.label}</span>
-                      </li>
-                    ))}
-                    {customLines.map((line, i) => (
-                      <li key={`custom-${i}`} className="flex items-start gap-2">
-                        <span className="mt-1 flex-shrink-0 w-1.5 h-1.5 rounded-full bg-amber-500/80" />
-                        <span>{line}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })()}
-
-            {/* Footer */}
-            <div className="pt-2 text-center text-xs text-muted-foreground border-t border-white/10">
-              Generated via <span className="font-semibold text-primary">Dealinsec</span> — Turn collaborations into professional deals
-            </div>
-          </div>
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex gap-3 pb-2 print:hidden">
-          <Button
-            variant="outline"
-            className="flex-1 h-12 rounded-xl font-semibold"
-            onClick={handlePrint}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Download PDF
+        <div className="flex gap-3 pt-4 pb-2 print:hidden">
+          <Button variant="outline" className="flex-1 h-12 rounded-xl font-semibold" onClick={() => window.print()}>
+            <Download className="w-4 h-4 mr-2" /> Download PDF
           </Button>
           <Link href={`/deals/${params.id}/contract`} className="flex-1">
             <Button className="w-full h-12 rounded-xl font-semibold gradient-btn text-white">
-              Proceed to Agreement
-              <ArrowRight className="w-4 h-4 ml-2" />
+              Proceed to Agreement <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </Link>
         </div>
       </main>
 
       <BottomNav />
-
-      <style>{`
-        @media print {
-          @page { margin: 1.2cm; size: A4; }
-
-          body { background: #ffffff !important; margin: 0; }
-
-          /* Hide everything except the document card */
-          header, nav, footer { display: none !important; }
-
-          body > div, .min-h-screen { padding-bottom: 0 !important; }
-
-          /* The action buttons + bottom nav are hidden via print:hidden Tailwind class */
-
-          /* Force gradient header to print */
-          .bg-gradient-to-r { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-
-          .glass-card {
-            background: #ffffff !important;
-            border: 1px solid #e5e7eb !important;
-            box-shadow: none !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }

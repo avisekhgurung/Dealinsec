@@ -14,6 +14,13 @@ import { ArrowLeft, Download, CheckCircle, Loader2, BellRing, Crown, Undo2 } fro
 import { InvoiceAttachments } from "@/components/invoice-attachments";
 import type { BrandInvoice, Deal, InvoiceLineItem } from "@shared/schema";
 import { useUpgradeModal } from "@/components/upgrade-modal";
+import { PagedDocument, type DocBlock } from "@/components/document/paged";
+import {
+  DocHeader, docFooter, SectionTitle, TwoParties, Party, KV, tableBlocks, TotalBlock,
+  SignatureCell, DocWarnings, inr, docDate,
+} from "@/components/document/primitives";
+import { validateDocData } from "@/components/document/checks";
+import { recordNo } from "@shared/schema";
 import { parseApiError, isUpgradeError } from "@/lib/api-error";
 
 function slugify(s: string): string {
@@ -168,6 +175,174 @@ export default function BrandInvoiceDetailsPage() {
   const bankName = issuer.bankName;
   const hasBankDetails = bankAccountHolder || bankAccountNumber || bankIfsc || bankName;
 
+  /* ── Document blocks — one A4 page whenever the content fits ─────────── */
+  const invoiceRows: { description: string; hsnSac?: string; period?: string; qty: number; rate: number; amount: number }[] =
+    lineItems.length > 0
+      ? lineItems.map((li) => ({
+          description: li.description, hsnSac: li.hsnSac,
+          qty: li.quantity, rate: li.rate, amount: li.amount,
+        }))
+      : [{
+          // Invoices raised before the composer derive their single line from
+          // the deal — appearance unchanged for documents clients already hold.
+          description: deal?.dealTitle || "Professional services",
+          period: deal ? `${fmtShort(deal.startDate)} – ${fmtShort(deal.endDate)}` : undefined,
+          qty: 1, rate: totalAmount, amount: totalAmount,
+        }];
+
+  const docWarnings = validateDocData({
+    clientName: invoice.brandName,
+    sellerName: influencerName === "—" ? "" : influencerName,
+    amount: totalAmount,
+    invoiceDate: invoice.invoiceDate,
+    dueDate: invoice.dueDate,
+  });
+
+  const docBlocks: DocBlock[] = [
+    {
+      key: "head",
+      keepWithNext: true,
+      node: (
+        <DocHeader
+          docType="Invoice"
+          docNo={invoice.invoiceNumber}
+          status={invoice.status}
+          meta={[
+            { label: "Invoice date", value: docDate(invoice.invoiceDate) },
+            { label: "Due", value: invoice.dueDate ? docDate(invoice.dueDate) : "On receipt" },
+            ...(invoice.invoiceType && invoice.invoiceType !== "full"
+              ? [{ label: "Type", value: invoice.invoiceType === "advance" ? "Advance" : "Final" }]
+              : []),
+          ]}
+        />
+      ),
+    },
+    {
+      key: "parties",
+      node: (
+        <TwoParties
+          left={
+            <Party
+              heading="From"
+              name={influencerName}
+              lines={[
+                influencerAddress,
+                influencerEmail,
+                influencerPhone,
+                influencerPan && `PAN: ${influencerPan}`,
+                influencerGst && `GSTIN: ${influencerGst}`,
+              ]}
+            />
+          }
+          right={
+            <Party
+              heading="Bill to"
+              name={invoice.brandName}
+              lines={[
+                deal?.dealTitle && `Re: ${deal.dealTitle}`,
+                invoice.contractId ? `Agreement: ${recordNo("agreement", invoice.contractId)}` : null,
+                invoice.dealId ? `Deal: ${recordNo("deal", invoice.dealId)}` : null,
+              ]}
+            />
+          }
+        />
+      ),
+    },
+    ...tableBlocks({
+      keyPrefix: "items",
+      cols: [
+        { label: "#", width: "8mm", align: "center" },
+        { label: "Description" },
+        { label: "Qty", width: "12mm", align: "center" },
+        { label: "Rate", width: "24mm", align: "right" },
+        { label: "Amount", width: "26mm", align: "right" },
+      ],
+      rows: invoiceRows,
+      renderCell: (r, ci, ri) =>
+        ci === 0 ? <span className="doc-muted-t doc-num">{ri + 1}</span>
+        : ci === 1 ? (
+            <div>
+              <div style={{ fontWeight: 600 }}>{r.description}</div>
+              {(r.hsnSac || r.period) && (
+                <div className="doc-small doc-muted-t">
+                  {[r.hsnSac && `HSN/SAC ${r.hsnSac}`, r.period].filter(Boolean).join(" · ")}
+                </div>
+              )}
+            </div>
+          )
+        : ci === 2 ? <span className="doc-num">{r.qty}</span>
+        : ci === 3 ? inr(r.rate)
+        : <span style={{ fontWeight: 600 }}>{inr(r.amount)}</span>,
+    }),
+    {
+      key: "total",
+      node: (
+        <TotalBlock
+          label="Total amount due"
+          amount={totalAmount}
+          note="Contract value — no GST computation. Not a tax invoice under Rule 46 of the CGST Rules, 2017."
+          ledger={invoiceRows.length > 1 ? [{ label: "Subtotal", value: inr(totalAmount) }] : []}
+        />
+      ),
+    },
+    ...(hasBankDetails
+      ? [{
+          key: "bank",
+          node: (
+            <div className="doc-panel">
+              <div className="doc-label" style={{ marginBottom: "2mm" }}>Payment details</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "4mm" }}>
+                {bankAccountHolder && <KV label="Account holder" strong>{bankAccountHolder}</KV>}
+                {bankAccountNumber && <KV label="Account number" strong><span className="doc-mono" style={{ fontSize: "9pt" }}>{bankAccountNumber}</span></KV>}
+                {bankIfsc && <KV label="IFSC" strong><span className="doc-mono" style={{ fontSize: "9pt" }}>{bankIfsc}</span></KV>}
+                {bankName && <KV label="Bank" strong>{bankName}</KV>}
+              </div>
+            </div>
+          ),
+        } satisfies DocBlock]
+      : []),
+    {
+      // Terms bottom-left, signatory bottom-right — the classic invoice
+      // closing row. One combined block, so it can never split across pages
+      // and the one-page target survives a full itemised invoice.
+      key: "closing-row",
+      keepWithNext: true,
+      node: (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 62mm", gap: "8mm", alignItems: "start" }}>
+          <div>
+            <div className="doc-label" style={{ marginBottom: "1.5mm" }}>Payment terms</div>
+            <ul className="doc-small doc-muted-t" style={{ margin: 0, paddingLeft: "5mm", listStyleType: "disc", display: "grid", gap: "1mm" }}>
+              <li>{invoice.dueDate ? <>Payment due by <strong>{docDate(invoice.dueDate)}</strong></> : "Payment due within 30 days of invoice date"}</li>
+              <li>Please quote invoice number <strong>{invoice.invoiceNumber}</strong> with your payment</li>
+              <li>All amounts are in Indian Rupees (₹ / INR)</li>
+            </ul>
+            {invoice.notes && (
+              <p className="doc-small doc-muted-t" style={{ marginTop: "2mm", whiteSpace: "pre-wrap" }}>
+                <strong>Notes:</strong> {invoice.notes}
+              </p>
+            )}
+          </div>
+          <SignatureCell
+            heading="Authorised signatory"
+            name={influencerName}
+            date={docDate(invoice.invoiceDate)}
+            signatureUrl={signatureUrl || null}
+            sealUrl={sealUrl || null}
+            awaitingText="Valid without signature"
+          />
+        </div>
+      ),
+    },
+    {
+      key: "legal",
+      node: (
+        <p className="doc-small" style={{ textAlign: "center", color: "var(--doc-faint)" }}>
+          Computer-generated invoice — valid without signature. Generated via DealInSec.
+        </p>
+      ),
+    },
+  ];
+
   return (
     <>
       <div className="min-h-screen bg-background pb-20 print:pb-0 print:bg-white print:min-h-0">
@@ -189,305 +364,11 @@ export default function BrandInvoiceDetailsPage() {
         </header>
 
         {/* ─────────────────── INVOICE DOCUMENT ─────────────────── */}
-        <main className="invoice-doc px-4 py-6 max-w-2xl lg:max-w-4xl mx-auto animate-fade-in print:max-w-none print:px-0 print:py-0 print:mx-0">
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-md border border-gray-100 dark:border-zinc-800 overflow-hidden print:rounded-none print:shadow-none print:border-0">
+        {/* ─────────────────── INVOICE DOCUMENT ─────────────────── */}
+        <main className="px-4 py-6 max-w-2xl lg:max-w-4xl mx-auto animate-fade-in">
+          <DocWarnings warnings={docWarnings} />
+          <PagedDocument blocks={docBlocks} footer={docFooter(invoice.invoiceNumber)} />
 
-            {/* ── Top colour band + INVOICE title ────── */}
-            <div
-              className="px-6 py-5 text-white"
-              style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
-            >
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div>
-                  <h1 className="text-2xl font-extrabold tracking-wide">INVOICE</h1>
-                  <div className="flex items-center gap-2 mt-1">
-                    <p className="text-sm text-white/80 font-medium">{invoice.invoiceNumber}</p>
-                    {invoice.invoiceType === "advance" && (
-                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-500/30 text-amber-100 border border-amber-300/40">
-                        Advance Payment
-                      </span>
-                    )}
-                    {invoice.invoiceType === "final" && (
-                      <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-emerald-500/30 text-emerald-100 border border-emerald-300/40">
-                        Final Payment
-                      </span>
-                    )}
-                  </div>
-                  {(invoice.invoiceType === "advance" || invoice.invoiceType === "final") && (invoice as any).splitPercentage && (
-                    <p className="text-[10px] text-white/60 mt-0.5">
-                      {(invoice as any).splitPercentage}% of total deal value
-                    </p>
-                  )}
-                </div>
-                <div className="text-right text-sm">
-                  <span
-                    className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
-                      invoice.status === "Paid"
-                        ? "bg-emerald-500/30 text-emerald-100 border border-emerald-300/40"
-                        : "bg-amber-500/30 text-amber-100 border border-amber-300/40"
-                    }`}
-                  >
-                    {invoice.status}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* ── Dates row ──────────────────────────── */}
-            <div className="px-6 py-3 bg-gray-50 dark:bg-zinc-800/60 flex flex-wrap gap-6 text-xs border-b border-gray-100 dark:border-zinc-700">
-              <div>
-                <span className="text-gray-400 uppercase tracking-wider font-semibold">Invoice Date</span>
-                <p className="text-gray-800 dark:text-gray-200 font-semibold mt-0.5">{fmt(invoice.invoiceDate)}</p>
-              </div>
-              {invoice.dueDate && (
-                <div>
-                  <span className="text-gray-400 uppercase tracking-wider font-semibold">Due Date</span>
-                  <p className="text-gray-800 dark:text-gray-200 font-semibold mt-0.5">{fmt(invoice.dueDate)}</p>
-                </div>
-              )}
-            </div>
-
-            {/* ── FROM / TO two-column ────────────────── */}
-            <div className="px-6 py-5 grid grid-cols-1 sm:grid-cols-2 gap-6 border-b border-gray-100 dark:border-zinc-700">
-              {/* FROM */}
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-2">From</p>
-                <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{influencerName}</p>
-                {influencerEmail && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{influencerEmail}</p>
-                )}
-                {influencerPhone && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{influencerPhone}</p>
-                )}
-                {influencerPan && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    <span className="font-semibold text-gray-600 dark:text-gray-300">PAN:</span> {influencerPan}
-                  </p>
-                )}
-                {influencerGst && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    <span className="font-semibold text-gray-600 dark:text-gray-300">GSTIN:</span> {influencerGst}
-                  </p>
-                )}
-                {influencerAddress && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 leading-relaxed whitespace-pre-line">
-                    {influencerAddress}
-                  </p>
-                )}
-              </div>
-
-              {/* TO */}
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-teal-600 mb-2">Bill To</p>
-                <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{invoice.brandName}</p>
-                {deal && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    Re: {deal.dealTitle}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* ── Line items table ────────────────────── */}
-            <div className="px-6 py-5">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b-2 border-gray-200 dark:border-zinc-700">
-                    <th className="text-left pb-2 font-semibold text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">#</th>
-                    <th className="text-left pb-2 font-semibold text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Description</th>
-                    <th className="text-center pb-2 font-semibold text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Period</th>
-                    <th className="text-right pb-2 font-semibold text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Itemised lines when the invoice was composed with them;
-                      invoices raised before the composer fall back to a single
-                      line derived from the deal, so nothing already sent to a
-                      client changes appearance. */}
-                  {lineItems.length > 0 ? (
-                    lineItems.map((li, idx) => (
-                      <tr key={idx} className="border-b border-gray-100 dark:border-zinc-800">
-                        <td className="py-3 text-gray-600 dark:text-gray-300">{idx + 1}</td>
-                        <td className="py-3">
-                          <p className="font-medium text-gray-900 dark:text-gray-100">{li.description}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {li.hsnSac ? `HSN/SAC ${li.hsnSac} · ` : ""}
-                            {li.quantity} × ₹{Number(li.rate).toLocaleString("en-IN")}
-                          </p>
-                        </td>
-                        <td className="py-3 text-center text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                          {deal ? `${fmtShort(deal.startDate)} – ${fmtShort(deal.endDate)}` : "—"}
-                        </td>
-                        <td className="py-3 text-right font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">
-                          ₹{Number(li.amount).toLocaleString("en-IN")}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                  <tr className="border-b border-gray-100 dark:border-zinc-800">
-                    <td className="py-3 text-gray-600 dark:text-gray-300">1</td>
-                    <td className="py-3">
-                      <p className="font-medium text-gray-900 dark:text-gray-100">
-                        {deal?.dealTitle || "Influencer Marketing Services"}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        Content creation & brand promotion
-                      </p>
-                      {deal?.deliverables && deal.deliverables.length > 0 && (
-                        <div className="mt-1.5 flex flex-wrap gap-1">
-                          {deal.deliverables.map((d: any, i: number) => (
-                            <span
-                              key={i}
-                              className="inline-block text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 font-medium"
-                            >
-                              {d.platform} · {d.contentType} ×{d.quantity}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-3 text-center text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                      {deal
-                        ? `${fmtShort(deal.startDate)} – ${fmtShort(deal.endDate)}`
-                        : "—"}
-                    </td>
-                    <td className="py-3 text-right font-semibold text-gray-900 dark:text-gray-100 whitespace-nowrap">
-                      ₹{totalAmount.toLocaleString("en-IN")}
-                    </td>
-                  </tr>
-                  )}
-                </tbody>
-
-                {/* ── Total ───────────────────────── */}
-                <tfoot>
-                  <tr>
-                    <td colSpan={3} className="pt-3 pr-4 text-right font-bold text-gray-900 dark:text-gray-100 border-t-2 border-gray-200 dark:border-zinc-700">
-                      Total Amount
-                    </td>
-                    <td className="pt-3 text-right border-t-2 border-gray-200 dark:border-zinc-700">
-                      <span className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">
-                        ₹{totalAmount.toLocaleString("en-IN")}
-                      </span>
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-
-            {/* ── Notes ───────────────────────────────── */}
-            {invoice.notes && (
-              <div className="px-6 py-4 border-t border-gray-100 dark:border-zinc-700">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">Notes</p>
-                <p className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap leading-relaxed">
-                  {invoice.notes}
-                </p>
-              </div>
-            )}
-
-            {/* ── Bank Details ────────────────────────── */}
-            {hasBankDetails ? (
-              <div className="px-6 py-4 border-t border-gray-100 dark:border-zinc-700">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-2">Bank Details</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
-                  {bankAccountHolder && (
-                    <div className="flex gap-2">
-                      <span className="text-gray-500 dark:text-gray-400 w-[110px]">Account Holder</span>
-                      <span className="text-gray-900 dark:text-gray-100 font-semibold">{bankAccountHolder}</span>
-                    </div>
-                  )}
-                  {bankAccountNumber && (
-                    <div className="flex gap-2">
-                      <span className="text-gray-500 dark:text-gray-400 w-[110px]">Account Number</span>
-                      <span className="text-gray-900 dark:text-gray-100 font-mono font-semibold">{bankAccountNumber}</span>
-                    </div>
-                  )}
-                  {bankIfsc && (
-                    <div className="flex gap-2">
-                      <span className="text-gray-500 dark:text-gray-400 w-[110px]">IFSC</span>
-                      <span className="text-gray-900 dark:text-gray-100 font-mono font-semibold">{bankIfsc}</span>
-                    </div>
-                  )}
-                  {bankName && (
-                    <div className="flex gap-2">
-                      <span className="text-gray-500 dark:text-gray-400 w-[110px]">Bank Name</span>
-                      <span className="text-gray-900 dark:text-gray-100 font-semibold">{bankName}</span>
-                    </div>
-                  )}
-                  {influencerPan && (
-                    <div className="flex gap-2">
-                      <span className="text-gray-500 dark:text-gray-400 w-[110px]">PAN</span>
-                      <span className="text-gray-900 dark:text-gray-100 font-mono font-semibold">{influencerPan}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="px-6 py-3 border-t border-amber-200 dark:border-amber-900/40 bg-amber-50/70 dark:bg-amber-950/20 print:hidden">
-                <p className="text-xs text-amber-800 dark:text-amber-300">
-                  <strong>Heads up:</strong> Add your bank details in Profile so they appear on invoices going forward.
-                </p>
-              </div>
-            )}
-
-            {/* ── Payment terms ───────────────────────── */}
-            <div className="px-6 py-4 bg-gray-50 dark:bg-zinc-800/40 border-t border-gray-100 dark:border-zinc-700">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Payment Terms</p>
-              <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
-                <li>
-                  {invoice.dueDate
-                    ? <>Payment due by <strong>{fmt(invoice.dueDate)}</strong></>
-                    : "Payment due within 30 days of invoice date"}
-                </li>
-                <li>Please reference invoice number <strong>{invoice.invoiceNumber}</strong> with payment</li>
-                <li>All amounts are in Indian Rupees (₹ / INR)</li>
-              </ul>
-            </div>
-
-            {/* ── Signature block ─────────────────────── */}
-            <div className="px-6 py-6 border-t border-gray-100 dark:border-zinc-700">
-              <div className="flex flex-col sm:flex-row justify-between gap-8">
-                {/* Authorised signatory */}
-                <div className="flex-1">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">
-                    Authorised Signatory
-                  </p>
-                  {signatureUrl ? (
-                    <div className="mb-1">
-                      <img
-                        src={signatureUrl}
-                        alt="Digital Signature"
-                        className="h-10 w-auto object-contain"
-                      />
-                    </div>
-                  ) : (
-                    <>
-                      <div className="h-16 w-48 border-b-2 border-gray-300 dark:border-zinc-600 mb-2" />
-                      <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{influencerName}</p>
-                    </>
-                  )}
-                  {sealUrl && (
-                    <img src={sealUrl} alt="Company stamp" className="h-14 w-auto object-contain -mt-2 ml-6 opacity-90" />
-                  )}
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    Date: {fmt(invoice.invoiceDate)}
-                  </p>
-                </div>
-
-              </div>
-            </div>
-
-            {/* ── Footer ──────────────────────────────── */}
-            <div className="px-6 py-3 bg-gray-50 dark:bg-zinc-800/40 border-t border-gray-100 dark:border-zinc-700 text-center">
-              <p className="text-[10px] text-gray-400">
-                Computer-generated invoice — valid without signature. Generated via Dealinsec.
-              </p>
-              <p className="text-[10px] text-gray-400 mt-0.5">
-                Amounts shown are the agreed contract value and do not include a GST tax computation.
-                This is not a tax invoice under Rule 46 of the CGST Rules, 2017. Charge and report GST as
-                applicable to you.
-              </p>
-            </div>
-          </div>
 
           {/* ── Tax documents (GST / TDS / receipts) ─ hidden in print ── */}
           <div className="mt-6">
@@ -583,65 +464,6 @@ export default function BrandInvoiceDetailsPage() {
         </div>
       </div>
 
-      {/* ── Print styles ─────────────────────────────── */}
-      <style>{`
-        @media print {
-          /* A PDF is A4 whatever screen made it. Tailwind's sm:/md: variants
-             are viewport media queries, so printing from a phone collapsed the
-             two-column layouts to one long column. Force the desktop grid in
-             print regardless of device. */
-          .md\\:grid-cols-2, .sm\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-          .md\\:grid-cols-4, .sm\\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
-          .max-w-2xl, .lg\\:max-w-4xl { max-width: 100% !important; }
-
-          @page { margin: 0.8cm; size: A4; }
-
-          * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-
-          body { background: #ffffff !important; margin: 0; }
-
-          /* Hide all app chrome */
-          header, nav, footer,
-          [data-testid], .glass-header,
-          .print\\:hidden { display: none !important; }
-
-          body > div,
-          .min-h-screen { padding-bottom: 0 !important; min-height: 0 !important; background: white !important; }
-
-          /* Invoice doc fills page */
-          .invoice-doc {
-            padding: 0 !important;
-            margin: 0 !important;
-            max-width: 100% !important;
-          }
-
-          .invoice-doc > div {
-            border-radius: 0 !important;
-            box-shadow: none !important;
-            border: none !important;
-          }
-
-          /* Force gradient header in print */
-          .invoice-doc > div > div:first-child {
-            background: linear-gradient(135deg, #059669 0%, #0D9488 100%) !important;
-          }
-
-          /* Force bg colours */
-          .bg-gray-50 { background-color: #f9fafb !important; }
-          .bg-emerald-50 { background-color: #ecfdf5 !important; }
-
-          img {
-            max-width: 100% !important;
-            max-height: 80px !important;
-            object-fit: contain !important;
-          }
-
-          .invoice-doc img {
-            display: block !important;
-            visibility: visible !important;
-          }
-        }
-      `}</style>
     </>
   );
 }

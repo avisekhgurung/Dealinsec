@@ -1,109 +1,424 @@
-import { useEffect } from "react";
+/**
+ * Agreement document — built on the DealInSec document system.
+ *
+ * The most formal of the three documents: white header with the green rule,
+ * numbered clauses, two-column execution block, and the execution record that
+ * states honestly what our electronic acceptance is and is not. Pagination is
+ * explicit (PagedDocument): a clause heading can never orphan at a page
+ * bottom, the signature grid and execution record are atomic, and every sheet
+ * carries "Page X of Y" with the agreement reference.
+ *
+ * The payment-contradiction fix lives in Clause 3: when the deal's own terms
+ * mention payment (they carry over from the quotation into Section 7), the
+ * Compensation clause DEFERS to them instead of asserting the old hardcoded
+ * "50% advance / 50% within 30 days" schedule that could contradict Section 7
+ * on the same document. The default schedule only prints when the deal has no
+ * payment terms of its own.
+ *
+ * Legal meaning is otherwise unchanged: same clauses, same disclosures, same
+ * execution-record wording (see ESIGN_RECOMMENDATION.md).
+ */
+import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAuth } from "@/hooks/useAuth";
 import { useIssuer } from "@/hooks/useIssuer";
-import { ArrowLeft, Printer, Shield, Lock } from "lucide-react";
-import type { Contract, Deal } from "@shared/schema";
+import { ArrowLeft, Printer } from "lucide-react";
+import type { Contract, Deal, Quote } from "@shared/schema";
 import { STANDARD_TERMS, recordNo } from "@shared/schema";
 import { getAgreementCopy, getDeliverableLabels } from "@shared/dealTypeTaxonomy";
+import { PagedDocument, type DocBlock } from "@/components/document/paged";
+import {
+  DocHeader, docFooter, SectionTitle, TwoParties, Party, KV, tableBlocks,
+  SignatureCell, DocWarnings, inr, docDate,
+} from "@/components/document/primitives";
+import {
+  detectPaymentConflicts, termsMentionPayment, validateDocData,
+} from "@/components/document/checks";
 
 function slugify(s: string): string {
-  return (s || "")
-    .normalize("NFKD")
-    .replace(/[^\w\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-");
+  return (s || "").normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
+}
+
+function Clause({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: "2.5mm", marginBottom: "1.5mm" }}>
+        <span className="doc-clause-no">{n}</span>
+        <span className="doc-h3">{title}</span>
+      </div>
+      <div className="doc-body doc-muted-t" style={{ paddingLeft: "8mm" }}>{children}</div>
+    </div>
+  );
 }
 
 export default function ContractPdfPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
   const issuer = useIssuer();
   const backPath = `/contracts/${id}`;
-  const contractsPath = "/contracts";
 
   const { data: contract, isLoading } = useQuery<Contract>({
     queryKey: ["/api/contracts", id],
   });
-
-  // Authenticity: the document renders the signature and name captured when
-  // the agreement was created — NOT the viewer's profile. Older agreements
-  // were backfilled from their creator by migrate-document-authenticity.ts;
-  // the fallback keeps anything older still rendering.
-  const signatureSrc: string | undefined =
-    (contract?.signatureUrl as string | null | undefined)
-    ?? issuer.digitalSignature
-    ?? undefined;
-  // Company stamp, snapshotted with the signature. Presentational only.
-  const sealSrc: string | undefined =
-    ((contract as any)?.sealUrl as string | null | undefined) ?? issuer.companySeal ?? undefined;
-
-  const signerLabel =
-    contract?.signerName
-    || issuer.name
-    || "—";
 
   const { data: deal } = useQuery<Deal>({
     queryKey: ["/api/deals", contract?.dealId],
     enabled: !!contract?.dealId,
   });
 
-  // Deal-type-aware language for the agreement document (title, party roles,
-  // scope, rights & exclusivity clauses). Falls back to Creator copy.
+  // Cross-reference: the quotation this agreement grew from. 404/permission
+  // misses degrade to "no reference line" — never an error.
+  const { data: refQuote } = useQuery<Quote | null>({
+    queryKey: ["/api/deals", contract?.dealId, "quote"],
+    enabled: !!contract?.dealId,
+    queryFn: async () => {
+      const res = await fetch(`/api/deals/${contract?.dealId}/quote`, { credentials: "include" });
+      return res.ok ? res.json() : null;
+    },
+  });
+
+  // Authenticity: signature/seal captured at creation, never the viewer's.
+  const signatureSrc = (contract?.signatureUrl as string | null) ?? issuer.digitalSignature ?? null;
+  const sealSrc = ((contract as any)?.sealUrl as string | null) ?? issuer.companySeal ?? null;
+  const signerLabel = contract?.signerName || issuer.name || "—";
+
   const copy = getAgreementCopy(deal?.dealType);
   const dLabels = getDeliverableLabels(deal?.dealType);
+  const agreementNo = contract ? recordNo("agreement", contract.id) : "";
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  };
-
-  // Set document.title so browsers use a brand-specific PDF filename on print.
   useEffect(() => {
     if (!contract) return;
     const previous = document.title;
-    const brand = slugify(contract.brandName) || "Agreement";
-    document.title = `Agreement_${brand}_${contract.id}`;
-    return () => {
-      document.title = previous;
-    };
-  }, [contract]);
+    document.title = `Agreement_${slugify(contract.brandName) || "Agreement"}_${agreementNo}`;
+    return () => { document.title = previous; };
+  }, [contract, agreementNo]);
 
-  const handlePrint = () => {
-    window.print();
-  };
+  /* ── Document blocks ─────────────────────────────────────────────────── */
+  const blocks = useMemo<DocBlock[]>(() => {
+    if (!contract) return [];
+    const c = contract;
+    const customTerms = (deal as any)?.customTerms as string | null;
+    const selectedIds = ((deal as any)?.standardTermIds as string[] | null) ?? [];
+    const selectedTerms = STANDARD_TERMS.filter((t) => selectedIds.includes(t.id));
+    const customLines = (customTerms ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+    const hasOwnPaymentTerms = termsMentionPayment(customTerms);
+    const out: DocBlock[] = [];
 
+    out.push({
+      key: "head",
+      keepWithNext: true,
+      node: (
+        <DocHeader
+          formal
+          docType={copy.title}
+          docNo={agreementNo}
+          status={c.status === "Signed" ? "Signed" : "Pending"}
+          meta={[
+            { label: "Effective", value: docDate(c.startDate) },
+            { label: "Ends", value: docDate(c.endDate) },
+            ...(c.exclusive ? [{ label: "Type", value: "Exclusive" }] : []),
+            ...(refQuote ? [{ label: "Based on", value: recordNo("quotation", refQuote.id) }] : []),
+          ]}
+        />
+      ),
+    });
+
+    out.push({
+      key: "parties",
+      node: (
+        <div>
+          <SectionTitle>Parties to this agreement</SectionTitle>
+          <TwoParties
+            left={
+              <Party
+                heading={`Party A — ${copy.providerRole}`}
+                name={signerLabel}
+                lines={[
+                  issuer.billingAddress,
+                  issuer.panNumber && `PAN: ${issuer.panNumber}`,
+                  issuer.gstNumber && `GSTIN: ${issuer.gstNumber}`,
+                  issuer.email,
+                  issuer.phone,
+                ]}
+              />
+            }
+            right={
+              <Party
+                heading={`Party B — ${copy.clientRole}`}
+                name={c.brandName}
+                lines={[deal?.dealTitle || c.contractName]}
+              />
+            }
+          />
+        </div>
+      ),
+    });
+
+    out.push({
+      key: "details",
+      node: (
+        <div className="doc-panel-subtle" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "4mm" }}>
+          <KV label="Effective date" strong>{docDate(c.startDate)}</KV>
+          <KV label="End date" strong>{docDate(c.endDate)}</KV>
+          <KV label="Agreement value" strong>
+            <span style={{ color: "var(--doc-brand)", fontWeight: 700 }}>{inr(c.contractValue)}</span>
+          </KV>
+          <KV label="Type" strong>{c.exclusive ? "Exclusive" : "Non-exclusive"}</KV>
+        </div>
+      ),
+    });
+
+    if (deal?.deliverables?.length) {
+      out.push({
+        key: "deliv-title",
+        keepWithNext: true,
+        node: (
+          <div>
+            <SectionTitle>
+              {deal.deliverableMode === "any_one" ? "Deliverable options — client selects one" : "Deliverables"}
+            </SectionTitle>
+            {deal.deliverableMode === "any_one" && (
+              <p className="doc-small doc-muted-t">The {copy.clientNoun} shall select one of the following options.</p>
+            )}
+          </div>
+        ),
+      });
+      out.push(
+        ...tableBlocks({
+          keyPrefix: "deliv",
+          chunk: 5,
+          cols: [
+            { label: "#", width: "8mm", align: "center" },
+            { label: dLabels.category, width: "30mm" },
+            { label: dLabels.type },
+            { label: "Qty", width: "12mm", align: "center" },
+            { label: "Frequency", width: "22mm" },
+            { label: "Notes", width: "44mm" },
+          ],
+          rows: deal.deliverables,
+          renderCell: (d: any, ci, ri) =>
+            ci === 0 ? <span className="doc-muted-t doc-num">{ri + 1}</span>
+            : ci === 1 ? <span style={{ fontWeight: 600 }}>{d.platform}</span>
+            : ci === 2 ? d.contentType
+            : ci === 3 ? <span style={{ fontWeight: 600 }}>{d.quantity}</span>
+            : ci === 4 ? d.frequency
+            : <span className="doc-small doc-muted-t">{d.notes || "—"}</span>,
+        }),
+      );
+    }
+
+    /* ── Numbered clauses — heading glued to clause 1, each clause atomic ── */
+    out.push({
+      key: "tc-title",
+      keepWithNext: true,
+      node: <SectionTitle>Terms &amp; conditions</SectionTitle>,
+    });
+    out.push({
+      key: "c1",
+      node: (
+        <Clause n={1} title="Scope of Work">
+          The {copy.providerNoun} agrees to provide {copy.serviceDescription} for the {copy.clientNoun}
+          {" "}as described in the Deliverables section above, in connection with the engagement titled
+          {" "}"{deal?.dealTitle || c.contractName}". {copy.complianceNote}
+        </Clause>
+      ),
+    });
+    out.push({
+      key: "c2",
+      node: (
+        <Clause n={2} title="Deliverables & Timeline">
+          All deliverables shall be submitted for {copy.clientNoun} approval at least 48 hours before the
+          scheduled delivery or publication date. The {copy.clientNoun} shall provide approval or revision
+          requests within 24 hours of receipt. The {copy.providerNoun} shall incorporate up to two (2) rounds
+          of revisions at no additional charge. This Agreement is effective from{" "}
+          <strong>{docDate(c.startDate)}</strong> through <strong>{docDate(c.endDate)}</strong>.
+        </Clause>
+      ),
+    });
+    out.push({
+      key: "c3",
+      node: (
+        <Clause n={3} title={`Compensation (${inr(c.contractValue)})`}>
+          In consideration for the services rendered, the {copy.clientNoun} shall pay the {copy.providerNoun} a
+          total fee of <strong>{inr(c.contractValue)}</strong> (Indian Rupees{" "}
+          {Number(c.contractValue).toLocaleString("en-IN")} only).{" "}
+          {hasOwnPaymentTerms ? (
+            <>Payment shall follow the schedule agreed between the parties as set out in the Deal-Specific
+            Terms (Section 7) of this Agreement.</>
+          ) : (
+            <>Payment shall be structured as: 50% advance upon execution and 50% within 30 days of final
+            deliverable approval.</>
+          )}{" "}
+          Late payments attract interest at 1.5% per month.
+        </Clause>
+      ),
+    });
+    out.push({
+      key: "c4",
+      node: <Clause n={4} title={copy.rightsHeading}>{copy.rightsText}</Clause>,
+    });
+    out.push({
+      key: "c5",
+      node: (
+        <Clause n={5} title="Exclusivity Terms">
+          {c.exclusive ? copy.exclusiveText : copy.nonExclusiveText}
+        </Clause>
+      ),
+    });
+    out.push({
+      key: "c6",
+      node: (
+        <Clause n={6} title="Governing Law (Indian Contract Act 1872)">
+          This Agreement shall be governed by and construed in accordance with the laws of India,
+          including the Indian Contract Act, 1872. Any disputes shall first be attempted to be resolved
+          through good-faith negotiation for 30 days, failing which disputes shall be submitted to
+          binding arbitration under the Arbitration and Conciliation Act, 1996. The courts of India
+          shall have exclusive jurisdiction for any legal proceedings.
+        </Clause>
+      ),
+    });
+
+    if (selectedTerms.length || customLines.length) {
+      const items = [
+        ...selectedTerms.map((t) => t.label),
+        ...customLines,
+      ];
+      out.push({
+        key: "c7-head",
+        keepWithNext: true,
+        node: (
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "2.5mm", marginBottom: "1mm" }}>
+              <span className="doc-clause-no">7</span>
+              <span className="doc-h3">Deal-Specific Terms</span>
+            </div>
+            <p className="doc-small doc-muted-t" style={{ paddingLeft: "8mm" }}>
+              The following terms were agreed in the quotation and carry over to this Agreement:
+            </p>
+          </div>
+        ),
+      });
+      const CHUNK = 5;
+      for (let i = 0; i < items.length; i += CHUNK) {
+        out.push({
+          key: `c7-${i}`,
+          node: (
+            <div style={{ paddingLeft: "8mm", display: "grid", gap: "1.5mm" }}>
+              {items.slice(i, i + CHUNK).map((line, j) => (
+                <div key={j} className="doc-body doc-muted-t" style={{ display: "flex", gap: "2mm" }}>
+                  <span className="doc-num" style={{ color: "var(--doc-brand)", fontWeight: 700, flex: "none" }}>
+                    7.{i + j + 1}
+                  </span>
+                  <span>{line}</span>
+                </div>
+              ))}
+            </div>
+          ),
+        });
+      }
+    }
+
+    /* ── Stamp duty (only when a certificate is recorded) ── */
+    if ((c as any).estampCertificateNo) {
+      out.push({
+        key: "estamp",
+        node: (
+          <div className="doc-panel">
+            <div className="doc-label" style={{ marginBottom: "2mm" }}>Stamp duty</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "4mm" }}>
+              <KV label="Certificate no." strong><span className="doc-mono" style={{ fontSize: "8.5pt" }}>{(c as any).estampCertificateNo}</span></KV>
+              {(c as any).estampDate && <KV label="Dated" strong>{docDate((c as any).estampDate)}</KV>}
+              {(c as any).estampAmount != null && <KV label="Duty paid" strong>{inr((c as any).estampAmount)}</KV>}
+              {(c as any).estampAuthority && <KV label="Issued by" strong>{(c as any).estampAuthority}</KV>}
+            </div>
+          </div>
+        ),
+      });
+    }
+
+    /* ── Signatures — atomic block, both parties side by side ── */
+    out.push({
+      key: "signatures",
+      keepWithNext: true,
+      node: (
+        <div>
+          <SectionTitle>Execution</SectionTitle>
+          <div className="doc-sig-grid">
+            <SignatureCell
+              heading={`Party A — ${copy.providerRole}`}
+              name={signerLabel}
+              date={c.signedDate ? docDate(c.signedDate) : docDate(c.startDate)}
+              signatureUrl={signatureSrc}
+              sealUrl={sealSrc}
+            />
+            <SignatureCell
+              heading={`Party B — ${copy.clientRole}`}
+              name={c.brandName}
+              date={c.signedByBrand && c.signedDate ? docDate(c.signedDate) : null}
+              signatureUrl={null}
+              awaitingText={c.signedByBrand ? "Accepted electronically — signed copy on record" : "Awaiting signature"}
+            />
+          </div>
+        </div>
+      ),
+    });
+
+    /* ── Execution record — the honest disclosure, atomic ── */
+    out.push({
+      key: "exec-record",
+      node: (
+        <div className="doc-panel-subtle">
+          <div className="doc-label" style={{ marginBottom: "2mm" }}>Execution record</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "4mm", marginBottom: "2.5mm" }}>
+            <KV label="Document ref" strong><span className="doc-mono" style={{ fontSize: "8.5pt" }}>{agreementNo}</span></KV>
+            <KV label="Prepared by" strong>{signerLabel}</KV>
+            <KV label="Effective from" strong>{docDate(c.startDate)}</KV>
+            <KV label="Status" strong>{c.status}{c.signedDate ? ` · ${docDate(c.signedDate)}` : ""}</KV>
+          </div>
+          <p className="doc-small doc-muted-t">
+            This agreement was prepared and accepted electronically. The signature shown for Party A is the
+            image on file for the named signatory, captured when this document was created. This is an
+            electronic acceptance with an audit record — it is not a Digital Signature Certificate issued
+            under the Information Technology Act, 2000, and no certifying-authority verification is claimed.
+            Parties may additionally execute a physically signed counterpart. Stamp duty and registration,
+            where applicable, are the responsibility of the parties — DealInSec does not pay, issue or
+            verify them.
+          </p>
+        </div>
+      ),
+    });
+
+    out.push({
+      key: "closing",
+      node: (
+        <p className="doc-small" style={{ textAlign: "center", color: "var(--doc-faint)" }}>
+          Generated via DealInSec · Electronic acceptance with audit record · Indian Contract Act, 1872
+        </p>
+      ),
+    });
+
+    return out;
+  }, [contract, deal, refQuote, issuer, copy, dLabels, agreementNo, signatureSrc, sealSrc, signerLabel]);
+
+  /* ── Screen states ───────────────────────────────────────────────────── */
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="glass-header sticky top-0 z-40">
-          <div className="flex items-center gap-3 px-4 py-4">
-            <Skeleton className="h-9 w-9" />
-            <Skeleton className="h-6 w-32" />
-          </div>
-        </header>
-        <div className="px-4 py-6 space-y-4">
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-32 w-full" />
+        <div className="px-4 py-6 space-y-4 max-w-4xl mx-auto">
+          <Skeleton className="h-10 w-56" />
+          <Skeleton className="h-72 w-full rounded-xl" />
         </div>
       </div>
     );
   }
-
   if (!contract) {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="glass-header sticky top-0 z-40">
           <div className="flex items-center gap-3 px-4 py-4">
-            <Button variant="ghost" size="icon" onClick={() => setLocation(contractsPath)} data-testid="button-back">
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/contracts")} data-testid="button-back">
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Agreement Not Found</h1>
@@ -113,588 +428,51 @@ export default function ContractPdfPage() {
     );
   }
 
+  const warnings = [
+    ...validateDocData({
+      clientName: contract.brandName,
+      sellerName: signerLabel === "—" ? "" : signerLabel,
+      amount: contract.contractValue,
+      startDate: contract.startDate,
+      endDate: contract.endDate,
+    }),
+    ...detectPaymentConflicts((deal as any)?.customTerms),
+  ];
+
   return (
-    <>
-      <div className="min-h-screen bg-background pb-20 print:pb-0 print:min-h-0 print:bg-white">
-
-        {/* Screen-only header */}
-        <header className="glass-header sticky top-0 z-40 print:hidden">
-          <div className="flex items-center justify-between gap-3 px-4 py-4">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => setLocation(backPath)} data-testid="button-back">
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Agreement Document</h1>
-            </div>
-            <Button onClick={handlePrint} className="gradient-btn text-white" data-testid="button-export-pdf">
-              <Printer className="w-4 h-4 mr-2" />
-              Print / Save PDF
+    <div className="min-h-screen bg-background pb-20 print:pb-0">
+      <header className="glass-header sticky top-0 z-40 print:hidden">
+        <div className="flex items-center justify-between gap-3 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => setLocation(backPath)} data-testid="button-back">
+              <ArrowLeft className="w-5 h-5" />
             </Button>
+            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Agreement Document</h1>
           </div>
-        </header>
+          <Button onClick={() => window.print()} className="gradient-btn text-white" data-testid="button-export-pdf">
+            <Printer className="w-4 h-4 mr-2" />
+            Print / Save PDF
+          </Button>
+        </div>
+      </header>
 
-        <main className="px-4 py-6 max-w-4xl mx-auto animate-fade-in print:px-0 print:py-0 print:max-w-none">
+      <main className="px-4 py-6 max-w-4xl mx-auto animate-fade-in">
+        <DocWarnings warnings={warnings} />
 
-          {/* ── Header Banner ── */}
-          <div className="rounded-2xl overflow-hidden mb-3 print:mb-2 print:rounded-none gradient-primary">
-            <div className="px-8 py-4 print:py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div>
-                <p className="text-white/70 text-xs font-semibold uppercase tracking-widest mb-1">Dealinsec Platform</p>
-                <h1 className="text-white text-2xl md:text-3xl print:text-xl font-extrabold tracking-wide uppercase">
-                  {copy.title}
-                </h1>
-              </div>
-              <div className="text-right text-white/90 text-sm space-y-0.5">
-                <p className="font-semibold text-white">Ref: {contract.contractName}</p>
-                <p>Dated: {formatDate(contract.startDate)}</p>
-                {contract.exclusive && (
-                  <span className="inline-flex items-center gap-1 bg-white/20 text-white text-xs font-semibold px-2 py-0.5 rounded-full mt-1">
-                    <Lock className="w-3 h-3" /> Exclusive
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
+        <PagedDocument
+          blocks={blocks}
+          footer={docFooter(agreementNo, contract.contractName)}
+        />
 
-          {/* ── Parties Section ── */}
-          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 print:p-4 mb-3 print:mb-2 print:rounded-none">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 print:text-gray-500">
-              Parties to this Agreement
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Party A */}
-              <div className="space-y-2">
-                <div className="text-xs font-bold uppercase tracking-wide text-primary mb-3">
-                  Party A — {copy.providerRole}
-                </div>
-                <div className="text-sm space-y-1.5">
-                  <div>
-                    <span className="text-muted-foreground text-xs">Full Name</span>
-                    <p className="font-semibold">{signerLabel}</p>
-                  </div>
-                  {issuer.billingAddress && (
-                    <div>
-                      <span className="text-muted-foreground text-xs">Address</span>
-                      <p className="font-medium">{issuer.billingAddress}</p>
-                    </div>
-                  )}
-                  {issuer.panNumber && (
-                    <div>
-                      <span className="text-muted-foreground text-xs">PAN</span>
-                      <p className="font-medium font-mono">{issuer.panNumber}</p>
-                    </div>
-                  )}
-                  {issuer.gstNumber && (
-                    <div>
-                      <span className="text-muted-foreground text-xs">GSTIN</span>
-                      <p className="font-medium font-mono">{issuer.gstNumber}</p>
-                    </div>
-                  )}
-                  {issuer.email && (
-                    <div>
-                      <span className="text-muted-foreground text-xs">Email</span>
-                      <p className="font-medium">{issuer.email}</p>
-                    </div>
-                  )}
-                  {issuer.phone && (
-                    <div>
-                      <span className="text-muted-foreground text-xs">Phone</span>
-                      <p className="font-medium">{issuer.phone}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Party B */}
-              <div className="space-y-2 md:border-l md:border-white/10 md:pl-6 print:border-gray-200">
-                <div className="text-xs font-bold uppercase tracking-wide text-primary mb-3">
-                  Party B — {copy.clientRole}
-                </div>
-                <div className="text-sm space-y-1.5">
-                  <div>
-                    <span className="text-muted-foreground text-xs">{copy.clientFieldLabel}</span>
-                    <p className="font-semibold">{contract.brandName}</p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground text-xs">Deal Title</span>
-                    <p className="font-medium">{deal?.dealTitle || contract.contractName}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Agreement Details ── */}
-          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 print:p-4 mb-3 print:mb-2 print:rounded-none">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 print:text-gray-500">
-              Agreement Details
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div>
-                <span className="text-muted-foreground text-xs block mb-1">Effective Date</span>
-                <span className="font-semibold">{formatDate(contract.startDate)}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground text-xs block mb-1">End Date</span>
-                <span className="font-semibold">{formatDate(contract.endDate)}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground text-xs block mb-1">Deal Value</span>
-                <span className="font-bold text-primary text-base">
-                  ₹{contract.contractValue.toLocaleString("en-IN")}
-                </span>
-              </div>
-              <div>
-                <span className="text-muted-foreground text-xs block mb-1">Type</span>
-                {contract.exclusive ? (
-                  <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 no-default-hover-elevate no-default-active-elevate">
-                    <Lock className="w-3 h-3 mr-1" />
-                    Exclusive
-                  </Badge>
-                ) : (
-                  <Badge variant="secondary">Non-Exclusive</Badge>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* ── Deliverables Table ── */}
-          {deal?.deliverables && deal.deliverables.length > 0 && (
-            <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 print:p-4 mb-3 print:mb-2 print:rounded-none overflow-x-auto">
-              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4 print:text-gray-500">
-                {deal.deliverableMode === "any_one" ? "Deliverable Options (Brand Chooses One)" : "Deliverables"}
-              </h2>
-              {deal.deliverableMode === "any_one" && (
-                <p className="text-xs text-amber-700 dark:text-amber-400 mb-3 print:text-amber-700">
-                  Note: The brand shall select one of the following deliverable options.
-                </p>
-              )}
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="border-b border-white/10 print:border-gray-300">
-                    <th className="text-left pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">{dLabels.category}</th>
-                    <th className="text-left pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">{dLabels.type}</th>
-                    <th className="text-left pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">Qty</th>
-                    <th className="text-left pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">Frequency</th>
-                    <th className="text-left pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground print:text-gray-500">Notes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {deal.deliverables.map((d, i) => (
-                    <tr
-                      key={i}
-                      className="border-b border-white/5 print:border-gray-100 last:border-0"
-                    >
-                      <td className="py-2.5 pr-4 font-medium">{d.platform}</td>
-                      <td className="py-2.5 pr-4">{d.contentType}</td>
-                      <td className="py-2.5 pr-4 font-semibold">{d.quantity}</td>
-                      <td className="py-2.5 pr-4 capitalize">{d.frequency}</td>
-                      <td className="py-2.5 text-muted-foreground text-xs">{d.notes || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* ── Numbered Clauses ── */}
-          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 print:p-4 mb-3 print:mb-2 print:rounded-none space-y-6" style={{ breakInside: 'auto' }}>
-            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground print:text-gray-500">
-              Terms &amp; Conditions
-            </h2>
-
-            {/* Clause 1 */}
-            <div className="space-y-1.5" style={{ pageBreakInside: 'avoid' }}>
-              <h3 className="font-bold text-sm flex items-center gap-2">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">1</span>
-                Scope of Work
-              </h3>
-              <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
-                The {copy.providerNoun} agrees to provide {copy.serviceDescription} for the {copy.clientNoun}
-                {" "}as described in the Deliverables section above, in connection with the engagement titled
-                {" "}"{deal?.dealTitle || contract.contractName}". {copy.complianceNote}
-              </p>
-            </div>
-
-            {/* Clause 2 */}
-            <div className="space-y-1.5" style={{ pageBreakInside: 'avoid' }}>
-              <h3 className="font-bold text-sm flex items-center gap-2">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">2</span>
-                Deliverables &amp; Timeline
-              </h3>
-              <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
-                All deliverables shall be submitted for {copy.clientNoun} approval at least 48 hours before the
-                scheduled delivery or publication date. The {copy.clientNoun} shall provide approval or revision
-                requests within 24 hours of receipt. The {copy.providerNoun} shall incorporate up to two (2) rounds
-                of revisions at no additional charge.
-                This Agreement is effective from <strong>{formatDate(contract.startDate)}</strong> through{" "}
-                <strong>{formatDate(contract.endDate)}</strong>.
-              </p>
-            </div>
-
-            {/* Clause 3 */}
-            <div className="space-y-1.5" style={{ pageBreakInside: 'avoid' }}>
-              <h3 className="font-bold text-sm flex items-center gap-2">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">3</span>
-                Compensation (₹{contract.contractValue.toLocaleString("en-IN")})
-              </h3>
-              <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
-                In consideration for the services rendered, the {copy.clientNoun} shall pay the {copy.providerNoun} a total fee of{" "}
-                <strong>₹{contract.contractValue.toLocaleString("en-IN")}</strong> (Indian Rupees{" "}
-                {contract.contractValue.toLocaleString("en-IN")} only). Payment shall be structured as:
-                50% advance upon execution and 50% within 30 days of final deliverable approval.
-                Late payments attract interest at 1.5% per month.
-              </p>
-            </div>
-
-            {/* Clause 4 */}
-            <div className="space-y-1.5" style={{ pageBreakInside: 'avoid' }}>
-              <h3 className="font-bold text-sm flex items-center gap-2">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">4</span>
-                {copy.rightsHeading}
-              </h3>
-              <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
-                {copy.rightsText}
-              </p>
-            </div>
-
-            {/* Clause 5 */}
-            <div className="space-y-1.5" style={{ pageBreakInside: 'avoid' }}>
-              <h3 className="font-bold text-sm flex items-center gap-2">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">5</span>
-                Exclusivity Terms
-              </h3>
-              <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
-                {contract.exclusive ? copy.exclusiveText : copy.nonExclusiveText}
-              </p>
-            </div>
-
-            {/* Clause 6 */}
-            <div className="space-y-1.5" style={{ pageBreakInside: 'avoid' }}>
-              <h3 className="font-bold text-sm flex items-center gap-2">
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">6</span>
-                Governing Law (Indian Contract Act 1872)
-              </h3>
-              <p className="text-sm text-muted-foreground leading-relaxed pl-8 print:text-gray-700">
-                This Agreement shall be governed by and construed in accordance with the laws of India,
-                including the Indian Contract Act, 1872. Any disputes shall first be attempted to be resolved
-                through good-faith negotiation for 30 days, failing which disputes shall be submitted to
-                binding arbitration under the Arbitration and Conciliation Act, 1996. The courts of India
-                shall have exclusive jurisdiction for any legal proceedings.
-              </p>
-            </div>
-
-            {/* Clause 7 — Deal-specific terms carried over from the quotation */}
-            {(() => {
-              if (!deal) return null;
-              const selectedIds = ((deal as any).standardTermIds as string[] | null) ?? [];
-              const selectedTerms = STANDARD_TERMS.filter((t) => selectedIds.includes(t.id));
-              const customTerms = (deal as any).customTerms as string | null;
-              const customLines = (customTerms ?? "")
-                .split("\n")
-                .map((l: string) => l.trim())
-                .filter(Boolean);
-              if (selectedTerms.length === 0 && customLines.length === 0) return null;
-              return (
-                <div className="space-y-1.5" style={{ pageBreakInside: 'avoid' }}>
-                  <h3 className="font-bold text-sm flex items-center gap-2">
-                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex-shrink-0">7</span>
-                    Deal-Specific Terms
-                  </h3>
-                  <p className="text-xs text-muted-foreground pl-8 print:text-gray-600">
-                    The following terms were agreed to in the quotation and carry over to this Agreement:
-                  </p>
-                  <ul className="pl-8 space-y-1.5">
-                    {selectedTerms.map((t, i) => (
-                      <li key={t.id} className="flex items-start gap-2 text-sm text-muted-foreground print:text-gray-700">
-                        <span className="font-semibold text-primary mt-0.5 flex-shrink-0">7.{i + 1}</span>
-                        <span className="leading-relaxed">{t.label}</span>
-                      </li>
-                    ))}
-                    {customLines.map((line: string, i: number) => (
-                      <li key={`custom-${i}`} className="flex items-start gap-2 text-sm text-muted-foreground print:text-gray-700">
-                        <span className="font-semibold text-primary mt-0.5 flex-shrink-0">
-                          7.{selectedTerms.length + i + 1}
-                        </span>
-                        <span className="leading-relaxed">{line}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* ── Signature Blocks ── */}
-          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-6 print:p-4 mb-3 print:mb-2 print:rounded-none">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6 print:text-gray-500">
-              Signatures
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-
-              {/* Creator Signature */}
-              <div className="space-y-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-primary">
-                  Party A — {copy.providerRole}
-                </p>
-
-                {/* Signature image or placeholder */}
-                <div className="min-h-[60px] border-2 border-dashed border-white/20 print:border-gray-300 rounded-xl flex items-center justify-center bg-white/5 print:bg-gray-50 overflow-hidden">
-                  {signatureSrc ? (
-                    <img
-                      src={signatureSrc}
-                      alt={`${copy.providerNoun} Signature`}
-                      className="h-10 print:h-8 w-auto object-contain p-1"
-                    />
-                  ) : (
-                    <p className="text-xs text-muted-foreground/60 text-center px-4 print:text-gray-400">
-                      Signature on file
-                    </p>
-                  )}
-                </div>
-
-                {sealSrc && (
-                  <div className="flex justify-center pt-1">
-                    <img
-                      src={sealSrc}
-                      alt="Company stamp"
-                      className="h-16 print:h-14 w-auto object-contain opacity-90"
-                    />
-                  </div>
-                )}
-
-                <div className="space-y-3 text-sm">
-                  {!signatureSrc && (
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 print:text-gray-500">Printed Name</p>
-                      <div className="border-b-2 border-foreground/30 print:border-gray-400 pb-1 font-medium">
-                        {signerLabel}
-                      </div>
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 print:text-gray-500">Date</p>
-                    <div className="border-b-2 border-foreground/30 print:border-gray-400 pb-1">
-                      {contract.signedDate ? formatDate(contract.signedDate) : formatDate(contract.startDate)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Brand Signature */}
-              <div className="space-y-4 md:border-l md:border-white/10 md:pl-8 print:border-gray-200">
-                <p className="text-xs font-bold uppercase tracking-wide text-primary">
-                  Party B — {copy.clientRole}
-                </p>
-
-                {contract.signedByBrand ? (
-                  <>
-                    <div className="min-h-[100px] border-2 border-dashed border-white/20 print:border-gray-300 rounded-xl flex items-center justify-center bg-white/5 print:bg-gray-50">
-                      <div className="text-center">
-                        <Shield className="w-6 h-6 text-emerald-500 mx-auto mb-1" />
-                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">Accepted Electronically</p>
-                        <p className="text-[9px] text-muted-foreground print:text-gray-500 mt-0.5">Signed copy on record</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3 text-sm">
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 print:text-gray-500">Authorised Signatory</p>
-                        <div className="border-b-2 border-foreground/30 print:border-gray-400 pb-1 font-medium">
-                          {contract.brandName}
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 print:text-gray-500">Date</p>
-                        <div className="border-b-2 border-foreground/30 print:border-gray-400 pb-1">
-                          {contract.signedDate ? formatDate(contract.signedDate) : formatDate(contract.startDate)}
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="min-h-[100px] border-2 border-dashed border-white/20 print:border-gray-300 rounded-xl flex items-center justify-center bg-white/5 print:bg-gray-50">
-                      <p className="text-xs text-muted-foreground/60 text-center px-4 print:text-gray-400">
-                        Authorised Signatory
-                      </p>
-                    </div>
-                    <div className="space-y-3 text-sm">
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 print:text-gray-500">Full Name</p>
-                        <div className="border-b-2 border-foreground/30 print:border-gray-400 h-8" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 print:text-gray-500">Date</p>
-                        <div className="border-b-2 border-foreground/30 print:border-gray-400 h-8" />
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* ── Execution record ──
-              Honest description of the signing mechanism. Per
-              ESIGN_RECOMMENDATION.md this is electronic acceptance, NOT a
-              Digital Signature Certificate under Section 3 of the IT Act —
-              never describe it as "legally verified" or "CCA certified". */}
-          <div className="glass-card print:bg-white print:shadow-none print:border print:border-gray-200 rounded-xl p-5 print:p-4 mb-3 print:mb-2 print:rounded-none">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 print:text-gray-500">
-              Execution Record
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[11px] mb-3">
-              <div>
-                <p className="text-muted-foreground uppercase tracking-wide print:text-gray-500">Document Ref</p>
-                <p className="font-mono font-semibold">{recordNo("agreement", contract.id)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground uppercase tracking-wide print:text-gray-500">Prepared By</p>
-                <p className="font-semibold">{signerLabel}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground uppercase tracking-wide print:text-gray-500">Effective From</p>
-                <p className="font-semibold">{formatDate(contract.startDate)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground uppercase tracking-wide print:text-gray-500">Status</p>
-                <p className="font-semibold">{contract.status}{contract.signedDate ? ` · ${formatDate(contract.signedDate)}` : ""}</p>
-              </div>
-            </div>
-
-            {/* e-Stamp certificate the parties bought themselves. DealInSec
-                neither issues nor satisfies stamp duty — it cites the
-                certificate so the document is complete. */}
-            {(contract as any).estampCertificateNo && (
-              <div className="mb-3 rounded-lg border border-border print:border-gray-300 p-3">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground print:text-gray-500 mb-1.5">
-                  Stamp Duty
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
-                  <div>
-                    <p className="text-muted-foreground print:text-gray-500">Certificate No.</p>
-                    <p className="font-mono font-semibold">{(contract as any).estampCertificateNo}</p>
-                  </div>
-                  {(contract as any).estampDate && (
-                    <div>
-                      <p className="text-muted-foreground print:text-gray-500">Dated</p>
-                      <p className="font-semibold">{formatDate((contract as any).estampDate)}</p>
-                    </div>
-                  )}
-                  {(contract as any).estampAmount != null && (
-                    <div>
-                      <p className="text-muted-foreground print:text-gray-500">Duty Paid</p>
-                      <p className="font-semibold">₹{Number((contract as any).estampAmount).toLocaleString("en-IN")}</p>
-                    </div>
-                  )}
-                  {(contract as any).estampAuthority && (
-                    <div>
-                      <p className="text-muted-foreground print:text-gray-500">Issued By</p>
-                      <p className="font-semibold">{(contract as any).estampAuthority}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            <p className="text-[10px] leading-relaxed text-muted-foreground print:text-gray-500">
-              This agreement was prepared and accepted electronically. The signature shown for Party A is the
-              image on file for the named signatory, captured when this document was created. This is an
-              electronic acceptance with an audit record — it is not a Digital Signature Certificate issued
-              under the Information Technology Act, 2000, and no certifying-authority verification is claimed.
-              Parties may additionally execute a physically signed counterpart. Stamp duty and
-              registration, where applicable, are the responsibility of the parties — DealInSec does not
-              pay, issue or verify them.
-            </p>
-          </div>
-
-          {/* ── Footer (print only) ── */}
-          <div className="hidden print:block mt-10 pt-6 border-t border-gray-200 text-center text-xs text-gray-400 space-y-1">
-            <p className="font-semibold text-gray-600">End of Agreement</p>
-            <p>Reference: {contract.contractName} · {recordNo("agreement", contract.id)}</p>
-            <p>Agreement Period: {formatDate(contract.startDate)} — {formatDate(contract.endDate)}</p>
-            <p>Agreement Value: ₹{contract.contractValue.toLocaleString("en-IN")}</p>
-            <p className="mt-2">Generated via Dealinsec · Electronic acceptance with audit record · Indian Contract Act, 1872</p>
-          </div>
-
-          {/* ── Screen action buttons ── */}
-          <div className="flex gap-3 print:hidden mt-2">
-            <Button
-              variant="outline"
-              className="flex-1 h-12 rounded-xl"
-              onClick={() => setLocation(backPath)}
-              data-testid="button-back-bottom"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
-            <Button
-              className="flex-1 h-12 rounded-xl gradient-btn text-white"
-              onClick={handlePrint}
-              data-testid="button-print-bottom"
-            >
-              <Printer className="w-4 h-4 mr-2" />
-              Print / Save PDF
-            </Button>
-          </div>
-
-        </main>
-      </div>
-
-      <style>{`
-        @media print {
-          /* A PDF is A4 whatever screen made it. Tailwind's sm:/md: variants
-             are viewport media queries, so printing from a phone collapsed the
-             two-column layouts to one long column. Force the desktop grid in
-             print regardless of device. */
-          .md\\:grid-cols-2, .sm\\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-          .md\\:grid-cols-4, .sm\\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
-          .max-w-2xl, .lg\\:max-w-4xl { max-width: 100% !important; }
-
-          @page { margin: 1.2cm; size: A4; }
-
-          /* Reset body */
-          body { background: #ffffff !important; margin: 0; }
-
-          /* Hide UI chrome — header, nav, buttons */
-          header, nav, footer,
-          [data-testid="button-back"],
-          [data-testid="button-export-pdf"],
-          [data-testid="button-back-bottom"],
-          [data-testid="button-print-bottom"] { display: none !important; }
-
-          /* Remove mobile padding so content fills the page */
-          body > div, .min-h-screen { padding: 0 !important; margin: 0 !important; }
-
-          main {
-            padding: 0 !important;
-            margin: 0 !important;
-            max-width: 100% !important;
-          }
-
-          /* Force gradient banner to print in colour */
-          .gradient-primary {
-            background: linear-gradient(135deg, #047857, #059669) !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-
-          /* Clean card styles for print */
-          .glass-card {
-            background: #ffffff !important;
-            border: 1px solid #e5e7eb !important;
-            box-shadow: none !important;
-            padding: 1rem !important;
-            break-inside: auto;
-          }
-
-          /* Keep signature images compact */
-          img {
-            max-height: 64px !important;
-            object-fit: contain !important;
-            display: block !important;
-          }
-        }
-      `}</style>
-    </>
+        <div className="flex gap-3 print:hidden mt-4">
+          <Button variant="outline" className="flex-1 h-12 rounded-xl" onClick={() => setLocation(backPath)} data-testid="button-back-bottom">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back
+          </Button>
+          <Button className="flex-1 h-12 rounded-xl gradient-btn text-white" onClick={() => window.print()} data-testid="button-print-bottom">
+            <Printer className="w-4 h-4 mr-2" /> Print / Save PDF
+          </Button>
+        </div>
+      </main>
+    </div>
   );
 }

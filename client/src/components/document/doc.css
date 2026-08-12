@@ -1,0 +1,250 @@
+/**
+ * DealInSec document design system — print-first tokens and layout.
+ *
+ * These styles serve the three business documents (quotation, agreement,
+ * invoice). They are deliberately independent of the app theme: a document is
+ * white with dark ink whatever the screen theme, because the artifact is the
+ * printed page, not the UI.
+ *
+ * Pagination model: PagedDocument composes explicit .doc-page sheets sized
+ * exactly A4 (210×297mm). @page has zero margin — the sheet's own padding is
+ * the safe area — which also leaves the browser nowhere to print its default
+ * url/date header and footer. Chrome prints each sheet 1:1, so "Page X of Y"
+ * in our footer is exact, not an estimate.
+ */
+
+.doc-pages {
+  --doc-ink: #16232e;
+  --doc-muted: #5b6b78;
+  --doc-faint: #8b98a5;
+  --doc-brand: #047857;      /* emerald-700 — the DealInSec green, used sparingly */
+  --doc-brand-soft: #ecfdf5; /* emerald-50 */
+  --doc-border: #dde4ea;
+  --doc-border-soft: #eaeff3;
+  --doc-bg-subtle: #f6f8fa;
+  --doc-amber: #b45309;
+  --doc-amber-soft: #fffbeb;
+
+  font-family: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--doc-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Sheet ─────────────────────────────────────────────────────────────── */
+.doc-page {
+  width: 210mm;
+  height: 297mm;
+  box-sizing: border-box;
+  padding: 14mm 16mm 10mm;
+  background: #ffffff;
+  color: var(--doc-ink);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* a sub-pixel rounding error must never spill a sliver page */
+  position: relative;
+}
+.doc-page-body { flex: 1 1 auto; min-height: 0; }
+.doc-block { margin-bottom: 3.2mm; }
+.doc-block:last-child { margin-bottom: 0; }
+
+/* Screen preview: sheets as cards, auto-scaled to the viewport by PagedDocument. */
+@media screen {
+  .doc-pages { display: block; }
+  .doc-scale {
+    transform: scale(var(--doc-scale, 1));
+    transform-origin: top left;
+  }
+  .doc-page {
+    margin: 0 auto 16px;
+    border: 1px solid var(--doc-border);
+    border-radius: 2px;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.08), 0 8px 24px rgb(0 0 0 / 0.06);
+  }
+}
+
+@media print {
+  @page { size: A4; margin: 0; }
+  html, body { background: #ffffff !important; margin: 0 !important; padding: 0 !important; }
+  /* Only the document prints. visibility:hidden is NOT enough — hidden app
+     layout still generates page boxes (the blank-trailing-page bug). Instead:
+     everything outside the document loses its box entirely, and the ancestor
+     chain of the document becomes display:contents so the sheets sit directly
+     in the body flow with no inherited padding or min-heights. */
+  /* :where() zeroes specificity so SOURCE ORDER decides — the ancestor-chain
+     rule below must beat the kill rule, and with raw :not()/:has() specificity
+     it loses. Both are (0,0,1) inside :where; the later rule wins. */
+  body :where(*:not(.doc-print-root):not(.doc-print-root *)) { display: none !important; }
+  body :where(:has(.doc-print-root)) { display: contents !important; }
+  .doc-print-root { width: 210mm; }
+  .doc-scale { transform: none !important; }
+  .doc-scale-outer { height: auto !important; overflow: visible !important; }
+  .doc-page {
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    break-after: page;
+  }
+  .doc-page:last-child { break-after: auto; }
+  * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+}
+
+/* Measurement column — offscreen, identical width to the page body. */
+.doc-measurer {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.doc-meas-col { width: 178mm; }
+
+/* ── Typography scale ──────────────────────────────────────────────────── */
+.doc-title   { font-size: 21pt; font-weight: 800; letter-spacing: 0.04em; line-height: 1.1; }
+.doc-h2      { font-size: 8.5pt; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--doc-muted); }
+.doc-h3      { font-size: 10pt; font-weight: 700; }
+.doc-body    { font-size: 9.5pt; line-height: 1.55; }
+.doc-small   { font-size: 8.5pt; line-height: 1.5; }
+.doc-label   { font-size: 7pt; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--doc-faint); }
+.doc-value   { font-size: 9.5pt; font-weight: 600; }
+.doc-mono    { font-family: "SF Mono", ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
+.doc-muted-t { color: var(--doc-muted); }
+.doc-num     { font-variant-numeric: tabular-nums; }
+
+/* ── Header band ───────────────────────────────────────────────────────── */
+.doc-band {
+  background: linear-gradient(120deg, #047857, #0d9488);
+  color: #ffffff;
+  margin: -14mm -16mm 6mm;      /* full-bleed against the page padding */
+  padding: 7mm 16mm 6mm;
+}
+.doc-band .doc-label { color: rgb(255 255 255 / 0.75); }
+.doc-band-brand { font-size: 8pt; font-weight: 800; letter-spacing: 0.28em; text-transform: uppercase; color: rgb(255 255 255 / 0.92); }
+
+/* Formal variant (agreement) — white header, green rule, quieter. */
+.doc-band-formal {
+  margin: -14mm -16mm 6mm;
+  padding: 7mm 16mm 5mm;
+  border-bottom: 2.5px solid var(--doc-brand);
+  color: var(--doc-ink);
+}
+.doc-band-formal .doc-band-brand { color: var(--doc-brand); }
+
+/* ── Footer ────────────────────────────────────────────────────────────── */
+.doc-foot {
+  flex: none;
+  border-top: 1px solid var(--doc-border-soft);
+  padding-top: 2.5mm;
+  margin-top: 3mm;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 7pt;
+  color: var(--doc-faint);
+}
+
+/* ── Status badge ──────────────────────────────────────────────────────── */
+.doc-badge {
+  display: inline-block;
+  font-size: 7.5pt;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 1mm 2.6mm;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.doc-badge-green { background: var(--doc-brand-soft); color: var(--doc-brand); border-color: #a7f3d0; }
+.doc-badge-amber { background: var(--doc-amber-soft); color: var(--doc-amber); border-color: #fde68a; }
+.doc-badge-slate { background: var(--doc-bg-subtle); color: var(--doc-muted); border-color: var(--doc-border); }
+.doc-band .doc-badge { background: rgb(255 255 255 / 0.16); color: #fff; border-color: rgb(255 255 255 / 0.35); }
+
+/* ── Tables ────────────────────────────────────────────────────────────── */
+.doc-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
+.doc-table th {
+  text-align: left;
+  font-size: 7pt;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--doc-muted);
+  padding: 1.6mm 2.5mm;
+  background: var(--doc-bg-subtle);
+  border-bottom: 1px solid var(--doc-border);
+}
+.doc-table td {
+  padding: 1.7mm 2.5mm;
+  border-bottom: 1px solid var(--doc-border-soft);
+  vertical-align: top;
+}
+.doc-table .doc-td-r, .doc-table .doc-th-r { text-align: right; }
+.doc-table .doc-td-c, .doc-table .doc-th-c { text-align: center; }
+
+/* ── Cards / panels ────────────────────────────────────────────────────── */
+.doc-panel { border: 1px solid var(--doc-border); border-radius: 1.5mm; padding: 3.5mm 4mm; }
+.doc-panel-subtle { background: var(--doc-bg-subtle); border: 1px solid var(--doc-border-soft); border-radius: 1.5mm; padding: 3.5mm 4mm; }
+
+/* ── Amount / total block ──────────────────────────────────────────────── */
+.doc-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6mm;
+  border: 1.5px solid var(--doc-brand);
+  border-radius: 1.5mm;
+  padding: 2.5mm 4.5mm;
+  background: var(--doc-brand-soft);
+}
+.doc-total-amount { font-size: 16pt; font-weight: 800; color: var(--doc-brand); }
+
+/* Sub-totals rows (right-aligned ledger above the total) */
+.doc-ledger { margin-left: auto; width: 62mm; font-size: 9pt; }
+.doc-ledger-row { display: flex; justify-content: space-between; padding: 1.2mm 0; }
+.doc-ledger-row + .doc-ledger-row { border-top: 1px solid var(--doc-border-soft); }
+
+/* ── Signatures ────────────────────────────────────────────────────────── */
+.doc-sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; }
+.doc-sig-box {
+  height: 15mm;
+  border-bottom: 1.5px solid var(--doc-ink);
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 1.5mm;
+}
+.doc-sig-box img { max-height: 14mm; width: auto; object-fit: contain; }
+.doc-sig-awaiting {
+  color: var(--doc-faint);
+  font-size: 8pt;
+  font-style: italic;
+}
+.doc-seal { max-height: 16mm; width: auto; object-fit: contain; opacity: 0.9; margin-top: 1mm; }
+
+/* ── Clause list (agreement) ───────────────────────────────────────────── */
+.doc-clause-no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 5.5mm;
+  height: 5.5mm;
+  border-radius: 50%;
+  background: var(--doc-brand-soft);
+  color: var(--doc-brand);
+  font-size: 8pt;
+  font-weight: 700;
+  flex: none;
+}
+
+/* ── KV grid ───────────────────────────────────────────────────────────── */
+.doc-kv { display: grid; gap: 0.8mm; }
+.doc-hr { border: 0; border-top: 1px solid var(--doc-border-soft); margin: 0; }
+
+/* ── Table continuation ────────────────────────────────────────────────────
+   A chunked table renders as several blocks. Mid-table chunks are flush
+   (margin 0) so adjacent chunks read as ONE table, and a continuation chunk
+   hides its repeated header UNLESS it starts a page — where the repeat is
+   exactly what a professional document does. The measurer keeps the header
+   visible so a chunk is budgeted at its tallest possible rendering. */
+.doc-tbl-mid { margin-bottom: 0 !important; }
+.doc-tbl-cont thead { display: none; }
+.doc-page-body > .doc-block:first-child .doc-tbl-cont thead { display: table-header-group; }
+.doc-measurer .doc-tbl-cont thead { display: table-header-group !important; }
