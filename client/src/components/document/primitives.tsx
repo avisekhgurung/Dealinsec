@@ -241,14 +241,19 @@ export function TotalBlock({
 /* ── Signatures ────────────────────────────────────────────────────────── */
 
 export function SignatureCell({
-  heading, name, date, signatureUrl, sealUrl, awaitingText = "Awaiting signature",
+  heading, name, date, signatureUrl, sealUrl, note,
 }: {
   heading: string;
   name?: string | null;
   date?: string | null;
   signatureUrl?: string | null;
   sealUrl?: string | null;
-  awaitingText?: string;
+  /** Statement rendered IN the box when there is nothing left to pen-sign
+   *  (e.g. "Accepted electronically — signed copy on record"). Without a
+   *  note, an unsigned box prints EMPTY: the printed page is the artifact the
+   *  counterparty signs, so the pen space must hold no text. The awaiting
+   *  state shows on screen only. */
+  note?: string;
 }) {
   return (
     <div>
@@ -256,7 +261,9 @@ export function SignatureCell({
       <div className="doc-sig-box">
         {signatureUrl
           ? <img src={signatureUrl} alt={`${heading} signature`} />
-          : <span className="doc-sig-awaiting">{awaitingText}</span>}
+          : note
+          ? <span className="doc-sig-awaiting">{note}</span>
+          : <span className="doc-sig-awaiting print:hidden">Awaiting signature — sign above the line</span>}
       </div>
       {sealUrl && <img className="doc-seal" src={sealUrl} alt="Company stamp" />}
       <div style={{ marginTop: "1.5mm", display: "grid", gap: "0.5mm" }}>

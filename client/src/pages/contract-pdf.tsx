@@ -358,7 +358,7 @@ export default function ContractPdfPage() {
               name={c.brandName}
               date={c.signedByBrand && c.signedDate ? docDate(c.signedDate) : null}
               signatureUrl={null}
-              awaitingText={c.signedByBrand ? "Accepted electronically — signed copy on record" : "Awaiting signature"}
+              note={c.signedByBrand ? "Accepted electronically — signed copy on record" : undefined}
             />
           </div>
         </div>

@@ -328,7 +328,7 @@ export default function BrandInvoiceDetailsPage() {
             date={docDate(invoice.invoiceDate)}
             signatureUrl={signatureUrl || null}
             sealUrl={sealUrl || null}
-            awaitingText="Valid without signature"
+            note="Valid without signature"
           />
         </div>
       ),
