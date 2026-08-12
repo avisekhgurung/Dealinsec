@@ -11,7 +11,19 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath, { index: false }));
+  // Hashed assets cache forever; everything that DECIDES freshness (sw.js,
+  // the manifest, index.html) must never be cached, or devices keep serving
+  // yesterday's build no matter what we deploy.
+  app.use(express.static(distPath, {
+    index: false,
+    setHeaders(res, filePath) {
+      if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      } else if (/\.(js|json|webmanifest|html)$/.test(filePath)) {
+        res.setHeader("Cache-Control", "no-cache");
+      }
+    },
+  }));
 
   const indexPath = path.resolve(distPath, "index.html");
   // Built once at boot: the marketing routes get a crawlable copy of the page
@@ -23,6 +35,7 @@ export function serveStatic(app: Express) {
 
   app.use("*", (req, res) => {
     const url = req.originalUrl.split("?")[0];
+    res.setHeader("Cache-Control", "no-cache");
     res.type("html").send(CRAWLABLE.has(url) ? landingHtml : shell);
   });
 }

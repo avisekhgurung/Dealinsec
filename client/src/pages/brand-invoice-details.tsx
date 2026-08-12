@@ -204,6 +204,7 @@ export default function BrandInvoiceDetailsPage() {
       keepWithNext: true,
       node: (
         <DocHeader
+          brand={influencerName !== "—" ? influencerName : undefined}
           docType="Invoice"
           docNo={invoice.invoiceNumber}
           status={invoice.status}
@@ -339,7 +340,7 @@ export default function BrandInvoiceDetailsPage() {
       key: "legal",
       node: (
         <p className="doc-small" style={{ textAlign: "center", color: "var(--doc-faint)" }}>
-          Computer-generated invoice — valid without signature. Generated via DealInSec.
+          Computer-generated invoice — valid without signature.
         </p>
       ),
     },

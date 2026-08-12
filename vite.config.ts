@@ -10,6 +10,9 @@ export default defineConfig({
     runtimeErrorOverlay(),
     VitePWA({
       registerType: "autoUpdate",
+      // Registration happens in main.tsx (registerSW) so we can poll for new
+      // versions and reload open tabs — the injected script can't do that.
+      injectRegister: null,
       includeAssets: ["favicon.svg", "favicon.png", "apple-touch-icon.png"],
       manifest: {
         name: "DealInSec — Deal Management OS",
@@ -30,6 +33,11 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // A new deploy takes over immediately: the fresh SW skips waiting and
+        // claims every open tab, and main.tsx reloads them (safely) so no
+        // device keeps running yesterday's build.
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
         // Server-rendered routes that live OUTSIDE the React SPA must NOT be
         // shadowed by the navigation fallback (index.html) — otherwise the SW

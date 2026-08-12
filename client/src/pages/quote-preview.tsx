@@ -91,6 +91,7 @@ export default function QuotePreviewPage() {
       keepWithNext: true,
       node: (
         <DocHeader
+          brand={fullName !== "—" ? fullName : undefined}
           docType="Quotation"
           docNo={quoteNumber}
           status={quote?.status === "revised" ? "Revised" : undefined}

@@ -119,6 +119,7 @@ export default function ContractPdfPage() {
       node: (
         <DocHeader
           formal
+          brand={signerLabel !== "—" ? signerLabel : undefined}
           docType={copy.title}
           docNo={agreementNo}
           status={c.status === "Signed" ? "Signed" : "Pending"}
@@ -401,7 +402,7 @@ export default function ContractPdfPage() {
       key: "closing",
       node: (
         <p className="doc-small" style={{ textAlign: "center", color: "var(--doc-faint)" }}>
-          Generated via DealInSec · Electronic acceptance with audit record · Indian Contract Act, 1872
+          Electronic acceptance with audit record · Indian Contract Act, 1872
         </p>
       ),
     });

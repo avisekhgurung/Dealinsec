@@ -45,19 +45,22 @@ export interface HeaderMeta { label: string; value: ReactNode }
  * green rule); default is the brand band shared by quotation and invoice.
  */
 export function DocHeader({
-  docType, docNo, status, meta = [], formal = false,
+  docType, docNo, status, meta = [], formal = false, brand,
 }: {
   docType: string;
   docNo: string;
   status?: string;
   meta?: HeaderMeta[];
   formal?: boolean;
+  /** The document owner's business name — these are the USER'S papers, so the
+   *  masthead carries THEIR identity, never DealInSec's. */
+  brand?: string;
 }) {
   return (
     <div className={formal ? "doc-band-formal" : "doc-band"}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8mm" }}>
         <div>
-          <div className="doc-band-brand">DealInSec</div>
+          {brand && <div className="doc-band-brand">{brand}</div>}
           <div className="doc-title" style={{ marginTop: "1.5mm" }}>{docType}</div>
           <div className="doc-mono doc-num" style={{ fontSize: "9pt", marginTop: "1mm", opacity: formal ? 0.75 : 0.9 }}>
             {docNo}
@@ -86,8 +89,7 @@ export function docFooter(ref: string, extra?: string) {
   return (page: number, total: number) => (
     <>
       <span>
-        <span style={{ fontWeight: 700, color: "var(--doc-muted)" }}>DealInSec</span>
-        {" · "}{ref}
+        <span style={{ fontWeight: 700, color: "var(--doc-muted)" }}>{ref}</span>
         {tail ? <> {" · "}{tail}</> : null}
       </span>
       <span className="doc-num">{page} / {total}</span>
