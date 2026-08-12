@@ -10,14 +10,22 @@ import { COMMON_JS, ITEMS_JS, MEDIA_JS, EXPORT_JS } from "./client-lib";
 import { STANDARD_TERMS } from "@shared/schema";
 
 const PATH = "/tools/quotation-maker";
-const TITLE = "Free Quotation Maker (India) — Create & Download PDF | DealInSec";
+const TITLE = "Online Quotation Maker — Make a Quotation Free (India) | DealInSec";
 const DESC =
-  "Make a professional quotation or estimate online free. Line items, optional GST, standard terms, amount in words, instant PDF — no sign-up. For Indian freelancers & service businesses.";
+  "Make a quotation online free: line items, optional GST, standard terms, amount in words and an instant PDF — no sign-up. The online quotation maker for Indian freelancers & service businesses.";
 
 const FAQ: { q: string; a: string }[] = [
   {
     q: "Is this quotation maker free?",
     a: "Yes. Create and download unlimited quotations as PDFs for free, with no sign-up. Everything runs in your browser.",
+  },
+  {
+    q: "How do I make a quotation online?",
+    a: "Fill in your business and client details, add each piece of work as a line item with a rate, pick a GST rate if you are registered, tick the terms that apply, and download the finished quotation as a PDF. The preview updates live as you type, and the whole process takes about five minutes.",
+  },
+  {
+    q: "Can I make a sample or dummy quotation with this tool?",
+    a: "Yes — samples with fictional details are a normal way to learn the format, build a portfolio piece or demo software. But a fabricated quotation presented as a genuine offer (for reimbursements, insurance claims or three-quote procurement rules) can amount to cheating and forgery under Indian law. This tool is for real and sample quotations, not for deception.",
   },
   {
     q: "What should a quotation include?",
@@ -62,8 +70,8 @@ function jsonLd(): object[] {
 
 const BODY = `
 <div class="hero"><div class="wrap">
-  <h1>Free Quotation Maker</h1>
-  <p class="sub">Create a clean, professional quotation in under a minute — line items, optional GST, standard terms and an instant PDF. No sign-up, no cost.</p>
+  <h1>Free Online Quotation Maker</h1>
+  <p class="sub">Make a quotation online in under a minute — line items, optional GST, standard terms and an instant PDF. No sign-up, no cost.</p>
   <div class="chips">
     <span class="chip">100% free</span>
     <span class="chip">No sign-up</span>
@@ -117,9 +125,8 @@ const BODY = `
           <select class="f" id="gstRate">
             <option value="0" selected>No GST (0%)</option>
             <option value="5">5%</option>
-            <option value="12">12%</option>
             <option value="18">18%</option>
-            <option value="28">28%</option>
+            <option value="40">40%</option>
           </select>
         </div>
         <div>
@@ -162,7 +169,7 @@ const BODY = `
 </div></section>
 
 <section><div class="wrap">
-  <h2>How to make a quotation</h2>
+  <h2>How to make a quotation online</h2>
   <div class="steps">
     <div class="step"><div class="n">1</div><b>Add details</b><p class="muted">Your business, your client, the quotation number, date and validity.</p></div>
     <div class="step"><div class="n">2</div><b>Add items &amp; terms</b><p class="muted">List the work with rates, add GST if needed, and pick your terms.</p></div>
@@ -173,6 +180,11 @@ const BODY = `
 <section><div class="wrap faq">
   <h2>Frequently asked questions</h2>
   ${faqHtml()}
+</div></section>
+
+<section><div class="wrap">
+  <h2>Learn more</h2>
+  <p class="muted">New to quotations? Read the <a href="/blog/quotation-format">quotation format guide</a> (all 9 fields, with a sample), the step-by-step on <a href="/blog/how-to-make-a-quotation-online">making a quotation online</a>, and <a href="/blog/fake-quotation">when a sample quotation is fine — and when it's fraud</a>.</p>
 </div></section>
 `;
 

@@ -98,6 +98,9 @@ export function landingSeoBody(): string {
 <a href="/tools/proforma-invoice-generator">proforma invoice</a> and a
 <a href="/tools/gst-calculator">GST calculator</a> — free in your browser, no account needed.</p>
 
+<h2>Guides</h2>
+<p>From the <a href="/blog">DealInSec blog</a>: the <a href="/blog/quotation-format">quotation format guide with a free sample</a>, <a href="/blog/how-to-make-a-quotation-online">how to make a quotation online step by step</a>, and <a href="/blog/fake-quotation">when a sample quotation is fine and when it's fraud</a>.</p>
+
 <h2>Pricing</h2>
 <p>7-day Pro trial with no card. Free plan covers 4 deals a month. Pro is ₹999 per month or ₹9,999 per year with unlimited deals, agreements, invoices, payment tracking and 5 team seats. No platform fee on your deal value.</p>
 

@@ -45,15 +45,19 @@ export default defineConfig({
         navigateFallbackDenylist: [
           /^\/api\//,
           /^\/tools(\/|$)/,
+          /^\/blog(\/|$)/,
           /^\/sitemap\.xml$/,
           /^\/robots\.txt$/,
         ],
         runtimeCaching: [
           {
             // App shell — network first so users get fresh deploys. Exclude the
-            // server-rendered /tools/* pages so the SW never caches/handles them.
+            // server-rendered /tools/* and /blog/* pages so the SW never
+            // caches/handles them.
             urlPattern: ({ request, url }) =>
-              request.mode === "navigate" && !url.pathname.startsWith("/tools"),
+              request.mode === "navigate" &&
+              !url.pathname.startsWith("/tools") &&
+              !url.pathname.startsWith("/blog"),
             handler: "NetworkFirst",
             options: { cacheName: "pages", networkTimeoutSeconds: 3 },
           },

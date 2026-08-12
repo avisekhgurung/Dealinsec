@@ -13,6 +13,7 @@ import { setupGoogleAuth } from './googleAuth';
 import { getSession } from './auth';
 import { storage } from './storage';
 import { registerToolPages, toolSitemapPaths } from './tools';
+import { registerBlogPages, blogSitemapPaths } from './blog';
 
 const app = express();
 
@@ -132,7 +133,7 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
   // auth and intentionally excluded).
   app.get("/sitemap.xml", (_req, res) => {
     const base = `https://${CANONICAL_HOST}`;
-    const paths = ["/", "/pitch", "/terms", "/privacy", "/cookies", "/refund", ...toolSitemapPaths()];
+    const paths = ["/", "/pitch", "/terms", "/privacy", "/cookies", "/refund", ...toolSitemapPaths(), ...blogSitemapPaths()];
     const urls = paths
       .map((p) => `  <url>\n    <loc>${base}${p}</loc>\n    <changefreq>weekly</changefreq>\n  </url>`)
       .join("\n");
@@ -292,9 +293,10 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
   const httpServer = await registerRoutes(app);
 
   // Public server-rendered SEO/tool pages — MUST be registered before the SPA
-  // catch-all (serveStatic / setupVite) so /tools/* returns real crawlable HTML
-  // instead of the SPA shell.
+  // catch-all (serveStatic / setupVite) so /tools/* and /blog/* return real
+  // crawlable HTML instead of the SPA shell.
   registerToolPages(app);
+  registerBlogPages(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

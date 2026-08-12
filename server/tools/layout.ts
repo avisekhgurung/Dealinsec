@@ -487,7 +487,7 @@ const STYLES = `<style>
 // Same mark as the React app's <DealinsecLogo> (client/src/components/
 // dealinsec-logo.tsx) — inlined as SVG so the server-rendered pages match the
 // landing page exactly: emerald gradient tile, geometric "D", gold accent seal.
-const LOGO_SVG = `<svg width="36" height="36" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo" aria-hidden="true">
+export const LOGO_SVG = `<svg width="36" height="36" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo" aria-hidden="true">
   <defs>
     <linearGradient id="dls-bg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#10B981"/><stop offset="0.55" stop-color="#059669"/><stop offset="1" stop-color="#0D9488"/></linearGradient>
     <linearGradient id="dls-sheen" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="white" stop-opacity="0.28"/><stop offset="0.5" stop-color="white" stop-opacity="0"/></linearGradient>
@@ -543,6 +543,7 @@ function header(): string {
     <a class="brand" href="/" aria-label="DealInSec home">${LOGO_SVG}<span class="brand-text">Deal<span class="brand-accent">insec</span></span></a>
     <nav class="nav">
       <a href="/tools" class="active">Free Tools</a>
+      <a href="/blog">Blog</a>
       <a href="/tools#how">How it works</a>
       <a href="/tools#faq">FAQs</a>
       <a href="mailto:support@dealinsec.com">Contact</a>
@@ -600,6 +601,7 @@ function footer(): string {
     <div class="footer-top">
       <div class="links" style="margin-bottom:0">
         <a href="/tools">Free Tools</a>
+        <a href="/blog">Blog</a>
         <a href="/tools/gst-invoice-generator">GST Invoice Generator</a>
         <a href="/">Product</a>
         <a href="/terms">Terms</a>

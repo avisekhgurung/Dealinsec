@@ -65,6 +65,7 @@ import { DealinsecLogo } from "@/components/dealinsec-logo";
 
 const NAV_LINKS = [
   { label: "Free Tools", href: "/tools" },
+  { label: "Blog", href: "/blog" },
   { label: "Who it's for", href: "#who" },
   { label: "Features", href: "#features" },
   { label: "How it works", href: "#how" },
@@ -722,7 +723,7 @@ function NavItem({ href, label }: { href: string; label: string }) {
   // Hash anchors AND the server-rendered /tools/* pages must be real <a> links
   // (a wouter <Link> would client-route /tools into the SPA, which has no such
   // route, and fall through to the landing page).
-  const isPlainAnchor = href.startsWith("#") || href.startsWith("/tools") || href.startsWith("mailto:");
+  const isPlainAnchor = href.startsWith("#") || href.startsWith("/tools") || href.startsWith("/blog") || href.startsWith("mailto:");
   if (isPlainAnchor) {
     return (
       <a
@@ -2034,6 +2035,7 @@ function Footer() {
             title="Resources"
             links={[
               { label: "Free Tools", href: "/tools" },
+              { label: "Blog", href: "/blog" },
               { label: "Cookies", href: "/cookies" },
               { label: "Contact", href: "mailto:support@dealinsec.com" },
             ]}
