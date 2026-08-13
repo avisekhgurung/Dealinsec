@@ -2144,10 +2144,12 @@ function FooterColumn({ title, links }: { title: string; links: { label: string;
       <p className="text-xs uppercase tracking-widest font-semibold text-neutral-900 dark:text-white mb-4">{title}</p>
       <ul className="space-y-2.5">
         {links.map((l) => {
-          // /tools/* are server-rendered pages outside the SPA — they need a
-          // real navigation (plain <a>), not wouter client-side routing.
+          // /tools/* and /blog/* are server-rendered pages outside the SPA —
+          // they need a real navigation (plain <a>), not wouter client-side
+          // routing (which would swallow the click: no such SPA route).
           const isHashOrExternal =
-            l.href.startsWith("#") || l.href.startsWith("mailto:") || l.href.startsWith("/tools");
+            l.href.startsWith("#") || l.href.startsWith("mailto:") ||
+            l.href.startsWith("/tools") || l.href.startsWith("/blog");
           if (isHashOrExternal) {
             return (
               <li key={l.label}>
