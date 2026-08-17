@@ -18,7 +18,7 @@ import type { Express } from "express";
 import { isAuthenticated } from "../auth";
 import { aiProvider, copilotConfigured, type ChatMessage } from "./provider";
 import { retrieveKnowledge, AI_KNOWLEDGE_VERSION } from "./knowledge";
-import { TOOL_DEFS, runTool, executeCreateQuotation } from "./tools";
+import { TOOL_DEFS, runTool, executeCreateQuotation, executeCreateDeal } from "./tools";
 import { getDealJourney } from "./workflow";
 import { computeBriefing, computeDealIntel } from "./insights";
 import { storage } from "../storage";
@@ -49,8 +49,17 @@ HARD RULES:
 
 ACTIONS: you may end your reply with ONE line exactly like:
 ACTIONS: [{"label":"Open Deal","to":"/deals/12"},{"label":"Generate Quotation","tool":"create_quotation","args":{"dealId":12}}]
-- "to" = navigation button (use routes from knowledge/tools). "tool" = a proposed action the USER must confirm; the only tool allowed is create_quotation.
-- Offer 1-3 actions max, only when genuinely useful. The line must be valid JSON.`;
+- "to" = navigation button (use routes from knowledge/tools). "tool" = a proposed action the USER must confirm.
+- Allowed tools: create_quotation {dealId} · create_deal {brandName, dealTitle, dealAmount, startDate, endDate, deliverables, customTerms}.
+- Offer 1-3 actions max, only when genuinely useful. The line must be valid JSON.
+
+DEAL INTAKE (create_deal): when the user asks you to create a deal, or pastes a client conversation/brief/WhatsApp chat, extract:
+- brandName: the client's name; dealTitle: a short title for the work.
+- dealAmount: the total in rupees as a plain NUMBER (convert Indian units: "1.5 lakh" = 150000, "2 cr" = 20000000). NEVER guess an amount that isn't stated.
+- startDate/endDate as YYYY-MM-DD, resolved from today's date in CONTEXT (defaults: today and +30 days).
+- deliverables: array of {platform (category, e.g. "Interior Design"), contentType (the specific item), quantity, frequency, notes}.
+- customTerms: any payment terms mentioned (advance %, balance timing), one per line.
+Then reply with a short bullet summary of what you extracted (₹ Indian format) and propose ONE create_deal action labelled "Create this deal". If the client name or the amount is missing, ask for just that missing piece instead of proposing. The deal is only created after the user confirms — say so.`;
 
 
 /** Marketing Copilot — public, unauthenticated, KNOWLEDGE ONLY.
@@ -120,7 +129,7 @@ export function registerCopilotRoutes(app: Express) {
     try {
       if (!copilotConfigured()) return res.status(503).json({ error: "Copilot isn't available right now." });
       if (!takeQuota(req.user.id)) return res.status(429).json({ error: "Daily Copilot limit reached." });
-      const tone = ["Friendly", "Professional", "Firm", "Final reminder"].includes(req.body?.tone)
+      const tone = ["Friendly", "Professional", "Firm", "Final reminder", "Hinglish"].includes(req.body?.tone)
         ? req.body.tone : "Professional";
       const invoice = await storage.getBrandInvoice(Number(req.body?.invoiceId));
       const owns = invoice && (invoice.organizationId
@@ -139,7 +148,7 @@ export function registerCopilotRoutes(app: Express) {
         `Sender (sign off as this person — never greet them): ${req.user.firstName ?? "the business owner"}`,
       ].join("\n");
       const result = await aiProvider.chat([
-        { role: "system", content: `You draft short payment follow-up messages for an Indian service business to send a client over WhatsApp or email. Tone: ${tone}. Rules: use ONLY the facts given — never invent amounts, dates or history; greet the RECIPIENT by name and sign off as the sender; 40-90 words; sound human and direct, no corporate filler; include the invoice number and amount; end with a clear ask (expected payment date). Output the message text only.` },
+        { role: "system", content: `You draft short payment follow-up messages for an Indian service business to send a client over WhatsApp or email. Tone: ${tone === "Hinglish" ? "warm Indian business Hinglish — Hindi in Latin script naturally mixed with English (e.g. 'Sir, ek gentle reminder…'), respectful, never slangy" : tone}. Rules: use ONLY the facts given — never invent amounts, dates or history; greet the RECIPIENT by name and sign off as the sender; 40-90 words; sound human and direct, no corporate filler; include the invoice number and amount; end with a clear ask (expected payment date). Output the message text only.` },
         { role: "user", content: facts },
       ], []);
       res.json({ message: result.content ?? "", tone, invoiceNumber: invoice!.invoiceNumber });
@@ -206,7 +215,7 @@ export function registerCopilotRoutes(app: Express) {
 
       // Page context: advisory. If it names a deal, attach its REAL journey
       // (org-checked server-side) so "what do I do here?" uses live state.
-      let contextBlock = `Signed-in user: ${req.user.firstName ?? ""} (${req.user.orgRole}${(req.user as any).customPermissions ? ", custom role" : ""}).`;
+      let contextBlock = `Today's date: ${new Date().toISOString().slice(0, 10)}. Signed-in user: ${req.user.firstName ?? ""} (${req.user.orgRole}${(req.user as any).customPermissions ? ", custom role" : ""}).`;
       if (ctx.page && typeof ctx.page === "string") {
         contextBlock += ` Current page: ${String(ctx.page).slice(0, 60)} (${String(ctx.route ?? "").slice(0, 100)}).`;
       }
@@ -272,6 +281,14 @@ export function registerCopilotRoutes(app: Express) {
               actions.push({ type: "navigate", label: a.label.slice(0, 40), to: a.to.slice(0, 120) });
             } else if (a && typeof a.label === "string" && a.tool === "create_quotation" && Number.isFinite(Number(a.args?.dealId))) {
               actions.push({ type: "confirm", label: a.label.slice(0, 40), tool: "create_quotation", args: { dealId: Number(a.args.dealId) } });
+            } else if (
+              a && typeof a.label === "string" && a.tool === "create_deal" &&
+              a.args && typeof a.args === "object" &&
+              JSON.stringify(a.args).length <= 4000
+            ) {
+              // Structural gate only — executeCreateDeal clamps and
+              // re-validates every field against the session user.
+              actions.push({ type: "confirm", label: a.label.slice(0, 40), tool: "create_deal", args: a.args });
             }
           }
         } catch {
@@ -294,10 +311,14 @@ export function registerCopilotRoutes(app: Express) {
   app.post("/api/copilot/execute", isAuthenticated, async (req: any, res) => {
     try {
       const { tool, args } = req.body ?? {};
-      if (tool !== "create_quotation") {
+      let result: { ok: boolean; message: string; route?: string };
+      if (tool === "create_quotation") {
+        result = await executeCreateQuotation(Number(args?.dealId), req.user);
+      } else if (tool === "create_deal") {
+        result = await executeCreateDeal(args, req.user);
+      } else {
         return res.status(400).json({ error: "Unknown action" });
       }
-      const result = await executeCreateQuotation(Number(args?.dealId), req.user);
       console.log(`[copilot] execute org=${req.user.organizationId} user=${req.user.id} tool=${tool} ok=${result.ok}`);
       res.status(result.ok ? 200 : 403).json(result);
     } catch (err) {

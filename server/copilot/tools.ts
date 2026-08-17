@@ -15,7 +15,7 @@
  */
 import { storage } from "../storage";
 import { memberCan } from "@shared/permissions";
-import { hasProAccess, type User } from "@shared/schema";
+import { hasProAccess, hasActiveDealBoost, insertDealSchema, type User, type Deliverable } from "@shared/schema";
 import { getBillingUser, logOrgActivity } from "../entitlements";
 import { getDealJourney } from "./workflow";
 
@@ -251,7 +251,100 @@ export async function runTool(name: string, args: any, user: User): Promise<Tool
   }
 }
 
-// ── The one confirm-gated mutation ─────────────────────────────────────
+// ── Confirm-gated mutations ────────────────────────────────────────────
+// NEVER callable from the chat loop: the model PROPOSES these via the
+// ACTIONS line, the user clicks a confirm button, and /api/copilot/execute
+// re-validates everything against the session user. Each mirrors its REST
+// route — keep in sync with the handlers in server/routes.ts.
+
+/** Agentic intake: create a deal from model-extracted fields, after the
+ *  user's explicit confirmation. Mirrors POST /api/deals exactly: same
+ *  permission gate, same schema validation, same credit spend with the
+ *  same compensation path. The model's args are UNTRUSTED — everything is
+ *  clamped and re-validated here. */
+export async function executeCreateDeal(rawArgs: any, user: User) {
+  if (!memberCan(user, "deals.create")) {
+    return { ok: false as const, message: "Your role doesn't allow creating deals. Ask your organization owner." };
+  }
+
+  // Clamp untrusted model output into a well-formed candidate.
+  const str = (x: unknown, max: number) => (typeof x === "string" ? x.trim().slice(0, max) : "");
+  const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+  const today = new Date();
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+  const brandName = str(rawArgs?.brandName, 120);
+  if (!brandName) return { ok: false as const, message: "I need the client's name to create a deal." };
+  const amountNum = Math.round(Number(rawArgs?.dealAmount));
+  if (!Number.isFinite(amountNum) || amountNum <= 0 || amountNum > 1_000_000_000) {
+    return { ok: false as const, message: "I need a valid deal amount (in rupees) to create the deal." };
+  }
+  const dealTitle = str(rawArgs?.dealTitle, 200) || `Work for ${brandName}`;
+  const startDate = dateRe.test(str(rawArgs?.startDate, 10)) ? str(rawArgs.startDate, 10) : iso(today);
+  const endDate = dateRe.test(str(rawArgs?.endDate, 10))
+    ? str(rawArgs.endDate, 10)
+    : iso(new Date(today.getTime() + 30 * 86_400_000));
+
+  const rawDeliv = Array.isArray(rawArgs?.deliverables) ? rawArgs.deliverables.slice(0, 12) : [];
+  const deliverables: Deliverable[] = rawDeliv
+    .map((d: any): Deliverable => ({
+      id: crypto.randomUUID(),
+      platform: str(d?.platform, 40) || "Service",
+      contentType: str(d?.contentType, 80) || "Deliverable",
+      quantity: Math.min(999, Math.max(1, Math.round(Number(d?.quantity)) || 1)),
+      frequency: str(d?.frequency, 30) || "One-time",
+      notes: str(d?.notes, 200),
+    }))
+    .filter((d: Deliverable) => d.contentType !== "Deliverable" || d.platform !== "Service" || rawDeliv.length === 1);
+  if (!deliverables.length) {
+    deliverables.push({ id: crypto.randomUUID(), platform: "Service", contentType: dealTitle.slice(0, 80), quantity: 1, frequency: "One-time", notes: "" });
+  }
+
+  const customTerms = str(rawArgs?.customTerms, 1200) || undefined;
+
+  const parsed = insertDealSchema.safeParse({
+    userId: user.id,
+    organizationId: user.organizationId,
+    brandName,
+    dealTitle,
+    dealType: "Custom",
+    dealAmount: amountNum,
+    startDate,
+    endDate,
+    deliverables,
+    deliverableMode: "all",
+    customTerms,
+  });
+  if (!parsed.success) {
+    return { ok: false as const, message: "Those details don't form a valid deal — try creating it from the Deals page." };
+  }
+
+  // Same credit gate as POST /api/deals: spend AFTER validation; compensate
+  // if the insert fails so a crash never eats a credit.
+  const billing = await getBillingUser(user);
+  let creditSpent = false;
+  if (!hasProAccess(billing) && !hasActiveDealBoost(billing)) {
+    await storage.ensureMonthlyCredits(billing.id);
+    const spend = await storage.spendDealCredit(billing.id);
+    if (!spend.ok) {
+      return { ok: false as const, message: "Your organization has used all its Deal Credits for this month — upgrade to Pro for unlimited deals." };
+    }
+    creditSpent = true;
+  }
+  try {
+    const deal = await storage.createDeal(parsed.data);
+    logOrgActivity(user, "created", "deal", deal.id, `Deal: ${deal.dealTitle || deal.brandName} (via Copilot)`);
+    return {
+      ok: true as const,
+      message: `Deal created: "${deal.dealTitle}" for ${deal.brandName} — ${fmtINR(Number(deal.dealAmount))}. Next step: generate its quotation.`,
+      route: `/deals/${deal.id}`,
+    };
+  } catch (err) {
+    if (creditSpent) await storage.regrantDealCredit(billing.id).catch(() => {});
+    throw err;
+  }
+}
+
 // Mirrors POST /api/deals/:id/quote (server/routes.ts) — keep in sync with
 // that handler. Never callable from the chat loop; only /api/copilot/execute
 // after an explicit user confirmation click.

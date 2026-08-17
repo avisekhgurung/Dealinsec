@@ -15,7 +15,7 @@ import {
   Sparkles, X, SendHorizonal, Loader2, ArrowRight, Check, Bot,
   AlertTriangle, Clock, Receipt, Copy as CopyIcon, RefreshCw, ShieldCheck,
 } from "lucide-react";
-import { apiRequest, getQueryFn } from "@/lib/queryClient";
+import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 
@@ -49,7 +49,7 @@ interface Msg {
   chaser?: { invoiceId: number; tone: string };
 }
 
-const TONES = ["Friendly", "Professional", "Firm", "Final reminder"] as const;
+const TONES = ["Friendly", "Professional", "Firm", "Final reminder", "Hinglish"] as const;
 
 const LOADING_STAGES = [
   "Reviewing your active deals…",
@@ -164,6 +164,11 @@ export function Copilot() {
     try {
       const res = await apiRequest("POST", "/api/copilot/execute", { tool: action.tool, args: action.args });
       const data = await res.json();
+      // A confirmed mutation changed real data — refresh the app's views.
+      if (data.ok) {
+        queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      }
       setMessages((cur) => {
         const copy = [...cur];
         copy[msgIndex] = { ...copy[msgIndex], done: true };
@@ -185,7 +190,7 @@ export function Copilot() {
       ? ["What should I do next on this deal?", "Is this deal healthy?", "Summarise this deal"]
       : ctx.entityType === "invoice"
         ? ["Is this invoice overdue?", "Prepare a payment reminder"]
-        : ["Which clients owe me money?", "What can I invoice today?", "Show my pending work", "How does DealInSec work?"];
+        : ["Create a deal — I'll paste the client chat", "Which clients owe me money?", "What can I invoice today?", "Show my pending work"];
 
   const radar = briefing?.radar;
   const allClear = briefing && briefing.attentionCount === 0;
