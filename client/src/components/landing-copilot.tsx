@@ -9,7 +9,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Sparkles, X, SendHorizonal, Loader2, ArrowRight } from "lucide-react";
+import { Sparkles, X, SendHorizonal, Loader2, ArrowRight, MessageSquareText, ShieldAlert, IndianRupee } from "lucide-react";
 
 const OPENER =
   "Ask me anything about DealInSec — how the workflow runs, what it costs, whether it fits how you bill clients.";
@@ -137,6 +137,26 @@ function ChatBody({ chat, onCta, className }: {
  * assistant they can type into, which is the whole point of putting it on a
  * marketing page.
  */
+/** The three real AI capabilities, stated exactly as the product does them —
+ *  each ends with the trust rule because that IS the differentiator. */
+const AI_CAPABILITIES = [
+  {
+    icon: MessageSquareText,
+    title: "Paste the chat, get the deal",
+    body: "Paste a client's WhatsApp conversation into Copilot — it extracts the client, scope, amount and payment terms, and drafts the deal. You confirm, it exists. It never invents a number that wasn't said.",
+  },
+  {
+    icon: ShieldAlert,
+    title: "It reads your terms like a sceptic",
+    body: "Protection Check flags risky wording — “unlimited revisions”, “pay when our client pays” — and the protections you forgot: advance, revision limits, exclusions. One tap suggests the missing lines.",
+  },
+  {
+    icon: IndianRupee,
+    title: "It chases your money, politely",
+    body: "Copilot knows what's overdue and drafts the follow-up — English or Hinglish, your choice of tone, always the real invoice number and amount. You press send, never it.",
+  },
+];
+
 export function LandingCopilotSection({ onCta }: { onCta: () => void }) {
   const chat = useCopilotChat();
   return (
@@ -144,18 +164,38 @@ export function LandingCopilotSection({ onCta }: { onCta: () => void }) {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-10">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-600 dark:text-emerald-400 mb-3">
-            <span className="relative flex w-2 h-2">
-              <span className="absolute inline-flex w-full h-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-              <span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-500" />
-            </span>
-            Live · answers from the real product
+            <Sparkles className="w-3.5 h-3.5" />
+            DealInSec Copilot · AI that acts — with your approval
           </span>
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
-            Not sure it fits how you work? Ask it.
+            Paste the WhatsApp chat. Get the deal.
           </h2>
-          <p className="text-neutral-600 dark:text-neutral-400 mt-3 max-w-xl mx-auto">
-            No sign-up, no email. It answers from the same product knowledge the app uses — so what it
-            tells you here is what you get inside.
+          <p className="text-neutral-600 dark:text-neutral-400 mt-3 max-w-2xl mx-auto">
+            Copilot turns conversations into deals, checks your terms for the gaps that cost money, and
+            writes the payment reminders you keep postponing. The numbers are never AI — every ₹ is
+            computed from your records. AI writes the words; you approve every action.
+          </p>
+        </div>
+
+        <div className="grid sm:grid-cols-3 gap-4 mb-12">
+          {AI_CAPABILITIES.map((cap) => (
+            <div
+              key={cap.title}
+              className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 p-5 text-left shadow-sm"
+            >
+              <span className="inline-flex w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 items-center justify-center mb-3">
+                <cap.icon className="w-[18px] h-[18px] text-emerald-600 dark:text-emerald-400" />
+              </span>
+              <p className="text-sm font-bold mb-1.5">{cap.title}</p>
+              <p className="text-[13px] leading-relaxed text-neutral-600 dark:text-neutral-400">{cap.body}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="text-center mb-6">
+          <p className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">
+            Not sure it fits how you work? Ask it — no sign-up, no email. It answers from the same
+            product knowledge the app uses.
           </p>
         </div>
 

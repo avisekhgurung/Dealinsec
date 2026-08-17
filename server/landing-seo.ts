@@ -34,6 +34,10 @@ const FAQS: Faq[] = [
     a: "Create the deal with the client name, amount and deliverables, then generate the quotation from it. The figures carry across, so the quotation, the agreement and the invoice always agree with each other.",
   },
   {
+    q: "Can DealInSec create a deal from a WhatsApp chat?",
+    a: "Yes. Paste the client conversation into DealInSec Copilot and it extracts the client, scope, amount and payment terms, then drafts the deal for your confirmation — nothing is created until you approve it, and it never invents an amount that wasn't stated. Copilot also runs a Protection Check on every deal's terms (flagging things like unlimited revisions or a missing advance) and drafts payment reminders in English or Hinglish that you copy and send yourself.",
+  },
+  {
     q: "Does DealInSec create GST invoices?",
     a: "Our free browser tool at dealinsec.com/tools/gst-invoice-generator creates a GST invoice with CGST, SGST and IGST computed, with no sign-up. Invoices inside the app record the agreed contract value and print your PAN and GSTIN, but they do not carry a GST tax computation and are not tax invoices under Rule 46 of the CGST Rules.",
   },
@@ -88,6 +92,7 @@ export function landingSeoBody(): string {
 <li><strong>Agreements</strong> — e-signed, with an execution record naming who signed and when.</li>
 <li><strong>Invoices</strong> — itemised, numbered consecutively per financial year (INV-2627-0001).</li>
 <li><strong>Payment tracking</strong> — what is overdue, due this week, and signed but not yet invoiced.</li>
+<li><strong>Copilot AI</strong> — paste a WhatsApp chat to draft the deal, get a Protection Check on risky or missing terms, and payment reminders drafted in English or Hinglish. Numbers are computed from your records, never AI-generated, and every action needs your confirmation.</li>
 </ul>
 
 <h2>Why service businesses lose money</h2>
