@@ -585,6 +585,363 @@ ${ctaInline("Need the real thing?", "Make a genuine, professional quotation in f
 <p>The irony of the "fake quotation" search is that a real quotation is now easier to produce than a convincing fake. A <a href="/tools/quotation-maker">free online maker</a> gives you a numbered, itemised, GST-correct PDF in minutes — and if the work turns into a project, <a href="/">DealInSec</a> carries that quotation into a written agreement and an invoice that all agree with each other. That paper trail is what protects <i>you</i> when a client disputes scope or payment; it's the opposite of a fake, and it's the reason to get the document right from the first quote.</p>
 `,
   },
+
+  /* ── 4. Pillar: what is deal management software ─────────────────────── */
+  {
+    slug: "what-is-deal-management-software",
+    title: "What Is Deal Management Software? A Plain-English Guide",
+    metaTitle: "What Is Deal Management Software? (Plain-English Guide)",
+    description:
+      "Deal management software runs a client deal after the 'yes' — quotation, agreement, invoice and payment on one thread. What it is, how it differs from a CRM, and who actually needs it.",
+    date: "2026-08-17",
+    readMins: 7,
+    excerpt:
+      "It's not a CRM. Deal management software runs the deal after the client says yes — the documents and the money. Here's what it does and who needs it.",
+    hero: {
+      src: "/blog/deal-management-handshake.webp",
+      alt: "Two people shaking hands on a business deal",
+      w: 1600,
+      h: 1068,
+    },
+    faq: [
+      {
+        q: "What is deal management software?",
+        a: "Software that manages a client deal from agreed scope to collected payment: generating the quotation, converting acceptance into a signed agreement, raising invoices against that agreement, and tracking payment. Its defining feature is that all the documents in one deal stay consistent with each other.",
+      },
+      {
+        q: "How is deal management software different from a CRM?",
+        a: "A CRM manages relationships before the yes — leads, contacts, follow-ups, pipeline forecasting. Deal management software runs the deal after the yes — the documents (quotation, agreement, invoice) and the money. Many small service businesses need the second before they need the first: losing a lead hurts, but delivering work without a signed scope and then chasing payment hurts more.",
+      },
+      {
+        q: "Do freelancers need deal management software, or only companies?",
+        a: "The problem is per-deal, not per-headcount. A freelancer running four client projects has four quotations, four scopes and four payments to keep straight — the same failure modes as an agency, just smaller. Free plans (DealInSec's covers 4 deals a month) exist for exactly this stage.",
+      },
+      {
+        q: "Is Excel enough for managing deals?",
+        a: "Excel can list your deals; it can't keep a quotation, an agreement and an invoice consistent with each other, record acceptance, or chase payment dates on its own. Up to a couple of deals a month the manual overhead is tolerable — past that, the coordination errors start costing real money. See our honest comparison of quotation software vs Excel.",
+      },
+    ],
+    body: `
+<p class="lead">"Deal management software" sounds like enterprise jargon, so here's the plain version: it's the software that runs a client deal <i>after</i> the client says yes — the quotation, the agreement, the invoices and the payment — on one thread, so the documents never contradict each other and nothing falls through the gaps between them.</p>
+
+<div class="answer"><p><b>Quick answer:</b> deal management software takes one deal — client, scope, value — and generates the quotation from it, turns acceptance into a signed agreement, raises invoices bounded by that agreement, and tracks payment. It's not a CRM (that's <i>before</i> the yes); it's the paperwork-and-money layer that CRMs stop at.</p></div>
+
+<h2>The four stages every deal goes through</h2>
+<ol>
+  <li><b>Quotation.</b> The priced, itemised offer with terms — the document that sets every number that follows. (<a href="/blog/quotation-format">What goes into it.</a>)</li>
+  <li><b>Agreement.</b> The accepted offer, in writing, with acceptance recorded — who, when, and on what terms.</li>
+  <li><b>Invoicing.</b> Bills raised against the agreement — an advance and a balance, or milestones — that never exceed what was agreed.</li>
+  <li><b>Payment.</b> Knowing what's overdue, what's due this week, and what's been delivered but never invoiced at all.</li>
+</ol>
+<p>Every service business already does all four. The question is only whether the four stages agree with each other — and that's precisely what breaks when the quotation is in WhatsApp, the agreement is a Word file in email, and the invoice is made fresh in some generator that never saw either.</p>
+
+<h2>Deal management vs CRM — the line that matters</h2>
+<div class="tbl-scroll"><table class="cmp">
+  <tr><th></th><th>CRM (HubSpot, Zoho CRM, Pipedrive…)</th><th>Deal management (DealInSec)</th></tr>
+  <tr><td><b>Phase</b></td><td>Before the yes — leads, contacts, follow-ups</td><td>After the yes — documents and money</td></tr>
+  <tr><td><b>Core object</b></td><td>The relationship</td><td>The deal and its paper trail</td></tr>
+  <tr><td><b>Output</b></td><td>A forecast</td><td>A quotation, a signed agreement, invoices, a payment record</td></tr>
+  <tr><td><b>Fails when</b></td><td>Leads go cold unworked</td><td>Documents contradict each other; work starts unsigned; payment goes unchased</td></tr>
+</table></div>
+<p>Big companies run both. A small service business that must choose starts where its money actually leaks — and for most, that's not lost leads, it's <a href="/blog/how-to-manage-a-deal-from-quotation-to-invoice">deals that were won and then managed badly</a>.</p>
+
+<h2>What to look for in deal management software</h2>
+<ul>
+  <li><b>One record, many documents</b> — the quotation, agreement and invoice generated from the same deal, not retyped three times.</li>
+  <li><b>Documents that cross-reference</b> — the agreement cites the quotation it came from; the invoice cites the agreement it bills.</li>
+  <li><b>Acceptance you can point to</b> — <a href="/e-signature">electronic acceptance with an audit record</a>, not a thumbs-up emoji.</li>
+  <li><b>Invoice discipline</b> — consecutive numbering per financial year, and totals bounded by the agreement.</li>
+  <li><b>A collectible view</b> — overdue / due this week / signed-but-not-invoiced, without opening a spreadsheet.</li>
+  <li><b>India-ready documents</b> — ₹1,35,000-style formatting, GST awareness, PAN/GSTIN on your papers.</li>
+  <li><b>Team roles</b> — an accounts person limited to invoices; a colleague who quotes but doesn't see the whole pipeline.</li>
+</ul>
+
+${ctaInline("See it on one real deal", "Create a deal, generate the quotation, convert it to an agreement, raise the invoice — 7-day free trial, no card.", SIGNUP, "Try DealInSec free →")}
+
+<h2>Who actually needs it</h2>
+<p>Deal-led service businesses: interior designers, architects, real estate consultants, marketing and digital agencies, construction contractors, consultants and freelancers — anyone whose work follows the quote → agree → deliver → bill arc. If you sell products off a shelf, you need billing/inventory software instead; if your problem is finding clients rather than papering them, you need a CRM first. DealInSec's stack covers the deal side: <a href="/quotation-software">quotation software</a>, <a href="/contract-management">contract management</a>, <a href="/invoice-management">invoice management</a> and <a href="/e-signature">e-signature</a> on one thread.</p>
+`,
+  },
+
+  /* ── 5. Quotation software vs Excel ──────────────────────────────────── */
+  {
+    slug: "quotation-software-vs-excel",
+    title: "Quotation Software vs Excel: An Honest Comparison",
+    metaTitle: "Quotation Software vs Excel — An Honest Comparison",
+    description:
+      "Excel can make a quotation; the question is what it costs you after: math errors, lost versions, no follow-up, retyping into contracts and invoices. An honest look at when Excel is fine and when software wins.",
+    date: "2026-08-17",
+    readMins: 6,
+    excerpt:
+      "Excel can absolutely make a quotation. The honest question is what it costs after you hit send — math errors, lost versions, no follow-up, and retyping everything twice.",
+    hero: {
+      src: "/blog/quotation-software-vs-excel-laptop.webp",
+      alt: "Laptop showing an analytics dashboard instead of a spreadsheet",
+      w: 1600,
+      h: 1140,
+    },
+    faq: [
+      {
+        q: "Is Excel good enough for making quotations?",
+        a: "For one or two quotations a month, honestly, yes — a well-made template works. The costs appear at volume and after sending: manual totals and GST invite errors, versions multiply, nothing reminds you to follow up, and every accepted quote gets retyped into a contract and invoice. That follow-through is where Excel has no answer.",
+      },
+      {
+        q: "What are the risks of quoting from Excel?",
+        a: "The classic four: a subtotal that doesn't match the rows (broken formula, instant credibility loss), sending the wrong version after a negotiation, forgetting follow-up before validity expires, and figures drifting when the quote is retyped into the agreement and invoice. Each is rare per-quote but near-certain across a year of quoting.",
+      },
+      {
+        q: "Is there a free alternative before buying software?",
+        a: "Yes — DealInSec's free quotation maker runs in the browser with no sign-up: itemised rows, GST split, amount-in-words and a clean PDF. It replaces the Excel template with zero commitment; the paid app is for when you also want the agreement, invoice and payment tracking on the same thread.",
+      },
+      {
+        q: "Can I import my existing Excel deal list?",
+        a: "DealInSec supports CSV import for deals, so an existing Excel pipeline can be brought across rather than retyped.",
+      },
+    ],
+    body: `
+<p class="lead">Every service business starts by quoting from Excel or Word — and for a while it's genuinely fine. This is an honest comparison, not a scare piece: where Excel holds up, where it quietly costs you money, and what changing actually gets you.</p>
+
+<div class="answer"><p><b>Quick answer:</b> Excel is fine at low volume if you're disciplined. It breaks on the follow-through: totals and GST are computed by hand, versions multiply during negotiation, nothing tracks follow-up or acceptance, and the accepted quote must be retyped into the agreement and invoice — which is where the numbers start disagreeing. Quotation software exists for everything after "send".</p></div>
+
+<h2>Where Excel genuinely holds up</h2>
+<ul>
+  <li><b>Very low volume</b> — a quote or two a month, one person, no handoffs.</li>
+  <li><b>Total layout control</b> — if your quotation is a bespoke design artifact, a document tool gives you pixel control software templates won't.</li>
+  <li><b>Zero cost, zero learning</b> — you already know it.</li>
+</ul>
+
+<h2>The four ways Excel quoting costs real money</h2>
+<ol>
+  <li><b>The broken-formula quote.</b> A row gets inserted, the SUM range doesn't stretch, and the client receives a quotation whose total doesn't match its rows. Nothing kills trust faster than wrong arithmetic on a price document — and GST split by hand doubles the chances.</li>
+  <li><b>The version shuffle.</b> Negotiation produces Quote_final, Quote_final2, Quote_FINAL_revised. Months later, the client claims the number from one file and you remember another. There is no authoritative record of which version was accepted.</li>
+  <li><b>The silent expiry.</b> Excel doesn't know your quotation had a validity date, so nobody follows up before it lapses — or worse, a client "accepts" a stale price and you honour it out of awkwardness.</li>
+  <li><b>The retype tax.</b> Every accepted quote is retyped into a contract, then into an invoice. Each retype is a chance for drift — and a quotation that says ₹1,35,000 while the agreement says ₹1,30,000 is a dispute waiting for a trigger. This is the deepest problem: it isn't fixable with a better template, only with <a href="/blog/what-is-deal-management-software">documents generated from one record</a>.</li>
+</ol>
+
+<h2>Side by side</h2>
+<div class="tbl-scroll"><table class="cmp">
+  <tr><th></th><th>Excel / Word template</th><th>Quotation software</th></tr>
+  <tr><td><b>Totals &amp; GST</b></td><td>Manual formulas — yours to break</td><td>Computed, Indian formatting</td></tr>
+  <tr><td><b>Numbering</b></td><td>Typed by hand, restarts when you forget</td><td>Automatic series</td></tr>
+  <tr><td><b>Versions</b></td><td>Files multiplying in a folder</td><td>Revisions with history; the accepted one is authoritative</td></tr>
+  <tr><td><b>Follow-up</b></td><td>Memory</td><td>Outstanding &amp; expiring quotes on a dashboard</td></tr>
+  <tr><td><b>After acceptance</b></td><td>Retype into contract, retype into invoice</td><td>Agreement and invoice generated from the quote</td></tr>
+  <tr><td><b>Cost</b></td><td>₹0</td><td>₹0 to start (free tool / free plan); ₹999/mo for Pro</td></tr>
+</table></div>
+
+${ctaInline("Replace the template first — it's free", "The free quotation maker does rows, GST and amount-in-words with no sign-up. Upgrade to the full thread only if you need it.", "/tools/quotation-maker", "Open the free maker →")}
+
+<h2>The honest migration path</h2>
+<p>Don't buy software on day one. Step 1: swap the Excel template for the <a href="/tools/quotation-maker">free quotation maker</a> — same five minutes, no math errors, no account. Step 2: when a quote turns into a real project, take the <a href="/">DealInSec trial</a> and run that one deal through quotation → agreement → invoice. If the thread saves you one retype and one awkward "which version?" conversation, you'll know whether it's worth ₹999 a month. If it doesn't — keep the free tool and lose nothing.</p>
+`,
+  },
+
+  /* ── 6. Best quotation software India (buyer's guide) ────────────────── */
+  {
+    slug: "best-quotation-software-india",
+    title: "Best Quotation Software for Small Businesses in India: A Buyer's Guide",
+    metaTitle: "Best Quotation Software for Small Businesses in India (2026)",
+    description:
+      "How to choose quotation software in India: the 7-point checklist (GST, numbering, PDF quality, what happens after acceptance), the honest landscape — Zoho, Refrens, Vyapar, DealInSec — and how to test for free.",
+    date: "2026-08-17",
+    readMins: 8,
+    excerpt:
+      "Not a fake top-10 list — a 7-point checklist for choosing quotation software in India, an honest look at the landscape, and a way to test your shortlist for free.",
+    hero: {
+      src: "/blog/best-quotation-software-team.webp",
+      alt: "Two colleagues celebrating over paperwork and a laptop",
+      w: 1600,
+      h: 1067,
+    },
+    faq: [
+      {
+        q: "Which is the best quotation software for a small business in India?",
+        a: "The one that fits how you work — there's no universal winner. Product-and-inventory businesses lean toward billing suites like Vyapar; freelancers wanting free invoicing often use Refrens; Zoho Invoice suits businesses already inside Zoho's ecosystem; and service businesses that need the quotation to become an agreement and then invoices on one thread are what DealInSec is built for. Test against the checklist in this guide.",
+      },
+      {
+        q: "Is there completely free quotation software?",
+        a: "Yes. DealInSec's free quotation maker needs no account at all, and the app's free plan covers 4 deals a month after a 7-day Pro trial with no card. Several competitors also offer free tiers — check what each caps (documents, users, or features).",
+      },
+      {
+        q: "Should quotation software handle GST?",
+        a: "It should let you show GST on the quotation so the client sees the final payable amount — but remember a quotation is not a tax document; the tax event is the invoice. For GST tax invoices with CGST/SGST/IGST computed, DealInSec's free GST invoice generator handles it without a sign-up.",
+      },
+      {
+        q: "What matters more — the quotation itself or what happens after?",
+        a: "After. Most tools produce a similar-looking PDF. The differences that cost or save money are downstream: whether acceptance is recorded, whether the agreement and invoice inherit the quote's figures automatically, and whether anything reminds you to follow up and collect. Choose on the follow-through, not the template gallery.",
+      },
+    ],
+    body: `
+<p class="lead">Most "best quotation software" articles are a top-10 list of screenshots. This is a buyer's guide instead: the seven things that actually separate quotation tools for an Indian small business, an honest sketch of the landscape — including where our own product is <i>not</i> the right pick — and a way to test your shortlist in an afternoon for free.</p>
+
+<div class="answer"><p><b>Quick answer:</b> judge quotation software on the follow-through, not the PDF. Any tool makes a decent-looking quote; the money is in what happens after — recorded acceptance, an agreement and invoice that inherit the figures, and follow-up you don't have to remember. For deal-led service businesses in India, that thread is exactly what <a href="/quotation-software">DealInSec</a> is; for inventory billing or pure accounting, other tools fit better.</p></div>
+
+<h2>The 7-point checklist</h2>
+<ol>
+  <li><b>Indian documents by default.</b> ₹1,35,000-style formatting, amount in words, GST shown correctly (CGST/SGST vs IGST), PAN and GSTIN on the letterhead. If the tool was built for US invoicing, you'll fight it forever.</li>
+  <li><b>Real numbering.</b> Automatic series that don't restart or duplicate — the thing clients, accountants and courts use to refer to your documents.</li>
+  <li><b>A PDF you'd be proud to send.</b> Itemised table, terms, totals, clean typography — on your identity, not the vendor's branding.</li>
+  <li><b>What happens after acceptance.</b> The big one. Does the accepted quote become an agreement? Does the agreement produce the invoices? Or do you retype everything into a different tool and hope the numbers stay aligned?</li>
+  <li><b>Follow-up built in.</b> Outstanding quotes, expiring validity, unpaid invoices — visible without opening each document.</li>
+  <li><b>Rupee-priced, small-business-sized.</b> Per-user dollar pricing gets absurd for a 3-person Indian firm. Look for flat plans in ₹.</li>
+  <li><b>A free way to test.</b> A free tier or a no-card trial — you should never pay to find out a tool doesn't fit.</li>
+</ol>
+
+<h2>The landscape, honestly</h2>
+<p>Four names come up constantly for Indian small businesses, and they're genuinely different tools:</p>
+<div class="tbl-scroll"><table class="cmp">
+  <tr><th>Tool</th><th>What it is</th><th>Natural fit</th></tr>
+  <tr><td><b>Vyapar</b></td><td>GST billing &amp; accounting app with estimates/quotations alongside inventory and ledgers</td><td>Product businesses and shops that live in billing + stock</td></tr>
+  <tr><td><b>Zoho Invoice</b></td><td>Invoicing product with estimates, part of the wider Zoho suite</td><td>Businesses already inside the Zoho ecosystem</td></tr>
+  <tr><td><b>Refrens</b></td><td>Invoicing and quotation platform with a strong free tier, popular with freelancers</td><td>Freelancers who mainly need documents sent fast</td></tr>
+  <tr><td><b>DealInSec</b></td><td>Deal management for service businesses — quotation → e-signed agreement → invoice → payment tracking on one thread</td><td>Deal-led service businesses: designers, architects, agencies, consultants, contractors</td></tr>
+</table></div>
+<p class="muted" style="font-size:14px">Descriptions kept to what each product plainly is — evaluate current features and pricing on their own sites; they all evolve.</p>
+
+<h2>Where DealInSec is the right pick — and where it isn't</h2>
+<ul>
+  <li><b>Right pick:</b> your work follows quote → agree → deliver → bill, and your pain is documents drifting apart, unsigned work starting anyway, and payments going unchased. That thread is the product. (<a href="/blog/what-is-deal-management-software">More on deal management.</a>)</li>
+  <li><b>Wrong pick:</b> you sell inventory (you need stock-aware billing — the Vyapar shape), you need full double-entry accounting (that's an accounting package), or you only ever need one quote a year (use our <a href="/tools/quotation-maker">free maker</a> and pay nobody).</li>
+</ul>
+
+${ctaInline("Test the whole thread in an afternoon", "Free 7-day trial, no card: run one real deal from quotation to invoice and judge it on your own client.", SIGNUP, "Start the trial →")}
+
+<h2>How to run the test</h2>
+<ol>
+  <li>Pick one real, current deal — not a dummy.</li>
+  <li>Make its quotation in each shortlisted tool. Time it, and look at the PDF a client would receive.</li>
+  <li>Simulate acceptance: how does the quote become an agreement? Where does acceptance get recorded?</li>
+  <li>Raise the advance invoice. Did the figures carry, or did you retype?</li>
+  <li>Check the dashboard: does the tool know this deal's next action, or do you?</li>
+</ol>
+<p>Whichever tool needs the least retyping and remembers the most on your behalf — that's your answer, whoever makes it.</p>
+`,
+  },
+
+  /* ── 7. Quotation vs proposal ────────────────────────────────────────── */
+  {
+    slug: "quotation-vs-proposal",
+    title: "Quotation vs Proposal: What's the Difference, and When to Send Which",
+    metaTitle: "Quotation vs Proposal — The Difference, With Examples",
+    description:
+      "Quotation vs proposal explained for Indian service businesses: what each contains, when clients expect which, how estimates fit in, and how one well-built document can serve as both.",
+    date: "2026-08-17",
+    readMins: 5,
+    excerpt:
+      "A quotation states the price; a proposal argues the approach. In scoped service work they converge into one document — here's when to send which, and why the difference stops mattering after acceptance.",
+    hero: {
+      src: "/blog/quotation-vs-proposal-discussion.webp",
+      alt: "Two people discussing work across laptops at a table",
+      w: 1600,
+      h: 1067,
+    },
+    faq: [
+      {
+        q: "What is the difference between a quotation and a proposal?",
+        a: "A quotation is a priced offer: itemised work, rates, taxes, terms and validity. A proposal wraps a recommended approach around the price — context, methodology, timeline — and argues why you're the right choice. For scoped service work the two converge: a quotation with well-written deliverables and notes reads as a proposal.",
+      },
+      {
+        q: "Which should I send — a quotation or a proposal?",
+        a: "Match the client's language and the deal's uncertainty. If they asked 'send me a quote', they want the number and terms — don't bury them in a deck. If the scope itself is undecided or you're competing on approach, send a proposal whose final section IS the quotation, so acceptance is unambiguous.",
+      },
+      {
+        q: "Where does an estimate fit in?",
+        a: "An estimate is a non-final ballpark given before the scope is firm — useful for budgeting, not for acceptance. The clean sequence is estimate (rough) → quotation/proposal (firm offer with validity) → agreement (accepted terms). Label estimates clearly so nobody treats a ballpark as a commitment.",
+      },
+      {
+        q: "Is a proposal legally binding once the client accepts?",
+        a: "Acceptance of a clear offer is generally how a contract forms, whichever word is on the document — which is why the priced section needs precise scope, terms and validity. For meaningful projects, move acceptance into a written, signed agreement rather than relying on an email 'looks good'. This is general information, not legal advice.",
+      },
+    ],
+    body: `
+<p class="lead">Clients use the words interchangeably; tools and templates treat them as different species. The truth for a service business is simpler: a <b>quotation states the price</b>, a <b>proposal argues the approach</b> — and for scoped service work, the winning document is usually both at once.</p>
+
+<div class="answer"><p><b>Quick answer:</b> quotation = itemised price + terms + validity (the offer). Proposal = the same offer wrapped in context — the problem, your approach, timeline, why you. If the client said "send a quote", lead with the number. If you're competing on approach, send the proposal — but end it with a real quotation section so there's something precise to accept.</p></div>
+
+<h2>Side by side</h2>
+<div class="tbl-scroll"><table class="cmp">
+  <tr><th></th><th>Quotation</th><th>Proposal</th></tr>
+  <tr><td><b>Core job</b></td><td>State the price precisely</td><td>Sell the approach, then state the price</td></tr>
+  <tr><td><b>Length</b></td><td>1–2 pages</td><td>2–10 pages</td></tr>
+  <tr><td><b>Contains</b></td><td>Line items, rates, GST, total, terms, validity</td><td>Context, methodology, timeline, team — plus everything a quotation contains</td></tr>
+  <tr><td><b>Client asked…</b></td><td>"What will it cost?"</td><td>"How would you do this — and what will it cost?"</td></tr>
+  <tr><td><b>Common in</b></td><td>Trades, design, construction, most Indian SME work</td><td>Agencies, consulting, competitive pitches</td></tr>
+</table></div>
+<p>India note: "quotation" is by far the dominant word in Indian SME work — builders, designers and consultants are asked for quotations daily, proposals mostly in agency and consulting pitches. When in doubt, say quotation and nobody blinks.</p>
+
+<h2>One document, both jobs</h2>
+<p>The practical move is to stop choosing. Build your <a href="/blog/quotation-format">quotation properly</a> — itemised deliverables, notes that explain approach where it matters, terms and validity — and it functions as a compact proposal. In <a href="/proposal-management">DealInSec</a>, deliverable rows carry notes precisely so the "why this scope" narrative lives inside the priced document rather than in a separate deck the client skims once and loses.</p>
+
+<h2>The difference stops mattering after acceptance</h2>
+<p>Whichever word was on the document, acceptance is the moment it must become precise: agreed scope, agreed amount, agreed terms, in writing. That's the real chain — offer (quotation or proposal) → <a href="/contract-management">agreement</a> → <a href="/invoice-management">invoices</a> — and it's why the document you send should be built for conversion, not just persuasion. A beautiful proposal that ends in vague pricing produces a vague agreement and a disputed invoice.</p>
+
+${ctaInline("Send one document that does both", "Itemised scope with notes, terms, validity — then acceptance becomes an agreement and invoices on the same thread.", "/tools/quotation-maker", "Build it free →")}
+`,
+  },
+
+  /* ── 8. How to manage a deal from quotation to invoice ───────────────── */
+  {
+    slug: "how-to-manage-a-deal-from-quotation-to-invoice",
+    title: "How to Manage a Deal From Quotation to Invoice (Without Dropping It)",
+    metaTitle: "Manage a Deal From Quotation to Invoice — Step by Step",
+    description:
+      "The full lifecycle of a service deal in India — quotation, follow-up, agreement, invoicing, payment — the three points where deals get dropped, and how to run the thread manually or with software.",
+    date: "2026-08-17",
+    readMins: 7,
+    excerpt:
+      "Deals aren't lost at the quote — they're dropped in the gaps between documents. The six steps from quotation to collected payment, and the three drop points to guard.",
+    hero: {
+      src: "/blog/deal-thread-meeting.webp",
+      alt: "A team discussing a project around a laptop in a meeting",
+      w: 1600,
+      h: 1067,
+    },
+    faq: [
+      {
+        q: "What are the stages of a client deal?",
+        a: "Six, in practice: record the deal (client, scope, value); send the quotation with validity; follow up before it expires; convert acceptance into a written agreement; invoice against the agreement (advance and balance, or milestones); and track payment until closed. Most losses happen between stages, not within them.",
+      },
+      {
+        q: "When should I send the invoice?",
+        a: "The advance invoice immediately on signing — before work starts, per your agreed split (50% advance is the common Indian default). The balance invoice on delivery, with its due date printed. Invoicing late signals that paying late is fine.",
+      },
+      {
+        q: "How do I stop work starting before the agreement is signed?",
+        a: "Make the advance the trigger: the agreement states work begins on advance receipt, and the advance invoice goes out with the signed agreement. It converts an awkward conversation into a standard process the client expects.",
+      },
+      {
+        q: "Can I manage all this without software?",
+        a: "Yes, with discipline: one folder per deal, a numbering convention, calendar reminders for validity and due dates, and a weekly review of every open deal. That system genuinely works — its weakness is that it depends on you never skipping the ritual. Software's job is making the thread automatic instead of virtuous.",
+      },
+    ],
+    body: `
+<p class="lead">Service deals are rarely lost at the quotation — they're dropped in the gaps between documents: the quote nobody followed up, the project that started on a WhatsApp "ok", the delivery that took three weeks to get invoiced. Here's the whole thread, step by step, with the drop points marked.</p>
+
+<div class="answer"><p><b>Quick answer:</b> record the deal → quotation with validity → follow up before expiry → convert acceptance into a signed agreement → invoice the advance on signing and the balance on delivery → track payment to closed. Guard the three gaps: after sending the quote, between "yes" and signature, and after delivery.</p></div>
+
+<h2>The six steps</h2>
+<ol>
+  <li><b>Record the deal first.</b> Client, scope as deliverable line items, value, dates — one record that every document will be generated from. This is the step that makes consistency possible; skip it and you'll be retyping forever.</li>
+  <li><b>Send the quotation — with a validity date.</b> Itemised, numbered, terms included (<a href="/blog/quotation-format">the full format</a>). Validity is your follow-up deadline, not decoration.</li>
+  <li><b>Follow up once before expiry.</b> One polite reminder citing the quotation number, a few days before validity ends. Revisions get a new version — never a phone-call discount that lives nowhere.</li>
+  <li><b>⚠ Convert the yes into a signed agreement.</b> The most dropped step in Indian service work: verbal approval feels like momentum, so work starts unsigned. The agreement should inherit the quotation's figures and be <a href="/e-signature">accepted electronically with a record</a> — and the advance invoice rides along with it.</li>
+  <li><b>Invoice on the agreed split.</b> Advance on signing — work starts on receipt. Balance on delivery, due date printed, never exceeding the agreement's value. Consecutive numbering (INV-2627-0001…) so the series survives an audit.</li>
+  <li><b>Track to closed.</b> A weekly look at three lists: overdue, due this week, and delivered-but-not-invoiced. The third list is where honest businesses quietly bleed.</li>
+</ol>
+
+<h2>The three drop points</h2>
+<ul>
+  <li><b>After the quote goes out.</b> No reminder exists, validity lapses, deal evaporates. Fix: follow-up is scheduled the moment the quote is sent.</li>
+  <li><b>Between "yes" and signature.</b> Work starts on goodwill; scope disputes arrive later with no signed reference. Fix: advance-on-signing makes the signature the natural gate.</li>
+  <li><b>After delivery.</b> The work is done, everyone relaxes, the invoice goes out late — or never. Fix: the balance invoice is prepared with the agreement, so delivery only needs a send.</li>
+</ul>
+
+${ctaInline("Run the thread automatically", "DealInSec generates each document from the deal record and shows you what needs action — quotation to collected payment.", SIGNUP, "Start free — no card →")}
+
+<h2>Manual vs software, honestly</h2>
+<p>The manual version of this system works: a folder per deal, a numbering convention, calendar reminders, a weekly review. Its cost isn't money — it's that every step depends on your discipline on a busy week, and the documents still can't check each other for drift. <a href="/blog/what-is-deal-management-software">Deal management software</a> exists to make the thread structural instead of virtuous: documents generated from one record can't disagree, and the dashboard remembers the follow-ups you'd otherwise carry in your head. Start manual; switch when a dropped deal costs more than ₹999.</p>
+`,
+  },
 ];
 
 /* ── Rendering ─────────────────────────────────────────────────────────── */

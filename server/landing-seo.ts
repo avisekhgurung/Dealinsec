@@ -102,7 +102,7 @@ export function landingSeoBody(): string {
 <p><a href="/quotation-software">Quotation software</a> · <a href="/proposal-management">proposal management</a> · <a href="/contract-management">contract management</a> · <a href="/e-signature">e-signature</a> · <a href="/invoice-management">invoice management</a> — one thread per deal, from first quote to final payment.</p>
 
 <h2>Guides</h2>
-<p>From the <a href="/blog">DealInSec blog</a>: the <a href="/blog/quotation-format">quotation format guide with a free sample</a>, <a href="/blog/how-to-make-a-quotation-online">how to make a quotation online step by step</a>, and <a href="/blog/fake-quotation">when a sample quotation is fine and when it's fraud</a>.</p>
+<p>From the <a href="/blog">DealInSec blog</a>: <a href="/blog/what-is-deal-management-software">what deal management software is</a>, the <a href="/blog/quotation-format">quotation format guide with a free sample</a>, <a href="/blog/how-to-make-a-quotation-online">how to make a quotation online</a>, <a href="/blog/quotation-software-vs-excel">quotation software vs Excel</a>, <a href="/blog/best-quotation-software-india">choosing quotation software in India</a>, <a href="/blog/quotation-vs-proposal">quotation vs proposal</a>, <a href="/blog/how-to-manage-a-deal-from-quotation-to-invoice">managing a deal from quotation to invoice</a>, and <a href="/blog/fake-quotation">when a sample quotation is fine and when it's fraud</a>.</p>
 
 <h2>Pricing</h2>
 <p>7-day Pro trial with no card. Free plan covers 4 deals a month. Pro is ₹999 per month or ₹9,999 per year with unlimited deals, agreements, invoices, payment tracking and 5 team seats. No platform fee on your deal value.</p>
