@@ -78,7 +78,7 @@ export function landingSeoBody(): string {
   ).join("");
 
   return `<div id="seo-fallback">
-<h1>Quotation, agreement and invoice software for Indian service businesses</h1>
+<h1>Deal management software for Indian service businesses — quotation, agreement and invoice on one thread</h1>
 <p>DealInSec keeps every client deal on one thread — quotation, e-signed agreement, invoice and payment tracking — so you look professional, never chase a client, and get paid on time. Built for India's real estate consultants, interior designers, architects, agencies and contractors.</p>
 
 <h2>One workflow from quotation to payment</h2>
@@ -97,6 +97,9 @@ export function landingSeoBody(): string {
 <p>Create a <a href="/tools/gst-invoice-generator">GST invoice</a> with CGST, SGST and IGST computed, a <a href="/tools/quotation-maker">quotation</a>, a <a href="/tools/purchase-order-generator">purchase order</a>, a <a href="/tools/service-agreement-template">service agreement</a>, a
 <a href="/tools/proforma-invoice-generator">proforma invoice</a> and a
 <a href="/tools/gst-calculator">GST calculator</a> — free in your browser, no account needed.</p>
+
+<h2>What DealInSec covers</h2>
+<p><a href="/quotation-software">Quotation software</a> · <a href="/proposal-management">proposal management</a> · <a href="/contract-management">contract management</a> · <a href="/e-signature">e-signature</a> · <a href="/invoice-management">invoice management</a> — one thread per deal, from first quote to final payment.</p>
 
 <h2>Guides</h2>
 <p>From the <a href="/blog">DealInSec blog</a>: the <a href="/blog/quotation-format">quotation format guide with a free sample</a>, <a href="/blog/how-to-make-a-quotation-online">how to make a quotation online step by step</a>, and <a href="/blog/fake-quotation">when a sample quotation is fine and when it's fraud</a>.</p>

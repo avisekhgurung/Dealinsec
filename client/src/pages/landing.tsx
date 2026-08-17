@@ -63,6 +63,20 @@ import { DealinsecLogo } from "@/components/dealinsec-logo";
 // Constants
 // ────────────────────────────────────────────────────────────────────────────
 
+// Server-rendered routes that live OUTSIDE the React SPA (Express pages).
+// Links to these must be plain <a> navigations — wouter has no such routes
+// and would silently swallow the click. ONE list, used by header and footer.
+const SERVER_ROUTE_PREFIXES = [
+  "/tools",
+  "/blog",
+  "/quotation-software",
+  "/contract-management",
+  "/proposal-management",
+  "/invoice-management",
+  "/e-signature",
+];
+const isServerRoute = (href: string) => SERVER_ROUTE_PREFIXES.some((p) => href.startsWith(p));
+
 const NAV_LINKS = [
   { label: "Free Tools", href: "/tools" },
   { label: "Blog", href: "/blog" },
@@ -723,7 +737,7 @@ function NavItem({ href, label }: { href: string; label: string }) {
   // Hash anchors AND the server-rendered /tools/* pages must be real <a> links
   // (a wouter <Link> would client-route /tools into the SPA, which has no such
   // route, and fall through to the landing page).
-  const isPlainAnchor = href.startsWith("#") || href.startsWith("/tools") || href.startsWith("/blog") || href.startsWith("mailto:");
+  const isPlainAnchor = href.startsWith("#") || href.startsWith("mailto:") || isServerRoute(href);
   if (isPlainAnchor) {
     return (
       <a
@@ -2016,9 +2030,11 @@ function Footer() {
           <FooterColumn
             title="Product"
             links={[
-              { label: "Who it's for", href: "#who" },
-              { label: "Features", href: "#features" },
-              { label: "How it works", href: "#how" },
+              { label: "Quotation Software", href: "/quotation-software" },
+              { label: "Contract Management", href: "/contract-management" },
+              { label: "Proposal Management", href: "/proposal-management" },
+              { label: "Invoice Management", href: "/invoice-management" },
+              { label: "E-Signature", href: "/e-signature" },
               { label: "Pricing", href: "#pricing" },
             ]}
           />
@@ -2144,12 +2160,8 @@ function FooterColumn({ title, links }: { title: string; links: { label: string;
       <p className="text-xs uppercase tracking-widest font-semibold text-neutral-900 dark:text-white mb-4">{title}</p>
       <ul className="space-y-2.5">
         {links.map((l) => {
-          // /tools/* and /blog/* are server-rendered pages outside the SPA —
-          // they need a real navigation (plain <a>), not wouter client-side
-          // routing (which would swallow the click: no such SPA route).
           const isHashOrExternal =
-            l.href.startsWith("#") || l.href.startsWith("mailto:") ||
-            l.href.startsWith("/tools") || l.href.startsWith("/blog");
+            l.href.startsWith("#") || l.href.startsWith("mailto:") || isServerRoute(l.href);
           if (isHashOrExternal) {
             return (
               <li key={l.label}>

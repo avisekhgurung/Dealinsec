@@ -46,18 +46,20 @@ export default defineConfig({
           /^\/api\//,
           /^\/tools(\/|$)/,
           /^\/blog(\/|$)/,
+          /^\/(quotation-software|contract-management|proposal-management|invoice-management|e-signature)(\/|$)/,
           /^\/sitemap\.xml$/,
           /^\/robots\.txt$/,
         ],
         runtimeCaching: [
           {
             // App shell — network first so users get fresh deploys. Exclude the
-            // server-rendered /tools/* and /blog/* pages so the SW never
-            // caches/handles them.
+            // server-rendered pages (/tools, /blog, category pages) so the SW
+            // never caches/handles them.
             urlPattern: ({ request, url }) =>
               request.mode === "navigate" &&
-              !url.pathname.startsWith("/tools") &&
-              !url.pathname.startsWith("/blog"),
+              !/^\/(tools|blog|quotation-software|contract-management|proposal-management|invoice-management|e-signature)(\/|$)/.test(
+                url.pathname,
+              ),
             handler: "NetworkFirst",
             options: { cacheName: "pages", networkTimeoutSeconds: 3 },
           },
