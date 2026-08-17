@@ -508,6 +508,7 @@ const AMBIENT = `<div class="ambient" aria-hidden="true"><span class="blob b1"><
 const TOOL_LINKS: [string, string][] = [
   ["/tools", "All tools"],
   ["/tools/gst-invoice-generator", "GST Invoice"],
+  ["/tools/bill-generator", "Bill Maker"],
   ["/tools/quotation-maker", "Quotation"],
   ["/tools/service-agreement-template", "Agreement"],
   ["/tools/gst-calculator", "GST Calculator"],

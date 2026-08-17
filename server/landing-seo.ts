@@ -94,7 +94,7 @@ export function landingSeoBody(): string {
 <p>Work starts without a written scope, invoices go out late, and payments are never followed up — because the quotation is in WhatsApp, the agreement is in email and the invoice is in someone's downloads folder. DealInSec puts the four documents on one thread and tells you what to do next.</p>
 
 <h2>Free tools, no sign-up</h2>
-<p>Create a <a href="/tools/gst-invoice-generator">GST invoice</a> with CGST, SGST and IGST computed, a <a href="/tools/quotation-maker">quotation</a>, a <a href="/tools/purchase-order-generator">purchase order</a>, a <a href="/tools/service-agreement-template">service agreement</a>, a
+<p>Create a <a href="/tools/gst-invoice-generator">GST invoice</a> with CGST, SGST and IGST computed, a <a href="/tools/bill-generator">bill</a>, a <a href="/tools/quotation-maker">quotation</a>, a <a href="/tools/purchase-order-generator">purchase order</a>, a <a href="/tools/service-agreement-template">service agreement</a>, a
 <a href="/tools/proforma-invoice-generator">proforma invoice</a> and a
 <a href="/tools/gst-calculator">GST calculator</a> — free in your browser, no account needed.</p>
 

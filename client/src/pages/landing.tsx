@@ -11,6 +11,7 @@ import {
   Briefcase,
   FileText,
   Receipt,
+  ReceiptText,
   Shield,
   Check,
   ChevronRight,
@@ -1143,6 +1144,7 @@ function WhoWeServeSection() {
 
 const FREE_TOOLS = [
   { name: "GST Invoice Generator", href: "/tools/gst-invoice-generator", desc: "Auto CGST/SGST/IGST, amount in words, instant PDF.", icon: Receipt },
+  { name: "Bill Generator", href: "/tools/bill-generator", desc: "Create a bill online in a minute — with a PAID stamp.", icon: ReceiptText },
   { name: "Quotation Maker", href: "/tools/quotation-maker", desc: "Professional quotations with line items, GST & terms.", icon: FileText },
   { name: "GST Calculator", href: "/tools/gst-calculator", desc: "Add or remove GST with the CGST/SGST or IGST split.", icon: Calculator },
   { name: "Service Agreement", href: "/tools/service-agreement-template", desc: "A ready-to-sign contract — scope, fees, editable clauses.", icon: FileSignature },
