@@ -58,6 +58,8 @@ async function loadOrg(user: User): Promise<OrgData> {
   return { deals, contracts, invoices };
 }
 
+import { analyzeDealProtections, type ProtectionReport } from "./riskcheck";
+
 const signed = (c: Contract) => c.status === "Signed" || !!c.signedByBrand;
 const invAmount = (i: BrandInvoice) => Number(i.dealAmount || 0);
 
@@ -245,9 +247,14 @@ export async function computeBriefing(user: User): Promise<Briefing> {
   };
 }
 
-export async function computeDealIntel(dealId: number, user: User): Promise<{ health: DealHealth; nextAction: NextBestAction | null } | null> {
+export async function computeDealIntel(dealId: number, user: User): Promise<{ health: DealHealth; nextAction: NextBestAction | null; protection: ProtectionReport; dealStatus: string } | null> {
   const data = await loadOrg(user);
   const deal = data.deals.find((d) => d.id === dealId);
   if (!deal) return null;
-  return { health: computeDealHealth(deal, data), nextAction: computeNextBestAction(deal, data) };
+  return {
+    health: computeDealHealth(deal, data),
+    nextAction: computeNextBestAction(deal, data),
+    protection: analyzeDealProtections(deal),
+    dealStatus: deal.status,
+  };
 }

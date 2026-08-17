@@ -14,7 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { trackEvent } from "@/lib/analytics";
-import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle, ChevronRight, Crown, Briefcase, ScrollText, ListChecks, Copy, Zap } from "lucide-react";
+import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle, ChevronRight, Crown, Briefcase, ScrollText, ListChecks, Copy, Zap, ShieldAlert, ShieldCheck, Sparkles } from "lucide-react";
 import { hasProAccess, STANDARD_TERMS } from "@shared/schema";
 import { memberCan } from "@shared/permissions";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
@@ -650,7 +650,7 @@ export default function DealDetailsPage() {
         </div>
 
         <div className="lg:col-span-2 xl:col-span-1 space-y-6">
-        <DealIntelCards dealId={deal.id} />
+        <DealIntelCards dealId={deal.id} existingTerms={(deal as any).customTerms ?? ""} />
         <section className="space-y-3">
           <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
             Deliverables ({completedIds.size}/{deal.deliverables.length} Completed)
@@ -815,13 +815,43 @@ export default function DealDetailsPage() {
 // ─── Deal intelligence rail cards ────────────────────────────────────────────
 // Health score + next best action from the deterministic server engine
 // (server/copilot/insights.ts) — every point traces to a visible signal.
-function DealIntelCards({ dealId }: { dealId: number }) {
+function DealIntelCards({ dealId, existingTerms }: { dealId: number; existingTerms: string }) {
+  const { toast } = useToast();
+  const [suggested, setSuggested] = useState<string | null>(null);
   const { data } = useQuery<{
     health: { score: number; grade: string; signals: { label: string; state: "good" | "warn" | "bad"; detail: string }[] };
     nextAction: { action: string; route: string; urgency: "red" | "yellow" | "green" } | null;
+    protection?: { flags: { id: string; severity: "risk" | "gap"; title: string; detail: string }[]; risks: number; gaps: number };
+    dealStatus?: string;
   }>({ queryKey: [`/api/copilot/deal-intel/${dealId}`], staleTime: 30_000 });
+
+  const suggest = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/copilot/risk-suggest", { dealId });
+      return res.json();
+    },
+    onSuccess: (d: any) => setSuggested(d.termsBlock || d.note || ""),
+    onError: () => toast({ title: "Couldn't get suggestions right now", variant: "destructive" }),
+  });
+
+  const addTerms = useMutation({
+    mutationFn: async () => {
+      const merged = existingTerms ? `${existingTerms}\n${suggested}` : suggested;
+      const res = await apiRequest("PATCH", `/api/deals/${dealId}`, { customTerms: merged });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Protections added to the deal's terms" });
+      setSuggested(null);
+      queryClient.invalidateQueries({ queryKey: [`/api/deals/${dealId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/copilot/deal-intel/${dealId}`] });
+    },
+    onError: () => toast({ title: "Couldn't update the terms", description: "Only pending deals can be edited.", variant: "destructive" }),
+  });
+
   if (!data) return null;
-  const { health, nextAction } = data;
+  const { health, nextAction, protection } = data;
+  const canEdit = data.dealStatus === "Pending";
   const scoreCls = health.score >= 80 ? "text-emerald-600 dark:text-emerald-400" : health.score >= 55 ? "text-amber-600 dark:text-amber-400" : "text-rose-600 dark:text-rose-400";
   const ringCls = health.score >= 80 ? "border-emerald-500/50" : health.score >= 55 ? "border-amber-500/50" : "border-rose-500/50";
   return (
@@ -865,6 +895,68 @@ function DealIntelCards({ dealId }: { dealId: number }) {
           </ul>
         </CardContent>
       </Card>
+
+      {protection && (
+        <Card className={`glass-card border ${protection.risks ? "border-rose-300/50 dark:border-rose-900/50" : protection.gaps ? "border-amber-300/50 dark:border-amber-900/50" : "border-emerald-300/50 dark:border-emerald-800/50"}`}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              {protection.flags.length ? (
+                <ShieldAlert className={`w-4 h-4 ${protection.risks ? "text-rose-500" : "text-amber-500"}`} />
+              ) : (
+                <ShieldCheck className="w-4 h-4 text-emerald-500" />
+              )}
+              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Protection check</p>
+            </div>
+            {protection.flags.length === 0 ? (
+              <p className="text-xs text-muted-foreground">The core protections are in place — advance, timelines, revision limits and exclusions are all covered in the terms.</p>
+            ) : (
+              <>
+                <p className="text-xs font-semibold mb-2">
+                  {protection.risks ? `${protection.risks} risky term${protection.risks > 1 ? "s" : ""}` : ""}
+                  {protection.risks && protection.gaps ? " · " : ""}
+                  {protection.gaps ? `${protection.gaps} protection${protection.gaps > 1 ? "s" : ""} missing` : ""}
+                </p>
+                <ul className="space-y-1.5 mb-3">
+                  {protection.flags.map((f) => (
+                    <li key={f.id} className="flex items-start gap-2 text-xs">
+                      <AlertTriangle className={`mt-0.5 w-3.5 h-3.5 shrink-0 ${f.severity === "risk" ? "text-rose-500" : "text-amber-500"}`} />
+                      <span className="min-w-0">
+                        <b className="font-semibold">{f.title}:</b>{" "}
+                        <span className="text-muted-foreground">{f.detail}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {suggested === null ? (
+                  protection.gaps > 0 && (
+                    <Button size="sm" variant="outline" className="h-8 text-xs font-bold w-full" disabled={suggest.isPending} onClick={() => suggest.mutate()}>
+                      {suggest.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-1.5" />}
+                      Suggest the missing terms
+                    </Button>
+                  )
+                ) : (
+                  <div className="rounded-lg border border-border/60 bg-muted/40 p-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Suggested terms — review before using</p>
+                    <p className="text-xs whitespace-pre-line mb-2.5">{suggested}</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="h-7 text-[11px] font-bold flex-1" onClick={() => { navigator.clipboard.writeText(suggested); toast({ title: "Copied" }); }}>
+                        <Copy className="w-3 h-3 mr-1" /> Copy
+                      </Button>
+                      {canEdit && (
+                        <Button size="sm" className="h-7 text-[11px] font-bold flex-1 gradient-btn text-white" disabled={addTerms.isPending} onClick={() => addTerms.mutate()}>
+                          {addTerms.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" strokeWidth={3} />}
+                          Add to deal terms
+                        </Button>
+                      )}
+                    </div>
+                    {!canEdit && <p className="text-[10px] text-muted-foreground mt-1.5">This deal is past editing — carry these into your next quotation revision.</p>}
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </>
   );
 }

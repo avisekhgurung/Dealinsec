@@ -158,6 +158,45 @@ export function registerCopilotRoutes(app: Express) {
     }
   });
 
+  // ── Protection Check: flags are COMPUTED (riskcheck.ts); AI only phrases
+  //    tailored term wording for the gaps. Falls back to the deterministic
+  //    default wording when the model is unavailable — the feature never
+  //    depends on AI being up. ──
+  app.post("/api/copilot/risk-suggest", isAuthenticated, async (req: any, res) => {
+    try {
+      const deal = await storage.getDeal(Number(req.body?.dealId));
+      const owns = deal && (deal.organizationId
+        ? deal.organizationId === req.user.organizationId
+        : deal.userId === req.user.id);
+      if (!owns) return res.status(404).json({ error: "Deal not found" });
+      const report = (await import("./riskcheck")).analyzeDealProtections(deal!);
+      const gaps = report.flags.filter((f) => f.severity === "gap" && f.suggestedTerm);
+      if (!gaps.length) {
+        return res.json({ report, termsBlock: "", note: report.risks ? "Fix the flagged wording directly in the deal's terms — those need your judgement, not new lines." : "No missing protections found." });
+      }
+      let termsBlock = gaps.map((g) => g.suggestedTerm).join("\n");
+      if (copilotConfigured() && takeQuota(req.user.id)) {
+        try {
+          const result = await aiProvider.chat([
+            { role: "system", content: `You tailor protective terms & conditions lines for an Indian service business's deal. You are given default term lines and the deal context. Rewrite each line to fit THIS deal naturally (its type of work, its client) while keeping the SAME protection and any bracketed [amount] placeholders. Rules: one term per line, same number of lines as given, plain business English, no legal-advice claims, never invent amounts or dates that aren't in the context. Output ONLY the term lines.` },
+            { role: "user", content: `Deal: "${deal!.dealTitle}" for ${deal!.brandName}, value ₹${Number(deal!.dealAmount).toLocaleString("en-IN")}.\nExisting terms:\n${(deal!.customTerms ?? "(none)").slice(0, 600)}\n\nDefault protection lines to tailor:\n${termsBlock}` },
+          ], []);
+          const lines = (result.content ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+          // Accept the tailored block only if it stayed line-shaped; else keep defaults.
+          if (lines.length >= gaps.length && lines.length <= gaps.length + 1) {
+            termsBlock = lines.slice(0, gaps.length).join("\n");
+          }
+        } catch {
+          /* model unavailable → deterministic defaults stand */
+        }
+      }
+      res.json({ report, termsBlock });
+    } catch (err) {
+      console.error("[copilot] risk-suggest error:", err);
+      res.status(500).json({ error: "Couldn't run the protection check right now." });
+    }
+  });
+
   // ── Public marketing Copilot (no auth — see PUBLIC_SYSTEM) ──
   app.post("/api/copilot/public", async (req: any, res) => {
     try {

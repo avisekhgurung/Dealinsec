@@ -118,6 +118,15 @@ async function main() {
         JSON.stringify([{ description: "Show-flat styling — full scope", quantity: 1, rate: 120000, amount: 120000 }])],
     );
 
+    // 🛡️ Protection-check showcase: a deal whose terms trip every red flag —
+    // the gallery shot for "stay protected".
+    await c.query(
+      `INSERT INTO deals (user_id,organization_id,brand_name,deal_title,deal_amount,start_date,end_date,status,deal_type,deliverables,custom_terms)
+       VALUES ($1,$2,'Risky Client Pvt Ltd','Office fit-out — as discussed',300000,CURRENT_DATE::text,(CURRENT_DATE+60)::text,'Pending','service',$3::jsonb,
+        'Work as per site requirement with unlimited revisions until satisfaction. Payment will be released after our client pays us. Balance within 30 days. Advance 50% and remaining within 7 days. Retention of 10% applies.')`,
+      [UID, ORG, deliv([["Fit-out", "Office interiors — full scope", 1, "One-time"]])],
+    );
+
     // 📥 Texture: fresh pipeline — pending deal with a draft quotation.
     const fresh = await c.query(
       `INSERT INTO deals (user_id,organization_id,brand_name,deal_title,deal_amount,start_date,end_date,status,deal_type,deliverables)
