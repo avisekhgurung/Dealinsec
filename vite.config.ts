@@ -47,6 +47,7 @@ export default defineConfig({
           /^\/tools(\/|$)/,
           /^\/blog(\/|$)/,
           /^\/(quotation-software|contract-management|proposal-management|invoice-management|e-signature)(\/|$)/,
+          /^\/templates\//,
           /^\/sitemap\.xml$/,
           /^\/robots\.txt$/,
         ],

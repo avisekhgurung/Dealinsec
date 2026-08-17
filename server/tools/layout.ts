@@ -510,6 +510,7 @@ const TOOL_LINKS: [string, string][] = [
   ["/tools/gst-invoice-generator", "GST Invoice"],
   ["/tools/bill-generator", "Bill Maker"],
   ["/tools/quotation-maker", "Quotation"],
+  ["/tools/quotation-templates", "Templates"],
   ["/tools/service-agreement-template", "Agreement"],
   ["/tools/gst-calculator", "GST Calculator"],
   ["/tools/proforma-invoice-generator", "Proforma"],
