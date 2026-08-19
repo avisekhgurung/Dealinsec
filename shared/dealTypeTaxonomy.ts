@@ -23,13 +23,21 @@ export const dealTypeOptions = [
   "Architecture",
   "Agency",
   "Construction",
+  // Freelance + Consulting are the B2B service segment the ICP pivot moved
+  // TOWARD — they were mistakenly bundled into "legacy" when Creator (the
+  // Instagram segment we moved AWAY from) was retired. Their taxonomy,
+  // agreement copy and deliverable labels are all fully defined below.
+  "Freelance",
+  "Consulting",
   "Custom",
 ] as const;
 
+// Retired from the active picker. Creator = the Instagram-creator ICP we
+// intentionally left. Service Vendor overlaps the active types; promote it
+// only if real vendors ask for it. Kept here (with full taxonomy) so existing
+// deals of these types still render correctly.
 export const legacyDealTypeOptions = [
   "Creator",
-  "Freelance",
-  "Consulting",
   "Service Vendor",
 ] as const;
 
