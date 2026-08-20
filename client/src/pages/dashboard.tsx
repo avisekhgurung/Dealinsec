@@ -1131,38 +1131,52 @@ export default function DashboardPage() {
                   ].filter(s => s.value > 0)
                 : [];
               return (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-5">
-                  {/* Platform bar — wider (2/3 on desktop) */}
-                  {platformDist.length > 0 && (
-                    <Card className="glass-card border-0 lg:col-span-2">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-5">
+                  {/* Deliverables by Category — donut + legend (matches Invoice donut) */}
+                  {platformDist.length > 0 && (() => {
+                    const dTotal = platformDist.reduce((s, e) => s + e.count, 0);
+                    return (
+                    <Card className="glass-card border-0">
                       <CardHeader className="pb-1 px-4 pt-4 lg:px-6 lg:pt-6">
                         <CardTitle className="text-sm lg:text-base font-semibold">Deliverables by Category</CardTitle>
                         <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Deliverables across platforms / categories</p>
                       </CardHeader>
-                      <CardContent className="px-2 pb-4 lg:px-4 lg:pb-6">
-                        <div className="h-[180px] sm:h-[200px] lg:h-[220px] xl:h-[240px]">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={platformDist} margin={{ top: 10, right: 15, left: -10, bottom: 0 }}>
-                              {/* theme-aware grid — a white grid is invisible on the light theme */}
-                              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.6)" vertical={false} />
-                              <XAxis dataKey="platform" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                                axisLine={false} tickLine={false} />
-                              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                                axisLine={false} tickLine={false} />
-                              <Tooltip content={<CustomTooltip />} />
-                              <Bar dataKey="count" name="Deliverables" radius={[6, 6, 0, 0]} maxBarSize={64}>
-                                {platformDist.map((entry, i) => (
-                                  <Cell key={i} fill={colorForPlatform(entry.platform, i)} />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
+                      <CardContent className="px-4 pb-5 lg:px-6 lg:pb-6">
+                        <div className="flex flex-col sm:flex-row items-center gap-4 lg:gap-6">
+                          <div className="relative w-[168px] h-[168px] lg:w-[190px] lg:h-[190px] shrink-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie data={platformDist} cx="50%" cy="50%" innerRadius="60%" outerRadius="88%"
+                                  dataKey="count" nameKey="platform" paddingAngle={2} stroke="none">
+                                  {platformDist.map((entry, i) => (
+                                    <Cell key={i} fill={colorForPlatform(entry.platform, i)} />
+                                  ))}
+                                </Pie>
+                                <Tooltip content={<CustomTooltip />} />
+                              </PieChart>
+                            </ResponsiveContainer>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                              <span className="text-[10px] lg:text-xs uppercase tracking-wider font-semibold text-muted-foreground">Total</span>
+                              <span className="text-2xl lg:text-3xl font-bold text-foreground leading-tight">{dTotal}</span>
+                            </div>
+                          </div>
+                          <div className="flex-1 w-full space-y-2">
+                            {platformDist.map((entry, i) => (
+                              <div key={i} className="flex items-center gap-2.5 text-xs lg:text-sm">
+                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colorForPlatform(entry.platform, i) }} />
+                                <span className="flex-1 min-w-0 truncate text-foreground">{entry.platform}</span>
+                                <span className="font-semibold text-foreground tabular-nums">{entry.count}</span>
+                                <span className="text-muted-foreground tabular-nums w-10 text-right">{Math.round((entry.count / dTotal) * 100)}%</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
-                  )}
+                    );
+                  })()}
 
-                  {/* Invoice Money status pie — narrow (1/3 on desktop) */}
+                  {/* Invoice Status — donut + legend */}
                   {moneyPie.length > 0 && (
                     <Card className="glass-card border-0">
                       <CardHeader className="pb-1 px-4 pt-4 lg:px-6 lg:pt-6">
@@ -1171,71 +1185,50 @@ export default function DashboardPage() {
                           Invoices by amount · {brandInvoices.length} total
                         </p>
                       </CardHeader>
-                      <CardContent className="px-2 pb-4 lg:px-4 lg:pb-6">
-                        <div className="relative h-[180px] sm:h-[200px] lg:h-[210px] xl:h-[230px]">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie
-                                data={moneyPie}
-                                cx="50%"
-                                cy="50%"
-                                innerRadius="56%"
-                                outerRadius="86%"
-                                dataKey="value"
-                                nameKey="name"
-                                paddingAngle={2}
-                                stroke="none"
-                              >
-                                {moneyPie.map((entry, i) => (
-                                  <Cell key={i} fill={entry.fill} />
-                                ))}
-                              </Pie>
-                              <Tooltip
-                                content={({ active, payload }) => {
-                                  if (!active || !payload?.length) return null;
-                                  const d = payload[0].payload as any;
-                                  return (
-                                    <div className="bg-background/95 border border-border/60 rounded-lg p-2.5 text-xs shadow-lg">
-                                      <p style={{ color: d.fill }} className="font-semibold mb-0.5">{d.name}</p>
-                                      <p className="font-bold text-foreground">₹{Number(d.value).toLocaleString("en-IN")}</p>
-                                      <p className="text-muted-foreground">{d.count} invoice{d.count !== 1 ? "s" : ""}</p>
-                                    </div>
-                                  );
-                                }}
-                              />
-                            </PieChart>
-                          </ResponsiveContainer>
-                          {/* Center label — total amount */}
-                          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <span className="text-[10px] lg:text-xs uppercase tracking-wider font-semibold text-muted-foreground">
-                              Total billed
-                            </span>
-                            <span className="text-lg lg:text-2xl font-bold text-foreground leading-tight">
-                              ₹{(totalInvoiceValue / 100000).toFixed(1) === (totalInvoiceValue / 100000).toFixed(0)
-                                ? totalInvoiceValue.toLocaleString("en-IN")
-                                : `${(totalInvoiceValue / 100000).toFixed(1)}L`}
-                            </span>
-                          </div>
-                        </div>
-                        {/* Legend strip below */}
-                        <div className="flex items-center justify-between gap-3 mt-3 px-1 lg:px-2 text-xs">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                            <div className="min-w-0">
-                              <p className="font-semibold text-foreground truncate">Received</p>
-                              <p className="text-[10px] text-muted-foreground">
-                                ₹{paidValue.toLocaleString("en-IN")}
-                              </p>
+                      <CardContent className="px-4 pb-5 lg:px-6 lg:pb-6">
+                        <div className="flex flex-col sm:flex-row items-center gap-4 lg:gap-6">
+                          <div className="relative w-[168px] h-[168px] lg:w-[190px] lg:h-[190px] shrink-0">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie data={moneyPie} cx="50%" cy="50%" innerRadius="60%" outerRadius="88%"
+                                  dataKey="value" nameKey="name" paddingAngle={2} stroke="none">
+                                  {moneyPie.map((entry, i) => (
+                                    <Cell key={i} fill={entry.fill} />
+                                  ))}
+                                </Pie>
+                                <Tooltip
+                                  content={({ active, payload }) => {
+                                    if (!active || !payload?.length) return null;
+                                    const d = payload[0].payload as any;
+                                    return (
+                                      <div className="bg-background/95 border border-border/60 rounded-lg p-2.5 text-xs shadow-lg">
+                                        <p style={{ color: d.fill }} className="font-semibold mb-0.5">{d.name}</p>
+                                        <p className="font-bold text-foreground">₹{Number(d.value).toLocaleString("en-IN")}</p>
+                                        <p className="text-muted-foreground">{d.count} invoice{d.count !== 1 ? "s" : ""}</p>
+                                      </div>
+                                    );
+                                  }}
+                                />
+                              </PieChart>
+                            </ResponsiveContainer>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                              <span className="text-[10px] lg:text-xs uppercase tracking-wider font-semibold text-muted-foreground">Total billed</span>
+                              <span className="text-lg lg:text-2xl font-bold text-foreground leading-tight">
+                                ₹{(totalInvoiceValue / 100000).toFixed(1) === (totalInvoiceValue / 100000).toFixed(0)
+                                  ? totalInvoiceValue.toLocaleString("en-IN")
+                                  : `${(totalInvoiceValue / 100000).toFixed(1)}L`}
+                              </span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-                            <div className="min-w-0">
-                              <p className="font-semibold text-foreground truncate">Pending</p>
-                              <p className="text-[10px] text-muted-foreground">
-                                ₹{unpaidValue.toLocaleString("en-IN")}
-                              </p>
-                            </div>
+                          <div className="flex-1 w-full space-y-2.5">
+                            {moneyPie.map((entry, i) => (
+                              <div key={i} className="flex items-center gap-2.5 text-xs lg:text-sm">
+                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.fill }} />
+                                <span className="flex-1 min-w-0 truncate text-foreground">{entry.name}</span>
+                                <span className="font-semibold text-foreground tabular-nums">₹{Number(entry.value).toLocaleString("en-IN")}</span>
+                                <span className="text-muted-foreground tabular-nums w-10 text-right">{Math.round((entry.value / totalInvoiceValue) * 100)}%</span>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       </CardContent>
