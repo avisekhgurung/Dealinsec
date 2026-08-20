@@ -270,27 +270,6 @@ function buildPlatformDist(deals: Deal[]) {
   return Object.entries(map).map(([platform, count]) => ({ platform, count }));
 }
 
-function buildDeliverableCompletion(deals: Deal[]) {
-  const platformMap: Record<string, { total: number; completed: number }> = {};
-  deals.forEach(d => {
-    let completedIds: Set<string> = new Set();
-    try {
-      const stored = localStorage.getItem(`deliverables-done-${d.id}`);
-      if (stored) completedIds = new Set(JSON.parse(stored));
-    } catch {}
-    d.deliverables.forEach(del => {
-      if (!platformMap[del.platform]) platformMap[del.platform] = { total: 0, completed: 0 };
-      platformMap[del.platform].total += 1;
-      if (completedIds.has(del.id)) platformMap[del.platform].completed += 1;
-    });
-  });
-  return Object.entries(platformMap).map(([platform, data]) => ({
-    platform,
-    total: data.total,
-    completed: data.completed,
-  }));
-}
-
 // Fallback palette for unmapped categories (Freelance/Consulting/Custom)
 const PLATFORM_COLORS = ["#0E8C5A", "#10B981", "#0D9488", "#06B6D4", "#1D4ED8", "#7C3AED", "#F59E0B", "#EC4899", "#64748B"];
 
@@ -621,9 +600,6 @@ export default function DashboardPage() {
 
   // Chart data
   const platformDist = buildPlatformDist(deals);
-  const deliverableCompletion = useMemo(() => buildDeliverableCompletion(deals), [deals]);
-  const totalDeliverables = deliverableCompletion.reduce((s, d) => s + d.total, 0);
-  const completedDeliverables = deliverableCompletion.reduce((s, d) => s + d.completed, 0);
 
   const recentDeals = deals.slice(0, 3);
 
@@ -1238,61 +1214,6 @@ export default function DashboardPage() {
               );
             })()}
           </>
-        )}
-
-        {/* ── Deliverable Completion Widget ── */}
-        {totalDeliverables > 0 && (
-          <Card className="glass-card border-0">
-            <CardHeader className="pb-2 px-4 pt-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                  Deliverable Progress
-                </CardTitle>
-                <span className="text-xs font-medium text-muted-foreground">
-                  {completedDeliverables}/{totalDeliverables} done
-                </span>
-              </div>
-              {/* Overall progress bar */}
-              <div className="w-full h-2 bg-muted rounded-full mt-2 overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${totalDeliverables > 0 ? (completedDeliverables / totalDeliverables) * 100 : 0}%`,
-                    background: "linear-gradient(90deg, #059669, #10b981)",
-                  }}
-                />
-              </div>
-            </CardHeader>
-            <CardContent className="px-4 pb-4 pt-2">
-              <div className="space-y-3">
-                {deliverableCompletion.map((item, i) => {
-                  const pct = item.total > 0 ? Math.round((item.completed / item.total) * 100) : 0;
-                  return (
-                    <div key={item.platform} className="flex items-center gap-3">
-                      <div
-                        className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: colorForPlatform(item.platform, i) }}
-                      />
-                      <span className="text-xs font-medium w-20 truncate">{item.platform}</span>
-                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${pct}%`,
-                            backgroundColor: colorForPlatform(item.platform, i),
-                          }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-muted-foreground w-12 text-right">
-                        {item.completed}/{item.total}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
         )}
 
         {/* ── Recent Deals — one divided list, not three stacked cards ── */}
