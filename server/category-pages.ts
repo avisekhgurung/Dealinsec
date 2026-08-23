@@ -256,6 +256,105 @@ const PAGES: CategoryPage[] = [
     ],
   },
 
+  /* ── /refrens-alternative — buying-intent comparison ─────────────────── */
+  {
+    path: "/refrens-alternative",
+    metaTitle: "Refrens Alternative for Deal-Led Service Businesses (India)",
+    description:
+      "A Refrens alternative built for service businesses that run deals: quotation → e-signed agreement → milestone invoices → payment tracking on one thread, with scope-creep protection. Honest comparison. Free 7-day trial, no card.",
+    h1: "Looking for a Refrens alternative?",
+    sub: "Refrens is a solid invoicing and quotation platform. DealInSec is built for a different job — running the whole client deal, from quotation to signed agreement to milestone invoices to getting paid, on one thread.",
+    chips: ["Made for India", "Deal → agreement → invoice", "Scope-creep protection", "Free 7-day trial · no card"],
+    shortLabel: "Refrens Alternative",
+    sections: `
+<section><div class="wrap">
+  <h2>When Refrens fits — and when DealInSec does</h2>
+  <p class="sec-sub">This is an honest comparison, not a takedown. Both are made in India and priced in rupees; they're built for different jobs, and the right pick depends on how your work runs.</p>
+  <div class="feat">
+    <div class="ft"><b>Refrens is great when…</b><p>your main need is invoicing and quotations — a broad billing and accounting toolkit with a strong free tier, popular with freelancers who mostly send documents fast.</p></div>
+    <div class="ft"><b>DealInSec is built when…</b><p>your work is deal-shaped: you quote, sign a scope, deliver in stages and chase payment. The quotation, agreement and invoices live on one record and can't drift apart.</p></div>
+    <div class="ft"><b>The difference in one line</b><p>Refrens documents your billing; DealInSec runs the deal around it — e-signed agreements, scope-creep protection, and payment chasing built into the same thread.</p></div>
+    <div class="ft"><b>Where DealInSec is sharpest</b><p>High-value, milestone-billed service work — interior design, architecture, agencies, consulting — where a forgotten invoice or unsigned scope costs real money.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>Side by side</h2>
+  <div class="tbl-scroll"><table class="cmp">
+    <tr><th></th><th>Refrens</th><th>DealInSec</th></tr>
+    <tr><td><b>Core job</b></td><td>Invoicing, quotations &amp; accounting</td><td>Running the whole client deal to payment</td></tr>
+    <tr><td><b>Quotation</b></td><td>Yes</td><td>Yes — and it converts into the agreement &amp; invoice</td></tr>
+    <tr><td><b>E-signed agreements</b></td><td>Focused on billing docs</td><td>Built in — acceptance recorded with an audit trail</td></tr>
+    <tr><td><b>Scope-creep protection</b></td><td>—</td><td>Protection Check flags missing revision limits, exclusions, advance</td></tr>
+    <tr><td><b>Payment chasing</b></td><td>Reminders</td><td>AI-drafted follow-ups (English/Hinglish), you send</td></tr>
+    <tr><td><b>Best for</b></td><td>Freelancers wanting fast billing</td><td>Deal-led service businesses &amp; studios</td></tr>
+  </table></div>
+  <p class="muted" style="font-size:14px;margin-top:10px">Refrens is a capable product — check their site for current features and pricing. Pick the tool that matches how your work actually runs.</p>
+</div></section>`,
+    faq: [
+      {
+        q: "Is DealInSec a free Refrens alternative?",
+        a: "DealInSec has a free plan (4 deals a month) and a 7-day Pro trial with no card, plus free no-sign-up tools (GST invoice, quotation maker, bill maker). It isn't a clone of Refrens, though — it's built to run the whole deal, not just billing, so compare on the job you need done.",
+      },
+      {
+        q: "Why choose DealInSec over Refrens?",
+        a: "Choose DealInSec if your work is deal-shaped — you quote, sign a scope, deliver in stages and chase payment — and you want those documents on one consistent thread with e-signed agreements and scope-creep protection. Choose Refrens if your main need is fast, broad invoicing and accounting. They're built for different jobs.",
+      },
+      {
+        q: "Can I switch from Refrens to DealInSec?",
+        a: "Yes — start with the free trial and run one live deal end to end (quotation → agreement → invoice) to see if the thread fits how you work. Keep using whatever handles the rest of your accounting.",
+      },
+    ],
+  },
+
+  /* ── /vyapar-alternative — buying-intent comparison ──────────────────── */
+  {
+    path: "/vyapar-alternative",
+    metaTitle: "Vyapar Alternative for Service Businesses (India)",
+    description:
+      "A Vyapar alternative for service businesses, not shops: DealInSec runs client deals — quotation, e-signed agreement, milestone invoices and payment tracking — instead of inventory-based GST billing. Honest comparison. Free trial, no card.",
+    h1: "Looking for a Vyapar alternative?",
+    sub: "Vyapar is excellent GST billing and inventory software for shops and product businesses. If you sell services — design, consulting, agency work — not stock, DealInSec is built for the way you actually get paid.",
+    chips: ["For service businesses", "Deal → agreement → invoice", "Made for India", "Free 7-day trial · no card"],
+    shortLabel: "Vyapar Alternative",
+    sections: `
+<section><div class="wrap">
+  <h2>Different tools for different businesses</h2>
+  <p class="sec-sub">Honestly, if you run a shop with stock, Vyapar is a strong choice — inventory, GST billing and accounting in one. DealInSec is for the other kind of business: the one that sells scoped services, one deal at a time.</p>
+  <div class="feat">
+    <div class="ft"><b>Vyapar is great when…</b><p>you sell products and need inventory, GST billing, stock and day-to-day accounting — the shape of a retail or trading business.</p></div>
+    <div class="ft"><b>DealInSec is built when…</b><p>you sell services on high-value, milestone-billed projects — interiors, architecture, agencies, consulting — where the scope, the agreement and the payment matter more than stock.</p></div>
+    <div class="ft"><b>No inventory, just deals</b><p>Instead of products and stock levels, DealInSec tracks quotations, e-signed agreements, milestone invoices and who owes you what.</p></div>
+    <div class="ft"><b>Protection built in</b><p>Scope-creep flags and payment chasing are part of the workflow — the risks a service business carries, not a shop.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>Side by side</h2>
+  <div class="tbl-scroll"><table class="cmp">
+    <tr><th></th><th>Vyapar</th><th>DealInSec</th></tr>
+    <tr><td><b>Built for</b></td><td>Shops &amp; product/trading businesses</td><td>Deal-led service businesses</td></tr>
+    <tr><td><b>Inventory / stock</b></td><td>Yes — a core strength</td><td>Not applicable — deals, not stock</td></tr>
+    <tr><td><b>GST tax invoices</b></td><td>Yes</td><td>Free GST invoice tool; in-app invoices record the deal value (not Rule-46 tax invoices)</td></tr>
+    <tr><td><b>Quotation → agreement → invoice</b></td><td>Billing-centric</td><td>One connected thread with e-signed agreements</td></tr>
+    <tr><td><b>Scope creep &amp; payment chasing</b></td><td>—</td><td>Protection Check + AI payment reminders</td></tr>
+  </table></div>
+  <p class="muted" style="font-size:14px;margin-top:10px">Vyapar is a strong product for what it's built for — check their site for current features. The question is whether you sell stock or sell deals.</p>
+</div></section>`,
+    faq: [
+      {
+        q: "Is DealInSec like Vyapar?",
+        a: "No — and that's the point. Vyapar is GST billing and inventory software for shops and product businesses. DealInSec runs client deals for service businesses: quotation, e-signed agreement, milestone invoices and payment tracking. If you sell services, not stock, DealInSec fits better.",
+      },
+      {
+        q: "Does DealInSec do GST invoices like Vyapar?",
+        a: "For a GST tax invoice with CGST/SGST/IGST computed, use DealInSec's free GST invoice generator (no sign-up). In-app invoices record the agreed deal value and print your PAN/GSTIN but are not Rule-46 tax invoices. Vyapar is the stronger pick if full GST-and-inventory accounting is your main need.",
+      },
+      {
+        q: "I'm a freelancer/designer, not a shop — which fits?",
+        a: "DealInSec. Service work is about scope, agreements and getting paid per milestone — not inventory. That's exactly what DealInSec is built for, with a free plan and a 7-day trial with no card.",
+      },
+    ],
+  },
+
   /* ── /quotation-software ─────────────────────────────────────────────── */
   {
     path: "/quotation-software",

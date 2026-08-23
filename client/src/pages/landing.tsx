@@ -76,6 +76,8 @@ const SERVER_ROUTE_PREFIXES = [
   "/invoice-management",
   "/e-signature",
   "/interior-design-software",
+  "/refrens-alternative",
+  "/vyapar-alternative",
 ];
 const isServerRoute = (href: string) => SERVER_ROUTE_PREFIXES.some((p) => href.startsWith(p));
 
