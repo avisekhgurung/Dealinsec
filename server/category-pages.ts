@@ -145,6 +145,7 @@ function footer(): string {
   return `<footer class="site"><div class="wrap">
     <div class="links">
       <a href="/">Product</a>
+      <a href="/interior-design-software">For Interior Designers</a>
       <a href="/quotation-software">Quotation Software</a>
       <a href="/contract-management">Contract Management</a>
       <a href="/invoice-management">Invoice Management</a>
@@ -198,6 +199,63 @@ function relatedSection(currentPath: string): string {
 /* ── Pages ─────────────────────────────────────────────────────────────── */
 
 const PAGES: CategoryPage[] = [
+  /* ── /interior-design-software — the sharp ICP wedge ──────────────────── */
+  {
+    path: "/interior-design-software",
+    metaTitle: "Interior Design Software — Quotations, Agreements & Payments",
+    description:
+      "The deal & payment software for Indian interior designers: quotation → e-signed agreement → milestone invoices on one thread, scope-creep protection, and payment reminders. Paste a client's WhatsApp chat and it drafts the deal. Free 7-day trial, no card.",
+    h1: "The deal & payment OS for interior designers",
+    sub: "Quotation, e-signed agreement, milestone invoices and payment chasing on one thread — built for the way Indian interior studios actually run projects. Paste the client's WhatsApp chat; it drafts the deal.",
+    chips: ["Made for interiors", "Milestone billing", "Scope-creep protection", "Free 7-day trial · no card"],
+    shortLabel: "For Interior Designers",
+    sections: `
+<section><div class="wrap">
+  <h2>Where interior projects leak money</h2>
+  <p class="sec-sub">It's never the design that costs you — it's what happens around it. A ₹8 lakh project agreed on WhatsApp, "just one more change" a dozen times, an advance taken with no written scope, and a final payment that never comes because nobody can prove what was agreed. DealInSec closes every one of those gaps.</p>
+  <div class="feat">
+    <div class="ft"><b>Paste the chat, get the deal</b><p>Paste the client's WhatsApp conversation and the Copilot drafts the deal — client, rooms, scope, amount, advance terms. You confirm; it never invents a number you didn't say.</p></div>
+    <div class="ft"><b>Scope-creep protection</b><p>Before you send, a Protection Check flags the gaps designers bleed on — no revision limit, no exclusions (civil work, furniture), no advance — and suggests the terms to add.</p></div>
+    <div class="ft"><b>Milestone billing, bounded</b><p>Bill 50% advance, stage payments, balance on handover — each invoice tied to the signed agreement, and never more than the project is worth.</p></div>
+    <div class="ft"><b>Payment chasing, in your voice</b><p>The Copilot drafts the follow-up for an overdue payment — English or Hinglish — using the real invoice number. You press send; it never messages a client on its own.</p></div>
+  </div>
+  <div class="callout honest"><b>Just need a quotation today?</b><p>Use the <a href="/tools/quotation-maker">free quotation maker</a> or grab a ready <a href="/tools/quotation-templates">interior quotation template</a> — no sign-up. The app is for when you're running projects every month and want them all on one thread.</p></div>
+</div></section>
+<section><div class="wrap">
+  <h2>WhatsApp + Excel vs DealInSec</h2>
+  <div class="tbl-scroll"><table class="cmp">
+    <tr><th></th><th>WhatsApp + Excel + memory</th><th>DealInSec</th></tr>
+    <tr><td><b>The scope</b></td><td>Agreed verbally, argued later</td><td>E-signed agreement with revision limits &amp; exclusions</td></tr>
+    <tr><td><b>Extra work</b></td><td>"You said you'd change it for free"</td><td>A change-order quotation before it's executed</td></tr>
+    <tr><td><b>Milestone invoices</b></td><td>Retyped each time, drift creeps in</td><td>Generated from the agreement, always consistent</td></tr>
+    <tr><td><b>The final payment</b></td><td>Chased awkwardly, or never</td><td>The dashboard shows what's overdue; the Copilot drafts the nudge</td></tr>
+  </table></div>
+  <p class="muted" style="font-size:14px;margin-top:10px">Guides for interiors: <a href="/blog/quotation-format">interior quotation format</a> · <a href="/blog/fake-quotation">client not paying — the written-trail method</a>.</p>
+</div></section>`,
+    faq: [
+      {
+        q: "Is DealInSec built for interior designers?",
+        a: "Yes — it's the sharpest fit. Interior projects are high-value and milestone-billed, with scope that shifts constantly, which is exactly what DealInSec manages: quotation → e-signed agreement → stage invoices on one thread, with scope-creep protection and payment tracking. It works for adjacent studios (architects, contractors, agencies) too.",
+      },
+      {
+        q: "Can it handle stage-wise / milestone billing?",
+        a: "Yes. Bill a 50% advance, stage payments, and a balance on handover — any split — with each invoice tied to the signed agreement, and DealInSec won't let you invoice more than the project is worth.",
+      },
+      {
+        q: "How does it stop scope creep?",
+        a: "Two ways: the agreement records the exact deliverables, revision limit and exclusions the client accepted; and the Protection Check flags when those are missing before you send. Extra work becomes a change-order quotation instead of a free favour.",
+      },
+      {
+        q: "Does it create GST invoices for my studio?",
+        a: "In-app invoices record the agreed value and print your PAN and GSTIN, but they are not Rule-46 GST tax invoices. For a GST tax invoice with CGST/SGST/IGST computed, use the free GST invoice generator — no sign-up.",
+      },
+      {
+        q: "What does it cost?",
+        a: "A 7-day Pro trial with no card, then a free plan covering 4 deals a month. Pro is ₹999/month or ₹9,999/year — less than one forgotten milestone invoice — with unlimited projects, agreements, invoices, payment tracking and 5 team seats.",
+      },
+    ],
+  },
+
   /* ── /quotation-software ─────────────────────────────────────────────── */
   {
     path: "/quotation-software",

@@ -75,6 +75,7 @@ const SERVER_ROUTE_PREFIXES = [
   "/proposal-management",
   "/invoice-management",
   "/e-signature",
+  "/interior-design-software",
 ];
 const isServerRoute = (href: string) => SERVER_ROUTE_PREFIXES.some((p) => href.startsWith(p));
 
