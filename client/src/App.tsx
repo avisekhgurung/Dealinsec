@@ -11,7 +11,7 @@ import { InstallPrompt } from "@/components/install-prompt";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 import { UpgradeModalProvider } from "@/components/upgrade-modal";
 import { Copilot } from "@/components/copilot/copilot";
-import { trackPageView } from "@/lib/analytics";
+import { trackPageView, trackEvent } from "@/lib/analytics";
 import { useLocation } from "wouter";
 
 // Eagerly loaded — always needed for first render
@@ -80,6 +80,20 @@ function Router() {
   useEffect(() => {
     trackPageView(location);
   }, [location]);
+
+  // Google OAuth signups redirect back with ?signup=google (email signups
+  // fire sign_up client-side already). Fire the GA4 conversion once, then
+  // strip the param so a refresh can't double-count.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("signup") === "google") {
+      trackEvent("sign_up", { method: "google" });
+      params.delete("signup");
+      const qs = params.toString();
+      window.history.replaceState({}, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    }
+  }, []);
 
 
   // Initial app load (auth check) → full branded splash, shown once per session

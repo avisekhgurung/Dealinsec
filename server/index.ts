@@ -200,7 +200,9 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
       if (req.user) {
         (req.session as any).userId = req.user.id;
       }
-      res.redirect("/");
+      // New Google signups carry a marker so the client fires the GA4
+      // sign_up conversion (Google was the untracked signup path).
+      res.redirect(req.user?.isNewSignup ? "/?signup=google" : "/");
     }
   );
 

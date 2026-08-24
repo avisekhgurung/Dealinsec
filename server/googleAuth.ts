@@ -56,6 +56,11 @@ export function setupGoogleAuth() {
             // Welcome email for new Google sign-ups — best-effort
             const { subject, html } = welcomeEmail({ firstName: user.firstName || undefined });
             void sendEmail({ to: email, subject, html });
+
+            // Transient flag (this request only) so the callback route can
+            // redirect with a signup marker → the client fires the GA4
+            // sign_up conversion. Google was the untracked signup path.
+            (user as any).isNewSignup = true;
           }
 
           return done(null, user);
