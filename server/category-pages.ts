@@ -256,6 +256,64 @@ const PAGES: CategoryPage[] = [
     ],
   },
 
+  /* ── /freelancer-invoice-software — the freelancer front door ─────────── */
+  {
+    path: "/freelancer-invoice-software",
+    metaTitle: "Invoice & Deal Software for Freelancers in India",
+    description:
+      "The get-paid toolkit for Indian freelancers: quotation → agreement → invoice → payment tracking on one thread, with scope-creep protection and AI payment reminders. Paste a client's WhatsApp chat and it drafts the deal. Free plan, no card.",
+    h1: "The get-paid toolkit for Indian freelancers",
+    sub: "You're the sales team, the delivery team AND the accounts team. DealInSec is your accounts team — quotation, agreement, invoice and payment chasing on one thread, so you look professional and actually get paid.",
+    chips: ["Made for India", "Free plan · no card", "Scope-creep protection", "AI payment reminders"],
+    shortLabel: "For Freelancers",
+    sections: `
+<section><div class="wrap">
+  <h2>The freelancer money problem isn't finding work — it's getting paid</h2>
+  <p class="sec-sub">You said yes on WhatsApp, started the work, and now the final payment is "coming soon" for the third week. No advance, no written scope, and asking again feels awkward. DealInSec fixes the whole chain so the awkward part is handled for you.</p>
+  <div class="feat">
+    <div class="ft"><b>Paste the chat, get the deal</b><p>Paste the client's WhatsApp conversation and the Copilot drafts the deal — scope, amount, advance terms. You confirm; it never invents a number you didn't say.</p></div>
+    <div class="ft"><b>Get the advance, in writing</b><p>Send a professional quotation with a 50% advance and clear terms, then an e-signed agreement — so "that wasn't what we agreed" never happens.</p></div>
+    <div class="ft"><b>Scope-creep protection</b><p>Before you send, a Protection Check flags what freelancers bleed on — no revision limit, no advance, nothing excluded — and suggests the terms to add.</p></div>
+    <div class="ft"><b>Chasing, without the awkward</b><p>The Copilot drafts the payment reminder — English or Hinglish — using the real invoice number. You press send; it never messages a client on its own.</p></div>
+  </div>
+  <div class="callout honest"><b>Just need one invoice or quote today?</b><p>Use the free <a href="/tools/gst-invoice-generator">GST invoice generator</a> or <a href="/tools/quotation-maker">quotation maker</a> — no sign-up. The app is for when you're juggling several clients and want them all on one thread.</p></div>
+</div></section>
+<section><div class="wrap">
+  <h2>Why "just an invoice generator" isn't enough</h2>
+  <div class="tbl-scroll"><table class="cmp">
+    <tr><th></th><th>Invoice generator alone</th><th>DealInSec</th></tr>
+    <tr><td><b>The offer</b></td><td>You retype a quote each time</td><td>Quotation generated, converts into the invoice</td></tr>
+    <tr><td><b>The agreement</b></td><td>None — verbal, then disputed</td><td>E-signed, with a recorded audit trail</td></tr>
+    <tr><td><b>Scope creep</b></td><td>"One more small change" for free</td><td>Revision limits &amp; exclusions the client agreed to</td></tr>
+    <tr><td><b>Getting paid</b></td><td>You chase, awkwardly</td><td>Dashboard shows overdue; Copilot drafts the nudge</td></tr>
+    <tr><td><b>Cost</b></td><td>—</td><td>Free plan; Pro ₹999/mo — less than one unpaid project</td></tr>
+  </table></div>
+  <p class="muted" style="font-size:14px;margin-top:10px">Guides: <a href="/blog/how-to-make-a-quotation-online">making a quotation online</a> · <a href="/blog/fake-quotation">client not paying — the written-trail method</a>.</p>
+</div></section>`,
+    faq: [
+      {
+        q: "Is DealInSec good for freelancers in India?",
+        a: "Yes — it's built for solo service providers who run client work: quotation → e-signed agreement → invoice → payment tracking on one thread, with scope-creep protection and AI payment reminders. The free plan (4 deals a month) suits a freelancer starting out.",
+      },
+      {
+        q: "Is there a free plan for freelancers?",
+        a: "Yes — a free plan covering 4 deals a month, plus a 7-day Pro trial with no card, and free no-sign-up tools (GST invoice generator, quotation maker, bill maker). Pro is ₹999/month or ₹9,999/year when you outgrow the free plan.",
+      },
+      {
+        q: "How does it help me get paid faster?",
+        a: "Three ways: you take an advance with a professional quotation and e-signed agreement up front; invoices are raised against that agreement; and the dashboard shows what's overdue while the Copilot drafts the follow-up (English or Hinglish) for you to send. Nothing is sent to a client without your tap.",
+      },
+      {
+        q: "Does it create GST invoices?",
+        a: "The free GST invoice generator computes CGST/SGST/IGST with no sign-up. In-app invoices record the agreed value and print your PAN/GSTIN but are not Rule-46 GST tax invoices — we say so plainly.",
+      },
+      {
+        q: "Are the agreements legally binding?",
+        a: "Electronic contracts are recognised in India under Section 10A of the IT Act, 2000. DealInSec records electronic acceptance with an audit trail — who accepted, when, with which signature. It is not a Digital Signature Certificate or Aadhaar eSign, and every agreement says so. We are not a law firm; have important agreements reviewed by a lawyer.",
+      },
+    ],
+  },
+
   /* ── /refrens-alternative — buying-intent comparison ─────────────────── */
   {
     path: "/refrens-alternative",

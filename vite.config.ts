@@ -46,7 +46,7 @@ export default defineConfig({
           /^\/api\//,
           /^\/tools(\/|$)/,
           /^\/blog(\/|$)/,
-          /^\/(quotation-software|contract-management|proposal-management|invoice-management|e-signature|interior-design-software|refrens-alternative|vyapar-alternative)(\/|$)/,
+          /^\/(quotation-software|contract-management|proposal-management|invoice-management|e-signature|interior-design-software|freelancer-invoice-software|refrens-alternative|vyapar-alternative)(\/|$)/,
           /^\/templates\//,
           /^\/sitemap\.xml$/,
           /^\/robots\.txt$/,
@@ -58,7 +58,7 @@ export default defineConfig({
             // never caches/handles them.
             urlPattern: ({ request, url }) =>
               request.mode === "navigate" &&
-              !/^\/(tools|blog|quotation-software|contract-management|proposal-management|invoice-management|e-signature|interior-design-software|refrens-alternative|vyapar-alternative)(\/|$)/.test(
+              !/^\/(tools|blog|quotation-software|contract-management|proposal-management|invoice-management|e-signature|interior-design-software|freelancer-invoice-software|refrens-alternative|vyapar-alternative)(\/|$)/.test(
                 url.pathname,
               ),
             handler: "NetworkFirst",

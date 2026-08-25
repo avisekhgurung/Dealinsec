@@ -76,6 +76,7 @@ const SERVER_ROUTE_PREFIXES = [
   "/invoice-management",
   "/e-signature",
   "/interior-design-software",
+  "/freelancer-invoice-software",
   "/refrens-alternative",
   "/vyapar-alternative",
 ];
