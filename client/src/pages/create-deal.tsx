@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { z } from "zod";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ import { parseApiError, isUpgradeError } from "@/lib/api-error";
 import { PlatformIcon } from "@/components/platform-icon";
 import { TaxonomyCombobox } from "@/components/taxonomy-combobox";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Plus, Trash2, Loader2, FileText } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, FileText, ChevronRight, Pencil } from "lucide-react";
 import {
   insertDealSchema,
   frequencyOptions,
@@ -63,10 +64,42 @@ type BrandOption = { id: string; name: string };
 
 type FormData = z.infer<typeof formSchema>;
 
+// Static tint → class maps (Tailwind purges interpolated class names).
+const TINT_CHIP: Record<string, string> = {
+  emerald: "bg-emerald-500/10 border-emerald-500/20",
+  teal: "bg-teal-500/10 border-teal-500/20",
+  indigo: "bg-indigo-500/10 border-indigo-500/20",
+  amber: "bg-amber-500/10 border-amber-500/20",
+  slate: "bg-slate-500/10 border-slate-500/20",
+};
+const TINT_HOVER: Record<string, string> = {
+  emerald: "hover:border-emerald-400/60",
+  teal: "hover:border-teal-400/60",
+  indigo: "hover:border-indigo-400/60",
+  amber: "hover:border-amber-400/60",
+  slate: "hover:border-slate-400/60",
+};
+
+// ?type=Freelance deep-links straight to the form with the type chosen —
+// used by vertical landing pages and the Copilot.
+function initialTypeFromUrl(): DealType | null {
+  try {
+    const t = new URLSearchParams(window.location.search).get("type");
+    return t && (dealTypeOptions as readonly string[]).includes(t) ? (t as DealType) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function CreateDealPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { openUpgradeModal } = useUpgradeModal();
+
+  // Two-step wizard: an app-like full-screen type picker, then the form.
+  // A valid ?type= param skips the picker (deep links from vertical pages).
+  const [urlType] = useState<DealType | null>(initialTypeFromUrl);
+  const [step, setStep] = useState<"type" | "form">(urlType ? "form" : "type");
 
   const { data: brands = [] } = useQuery<BrandOption[]>({
     queryKey: ["/api/brands"],
@@ -77,7 +110,7 @@ export default function CreateDealPage() {
     defaultValues: {
       brandName: "",
       dealTitle: "",
-      dealType: "Real Estate",
+      dealType: urlType ?? "Real Estate",
       dealAmount: 0,
       startDate: "",
       endDate: "",
@@ -176,6 +209,14 @@ export default function CreateDealPage() {
     );
   };
 
+  // Picker → form. Only reset taxonomy fields when the type actually changed
+  // (returning via "Change" and re-picking the same type keeps filled rows).
+  const pickType = (next: DealType) => {
+    if (next !== form.getValues("dealType")) handleDealTypeChange(next);
+    setStep("form");
+    window.scrollTo({ top: 0 });
+  };
+
   const L = getDeliverableLabels(dealType);
 
   return (
@@ -185,69 +226,130 @@ export default function CreateDealPage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setLocation("/deals")}
+            onClick={() => (step === "form" ? setStep("type") : setLocation("/deals"))}
             data-testid="button-back"
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Create Deal</h1>
+          <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">
+            {step === "type" ? "New Deal" : "Create Deal"}
+          </h1>
         </div>
       </header>
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 py-6 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-7 lg:space-y-5">
-        {/* Deal Type — first step, drives downstream taxonomy */}
-        <section className="glass-card rounded-xl p-5 sm:p-6 space-y-5">
-          <div className="flex items-baseline justify-between gap-3">
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-primary mb-1">
-                Step 1
-              </div>
-              <h2 className="text-base font-semibold text-foreground">Choose deal type</h2>
-            </div>
-            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-              Tailors deliverable options
-            </span>
+      <AnimatePresence mode="wait">
+      {step === "type" ? (
+        /* ── Step 1: full-screen deal-type picker ─────────────────────── */
+        <motion.div
+          key="type"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0, x: -24 }}
+          transition={{ duration: 0.18 }}
+          className="px-4 py-8 lg:max-w-5xl lg:mx-auto lg:px-8 lg:py-12"
+        >
+          <div className="text-center mb-8 lg:mb-10">
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-[11px] font-bold uppercase tracking-[0.14em] text-primary mb-2"
+            >
+              Step 1 of 2
+            </motion.div>
+            <motion.h2
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.05 }}
+              className="text-2xl lg:text-3xl font-bold tracking-tight text-foreground"
+            >
+              What kind of deal is this?
+            </motion.h2>
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="text-sm lg:text-base text-muted-foreground mt-2 max-w-md mx-auto"
+            >
+              This tailors your deliverables, agreement wording and documents.
+            </motion.p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          <motion.div
+            initial="hidden"
+            animate="show"
+            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.045 } } }}
+            className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4"
+          >
             {dealTypeOptions.map((dt) => {
               const meta = dealTypeMeta[dt];
-              const selected = dealType === dt;
               return (
-                <button
+                <motion.button
                   key={dt}
                   type="button"
-                  onClick={() => handleDealTypeChange(dt)}
-                  className={`group relative rounded-xl border p-4 text-left transition-all duration-150 ${
-                    selected
-                      ? "border-primary/70 bg-gradient-to-br from-primary/[0.07] to-primary/[0.02] shadow-[0_1px_2px_rgba(0,0,0,0.04),0_0_0_1px_rgba(16,185,129,0.18)]"
-                      : "border-input/60 hover:border-primary/40 hover:bg-muted/40 bg-background/60"
-                  }`}
+                  variants={{ hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0 } }}
+                  whileHover={{ y: -4 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => pickType(dt)}
+                  className={`group relative rounded-2xl border border-input/60 bg-card/80 p-4 lg:p-5 text-left shadow-sm hover:shadow-lg transition-shadow ${TINT_HOVER[meta.tint] ?? "hover:border-primary/40"}`}
                   data-testid={`select-deal-type-${dt}`}
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className={`text-2xl leading-none transition-transform ${selected ? "scale-110" : "group-hover:scale-105"}`}>
-                      {meta.emoji}
-                    </div>
-                    <div
-                      className={`w-4 h-4 rounded-full border-2 transition-all flex items-center justify-center ${
-                        selected
-                          ? "border-primary bg-primary"
-                          : "border-input/60 group-hover:border-primary/40"
-                      }`}
-                    >
-                      {selected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                    </div>
+                  <div
+                    className={`w-12 h-12 lg:w-14 lg:h-14 rounded-2xl border flex items-center justify-center text-2xl lg:text-[28px] mb-3 transition-transform group-hover:scale-105 ${TINT_CHIP[meta.tint] ?? "bg-primary/10 border-primary/20"}`}
+                  >
+                    {meta.emoji}
                   </div>
-                  <div className={`text-sm font-semibold leading-tight ${selected ? "text-primary" : "text-foreground"}`}>
+                  <div className="text-sm lg:text-[15px] font-semibold leading-tight text-foreground flex items-center gap-1">
                     {meta.label}
+                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/0 group-hover:text-primary transition-colors" />
                   </div>
-                  <div className="text-[11px] text-muted-foreground/90 mt-1 leading-snug line-clamp-2">
+                  <div className="text-[11px] lg:text-xs text-muted-foreground/90 mt-1 leading-snug line-clamp-2">
                     {meta.description}
                   </div>
-                </button>
+                </motion.button>
               );
             })}
+          </motion.div>
+
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="text-center text-xs text-muted-foreground mt-8"
+          >
+            Not sure? Pick <button type="button" className="font-semibold text-primary hover:underline" onClick={() => pickType("Custom")}>Custom</button> — you can describe anything.
+          </motion.p>
+        </motion.div>
+      ) : (
+        /* ── Step 2: the deal form ────────────────────────────────────── */
+        <motion.div
+          key="form"
+          initial={{ opacity: 0, x: 24 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+        >
+      <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 py-6 space-y-6 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-7 lg:space-y-5">
+        {/* Selected type — compact banner; "Change" returns to the picker */}
+        <section className="glass-card rounded-xl p-4 sm:p-5">
+          <div className="flex items-center gap-3">
+            <div className={`w-11 h-11 rounded-xl border flex items-center justify-center text-xl shrink-0 ${TINT_CHIP[dealTypeMeta[dealType].tint] ?? "bg-primary/10 border-primary/20"}`}>
+              {dealTypeMeta[dealType].emoji}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-primary">Deal type</div>
+              <div className="text-sm font-semibold text-foreground truncate">{dealTypeMeta[dealType].label}</div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs shrink-0"
+              onClick={() => setStep("type")}
+              data-testid="button-change-deal-type"
+            >
+              <Pencil className="w-3 h-3 mr-1.5" />
+              Change
+            </Button>
           </div>
         </section>
 
@@ -611,6 +713,9 @@ export default function CreateDealPage() {
           </Button>
         </div>
       </form>
+        </motion.div>
+      )}
+      </AnimatePresence>
     </div>
   );
 }
