@@ -7,7 +7,8 @@
  */
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import type { ColumnDef } from "@tanstack/react-table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
+import { DataTable } from "@/components/data-table/data-table";
 import { recordNo } from "@shared/schema";
 import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
 import { PickParentDialog } from "@/components/pick-parent-dialog";
@@ -25,14 +27,82 @@ import type { Quote, Deal } from "@shared/schema";
 import { FileText, Search, X, ChevronRight, Plus } from "lucide-react";
 
 type QuoteRow = Quote & { deal: Deal | null };
+// Flat search fields for the table's global filter (it reads top-level keys).
+type QuoteTableRow = QuoteRow & { clientName: string; dealName: string; quoteNo: string };
 
 const fmtDate = (s?: string | Date | null) =>
   s ? new Date(s).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
+
+// Desktop table columns — same register conventions as Deals: mono record
+// number, bold client, tinted type chip, tabular ₹, compact badges.
+const columns: ColumnDef<QuoteTableRow>[] = [
+  {
+    id: "quoteNo",
+    header: "Quotation No.",
+    meta: { label: "Quotation No.", filter: "text", filterPlaceholder: "QT-…" },
+    accessorFn: (r) => recordNo("quotation", r.id),
+    cell: ({ row }) => (
+      <span className="font-mono text-[11px] text-muted-foreground tabular-nums">{recordNo("quotation", row.original.id)}</span>
+    ),
+  },
+  {
+    id: "client",
+    header: "Client",
+    meta: { label: "Client", filter: "text" },
+    accessorFn: (r) => r.deal?.brandName ?? "",
+    cell: ({ row }) => <span className="font-semibold text-foreground">{row.original.deal?.brandName || "—"}</span>,
+  },
+  {
+    id: "dealTitle",
+    header: "Deal",
+    meta: { label: "Deal", filter: "text" },
+    accessorFn: (r) => r.deal?.dealTitle ?? "",
+    cell: ({ row }) => <span className="text-muted-foreground">{row.original.deal?.dealTitle || "Deal removed"}</span>,
+  },
+  {
+    id: "dealType",
+    header: "Type",
+    meta: { label: "Type", filter: "select" },
+    accessorFn: (r) => r.deal?.dealType ?? "",
+    cell: ({ row }) => {
+      const t = row.original.deal?.dealType;
+      return t ? (
+        <span className="text-xs px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
+          {(dealTypeMeta as any)[t]?.emoji ?? "·"} {t}
+        </span>
+      ) : <span className="text-muted-foreground">—</span>;
+    },
+  },
+  {
+    id: "value",
+    header: "Value",
+    meta: { label: "Value", align: "right", exportValue: (r: QuoteRow) => r.deal?.dealAmount ?? 0 },
+    accessorFn: (r) => Number(r.deal?.dealAmount ?? 0),
+    cell: ({ row }) => (
+      <span className="font-semibold text-primary tabular-nums">₹{Number(row.original.deal?.dealAmount || 0).toLocaleString("en-IN")}</span>
+    ),
+  },
+  {
+    accessorKey: "version",
+    header: "Version",
+    meta: { label: "Version", align: "center", exportValue: (r: QuoteRow) => r.version },
+    enableGlobalFilter: false,
+    cell: ({ row }) => <Badge variant="secondary" className="text-[11px] font-medium">v{row.original.version}</Badge>,
+  },
+  {
+    id: "issued",
+    header: "Issued",
+    meta: { label: "Issued", exportValue: (r: QuoteRow) => (r.createdAt ? String(r.createdAt) : "") },
+    accessorFn: (r) => (r.createdAt ? new Date(r.createdAt as any).getTime() : 0),
+    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.createdAt)}</span>,
+  },
+];
 
 export default function QuotationsPage() {
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME);
   const [pickOpen, setPickOpen] = useState(false);
+  const [, setLocation] = useLocation();
   const { user } = useAuth();
   const canCreate = memberCan(user as any, "quotations.create");
   const { data: quotes = [], isLoading } = useQuery<QuoteRow[]>({ queryKey: ["/api/quotes"] });
@@ -49,6 +119,17 @@ export default function QuotationsPage() {
       );
     });
   }, [quotes, search, dateRange]);
+
+  const tableRows = useMemo<QuoteTableRow[]>(
+    () =>
+      rows.map((r) => ({
+        ...r,
+        clientName: r.deal?.brandName ?? "",
+        dealName: r.deal?.dealTitle ?? "",
+        quoteNo: recordNo("quotation", r.id),
+      })),
+    [rows],
+  );
 
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-12">
@@ -77,9 +158,8 @@ export default function QuotationsPage() {
       <main className="px-4 py-5 space-y-4 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-6 lg:space-y-5">
         {/* Analytics for quotations live on the Dashboard — this page is the register. */}
 
-        {/* Search — capped on desktop; a full-bleed 1500px input reads as a
-            layout bug, not a search box */}
-        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3 mb-4">
+        {/* Mobile search + date filter (desktop uses the table toolbar) */}
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3 mb-4 lg:hidden">
         <div className="relative flex-1 lg:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <Input
@@ -104,8 +184,24 @@ export default function QuotationsPage() {
         </div>
         </div>
 
-        {/* Register */}
-        <Card className="glass-card overflow-hidden">
+        {/* ── Desktop: fintech data table (sorting, filters, pagination) ── */}
+        {!isLoading && quotes.length > 0 && (
+          <div className="hidden lg:block">
+            <DataTable
+              columns={columns}
+              data={tableRows}
+              searchPlaceholder="Search quotations..."
+              searchKeys={["clientName", "dealName", "quoteNo"]}
+              onRowClick={(r) => setLocation(r.deal ? `/deals/${r.deal.id}/quote` : "/deals")}
+              exportFileName="quotations"
+              toolbarExtra={<DateRangeFilter value={dateRange} onChange={setDateRange} />}
+              emptyMessage="No quotations match your filters."
+            />
+          </div>
+        )}
+
+        {/* ── Mobile: register list (and shared loading/empty states) ── */}
+        <Card className={`glass-card overflow-hidden ${!isLoading && quotes.length > 0 ? "lg:hidden" : ""}`}>
           <CardContent className="p-0">
             {isLoading ? (
               <div className="p-4 space-y-3">
