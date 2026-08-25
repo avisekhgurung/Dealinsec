@@ -91,15 +91,35 @@ function initialTypeFromUrl(): DealType | null {
   }
 }
 
+// "Remember and skip": an interiors studio shouldn't re-pick Interior Design
+// on every deal. The last-used type is remembered per device and the picker
+// is skipped on the next deal — the form banner's "Change" button is the
+// always-one-tap-away escape, so this never locks anyone in.
+const DEAL_TYPE_MEMORY_KEY = "dis_last_deal_type";
+
+function rememberedDealType(): DealType | null {
+  try {
+    const t = localStorage.getItem(DEAL_TYPE_MEMORY_KEY);
+    return t && (dealTypeOptions as readonly string[]).includes(t) ? (t as DealType) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function CreateDealPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { openUpgradeModal } = useUpgradeModal();
 
   // Two-step wizard: an app-like full-screen type picker, then the form.
-  // A valid ?type= param skips the picker (deep links from vertical pages).
+  // Skip the picker when the type is already known: ?type= param (deep links)
+  // wins, else the remembered last-used type. First-ever deal sees the picker.
   const [urlType] = useState<DealType | null>(initialTypeFromUrl);
-  const [step, setStep] = useState<"type" | "form">(urlType ? "form" : "type");
+  const [memoryType] = useState<DealType | null>(() => (urlType ? null : rememberedDealType()));
+  const initialType = urlType ?? memoryType;
+  const [step, setStep] = useState<"type" | "form">(initialType ? "form" : "type");
+  // True while the form shows a type the user didn't pick this visit.
+  const [fromMemory, setFromMemory] = useState(!!memoryType);
 
   const { data: brands = [] } = useQuery<BrandOption[]>({
     queryKey: ["/api/brands"],
@@ -110,7 +130,7 @@ export default function CreateDealPage() {
     defaultValues: {
       brandName: "",
       dealTitle: "",
-      dealType: urlType ?? "Real Estate",
+      dealType: initialType ?? "Real Estate",
       dealAmount: 0,
       startDate: "",
       endDate: "",
@@ -211,8 +231,11 @@ export default function CreateDealPage() {
 
   // Picker → form. Only reset taxonomy fields when the type actually changed
   // (returning via "Change" and re-picking the same type keeps filled rows).
+  // Every explicit pick is remembered so the NEXT deal skips the picker.
   const pickType = (next: DealType) => {
     if (next !== form.getValues("dealType")) handleDealTypeChange(next);
+    try { localStorage.setItem(DEAL_TYPE_MEMORY_KEY, next); } catch {}
+    setFromMemory(false);
     setStep("form");
     window.scrollTo({ top: 0 });
   };
@@ -338,6 +361,9 @@ export default function CreateDealPage() {
             <div className="min-w-0 flex-1">
               <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-primary">Deal type</div>
               <div className="text-sm font-semibold text-foreground truncate">{dealTypeMeta[dealType].label}</div>
+              {fromMemory && (
+                <div className="text-[10px] text-muted-foreground mt-0.5">Remembered from your last deal</div>
+              )}
             </div>
             <Button
               type="button"
