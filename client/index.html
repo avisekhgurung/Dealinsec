@@ -62,12 +62,23 @@
     <!-- Google Analytics (GA4) -->
     <!-- SPA route changes are tracked from the React side (see lib/analytics.ts),
          so we disable the automatic first-load page_view to avoid double-counting. -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-W3VTLRH79B"></script>
+    <!-- Analytics loads ONLY on the real domain: localhost dev sessions and
+         automated browser tests were polluting GA with page_views and even
+         create_deal events, which corrupts every conversion number. On other
+         hosts gtag stays undefined and lib/analytics.ts no-ops safely. -->
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){ dataLayer.push(arguments); }
-      gtag('js', new Date());
-      gtag('config', 'G-W3VTLRH79B', { send_page_view: false });
+      (function () {
+        var h = location.hostname;
+        if (h === "localhost" || h === "127.0.0.1" || h.endsWith(".local")) return;
+        var s = document.createElement("script");
+        s.async = true;
+        s.src = "https://www.googletagmanager.com/gtag/js?id=G-W3VTLRH79B";
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { dataLayer.push(arguments); };
+        gtag("js", new Date());
+        gtag("config", "G-W3VTLRH79B", { send_page_view: false });
+      })();
     </script>
     <!-- Pre-paint bootstraps: sidebar collapse + theme, applied before first
          style resolution so neither ever flashes. Theme default is LIGHT —
