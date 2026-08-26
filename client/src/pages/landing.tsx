@@ -242,6 +242,20 @@ const WHO_WE_SERVE = [
     desc: "Contractors managing works contracts, RA bills and milestone payments without the paperwork chaos.",
     accent: "amber",
   },
+  {
+    icon: Briefcase,
+    title: "Freelancers",
+    tagline: "Design · Dev · Content",
+    desc: "Solo professionals taking a 50% advance in writing, capping revisions, and chasing payments without the awkwardness.",
+    accent: "emerald",
+  },
+  {
+    icon: Lightbulb,
+    title: "Consultants",
+    tagline: "Advisory · Retainers · Coaching",
+    desc: "Consultants and coaches putting scope and fees in writing — hourly, retainer or milestone — and getting paid on time.",
+    accent: "teal",
+  },
 ];
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -1061,6 +1075,8 @@ function TrustStrip() {
             { Icon: DraftingCompass, name: "Architecture" },
             { Icon: Megaphone, name: "Agencies" },
             { Icon: HardHat, name: "Construction" },
+            { Icon: Briefcase, name: "Freelancers" },
+            { Icon: Lightbulb, name: "Consultants" },
           ].map(({ Icon, name }, i) => (
             <motion.div
               key={name}
