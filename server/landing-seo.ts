@@ -27,7 +27,7 @@ const FAQS: Faq[] = [
   },
   {
     q: "Who is it for?",
-    a: "Deal-led service businesses in India — real estate consultants and brokers, interior designers, architects, marketing and digital agencies, and construction contractors. If you quote, sign and bill clients, the workflow fits.",
+    a: "Deal-led service businesses in India — freelancers and consultants, real estate brokers, interior designers, architects, marketing and digital agencies, and construction contractors. If you quote, sign and bill clients, the workflow fits.",
   },
   {
     q: "How do I make a quotation for a client?",
@@ -83,7 +83,7 @@ export function landingSeoBody(): string {
 
   return `<div id="seo-fallback">
 <h1>Deal management software for Indian service businesses — quotation, agreement and invoice on one thread</h1>
-<p>DealInSec keeps every client deal on one thread — quotation, e-signed agreement, invoice and payment tracking — so you look professional, never chase a client, and get paid on time. Built for India's real estate consultants, interior designers, architects, agencies and contractors.</p>
+<p>DealInSec keeps every client deal on one thread — quotation, e-signed agreement, invoice and payment tracking — so you look professional, never chase a client, and get paid on time. Built for India's freelancers, real estate consultants, interior designers, architects, agencies and contractors.</p>
 
 <h2>One workflow from quotation to payment</h2>
 <ul>
