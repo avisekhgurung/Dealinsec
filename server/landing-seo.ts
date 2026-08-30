@@ -47,7 +47,7 @@ const FAQS: Faq[] = [
   },
   {
     q: "What does DealInSec cost?",
-    a: "Every new account gets a 7-day Pro trial with no card. After that the free plan covers 4 deals a month, each with a quotation. Pro is ₹999 a month or ₹9,999 a year and adds unlimited deals, agreements, invoices, payment tracking and 5 team seats. There is no platform fee on your deal value.",
+    a: "Every new account gets a 7-day Pro trial with no card. After that the free plan covers 4 deals a month, each with a quotation. Pro is ₹999 a month, or ₹5,999 a year as a founding member — about ₹499 a month, locked for as long as you stay — and adds unlimited deals, agreements, invoices, payment tracking and 5 team seats. There is no platform fee on your deal value.",
   },
   {
     q: "Can I bill 50% advance and 50% on delivery?",
@@ -110,7 +110,7 @@ export function landingSeoBody(): string {
 <p>From the <a href="/blog">DealInSec blog</a>: <a href="/blog/what-is-deal-management-software">what deal management software is</a>, the <a href="/blog/quotation-format">quotation format guide with a free sample</a>, <a href="/blog/how-to-make-a-quotation-online">how to make a quotation online</a>, <a href="/blog/quotation-software-vs-excel">quotation software vs Excel</a>, <a href="/blog/best-quotation-software-india">choosing quotation software in India</a>, <a href="/blog/quotation-vs-proposal">quotation vs proposal</a>, <a href="/blog/how-to-manage-a-deal-from-quotation-to-invoice">managing a deal from quotation to invoice</a>, and <a href="/blog/fake-quotation">when a sample quotation is fine and when it's fraud</a>. For getting paid: <a href="/blog/client-not-paying">what to do when a client isn't paying</a>, <a href="/blog/payment-reminder-message-to-client">payment reminder messages that work</a>, <a href="/blog/msme-payment-rule-45-days-samadhaan">the MSME 45-day payment rule</a>, <a href="/blog/advance-payment-terms">advance payment terms</a>, and the <a href="/blog/ra-bill-format">RA bill format for contractors</a>.</p>
 
 <h2>Pricing</h2>
-<p>7-day Pro trial with no card. Free plan covers 4 deals a month. Pro is ₹999 per month or ₹9,999 per year with unlimited deals, agreements, invoices, payment tracking and 5 team seats. No platform fee on your deal value.</p>
+<p>7-day Pro trial with no card. Free plan covers 4 deals a month. Pro is ₹999 per month, or ₹5,999 per year as a founding member (about ₹499 per month, locked for as long as you stay), with unlimited deals, agreements, invoices, payment tracking and 5 team seats. No platform fee on your deal value.</p>
 
 <h2>Frequently asked questions</h2>
 ${faqs}

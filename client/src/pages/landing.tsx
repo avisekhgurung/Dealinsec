@@ -186,7 +186,7 @@ const FAQS = [
   },
   {
     q: "Is Dealinsec free to use?",
-    a: "Yes — every new account starts with a 7-day Pro trial: everything unlocked, no card needed. After that the free plan covers 4 deals every month, each with a professional quotation. Signed agreements, invoices and payment tracking are part of DealInSec Pro (₹999/month or ₹9,999/year). There are no platform fees on your deal value.",
+    a: "Yes — every new account starts with a 7-day Pro trial: everything unlocked, no card needed. After that the free plan covers 4 deals every month, each with a professional quotation. Signed agreements, invoices and payment tracking are part of DealInSec Pro — ₹999/month, or ₹5,999 for the first year as a founding member (about ₹499/month, locked for as long as you stay). There are no platform fees on your deal value.",
   },
   {
     q: "Do agreements generated here hold up legally?",
@@ -1868,14 +1868,15 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                 <p className="text-sm font-semibold">Pro · Annual</p>
               </div>
               <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                Save 2 Months
+                Founding price
               </span>
             </div>
-            <div className="mt-4 flex items-baseline gap-1">
-              <span className="text-4xl font-bold tracking-tight">₹9,999</span>
+            <div className="mt-4 flex items-baseline gap-2">
+              <span className="text-4xl font-bold tracking-tight">₹5,999</span>
               <span className="text-sm text-neutral-500">/ year</span>
+              <span className="text-sm text-neutral-400 line-through">₹9,999</span>
             </div>
-            <p className="text-xs text-neutral-500 mt-1">≈ ₹833/month — two months free vs paying monthly.</p>
+            <p className="text-xs text-neutral-500 mt-1">≈ ₹499/month — first 100 members, locked for life.</p>
             <ul className="mt-5 space-y-2.5 flex-1">
               {proAnnualPerks.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">
@@ -1890,10 +1891,10 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
               style={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" }}
               data-testid="button-go-pro"
             >
-              Go Annual — ₹9,999/year
+              Become a founding member — ₹5,999
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-            <p className="text-[11px] text-neutral-500 text-center mt-3">One payment, not auto-renewing.</p>
+            <p className="text-[11px] text-neutral-500 text-center mt-3">One payment, not auto-renewing. Founding price is locked for as long as you stay.</p>
           </motion.div>
         </motion.div>
 

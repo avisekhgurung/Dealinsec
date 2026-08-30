@@ -338,7 +338,7 @@ export default function PricingPage() {
             <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-emerald-500/[0.05] pointer-events-none" />
             <div className="relative bg-gradient-to-r from-primary to-emerald-600 text-white px-4 py-1.5 text-center">
               <span className="text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
-                <Zap className="w-3 h-3" /> Save 2 Months
+                <Zap className="w-3 h-3" /> Founding price · first 100
               </span>
             </div>
             <div className="relative p-5 lg:p-6 flex flex-col flex-1">
@@ -352,6 +352,8 @@ export default function PricingPage() {
               <p className="text-xs text-muted-foreground mb-4">
                 ≈ {fmt(Math.round(proYearlyPrice / 12))}/month
                 {yearlySavings > 0 ? ` — save ${fmt(yearlySavings)} vs monthly` : ""}
+                <br />
+                <span className="text-primary font-semibold">Founding price, locked for as long as you stay.</span>
               </p>
               <ul className="space-y-2.5 mb-6 flex-1">
                 {[
