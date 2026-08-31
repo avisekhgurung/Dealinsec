@@ -34,9 +34,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { NotificationBell } from "@/components/notification-bell";
 import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
@@ -493,43 +490,47 @@ export function DesktopSidebar() {
           </nav>
         </div>
 
-        {/* ── User card → popover (keyboard-reachable logout lives here) ── */}
-        <div className={`border-t border-sidebar-border ${collapsed ? "py-3 flex justify-center" : "p-3"}`}>
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                data-testid="sidebar-user-card"
-                aria-label={`Account: ${displayName}`}
-                className={`flex items-center gap-3 rounded-[10px] hover:bg-sidebar-accent/55 transition-colors duration-150 focus-visible:!rounded-[10px] focus-visible:outline-[hsl(var(--sidebar-ring))] ${
-                  collapsed ? "p-1.5" : "w-full p-2.5 text-left"
-                }`}
+        {/* ── User identity + a direct Sign out button (no dropdown: one tap,
+               nothing to discover). Collapsed rail shows only the icon button. ── */}
+        <div className={`border-t border-sidebar-border ${collapsed ? "py-3 flex flex-col items-center gap-2" : "p-3 space-y-2"}`}>
+          {collapsed ? (
+            <>
+              <span
+                title={`${displayName} · ${user?.email ?? ""}`}
+                className="flex items-center justify-center w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary/70 text-white font-bold text-sm shrink-0"
               >
-                <span className="flex items-center justify-center w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary/70 text-white font-bold text-sm shrink-0">
-                  {initials.slice(0, 2).toUpperCase()}
-                </span>
-                {!collapsed && (
-                  <span className={labelClass}>
-                    <span className="block text-sm font-semibold text-foreground truncate">{displayName}</span>
-                    <span className="block text-[11px] text-muted-foreground truncate">{user?.email ?? ""}</span>
-                  </span>
-                )}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="right" align="end" sideOffset={12} className="w-56 p-1.5">
-              <div className="px-2.5 py-2">
-                <p className="text-sm font-semibold truncate">{displayName}</p>
-                <p className="text-[11px] text-muted-foreground truncate">{user?.email ?? ""}</p>
-              </div>
-              <div className="h-px bg-border my-1" aria-hidden="true" />
+                {initials.slice(0, 2).toUpperCase()}
+              </span>
               <button
                 onClick={handleLogout}
                 data-testid="sidebar-logout"
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm font-medium text-rose-600 hover:bg-rose-500/10 transition-colors"
+                aria-label="Sign out"
+                title="Sign out"
+                className="flex items-center justify-center w-9 h-9 rounded-[10px] text-rose-600 hover:bg-rose-500/10 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <>
+              <div data-testid="sidebar-user-card" className="flex items-center gap-3 w-full p-2.5 rounded-[10px]">
+                <span className="flex items-center justify-center w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary/70 text-white font-bold text-sm shrink-0">
+                  {initials.slice(0, 2).toUpperCase()}
+                </span>
+                <span className={labelClass}>
+                  <span className="block text-sm font-semibold text-foreground truncate">{displayName}</span>
+                  <span className="block text-[11px] text-muted-foreground truncate">{user?.email ?? ""}</span>
+                </span>
+              </div>
+              <button
+                onClick={handleLogout}
+                data-testid="sidebar-logout"
+                className="w-full flex items-center justify-center gap-2 px-2.5 py-2 rounded-[10px] border border-border/60 text-sm font-semibold text-rose-600 hover:bg-rose-500/10 hover:border-rose-500/40 transition-colors"
               >
                 <LogOut className="w-4 h-4" /> Sign out
               </button>
-            </PopoverContent>
-          </Popover>
+            </>
+          )}
         </div>
       </TooltipProvider>
     </aside>

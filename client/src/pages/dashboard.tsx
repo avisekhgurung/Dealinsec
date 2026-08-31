@@ -1119,7 +1119,7 @@ export default function DashboardPage() {
                       </CardHeader>
                       <CardContent className="px-4 pb-5 lg:px-6 lg:pb-6">
                         <div className="flex flex-col sm:flex-row items-center gap-4 lg:gap-6">
-                          <div className="relative w-[168px] h-[168px] lg:w-[190px] lg:h-[190px] shrink-0">
+                          <div className="relative w-[168px] h-[168px] lg:w-[150px] lg:h-[150px] xl:w-[186px] xl:h-[186px] shrink-0">
                             <ResponsiveContainer width="100%" height="100%">
                               <PieChart>
                                 <Pie data={platformDist} cx="50%" cy="50%" innerRadius="60%" outerRadius="88%"
@@ -1136,13 +1136,16 @@ export default function DashboardPage() {
                               <span className="text-2xl lg:text-3xl font-bold text-foreground leading-tight">{dTotal}</span>
                             </div>
                           </div>
-                          <div className="flex-1 w-full space-y-2">
+                          {/* min-w-0 (not w-full) — a 100%-wide flex child beside
+                              the fixed-width donut overflows the card and clips
+                              the % column. */}
+                          <div className="flex-1 min-w-0 self-stretch flex flex-col justify-center gap-1.5">
                             {platformDist.map((entry, i) => (
-                              <div key={i} className="flex items-center gap-2.5 text-xs lg:text-sm">
-                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colorForPlatform(entry.platform, i) }} />
+                              <div key={i} className="flex items-baseline gap-2 text-xs lg:text-[13px]">
+                                <span className="w-2 h-2 rounded-full shrink-0 translate-y-[-1px]" style={{ backgroundColor: colorForPlatform(entry.platform, i) }} />
                                 <span className="flex-1 min-w-0 truncate text-foreground">{entry.platform}</span>
-                                <span className="font-semibold text-foreground tabular-nums">{entry.count}</span>
-                                <span className="text-muted-foreground tabular-nums w-10 text-right">{Math.round((entry.count / dTotal) * 100)}%</span>
+                                <span className="font-semibold text-foreground tabular-nums shrink-0">{entry.count}</span>
+                                <span className="text-muted-foreground/80 tabular-nums shrink-0 w-9 text-right">{Math.round((entry.count / dTotal) * 100)}%</span>
                               </div>
                             ))}
                           </div>
@@ -1163,7 +1166,7 @@ export default function DashboardPage() {
                       </CardHeader>
                       <CardContent className="px-4 pb-5 lg:px-6 lg:pb-6">
                         <div className="flex flex-col sm:flex-row items-center gap-4 lg:gap-6">
-                          <div className="relative w-[168px] h-[168px] lg:w-[190px] lg:h-[190px] shrink-0">
+                          <div className="relative w-[168px] h-[168px] lg:w-[150px] lg:h-[150px] xl:w-[186px] xl:h-[186px] shrink-0">
                             <ResponsiveContainer width="100%" height="100%">
                               <PieChart>
                                 <Pie data={moneyPie} cx="50%" cy="50%" innerRadius="60%" outerRadius="88%"
@@ -1196,13 +1199,19 @@ export default function DashboardPage() {
                               </span>
                             </div>
                           </div>
-                          <div className="flex-1 w-full space-y-2.5">
+                          {/* Stacked rows: a ₹ amount and a label can't share one
+                              line in a ~180px legend without truncating the name. */}
+                          <div className="flex-1 min-w-0 self-stretch flex flex-col justify-center gap-3">
                             {moneyPie.map((entry, i) => (
-                              <div key={i} className="flex items-center gap-2.5 text-xs lg:text-sm">
-                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.fill }} />
-                                <span className="flex-1 min-w-0 truncate text-foreground">{entry.name}</span>
-                                <span className="font-semibold text-foreground tabular-nums">₹{Number(entry.value).toLocaleString("en-IN")}</span>
-                                <span className="text-muted-foreground tabular-nums w-10 text-right">{Math.round((entry.value / totalInvoiceValue) * 100)}%</span>
+                              <div key={i} className="min-w-0">
+                                <div className="flex items-baseline gap-2 text-xs lg:text-[13px]">
+                                  <span className="w-2 h-2 rounded-full shrink-0 translate-y-[-1px]" style={{ backgroundColor: entry.fill }} />
+                                  <span className="flex-1 min-w-0 truncate text-foreground">{entry.name}</span>
+                                  <span className="text-muted-foreground/80 tabular-nums shrink-0">{Math.round((entry.value / totalInvoiceValue) * 100)}%</span>
+                                </div>
+                                <div className="pl-4 font-semibold text-foreground tabular-nums text-sm lg:text-[15px] leading-tight">
+                                  ₹{Number(entry.value).toLocaleString("en-IN")}
+                                </div>
                               </div>
                             ))}
                           </div>
