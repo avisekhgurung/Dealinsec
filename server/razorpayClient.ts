@@ -38,8 +38,11 @@ export function getProMonthlyPrice(): number {
   return parseInt(process.env.PRO_MONTHLY_PRICE ?? "999", 10);
 }
 
+// Launch default is the FOUNDING price (₹5,999/yr) the site advertises —
+// the marketing copy and the charge must never disagree. Raise it back to
+// 9999 (or any value) via PRO_YEARLY_PRICE once the founding cohort closes.
 export function getProYearlyPrice(): number {
-  return parseInt(process.env.PRO_YEARLY_PRICE ?? "9999", 10);
+  return parseInt(process.env.PRO_YEARLY_PRICE ?? "5999", 10);
 }
 
 export function getDealBoostPrice(): number {
