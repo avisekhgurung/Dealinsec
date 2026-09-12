@@ -10,9 +10,14 @@
  *   RAZORPAY_WEBHOOK_SECRET  (private — verifies webhook authenticity)
  *
  * Pricing (₹, env-overridable for test-mode runs):
- *   PRO_MONTHLY_PRICE (default 999)   — Pro, 1 month
- *   PRO_YEARLY_PRICE  (default 9999)  — Pro, 1 year ("Save 2 Months")
- *   DEAL_BOOST_PRICE  (default 99)    — unlimited deals+quotations, 1 month
+ *   PRO_MONTHLY_PRICE (default 99)    — Pro, 1 month
+ *   PRO_YEARLY_PRICE  (default 999)   — Pro, 1 year (≈ ₹83/month; ₹189 less
+ *                                       than 12 × monthly — NOT "2 months free")
+ *   EXTRA_SEAT_PRICE  (default 99)    — one extra seat, 1 month
+ *   DEAL_BOOST_PRICE  (default 99)    — unlimited deals+quotations, 1 month.
+ *                                       Retired from every UI surface; the SKU
+ *                                       stays for cached clients and refunds.
+ * The client mirrors these defaults in client/src/hooks/use-plan-prices.ts.
  */
 import Razorpay from "razorpay";
 import crypto from "crypto";
@@ -35,25 +40,25 @@ export const PRO_YEARLY_DAYS = 366;
 export const DEAL_BOOST_DAYS = 31;
 
 export function getProMonthlyPrice(): number {
-  return parseInt(process.env.PRO_MONTHLY_PRICE ?? "999", 10);
+  return parseInt(process.env.PRO_MONTHLY_PRICE ?? "99", 10);
 }
 
-// Launch default is the FOUNDING price (₹5,999/yr) the site advertises —
-// the marketing copy and the charge must never disagree. Raise it back to
-// 9999 (or any value) via PRO_YEARLY_PRICE once the founding cohort closes.
+// Default is the ₹999/yr list price the site advertises — the marketing copy
+// and the charge must never disagree, so change both together.
+// PRO_YEARLY_PRICE still overrides it (e.g. ₹1 for test-mode runs).
 export function getProYearlyPrice(): number {
-  return parseInt(process.env.PRO_YEARLY_PRICE ?? "5999", 10);
+  return parseInt(process.env.PRO_YEARLY_PRICE ?? "999", 10);
 }
 
 export function getDealBoostPrice(): number {
   return parseInt(process.env.DEAL_BOOST_PRICE ?? "99", 10);
 }
 
-// Extra team seats beyond the plan's included 5 (Pro): ₹199/seat/month.
+// Extra seats beyond the plan's included 5 (Pro): ₹99/seat/month.
 export const EXTRA_SEAT_DAYS = 31;
 
 export function getExtraSeatPrice(): number {
-  return parseInt(process.env.EXTRA_SEAT_PRICE ?? "199", 10);
+  return parseInt(process.env.EXTRA_SEAT_PRICE ?? "99", 10);
 }
 
 function getClient(): Razorpay {

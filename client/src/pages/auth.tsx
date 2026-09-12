@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Loader2, Briefcase, FileText, FileCheck, Receipt, Check, ArrowLeft, Eye, EyeOff,
-  Mail, Lock, ShieldCheck, KeyRound, Users, Sparkles,
+  Mail, Lock, ShieldCheck, KeyRound, Trash2, Sparkles,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -37,15 +37,15 @@ const PIPELINE = [
 const PROOF_POINTS = [
   "Agreements carry a signed execution record",
   "No credit card required",
-  "Built for India's deal-led businesses",
+  "Built for India's freelancers",
   "7-day Pro trial — everything unlocked",
 ];
 
-/** Security facts, each one verifiable in the code — see PRIVACY policy §3. */
+/** Security facts, each one verifiable in the code — see the PRIVACY policy. */
 const TRUST_STRIP = [
   { icon: Lock, title: "Encrypted in transit", sub: "Every request over HTTPS" },
   { icon: KeyRound, title: "Passwords hashed", sub: "bcrypt — never stored plain" },
-  { icon: Users, title: "Role-based access", sub: "You control who sees what" },
+  { icon: Trash2, title: "Delete anytime", sub: "Settings → Your data" },
 ];
 
 function GoogleIcon() {
@@ -251,7 +251,7 @@ export default function AuthPage() {
                       className="h-12 rounded-xl !pl-10"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@company.com"
+                      placeholder="you@example.com"
                       autoComplete="email"
                       data-testid="input-email"
                     />
@@ -372,9 +372,9 @@ export default function AuthPage() {
             <span className="text-emerald-300">And get paid on time.</span>
           </h2>
           <p className="text-emerald-100/70 mt-4 text-sm leading-relaxed">
-            One workflow for India's real estate consultants, interior designers,
-            architects, agencies &amp; contractors — quotation, e-signed agreement,
-            GST invoice and payment tracking.
+            One workflow for India's freelancers — designers, developers, writers,
+            video editors &amp; photographers, marketers and consultants. Quotation,
+            e-signed agreement, invoice and payment tracking, on one thread per client.
           </p>
 
           <div className="flex items-center gap-2 mt-9">

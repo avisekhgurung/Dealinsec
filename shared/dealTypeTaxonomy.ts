@@ -1,8 +1,9 @@
 /**
  * DealInSec — Deal Type Taxonomy
  *
- * Comprehensive catalog of deal categories and output/content types for
- * every type of service business in India. Each dealType has a list of
+ * Catalog of deal categories and output/billing types for the work India's
+ * freelancers quote and bill — designers, developers, writers, video editors
+ * & photographers, marketers and consultants. Each dealType has a list of
  * categories grouped by domain, and each category has a list of typical
  * output/type options. Every dropdown also supports an "Other (specify)"
  * free-text fallback, so users are never stuck.
@@ -13,30 +14,34 @@
  *  - client/src/pages/deal-details.tsx & deals.tsx (display)
  */
 
-// Phase-1 ICP: B2B service sectors. These are the ONLY selectable types for
-// new deals. Legacy types (Creator/Freelance/Consulting/Service Vendor) are no
-// longer offered but stay fully supported for existing deals — display,
-// editing, quotes and agreement PDFs all keep their original wording.
+// Freelancer-only: DealInSec serves solo independent professionals who quote,
+// sign and bill their own clients. These are the ONLY selectable types for new
+// deals, ordered by how many freelancers do that work. The five craft types
+// (Design → Video & Photo) are built from the Freelance taxonomy's groups
+// below rather than new option lists, so wording stays identical across them.
 export const dealTypeOptions = [
+  "Design",
+  "Development",
+  "Writing",
+  "Marketing",
+  "Video & Photo",
+  "Consulting",
+  "Custom",
+] as const;
+
+// Retired from the new-deal picker. The service-business types (Real Estate
+// → Construction) were the earlier SMB positioning; Freelance is replaced by
+// the five craft types above; Creator and Service Vendor were retired before
+// that. All keep their full taxonomy, agreement copy and labels so existing
+// deals still render, stay editable (edit-deal accepts active + legacy), and
+// signed agreements re-render with their original wording.
+export const legacyDealTypeOptions = [
   "Real Estate",
   "Interior Design",
   "Architecture",
   "Agency",
   "Construction",
-  // Freelance + Consulting are the B2B service segment the ICP pivot moved
-  // TOWARD — they were mistakenly bundled into "legacy" when Creator (the
-  // Instagram segment we moved AWAY from) was retired. Their taxonomy,
-  // agreement copy and deliverable labels are all fully defined below.
   "Freelance",
-  "Consulting",
-  "Custom",
-] as const;
-
-// Retired from the active picker. Creator = the Instagram-creator ICP we
-// intentionally left. Service Vendor overlaps the active types; promote it
-// only if real vendors ask for it. Kept here (with full taxonomy) so existing
-// deals of these types still render correctly.
-export const legacyDealTypeOptions = [
   "Creator",
   "Service Vendor",
 ] as const;
@@ -46,6 +51,51 @@ export type LegacyDealType = (typeof legacyDealTypeOptions)[number];
 export type AnyDealType = DealType | LegacyDealType;
 
 export const dealTypeMeta: Record<AnyDealType, { label: string; description: string; emoji: string; tint: string }> = {
+  // Tints are spread so neighbouring cards differ in both the 2-column
+  // (mobile) and 4-column (desktop) picker grids in create-deal.tsx.
+  Design: {
+    label: "Design",
+    description: "Logos, branding, UI/UX, social creatives & pitch decks.",
+    emoji: "🎨",
+    tint: "teal",
+  },
+  Development: {
+    label: "Development",
+    description: "Websites, apps, Shopify & WordPress builds, automations.",
+    emoji: "💻",
+    tint: "emerald",
+  },
+  Writing: {
+    label: "Writing",
+    description: "Copy, SEO blogs, scripts, ghostwriting & translation.",
+    emoji: "✍️",
+    tint: "indigo",
+  },
+  Marketing: {
+    label: "Marketing",
+    description: "SEO, Meta & Google ads, social media and email marketing.",
+    emoji: "📣",
+    tint: "amber",
+  },
+  "Video & Photo": {
+    label: "Video & Photo",
+    description: "Reels & YouTube edits, motion graphics, shoots, voiceovers.",
+    emoji: "📸",
+    tint: "emerald",
+  },
+  Consulting: {
+    label: "Consulting",
+    description: "Strategy, audits, coaching, training & business support.",
+    emoji: "💡",
+    tint: "indigo",
+  },
+  Custom: {
+    label: "Custom",
+    description: "Any other freelance work — describe it your own way.",
+    emoji: "⚙️",
+    tint: "slate",
+  },
+  // ── Legacy types (existing deals only, not selectable) ──
   "Real Estate": {
     label: "Real Estate",
     description: "Sales, rentals, leasing & property services — brokerage and advisory.",
@@ -76,30 +126,17 @@ export const dealTypeMeta: Record<AnyDealType, { label: string; description: str
     emoji: "🏗️",
     tint: "slate",
   },
-  Custom: {
-    label: "Custom",
-    description: "Anything else — free-form deal not covered above.",
-    emoji: "⚙️",
-    tint: "slate",
-  },
-  // ── Legacy types (existing deals only, not selectable) ──
-  Creator: {
-    label: "Creator",
-    description: "Brand deals, sponsored content, paid posts on social platforms.",
-    emoji: "🎬",
-    tint: "emerald",
-  },
   Freelance: {
     label: "Freelance",
     description: "Project-based digital work — design, dev, writing, marketing.",
     emoji: "💼",
     tint: "teal",
   },
-  Consulting: {
-    label: "Consulting",
-    description: "Hourly, retainer, coaching, advisory, strategy work.",
-    emoji: "💡",
-    tint: "indigo",
+  Creator: {
+    label: "Creator",
+    description: "Brand deals, sponsored content, paid posts on social platforms.",
+    emoji: "🎬",
+    tint: "emerald",
   },
   "Service Vendor": {
     label: "Service Vendor",
@@ -330,6 +367,33 @@ const freelanceTaxonomy: TaxonomyEntry = {
 };
 
 // ===================================================================
+// ACTIVE CRAFT TYPES — built from the Freelance groups above, so the
+// options stay the same ones freelancers already pick from.
+// ===================================================================
+
+/** Freelance category groups by name, in the order given. Throws on a typo
+ *  so a missing group fails loudly at load instead of silently vanishing. */
+function pickFreelanceGroups(...names: string[]): CategoryGroup[] {
+  return names.map((name) => {
+    const group = freelanceTaxonomy.categories.find((g) => g.group === name);
+    if (!group) throw new Error(`dealTypeTaxonomy: unknown freelance group "${name}"`);
+    return group;
+  });
+}
+
+function freelanceSubset(...names: string[]): TaxonomyEntry {
+  return { categories: pickFreelanceGroups(...names), outputs: freelanceTaxonomy.outputs };
+}
+
+const designTaxonomy = freelanceSubset("Design");
+const developmentTaxonomy = freelanceSubset("Development");
+const writingTaxonomy = freelanceSubset("Writing");
+const marketingTaxonomy = freelanceSubset("Marketing");
+// "Visual" is mostly photography (product / event / portrait) plus 3D renders
+// — visual production work, so it sits with video rather than Design.
+const videoPhotoTaxonomy = freelanceSubset("Video & Audio", "Visual");
+
+// ===================================================================
 // CONSULTING
 // ===================================================================
 const consultingTaxonomy: TaxonomyEntry = {
@@ -394,6 +458,9 @@ const consultingTaxonomy: TaxonomyEntry = {
       group: "Industry-specific",
       options: ["Real estate advisory", "Healthcare consulting", "Hospitality consulting", "Manufacturing / Supply chain"],
     },
+    // Freelance groups with no craft type of their own — appended here so
+    // every Freelance option stays reachable from an active type.
+    ...pickFreelanceGroups("Business support", "Education / Training"),
   ],
   outputs: [
     {
@@ -633,7 +700,7 @@ const serviceVendorTaxonomy: TaxonomyEntry = {
 };
 
 // ===================================================================
-// REAL ESTATE — Phase 1
+// REAL ESTATE — legacy (existing deals only)
 // ===================================================================
 const realEstateTaxonomy: TaxonomyEntry = {
   categories: [
@@ -695,7 +762,7 @@ const realEstateTaxonomy: TaxonomyEntry = {
 };
 
 // ===================================================================
-// INTERIOR DESIGN — Phase 1
+// INTERIOR DESIGN — legacy (existing deals only)
 // ===================================================================
 const interiorDesignTaxonomy: TaxonomyEntry = {
   categories: [
@@ -757,7 +824,7 @@ const interiorDesignTaxonomy: TaxonomyEntry = {
 };
 
 // ===================================================================
-// ARCHITECTURE — Phase 1
+// ARCHITECTURE — legacy (existing deals only)
 // ===================================================================
 const architectureTaxonomy: TaxonomyEntry = {
   categories: [
@@ -814,7 +881,7 @@ const architectureTaxonomy: TaxonomyEntry = {
 };
 
 // ===================================================================
-// AGENCY — Phase 1 (marketing / creative / digital / web)
+// AGENCY — legacy (existing deals only; marketing / creative / digital / web)
 // ===================================================================
 const agencyTaxonomy: TaxonomyEntry = {
   categories: [
@@ -874,7 +941,7 @@ const agencyTaxonomy: TaxonomyEntry = {
 };
 
 // ===================================================================
-// CONSTRUCTION — Phase 1
+// CONSTRUCTION — legacy (existing deals only)
 // ===================================================================
 const constructionTaxonomy: TaxonomyEntry = {
   categories: [
@@ -955,16 +1022,21 @@ const customTaxonomy: TaxonomyEntry = {
 // ───────────────────────────────────────────────────────────────────────
 
 export const TAXONOMY: Record<AnyDealType, TaxonomyEntry> = {
+  Design: designTaxonomy,
+  Development: developmentTaxonomy,
+  Writing: writingTaxonomy,
+  Marketing: marketingTaxonomy,
+  "Video & Photo": videoPhotoTaxonomy,
+  Consulting: consultingTaxonomy,
+  Custom: customTaxonomy,
+  // Legacy (existing deals only)
   "Real Estate": realEstateTaxonomy,
   "Interior Design": interiorDesignTaxonomy,
   Architecture: architectureTaxonomy,
   Agency: agencyTaxonomy,
   Construction: constructionTaxonomy,
-  Custom: customTaxonomy,
-  // Legacy (existing deals only)
-  Creator: creatorTaxonomy,
   Freelance: freelanceTaxonomy,
-  Consulting: consultingTaxonomy,
+  Creator: creatorTaxonomy,
   "Service Vendor": serviceVendorTaxonomy,
 };
 
@@ -1023,7 +1095,33 @@ export interface AgreementCopy {
   nonExclusiveText: string;
 }
 
+// Shared by the legacy Freelance type and the five active craft types, so a
+// Design or Writing deal gets the same agreement a Freelance deal always had.
+// Existing Freelance agreements must re-render identically — do not edit.
+const FREELANCE_AGREEMENT_COPY: AgreementCopy = {
+  title: "Freelance Services Agreement",
+  providerRole: "Freelancer / Service Provider",
+  providerNoun: "Freelancer",
+  clientRole: "Client",
+  clientNoun: "Client",
+  clientFieldLabel: "Client Name",
+  serviceDescription: "freelance professional services",
+  complianceNote: "All work shall be original, professionally executed, and compliant with applicable laws and industry standards.",
+  rightsHeading: "Work Product & Ownership",
+  rightsText:
+    "Upon full and final payment, the Freelancer assigns to the Client all rights, title, and interest in the final deliverables produced under this Agreement. Until full payment is received, all work product remains the property of the Freelancer. The Freelancer retains the right to display the work in their portfolio unless otherwise agreed in writing.",
+  exclusiveText:
+    "This Agreement is EXCLUSIVE for its scope. During the Agreement period, the Freelancer shall not provide identical competing deliverables to a direct competitor of the Client for the same project without prior written consent.",
+  nonExclusiveText:
+    "This Agreement is NON-EXCLUSIVE. The Freelancer may take on other clients and projects during the Agreement period, provided such work does not delay or compromise the deliverables agreed herein.",
+};
+
 const AGREEMENT_COPY: Record<AnyDealType, AgreementCopy> = {
+  Design: FREELANCE_AGREEMENT_COPY,
+  Development: FREELANCE_AGREEMENT_COPY,
+  Writing: FREELANCE_AGREEMENT_COPY,
+  Marketing: FREELANCE_AGREEMENT_COPY,
+  "Video & Photo": FREELANCE_AGREEMENT_COPY,
   "Real Estate": {
     title: "Real Estate Services Agreement",
     providerRole: "Broker / Real Estate Consultant",
@@ -1131,23 +1229,7 @@ const AGREEMENT_COPY: Record<AnyDealType, AgreementCopy> = {
     nonExclusiveText:
       "This Agreement is NON-EXCLUSIVE. The Creator may engage with other brands and clients during the Agreement period, provided such engagements do not directly conflict with or diminish the promotional value of this Agreement.",
   },
-  Freelance: {
-    title: "Freelance Services Agreement",
-    providerRole: "Freelancer / Service Provider",
-    providerNoun: "Freelancer",
-    clientRole: "Client",
-    clientNoun: "Client",
-    clientFieldLabel: "Client Name",
-    serviceDescription: "freelance professional services",
-    complianceNote: "All work shall be original, professionally executed, and compliant with applicable laws and industry standards.",
-    rightsHeading: "Work Product & Ownership",
-    rightsText:
-      "Upon full and final payment, the Freelancer assigns to the Client all rights, title, and interest in the final deliverables produced under this Agreement. Until full payment is received, all work product remains the property of the Freelancer. The Freelancer retains the right to display the work in their portfolio unless otherwise agreed in writing.",
-    exclusiveText:
-      "This Agreement is EXCLUSIVE for its scope. During the Agreement period, the Freelancer shall not provide identical competing deliverables to a direct competitor of the Client for the same project without prior written consent.",
-    nonExclusiveText:
-      "This Agreement is NON-EXCLUSIVE. The Freelancer may take on other clients and projects during the Agreement period, provided such work does not delay or compromise the deliverables agreed herein.",
-  },
+  Freelance: FREELANCE_AGREEMENT_COPY,
   Consulting: {
     title: "Consulting Services Agreement",
     providerRole: "Consultant / Advisor",
@@ -1229,17 +1311,25 @@ export interface DeliverableLabels {
   who: string;
 }
 
+// The five craft types share Freelance's labels (same taxonomy outputs).
+const FREELANCE_LABELS: DeliverableLabels = { category: "Category", type: "Output", who: "Client Name" };
+
 const DELIVERABLE_LABELS: Record<AnyDealType, DeliverableLabels> = {
+  Design: FREELANCE_LABELS,
+  Development: FREELANCE_LABELS,
+  Writing: FREELANCE_LABELS,
+  Marketing: FREELANCE_LABELS,
+  "Video & Photo": FREELANCE_LABELS,
+  Consulting: { category: "Practice Area", type: "Format", who: "Client Name" },
+  Custom: { category: "Category", type: "Output", who: "Client / Brand" },
+  // Legacy (existing deals only)
   "Real Estate": { category: "Service", type: "Billing Basis", who: "Client Name" },
   "Interior Design": { category: "Scope / Area", type: "Billing Basis", who: "Client Name" },
   Architecture: { category: "Service", type: "Billing Basis", who: "Client Name" },
   Agency: { category: "Service", type: "Billing Model", who: "Client Name" },
   Construction: { category: "Work / Trade", type: "Billing Basis", who: "Client Name" },
-  Custom: { category: "Category", type: "Output", who: "Client / Brand" },
-  // Legacy (existing deals only)
+  Freelance: FREELANCE_LABELS,
   Creator: { category: "Platform", type: "Content Type", who: "Brand Name" },
-  Freelance: { category: "Category", type: "Output", who: "Client Name" },
-  Consulting: { category: "Practice Area", type: "Format", who: "Client Name" },
   "Service Vendor": { category: "Service", type: "Output", who: "Client Name" },
 };
 

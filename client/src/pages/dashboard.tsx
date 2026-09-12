@@ -550,7 +550,7 @@ export default function DashboardPage() {
   const canCreateDeal = memberCan(user as any, "deals.create");
   const displayName = user?.firstName && user?.lastName
     ? `${user.firstName} ${user.lastName}`
-    : user?.email?.split("@")[0] || "Influencer";
+    : user?.email?.split("@")[0] || "there";
   // Time-of-day greeting + today's date — the header should orient, not
   // just repeat the name that's already in the sidebar footer.
   const hour = new Date().getHours();
@@ -1290,7 +1290,7 @@ export default function DashboardPage() {
               </div>
               <h3 className="font-semibold mb-1">No deals yet</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Create your first brand deal to get started
+                Create your first client deal to get started
               </p>
               {canCreateDeal && (
                 <Link href="/deals/new">

@@ -99,7 +99,7 @@ export async function setupAuth(app: Express) {
       }
 
       if (role && role !== "influencer") {
-        return res.status(400).json({ message: "Only influencer signup is available right now" });
+        return res.status(400).json({ message: "Only freelancer signup is available right now" });
       }
 
       // 5 new accounts / 15 min from one IP is far above honest use.

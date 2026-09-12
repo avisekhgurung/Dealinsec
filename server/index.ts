@@ -15,6 +15,7 @@ import { storage } from './storage';
 import { registerToolPages, toolSitemapPaths } from './tools';
 import { registerBlogPages, blogSitemapPaths } from './blog';
 import { registerCategoryPages, categorySitemapPaths } from './category-pages';
+import { registerLegacyRedirects } from './legacy-redirects';
 
 const app = express();
 
@@ -297,7 +298,9 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
 
   // Public server-rendered SEO/tool pages — MUST be registered before the SPA
   // catch-all (serveStatic / setupVite) so /tools/* and /blog/* return real
-  // crawlable HTML instead of the SPA shell.
+  // crawlable HTML instead of the SPA shell. Retired-page redirects go first
+  // so a removed path can never fall through to a param route.
+  registerLegacyRedirects(app);
   registerToolPages(app);
   registerBlogPages(app);
   registerCategoryPages(app);

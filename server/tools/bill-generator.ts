@@ -18,7 +18,7 @@ import { COMMON_JS, ITEMS_JS, MEDIA_JS, EXPORT_JS } from "./client-lib";
 const PATH = "/tools/bill-generator";
 const TITLE = "Free Bill Generator — Create a Bill Online (India) | DealInSec";
 const DESC =
-  "Create a bill online free: item-wise bill with total, amount in words, optional GST, logo, signature and a PAID stamp — instant PDF, no sign-up. The online bill maker for Indian shops and service businesses.";
+  "Create a bill online free: item-wise bill with total, amount in words, optional GST, logo, signature and a PAID stamp — instant PDF, no sign-up. The online bill maker for India's freelancers and small sellers.";
 
 const FAQ: { q: string; a: string }[] = [
   {
@@ -187,7 +187,7 @@ const BODY = `
 
 <section><div class="wrap">
   <h2>Need a GST invoice instead?</h2>
-  <p class="muted" style="max-width:720px">A simple bill is fine for counter sales and everyday services. If you're GST-registered and the buyer needs to claim input credit, issue a proper tax invoice with CGST/SGST/IGST computed and your GSTIN shown — our <a href="/tools/gst-invoice-generator">free GST invoice generator</a> does that, also without a sign-up. And when your work is deal-shaped (quotation first, then an agreement, then bills), that's what <a href="/">DealInSec</a> itself is for.</p>
+  <p class="muted" style="max-width:720px">A simple bill is fine for counter sales and everyday services. If you're GST-registered and the buyer needs to claim input credit, issue a proper tax invoice with CGST/SGST/IGST computed and your GSTIN shown — our <a href="/tools/gst-invoice-generator">free GST invoice generator</a> does that, also without a sign-up. And if you freelance — quotation first, then a signed agreement, then the invoice — that's what <a href="/">DealInSec</a> itself is for.</p>
 </div></section>
 
 <section><div class="wrap faq">

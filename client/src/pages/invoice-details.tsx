@@ -153,7 +153,7 @@ export default function InvoiceDetailsPage() {
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                  Influencer
+                  From
                 </p>
                 <p className="font-semibold" data-testid="text-influencer-name">
                   {invoice.influencerName}
@@ -161,7 +161,7 @@ export default function InvoiceDetailsPage() {
               </div>
               <div>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">
-                  Brand
+                  Client
                 </p>
                 <p className="font-semibold" data-testid="text-brand-name">
                   {invoice.brandName}

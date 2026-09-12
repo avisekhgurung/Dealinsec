@@ -2,7 +2,7 @@
  * Deal Protection Check — the deterministic half of "stay protected".
  *
  * Scans a deal's terms (custom lines + selected standard terms) for the
- * failure modes that actually burn Indian service businesses: vague scope
+ * failure modes that actually burn India's freelancers: vague scope
  * hooks ("as per site requirement"), unlimited revisions, pay-when-paid
  * chains, retention without a release date, missing advance/balance/revision
  * /exclusion protections, and self-contradicting payment figures.
@@ -53,12 +53,12 @@ export function analyzeDealProtections(deal: Deal): ProtectionReport {
   const flags: ProtectionFlag[] = [];
 
   /* ── Dangerous phrases (disputes waiting for a trigger) ── */
-  if (has(/as per (the )?site (requirement|condition)/i)) {
+  if (has(/as per (the )?(site|project|client)? ?(requirement|condition)/i)) {
     flags.push({
       id: "vague_site",
       severity: "risk",
       title: "Vague scope hook",
-      detail: '"As per site requirement" lets scope grow without a paper trail — every addition becomes an argument.',
+      detail: '"As per requirement" lets scope grow without a paper trail — every addition becomes an argument.',
     });
   }
   if (has(/unlimited (revision|change|iteration|modification)/i)) {

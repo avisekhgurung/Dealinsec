@@ -8,6 +8,15 @@
  * "best e signature software" (SD 9). The homepage owns "deal management
  * software" (SD 15); these pages own the members of the thread and link back.
  *
+ * Audience (Sept 2026 pivot): India's freelancers ONLY — designers,
+ * developers, writers, video editors & photographers, marketers and
+ * consultants. /freelancer-invoice-software is the flagship; the old
+ * /interior-design-software page is gone (301'd to the flagship elsewhere),
+ * so nothing here may link to it. Pricing on every page: Free ₹0 (4 deals a
+ * month, quotations only — agreements, invoices and payment tracking are Pro
+ * via requirePro), Pro ₹99/month or ₹999/year. No founding offer, no Deal
+ * Boost, no team seats in marketing copy.
+ *
  * Same architecture as /tools and /blog: complete server-rendered HTML,
  * registered BEFORE the SPA catch-all. Every path here must ALSO be in
  * vite.config.ts navigateFallbackDenylist (and the NetworkFirst exclusion),
@@ -15,9 +24,11 @@
  * worker / wouter swallow the navigation.
  *
  * Copy rules (standing): no invented customers, counts or testimonials; no
- * "legally binding" claims — electronic acceptance with an audit record,
- * hedged, exactly as the product's own documents state it; in-app invoices
- * are NOT Rule-46 GST tax invoices and the invoice page says so plainly.
+ * claims that agreements are "binding" — electronic acceptance with an audit
+ * record, hedged, exactly as the product's own documents state it; in-app
+ * invoices are NOT Rule-46 GST tax invoices and the invoice page says so
+ * plainly; never promise that a client WILL pay — the product prevents the
+ * non-payment disorganisation causes and leaves a record, nothing more.
  */
 import type { Express } from "express";
 import { esc, SITE_ORIGIN, LOGO_SVG } from "./tools/layout";
@@ -145,7 +156,7 @@ function footer(): string {
   return `<footer class="site"><div class="wrap">
     <div class="links">
       <a href="/">Product</a>
-      <a href="/interior-design-software">For Interior Designers</a>
+      <a href="/freelancer-invoice-software">For Freelancers</a>
       <a href="/quotation-software">Quotation Software</a>
       <a href="/contract-management">Contract Management</a>
       <a href="/invoice-management">Invoice Management</a>
@@ -155,26 +166,26 @@ function footer(): string {
       <a href="/terms">Terms</a>
       <a href="/privacy">Privacy</a>
     </div>
-    <div class="muted">© 2026 DealInSec — deal management software for India's service businesses: quotation, e-signed agreement, invoice and payment tracking on one thread.</div>
+    <div class="muted">© 2026 DealInSec — for India's freelancers: quotation, e-signed agreement, invoice and payment tracking on one thread per client.</div>
   </div></footer>`;
 }
 
 function ctaBand(): string {
   return `<div class="cta-band"><div class="wrap">
-    <h2>One deal. One thread. Zero retyping.</h2>
-    <p>Quotation, e-signed agreement, invoice and payment tracking that always agree with each other — built for India's service businesses.</p>
+    <h2>One client. One thread. Zero retyping.</h2>
+    <p>Quotation, e-signed scope, invoices and payment follow-up that always agree with each other — built for India's freelancers.</p>
     <a class="btn" href="${SIGNUP}">Start your 7-day free trial →</a>
-    <span class="sub-note">No card required · Free plan after the trial · ₹999/month or ₹9,999/year for Pro</span>
+    <span class="sub-note">No card required · Free plan after the trial · Pro ₹99/month or ₹999/year</span>
   </div></div>`;
 }
 
 /** The quote → agreement → invoice → payment walk, highlighting this page's step. */
 function threadSection(highlight: "quote" | "contract" | "invoice" | "track" | "none"): string {
   const steps: { key: string; n: string; title: string; body: string }[] = [
-    { key: "quote", n: "1", title: "Quotation", body: "Generated from the deal record — itemised deliverables, terms, a stable number (QT-series) and a clean PDF in your name." },
+    { key: "quote", n: "1", title: "Quotation", body: "Generated from the deal record — itemised deliverables, revision rounds, terms, a stable number (QT-series) and a clean PDF in your name." },
     { key: "contract", n: "2", title: "Agreement", body: "The accepted quotation becomes an agreement with the same figures. Electronic acceptance is recorded — who, when, which signature." },
     { key: "invoice", n: "3", title: "Invoice", body: "Billed from the agreement — advance/balance or milestones — and DealInSec won't let you invoice more than the agreement is worth." },
-    { key: "track", n: "4", title: "Payment tracking", body: "Overdue, due this week, signed-but-not-invoiced — the dashboard tells you what is collectible today." },
+    { key: "track", n: "4", title: "Payment tracking", body: "Overdue, due this week, ready to invoice — the dashboard tells you what to bill and what to chase today." },
   ];
   const cards = steps
     .map((s) => `<div class="th-card${s.key === highlight ? " hl" : ""}"><div class="n">${s.n}</div><b>${s.title}</b><p>${s.body}</p></div>`)
@@ -199,117 +210,98 @@ function relatedSection(currentPath: string): string {
 /* ── Pages ─────────────────────────────────────────────────────────────── */
 
 const PAGES: CategoryPage[] = [
-  /* ── /interior-design-software — the sharp ICP wedge ──────────────────── */
-  {
-    path: "/interior-design-software",
-    metaTitle: "Interior Design Software — Quotations, Agreements & Payments",
-    description:
-      "The deal & payment software for Indian interior designers: quotation → e-signed agreement → milestone invoices on one thread, scope-creep protection, and payment reminders. Paste a client's WhatsApp chat and it drafts the deal. Free 7-day trial, no card.",
-    h1: "The deal & payment OS for interior designers",
-    sub: "Quotation, e-signed agreement, milestone invoices and payment chasing on one thread — built for the way Indian interior studios actually run projects. Paste the client's WhatsApp chat; it drafts the deal.",
-    chips: ["Made for interiors", "Milestone billing", "Scope-creep protection", "Free 7-day trial · no card"],
-    shortLabel: "For Interior Designers",
-    sections: `
-<section><div class="wrap">
-  <h2>Where interior projects leak money</h2>
-  <p class="sec-sub">It's never the design that costs you — it's what happens around it. A ₹8 lakh project agreed on WhatsApp, "just one more change" a dozen times, an advance taken with no written scope, and a final payment that never comes because nobody can prove what was agreed. DealInSec closes every one of those gaps.</p>
-  <div class="feat">
-    <div class="ft"><b>Paste the chat, get the deal</b><p>Paste the client's WhatsApp conversation and the Copilot drafts the deal — client, rooms, scope, amount, advance terms. You confirm; it never invents a number you didn't say.</p></div>
-    <div class="ft"><b>Scope-creep protection</b><p>Before you send, a Protection Check flags the gaps designers bleed on — no revision limit, no exclusions (civil work, furniture), no advance — and suggests the terms to add.</p></div>
-    <div class="ft"><b>Milestone billing, bounded</b><p>Bill 50% advance, stage payments, balance on handover — each invoice tied to the signed agreement, and never more than the project is worth.</p></div>
-    <div class="ft"><b>Payment chasing, in your voice</b><p>The Copilot drafts the follow-up for an overdue payment — English or Hinglish — using the real invoice number. You press send; it never messages a client on its own.</p></div>
-  </div>
-  <div class="callout honest"><b>Just need a quotation today?</b><p>Use the <a href="/tools/quotation-maker">free quotation maker</a> or grab a ready <a href="/tools/quotation-templates">interior quotation template</a> — no sign-up. The app is for when you're running projects every month and want them all on one thread.</p></div>
-</div></section>
-<section><div class="wrap">
-  <h2>WhatsApp + Excel vs DealInSec</h2>
-  <div class="tbl-scroll"><table class="cmp">
-    <tr><th></th><th>WhatsApp + Excel + memory</th><th>DealInSec</th></tr>
-    <tr><td><b>The scope</b></td><td>Agreed verbally, argued later</td><td>E-signed agreement with revision limits &amp; exclusions</td></tr>
-    <tr><td><b>Extra work</b></td><td>"You said you'd change it for free"</td><td>A change-order quotation before it's executed</td></tr>
-    <tr><td><b>Milestone invoices</b></td><td>Retyped each time, drift creeps in</td><td>Generated from the agreement, always consistent</td></tr>
-    <tr><td><b>The final payment</b></td><td>Chased awkwardly, or never</td><td>The dashboard shows what's overdue; the Copilot drafts the nudge</td></tr>
-  </table></div>
-  <p class="muted" style="font-size:14px;margin-top:10px">Guides for interiors: <a href="/blog/quotation-format">interior quotation format</a> · <a href="/blog/fake-quotation">client not paying — the written-trail method</a>.</p>
-</div></section>`,
-    faq: [
-      {
-        q: "Is DealInSec built for interior designers?",
-        a: "Yes — it's the sharpest fit. Interior projects are high-value and milestone-billed, with scope that shifts constantly, which is exactly what DealInSec manages: quotation → e-signed agreement → stage invoices on one thread, with scope-creep protection and payment tracking. It works for adjacent studios (architects, contractors, agencies) too.",
-      },
-      {
-        q: "Can it handle stage-wise / milestone billing?",
-        a: "Yes. Bill a 50% advance, stage payments, and a balance on handover — any split — with each invoice tied to the signed agreement, and DealInSec won't let you invoice more than the project is worth.",
-      },
-      {
-        q: "How does it stop scope creep?",
-        a: "Two ways: the agreement records the exact deliverables, revision limit and exclusions the client accepted; and the Protection Check flags when those are missing before you send. Extra work becomes a change-order quotation instead of a free favour.",
-      },
-      {
-        q: "Does it create GST invoices for my studio?",
-        a: "In-app invoices record the agreed value and print your PAN and GSTIN, but they are not Rule-46 GST tax invoices. For a GST tax invoice with CGST/SGST/IGST computed, use the free GST invoice generator — no sign-up.",
-      },
-      {
-        q: "What does it cost?",
-        a: "A 7-day Pro trial with no card, then a free plan covering 4 deals a month. Pro is ₹999/month or ₹9,999/year — less than one forgotten milestone invoice — with unlimited projects, agreements, invoices, payment tracking and 5 team seats.",
-      },
-    ],
-  },
-
-  /* ── /freelancer-invoice-software — the freelancer front door ─────────── */
+  /* ── /freelancer-invoice-software — the flagship: the whole audience ─── */
   {
     path: "/freelancer-invoice-software",
-    metaTitle: "Invoice & Deal Software for Freelancers in India",
+    metaTitle: "Freelancer Invoice Software for India — Quote, Sign, Get Paid",
     description:
-      "The get-paid toolkit for Indian freelancers: quotation → agreement → invoice → payment tracking on one thread, with scope-creep protection and AI payment reminders. Paste a client's WhatsApp chat and it drafts the deal. Free plan, no card.",
-    h1: "The get-paid toolkit for Indian freelancers",
-    sub: "You're the sales team, the delivery team AND the accounts team. DealInSec is your accounts team — quotation, agreement, invoice and payment chasing on one thread, so you look professional and actually get paid.",
-    chips: ["Made for India", "Free plan · no card", "Scope-creep protection", "AI payment reminders"],
+      "For India's freelancers: quotation, e-signed scope, advance & milestone invoices with your PAN/GSTIN, and payment reminders drafted in English or Hinglish — on one thread per client. Free plan; Pro ₹99/month.",
+    h1: "Invoice software for Indian freelancers who are tired of chasing payments",
+    sub: "For India's freelancers — designers, developers, writers, video editors & photographers, marketers and consultants. Quote the work, get the scope accepted in writing, bill the advance and milestones, and follow up on late payments — one thread per client, ₹99/month.",
+    chips: ["Advance + milestone billing", "Signed, timestamped scope", "Reminders in English or Hinglish", "Pro ₹99/month · free plan", "7-day trial · no card"],
     shortLabel: "For Freelancers",
     sections: `
 <section><div class="wrap">
-  <h2>The freelancer money problem isn't finding work — it's getting paid</h2>
-  <p class="sec-sub">You said yes on WhatsApp, started the work, and now the final payment is "coming soon" for the third week. No advance, no written scope, and asking again feels awkward. DealInSec fixes the whole chain so the awkward part is handled for you.</p>
-  <div class="feat">
-    <div class="ft"><b>Paste the chat, get the deal</b><p>Paste the client's WhatsApp conversation and the Copilot drafts the deal — scope, amount, advance terms. You confirm; it never invents a number you didn't say.</p></div>
-    <div class="ft"><b>Get the advance, in writing</b><p>Send a professional quotation with a 50% advance and clear terms, then an e-signed agreement — so "that wasn't what we agreed" never happens.</p></div>
-    <div class="ft"><b>Scope-creep protection</b><p>Before you send, a Protection Check flags what freelancers bleed on — no revision limit, no advance, nothing excluded — and suggests the terms to add.</p></div>
-    <div class="ft"><b>Chasing, without the awkward</b><p>The Copilot drafts the payment reminder — English or Hinglish — using the real invoice number. You press send; it never messages a client on its own.</p></div>
+  <h2>Built for people who quote, sign and bill their own clients</h2>
+  <p class="sec-sub">No accounts team, no office manager — just you, your laptop and your clients on WhatsApp. DealInSec handles the paperwork and the follow-up so you can get back to the work. Pick yours to see an invoice format made for it.</p>
+  <div class="rel-grid">
+    <a class="rel-card" href="/tools/invoice-format/for-graphic-designers">Design<span>Logos, brand kits, UI — revision rounds are where the unpaid hours go.</span></a>
+    <a class="rel-card" href="/tools/invoice-format/for-web-developers">Development<span>Sites and apps billed in milestones, then "one small change" after launch.</span></a>
+    <a class="rel-card" href="/tools/invoice-format/for-content-writers">Writing<span>Per word or per piece — and the draft is usually delivered before you're paid.</span></a>
+    <a class="rel-card" href="/tools/invoice-format/for-social-media-managers">Marketing<span>Monthly work, where one unpaid month quietly turns into two.</span></a>
+    <a class="rel-card" href="/tools/invoice-format/for-video-editors">Video &amp; Photo<span>Shoot days and edit rounds — and the client already has the files.</span></a>
+    <a class="rel-card" href="/tools/invoice-format/for-consultants">Consulting<span>Advice given on a call can't be taken back when the invoice is ignored.</span></a>
   </div>
-  <div class="callout honest"><b>Just need one invoice or quote today?</b><p>Use the free <a href="/tools/gst-invoice-generator">GST invoice generator</a> or <a href="/tools/quotation-maker">quotation maker</a> — no sign-up. The app is for when you're juggling several clients and want them all on one thread.</p></div>
+  <p class="muted" style="font-size:14px;margin-top:12px">More invoice formats: <a href="/tools/invoice-format/for-photographers">photographers</a> · <a href="/tools/invoice-format/for-translators">translators</a> · <a href="/tools/invoice-format/for-voice-over-artists">voice-over artists</a> · <a href="/tools/invoice-format/for-tutors">tutors</a> · <a href="/tools/invoice-format/for-freelancers">any freelancer</a>.</p>
 </div></section>
 <section><div class="wrap">
-  <h2>Why "just an invoice generator" isn't enough</h2>
+  <h2>Late, less, or never: where freelance money goes missing</h2>
+  <p class="sec-sub">The work is done. Now the payment is "coming this week" for the third week, the client wants ₹5,000 off because "the last round took long", or the chat has simply gone quiet. Some clients won't pay whatever you do — no software changes that. But a lot of unpaid invoices start on your side of the table: nothing in writing, no advance, an invoice sent a fortnight late, a reminder you felt too awkward to send. That part you can fix.</p>
+  <div class="feat">
+    <div class="ft"><b>No written scope → a scope the client accepted</b><p>Your quotation lists the deliverables, the revision rounds and what's not included. It becomes an agreement the client accepts electronically — DealInSec records who accepted, when, and with which signature.</p></div>
+    <div class="ft"><b>No advance → advance first, then milestones</b><p>Bill 50% before you start, a milestone on the first draft, the balance on delivery — any split. Every invoice is raised from the agreement, and DealInSec won't let you bill more than it's worth.</p></div>
+    <div class="ft"><b>Invoice sent late → nothing drops off the list</b><p>The dashboard shows what's ready to invoice, what's due this week and what's overdue — so the invoice goes out the day the milestone is done, not the day you remember.</p></div>
+    <div class="ft"><b>Awkward chasing → the reminder, already written</b><p>Pick a tone — Friendly, Professional, Firm, Final reminder or Hinglish — and the Copilot drafts the follow-up with the real invoice number and amount. You send it yourself on WhatsApp or email; it never messages a client on its own.</p></div>
+    <div class="ft"><b>Scope creep → caught before you send</b><p>The Protection Check reads your terms and flags unlimited revisions, no revision limit, no advance, nothing excluded and no late-payment terms — with a suggested line to add. Extra work gets its own quotation instead of becoming a free favour.</p></div>
+    <div class="ft"><b>Deal agreed on WhatsApp → paste the chat</b><p>Paste the client conversation and the Copilot drafts the deal — client, scope, amount, advance. You check it and confirm; it doesn't invent a number the chat doesn't contain.</p></div>
+  </div>
+  <div class="callout honest"><b>What DealInSec can't do</b><p>It can't make an unwilling client pay, and it isn't a collection agency. What it gives you is the record: the scope the client accepted, when they accepted it, and every invoice raised against it — timestamped, in one place, ready to show the client, a mediator or a lawyer if it comes to that. For next steps, see the <a href="/blog/client-not-paying">client-not-paying guide</a> and, if you're Udyam-registered, the <a href="/blog/msme-payment-rule-45-days-samadhaan">MSME 45-day payment rule</a>.</p></div>
+</div></section>
+<section><div class="wrap">
+  <h2>Example: a ₹60,000 website, start to finish</h2>
+  <p class="sec-sub">An illustrative project — not a real client — showing how one deal runs on one thread. Amounts are before GST.</p>
   <div class="tbl-scroll"><table class="cmp">
-    <tr><th></th><th>Invoice generator alone</th><th>DealInSec</th></tr>
-    <tr><td><b>The offer</b></td><td>You retype a quote each time</td><td>Quotation generated, converts into the invoice</td></tr>
-    <tr><td><b>The agreement</b></td><td>None — verbal, then disputed</td><td>E-signed, with a recorded audit trail</td></tr>
-    <tr><td><b>Scope creep</b></td><td>"One more small change" for free</td><td>Revision limits &amp; exclusions the client agreed to</td></tr>
-    <tr><td><b>Getting paid</b></td><td>You chase, awkwardly</td><td>Dashboard shows overdue; Copilot drafts the nudge</td></tr>
-    <tr><td><b>Cost</b></td><td>—</td><td>Free plan; Pro ₹999/mo — less than one unpaid project</td></tr>
+    <tr><th>Step</th><th>What happens in DealInSec</th></tr>
+    <tr><td><b>Quotation</b></td><td>5-page website, 2 revision rounds, hosting and copywriting excluded. ₹60,000 split 50 / 30 / 20. The Protection Check confirms the advance, revision limit and exclusions are all there.</td></tr>
+    <tr><td><b>Agreement</b></td><td>The accepted quotation becomes the agreement, same figures. The client accepts electronically; the record shows who, when and which signature.</td></tr>
+    <tr><td><b>Advance invoice</b></td><td>₹30,000 (50%) — work starts when it's paid.</td></tr>
+    <tr><td><b>Milestone invoice</b></td><td>₹18,000 (30%) on design approval.</td></tr>
+    <tr><td><b>"Can you add a blog too?"</b></td><td>Not in the accepted scope — so it goes out as a separate quotation, not a free favour.</td></tr>
+    <tr><td><b>Balance invoice</b></td><td>₹12,000 (20%) on launch. The three invoices can't add up to more than ₹60,000.</td></tr>
+    <tr><td><b>The balance is late</b></td><td>It shows as overdue on the dashboard. The Copilot drafts a Hinglish nudge — something like "Hi Rohan, ek gentle reminder — invoice INV-2627-0014 for ₹12,000 was due on the 5th. Payment kab tak ho payega?" — and you send it.</td></tr>
   </table></div>
-  <p class="muted" style="font-size:14px;margin-top:10px">Guides: <a href="/blog/how-to-make-a-quotation-online">making a quotation online</a> · <a href="/blog/fake-quotation">client not paying — the written-trail method</a>.</p>
+</div></section>
+<section><div class="wrap">
+  <h2>Why an invoice generator alone isn't enough</h2>
+  <div class="tbl-scroll"><table class="cmp">
+    <tr><th></th><th>Invoice generator + WhatsApp</th><th>DealInSec</th></tr>
+    <tr><td><b>The offer</b></td><td>A quote retyped every time</td><td>Quotation generated from the deal, carried into the invoice</td></tr>
+    <tr><td><b>The scope</b></td><td>Agreed in chat, argued about later</td><td>Accepted electronically, with revision limits &amp; exclusions</td></tr>
+    <tr><td><b>Your details</b></td><td>PAN and GSTIN typed in again</td><td>PAN and GSTIN from your profile on every document — GST-ready</td></tr>
+    <tr><td><b>Getting paid</b></td><td>You remember, then chase awkwardly</td><td>Overdue list, plus a drafted reminder in the tone you pick</td></tr>
+    <tr><td><b>Cost</b></td><td>—</td><td>Free plan for quotations; Pro ₹99/month or ₹999/year</td></tr>
+  </table></div>
+  <div class="callout honest"><b>What it costs, plainly</b><p>Free is ₹0: 4 deals a month, each with its quotation. Pro is ₹99/month, or ₹999/year (about ₹83/month — ₹189 less than paying monthly), and adds e-signed agreements, invoices, payment tracking and unlimited deals. Every account starts with a 7-day Pro trial, no card. DealInSec takes no percentage of your project value. Just need one invoice today? The <a href="/tools/gst-invoice-generator">free GST invoice generator</a> and <a href="/tools/quotation-maker">quotation maker</a> need no sign-up.</p></div>
+  <p class="muted" style="font-size:14px;margin-top:10px">Guides: <a href="/blog/advance-payment-terms">advance payment terms</a> · <a href="/blog/payment-reminder-message-to-client">payment reminder messages</a> · <a href="/blog/how-to-make-a-quotation-online">making a quotation online</a>.</p>
 </div></section>`,
     faq: [
       {
-        q: "Is DealInSec good for freelancers in India?",
-        a: "Yes — it's built for solo service providers who run client work: quotation → e-signed agreement → invoice → payment tracking on one thread, with scope-creep protection and AI payment reminders. The free plan (4 deals a month) suits a freelancer starting out.",
+        q: "Who is DealInSec for?",
+        a: "India's freelancers — designers, developers, writers, video editors & photographers, marketers and consultants. If you're a solo professional who quotes, signs and bills your own clients, it's built for you. If you sell stock from a shop, a billing-and-inventory tool will suit you better.",
       },
       {
-        q: "Is there a free plan for freelancers?",
-        a: "Yes — a free plan covering 4 deals a month, plus a 7-day Pro trial with no card, and free no-sign-up tools (GST invoice generator, quotation maker, bill maker). Pro is ₹999/month or ₹9,999/year when you outgrow the free plan.",
+        q: "Can DealInSec guarantee that my client pays?",
+        a: "No — no software can make an unwilling client pay, and we won't pretend otherwise. DealInSec prevents the payment problems that come from disorganisation: no written scope, no advance, invoices sent late or never, reminders you keep putting off. If a client disputes the work, you have the accepted scope and the invoice trail, timestamped, to point to.",
       },
       {
-        q: "How does it help me get paid faster?",
-        a: "Three ways: you take an advance with a professional quotation and e-signed agreement up front; invoices are raised against that agreement; and the dashboard shows what's overdue while the Copilot drafts the follow-up (English or Hinglish) for you to send. Nothing is sent to a client without your tap.",
+        q: "How much does it cost?",
+        a: "Free is ₹0 for 4 deals a month, each with its quotation. Pro is ₹99/month or ₹999/year (about ₹83/month) and adds e-signed agreements, invoices, payment tracking and unlimited deals. Every new account gets a 7-day Pro trial with no card, and DealInSec takes no percentage of your project value.",
       },
       {
-        q: "Does it create GST invoices?",
-        a: "The free GST invoice generator computes CGST/SGST/IGST with no sign-up. In-app invoices record the agreed value and print your PAN/GSTIN but are not Rule-46 GST tax invoices — we say so plainly.",
+        q: "Can I take an advance and bill in milestones?",
+        a: "Yes. Bill an advance before you start, milestone invoices as you deliver, and the balance at the end — any split. Each invoice is raised from the accepted agreement, and DealInSec won't let the total exceed what the client agreed to pay.",
       },
       {
-        q: "Are the agreements legally binding?",
-        a: "Electronic contracts are recognised in India under Section 10A of the IT Act, 2000. DealInSec records electronic acceptance with an audit trail — who accepted, when, with which signature. It is not a Digital Signature Certificate or Aadhaar eSign, and every agreement says so. We are not a law firm; have important agreements reviewed by a lawyer.",
+        q: "Can it write payment reminders in Hinglish?",
+        a: "Yes. Choose Friendly, Professional, Firm, Final reminder or Hinglish, and the Copilot drafts a short follow-up using the real invoice number and amount. You review it and send it yourself on WhatsApp or email — it never messages your client on its own.",
+      },
+      {
+        q: "Are the invoices GST-ready?",
+        a: "In-app invoices print your PAN and GSTIN and record the agreed amount, but they are not Rule-46 GST tax invoices. If you're GST-registered and need CGST/SGST/IGST computed, use the free GST invoice generator — no sign-up.",
+      },
+      {
+        q: "Is my client's electronic acceptance valid?",
+        a: "Electronic contracts are recognised in India under Section 10A of the IT Act, 2000. DealInSec records electronic acceptance with an audit trail — who accepted, when, with which signature. It is not a Digital Signature Certificate or Aadhaar eSign, and every agreement says so. This is general information, not legal advice; have important agreements reviewed by a lawyer.",
       },
     ],
   },
@@ -317,49 +309,50 @@ const PAGES: CategoryPage[] = [
   /* ── /refrens-alternative — buying-intent comparison ─────────────────── */
   {
     path: "/refrens-alternative",
-    metaTitle: "Refrens Alternative for Deal-Led Service Businesses (India)",
+    metaTitle: "Refrens Alternative for Freelancers in India",
     description:
-      "A Refrens alternative built for service businesses that run deals: quotation → e-signed agreement → milestone invoices → payment tracking on one thread, with scope-creep protection. Honest comparison. Free 7-day trial, no card.",
+      "A Refrens alternative for Indian freelancers who want the whole client deal on one thread: quotation → e-signed scope → advance & milestone invoices → payment follow-up. Honest comparison. Pro ₹99/month; free 7-day trial, no card.",
     h1: "Looking for a Refrens alternative?",
-    sub: "Refrens is a solid invoicing and quotation platform. DealInSec is built for a different job — running the whole client deal, from quotation to signed agreement to milestone invoices to getting paid, on one thread.",
-    chips: ["Made for India", "Deal → agreement → invoice", "Scope-creep protection", "Free 7-day trial · no card"],
+    sub: "Refrens is a solid invoicing and quotation platform. DealInSec is built for a different job — running each client deal a freelancer takes on, from quotation to accepted scope to milestone invoices to getting paid, on one thread.",
+    chips: ["Built for freelancers", "Quote → signed scope → invoice", "Pro ₹99/month", "Free 7-day trial · no card"],
     shortLabel: "Refrens Alternative",
     sections: `
 <section><div class="wrap">
   <h2>When Refrens fits — and when DealInSec does</h2>
-  <p class="sec-sub">This is an honest comparison, not a takedown. Both are made in India and priced in rupees; they're built for different jobs, and the right pick depends on how your work runs.</p>
+  <p class="sec-sub">This is an honest comparison, not a takedown. Both are made in India and priced in rupees; they're built for different jobs, and the right pick depends on how your freelance work runs.</p>
   <div class="feat">
-    <div class="ft"><b>Refrens is great when…</b><p>your main need is invoicing and quotations — a broad billing and accounting toolkit with a strong free tier, popular with freelancers who mostly send documents fast.</p></div>
-    <div class="ft"><b>DealInSec is built when…</b><p>your work is deal-shaped: you quote, sign a scope, deliver in stages and chase payment. The quotation, agreement and invoices live on one record and can't drift apart.</p></div>
-    <div class="ft"><b>The difference in one line</b><p>Refrens documents your billing; DealInSec runs the deal around it — e-signed agreements, scope-creep protection, and payment chasing built into the same thread.</p></div>
-    <div class="ft"><b>Where DealInSec is sharpest</b><p>High-value, milestone-billed service work — interior design, architecture, agencies, consulting — where a forgotten invoice or unsigned scope costs real money.</p></div>
+    <div class="ft"><b>Refrens is great when…</b><p>your main need is invoicing and quotations — a broad billing and accounting toolkit with a strong free tier, for when you mostly need documents out fast.</p></div>
+    <div class="ft"><b>DealInSec is built when…</b><p>your work is deal-shaped: you quote, get the scope accepted, deliver in stages and chase payment. The quotation, agreement and invoices live on one record and can't drift apart.</p></div>
+    <div class="ft"><b>The difference in one line</b><p>Refrens documents your billing; DealInSec runs the deal around it — e-signed agreements, scope-creep checks, and payment follow-up built into the same thread.</p></div>
+    <div class="ft"><b>Where DealInSec is sharpest</b><p>Freelance projects with an advance, milestones and a revision limit — a website build, a brand identity, a batch of articles, a video edit — where one forgotten invoice or unsigned scope costs you real money.</p></div>
   </div>
 </div></section>
 <section><div class="wrap">
   <h2>Side by side</h2>
   <div class="tbl-scroll"><table class="cmp">
     <tr><th></th><th>Refrens</th><th>DealInSec</th></tr>
-    <tr><td><b>Core job</b></td><td>Invoicing, quotations &amp; accounting</td><td>Running the whole client deal to payment</td></tr>
+    <tr><td><b>Core job</b></td><td>Invoicing, quotations &amp; accounting</td><td>Running each client deal through to payment</td></tr>
     <tr><td><b>Quotation</b></td><td>Yes</td><td>Yes — and it converts into the agreement &amp; invoice</td></tr>
     <tr><td><b>E-signed agreements</b></td><td>Focused on billing docs</td><td>Built in — acceptance recorded with an audit trail</td></tr>
     <tr><td><b>Scope-creep protection</b></td><td>—</td><td>Protection Check flags missing revision limits, exclusions, advance</td></tr>
-    <tr><td><b>Payment chasing</b></td><td>Reminders</td><td>AI-drafted follow-ups (English/Hinglish), you send</td></tr>
-    <tr><td><b>Best for</b></td><td>Freelancers wanting fast billing</td><td>Deal-led service businesses &amp; studios</td></tr>
+    <tr><td><b>Payment chasing</b></td><td>Reminders</td><td>AI-drafted follow-ups (English or Hinglish), you send</td></tr>
+    <tr><td><b>Pricing</b></td><td>See their site</td><td>Free plan; Pro ₹99/month or ₹999/year</td></tr>
+    <tr><td><b>Best for</b></td><td>Fast, broad invoicing &amp; accounting</td><td>Freelancers who want the scope signed and the payment followed up</td></tr>
   </table></div>
   <p class="muted" style="font-size:14px;margin-top:10px">Refrens is a capable product — check their site for current features and pricing. Pick the tool that matches how your work actually runs.</p>
 </div></section>`,
     faq: [
       {
         q: "Is DealInSec a free Refrens alternative?",
-        a: "DealInSec has a free plan (4 deals a month) and a 7-day Pro trial with no card, plus free no-sign-up tools (GST invoice, quotation maker, bill maker). It isn't a clone of Refrens, though — it's built to run the whole deal, not just billing, so compare on the job you need done.",
+        a: "DealInSec has a free plan (4 deals a month, each with its quotation) and a 7-day Pro trial with no card, plus free no-sign-up tools (GST invoice, quotation maker, bill maker). Agreements, invoices and payment tracking are on Pro at ₹99/month or ₹999/year. It isn't a clone of Refrens, though — it's built to run the whole deal, not just billing, so compare on the job you need done.",
       },
       {
-        q: "Why choose DealInSec over Refrens?",
-        a: "Choose DealInSec if your work is deal-shaped — you quote, sign a scope, deliver in stages and chase payment — and you want those documents on one consistent thread with e-signed agreements and scope-creep protection. Choose Refrens if your main need is fast, broad invoicing and accounting. They're built for different jobs.",
+        q: "Why would a freelancer choose DealInSec over Refrens?",
+        a: "Choose DealInSec if your work is deal-shaped — you quote, get the scope accepted, deliver in stages and chase payment — and you want those documents on one consistent thread with e-signed agreements and scope-creep checks. Choose Refrens if your main need is fast, broad invoicing and accounting. They're built for different jobs.",
       },
       {
         q: "Can I switch from Refrens to DealInSec?",
-        a: "Yes — start with the free trial and run one live deal end to end (quotation → agreement → invoice) to see if the thread fits how you work. Keep using whatever handles the rest of your accounting.",
+        a: "Yes — start with the free trial and run one live client deal end to end (quotation → agreement → invoice) to see if the thread fits how you work. Keep using whatever handles the rest of your accounting.",
       },
     ],
   },
@@ -367,48 +360,49 @@ const PAGES: CategoryPage[] = [
   /* ── /vyapar-alternative — buying-intent comparison ──────────────────── */
   {
     path: "/vyapar-alternative",
-    metaTitle: "Vyapar Alternative for Service Businesses (India)",
+    metaTitle: "Vyapar Alternative for Freelancers (India)",
     description:
-      "A Vyapar alternative for service businesses, not shops: DealInSec runs client deals — quotation, e-signed agreement, milestone invoices and payment tracking — instead of inventory-based GST billing. Honest comparison. Free trial, no card.",
+      "A Vyapar alternative for freelancers, not shops: DealInSec runs client deals — quotation, e-signed scope, milestone invoices and payment follow-up — instead of inventory-based GST billing. Honest comparison. Pro ₹99/month; free trial, no card.",
     h1: "Looking for a Vyapar alternative?",
-    sub: "Vyapar is excellent GST billing and inventory software for shops and product businesses. If you sell services — design, consulting, agency work — not stock, DealInSec is built for the way you actually get paid.",
-    chips: ["For service businesses", "Deal → agreement → invoice", "Made for India", "Free 7-day trial · no card"],
+    sub: "Vyapar is excellent GST billing and inventory software for shops and product businesses. If you're a freelancer — you sell design, code, words, edits or advice, not stock — DealInSec is built for the way you actually get paid.",
+    chips: ["For freelancers, not shops", "Quote → signed scope → invoice", "Pro ₹99/month", "Free 7-day trial · no card"],
     shortLabel: "Vyapar Alternative",
     sections: `
 <section><div class="wrap">
-  <h2>Different tools for different businesses</h2>
-  <p class="sec-sub">Honestly, if you run a shop with stock, Vyapar is a strong choice — inventory, GST billing and accounting in one. DealInSec is for the other kind of business: the one that sells scoped services, one deal at a time.</p>
+  <h2>Different tools for different work</h2>
+  <p class="sec-sub">Honestly, if you run a shop with stock, Vyapar is a strong choice — inventory, GST billing and accounting in one. DealInSec is for the other kind of work: a freelancer selling scoped services, one client deal at a time.</p>
   <div class="feat">
     <div class="ft"><b>Vyapar is great when…</b><p>you sell products and need inventory, GST billing, stock and day-to-day accounting — the shape of a retail or trading business.</p></div>
-    <div class="ft"><b>DealInSec is built when…</b><p>you sell services on high-value, milestone-billed projects — interiors, architecture, agencies, consulting — where the scope, the agreement and the payment matter more than stock.</p></div>
+    <div class="ft"><b>DealInSec is built when…</b><p>you're a freelancer selling scoped work — a logo, a website, a video edit, a consulting engagement — where the scope, the client's acceptance and the payment matter more than stock.</p></div>
     <div class="ft"><b>No inventory, just deals</b><p>Instead of products and stock levels, DealInSec tracks quotations, e-signed agreements, milestone invoices and who owes you what.</p></div>
-    <div class="ft"><b>Protection built in</b><p>Scope-creep flags and payment chasing are part of the workflow — the risks a service business carries, not a shop.</p></div>
+    <div class="ft"><b>Protection built in</b><p>Scope-creep checks and payment follow-up are part of the workflow — the risks a freelancer carries, not a shop.</p></div>
   </div>
 </div></section>
 <section><div class="wrap">
   <h2>Side by side</h2>
   <div class="tbl-scroll"><table class="cmp">
     <tr><th></th><th>Vyapar</th><th>DealInSec</th></tr>
-    <tr><td><b>Built for</b></td><td>Shops &amp; product/trading businesses</td><td>Deal-led service businesses</td></tr>
+    <tr><td><b>Built for</b></td><td>Shops &amp; product/trading businesses</td><td>Freelancers selling services</td></tr>
     <tr><td><b>Inventory / stock</b></td><td>Yes — a core strength</td><td>Not applicable — deals, not stock</td></tr>
     <tr><td><b>GST tax invoices</b></td><td>Yes</td><td>Free GST invoice tool; in-app invoices record the deal value (not Rule-46 tax invoices)</td></tr>
     <tr><td><b>Quotation → agreement → invoice</b></td><td>Billing-centric</td><td>One connected thread with e-signed agreements</td></tr>
-    <tr><td><b>Scope creep &amp; payment chasing</b></td><td>—</td><td>Protection Check + AI payment reminders</td></tr>
+    <tr><td><b>Scope creep &amp; payment chasing</b></td><td>—</td><td>Protection Check + AI-drafted payment reminders</td></tr>
+    <tr><td><b>Pricing</b></td><td>See their site</td><td>Free plan; Pro ₹99/month or ₹999/year</td></tr>
   </table></div>
-  <p class="muted" style="font-size:14px;margin-top:10px">Vyapar is a strong product for what it's built for — check their site for current features. The question is whether you sell stock or sell deals.</p>
+  <p class="muted" style="font-size:14px;margin-top:10px">Vyapar is a strong product for what it's built for — check their site for current features. The question is whether you sell stock or sell your work.</p>
 </div></section>`,
     faq: [
       {
         q: "Is DealInSec like Vyapar?",
-        a: "No — and that's the point. Vyapar is GST billing and inventory software for shops and product businesses. DealInSec runs client deals for service businesses: quotation, e-signed agreement, milestone invoices and payment tracking. If you sell services, not stock, DealInSec fits better.",
+        a: "No — and that's the point. Vyapar is GST billing and inventory software for shops and product businesses. DealInSec runs client deals for freelancers: quotation, e-signed agreement, milestone invoices and payment tracking. If you sell services, not stock, DealInSec fits better.",
       },
       {
         q: "Does DealInSec do GST invoices like Vyapar?",
         a: "For a GST tax invoice with CGST/SGST/IGST computed, use DealInSec's free GST invoice generator (no sign-up). In-app invoices record the agreed deal value and print your PAN/GSTIN but are not Rule-46 tax invoices. Vyapar is the stronger pick if full GST-and-inventory accounting is your main need.",
       },
       {
-        q: "I'm a freelancer/designer, not a shop — which fits?",
-        a: "DealInSec. Service work is about scope, agreements and getting paid per milestone — not inventory. That's exactly what DealInSec is built for, with a free plan and a 7-day trial with no card.",
+        q: "I'm a freelancer, not a shop — which fits?",
+        a: "DealInSec. Freelance work is about scope, the client's acceptance and getting paid per milestone — not inventory. That's exactly what DealInSec is built for: a free plan for quotations, Pro at ₹99/month, and a 7-day trial with no card.",
       },
     ],
   },
@@ -416,24 +410,24 @@ const PAGES: CategoryPage[] = [
   /* ── /quotation-software ─────────────────────────────────────────────── */
   {
     path: "/quotation-software",
-    metaTitle: "Quotation Software for Small Businesses in India",
+    metaTitle: "Quotation Software for Freelancers in India",
     description:
-      "Online quotation software for Indian service businesses: itemised quotations with GST and terms, numbered PDFs, revision tracking — and each quote converts into an agreement and invoice. Free 7-day trial, no card.",
+      "Online quotation software for Indian freelancers: itemised quotes with GST, revision rounds and advance terms, numbered PDFs in your name — and each accepted quote converts into an agreement and invoice. Free plan; Pro ₹99/month.",
     h1: "Quotation software that doesn't stop at the quotation",
-    sub: "Make professional, numbered quotations online in minutes — then convert the accepted quote into an e-signed agreement and an invoice with the same figures, automatically.",
-    chips: ["Made for India", "GST-aware", "Free 7-day trial · no card", "Free plan after"],
+    sub: "Make professional, numbered quotations for your clients in minutes — then convert the accepted quote into an e-signed agreement and an invoice with the same figures, automatically.",
+    chips: ["Made for freelancers", "GST-ready", "Free plan · 4 deals a month", "Pro ₹99/month"],
     shortLabel: "Quotation Software",
     sections: `
 <section><div class="wrap">
-  <h2>Why quotations made in Excel and Word go wrong</h2>
-  <p class="sec-sub">The quotation itself is easy. What breaks is everything after it: the client negotiates on a phone call, the discount never gets written down, the agreement says one number and the invoice another — and when payment is late, nobody can find the version the client actually accepted.</p>
+  <h2>Why quotations made in Excel, Word or a WhatsApp message go wrong</h2>
+  <p class="sec-sub">The quotation itself is easy. What breaks is everything after it: the client negotiates on a call, the discount never gets written down, the agreement says one number and the invoice another — and when payment is late, nobody can find the version the client actually accepted.</p>
   <div class="feat">
-    <div class="ft"><b>Itemised, numbered, consistent</b><p>Quotations are generated from the deal record — deliverables, quantities, rates, terms — with a stable QT-series number and a clean PDF that carries your business name, not ours.</p></div>
-    <div class="ft"><b>Revisions with history</b><p>Client negotiated? Issue a revised version. The document the client accepted is the one your agreement and invoice inherit.</p></div>
-    <div class="ft"><b>Terms that carry forward</b><p>Advance percentage, balance timeline, validity — set once on the deal, printed on the quotation, carried into the agreement so the documents never contradict each other.</p></div>
+    <div class="ft"><b>Itemised, numbered, consistent</b><p>Quotations are generated from the deal record — deliverables, quantities, rates, terms — with a stable QT-series number and a clean PDF that carries your name, not ours.</p></div>
+    <div class="ft"><b>Revisions with history</b><p>Client negotiated? Issue a revised version. The version the client accepted is the one your agreement and invoice inherit.</p></div>
+    <div class="ft"><b>Terms that carry forward</b><p>Advance percentage, balance timeline, revision rounds, validity — set once on the deal, printed on the quotation, carried into the agreement so the documents never contradict each other.</p></div>
     <div class="ft"><b>Quotation tracking</b><p>See which quotations are outstanding, accepted or expiring from the dashboard — the follow-up happens before the validity runs out.</p></div>
   </div>
-  <div class="callout honest"><b>Just need one quotation right now?</b><p>Use the <a href="/tools/quotation-maker">free online quotation maker</a> — no sign-up, GST-aware, instant PDF. The software is for when quotations are a weekly habit, not a one-off.</p></div>
+  <div class="callout honest"><b>Just need one quotation right now?</b><p>Use the <a href="/tools/quotation-maker">free online quotation maker</a> — no sign-up, GST-ready, instant PDF. The software is for when you're quoting new clients every month, not once a year.</p></div>
 </div></section>
 <section><div class="wrap">
   <h2>Quotation software vs Excel</h2>
@@ -449,7 +443,7 @@ const PAGES: CategoryPage[] = [
     faq: [
       {
         q: "What is quotation software?",
-        a: "Quotation software creates professional, itemised price quotations — business details, line items, taxes, terms and a numbered PDF — and tracks what happens to them. Quotation management software also handles the follow-through: revisions, acceptance, and converting the quote into an agreement and invoice, which is what DealInSec does.",
+        a: "Quotation software creates professional, itemised price quotations — your details, line items, taxes, terms and a numbered PDF — and tracks what happens to them. Quotation management software also handles the follow-through: revisions, acceptance, and converting the quote into an agreement and invoice, which is what DealInSec does.",
       },
       {
         q: "Is there a free version?",
@@ -460,12 +454,12 @@ const PAGES: CategoryPage[] = [
         a: "Yes — quotations can show GST so the client sees the final payable amount. Note that a quotation is not a tax document; tax applies on the invoice. For a GST tax invoice with CGST/SGST/IGST computation, use the free GST invoice generator.",
       },
       {
-        q: "Is it built for small businesses in India?",
-        a: "Yes — Indian number formatting, GST-aware documents, PAN/GSTIN on your papers, and pricing in rupees (free plan; Pro at ₹999/month or ₹9,999/year). It's made for service businesses: consultants, designers, architects, agencies, contractors.",
+        q: "Is it built for freelancers in India?",
+        a: "Yes — it's made for India's freelancers: designers, developers, writers, video editors & photographers, marketers and consultants. Indian number formatting, GST-ready documents, your PAN/GSTIN on your papers, and pricing in rupees: a free plan, then Pro at ₹99/month or ₹999/year.",
       },
       {
-        q: "Can my sales team use it together?",
-        a: "Yes — Pro includes 5 team seats with roles and permissions, so a colleague can prepare quotations without seeing your whole pipeline, and an accounts person can be limited to invoices and payments.",
+        q: "What should a freelancer's quotation include?",
+        a: "What you'll deliver, as specific line items; how many revision rounds are included; what's not included; the price, with GST if you're registered; the advance and when the balance is due; and how long the quote is valid. DealInSec's Protection Check flags the missing ones before you send.",
       },
     ],
   },
@@ -473,21 +467,21 @@ const PAGES: CategoryPage[] = [
   /* ── /contract-management ────────────────────────────────────────────── */
   {
     path: "/contract-management",
-    metaTitle: "Contract Management Software for Small Businesses in India",
+    metaTitle: "Contract Management Software for Freelancers in India",
     description:
-      "Contract management software for Indian service businesses: agreements generated from accepted quotations, electronic acceptance with an audit record, statuses, linked invoices. Free 7-day trial, no card.",
-    h1: "Contract management software for service businesses",
-    sub: "Your agreement is generated from the accepted quotation — same scope, same figures — accepted electronically with an audit record, and linked to the invoices it authorises.",
-    chips: ["Electronic acceptance + audit record", "Made for India", "Free 7-day trial · no card"],
+      "Contract management for Indian freelancers: agreements generated from accepted quotations, electronic acceptance with an audit record, statuses, and linked invoices. Pro ₹99/month; free 7-day trial, no card.",
+    h1: "Contract management software for freelancers",
+    sub: "Your agreement is generated from the accepted quotation — same scope, same figures — accepted electronically by your client with an audit record, and linked to the invoices it authorises.",
+    chips: ["Electronic acceptance + audit record", "Made for freelancers", "Free 7-day trial · no card"],
     shortLabel: "Contract Management",
     sections: `
 <section><div class="wrap">
   <h2>Contracts that match the deal they came from</h2>
-  <p class="sec-sub">The most common contract problem in a small service business isn't a missing clause — it's an agreement whose numbers quietly disagree with the quotation, or that lives in an email attachment nobody can find when the dispute starts.</p>
+  <p class="sec-sub">The most common contract problem for a freelancer isn't a missing clause — it's having no contract at all, just a scope agreed over WhatsApp. The next most common is an agreement whose numbers quietly disagree with the quotation, or that lives in an email attachment nobody can find when the dispute starts.</p>
   <div class="feat">
     <div class="ft"><b>Generated, not retyped</b><p>The agreement inherits the accepted quotation's scope, deliverables, value and payment terms — and cross-references the quotation number on its face.</p></div>
-    <div class="ft"><b>Electronic acceptance, recorded</b><p>Who accepted, when, and with which signature — an execution record printed on the agreement itself. Counterparties accept electronically; a signed copy stays on record.</p></div>
-    <div class="ft"><b>Status you can see</b><p>Draft, pending, signed — with start and end dates, exclusivity, and the linked invoices, on one screen per deal.</p></div>
+    <div class="ft"><b>Electronic acceptance, recorded</b><p>Who accepted, when, and with which signature — an execution record printed on the agreement itself. Your client accepts electronically; a signed copy stays on record.</p></div>
+    <div class="ft"><b>Status you can see</b><p>Draft, pending, signed — with start and end dates, exclusivity, and the linked invoices, on one screen per client deal.</p></div>
     <div class="ft"><b>Invoices bounded by the contract</b><p>Bill an advance, a balance, or milestones — DealInSec will not let invoices exceed the agreement's value.</p></div>
   </div>
   <div class="callout honest"><b>Honest legal note</b><p>Electronic contracts are recognised in India under Section 10A of the Information Technology Act, 2000. DealInSec records electronic acceptance with an audit record — it is not a Digital Signature Certificate or an Aadhaar eSign, and every agreement says so on its face. For important agreements, have a lawyer review the terms. There's a free <a href="/tools/service-agreement-template">service agreement template</a> if you just need a document today.</p></div>
@@ -498,20 +492,20 @@ const PAGES: CategoryPage[] = [
         a: "Software that creates, tracks and stores your client agreements: generating the contract from agreed terms, recording acceptance, tracking status and dates, and linking the contract to the invoices it authorises. DealInSec does this as part of one deal thread — quotation to agreement to invoice.",
       },
       {
-        q: "Are the agreements legally valid in India?",
+        q: "Are the agreements valid in India?",
         a: "Electronic contracts are recognised in India under Section 10A of the Information Technology Act, 2000. DealInSec records electronic acceptance with an audit record naming who accepted, when, and with which signature. It is not a Digital Signature Certificate or Aadhaar eSign, and agreements state this on their face. We are not a law firm — have important agreements reviewed by a lawyer.",
       },
       {
-        q: "Is it suitable for service contracts?",
-        a: "That's exactly what it's built for — scoped service engagements with deliverables, a value, a duration and a payment split: design projects, consulting retainers, agency engagements, construction work packages.",
+        q: "Does it work for freelance contracts?",
+        a: "That's exactly what it's built for — scoped freelance work with deliverables, a value, a duration and a payment split: a logo and brand kit, a website build, a batch of articles, a video edit, a month of social media, a consulting engagement.",
       },
       {
-        q: "What does it cost for a small business?",
-        a: "A 7-day Pro trial with no card, then a free plan (4 deals a month). Pro is ₹999/month or ₹9,999/year and adds unlimited deals, agreements, invoices, payment tracking and 5 team seats.",
+        q: "What does it cost?",
+        a: "Agreements are part of Pro: ₹99/month or ₹999/year, with unlimited deals, agreements, invoices and payment tracking. Every new account starts with a 7-day Pro trial with no card; after that the free plan covers 4 deals a month with quotations.",
       },
       {
         q: "Can my client sign without creating an account?",
-        a: "Your counterparty accepts the agreement electronically through a confirmation flow — the execution record then names both parties, and the signed copy stays on the deal thread.",
+        a: "Your client accepts the agreement electronically through a confirmation flow — the execution record then names both parties, and the signed copy stays on the deal thread.",
       },
     ],
   },
@@ -519,11 +513,11 @@ const PAGES: CategoryPage[] = [
   /* ── /proposal-management ────────────────────────────────────────────── */
   {
     path: "/proposal-management",
-    metaTitle: "Proposal Management Software for Service Businesses",
+    metaTitle: "Proposal Management Software for Freelancers",
     description:
-      "Proposal management for Indian service businesses: itemised, priced proposals (quotations) with terms, tracked to acceptance and converted into e-signed agreements and invoices. Free 7-day trial.",
+      "Proposal management for Indian freelancers: itemised, priced proposals (quotations) with revision rounds and advance terms, tracked to acceptance and converted into e-signed agreements and invoices. Free 7-day trial.",
     h1: "Proposal management, the quotation-first way",
-    sub: "In a service business, your proposal is a priced scope with terms — a quotation. DealInSec manages that proposal from first draft to accepted, signed and invoiced.",
+    sub: "For a freelancer, your proposal is a priced scope with terms — a quotation. DealInSec manages that proposal from first draft to accepted, signed and invoiced.",
     chips: ["Priced proposals with terms", "Tracked to acceptance", "Free 7-day trial · no card"],
     shortLabel: "Proposal Management",
     sections: `
@@ -531,21 +525,21 @@ const PAGES: CategoryPage[] = [
   <h2>What a proposal needs to actually close</h2>
   <p class="sec-sub">Decks look nice, but clients decide on three things: what exactly you'll deliver, what it costs, and on what terms. DealInSec's proposals are built from those three — an itemised scope, transparent pricing, and payment terms the client can accept on the spot.</p>
   <div class="feat">
-    <div class="ft"><b>Scope as line items</b><p>Deliverables with quantities, frequencies and notes — specific rows justify the price and prevent "that was included, right?" disputes later.</p></div>
-    <div class="ft"><b>Terms up front</b><p>Validity, advance percentage, revision limits — on the proposal itself, so acceptance means accepting the terms, not just the price.</p></div>
+    <div class="ft"><b>Scope as line items</b><p>Deliverables with quantities, frequencies and notes — specific rows justify your fee and prevent "that was included, right?" disputes later.</p></div>
+    <div class="ft"><b>Terms up front</b><p>Validity, advance percentage, revision rounds — on the proposal itself, so acceptance means accepting the terms, not just the price.</p></div>
     <div class="ft"><b>Versions, tracked</b><p>Negotiations produce revised versions with history — the accepted version is the one that becomes the agreement.</p></div>
     <div class="ft"><b>Acceptance → agreement → invoice</b><p>The moment a proposal is accepted it can become an e-signed agreement and then invoices, with no retyping and no drift.</p></div>
   </div>
-  <div class="callout honest"><b>Proposal vs quotation — same document, different word</b><p>For scoped service work, a proposal and a quotation are functionally the same artifact: a priced offer with terms. If your clients say "send a proposal", send them a DealInSec quotation with well-written deliverables — it reads as one. See the <a href="/blog/quotation-format">format guide</a>.</p></div>
+  <div class="callout honest"><b>Proposal vs quotation — same document, different word</b><p>For scoped freelance work, a proposal and a quotation are functionally the same artifact: a priced offer with terms. If a client says "send a proposal", send them a DealInSec quotation with well-written deliverables — it reads as one. See the <a href="/blog/quotation-format">format guide</a>.</p></div>
 </div></section>`,
     faq: [
       {
         q: "What is proposal management software?",
-        a: "Software that creates, sends, tracks and closes client proposals. For service businesses the proposal is a priced scope with terms — DealInSec builds it as a quotation, tracks revisions and acceptance, and converts the accepted proposal into an e-signed agreement and invoices.",
+        a: "Software that creates, sends, tracks and closes client proposals. For a freelancer the proposal is a priced scope with terms — DealInSec builds it as a quotation, tracks revisions and acceptance, and converts the accepted proposal into an e-signed agreement and invoices.",
       },
       {
         q: "How is a proposal different from a quotation?",
-        a: "In scoped service work, barely at all — both are a priced offer with terms. 'Proposal' tends to be used when there's more narrative around the scope; 'quotation' when the line items dominate. DealInSec's document carries both: itemised deliverables plus notes and terms.",
+        a: "In scoped freelance work, barely at all — both are a priced offer with terms. 'Proposal' tends to be used when there's more narrative around the scope; 'quotation' when the line items dominate. DealInSec's document carries both: itemised deliverables plus notes and terms.",
       },
       {
         q: "Can I track whether the client accepted?",
@@ -553,7 +547,7 @@ const PAGES: CategoryPage[] = [
       },
       {
         q: "What happens after acceptance?",
-        a: "The accepted proposal becomes an agreement with the same figures, accepted electronically with an audit record, and then invoices — an advance/balance split or milestones — bounded by the agreement's value.",
+        a: "On Pro (₹99/month or ₹999/year), the accepted proposal becomes an agreement with the same figures, accepted electronically with an audit record, and then invoices — an advance/balance split or milestones — bounded by the agreement's value.",
       },
     ],
   },
@@ -561,24 +555,24 @@ const PAGES: CategoryPage[] = [
   /* ── /invoice-management ─────────────────────────────────────────────── */
   {
     path: "/invoice-management",
-    metaTitle: "Invoice Management Software for Small Businesses in India",
+    metaTitle: "Invoice Management Software for Freelancers in India",
     description:
-      "Invoice management software for Indian service businesses: invoices generated from agreements, consecutive numbering per financial year, paid/unpaid tracking with dates, and a dashboard of what's collectible. Free 7-day trial.",
+      "Invoice management for Indian freelancers: invoices generated from agreements, consecutive numbering per financial year, paid/unpaid tracking with dates, and a dashboard of what to bill and chase. Pro ₹99/month; free 7-day trial.",
     h1: "Invoice management software that knows what you're owed",
-    sub: "Invoices generated from the agreement — never more than it's worth — numbered consecutively per financial year, tracked from sent to paid, with a dashboard of what's collectible today.",
-    chips: ["INV-series per financial year", "Paid/unpaid with dates", "Made for India", "Free 7-day trial"],
+    sub: "Invoices generated from the agreement — never more than it's worth — numbered consecutively per financial year, tracked from sent to paid, with a dashboard of what to bill and what to chase today.",
+    chips: ["INV-series per financial year", "Paid/unpaid with dates", "Made for freelancers", "Free 7-day trial"],
     shortLabel: "Invoice Management",
     sections: `
 <section><div class="wrap">
-  <h2>The invoice is easy. Managing invoices is the job.</h2>
-  <p class="sec-sub">Any tool can print an invoice. The money is lost in the management: invoices that never got raised after signing, sent invoices nobody followed up, and totals that quietly exceeded what the contract allowed.</p>
+  <h2>The invoice is easy. Keeping track of invoices is the job.</h2>
+  <p class="sec-sub">Any tool can print an invoice. Freelance money is lost in the tracking: invoices that never got raised after the client said yes, sent invoices nobody followed up, and totals that quietly exceeded what was agreed.</p>
   <div class="feat">
     <div class="ft"><b>Raised from the agreement</b><p>Advance and balance at any split, or milestone invoices — each cross-referencing the agreement, and the total can never exceed the agreement's value.</p></div>
-    <div class="ft"><b>Consecutive numbering</b><p>Per financial year (INV-2627-0001…), automatic — the numbering discipline accountants and auditors expect.</p></div>
-    <div class="ft"><b>Paid / unpaid, with dates</b><p>Mark an invoice paid and the document records the settlement date — a paid invoice prints PAID with the date it was settled.</p></div>
-    <div class="ft"><b>The collectible dashboard</b><p>Overdue, due this week, and signed-but-not-yet-invoiced — the three lists that decide this month's cash flow, on one screen.</p></div>
+    <div class="ft"><b>Consecutive numbering</b><p>Per financial year (INV-2627-0001…), automatic — the numbering discipline your CA expects at filing time.</p></div>
+    <div class="ft"><b>Paid / unpaid, with dates</b><p>Mark an invoice paid when the UPI or bank transfer lands and the document records the settlement date — a paid invoice prints PAID with the date it was settled.</p></div>
+    <div class="ft"><b>The collectible dashboard</b><p>Overdue, due this week, and ready to invoice — the three lists that decide this month's income, on one screen.</p></div>
   </div>
-  <div class="callout honest"><b>Honest GST note</b><p>Invoices inside DealInSec record the agreed contract value and print your PAN and GSTIN, but they do not carry a GST tax computation and are not tax invoices under Rule 46 of the CGST Rules. For a GST invoice with CGST/SGST/IGST computed, use the <a href="/tools/gst-invoice-generator">free GST invoice generator</a> — no sign-up needed.</p></div>
+  <div class="callout honest"><b>Honest GST note</b><p>Invoices inside DealInSec record the agreed value and print your PAN and GSTIN, but they do not carry a GST tax computation and are not tax invoices under Rule 46 of the CGST Rules. For a GST invoice with CGST/SGST/IGST computed, use the <a href="/tools/gst-invoice-generator">free GST invoice generator</a> — no sign-up needed. Not sure what to put on yours? See the <a href="/tools/invoice-format/for-freelancers">invoice format for freelancers</a>.</p></div>
 </div></section>`,
     faq: [
       {
@@ -587,7 +581,7 @@ const PAGES: CategoryPage[] = [
       },
       {
         q: "Does it create GST tax invoices?",
-        a: "The free GST invoice generator at dealinsec.com/tools/gst-invoice-generator creates a GST invoice with CGST, SGST and IGST computed, with no sign-up. Invoices inside the app record the agreed contract value and print your PAN and GSTIN, but they are not tax invoices under Rule 46 of the CGST Rules — we say this plainly rather than let you assume otherwise.",
+        a: "The free GST invoice generator at dealinsec.com/tools/gst-invoice-generator creates a GST invoice with CGST, SGST and IGST computed, with no sign-up. Invoices inside the app record the agreed value and print your PAN and GSTIN, but they are not tax invoices under Rule 46 of the CGST Rules — we say this plainly rather than let you assume otherwise.",
       },
       {
         q: "Can I bill 50% advance and 50% on delivery?",
@@ -595,11 +589,11 @@ const PAGES: CategoryPage[] = [
       },
       {
         q: "Is there a free plan?",
-        a: "Yes — a 7-day Pro trial with no card, then a free plan covering 4 deals a month. Pro (₹999/month or ₹9,999/year) adds unlimited invoices, payment tracking and 5 team seats.",
+        a: "The free plan covers 4 deals a month, each with its quotation. Invoices, agreements and payment tracking are Pro — ₹99/month, or ₹999/year (about ₹83/month). Every new account gets a 7-day Pro trial with no card, so you can raise real invoices before deciding.",
       },
       {
-        q: "Can my accountant get limited access?",
-        a: "Yes — invite them with a role limited to invoices and payments; they won't see your deal pipeline. Roles are editable per your needs.",
+        q: "What do I do when a client hasn't paid?",
+        a: "The dashboard lists overdue invoices, and the Copilot drafts a reminder in the tone you choose — Friendly, Professional, Firm, Final reminder or Hinglish — with the real invoice number and amount; you send it. DealInSec can't force a client to pay, but you'll have the accepted agreement and invoice trail on record if it becomes a dispute.",
       },
     ],
   },
@@ -607,11 +601,11 @@ const PAGES: CategoryPage[] = [
   /* ── /e-signature ────────────────────────────────────────────────────── */
   {
     path: "/e-signature",
-    metaTitle: "E-Signature Software for Small Businesses in India",
+    metaTitle: "E-Signature for Freelancers in India",
     description:
-      "E-signature for Indian service businesses: agreements accepted electronically with an audit record — who signed, when, with which signature — built into the quotation-to-invoice workflow. Honest about what it is. Free 7-day trial.",
-    h1: "E-signature software built into the deal, not bolted on",
-    sub: "Your agreement is accepted electronically with an audit record — who, when, which signature — and the signed document links straight to the quotation before it and the invoices after it.",
+      "E-signature for Indian freelancers: your client accepts the agreement electronically with an audit record — who signed, when, with which signature — built into the quotation-to-invoice workflow. Honest about what it is. Pro ₹99/month; free 7-day trial.",
+    h1: "E-signature built into the deal, not bolted on",
+    sub: "Your client accepts the agreement electronically with an audit record — who, when, which signature — and the signed document links straight to the quotation before it and the invoices after it.",
     chips: ["Audit record on the document", "Section 10A, IT Act 2000", "Free 7-day trial · no card"],
     shortLabel: "E-Signature",
     sections: `
@@ -619,29 +613,29 @@ const PAGES: CategoryPage[] = [
   <h2>Signature tools sign documents. This one closes deals.</h2>
   <p class="sec-sub">Standalone e-sign tools give you a signed PDF — and then the signed scope still has to be retyped into an invoice. In DealInSec, signing is one step on a thread: the accepted quotation became this agreement, and the signed agreement authorises the invoices.</p>
   <div class="feat">
-    <div class="ft"><b>Execution record on the face</b><p>The agreement prints who accepted it, when, and with which signature — plus your signature image and company stamp where you've set them.</p></div>
-    <div class="ft"><b>Counterparty-friendly</b><p>Your client accepts electronically through a confirmation flow — the signed copy stays on record, and the printed document reflects the acceptance.</p></div>
+    <div class="ft"><b>Execution record on the face</b><p>The agreement prints who accepted it, when, and with which signature — plus your signature image and stamp where you've set them.</p></div>
+    <div class="ft"><b>Client-friendly</b><p>Your client accepts electronically through a confirmation flow — the signed copy stays on record, and the printed document reflects the acceptance.</p></div>
     <div class="ft"><b>Signature binding</b><p>The signature captured at creation stays with the document — it doesn't change when someone else views or reprints it.</p></div>
-    <div class="ft"><b>Priced for Indian small business</b><p>E-sign is included in the deal workflow — free trial, free plan, and Pro at ₹999/month — rather than a separate per-envelope bill in dollars.</p></div>
+    <div class="ft"><b>Priced for a freelancer</b><p>E-sign is part of Pro — ₹99/month or ₹999/year, with a 7-day free trial — rather than a separate per-envelope bill in dollars.</p></div>
   </div>
-  <div class="callout honest"><b>What this is — and isn't</b><p>Electronic contracts are recognised in India under Section 10A of the Information Technology Act, 2000, and DealInSec records electronic acceptance with an audit record. It is <b>not</b> a Digital Signature Certificate (DSC) or an Aadhaar eSign, and every agreement says so on its face. If a regulator or counterparty specifically requires DSC/Aadhaar eSign, use those; for everyday service agreements, an accepted document with a clear audit record is what most businesses actually need. We are not a law firm — have important agreements reviewed by a lawyer.</p></div>
+  <div class="callout honest"><b>What this is — and isn't</b><p>Electronic contracts are recognised in India under Section 10A of the Information Technology Act, 2000, and DealInSec records electronic acceptance with an audit record. It is <b>not</b> a Digital Signature Certificate (DSC) or an Aadhaar eSign, and every agreement says so on its face. If a client or regulator specifically requires DSC/Aadhaar eSign, use those; for an everyday freelance scope, an accepted document with a clear audit record is the practical option. We are not a law firm — have important agreements reviewed by a lawyer.</p></div>
 </div></section>`,
     faq: [
       {
-        q: "Are electronic signatures legally valid in India?",
+        q: "Are electronic signatures valid in India?",
         a: "Electronic contracts are recognised in India under Section 10A of the Information Technology Act, 2000. DealInSec records electronic acceptance with an audit record — who accepted, when, and with which signature. It is not a Digital Signature Certificate or an Aadhaar eSign, and every agreement states this on its face. This is general information, not legal advice.",
       },
       {
         q: "How is this different from DocuSign-style tools?",
-        a: "Standalone tools sign a document you made elsewhere. DealInSec's e-signature is one step in a deal thread: the agreement was generated from your accepted quotation, and once signed it authorises the invoices — same figures throughout, nothing retyped. It's also priced for Indian small businesses rather than per-envelope in dollars.",
+        a: "Standalone tools sign a document you made elsewhere. DealInSec's e-signature is one step in a deal thread: the agreement was generated from your accepted quotation, and once signed it authorises the invoices — same figures throughout, nothing retyped. It's also priced for Indian freelancers rather than per-envelope in dollars.",
       },
       {
         q: "Does my client need an account to sign?",
-        a: "Your counterparty accepts the agreement electronically through a confirmation flow; the execution record names both parties and the signed copy stays on the deal thread.",
+        a: "Your client accepts the agreement electronically through a confirmation flow; the execution record names both parties and the signed copy stays on the deal thread.",
       },
       {
         q: "What does it cost?",
-        a: "E-signature is part of the normal plans — 7-day Pro trial with no card, free plan after (4 deals a month), Pro at ₹999/month or ₹9,999/year with unlimited agreements.",
+        a: "E-signed agreements are part of Pro — ₹99/month or ₹999/year, with unlimited agreements. Every new account starts with a 7-day Pro trial with no card; the free plan after that covers 4 deals a month with quotations only.",
       },
     ],
   },
@@ -668,7 +662,10 @@ function categoryPage(p: CategoryPage): string {
       operatingSystem: "Web",
       description: p.description,
       url,
-      offers: { "@type": "Offer", price: "999", priceCurrency: "INR", description: "Pro plan ₹999/month or ₹9,999/year; free plan and 7-day trial available" },
+      offers: [
+        { "@type": "Offer", name: "Pro Monthly", price: "99", priceCurrency: "INR", description: "Pro plan ₹99/month; free plan and 7-day trial available" },
+        { "@type": "Offer", name: "Pro Annual", price: "999", priceCurrency: "INR", description: "Pro plan ₹999/year (about ₹83/month)" },
+      ],
     },
     {
       "@context": "https://schema.org",

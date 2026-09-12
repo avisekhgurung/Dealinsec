@@ -23,11 +23,15 @@ interface Faq { q: string; a: string }
 const FAQS: Faq[] = [
   {
     q: "What is DealInSec?",
-    a: "DealInSec is deal management software for Indian service businesses. It keeps a quotation, an agreement and an invoice on one thread for every client deal, so nothing is retyped and nothing is forgotten, and shows you what is collectible today.",
+    a: "DealInSec is quotation, agreement and invoice software for Indian freelancers. Every client project stays on one thread — quotation, e-signed agreement, invoice and payment tracking — so nothing is retyped and nothing is forgotten, and you can see what is collectible today.",
   },
   {
     q: "Who is it for?",
-    a: "Deal-led service businesses in India — freelancers and consultants, real estate brokers, interior designers, architects, marketing and digital agencies, and construction contractors. If you quote, sign and bill clients, the workflow fits.",
+    a: "India's freelancers — designers, developers, writers, video editors and photographers, marketers and consultants. It is built for solo independent professionals who quote, sign and bill their own clients.",
+  },
+  {
+    q: "Will DealInSec make sure my client pays?",
+    a: "No software can force an unwilling client to pay. What DealInSec prevents is the non-payment you cause by being disorganised: work starting without a written scope, the invoice going out late or never, follow-ups that feel too awkward to send, and scope creep nobody priced. Your client accepts the scope and fee before you start, the invoice comes off the same record, and Copilot drafts the reminder. If a client later disputes the work, you have a signed, timestamped record of what they agreed to.",
   },
   {
     q: "How do I make a quotation for a client?",
@@ -47,15 +51,15 @@ const FAQS: Faq[] = [
   },
   {
     q: "What does DealInSec cost?",
-    a: "Every new account gets a 7-day Pro trial with no card. After that the free plan covers 4 deals a month, each with a quotation. Pro is ₹999 a month, or ₹5,999 a year as a founding member — about ₹499 a month, locked for as long as you stay — and adds unlimited deals, agreements, invoices, payment tracking and 5 team seats. There is no platform fee on your deal value.",
+    a: "Every new account gets a 7-day Pro trial with no card. After that the free plan is ₹0 and covers 4 deals a month, each with its quotation. Pro is ₹99 a month, or ₹999 a year (about ₹83 a month), and adds unlimited deals, e-signed agreements, invoices and payment tracking. There is no platform fee on your deal value.",
   },
   {
     q: "Can I bill 50% advance and 50% on delivery?",
     a: "Yes. An agreement can be billed as an advance invoice and a final invoice at any split you choose, or as separate milestone invoices. DealInSec will not let you invoice more than the agreement is worth.",
   },
   {
-    q: "Can my team use it with limited access?",
-    a: "Yes. Invite teammates and give each a role — an accounts person can be limited to invoices and payments and will not see your deal pipeline. Roles are editable, and reads as well as actions are restricted.",
+    q: "How does it help with scope creep?",
+    a: "The quotation and the agreement list the deliverables, revision limit and fee your client accepted, so extra work is visibly extra. Before you send the terms, Copilot's Protection Check flags the things that cost freelancers money — unlimited revisions, no advance, a vague \"as per requirement\" scope, no balance timeline — and suggests wording to fix them. When the client asks for more, you quote the extra work instead of absorbing it.",
   },
 ];
 
@@ -82,8 +86,8 @@ export function landingSeoBody(): string {
   ).join("");
 
   return `<div id="seo-fallback">
-<h1>Deal management software for Indian service businesses — quotation, agreement and invoice on one thread</h1>
-<p>DealInSec keeps every client deal on one thread — quotation, e-signed agreement, invoice and payment tracking — so you look professional, never chase a client, and get paid on time. Built for India's freelancers, real estate consultants, interior designers, architects, agencies and contractors.</p>
+<h1>Quotation, agreement and invoice software for Indian freelancers — one thread per client</h1>
+<p>DealInSec keeps every client project on one thread — quotation, e-signed agreement, invoice and payment tracking — so the scope is agreed in writing before you start, the invoice goes out the day the work is done, and you always know who still owes you. Built for India's freelancers — designers, developers, writers, video editors &amp; photographers, marketers and consultants.</p>
 
 <h2>One workflow from quotation to payment</h2>
 <ul>
@@ -95,22 +99,22 @@ export function landingSeoBody(): string {
 <li><strong>Copilot AI</strong> — paste a WhatsApp chat to draft the deal, get a Protection Check on risky or missing terms, and payment reminders drafted in English or Hinglish. Numbers are computed from your records, never AI-generated, and every action needs your confirmation.</li>
 </ul>
 
-<h2>Why service businesses lose money</h2>
-<p>Work starts without a written scope, invoices go out late, and payments are never followed up — because the quotation is in WhatsApp, the agreement is in email and the invoice is in someone's downloads folder. DealInSec puts the four documents on one thread and tells you what to do next.</p>
+<h2>Why freelancers don't get paid</h2>
+<p>Unpaid freelance work often starts the same way: a "go ahead" on WhatsApp with no written scope, an invoice raised weeks after delivery, a follow-up that feels too awkward to send, and "one small change" that turns into a second project — because the quotation is in WhatsApp, the agreement is in email and the invoice is in your downloads folder. DealInSec puts the four documents on one thread and tells you what to do next. It cannot force an unwilling client to pay, but it removes the reasons you go unpaid through disorganisation, and leaves a signed, timestamped record if a client disputes what was agreed.</p>
 
 <h2>Free tools, no sign-up</h2>
 <p>Create a <a href="/tools/gst-invoice-generator">GST invoice</a> with CGST, SGST and IGST computed, a <a href="/tools/bill-generator">bill</a>, a <a href="/tools/quotation-maker">quotation</a>, a <a href="/tools/purchase-order-generator">purchase order</a>, a <a href="/tools/service-agreement-template">service agreement</a>, a
 <a href="/tools/proforma-invoice-generator">proforma invoice</a> and a
-<a href="/tools/gst-calculator">GST calculator</a> — free in your browser, no account needed.</p>
+<a href="/tools/gst-calculator">GST calculator</a> — free in your browser, no account needed. There is also an <a href="/tools/invoice-format/for-freelancers">invoice format for freelancers</a>.</p>
 
 <h2>What DealInSec covers</h2>
-<p><a href="/interior-design-software">Interior design software</a> · <a href="/freelancer-invoice-software">software for freelancers</a> · <a href="/quotation-software">quotation software</a> · <a href="/proposal-management">proposal management</a> · <a href="/contract-management">contract management</a> · <a href="/e-signature">e-signature</a> · <a href="/invoice-management">invoice management</a> — one thread per deal, from first quote to final payment.</p>
+<p><a href="/freelancer-invoice-software">Freelancer invoice software</a> · <a href="/quotation-software">quotation software</a> · <a href="/proposal-management">proposal management</a> · <a href="/contract-management">contract management</a> · <a href="/e-signature">e-signature</a> · <a href="/invoice-management">invoice management</a> · <a href="/refrens-alternative">Refrens alternative</a> · <a href="/vyapar-alternative">Vyapar alternative</a> — one thread per deal, from first quote to final payment.</p>
 
 <h2>Guides</h2>
-<p>From the <a href="/blog">DealInSec blog</a>: <a href="/blog/what-is-deal-management-software">what deal management software is</a>, the <a href="/blog/quotation-format">quotation format guide with a free sample</a>, <a href="/blog/how-to-make-a-quotation-online">how to make a quotation online</a>, <a href="/blog/quotation-software-vs-excel">quotation software vs Excel</a>, <a href="/blog/best-quotation-software-india">choosing quotation software in India</a>, <a href="/blog/quotation-vs-proposal">quotation vs proposal</a>, <a href="/blog/how-to-manage-a-deal-from-quotation-to-invoice">managing a deal from quotation to invoice</a>, and <a href="/blog/fake-quotation">when a sample quotation is fine and when it's fraud</a>. For getting paid: <a href="/blog/client-not-paying">what to do when a client isn't paying</a>, <a href="/blog/payment-reminder-message-to-client">payment reminder messages that work</a>, <a href="/blog/msme-payment-rule-45-days-samadhaan">the MSME 45-day payment rule</a>, <a href="/blog/advance-payment-terms">advance payment terms</a>, and the <a href="/blog/ra-bill-format">RA bill format for contractors</a>.</p>
+<p>From the <a href="/blog">DealInSec blog</a>: <a href="/blog/what-is-deal-management-software">what deal management software is</a>, the <a href="/blog/quotation-format">quotation format guide with a free sample</a>, <a href="/blog/how-to-make-a-quotation-online">how to make a quotation online</a>, <a href="/blog/quotation-software-vs-excel">quotation software vs Excel</a>, <a href="/blog/best-quotation-software-india">choosing quotation software in India</a>, <a href="/blog/quotation-vs-proposal">quotation vs proposal</a>, <a href="/blog/how-to-manage-a-deal-from-quotation-to-invoice">managing a deal from quotation to invoice</a>, and <a href="/blog/fake-quotation">when a sample quotation is fine and when it's fraud</a>. For getting paid: <a href="/blog/client-not-paying">what to do when a client isn't paying</a>, <a href="/blog/payment-reminder-message-to-client">payment reminder messages that work</a>, <a href="/blog/msme-payment-rule-45-days-samadhaan">the MSME 45-day payment rule</a>, and <a href="/blog/advance-payment-terms">advance payment terms</a>.</p>
 
 <h2>Pricing</h2>
-<p>7-day Pro trial with no card. Free plan covers 4 deals a month. Pro is ₹999 per month, or ₹5,999 per year as a founding member (about ₹499 per month, locked for as long as you stay), with unlimited deals, agreements, invoices, payment tracking and 5 team seats. No platform fee on your deal value.</p>
+<p>7-day Pro trial with no card. Free plan is ₹0 and covers 4 deals a month, each with its quotation. Pro is ₹99 per month, or ₹999 per year (about ₹83 per month), with unlimited deals, e-signed agreements, invoices and payment tracking. No platform fee on your deal value.</p>
 
 <h2>Frequently asked questions</h2>
 ${faqs}

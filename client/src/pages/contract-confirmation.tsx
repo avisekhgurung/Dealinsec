@@ -449,9 +449,9 @@ export default function ContractConfirmationPage() {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mx-auto">
               <Shield className="w-8 h-8 text-primary" />
             </div>
-            <h2 className="text-xl font-bold">Exclusive Agreement</h2>
+            <h2 className="text-xl font-bold">Create the agreement</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              You're about to create an exclusive agreement with{" "}
+              You're about to create the agreement for{" "}
               <span className="font-semibold text-foreground">{deal.brandName}</span>
             </p>
           </div>
@@ -488,8 +488,9 @@ export default function ContractConfirmationPage() {
                 <div>
                   <p className="font-semibold text-amber-900 dark:text-amber-200 text-sm">Important Notice</p>
                   <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed mt-0.5">
-                    This is an <strong>EXCLUSIVE AGREEMENT</strong>. All brand deals during
-                    this period must be registered on this platform.
+                    This agreement is <strong>EXCLUSIVE for its scope</strong>. While it runs, you
+                    won't deliver the same work to a direct competitor of this client for this
+                    project without their written consent.
                   </p>
                 </div>
               </div>
@@ -501,7 +502,7 @@ export default function ContractConfirmationPage() {
               <h3 className="font-semibold text-sm">Agreement Details</h3>
               <div className="space-y-2.5 text-sm">
                 {[
-                  { label: "Brand", value: deal.brandName },
+                  { label: "Client", value: deal.brandName },
                   { label: "Deal", value: deal.dealTitle },
                   { label: "Value", value: `₹${Number(deal.dealAmount).toLocaleString("en-IN")}`, bold: true },
                   {
@@ -713,8 +714,7 @@ export default function ContractConfirmationPage() {
               data-testid="checkbox-agree"
             />
             <label htmlFor="agree" className="text-sm leading-relaxed cursor-pointer select-none">
-              I understand and agree to the exclusive usage terms. All my brand deals
-              during this agreement period will be registered on this platform.
+              I understand and agree to the exclusivity terms in this agreement.
             </label>
           </div>
 

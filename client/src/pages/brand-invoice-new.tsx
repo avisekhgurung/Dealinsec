@@ -372,7 +372,7 @@ export default function BrandInvoiceNewPage() {
                           <Input
                             id={`desc-${i}`}
                             value={line.description}
-                            placeholder="Interior design — phase 1"
+                            placeholder="Website design — milestone 1"
                             onChange={(e) => updateLine(i, { description: e.target.value })}
                             data-testid={`input-line-desc-${i}`}
                           />

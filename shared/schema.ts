@@ -145,7 +145,7 @@ export const organizations = pgTable("organizations", {
   slug: varchar("slug").unique(),
   logo: varchar("logo"),
   industry: varchar("industry"),
-  // Extra seats purchased beyond the plan's included seats (₹199/seat/month).
+  // Extra seats purchased beyond the plan's included seats (₹99/seat/month).
   // One shared expiry: rebuying resets the pack. Included seats are derived
   // from the owner's plan (free = 1, Pro = 5) via getSeatLimit().
   extraSeats: integer("extra_seats").notNull().default(0),

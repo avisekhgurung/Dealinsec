@@ -29,24 +29,18 @@ import {
   FileCheck,
   UserCircle,
   LogOut,
-  Quote,
-  Star,
   IndianRupee,
-  Users,
   Lightbulb,
   Camera,
   PenTool,
+  PenLine,
+  Code2,
+  Clapperboard,
+  Megaphone,
   Calculator,
   ClipboardList,
-  Building2,
-  Sofa,
-  DraftingCompass,
-  Megaphone,
-  HardHat,
   Infinity as InfinityIcon,
-  UserPlus,
   ShieldCheck,
-  ScrollText,
   Radar,
   Navigation,
   MessageSquare,
@@ -104,19 +98,19 @@ const FEATURES = [
   {
     icon: Briefcase,
     title: "Deal Management",
-    desc: "Track every mandate, project and retainer — scope, timelines and pricing in one clean dashboard.",
+    desc: "Every project, retainer and one-off gig in one place — scope, deadline and fee, not four chat threads.",
     tint: "emerald",
   },
   {
     icon: FileText,
     title: "Instant Quotations",
-    desc: "Per sq ft, milestone or retainer — professional quotes in under 60 seconds, on your terms.",
+    desc: "Fixed fee, per hour, per piece or milestone — a professional quote in under 60 seconds, on your terms.",
     tint: "teal",
   },
   {
     icon: FileSignature,
-    title: "Legal Agreements",
-    desc: "Digitally-signed agreements with secure signature workflow and PDF downloads.",
+    title: "Signed Agreements",
+    desc: "Your client accepts electronically and the record shows who signed, when — PDF for both sides.",
     tint: "cyan",
   },
   {
@@ -150,13 +144,13 @@ const WORKFLOW_STEPS = [
     step: "02",
     icon: FileText,
     title: "Send Quotation",
-    desc: "Professional quote with selectable T&Cs. Shareable in a click.",
+    desc: "Professional quote with selectable T&Cs. Save the PDF and send it.",
   },
   {
     step: "03",
     icon: FileSignature,
     title: "Sign Agreement",
-    desc: "Secure digital signatures. Both sides get legally-worded, downloadable PDFs.",
+    desc: "Your client accepts online — who, when and which signature, on record. PDF for both.",
   },
   {
     step: "04",
@@ -182,15 +176,19 @@ const STATS = [
 const FAQS = [
   {
     q: "Who is DealInSec built for?",
-    a: "Deal-led service businesses — freelancers and consultants, real estate brokers, interior designers, architects, marketing and digital agencies, and construction contractors. If you quote, sign and bill clients, the workflow fits: deal â quotation â agreement â invoice â payment tracking. DealInSec never touches your clients’ money â you record payments, we keep the register.",
+    a: "India's freelancers — designers, developers, writers, video editors & photographers, marketers and consultants. If you quote, sign and bill your own clients, the workflow fits: deal → quotation → agreement → invoice → payment tracking. DealInSec never touches your client's money — you record the payment, we keep the register.",
   },
   {
     q: "Is Dealinsec free to use?",
-    a: "Yes — every new account starts with a 7-day Pro trial: everything unlocked, no card needed. After that the free plan covers 4 deals every month, each with a professional quotation. Signed agreements, invoices and payment tracking are part of DealInSec Pro — ₹999/month, or ₹5,999 for the first year as a founding member (about ₹499/month, locked for as long as you stay). There are no platform fees on your deal value.",
+    a: "Yes — every new account starts with a 7-day Pro trial: everything unlocked, no card needed. After that the free plan covers 4 deals every month, each with a professional quotation. Signed agreements, invoices and payment tracking are part of DealInSec Pro — ₹99/month, or ₹999 for a full year (about ₹83/month, which is ₹189 less than paying monthly). There are no platform fees on your deal value.",
   },
   {
-    q: "Do agreements generated here hold up legally?",
-    a: "Yes. Agreements are generated with legally-worded clauses and captured via digital signatures. Both parties get a PDF copy for their records.",
+    q: "Will DealInSec make a client pay me?",
+    a: "No tool can force an unwilling client to pay, and we are not going to pretend otherwise. What DealInSec fixes is the half that sits with you: the scope nobody wrote down, the invoice that went out three weeks late, the follow-up you kept postponing. And if the client later disputes what was agreed, you have a signed, timestamped record instead of a WhatsApp thread.",
+  },
+  {
+    q: "What does an e-signed agreement actually give me?",
+    a: "Electronic acceptance with an audit record — who accepted, when, and which signature was used — plus a PDF both sides can keep. It is not a DSC or Aadhaar eSign, so have a lawyer look at anything high-value or unusual. For everyday client work it gives you a dated record of the scope and the fee you both agreed to.",
   },
   {
     q: "Can I add my own terms and conditions?",
@@ -198,7 +196,11 @@ const FAQS = [
   },
   {
     q: "How do I get paid?",
-    a: "Your banking details (account number, IFSC, PAN) live in your profile and are auto-populated into every invoice you send. Brands pay you directly.",
+    a: "Your banking details (account number, IFSC, PAN) live in your profile and are auto-filled into every invoice you send. Clients pay you directly — bank transfer or UPI — and you mark the invoice paid so the register always shows what is still outstanding.",
+  },
+  {
+    q: "Are the invoices GST tax invoices?",
+    a: "In-app invoices are GST-ready professional invoices for your client and your own records — they are not Rule-46 GST tax invoices. If you need a full GST tax invoice, the free GST Invoice Generator in Free Tools is built for exactly that.",
   },
   {
     q: "Is my data secure?",
@@ -206,54 +208,49 @@ const FAQS = [
   },
 ];
 
+// The six craft deal types freelancers pick from (shared/dealTypeTaxonomy.ts),
+// in taxonomy order — Custom is intentionally omitted from marketing cards.
 const WHO_WE_SERVE = [
   {
-    icon: Building2,
-    title: "Real Estate",
-    tagline: "Sales · Rentals · Leasing",
-    desc: "Brokers and consultants closing property deals with proper mandates, agreements and brokerage invoices.",
+    icon: PenTool,
+    title: "Design",
+    tagline: "Brand · UI/UX · Social",
+    desc: "Scope and revision count agreed before the first draft, advance taken in writing, invoice out the day the files go.",
     accent: "emerald",
   },
   {
-    icon: Sofa,
-    title: "Interior Designers",
-    tagline: "Homes · Offices · Retail",
-    desc: "Studios quoting per sq ft or turnkey, signing scope before work starts, and billing by milestone.",
+    icon: Code2,
+    title: "Development",
+    tagline: "Web · App · No-code",
+    desc: "Quote milestone by milestone, get the scope signed before you write a line, and see exactly which milestone is still unpaid.",
     accent: "teal",
   },
   {
-    icon: DraftingCompass,
-    title: "Architects",
-    tagline: "Design · Drawings · PMC",
-    desc: "Firms billing stage-wise design fees, protecting drawings with agreements, and tracking every payment.",
+    icon: PenLine,
+    title: "Writing",
+    tagline: "Content · Copy · Ghostwriting",
+    desc: "Per piece, per word or monthly retainer — the rate, the deadline and the revision limit on record instead of in a chat.",
     accent: "cyan",
   },
   {
     icon: Megaphone,
-    title: "Agencies",
-    tagline: "Marketing · Digital · Web",
-    desc: "Marketing, creative and web agencies running client retainers, campaigns and project billing in one place.",
+    title: "Marketing",
+    tagline: "Social · Ads · SEO",
+    desc: "Retainers with a written deliverable list, so \"just one more post\" becomes a line item instead of a favour.",
     accent: "indigo",
   },
   {
-    icon: HardHat,
-    title: "Construction",
-    tagline: "Civil · Turnkey · Trades",
-    desc: "Contractors managing works contracts, RA bills and milestone payments without the paperwork chaos.",
+    icon: Clapperboard,
+    title: "Video & Photo",
+    tagline: "Editing · Shoots · Reels",
+    desc: "Shoot dates, deliverables and usage in one signed agreement — and a register that shows who still owes for last month's edit.",
     accent: "amber",
   },
   {
-    icon: Briefcase,
-    title: "Freelancers",
-    tagline: "Design · Dev · Content",
-    desc: "Solo professionals taking a 50% advance in writing, capping revisions, and chasing payments without the awkwardness.",
-    accent: "emerald",
-  },
-  {
     icon: Lightbulb,
-    title: "Consultants",
+    title: "Consulting",
     tagline: "Advisory · Retainers · Coaching",
-    desc: "Consultants and coaches putting scope and fees in writing — hourly, retainer or milestone — and getting paid on time.",
+    desc: "Hourly, retainer or milestone fees agreed up front, invoiced on time, and followed up without the awkward phone call.",
     accent: "teal",
   },
 ];
@@ -395,7 +392,6 @@ export default function LandingPage() {
         <LandingCopilotSection
           onCta={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
         />
-        <TeamSection />
         {/* Testimonials hidden until we have real users. Re-enable <Testimonials /> once you have genuine quotes. */}
         <MadeInIndiaSection />
         <PricingPreview onCTA={() => (isAuthenticated ? setLocation("/pricing") : openAuth("signup"))} />
@@ -834,8 +830,8 @@ function Hero({
 
             <motion.p variants={heroFadeUp} className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
               One simple workflow — quotation, e-signed agreement, professional invoice, payment tracking —{" "}
-              <span className="font-semibold text-neutral-900 dark:text-white">so you look professional, never chase a client, and get paid on time.</span>{" "}
-              Built for India's freelancers, real estate consultants, interior designers, architects, agencies &amp; contractors.
+              <span className="font-semibold text-neutral-900 dark:text-white">so the scope is in writing, the invoice goes out on time, and you always know who still owes you.</span>{" "}
+              Built for India's freelancers — designers, developers, writers, video editors &amp; photographers, marketers and consultants.
             </motion.p>
 
             <motion.div variants={heroFadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
@@ -924,8 +920,8 @@ function ProductPreview() {
             {[
               { label: "Deals", value: "12", change: "+3", tint: "emerald" },
               { label: "Agreements", value: "8", change: "+2", tint: "teal" },
-              { label: "Pipeline", value: "₹4.2L", change: "+18%", tint: "cyan" },
-              { label: "Paid this month", value: "₹2.8L", change: "+42%", tint: "indigo" },
+              { label: "Pipeline", value: "₹2.4L", change: "+18%", tint: "cyan" },
+              { label: "Paid this month", value: "₹86,000", change: "+42%", tint: "indigo" },
             ].map((s, i) => (
               <motion.div
                 key={s.label}
@@ -959,9 +955,9 @@ function ProductPreview() {
               <p className="text-xs font-semibold mb-3">Recent deals</p>
               <div className="space-y-2.5">
                 {[
-                  { name: "Sharma Residence · 3BHK Interiors", status: "Paid", amount: "₹4.5L" },
-                  { name: "Skyline Devs · Office Fit-out", status: "Signed", amount: "₹12L" },
-                  { name: "Café Aroma · Design + Execution", status: "Quote", amount: "₹2.8L" },
+                  { name: "Café Aroma · Brand identity", status: "Paid", amount: "₹45,000" },
+                  { name: "Nimbus Labs · Website build", status: "Signed", amount: "₹1.2L" },
+                  { name: "Brightpath · 4 reels a month", status: "Quote", amount: "₹28,000" },
                 ].map((d) => (
                   <div key={d.name} className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
@@ -988,7 +984,7 @@ function ProductPreview() {
         </div>
         <div>
           <p className="text-[10px] text-neutral-500">Agreement signed</p>
-          <p className="text-xs font-semibold">Skyline Developers LLP</p>
+          <p className="text-xs font-semibold">Nimbus Labs Pvt Ltd</p>
         </div>
       </motion.div>
 
@@ -1002,7 +998,7 @@ function ProductPreview() {
         </div>
         <div>
           <p className="text-[10px] text-neutral-500">Payment received</p>
-          <p className="text-xs font-semibold">₹2,25,000</p>
+          <p className="text-xs font-semibold">₹60,000</p>
         </div>
       </motion.div>
     </div>
@@ -1066,16 +1062,16 @@ function TrustStrip() {
           viewport={{ once: true }}
           className="text-center text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-6"
         >
-          Built for India's deal-led service sectors
+          Built for India's freelancers
         </motion.p>
         <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-5 opacity-70">
           {[
-            { Icon: Building2, name: "Real Estate" },
-            { Icon: Sofa, name: "Interior Design" },
-            { Icon: DraftingCompass, name: "Architecture" },
-            { Icon: Megaphone, name: "Agencies" },
-            { Icon: HardHat, name: "Construction" },
-            { Icon: Briefcase, name: "Freelancers" },
+            { Icon: PenTool, name: "Designers" },
+            { Icon: Code2, name: "Developers" },
+            { Icon: PenLine, name: "Writers" },
+            { Icon: Clapperboard, name: "Video editors" },
+            { Icon: Camera, name: "Photographers" },
+            { Icon: Megaphone, name: "Marketers" },
             { Icon: Lightbulb, name: "Consultants" },
           ].map(({ Icon, name }, i) => (
             <motion.div
@@ -1106,12 +1102,12 @@ function WhoWeServeSection() {
             <>
               Built for{" "}
               <span style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                every business
+                India's freelancers
               </span>{" "}
-              that closes deals
+              who bill their own clients
             </>
           }
-          subtitle="Built for everyone who runs on deals — freelancers, brokers, designers, architects, agencies and contractors. One workflow from first quotation to final invoice — with every payment tracked."
+          subtitle="Designers, developers, writers, video editors &amp; photographers, marketers and consultants. One workflow from first quotation to final invoice — with every payment tracked."
         />
 
         <motion.div
@@ -1119,7 +1115,7 @@ function WhoWeServeSection() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-80px" }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-5 mt-14"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5 mt-14"
         >
           {WHO_WE_SERVE.map((p) => (
             <motion.div
@@ -1153,8 +1149,8 @@ function WhoWeServeSection() {
           className="mt-12 max-w-3xl mx-auto rounded-2xl border border-neutral-900/90 dark:border-neutral-700 bg-neutral-950 dark:bg-neutral-900 p-5 sm:p-6 text-center"
         >
           <p className="text-sm sm:text-base text-neutral-200 font-medium leading-relaxed">
-            <span className="text-emerald-400 font-semibold">One platform.</span>{" "}
-            Every deal-led business. Whether you're a solo consultant or a 50-person agency — same workflow, same simple pricing.
+            <span className="text-emerald-400 font-semibold">One workflow.</span>{" "}
+            Every client you invoice. Whether it's a ₹5,000 logo or a ₹2,00,000 app build — quotation, signed scope, invoice, payment tracked. Pro is ₹99 a month.
           </p>
         </motion.div>
       </div>
@@ -1186,7 +1182,7 @@ function FreeToolsSection() {
               </span>
             </>
           }
-          subtitle="Create GST invoices, quotations and agreements right in your browser — free, instant, no sign-up. Our gift to Indian businesses. When you're ready to run whole deals, the app is one click away."
+          subtitle="Create GST invoices, quotations and agreements right in your browser — free, instant, no sign-up. Our gift to India's freelancers. When you're ready to run whole deals, the app is one click away."
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5 mt-14">
           {FREE_TOOLS.map((t) => (
@@ -1216,16 +1212,19 @@ function FreeToolsSection() {
           </a>
         </div>
 
-        {/* Sector bridge: invoice-format guides for the Phase-1 ICP (also
+        {/* Discipline bridge: invoice-format guides for the freelance ICP (also
             internal links that help Google connect the landing to the SEO pages) */}
         <div className="mt-8 flex flex-wrap items-center justify-center gap-x-2 gap-y-2 text-xs text-neutral-500">
-          <span className="font-semibold uppercase tracking-wider text-[10px]">Invoice formats for your sector:</span>
+          <span className="font-semibold uppercase tracking-wider text-[10px]">Invoice formats for your work:</span>
           {[
-            { label: "Real Estate", href: "/tools/invoice-format/for-real-estate-agents" },
-            { label: "Interior Design", href: "/tools/invoice-format/for-interior-designers" },
-            { label: "Architecture", href: "/tools/invoice-format/for-architects" },
-            { label: "Agencies", href: "/tools/invoice-format/for-digital-marketing-agencies" },
-            { label: "Construction", href: "/tools/invoice-format/for-construction-contractors" },
+            { label: "Graphic designers", href: "/tools/invoice-format/for-graphic-designers" },
+            { label: "Web developers", href: "/tools/invoice-format/for-web-developers" },
+            { label: "Content writers", href: "/tools/invoice-format/for-content-writers" },
+            { label: "Video editors", href: "/tools/invoice-format/for-video-editors" },
+            { label: "Photographers", href: "/tools/invoice-format/for-photographers" },
+            { label: "Social media managers", href: "/tools/invoice-format/for-social-media-managers" },
+            { label: "Consultants", href: "/tools/invoice-format/for-consultants" },
+            { label: "Freelancers", href: "/tools/invoice-format/for-freelancers" },
           ].map((s) => (
             <a
               key={s.href}
@@ -1298,7 +1297,7 @@ function WorkflowSection() {
         <SectionHeader
           eyebrow="How it works"
           title="From handshake to paid invoice in 4 steps"
-          subtitle="Every client deal moves cleanly through the Dealinsec pipeline — no follow-ups, no lost threads."
+          subtitle="Every client deal moves cleanly through the Dealinsec pipeline — fewer awkward follow-ups, nothing lost in a WhatsApp thread."
         />
 
         <div className="mt-16 relative">
@@ -1342,21 +1341,21 @@ function ProductShowcase() {
     {
       eyebrow: "Quotations",
       title: "Professional quotes in 60 seconds",
-      desc: "Send out quotations with standard or custom terms. Clients see a polished, branded PDF they can approve or pay instantly.",
+      desc: "Send out quotations with standard or custom terms. Your client gets a clean PDF with the scope, the price and the payment terms in one place — no more quoting a number on WhatsApp.",
       bullets: [
         "Selectable standard T&Cs (30-day validity, 50% advance, etc.)",
         "Custom terms — add your own clauses",
-        "Shareable link or branded PDF",
+        "Save the PDF and send it however your client reads things",
       ],
       mockup: <QuoteMockup />,
     },
     {
       eyebrow: "Agreements",
-      title: "Legal agreements, digitally signed",
-      desc: "Generate legally-worded agreements both parties can sign digitally. Downloadable PDFs for your records — no printing, no scanning.",
+      title: "Scope and fee, signed before you start",
+      desc: "Turn the quote into an agreement your client accepts electronically. DealInSec records who accepted, when and which signature — so \"we never agreed to that\" has an answer.",
       bullets: [
-        "Legally-worded standard templates",
-        "Secure digital signature workflow",
+        "Clearly-worded standard templates",
+        "Electronic acceptance with an audit record",
         "Downloadable PDFs for both sides",
       ],
       mockup: <AgreementMockup />,
@@ -1364,7 +1363,7 @@ function ProductShowcase() {
     {
       eyebrow: "Invoices",
       title: "Get paid, track every rupee",
-      desc: "Banking details, PAN, and IFSC are auto-filled into every invoice. Track advance and final payments without chasing emails.",
+      desc: "Banking details, PAN, and IFSC are auto-filled into every invoice. Track advance and balance payments without digging through old emails.",
       bullets: [
         "Your banking details saved once, used everywhere",
         "Advance + final invoice split",
@@ -1380,7 +1379,7 @@ function ProductShowcase() {
         <SectionHeader
           eyebrow="Product showcase"
           title="Built like the tools you already love"
-          subtitle="Opinionated, fast, and designed for how service businesses actually work."
+          subtitle="Opinionated, fast, and designed for how freelancers actually work."
         />
 
         <div className="mt-16 space-y-20 lg:space-y-28">
@@ -1462,11 +1461,11 @@ function QuoteMockup() {
       <div className="space-y-3">
         <div className="flex justify-between text-xs">
           <span className="text-neutral-500">To</span>
-          <span className="font-semibold">Skyline Developers LLP</span>
+          <span className="font-semibold">Café Aroma</span>
         </div>
         <div className="flex justify-between text-xs">
           <span className="text-neutral-500">Deliverable</span>
-          <span className="font-semibold">1 Instagram Reel · 1 Story</span>
+          <span className="font-semibold">Logo + brand guidelines</span>
         </div>
         <div className="flex justify-between text-xs">
           <span className="text-neutral-500">Valid till</span>
@@ -1501,15 +1500,15 @@ function AgreementMockup() {
           <FileSignature className="w-4 h-4 text-emerald-600" />
         </div>
         <div>
-          <p className="text-sm font-bold">Collaboration Agreement</p>
-          <p className="text-[10px] text-neutral-500">Between Meera Nair and Skyline Developers LLP</p>
+          <p className="text-sm font-bold">Service Agreement</p>
+          <p className="text-[10px] text-neutral-500">Between Meera Nair and Nimbus Labs Pvt Ltd</p>
         </div>
       </div>
 
       <div className="space-y-2 text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed mb-5">
-        <p>This agreement confirms the collaboration terms between the parties...</p>
-        <p className="opacity-60">Section 1 — Scope of work · Section 2 — Compensation...</p>
-        <p className="opacity-40">Section 3 — Exclusivity...</p>
+        <p>This agreement confirms the terms of work between the parties...</p>
+        <p className="opacity-60">Section 1 — Scope of work · Section 2 — Fees &amp; payment...</p>
+        <p className="opacity-40">Section 3 — Revisions &amp; ownership...</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -1522,7 +1521,7 @@ function AgreementMockup() {
           </div>
         </div>
         <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 p-3">
-          <p className="text-[9px] uppercase tracking-widest text-neutral-500 mb-1">Brand</p>
+          <p className="text-[9px] uppercase tracking-widest text-neutral-500 mb-1">Client</p>
           <div className="h-4 rounded bg-neutral-100 dark:bg-neutral-800 animate-pulse" />
           <div className="flex items-center gap-1 mt-1.5">
             <div className="w-3 h-3 rounded-full border-2 border-amber-500 animate-pulse" />
@@ -1554,8 +1553,8 @@ function InvoiceMockup() {
 
       <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 p-4 mb-5">
         <p className="text-[10px] uppercase tracking-widest text-neutral-600 dark:text-neutral-400 font-semibold mb-1">Amount received</p>
-        <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">₹45,000</p>
-        <p className="text-[10px] text-neutral-500 mt-1">Final payment · 22 Apr 2026</p>
+        <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">₹22,500</p>
+        <p className="text-[10px] text-neutral-500 mt-1">Balance 50% · 22 Apr 2026</p>
       </div>
 
       <div className="space-y-2 text-[11px]">
@@ -1616,7 +1615,7 @@ function Testimonials() {
         <div className="max-w-3xl mx-auto mt-12">
           <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-7 sm:p-9">
             <p className="text-[15px] leading-relaxed text-neutral-700 dark:text-neutral-300">
-              Most Indian service businesses lose money in the same three places: work that starts
+              Most Indian freelancers lose money in the same three places: work that starts
               without a written scope, invoices that go out late, and payments nobody follows up on.
               Not because anyone is careless — because the quotation is in WhatsApp, the agreement is in
               email, and the invoice is in someone's Downloads folder.
@@ -1672,7 +1671,7 @@ function MadeInIndiaSection() {
               <span className="text-xs font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-300">Made in India</span>
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4" style={{ textWrap: "balance" }}>
-              Built in India, for the businesses{" "}
+              Built in India, for the freelancers{" "}
               <span
                 style={{
                   background: "linear-gradient(135deg, #FF9933 0%, #E01B6F 50%, #138808 100%)",
@@ -1681,21 +1680,21 @@ function MadeInIndiaSection() {
                   backgroundClip: "text",
                 }}
               >
-                that build India
+                who do the work
               </span>
             </h2>
             <p className="text-base sm:text-lg text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed mb-3">
-              The broker closing a family's first home. The designer turning a bare flat into
-              a place someone loves coming back to. The contractor whose RA bill feeds thirty
-              families. The agency putting a local brand on the map.
+              The designer whose client said "loved it!" and then went quiet. The developer
+              still chasing the last 30% two months after launch. The writer invoicing from
+              a notes app. The video editor who has been told "next week" four weeks running.
             </p>
             <p className="text-base sm:text-lg text-neutral-700 dark:text-neutral-300 max-w-2xl mx-auto leading-relaxed font-medium">
-              Your work runs on trust and a handshake. DealInSec puts that handshake in
-              writing &mdash; GST-native, &#8377;-first, and made for how Indian business actually runs.
+              You did the work. DealInSec puts the scope, the signature and the invoice on one
+              thread &mdash; GST-ready, &#8377;-first, and made for how Indian freelancing actually runs.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 mt-7 text-xs text-neutral-500">
-              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> GST &amp; SAC built in</span>
-              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> PAN, IFSC &amp; UPI native</span>
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> GST-ready quotes &amp; invoices</span>
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> PAN &amp; IFSC on every invoice</span>
               <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> Priced in &#8377;, for India</span>
               <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> Built by a founder, not a giant</span>
             </div>
@@ -1717,15 +1716,14 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
     "Unlimited deals & quotations",
     "Unlimited signed agreements with e-signature",
     "Unlimited professional invoices",
-    "Payment tracking & reminders",
-    "5 team seats · custom roles & permissions",
-    "Custom branding · Priority support",
+    "Payment tracking — know who still owes you",
+    "Priority email support",
   ];
   const proAnnualPerks = [
     "Everything in Pro Monthly",
     "Unlimited workflow for a full year",
     "One payment — no monthly renewals",
-    "Lock today's price for 12 months",
+    "₹999 for the year instead of ₹1,188",
   ];
 
   return (
@@ -1815,11 +1813,11 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                     backgroundClip: "text",
                   }}
                 >
-                  ₹999
+                  ₹99
                 </span>
                 <span className="text-sm text-neutral-500">/ month</span>
               </div>
-              <p className="text-xs text-neutral-500 mt-1">The complete Lead → Deal → Quote → Agreement → Invoice → Payment workflow.</p>
+              <p className="text-xs text-neutral-500 mt-1">The complete Deal → Quote → Agreement → Invoice → Payment workflow.</p>
 
               <ul className="mt-5 space-y-2.5">
                 {proMonthlyPerks.map((f) => (
@@ -1836,7 +1834,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                 style={{ background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)" }}
                 data-testid="button-go-pro-monthly"
               >
-                Go Pro — ₹999/month
+                Go Pro — ₹99/month
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
 
@@ -1855,7 +1853,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
             </div>
           </motion.div>
 
-          {/* Pro Annual — save 2 months */}
+          {/* Pro Annual — ₹999/yr, i.e. ₹189 less than 12 × ₹99 */}
           <motion.div
             variants={fadeUp}
             className="relative rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-7 flex flex-col"
@@ -1868,15 +1866,14 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                 <p className="text-sm font-semibold">Pro · Annual</p>
               </div>
               <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                Founding price
+                Save ₹189
               </span>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-4xl font-bold tracking-tight">₹5,999</span>
+              <span className="text-4xl font-bold tracking-tight">₹999</span>
               <span className="text-sm text-neutral-500">/ year</span>
-              <span className="text-sm text-neutral-400 line-through">₹9,999</span>
             </div>
-            <p className="text-xs text-neutral-500 mt-1">≈ ₹499/month — first 100 members, locked for life.</p>
+            <p className="text-xs text-neutral-500 mt-1">≈ ₹83/month — ₹189 less than paying ₹99 twelve times.</p>
             <ul className="mt-5 space-y-2.5 flex-1">
               {proAnnualPerks.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">
@@ -1891,14 +1888,14 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
               style={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" }}
               data-testid="button-go-pro"
             >
-              Become a founding member — ₹5,999
+              Go Pro Annual — ₹999/year
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-            <p className="text-[11px] text-neutral-500 text-center mt-3">One payment, not auto-renewing. Founding price is locked for as long as you stay.</p>
+            <p className="text-[11px] text-neutral-500 text-center mt-3">One payment, not auto-renewing. A full year of the Pro workflow.</p>
           </motion.div>
         </motion.div>
 
-        {/* What's free vs. what costs a credit */}
+        {/* What's free vs. what needs Pro */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -1937,7 +1934,7 @@ function FAQSection() {
         <SectionHeader
           eyebrow="FAQ"
           title="Questions, answered"
-          subtitle="Still curious? Our team replies to every email within 24 hours."
+          subtitle="Still curious? Every email gets a reply, usually within a day."
         />
 
         <motion.div
@@ -1992,7 +1989,7 @@ function FinalCTA({ isAuthenticated, onCTA }: { isAuthenticated: boolean; onCTA:
               Deals in seconds.<br />Secured for life.
             </h2>
             <p className="text-base sm:text-lg text-emerald-100/90 max-w-xl mx-auto mb-8">
-              Join freelancers, brokers, designers, architects, agencies and contractors closing professional deals — quoted, signed, invoiced and paid. Free to start, no credit card required.
+              For freelancers who would rather be doing the work than chasing it — every client deal quoted, signed, invoiced and tracked in one place. Free to start, no credit card required.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Button
@@ -2028,7 +2025,7 @@ function Footer() {
           <div className="col-span-2 md:col-span-1">
             <DealinsecLogo size="md" withText />
             <p className="text-xs text-neutral-500 mt-4 leading-relaxed max-w-[240px]">
-              The deal-management OS for India's service sectors — real estate, interiors, architecture, agencies and construction. Quote, sign, bill and get paid in one workflow.
+              Deal management for India's freelancers — designers, developers, writers, video editors &amp; photographers, marketers and consultants. Quote, sign, bill and track every payment in one workflow.
             </p>
             <div className="flex items-center gap-3 mt-5">
               {[
@@ -2053,6 +2050,7 @@ function Footer() {
           <FooterColumn
             title="Product"
             links={[
+              { label: "Freelancer Invoice Software", href: "/freelancer-invoice-software" },
               { label: "Quotation Software", href: "/quotation-software" },
               { label: "Contract Management", href: "/contract-management" },
               { label: "Proposal Management", href: "/proposal-management" },
@@ -2087,7 +2085,7 @@ function Footer() {
             { Icon: Shield, text: "256-bit encrypted" },
             { Icon: Lock, text: "Pro purchases secured by Razorpay" },
             { Icon: Check, text: "UPI · Cards · NetBanking" },
-            { Icon: Zap, text: "7-day Pro trial · Pro from ₹999/month" },
+            { Icon: Zap, text: "7-day Pro trial · Pro from ₹99/month" },
           ].map(({ Icon, text }) => (
             <span key={text} className="inline-flex items-center gap-1.5 text-[11px] text-neutral-500">
               <Icon className="w-3.5 h-3.5 text-emerald-600" />
@@ -2214,7 +2212,7 @@ function WatchesSection() {
       Icon: Radar,
       title: "Money Radar",
       line: "One number for everything you can collect right now — overdue, due this week, and signed work you haven't invoiced yet.",
-      quote: "₹2,84,500 potentially collectible",
+      quote: "₹84,500 potentially collectible",
     },
     {
       Icon: ShieldCheck,
@@ -2266,96 +2264,6 @@ function WatchesSection() {
         <p className="text-center text-xs text-neutral-500 mt-8 max-w-xl mx-auto">
           Every figure comes from your own deals — DealInSec never invents numbers, and never messages a client without your approval.
         </p>
-      </div>
-    </section>
-  );
-}
-
-// ── Team & roles — the multiplayer pitch ────────────────────────────────────
-function TeamSection() {
-  const MATRIX_ROWS = [
-    { module: "Deals", site: true, jr: true, acc: false },
-    { module: "Agreements", site: false, jr: false, acc: false },
-    { module: "Invoices", site: false, jr: false, acc: true },
-    { module: "Payments", site: false, jr: false, acc: true },
-  ];
-  const cell = (on: boolean, key: string) => (
-    <td key={key} className="text-center py-1.5">
-      <span className={`inline-flex items-center justify-center w-4 h-4 rounded ${on ? "bg-emerald-500/15" : "bg-neutral-200/60 dark:bg-neutral-800"}`}>
-        {on
-          ? <Check className="w-2.5 h-2.5 text-emerald-600" strokeWidth={3.5} />
-          : <X className="w-2.5 h-2.5 text-neutral-400" strokeWidth={3} />}
-      </span>
-    </td>
-  );
-  return (
-    <section className="py-20 sm:py-28 border-t border-neutral-200 dark:border-neutral-800 scroll-mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionHeader
-          eyebrow="Built for teams"
-          title="Your whole team. You decide who does what."
-          subtitle="Invite your site engineers, junior sales and accountant — everyone works in one workspace, and you control exactly what each person can see and do."
-        />
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-80px" }}
-          className="grid md:grid-cols-3 gap-5 mt-14 max-w-6xl mx-auto"
-        >
-          <motion.div variants={fadeUp} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-6">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center mb-4">
-              <UserPlus className="w-5 h-5 text-emerald-600" />
-            </div>
-            <h3 className="font-semibold text-lg">Invite your team</h3>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1.5 leading-relaxed">
-              5 team seats on Pro — included in your free trial too. Everyone sees the
-              organization's deals, quotes and invoices in one place.
-            </p>
-          </motion.div>
-          <motion.div variants={fadeUp} className="rounded-2xl border border-emerald-300/50 dark:border-emerald-800/50 bg-white dark:bg-neutral-900/50 p-6 shadow-lg shadow-emerald-500/[0.06]">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center mb-4">
-              <ShieldCheck className="w-5 h-5 text-emerald-600" />
-            </div>
-            <h3 className="font-semibold text-lg">Control every permission</h3>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1.5 leading-relaxed mb-4">
-              Use the ready-made roles or create your own — a full permission matrix
-              decides who can create, edit or delete in every module.
-            </p>
-            <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden text-[11px]">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-neutral-50 dark:bg-neutral-900 text-neutral-500">
-                    <th className="text-left font-semibold px-2.5 py-1.5">Module</th>
-                    <th className="font-semibold px-1 py-1.5">Site Eng.</th>
-                    <th className="font-semibold px-1 py-1.5">Jr. Sales</th>
-                    <th className="font-semibold px-1 py-1.5">Accounts</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                  {MATRIX_ROWS.map((r) => (
-                    <tr key={r.module}>
-                      <td className="px-2.5 py-1.5 font-medium text-neutral-700 dark:text-neutral-300">{r.module}</td>
-                      {cell(r.site, r.module + "-s")}
-                      {cell(r.jr, r.module + "-j")}
-                      {cell(r.acc, r.module + "-a")}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </motion.div>
-          <motion.div variants={fadeUp} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-6">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center mb-4">
-              <ScrollText className="w-5 h-5 text-emerald-600" />
-            </div>
-            <h3 className="font-semibold text-lg">Every action logged</h3>
-            <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1.5 leading-relaxed">
-              Deals created, agreements signed, payments recorded — the activity log
-              shows who did what and when, across your whole organization.
-            </p>
-          </motion.div>
-        </motion.div>
       </div>
     </section>
   );

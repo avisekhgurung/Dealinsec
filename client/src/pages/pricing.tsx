@@ -30,6 +30,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { queryClient } from "@/lib/queryClient";
 import { PaymentResult } from "@/components/payment-result";
 import { useRazorpayCheckout, type CheckoutPlan } from "@/hooks/use-razorpay-checkout";
+import { PLAN_PRICE_DEFAULTS } from "@/hooks/use-plan-prices";
 
 const REDIRECT_KEY = "postPaymentRedirect";
 
@@ -44,10 +45,10 @@ export default function PricingPage() {
   const [purchasedPlan, setPurchasedPlan] = useState<CheckoutPlan>("pro_monthly");
 
   // Live pricing — driven by server env vars (PRO_MONTHLY_PRICE etc.)
-  const [proMonthlyPrice, setProMonthlyPrice] = useState<number>(999);
-  const [proYearlyPrice, setProYearlyPrice] = useState<number>(9999);
-  const [dealBoostPrice, setDealBoostPrice] = useState<number>(99);
-  const [extraSeatPrice, setExtraSeatPrice] = useState<number>(199);
+  // Defaults (₹99 / ₹999 / ₹99 per seat) are shared with the other surfaces.
+  const [proMonthlyPrice, setProMonthlyPrice] = useState<number>(PLAN_PRICE_DEFAULTS.proMonthlyPrice);
+  const [proYearlyPrice, setProYearlyPrice] = useState<number>(PLAN_PRICE_DEFAULTS.proYearlyPrice);
+  const [extraSeatPrice, setExtraSeatPrice] = useState<number>(PLAN_PRICE_DEFAULTS.extraSeatPrice);
   const [seatQty, setSeatQty] = useState<number>(1);
   useEffect(() => {
     fetch("/api/payments/config", { credentials: "include" })
@@ -55,7 +56,6 @@ export default function PricingPage() {
       .then((cfg) => {
         if (cfg?.proMonthlyPrice) setProMonthlyPrice(cfg.proMonthlyPrice);
         if (cfg?.proYearlyPrice) setProYearlyPrice(cfg.proYearlyPrice);
-        if (cfg?.dealBoostPrice) setDealBoostPrice(cfg.dealBoostPrice);
         if (cfg?.extraSeatPrice) setExtraSeatPrice(cfg.extraSeatPrice);
       })
       .catch(() => {});
@@ -65,9 +65,8 @@ export default function PricingPage() {
   const proActive = hasActivePro(user);
   const boostActive = hasActiveDealBoost(user);
   // Display only — a trialist still sees every buy button (that's the point
-  // of the trial); what changes is the "current plan" framing and the Deal
-  // Boost card (hidden: a ₹99 boost bought mid-trial overlaps useless days
-  // and generates a guaranteed refund request).
+  // of the trial); what changes is the "current plan" framing. Deal Boost is
+  // no longer sold; boostActive only labels a boost someone already bought.
   const trialActive = hasActiveTrial(user);
   const trialDaysLeft = getTrialDaysLeft(user);
   const trialLapsed = hasLapsedTrial(user);
@@ -78,7 +77,8 @@ export default function PricingPage() {
   const boostExpiryLabel = user?.dealBoostExpiresAt
     ? new Date(user.dealBoostExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
     : null;
-  // "Save 2 Months": yearly at the monthly rate would cost 12×monthly.
+  // Annual vs 12 × monthly (₹1,188 − ₹999 = ₹189 at list prices). Always shown
+  // as a rupee amount — it is less than two months, so never "2 months free".
   const yearlySavings = Math.max(0, proMonthlyPrice * 12 - proYearlyPrice);
 
   // On mount: persist ?redirect= param (used to hop back into the workflow
@@ -100,9 +100,7 @@ export default function PricingPage() {
           title: "Payment successful!",
           description:
             plan === "extra_seat"
-              ? `${seatQty} extra team seat${seatQty > 1 ? "s" : ""} added for 1 month.`
-              : plan === "deal_boost"
-              ? "Deal Boost active — unlimited deals & quotations for 1 month."
+              ? `${seatQty} extra seat${seatQty > 1 ? "s" : ""} added for 1 month.`
               : plan === "pro_monthly"
               ? "DealInSec Pro is active — the full workflow is unlocked for 1 month."
               : "DealInSec Pro is active — the full workflow is unlocked for 1 year.",
@@ -133,18 +131,15 @@ export default function PricingPage() {
     "Unlimited signed agreements with e-signature",
     "Unlimited GST-ready invoices",
     "Payment tracking — know who owes you",
-    "5 team seats · custom roles & permissions",
     "Payment reminders (coming soon)",
     "Custom branding (coming soon)",
-    "Priority support on WhatsApp",
+    "Priority email support",
     "Early access to AI features",
   ];
 
   const successMessage =
     purchasedPlan === "extra_seat"
-      ? "Extra team seats added — invite your teammates from Settings."
-      : purchasedPlan === "deal_boost"
-      ? "Deal Boost active — unlimited deals & quotations for 1 month."
+      ? "Extra seats added — invite people from Settings."
       : purchasedPlan === "pro_monthly"
       ? "DealInSec Pro is active — everything unlocked for 1 month."
       : "DealInSec Pro is active — everything unlocked for 1 year.";
@@ -183,8 +178,7 @@ export default function PricingPage() {
         credits={1}
         successMessage={successMessage}
         chipLabel={
-          purchasedPlan === "extra_seat" ? "Team seats · 1 month"
-          : purchasedPlan === "deal_boost" ? "Deal Boost · 1 month"
+          purchasedPlan === "extra_seat" ? "Extra seats · 1 month"
           : "Pro · Unlimited workflow"
         }
         errorReason={paymentErrorReason}
@@ -260,7 +254,7 @@ export default function PricingPage() {
               <span className="text-4xl font-black text-foreground leading-none">₹0</span>
               <span className="text-sm text-muted-foreground font-medium">/ forever</span>
             </div>
-            <p className="text-xs text-muted-foreground mb-4">Start managing deals professionally</p>
+            <p className="text-xs text-muted-foreground mb-4">Quote every new client properly, free</p>
             <ul className="space-y-2.5 mb-6 flex-1">
               {[
                 "4 deals every month",
@@ -300,7 +294,7 @@ export default function PricingPage() {
                 <span className="text-sm text-muted-foreground font-medium">/ month</span>
               </div>
               <p className="text-xs text-muted-foreground mb-4">
-                The complete workflow — deal to payment
+                Quote, e-sign, invoice and track payment for every client
               </p>
               <ul className="space-y-2.5 mb-6 flex-1">
                 {PRO_FEATURES.map((f) => (
@@ -333,12 +327,12 @@ export default function PricingPage() {
             </div>
           </Card>
 
-          {/* Pro Annual — save 2 months */}
+          {/* Pro Annual — one payment, a little less than 12 × monthly */}
           <Card className="glass-card border-primary/30 relative overflow-hidden flex flex-col shadow-xl shadow-primary/[0.08]">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-emerald-500/[0.05] pointer-events-none" />
             <div className="relative bg-gradient-to-r from-primary to-emerald-600 text-white px-4 py-1.5 text-center">
               <span className="text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
-                <Zap className="w-3 h-3" /> Founding price · first 100
+                <Zap className="w-3 h-3" /> {yearlySavings > 0 ? `Save ${fmt(yearlySavings)} a year` : "Pay once a year"}
               </span>
             </div>
             <div className="relative p-5 lg:p-6 flex flex-col flex-1">
@@ -352,8 +346,6 @@ export default function PricingPage() {
               <p className="text-xs text-muted-foreground mb-4">
                 ≈ {fmt(Math.round(proYearlyPrice / 12))}/month
                 {yearlySavings > 0 ? ` — save ${fmt(yearlySavings)} vs monthly` : ""}
-                <br />
-                <span className="text-primary font-semibold">Founding price, locked for as long as you stay.</span>
               </p>
               <ul className="space-y-2.5 mb-6 flex-1">
                 {[
@@ -395,47 +387,7 @@ export default function PricingPage() {
           </Card>
         </div>
 
-        {/* ── Deal Boost — the ₹99 bridge. Hidden during a trial: a boost
-            bought mid-trial overlaps days that are already unlimited and
-            generates a guaranteed refund request. ── */}
-        {!proActive && !trialActive && (
-          <Card className="glass-card border-emerald-300/40 dark:border-emerald-800/40 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/[0.06] to-teal-500/[0.04] pointer-events-none" />
-            <div className="relative p-4 lg:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-500/30">
-                <Rocket className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-sm lg:text-base">
-                  Deal Boost — {fmt(dealBoostPrice)}
-                  <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
-                    1 month
-                  </span>
-                </p>
-                <p className="text-xs lg:text-sm text-muted-foreground mt-0.5">
-                  Unlimited deals &amp; quotations for a month — no agreements or invoices.
-                  {boostActive && boostExpiryLabel ? ` Active until ${boostExpiryLabel}; buying again extends it.` : " Stacks if you buy again."}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                className="flex-shrink-0 h-11 rounded-xl font-semibold border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300"
-                onClick={() => handlePurchase("deal_boost")}
-                disabled={isLoading}
-                data-testid="button-buy-deal-boost"
-              >
-                {isLoading && activePlan === "deal_boost" ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Rocket className="h-4 w-4 mr-2" />
-                )}
-                {boostActive ? `Extend — ${fmt(dealBoostPrice)}` : `Get Boost — ${fmt(dealBoostPrice)}`}
-              </Button>
-            </div>
-          </Card>
-        )}
-
-        {/* ── Extra team seats ── */}
+        {/* ── Extra seats (Deal Boost is retired — no card for it) ── */}
         <Card id="seats" className="glass-card border-primary/20 relative overflow-hidden scroll-mt-24">
           <div className="relative p-4 lg:p-5 flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -443,11 +395,11 @@ export default function PricingPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-bold text-sm lg:text-base">
-                Extra team seats — {fmt(extraSeatPrice)}
+                Extra seats — {fmt(extraSeatPrice)}
                 <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-primary">per seat / month</span>
               </p>
               <p className="text-xs lg:text-sm text-muted-foreground mt-0.5">
-                Pro includes 5 team members. Need more? Add seats — they renew together as one pack.
+                Only if someone else needs their own login — say your CA or a collaborator. Pro includes 5; extra seats renew together as one pack.
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -484,7 +436,7 @@ export default function PricingPage() {
             {[
               { step: "1", title: "Create a Deal", desc: "Free plan covers 4 deals every month" },
               { step: "2", title: "Generate its Quotation", desc: "Included with the deal — no extra cost" },
-              { step: "3", title: "Sign the Agreement", desc: "Pro — legally-worded contract with e-signature" },
+              { step: "3", title: "Sign the Agreement", desc: "Pro — scope & terms your client accepts with an e-signature" },
               { step: "4", title: "Invoice & track payment", desc: "Pro — GST-ready invoice + payment tracking" },
             ].map(({ step, title, desc }) => (
               <div key={step} className="flex items-start gap-3">

@@ -42,7 +42,7 @@ import { trackEvent } from "@/lib/analytics";
 const formSchema = insertDealSchema.omit({ userId: true }).extend({
   brandName: z.string().min(1, "Client / brand name is required"),
   dealTitle: z.string().min(1, "Deal title is required"),
-  dealType: z.enum(dealTypeOptions).default("Real Estate"),
+  dealType: z.enum(dealTypeOptions).default(dealTypeOptions[0]),
   dealAmount: z.coerce.number().min(1, "Deal amount must be positive"),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
@@ -80,7 +80,7 @@ const TINT_HOVER: Record<string, string> = {
   slate: "hover:border-slate-400/60",
 };
 
-// ?type=Freelance deep-links straight to the form with the type chosen —
+// ?type=Development deep-links straight to the form with the type chosen —
 // used by vertical landing pages and the Copilot.
 function initialTypeFromUrl(): DealType | null {
   try {
@@ -91,8 +91,8 @@ function initialTypeFromUrl(): DealType | null {
   }
 }
 
-// "Remember and skip": an interiors studio shouldn't re-pick Interior Design
-// on every deal. The last-used type is remembered per device and the picker
+// "Remember and skip": a video editor shouldn't re-pick Video & Photo on
+// every deal. The last-used type is remembered per device and the picker
 // is skipped on the next deal — the form banner's "Change" button is the
 // always-one-tap-away escape, so this never locks anyone in.
 const DEAL_TYPE_MEMORY_KEY = "dis_last_deal_type";
@@ -130,7 +130,7 @@ export default function CreateDealPage() {
     defaultValues: {
       brandName: "",
       dealTitle: "",
-      dealType: initialType ?? "Real Estate",
+      dealType: initialType ?? dealTypeOptions[0],
       dealAmount: 0,
       startDate: "",
       endDate: "",
@@ -150,7 +150,7 @@ export default function CreateDealPage() {
     },
   });
 
-  const dealType = (form.watch("dealType") as DealType) || "Real Estate";
+  const dealType = (form.watch("dealType") as DealType) || dealTypeOptions[0];
   const taxonomy = TAXONOMY[dealType];
 
   // Itemizable custom terms — stored as newline-joined string in form for
@@ -189,7 +189,7 @@ export default function CreateDealPage() {
     onError: (err) => {
       const parsed = parseApiError(err);
       if (isUpgradeError(parsed)) {
-        // Out of monthly Deal Credits — offer Pro or the ₹99 Deal Boost.
+        // Out of monthly Deal Credits — offer Pro.
         openUpgradeModal({ feature: "deals" });
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
         return;
@@ -218,8 +218,8 @@ export default function CreateDealPage() {
   };
 
   // When dealType changes, reset all deliverable category/type fields so the
-  // user picks from the new taxonomy (prevents stale Creator values lingering
-  // on a Freelance deal, etc.)
+  // user picks from the new taxonomy (prevents stale Design values lingering
+  // on a Writing deal, etc.)
   const handleDealTypeChange = (next: DealType) => {
     form.setValue("dealType", next);
     const current = form.getValues("deliverables");
@@ -305,6 +305,9 @@ export default function CreateDealPage() {
           >
             {dealTypeOptions.map((dt) => {
               const meta = dealTypeMeta[dt];
+              // 7 types: Custom (last) spans two columns so both the 2-col and
+              // 4-col grids end on a full row instead of a lone gap.
+              const span = dt === "Custom" ? "col-span-2" : "";
               return (
                 <motion.button
                   key={dt}
@@ -313,7 +316,7 @@ export default function CreateDealPage() {
                   whileHover={{ y: -4 }}
                   whileTap={{ scale: 0.97 }}
                   onClick={() => pickType(dt)}
-                  className={`group relative rounded-2xl border border-input/60 bg-card/80 p-4 lg:p-5 text-left shadow-sm hover:shadow-lg transition-shadow ${TINT_HOVER[meta.tint] ?? "hover:border-primary/40"}`}
+                  className={`group relative rounded-2xl border border-input/60 bg-card/80 p-4 lg:p-5 text-left shadow-sm hover:shadow-lg transition-shadow ${span} ${TINT_HOVER[meta.tint] ?? "hover:border-primary/40"}`}
                   data-testid={`select-deal-type-${dt}`}
                 >
                   <div
@@ -430,7 +433,7 @@ export default function CreateDealPage() {
               <Label htmlFor="dealTitle">Deal Title</Label>
               <Input
                 id="dealTitle"
-                placeholder="e.g., Summer Campaign 2024"
+                placeholder="e.g., Website redesign — 5 pages"
                 className="h-12"
                 data-testid="input-deal-title"
                 {...form.register("dealTitle")}
@@ -671,7 +674,7 @@ export default function CreateDealPage() {
                 Your own terms (optional)
               </Label>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Add as many clauses as you need — exclusivity, usage rights, posting schedule, revisions, etc.
+                Add as many clauses as you need — revision rounds, advance payment, usage rights, exclusivity, etc.
               </p>
             </div>
 
@@ -685,7 +688,7 @@ export default function CreateDealPage() {
                     <Input
                       value={term}
                       onChange={(e) => syncCustomTerms(customTermsList.map((t, j) => j === i ? e.target.value : t))}
-                      placeholder={i === 0 ? "e.g. Content must be posted by 5pm IST" : "Add another clause"}
+                      placeholder={i === 0 ? "e.g. 2 revision rounds included; extra rounds billed separately" : "Add another clause"}
                       className="h-9"
                       data-testid={`input-custom-term-${i}`}
                     />

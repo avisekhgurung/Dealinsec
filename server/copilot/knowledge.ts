@@ -16,7 +16,7 @@
 import fs from "fs";
 import path from "path";
 
-export const AI_KNOWLEDGE_VERSION = "2026-08-17.1";
+export const AI_KNOWLEDGE_VERSION = "2026-09-12.1";
 
 interface KnowledgeDoc {
   name: string;

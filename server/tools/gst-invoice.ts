@@ -22,7 +22,7 @@ const AI_BOX = `<div class="ai-box">
 const PATH = "/tools/gst-invoice-generator";
 const TITLE = "Free GST Invoice Generator (India) — Download PDF | DealInSec";
 const DESC =
-  "Create a professional GST invoice online free. Auto CGST/SGST/IGST split, amount in words, instant PDF — no sign-up. For Indian freelancers, agencies & service businesses.";
+  "Create a professional GST invoice online free. Auto CGST/SGST/IGST split, amount in words, instant PDF — no sign-up. Made for India's freelancers.";
 
 const FAQ: { q: string; a: string }[] = [
   {
@@ -43,7 +43,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Can I save clients and send invoices directly?",
-    a: "This free tool creates one-off invoices. To save clients, send invoices, set payment reminders, generate quotations and e-sign agreements, create a free DealInSec account.",
+    a: "This free tool creates one-off invoices. A DealInSec account keeps each client's quotation, agreement, invoice and payments on one thread — the free plan covers 4 deals a month with their quotations, and Pro (₹99/month, after a 7-day trial with no card) adds e-signed agreements, invoices and payment tracking.",
   },
 ];
 

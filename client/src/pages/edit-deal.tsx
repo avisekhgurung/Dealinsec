@@ -116,7 +116,9 @@ export default function EditDealPage() {
   });
 
   const dealType = (form.watch("dealType") as AnyDealType) || "Custom";
-  const taxonomy = TAXONOMY[dealType];
+  // Mirror the fallback getDeliverableLabels/getAgreementCopy use internally:
+  // deal_type is a plain varchar, so an off-list value must not crash the page.
+  const taxonomy = TAXONOMY[dealType] ?? TAXONOMY.Custom;
   const L = getDeliverableLabels(dealType);
 
   const handleDealTypeChange = (next: DealType) => {
@@ -180,7 +182,7 @@ export default function EditDealPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/deals", params.id] });
       toast({
         title: "Deal updated",
-        description: "Your brand deal has been updated successfully.",
+        description: "Your deal has been updated.",
       });
       setLocation(`/deals/${params.id}`);
     },
@@ -254,6 +256,15 @@ export default function EditDealPage() {
               Changing resets deliverables
             </span>
           </div>
+
+          {/* A pre-pivot deal keeps its retired type: name it, because no card
+              below will be selected and picking one rewrites the deal. */}
+          {!(dealTypeOptions as readonly string[]).includes(dealType) && (
+            <p className="text-xs text-muted-foreground">
+              Current type: {dealTypeMeta[dealType]?.emoji} {dealTypeMeta[dealType]?.label ?? dealType} — no
+              longer offered for new deals. Picking one below will reset your deliverables.
+            </p>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {dealTypeOptions.map((dt) => {
@@ -439,7 +450,7 @@ export default function EditDealPage() {
                           size={18}
                         />
                       ) : (
-                        <span className="text-lg">{dealTypeMeta[dealType].emoji}</span>
+                        <span className="text-lg">{dealTypeMeta[dealType]?.emoji ?? "·"}</span>
                       )}
                       <span className="font-medium text-sm">Deliverable {index + 1}</span>
                     </div>

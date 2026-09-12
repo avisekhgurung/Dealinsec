@@ -6,7 +6,7 @@
  * (PRODUCT_HUNT_PLAYBOOK.md §2), so the dashboard reads:
  *   Money Radar: ₹1,45,000 potentially collectible
  *   🔴 ₹32,500 overdue — ABC Media, 6 days
- *   🟢 ₹1,12,500 ready to invoice — Kalka's ₹80,000 (nothing billed) plus
+ *   🟢 ₹1,12,500 ready to invoice — Uplift's ₹80,000 (nothing billed) plus
  *      ABC's ₹32,500 unbilled balance (the engine counts both, correctly)
  * plus a paid deal and a fresh pipeline deal for texture.
  *
@@ -62,7 +62,7 @@ async function main() {
     // 🔴 ABC Media — signed deal, advance invoice ₹32,500 OVERDUE by 6 days.
     const abc = await c.query(
       `INSERT INTO deals (user_id,organization_id,brand_name,deal_title,deal_amount,start_date,end_date,status,deal_type,deliverables,custom_terms)
-       VALUES ($1,$2,'ABC Media','Brand film & social campaign — Q3',65000,(CURRENT_DATE-20)::text,(CURRENT_DATE+40)::text,'Active','service',$3::jsonb,
+       VALUES ($1,$2,'ABC Media','Brand film & social campaign — Q3',65000,(CURRENT_DATE-20)::text,(CURRENT_DATE+40)::text,'Active','Video & Photo',$3::jsonb,
         '50% advance to confirm the campaign\nBalance within 7 days of final delivery') RETURNING id`,
       [UID, ORG, deliv([
         ["Video", "Brand film — 90s hero cut", 1, "One-time", "Includes two revision rounds"],
@@ -85,53 +85,53 @@ async function main() {
         JSON.stringify([{ description: "Campaign advance (50%) — as per agreement", hsnSac: "998361", quantity: 1, rate: 32500, amount: 32500 }])],
     );
 
-    // 🟢 Kalka Constructions — signed ₹80,000 agreement, NOTHING invoiced yet.
-    const kalka = await c.query(
+    // 🟢 Uplift Learning — signed ₹80,000 agreement, NOTHING invoiced yet.
+    const uplift = await c.query(
       `INSERT INTO deals (user_id,organization_id,brand_name,deal_title,deal_amount,start_date,end_date,status,deal_type,deliverables,custom_terms)
-       VALUES ($1,$2,'Kalka Constructions','Site office interiors — Matigara',80000,(CURRENT_DATE-5)::text,(CURRENT_DATE+55)::text,'Signed','service',$3::jsonb,
+       VALUES ($1,$2,'Uplift Learning','Website redesign — 6 pages',80000,(CURRENT_DATE-5)::text,(CURRENT_DATE+55)::text,'Signed','Design',$3::jsonb,
         '50% advance on signing\nBalance on handover') RETURNING id`,
       [UID, ORG, deliv([
-        ["Interior Design", "Reception & waiting area", 1, "One-time"],
-        ["Interior Design", "Workstations & cabin fit-out", 8, "One-time"],
-        ["Supervision", "Site supervision", 2, "Monthly"],
+        ["Design", "Homepage design — desktop & mobile", 1, "One-time"],
+        ["Design", "Inner page designs", 5, "One-time"],
+        ["Development", "Build, QA & handover", 1, "One-time"],
       ])],
     );
     await c.query(
       `INSERT INTO contracts (user_id,organization_id,deal_id,brand_name,contract_name,contract_value,start_date,end_date,status,
          signed_date,signed_by_brand,signer_user_id,signer_name,signature_url,seal_url)
-       VALUES ($1,$2,$3,'Kalka Constructions','Kalka Constructions — site office interiors',80000,(CURRENT_DATE-5)::text,(CURRENT_DATE+55)::text,'Signed',
+       VALUES ($1,$2,$3,'Uplift Learning','Uplift Learning — website redesign',80000,(CURRENT_DATE-5)::text,(CURRENT_DATE+55)::text,'Signed',
          (CURRENT_DATE-2)::text,true,$1,'Anaya Deshpande',$4,$5)`,
-      [UID, ORG, kalka.rows[0].id, SIG, SEAL],
+      [UID, ORG, uplift.rows[0].id, SIG, SEAL],
     );
 
     // ✅ Texture: a completed, PAID deal so the history looks alive.
     const paid = await c.query(
       `INSERT INTO deals (user_id,organization_id,brand_name,deal_title,deal_amount,start_date,end_date,status,deal_type,deliverables)
-       VALUES ($1,$2,'Meraki Homes','2BHK show-flat styling',120000,(CURRENT_DATE-90)::text,(CURRENT_DATE-30)::text,'Completed','service',$3::jsonb) RETURNING id`,
-      [UID, ORG, deliv([["Interior Design", "Show-flat styling & décor", 1, "One-time"]])],
+       VALUES ($1,$2,'Greenleaf Cafe','Brand identity & menu design',120000,(CURRENT_DATE-90)::text,(CURRENT_DATE-30)::text,'Completed','Design',$3::jsonb) RETURNING id`,
+      [UID, ORG, deliv([["Design", "Logo, brand kit & menu design", 1, "One-time"]])],
     );
     await c.query(
       `INSERT INTO brand_invoices (user_id,organization_id,invoice_number,invoice_date,due_date,deal_id,brand_name,influencer_name,influencer_email,deal_amount,invoice_type,notes,line_items,status,paid_at)
-       VALUES ($1,$2,'INV-2627-0097',(CURRENT_DATE-35)::text,(CURRENT_DATE-20)::text,$3,'Meraki Homes','Anaya Deshpande',$4,120000,'final',
+       VALUES ($1,$2,'INV-2627-0097',(CURRENT_DATE-35)::text,(CURRENT_DATE-20)::text,$3,'Greenleaf Cafe','Anaya Deshpande',$4,120000,'final',
         'Final settlement — thank you!',$5::jsonb,'Paid',now()-interval '22 days')`,
       [UID, ORG, paid.rows[0].id, EMAIL,
-        JSON.stringify([{ description: "Show-flat styling — full scope", quantity: 1, rate: 120000, amount: 120000 }])],
+        JSON.stringify([{ description: "Brand identity & menu design — full scope", quantity: 1, rate: 120000, amount: 120000 }])],
     );
 
     // 🛡️ Protection-check showcase: a deal whose terms trip every red flag —
     // the gallery shot for "stay protected".
     await c.query(
       `INSERT INTO deals (user_id,organization_id,brand_name,deal_title,deal_amount,start_date,end_date,status,deal_type,deliverables,custom_terms)
-       VALUES ($1,$2,'Risky Client Pvt Ltd','Office fit-out — as discussed',300000,CURRENT_DATE::text,(CURRENT_DATE+60)::text,'Pending','service',$3::jsonb,
-        'Work as per site requirement with unlimited revisions until satisfaction. Payment will be released after our client pays us. Balance within 30 days. Advance 50% and remaining within 7 days. Retention of 10% applies.')`,
-      [UID, ORG, deliv([["Fit-out", "Office interiors — full scope", 1, "One-time"]])],
+       VALUES ($1,$2,'Risky Client Pvt Ltd','App build — as discussed',300000,CURRENT_DATE::text,(CURRENT_DATE+60)::text,'Pending','Development',$3::jsonb,
+        'Work as per project requirement with unlimited revisions until satisfaction. Payment will be released after our client pays us. Balance within 30 days. Advance 50% and remaining within 7 days. Retention of 10% applies.')`,
+      [UID, ORG, deliv([["Development", "Mobile app — full scope", 1, "One-time"]])],
     );
 
     // 📥 Texture: fresh pipeline — pending deal with a draft quotation.
     const fresh = await c.query(
       `INSERT INTO deals (user_id,organization_id,brand_name,deal_title,deal_amount,start_date,end_date,status,deal_type,deliverables)
-       VALUES ($1,$2,'Sunrise Ventures','Office branding & signage',45000,CURRENT_DATE::text,(CURRENT_DATE+30)::text,'Pending','service',$3::jsonb) RETURNING id`,
-      [UID, ORG, deliv([["Branding", "Logo wall, signage & wayfinding", 1, "One-time"]])],
+       VALUES ($1,$2,'Sunrise Ventures','Brand refresh — logo & social kit',45000,CURRENT_DATE::text,(CURRENT_DATE+30)::text,'Pending','Design',$3::jsonb) RETURNING id`,
+      [UID, ORG, deliv([["Design", "Logo refresh, brand kit & social templates", 1, "One-time"]])],
     );
     await c.query(
       `INSERT INTO quotes (user_id,organization_id,deal_id,version,status) VALUES ($1,$2,$3,1,'draft')`,
@@ -141,7 +141,7 @@ async function main() {
     console.log(JSON.stringify({
       login: { email: EMAIL, password: "SmokeTest#2026" },
       radar_expected: { overdue: 32500, readyToInvoice: 112500, collectible: 145000 },
-      deals: { abcMedia: abc.rows[0].id, kalka: kalka.rows[0].id, paid: paid.rows[0].id, pipeline: fresh.rows[0].id },
+      deals: { abcMedia: abc.rows[0].id, uplift: uplift.rows[0].id, paid: paid.rows[0].id, pipeline: fresh.rows[0].id },
     }, null, 1));
   } finally {
     c.release();

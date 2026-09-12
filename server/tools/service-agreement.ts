@@ -12,7 +12,7 @@ import { COMMON_JS, MEDIA_JS, EXPORT_JS } from "./client-lib";
 const PATH = "/tools/service-agreement-template";
 const TITLE = "Free Service Agreement Template (India) — Download PDF | DealInSec";
 const DESC =
-  "Create a free service agreement between a service provider and client — scope, deliverables, fees, revisions, cancellation and signatures. Download as PDF, no sign-up.";
+  "Create a free service agreement between a freelancer and their client — scope, deliverables, fees, revisions, cancellation and signatures. Download as PDF, no sign-up.";
 
 const FAQ: { q: string; a: string }[] = [
   {
@@ -24,12 +24,12 @@ const FAQ: { q: string; a: string }[] = [
     a: "A solid service agreement names both parties, describes the scope of services and deliverables, sets the timeline, states the fee and payment schedule (such as an advance and balance), covers revisions, cancellation, confidentiality, and governing law, and provides signature blocks for both parties.",
   },
   {
-    q: "Is this a legally binding contract?",
-    a: "This template gives you a clear, professionally structured starting point. Whether an agreement is enforceable depends on the specific terms and how it is signed. For high-value or complex work, have a lawyer review it. This tool does not provide legal advice.",
+    q: "Is this service agreement legally valid?",
+    a: "Electronic contracts are recognised in India under Section 10A of the Information Technology Act, 2000. This template gives you a clear, professionally structured starting point; whether an agreement is enforceable depends on its specific terms and how it was signed. We are not a law firm and this tool does not provide legal advice — for high-value or complex work, have a lawyer review it.",
   },
   {
     q: "How do I get it signed?",
-    a: "You can print and sign it, or create a free DealInSec account to e-sign the agreement, collect the client's counter-signature, and keep signed proof attached to the deal.",
+    a: "You can print and sign it, or send it from DealInSec: your client accepts it online and the agreement keeps an execution record — who accepted it, when, and with which signature — attached to the deal. Agreements are part of Pro (₹99/month), and every new account starts with a 7-day Pro trial, no card.",
   },
 ];
 

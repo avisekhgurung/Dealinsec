@@ -70,7 +70,7 @@ const ICONS: Record<string, string> = {
 const INDEX_FAQ: { q: string; a: string }[] = [
   { q: "Are these tools really free?", a: "Yes — every tool is free to use with no sign-up. You can create and download unlimited invoices, quotations and agreements as PDFs." },
   { q: "Is my data safe?", a: "Everything runs in your browser. What you type is saved only on your own device and is never sent to or stored on our servers." },
-  { q: "What do I get if I create an account?", a: "A free DealInSec account lets you save clients, send documents, track payments, and e-sign agreements with counter-signed proof — the full deal workflow in one place." },
+  { q: "What do I get if I create an account?", a: "Every client project lives on one thread — quotation, agreement, invoice and payment tracking — instead of scattered across WhatsApp, email and your downloads folder. The free plan covers 4 deals a month, each with its quotation, and every new account starts with a 7-day Pro trial (no card) that unlocks e-signed agreements, invoices and payment tracking. Pro is ₹99 a month or ₹999 a year." },
 ];
 
 function toolsIndexPage(): string {
@@ -88,8 +88,8 @@ function toolsIndexPage(): string {
   const body = `
   <div class="hero"><div class="wrap">
     <span class="badge">🎁 100% Free · No sign-up · Instant download</span>
-    <h1>Free tools for Indian<br /><span class="accent">service businesses</span></h1>
-    <p class="sub">Practical, no-sign-up tools for real estate consultants, interior designers, architects, agencies, contractors and every service business — invoices, quotations and agreements, done in your browser.</p>
+    <h1>Free tools for Indian<br /><span class="accent">freelancers</span></h1>
+    <p class="sub">Practical, no-sign-up tools for designers, developers, writers, video editors &amp; photographers, marketers and consultants — invoices, quotations and agreements, done in your browser.</p>
   </div></div>
 
   <section><div class="wrap">
@@ -111,9 +111,9 @@ function toolsIndexPage(): string {
   </div></section>`;
 
   return renderToolPage({
-    title: "Free Tools for Freelancers & Service Businesses (India) | DealInSec",
+    title: "Free Invoice & Quotation Tools for Freelancers (India) | DealInSec",
     description:
-      "Free, no-sign-up tools for Indian freelancers, agencies and service businesses — GST invoice generator, quotation maker and service agreement template.",
+      "Free, no-sign-up tools for Indian freelancers — GST invoice generator, quotation maker, bill maker, service agreement template and GST calculator. PDF in a minute.",
     canonicalPath: "/tools",
     bodyHtml: body,
     jsonLd: [

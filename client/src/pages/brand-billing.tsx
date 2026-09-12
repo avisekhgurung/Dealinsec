@@ -99,7 +99,7 @@ export default function BrandBillingPage() {
               </div>
               <h3 className="font-semibold mb-1">No invoices yet</h3>
               <p className="text-sm text-muted-foreground">
-                Invoices from influencers will appear here
+                Invoices from freelancers will appear here
               </p>
             </CardContent>
           </Card>

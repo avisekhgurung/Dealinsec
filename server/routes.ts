@@ -2060,9 +2060,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // returned orderId + key. Reuses the payu_orders table for persistence.
   //
   // Three SKUs (one-time payments; terms are non-auto-renewing):
-  //   { plan: "pro_monthly" } — ₹999, Pro for 1 month
-  //   { plan: "pro_yearly" }  — ₹9,999, Pro for 1 year
+  //   { plan: "pro_monthly" } — ₹99, Pro for 1 month
+  //   { plan: "pro_yearly" }  — ₹999, Pro for 1 year
   //   { plan: "deal_boost" }  — ₹99, unlimited deals+quotations for 1 month
+  //                             (retired from the UI; kept for cached clients)
+  // Defaults shown — live prices are env-driven (see razorpayClient.ts).
   // Legacy bodies from cached clients are mapped: {plan:"pro"} → pro_yearly,
   // {credits:n} → deal_boost.
   app.post("/api/payments/razorpay/order", isAuthenticated, requireOrgPermission("billing.manage"), async (req: any, res) => {

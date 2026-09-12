@@ -560,7 +560,7 @@ function ctaBand(): string {
     <div class="cta-ico">${clock}</div>
     <div class="cta-copy">
       <h2>Get every deal in writing — and get paid on time</h2>
-      <p>DealInSec takes you from quotation to signed agreement to GST invoice in one place. Save your clients, send invoices, track payments, and e-sign contracts. Free to start.</p>
+      <p>Built for India's freelancers: quotation, e-signed agreement, invoice and payment tracking on one thread per client. Free to start, 7-day Pro trial with no card, then Pro at ₹99/month.</p>
     </div>
     <a class="btn" href="${APP_LINK}">Start free →</a>
   </div></div>`;
@@ -612,7 +612,7 @@ function footer(): string {
       </div>
       ${SOCIALS}
     </div>
-    <div class="muted">© ${y} DealInSec — the deal-management OS for India's service businesses. These free tools run in your browser; nothing you enter is stored on our servers.</div>
+    <div class="muted">© ${y} DealInSec — quotation, agreement and invoice software for India's freelancers. These free tools run in your browser; nothing you enter is stored on our servers.</div>
   </div></footer>`;
 }
 
@@ -632,7 +632,7 @@ function brandModal(): string {
         <ul class="bm-list">
           <li>Remove the &ldquo;Made with DealInSec&rdquo; footer</li>
           <li><b>4 free Deal Credits every month</b> &mdash; run real deals with quotations</li>
-          <li>Manage clients, send documents, track payments and e-sign with Pro</li>
+          <li>E-signed agreements, invoices and payment tracking with Pro &mdash; ₹99/month</li>
         </ul>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
           <a class="btn" href="${APP_SIGNUP}" style="flex:1;min-width:150px;justify-content:center">Sign up free →</a>

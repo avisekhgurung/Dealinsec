@@ -23,6 +23,7 @@ import {
 import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { usePlanPrices, formatRupees } from "@/hooks/use-plan-prices";
 import { useConfirm } from "@/components/confirm-dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { parseApiError } from "@/lib/api-error";
@@ -111,6 +112,7 @@ export default function SettingsPage() {
   const canActivity = memberCan(me, "activity.view");
 
   const { data: org, isLoading: orgLoading } = useQuery<OrgSummary>({ queryKey: ["/api/org"] });
+  const { extraSeatPrice } = usePlanPrices();
   const { data: members = [] } = useQuery<Member[]>({ queryKey: ["/api/org/members"] });
   const { data: invites = [] } = useQuery<Invite[]>({
     queryKey: ["/api/org/invitations"],
@@ -349,7 +351,7 @@ export default function SettingsPage() {
                         <Label htmlFor="org-industry">Industry</Label>
                         <Input
                           id="org-industry"
-                          placeholder="e.g. Interior Design, Real Estate, Agency"
+                          placeholder="e.g. Design, Development, Video editing"
                           value={orgIndustry ?? org?.industry ?? ""}
                           onChange={(e) => setOrgIndustry(e.target.value)}
                           disabled={!canEditOrg}
@@ -769,7 +771,7 @@ export default function SettingsPage() {
                   </div>
                   <p className="text-sm text-muted-foreground max-w-md">
                     Free plan includes 1 user. Pro — and your free trial — includes 5 team members.
-                    Need more? Extra seats are ₹199/seat per month.
+                    Need more? Extra seats are {formatRupees(extraSeatPrice)}/seat per month.
                   </p>
                   {canBilling ? (
                     <div className="flex flex-wrap gap-2">
@@ -985,7 +987,7 @@ export default function SettingsPage() {
                   <Button className="w-full gradient-btn text-white">Upgrade Plan</Button>
                 </Link>
                 <Link href="/pricing#seats">
-                  <Button variant="outline" className="w-full">Buy Additional Seats — ₹199/seat</Button>
+                  <Button variant="outline" className="w-full">Buy Additional Seats — {formatRupees(extraSeatPrice)}/seat</Button>
                 </Link>
               </>
             ) : (

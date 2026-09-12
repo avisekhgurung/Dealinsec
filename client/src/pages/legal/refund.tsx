@@ -28,9 +28,8 @@ export default function RefundPolicy() {
           of purchase):
         </p>
         <ul>
-          <li><strong>DealInSec Pro — Monthly (₹999)</strong>: the full workflow (unlimited deals, quotations, agreements, invoices and payment tracking) for 1 month.</li>
-          <li><strong>DealInSec Pro — Annual (₹9,999)</strong>: the same, for 1 year.</li>
-          <li><strong>Deal Boost (₹99)</strong>: unlimited deals and quotations for 1 month (does not include agreements, invoices or payment tracking).</li>
+          <li><strong>DealInSec Pro — Monthly (₹99)</strong>: the full workflow (unlimited deals, quotations, agreements, invoices and payment tracking) for 1 month.</li>
+          <li><strong>DealInSec Pro — Annual (₹999)</strong>: the same, for 1 year.</li>
         </ul>
         <p>
           All plans are <strong>one-time payments</strong> for a fixed term. Nothing
@@ -58,7 +57,7 @@ export default function RefundPolicy() {
           </tbody>
         </table>
         <p>
-          When a refund is processed, the corresponding plan term (or Deal Boost) is
+          When a refund is processed, the corresponding plan term is
           revoked from the account.
         </p>
 

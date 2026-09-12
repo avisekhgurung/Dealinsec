@@ -7,15 +7,15 @@
  * - Every tool goes through the same gates as the REST routes: org-scoped
  *   storage queries + inOrg on single entities + memberCan for permissioned
  *   data. A denied tool returns a polite denial string, not a leak.
- * - Read tools execute directly. The ONLY mutation is create_quotation and
- *   it is NEVER executed from the chat loop — the model proposes it, the
- *   user clicks a confirm button, and /api/copilot/execute re-validates
- *   everything. No sending, deleting, billing or permission tools exist.
+ * - Read tools execute directly. The ONLY mutations are create_quotation and
+ *   create_deal, and they are NEVER executed from the chat loop — the model
+ *   proposes one, the user clicks a confirm button, and /api/copilot/execute
+ *   re-validates everything. No sending, deleting, billing or permission tools exist.
  * - Results are size-capped: the model sees summaries, not row dumps.
  */
 import { storage } from "../storage";
 import { memberCan } from "@shared/permissions";
-import { hasProAccess, hasActiveDealBoost, insertDealSchema, type User, type Deliverable } from "@shared/schema";
+import { hasProAccess, hasActiveDealBoost, insertDealSchema, dealTypeOptions, type User, type Deliverable } from "@shared/schema";
 import { getBillingUser, logOrgActivity } from "../entitlements";
 import { getDealJourney } from "./workflow";
 
@@ -280,6 +280,12 @@ export async function executeCreateDeal(rawArgs: any, user: User) {
     return { ok: false as const, message: "I need a valid deal amount (in rupees) to create the deal." };
   }
   const dealTitle = str(rawArgs?.dealTitle, 200) || `Work for ${brandName}`;
+  // Only an ACTIVE deal type is accepted (case-insensitive); legacy, misspelt
+  // or invented types fall back to Custom. dealType is a plain varchar in the
+  // schema, so this clamp is the only thing standing between model output and
+  // the column.
+  const wantType = str(rawArgs?.dealType, 40).toLowerCase();
+  const dealType = dealTypeOptions.find((t) => t.toLowerCase() === wantType) ?? "Custom";
   const startDate = dateRe.test(str(rawArgs?.startDate, 10)) ? str(rawArgs.startDate, 10) : iso(today);
   const endDate = dateRe.test(str(rawArgs?.endDate, 10))
     ? str(rawArgs.endDate, 10)
@@ -307,7 +313,7 @@ export async function executeCreateDeal(rawArgs: any, user: User) {
     organizationId: user.organizationId,
     brandName,
     dealTitle,
-    dealType: "Custom",
+    dealType,
     dealAmount: amountNum,
     startDate,
     endDate,

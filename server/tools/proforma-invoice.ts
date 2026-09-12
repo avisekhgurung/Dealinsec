@@ -9,7 +9,7 @@ import { COMMON_JS, ITEMS_JS, MEDIA_JS, EXPORT_JS } from "./client-lib";
 const PATH = "/tools/proforma-invoice-generator";
 const TITLE = "Free Proforma Invoice Generator (India) — Download PDF | DealInSec";
 const DESC =
-  "Create a professional proforma invoice online free. GST-ready format, amount in words, validity date, instant PDF — no sign-up. For Indian freelancers, agencies & exporters.";
+  "Create a professional proforma invoice online free. GST-ready format, amount in words, validity date, instant PDF — no sign-up. Made for India's freelancers.";
 
 const FAQ: { q: string; a: string }[] = [
   {
@@ -22,7 +22,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "When should I use a proforma invoice?",
-    a: "Use it to quote a firm price, request an advance, help a client raise a purchase order, or for export/customs pre-clearance. It signals intent to supply on stated terms without triggering GST until the actual invoice is raised.",
+    a: "Use it to confirm a firm price before you start, request an advance, or help a client's accounts team raise a purchase order. It signals intent to supply on stated terms without triggering GST until the actual invoice is raised.",
   },
   {
     q: "Is this proforma invoice generator free?",
@@ -30,7 +30,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Can I turn a proforma into a real GST invoice?",
-    a: "Yes — once the client confirms, use our free GST Invoice Generator, or create a DealInSec account to convert quotes and proformas into invoices, track payments and e-sign agreements.",
+    a: "Yes — once the client confirms, use our free GST Invoice Generator for the tax invoice. And if you would rather keep a client's quotation, agreement, invoice and payments together instead of as loose files, that is what DealInSec does: one thread per deal.",
   },
 ];
 

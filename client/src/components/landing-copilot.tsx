@@ -15,10 +15,10 @@ const OPENER =
   "Ask me anything about DealInSec — how the workflow runs, what it costs, whether it fits how you bill clients.";
 
 const SUGGESTIONS = [
-  "How does DealInSec help me get paid faster?",
+  "How does DealInSec help me get paid on time?",
   "Can I do 50% advance and 50% on delivery?",
   "What does it cost?",
-  "Is this useful for an interior designer?",
+  "Does this work for a freelance video editor?",
 ];
 
 interface Msg { role: "user" | "assistant"; content: string }

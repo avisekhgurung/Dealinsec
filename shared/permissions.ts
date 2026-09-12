@@ -223,7 +223,7 @@ export const INVITABLE_ROLES: OrgRole[] = ["ADMIN", "SALES", "ACCOUNTS"];
 // ── Seats ──────────────────────────────────────────────────────────────
 // Free plan: 1 user. Pro (monthly or annual) AND the 7-day trial: 5
 // included — the trial must sell the team workflow too (owner's call,
-// 2026-08-08). Extra seats are purchased (₹199/seat/month) and live on the
+// 2026-08-08). Extra seats are purchased (₹99/seat/month) and live on the
 // organization with one shared expiry. `owner` is the org owner's user row
 // (billing lives there).
 //

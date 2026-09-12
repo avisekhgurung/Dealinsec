@@ -153,7 +153,7 @@ export default function BrandDashboardPage() {
               </div>
               <h3 className="font-semibold mb-1">No deals shared with you</h3>
               <p className="text-sm text-muted-foreground">
-                When influencers assign you to their deals, they will appear here
+                When freelancers assign you to their deals, they will appear here
               </p>
             </CardContent>
           </Card>

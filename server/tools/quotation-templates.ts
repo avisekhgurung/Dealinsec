@@ -16,7 +16,7 @@ import { renderToolPage, esc, SITE_ORIGIN } from "./layout";
 const PATH = "/tools/quotation-templates";
 const TITLE = "Free Quotation Templates — Word & Excel Download | DealInSec";
 const DESC =
-  "Download free quotation templates for India: simple service quotation, GST quotation and freelancer quotation in Word, plus an Excel format with auto-totals. No sign-up — or edit online and export a PDF.";
+  "Download free quotation templates for Indian freelancers: a simple service quotation, a GST quotation and a freelancer one-pager in Word, plus an Excel format with auto-totals. No sign-up — or edit online and export a PDF.";
 
 interface Tpl {
   key: string;
@@ -35,13 +35,13 @@ const TEMPLATES: Tpl[] = [
     name: "Simple Service Quotation",
     file: "/templates/quotation-format-simple.docx",
     kind: "Word (.docx)",
-    bestFor: "Any service business — the clean, universal format",
+    bestFor: "Any freelance project — the clean, universal format",
     includes: ["Itemised work table", "Validity & advance terms", "Amount in words", "Signature block"],
     seed: {
       quoteNo: "QT-2026-001", gstRate: "0", taxType: "cgst_sgst",
       items: [
-        { desc: "Concept design & 3D views", qty: 1, rate: 60000 },
-        { desc: "Site supervision — 3 months", qty: 3, rate: 15000 },
+        { desc: "Website copy — 6 pages", qty: 1, rate: 24000 },
+        { desc: "Monthly content retainer — 3 months", qty: 3, rate: 12000 },
       ],
     },
   },
@@ -50,7 +50,7 @@ const TEMPLATES: Tpl[] = [
     name: "GST Quotation",
     file: "/templates/quotation-format-gst.docx",
     kind: "Word (.docx)",
-    bestFor: "GST-registered businesses quoting with tax shown",
+    bestFor: "GST-registered freelancers quoting with tax shown",
     includes: ["GSTIN fields for both parties", "HSN/SAC column", "CGST/SGST rows (IGST note)", "Tax-estimate disclaimer"],
     seed: {
       quoteNo: "QT-2026-001", gstRate: "18", taxType: "cgst_sgst",
@@ -170,7 +170,7 @@ function cards(): string {
 const BODY = `
 <div class="hero"><div class="wrap">
   <h1>Free Quotation Templates</h1>
-  <p class="sub">Download a professional quotation format in Word or Excel — or edit it online and export a PDF. Brand-neutral, made for India, no sign-up.</p>
+  <p class="sub">Download a professional quotation format in Word or Excel — or edit it online and export a PDF. Brand-neutral, made for India's freelancers, no sign-up.</p>
   <div class="chips">
     <span class="chip">100% free</span>
     <span class="chip">Word &amp; Excel</span>

@@ -73,7 +73,7 @@ export default function BrandDealsPage() {
               </div>
               <h3 className="font-semibold mb-1">No deals yet</h3>
               <p className="text-sm text-muted-foreground">
-                Deals assigned to you by influencers will appear here
+                Deals assigned to you by freelancers will appear here
               </p>
             </CardContent>
           </Card>

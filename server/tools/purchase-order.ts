@@ -14,7 +14,7 @@ const DESC =
 const FAQ: { q: string; a: string }[] = [
   {
     q: "What is a purchase order?",
-    a: "A purchase order (PO) is a document a buyer sends to a supplier to formally request goods or services at agreed prices. It lists the items, quantities, rates, delivery date and terms, and becomes a binding contract once the supplier accepts it.",
+    a: "A purchase order (PO) is a document a buyer sends to a supplier to formally request goods or services at agreed prices. It lists the items, quantities, rates, delivery date and terms, and forms the contract between the two sides once the supplier accepts it.",
   },
   {
     q: "What is the difference between a purchase order and an invoice?",
@@ -30,7 +30,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Can I manage POs, quotes and invoices together?",
-    a: "This free tool creates one-off purchase orders. Create a free DealInSec account to manage the full deal workflow — quotations, agreements, e-signatures and GST invoices — in one place.",
+    a: "This free tool creates one-off purchase orders. For your own client work, a DealInSec account keeps the quotation, the e-signed agreement, the invoice and the payments on one thread per client.",
   },
 ];
 
@@ -173,7 +173,7 @@ const BODY = `
 <section><div class="wrap">
   <div class="card">
     <h2>What is a purchase order?</h2>
-    <p class="muted">A purchase order is a document a buyer sends to a supplier to formally request goods or services at agreed prices. It records exactly what is being ordered, the quantities and rates, the delivery date and any terms — and becomes a binding agreement once the supplier accepts it. Using POs gives both sides a clear paper trail: the buyer controls spend and the supplier knows precisely what to deliver and invoice. Quote the PO number on the matching invoice so everything reconciles.</p>
+    <p class="muted">A purchase order is a document a buyer sends to a supplier to formally request goods or services at agreed prices. It records exactly what is being ordered, the quantities and rates, the delivery date and any terms — and forms the agreement between both sides once the supplier accepts it. Using POs gives both sides a clear paper trail: the buyer controls spend and the supplier knows precisely what to deliver and invoice. Quote the PO number on the matching invoice so everything reconciles.</p>
   </div>
 </div></section>
 

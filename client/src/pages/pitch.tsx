@@ -1,12 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Download, 
-  TrendingUp, 
-  FileText, 
-  Receipt, 
-  Shield, 
+import {
+  Download,
+  TrendingUp,
+  FileText,
+  Receipt,
+  Shield,
   CheckCircle,
   Star,
   Zap,
@@ -28,9 +28,11 @@ import {
   Edit,
   Trash2,
   Copy,
-  AlertCircle
+  AlertCircle,
+  PenTool,
+  Code2,
+  Video
 } from "lucide-react";
-import { SiInstagram, SiYoutube, SiTiktok } from "react-icons/si";
 
 export default function PitchPage() {
   const handleExportPDF = () => {
@@ -51,18 +53,18 @@ export default function PitchPage() {
         </header>
 
         <main className="px-4 py-8 max-w-6xl mx-auto space-y-12 print:py-4 print:space-y-8">
-          
+
           <section className="text-center py-8 print:py-4">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-4">
               <Zap className="w-4 h-4" />
-              <span className="text-sm font-medium">For Professional Influencers</span>
+              <span className="text-sm font-medium">For India's freelancers</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4 print:text-3xl">
               DealInSec
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto print:text-base">
-              Manage your brand deals, contracts, and billing like a pro. 
-              Get paid faster, stay organized, and grow your influencer business.
+              Quotation, e-signed agreement, invoice and payment tracking on one
+              thread per client.
             </p>
           </section>
 
@@ -71,39 +73,42 @@ export default function PitchPage() {
               <CardContent className="p-0">
                 <TrendingUp className="w-8 h-8 mx-auto mb-2 text-emerald-600" />
                 <p className="font-bold text-2xl">Track Deals</p>
-                <p className="text-sm text-muted-foreground">All partnerships in one place</p>
+                <p className="text-sm text-muted-foreground">Every client deal in one place</p>
               </CardContent>
             </Card>
             <Card className="text-center p-4">
               <CardContent className="p-0">
                 <FileText className="w-8 h-8 mx-auto mb-2 text-blue-600" />
-                <p className="font-bold text-2xl">Sign Contracts</p>
-                <p className="text-sm text-muted-foreground">Professional agreements</p>
+                <p className="font-bold text-2xl">Sign Agreements</p>
+                <p className="text-sm text-muted-foreground">Scope accepted in writing</p>
               </CardContent>
             </Card>
             <Card className="text-center p-4">
               <CardContent className="p-0">
                 <Receipt className="w-8 h-8 mx-auto mb-2 text-violet-600" />
                 <p className="font-bold text-2xl">Send Invoices</p>
-                <p className="text-sm text-muted-foreground">Get paid on time</p>
+                <p className="text-sm text-muted-foreground">Bill the day you deliver</p>
               </CardContent>
             </Card>
             <Card className="text-center p-4">
               <CardContent className="p-0">
                 <Shield className="w-8 h-8 mx-auto mb-2 text-amber-600" />
                 <p className="font-bold text-2xl">Stay Protected</p>
-                <p className="text-sm text-muted-foreground">Legal documentation</p>
+                <p className="text-sm text-muted-foreground">A timestamped record</p>
               </CardContent>
             </Card>
           </section>
 
           <section>
-            <h2 className="text-2xl font-bold text-center mb-8 print:text-xl print:mb-4">
+            <h2 className="text-2xl font-bold text-center mb-2 print:text-xl">
               How DealInSec Works
             </h2>
-            
+            <p className="text-muted-foreground text-center mb-8 print:mb-4 text-sm">
+              Sample screens below — the clients, amounts and dates are examples, not real accounts.
+            </p>
+
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 print:gap-3">
-              
+
               <div className="space-y-3">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold">1</div>
@@ -120,7 +125,7 @@ export default function PitchPage() {
                   </div>
                   <div className="p-3 space-y-3">
                     <div className="text-center py-2">
-                      <p className="text-xs text-muted-foreground">Total Earnings</p>
+                      <p className="text-xs text-muted-foreground">Earned this year</p>
                       <p className="text-2xl font-bold text-emerald-600">₹2,45,000</p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -130,7 +135,7 @@ export default function PitchPage() {
                       </div>
                       <div className="bg-muted/50 rounded-lg p-2 text-center">
                         <p className="text-lg font-bold">8</p>
-                        <p className="text-xs text-muted-foreground">Contracts</p>
+                        <p className="text-xs text-muted-foreground">Agreements</p>
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -160,35 +165,35 @@ export default function PitchPage() {
                   <div className="p-3 space-y-2">
                     <div className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-sm">Nike Campaign</span>
+                        <span className="font-medium text-sm">Mehta Spice Co.</span>
                         <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700">Active</Badge>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <SiInstagram className="w-3 h-3" />
-                        <span>3 Reels</span>
-                        <span>₹75,000</span>
+                        <PenTool className="w-3 h-3" />
+                        <span>Logo & brand identity</span>
+                        <span>₹35,000</span>
                       </div>
                     </div>
                     <div className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-sm">Spotify Promo</span>
+                        <span className="font-medium text-sm">Uplift Learning</span>
                         <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">Pending</Badge>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <SiYoutube className="w-3 h-3" />
-                        <span>1 Video</span>
-                        <span>₹1,20,000</span>
+                        <Code2 className="w-3 h-3" />
+                        <span>Website — 3 milestones</span>
+                        <span>₹80,000</span>
                       </div>
                     </div>
                     <div className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-sm">Myntra Collab</span>
-                        <Badge variant="secondary" className="text-xs bg-violet-100 text-violet-700">Exclusive</Badge>
+                        <span className="font-medium text-sm">Greenleaf Cafe</span>
+                        <Badge variant="secondary" className="text-xs bg-violet-100 text-violet-700">Retainer</Badge>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <SiTiktok className="w-3 h-3" />
-                        <span>5 Posts</span>
-                        <span>₹50,000</span>
+                        <Video className="w-3 h-3" />
+                        <span>12 Reels / month</span>
+                        <span>₹36,000</span>
                       </div>
                     </div>
                   </div>
@@ -198,7 +203,7 @@ export default function PitchPage() {
               <div className="space-y-3">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold">3</div>
-                  <h3 className="font-bold">Sign Contracts</h3>
+                  <h3 className="font-bold">Sign Agreements</h3>
                 </div>
                 <div className="border-2 border-border rounded-2xl overflow-hidden bg-background shadow-lg">
                   <div className="bg-muted/50 px-3 py-2 flex items-center gap-2 border-b">
@@ -207,14 +212,14 @@ export default function PitchPage() {
                       <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
                       <div className="w-2 h-2 rounded-full bg-green-400"></div>
                     </div>
-                    <span className="text-xs text-muted-foreground">Contracts</span>
+                    <span className="text-xs text-muted-foreground">Agreements</span>
                   </div>
                   <div className="p-3 space-y-2">
                     <div className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-sm">Nike Agreement</span>
+                        <span className="font-medium text-sm">Mehta Spice Co.</span>
                       </div>
-                      <p className="text-xs text-muted-foreground mb-2">Jan 1 - Mar 31, 2025</p>
+                      <p className="text-xs text-muted-foreground mb-2">Jan 1 - Mar 31, 2026</p>
                       <div className="flex gap-2">
                         <div className="flex items-center gap-1">
                           <CheckCircle className="w-3 h-3 text-emerald-600" />
@@ -222,15 +227,15 @@ export default function PitchPage() {
                         </div>
                         <div className="flex items-center gap-1">
                           <CheckCircle className="w-3 h-3 text-emerald-600" />
-                          <span className="text-xs text-emerald-600">Brand: Signed</span>
+                          <span className="text-xs text-emerald-600">Client: Accepted</span>
                         </div>
                       </div>
                     </div>
                     <div className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-sm">Spotify Contract</span>
+                        <span className="font-medium text-sm">Uplift Learning</span>
                       </div>
-                      <p className="text-xs text-muted-foreground mb-2">Feb 1 - Apr 30, 2025</p>
+                      <p className="text-xs text-muted-foreground mb-2">Feb 1 - Apr 30, 2026</p>
                       <div className="flex gap-2">
                         <div className="flex items-center gap-1">
                           <CheckCircle className="w-3 h-3 text-emerald-600" />
@@ -238,13 +243,13 @@ export default function PitchPage() {
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="w-3 h-3 text-amber-600" />
-                          <span className="text-xs text-amber-600">Brand: Pending</span>
+                          <span className="text-xs text-amber-600">Client: Pending</span>
                         </div>
                       </div>
                     </div>
                     <div className="p-2 bg-muted/30 rounded-lg text-center">
                       <FileText className="w-5 h-5 mx-auto text-muted-foreground mb-1" />
-                      <p className="text-xs text-muted-foreground">Export PDF & Send to Brand</p>
+                      <p className="text-xs text-muted-foreground">Export PDF & Send to Client</p>
                     </div>
                   </div>
                 </div>
@@ -267,19 +272,19 @@ export default function PitchPage() {
                   <div className="p-3 space-y-2">
                     <div className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-sm">INV-2025-001</span>
+                        <span className="font-medium text-sm">INV-2026-001</span>
                         <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700">Paid</Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground">Nike Campaign</p>
-                      <p className="text-sm font-bold text-emerald-600 mt-1">₹75,000</p>
+                      <p className="text-xs text-muted-foreground">Mehta Spice Co.</p>
+                      <p className="text-sm font-bold text-emerald-600 mt-1">₹35,000</p>
                     </div>
                     <div className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-sm">INV-2025-002</span>
+                        <span className="font-medium text-sm">INV-2026-002</span>
                         <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">Pending</Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground">Spotify Promo</p>
-                      <p className="text-sm font-bold mt-1">₹1,20,000</p>
+                      <p className="text-xs text-muted-foreground">Uplift Learning</p>
+                      <p className="text-sm font-bold mt-1">₹80,000</p>
                     </div>
                     <Button size="sm" className="w-full text-xs">
                       <Receipt className="w-3 h-3 mr-1" />
@@ -298,11 +303,11 @@ export default function PitchPage() {
               Complete Workflow Details
             </h2>
             <p className="text-muted-foreground text-center mb-8 print:mb-4">
-              Every step of managing your influencer business, simplified
+              Every step of running a client deal, simplified
             </p>
-            
+
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 print:gap-4">
-              
+
               {/* Create New Deal Screen */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 mb-2">
@@ -325,30 +330,30 @@ export default function PitchPage() {
                       <div className="flex items-center gap-2 p-2 border rounded-lg">
                         <Building2 className="w-4 h-4 text-muted-foreground" />
                         <div className="flex-1">
-                          <p className="text-xs text-muted-foreground">Brand Name</p>
-                          <p className="text-sm font-medium">Nike India</p>
+                          <p className="text-xs text-muted-foreground">Client Name</p>
+                          <p className="text-sm font-medium">Mehta Spice Co.</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 p-2 border rounded-lg">
-                        <SiInstagram className="w-4 h-4 text-pink-500" />
+                        <PenTool className="w-4 h-4 text-emerald-600" />
                         <div className="flex-1">
-                          <p className="text-xs text-muted-foreground">Platform</p>
-                          <p className="text-sm font-medium">Instagram</p>
+                          <p className="text-xs text-muted-foreground">Deal Type</p>
+                          <p className="text-sm font-medium">Design</p>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div className="p-2 border rounded-lg">
-                          <p className="text-xs text-muted-foreground">Content Type</p>
-                          <p className="text-sm font-medium">Reels</p>
+                          <p className="text-xs text-muted-foreground">Output</p>
+                          <p className="text-sm font-medium">Brand identity</p>
                         </div>
                         <div className="p-2 border rounded-lg">
-                          <p className="text-xs text-muted-foreground">Quantity</p>
-                          <p className="text-sm font-medium">3 Posts</p>
+                          <p className="text-xs text-muted-foreground">Deliverables</p>
+                          <p className="text-sm font-medium">2 items</p>
                         </div>
                       </div>
                       <div className="p-2 border rounded-lg">
                         <p className="text-xs text-muted-foreground">Deal Value</p>
-                        <p className="text-lg font-bold text-emerald-600">₹75,000</p>
+                        <p className="text-lg font-bold text-emerald-600">₹35,000</p>
                       </div>
                     </div>
                     <Button size="sm" className="w-full text-xs" data-testid="button-mockup-create-deal">
@@ -374,36 +379,36 @@ export default function PitchPage() {
                       <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
                       <div className="w-2 h-2 rounded-full bg-green-400"></div>
                     </div>
-                    <span className="text-xs text-muted-foreground">Nike Campaign</span>
+                    <span className="text-xs text-muted-foreground">Logo & brand identity</span>
                   </div>
                   <div className="p-3 space-y-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-bold">Nike India</p>
-                        <p className="text-xs text-muted-foreground">Sports & Fitness</p>
+                        <p className="font-bold">Mehta Spice Co.</p>
+                        <p className="text-xs text-muted-foreground">Packaged foods</p>
                       </div>
                       <Badge variant="secondary" className="bg-emerald-100 text-emerald-700">Active</Badge>
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div className="p-2 bg-muted/50 rounded-lg">
-                        <SiInstagram className="w-4 h-4 mx-auto mb-1 text-pink-500" />
-                        <p className="text-xs text-muted-foreground">Platform</p>
+                        <PenTool className="w-4 h-4 mx-auto mb-1 text-emerald-600" />
+                        <p className="text-xs text-muted-foreground">Design</p>
                       </div>
                       <div className="p-2 bg-muted/50 rounded-lg">
-                        <p className="text-sm font-bold">3</p>
-                        <p className="text-xs text-muted-foreground">Reels</p>
+                        <p className="text-sm font-bold">2</p>
+                        <p className="text-xs text-muted-foreground">Deliverables</p>
                       </div>
                       <div className="p-2 bg-muted/50 rounded-lg">
-                        <p className="text-sm font-bold text-emerald-600">₹75K</p>
+                        <p className="text-sm font-bold text-emerald-600">₹35K</p>
                         <p className="text-xs text-muted-foreground">Value</p>
                       </div>
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs font-medium">Deliverables Progress</p>
                       <div className="w-full bg-muted rounded-full h-2">
-                        <div className="bg-emerald-600 h-2 rounded-full" style={{width: '66%'}}></div>
+                        <div className="bg-emerald-600 h-2 rounded-full" style={{width: '50%'}}></div>
                       </div>
-                      <p className="text-xs text-muted-foreground">2 of 3 completed</p>
+                      <p className="text-xs text-muted-foreground">1 of 2 completed</p>
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" className="flex-1 text-xs" data-testid="button-mockup-edit-deal">
@@ -412,20 +417,20 @@ export default function PitchPage() {
                       </Button>
                       <Button size="sm" className="flex-1 text-xs" data-testid="button-mockup-deal-contract">
                         <FileText className="w-3 h-3 mr-1" />
-                        Contract
+                        Agreement
                       </Button>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Contract Details Screen */}
+              {/* Agreement Details Screen */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center text-white">
                     <FileText className="w-4 h-4" />
                   </div>
-                  <h3 className="font-bold">Contract Details</h3>
+                  <h3 className="font-bold">Agreement Details</h3>
                 </div>
                 <div className="border-2 border-border rounded-2xl overflow-hidden bg-background shadow-lg">
                   <div className="bg-muted/50 px-3 py-2 flex items-center gap-2 border-b">
@@ -434,41 +439,44 @@ export default function PitchPage() {
                       <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
                       <div className="w-2 h-2 rounded-full bg-green-400"></div>
                     </div>
-                    <span className="text-xs text-muted-foreground">Contract View</span>
+                    <span className="text-xs text-muted-foreground">Agreement View</span>
                   </div>
                   <div className="p-3 space-y-3">
                     <div className="flex items-center justify-between">
-                      <p className="font-bold text-sm">Nike Agreement</p>
+                      <p className="font-bold text-sm">Mehta Spice Co.</p>
                       <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 text-xs">Signed</Badge>
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-xs">
                         <Calendar className="w-3 h-3 text-muted-foreground" />
-                        <span className="text-muted-foreground">Jan 1 - Mar 31, 2025</span>
+                        <span className="text-muted-foreground">Jan 1 - Mar 31, 2026</span>
                       </div>
                       <div className="flex items-center gap-2 text-xs">
                         <User className="w-3 h-3 text-muted-foreground" />
-                        <span className="text-muted-foreground">Contact: Rahul Sharma</span>
+                        <span className="text-muted-foreground">Contact: Rahul Mehta</span>
                       </div>
                     </div>
                     <div className="p-2 border rounded-lg bg-muted/30">
                       <p className="text-xs font-medium mb-2">Signature Status</p>
                       <div className="space-y-1">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">You (Influencer)</span>
+                          <span className="text-xs text-muted-foreground">You (Freelancer)</span>
                           <div className="flex items-center gap-1">
                             <CheckCircle className="w-3 h-3 text-emerald-600" />
                             <span className="text-xs text-emerald-600">Signed</span>
                           </div>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Brand (Nike)</span>
+                          <span className="text-xs text-muted-foreground">Client (Mehta Spice Co.)</span>
                           <div className="flex items-center gap-1">
                             <CheckCircle className="w-3 h-3 text-emerald-600" />
-                            <span className="text-xs text-emerald-600">Signed</span>
+                            <span className="text-xs text-emerald-600">Accepted</span>
                           </div>
                         </div>
                       </div>
+                      <p className="text-[10px] text-muted-foreground mt-2">
+                        Electronic acceptance with an audit record — who accepted, when.
+                      </p>
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" className="flex-1 text-xs" data-testid="button-mockup-view-pdf">
@@ -477,14 +485,14 @@ export default function PitchPage() {
                       </Button>
                       <Button size="sm" className="flex-1 text-xs" data-testid="button-mockup-download-contract">
                         <Send className="w-3 h-3 mr-1" />
-                        Send to Brand
+                        Send to Client
                       </Button>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Upload Contract Proof Screen */}
+              {/* Upload Signed Proof Screen */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-8 h-8 rounded-full bg-amber-600 flex items-center justify-center text-white">
@@ -505,7 +513,7 @@ export default function PitchPage() {
                     <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-4 text-center">
                       <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                       <p className="text-xs text-muted-foreground mb-2">
-                        Upload brand-signed contract
+                        Upload the client-signed agreement
                       </p>
                       <p className="text-xs text-muted-foreground">
                         PDF, JPG, PNG up to 10MB
@@ -515,7 +523,7 @@ export default function PitchPage() {
                       <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-emerald-600" />
                         <div className="flex-1">
-                          <p className="text-xs font-medium">Nike_Brand_Signed.pdf</p>
+                          <p className="text-xs font-medium">Mehta_Spice_Signed.pdf</p>
                           <p className="text-xs text-muted-foreground">2.3 MB</p>
                         </div>
                         <CheckCircle className="w-4 h-4 text-emerald-600" />
@@ -523,7 +531,7 @@ export default function PitchPage() {
                     </div>
                     <Button size="sm" className="w-full text-xs" data-testid="button-mockup-upload-proof">
                       <Upload className="w-3 h-3 mr-1" />
-                      Upload Brand Signature
+                      Upload Client Signature
                     </Button>
                   </div>
                 </div>
@@ -544,24 +552,24 @@ export default function PitchPage() {
                       <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
                       <div className="w-2 h-2 rounded-full bg-green-400"></div>
                     </div>
-                    <span className="text-xs text-muted-foreground">INV-2025-001</span>
+                    <span className="text-xs text-muted-foreground">INV-2026-001</span>
                   </div>
                   <div className="p-3 space-y-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-bold text-sm">Nike India</p>
-                        <p className="text-xs text-muted-foreground">Nike Campaign</p>
+                        <p className="font-bold text-sm">Mehta Spice Co.</p>
+                        <p className="text-xs text-muted-foreground">Logo & brand identity</p>
                       </div>
                       <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 text-xs">Paid</Badge>
                     </div>
                     <div className="space-y-1 text-xs">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Deal Amount</span>
-                        <span>₹75,000</span>
+                        <span>₹35,000</span>
                       </div>
                       <div className="border-t pt-1 flex justify-between font-bold">
                         <span>Total Amount</span>
-                        <span className="text-emerald-600">₹75,000</span>
+                        <span className="text-emerald-600">₹35,000</span>
                       </div>
                     </div>
                     <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
@@ -569,7 +577,7 @@ export default function PitchPage() {
                         <CheckCircle className="w-4 h-4 text-emerald-600" />
                         <div>
                           <p className="text-xs font-medium text-emerald-700">Payment Received</p>
-                          <p className="text-xs text-emerald-600">Dec 10, 2025</p>
+                          <p className="text-xs text-emerald-600">Mar 10, 2026</p>
                         </div>
                       </div>
                     </div>
@@ -602,24 +610,24 @@ export default function PitchPage() {
                     <div className="p-2 border rounded-lg">
                       <p className="text-xs text-muted-foreground">Select Deal</p>
                       <div className="flex items-center justify-between mt-1">
-                        <p className="text-sm font-medium">Spotify Promo</p>
+                        <p className="text-sm font-medium">Uplift Learning</p>
                         <ChevronRight className="w-4 h-4 text-muted-foreground" />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 p-2 border rounded-lg">
                         <Mail className="w-4 h-4 text-muted-foreground" />
-                        <input className="text-sm bg-transparent flex-1 outline-none" placeholder="Brand email" defaultValue="billing@spotify.com" readOnly />
+                        <input className="text-sm bg-transparent flex-1 outline-none" placeholder="Client email" defaultValue="accounts@upliftlearning.in" readOnly />
                       </div>
                       <div className="flex items-center gap-2 p-2 border rounded-lg">
                         <Calendar className="w-4 h-4 text-muted-foreground" />
-                        <input className="text-sm bg-transparent flex-1 outline-none" placeholder="Due date" defaultValue="Jan 15, 2025" readOnly />
+                        <input className="text-sm bg-transparent flex-1 outline-none" placeholder="Due date" defaultValue="May 15, 2026" readOnly />
                       </div>
                     </div>
                     <div className="p-2 bg-muted/30 rounded-lg">
                       <div className="flex justify-between text-xs">
                         <span className="text-muted-foreground">Total Amount</span>
-                        <span className="font-bold">₹1,20,000</span>
+                        <span className="font-bold">₹80,000</span>
                       </div>
                     </div>
                     <Button size="sm" className="w-full text-xs" data-testid="button-mockup-generate-invoice">
@@ -641,9 +649,9 @@ export default function PitchPage() {
             <p className="text-muted-foreground text-center mb-8 print:mb-4">
               Manage payments and customize your profile
             </p>
-            
+
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 print:gap-4">
-              
+
               {/* Payment History Screen */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 mb-2">
@@ -664,28 +672,28 @@ export default function PitchPage() {
                   <div className="p-3 space-y-2">
                     <div className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-sm">Nike India</span>
-                        <span className="text-sm font-bold text-emerald-600">+₹75,000</span>
+                        <span className="font-medium text-sm">Mehta Spice Co.</span>
+                        <span className="text-sm font-bold text-emerald-600">+₹35,000</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">Dec 10, 2025</p>
+                      <p className="text-xs text-muted-foreground">Mar 10, 2026</p>
                     </div>
                     <div className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-sm">Myntra</span>
-                        <span className="text-sm font-bold text-emerald-600">+₹50,000</span>
+                        <span className="font-medium text-sm">Greenleaf Cafe</span>
+                        <span className="text-sm font-bold text-emerald-600">+₹36,000</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">Dec 5, 2025</p>
+                      <p className="text-xs text-muted-foreground">Mar 5, 2026</p>
                     </div>
                     <div className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-sm">Boat Audio</span>
+                        <span className="font-medium text-sm">Sood & Associates</span>
                         <span className="text-sm font-bold text-emerald-600">+₹30,000</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">Nov 28, 2025</p>
+                      <p className="text-xs text-muted-foreground">Feb 28, 2026</p>
                     </div>
                     <div className="text-center py-2 border-t">
                       <p className="text-xs text-muted-foreground">Total This Month</p>
-                      <p className="text-lg font-bold text-emerald-600">₹1,55,000</p>
+                      <p className="text-lg font-bold text-emerald-600">₹1,01,000</p>
                     </div>
                   </div>
                 </div>
@@ -714,7 +722,7 @@ export default function PitchPage() {
                         PS
                       </div>
                       <p className="font-bold">Priya Sharma</p>
-                      <p className="text-xs text-muted-foreground">@priyasharma</p>
+                      <p className="text-xs text-muted-foreground">Freelance designer</p>
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 p-2 border rounded-lg">
@@ -758,27 +766,27 @@ export default function PitchPage() {
                   <div className="p-3 space-y-2">
                     <div className="p-2 border rounded-lg border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-sm">Spotify</span>
+                        <span className="font-medium text-sm">Uplift Learning</span>
                         <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">Overdue</Badge>
                       </div>
-                      <p className="text-sm font-bold">₹1,14,000</p>
-                      <p className="text-xs text-amber-600">Due: Dec 1, 2025</p>
+                      <p className="text-sm font-bold">₹80,000</p>
+                      <p className="text-xs text-amber-600">Due: May 15, 2026</p>
                     </div>
                     <div className="p-2 border rounded-lg">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-sm">Zomato</span>
+                        <span className="font-medium text-sm">Greenleaf Cafe</span>
                         <Badge variant="secondary" className="text-xs">Due Soon</Badge>
                       </div>
-                      <p className="text-sm font-bold">₹45,000</p>
-                      <p className="text-xs text-muted-foreground">Due: Dec 20, 2025</p>
+                      <p className="text-sm font-bold">₹12,000</p>
+                      <p className="text-xs text-muted-foreground">Due: Jun 5, 2026</p>
                     </div>
                     <div className="text-center py-2 border-t">
                       <p className="text-xs text-muted-foreground">Total Pending</p>
-                      <p className="text-lg font-bold text-amber-600">₹1,59,000</p>
+                      <p className="text-lg font-bold text-amber-600">₹92,000</p>
                     </div>
                     <Button size="sm" className="w-full text-xs" data-testid="button-mockup-send-reminders">
                       <Send className="w-3 h-3 mr-1" />
-                      Send Reminders
+                      Draft Reminders
                     </Button>
                   </div>
                 </div>
@@ -789,7 +797,7 @@ export default function PitchPage() {
 
           <section className="py-8 print:py-4">
             <h2 className="text-2xl font-bold text-center mb-6 print:text-xl">
-              Why Influencers Choose DealInSec
+              Why freelancers choose DealInSec
             </h2>
             <div className="grid md:grid-cols-3 gap-6 print:gap-3">
               <div className="flex items-start gap-3">
@@ -797,9 +805,9 @@ export default function PitchPage() {
                   <Star className="w-5 h-5 text-emerald-600" />
                 </div>
                 <div>
-                  <h3 className="font-bold mb-1">Professional Image</h3>
+                  <h3 className="font-bold mb-1">You look like a business</h3>
                   <p className="text-sm text-muted-foreground">
-                    Send professional contracts and invoices that brands respect. Stand out from other creators.
+                    A numbered quotation, a signed agreement and a proper invoice — instead of a price in a WhatsApp message.
                   </p>
                 </div>
               </div>
@@ -808,9 +816,9 @@ export default function PitchPage() {
                   <Clock className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="font-bold mb-1">Save Time</h3>
+                  <h3 className="font-bold mb-1">Nothing slips</h3>
                   <p className="text-sm text-muted-foreground">
-                    No more spreadsheets or messy notes. Everything organized in one mobile-friendly app.
+                    No spreadsheets, no invoice sitting in a Downloads folder. One thread per client deal, on your phone.
                   </p>
                 </div>
               </div>
@@ -819,9 +827,9 @@ export default function PitchPage() {
                   <Shield className="w-5 h-5 text-violet-600" />
                 </div>
                 <div>
-                  <h3 className="font-bold mb-1">Legal Protection</h3>
+                  <h3 className="font-bold mb-1">A record if it is disputed</h3>
                   <p className="text-sm text-muted-foreground">
-                    Professional contracts protect your work. Clear terms, deliverables, and payment schedules.
+                    Scope, revision limit and payment dates accepted in writing — with a timestamped record of who accepted and when.
                   </p>
                 </div>
               </div>
@@ -829,9 +837,9 @@ export default function PitchPage() {
           </section>
 
           <section className="text-center py-8 bg-muted/30 rounded-2xl print:py-4">
-            <h2 className="text-2xl font-bold mb-2 print:text-xl">Ready to Level Up Your Influencer Business?</h2>
+            <h2 className="text-2xl font-bold mb-2 print:text-xl">Ready to run your next client deal properly?</h2>
             <p className="text-muted-foreground mb-6 print:mb-4">
-              Join thousands of creators who manage their brand deals professionally with DealInSec.
+              Start your next client deal with the scope in writing — 7-day Pro trial, no card.
             </p>
             <div className="flex items-center justify-center gap-4 flex-wrap print:hidden">
               <Button size="lg">
@@ -839,14 +847,17 @@ export default function PitchPage() {
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground mt-4">
+              Free plan: 4 deals a month, each with its quotation. Pro: ₹99/month or ₹999/year.
+            </p>
             <div className="hidden print:block">
               <p className="font-bold text-lg">www.dealinsec.com</p>
             </div>
           </section>
 
           <footer className="text-center py-6 text-sm text-muted-foreground border-t print:py-2">
-            <p>DealInSec - Professional Deal Management for Influencers</p>
-            <p className="mt-1">Track Deals. Sign Contracts. Get Paid.</p>
+            <p>DealInSec - deal management for India's freelancers</p>
+            <p className="mt-1">Quote it. Sign it. Invoice it. Get paid.</p>
           </footer>
 
         </main>

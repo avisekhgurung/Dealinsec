@@ -45,6 +45,7 @@ import {
   TRIAL_DAYS,
 } from "@shared/schema";
 import { canSeeModule } from "@shared/permissions";
+import { usePlanPrices, formatRupees } from "@/hooks/use-plan-prices";
 
 interface NavItem {
   path: string;
@@ -75,7 +76,7 @@ type PlanState =
   | "PRO"           // paid — always wins over a parallel unexpired trial
   | "TRIAL_ACTIVE"  // 4–7 days left
   | "TRIAL_ENDING"  // 1–3 days left
-  | "BOOST"         // ₹99 Deal Boost active
+  | "BOOST"         // Deal Boost still running (no longer sold)
   | "TRIAL_ENDED"   // lived a real trial, let it lapse — highest-intent moment
   | "FREE";
 
@@ -162,6 +163,10 @@ export function DesktopSidebar() {
     const id = setInterval(tick, 3_600_000);
     return () => clearInterval(id);
   }, []);
+
+  // Live Pro price for the trial-ended CTA (shared cached query; above the
+  // auth guard so hook order is stable, but idle on marketing routes).
+  const { proMonthlyPrice } = usePlanPrices({ enabled: isAuthenticated });
 
   // Hide sidebar entirely if not logged in (landing/onboarding/marketing routes)
   if (!isAuthenticated) return null;
@@ -364,7 +369,7 @@ export function DesktopSidebar() {
               Your 7-day trial has ended. Your deals and documents are safe.
             </div>
             <span className="gradient-btn block w-full text-center text-[12px] font-semibold text-white rounded-lg py-2">
-              Upgrade to Pro — ₹999/mo
+              Upgrade to Pro — {formatRupees(proMonthlyPrice)}/mo
             </span>
           </Link>
         );

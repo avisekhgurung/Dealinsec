@@ -5,11 +5,9 @@
  *   const { openUpgradeModal } = useUpgradeModal();
  *   openUpgradeModal({ feature: "agreements" });
  *
- * Two paths out:
- *   1. "Upgrade to Pro" (recommended) → /pricing (monthly & annual choices)
- *   2. "Deal Boost — ₹99" → inline Razorpay checkout (unlimited deals +
- *      quotations for 1 month). Hidden for Pro-only features — the boost
- *      never unlocks agreements/invoices/payment tracking.
+ * One path out: "Upgrade to Pro" → /pricing (monthly & annual choices). The
+ * prices shown are the live ones from /api/payments/config. Deal Boost is no
+ * longer sold anywhere in the UI (the server SKU remains for existing boosts).
  */
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import { useLocation } from "wouter";
@@ -21,11 +19,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Check, Crown, Loader2, Rocket, Sparkles } from "lucide-react";
-import { useRazorpayCheckout } from "@/hooks/use-razorpay-checkout";
-import { useToast } from "@/hooks/use-toast";
+import { Check, Crown, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { hasActiveTrial, hasLapsedTrial } from "@shared/schema";
+import { usePlanPrices, formatRupees } from "@/hooks/use-plan-prices";
+import { hasLapsedTrial } from "@shared/schema";
 import { trackEvent } from "@/lib/analytics";
 
 export type UpgradeFeature = "deals" | "agreements" | "invoices" | "payment_tracking";
@@ -53,54 +50,31 @@ const FEATURE_COPY: Record<UpgradeFeature, string> = {
   payment_tracking: "Payment tracking — recording payments and marking invoices Paid — is a Pro feature.",
 };
 
+// Only what ships today — reminders and custom branding are still "coming
+// soon" on /pricing, so they're not promised here.
 const PRO_FEATURES = [
   "Unlimited deals & quotations",
-  "Unlimited agreements & invoices",
-  "Payment tracking & reminders",
-  "Custom branding · Priority support",
+  "Unlimited e-signed agreements & GST-ready invoices",
+  "Payment tracking — see which client owes you what",
+  "Priority email support",
 ];
 
 export function UpgradeModalProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [feature, setFeature] = useState<UpgradeFeature>("deals");
   const [, setLocation] = useLocation();
-  const { checkout, isLoading } = useRazorpayCheckout();
-  const { toast } = useToast();
   // Lapsed trialists get their own framing: they've SEEN the full workflow,
   // so the modal speaks to what they're losing, not what they'd gain.
   const { user } = useAuth();
   const trialEnded = hasLapsedTrial(user);
+  // Fetched only once the modal opens; the defaults are the list prices.
+  const { proMonthlyPrice, proYearlyPrice } = usePlanPrices({ enabled: open });
 
   const openUpgradeModal = useCallback((options: UpgradeModalOptions = {}) => {
     setFeature(options.feature ?? "deals");
     setOpen(true);
     trackEvent("upgrade_modal_shown", { feature: options.feature ?? "deals" });
   }, []);
-
-  // The boost only lifts the deal/quotation limit — for Pro-only features it
-  // would be a dead-end purchase, so it's only offered on the deal-limit path.
-  // Never during an active trial either: a boost bought mid-trial overlaps
-  // days that are already unlimited (guaranteed refund request).
-  const boostApplies = feature === "deals" && !hasActiveTrial(user);
-
-  const buyBoost = () =>
-    checkout("deal_boost", {
-      onSuccess: () => {
-        setOpen(false);
-        toast({
-          title: "Deal Boost active 🚀",
-          description: "Unlimited deals & quotations for the next month.",
-          variant: "success" as any,
-        });
-      },
-      onPendingVerification: () =>
-        toast({
-          title: "Verification pending",
-          description: "Payment received — your Deal Boost will activate shortly.",
-        }),
-      onError: (message) =>
-        toast({ title: "Payment failed", description: message, variant: "destructive" }),
-    });
 
   return (
     <UpgradeModalContext.Provider value={{ openUpgradeModal }}>
@@ -142,33 +116,15 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
               data-testid="upgrade-modal-pro"
             >
               <Crown className="w-4 h-4 mr-2 text-amber-300" />
-              Upgrade to Pro — ₹999/month
+              Upgrade to Pro — {formatRupees(proMonthlyPrice)}/month
               <span className="absolute -top-2 right-3 px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 text-[9px] font-black uppercase tracking-wide flex items-center gap-0.5">
                 <Sparkles className="w-2.5 h-2.5" /> Recommended
               </span>
             </Button>
 
-            {boostApplies ? (
-              <Button
-                variant="outline"
-                className="w-full h-11 rounded-xl font-semibold"
-                onClick={buyBoost}
-                disabled={isLoading}
-                data-testid="upgrade-modal-boost"
-              >
-                {isLoading ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Rocket className="w-4 h-4 mr-2" />
-                )}
-                Deal Boost — ₹99: unlimited deals for 1 month
-              </Button>
-            ) : (
-              <p className="text-[11px] text-center text-muted-foreground">
-                The ₹99 Deal Boost covers deals &amp; quotations only — this feature
-                needs Pro.
-              </p>
-            )}
+            <p className="text-[11px] text-center text-muted-foreground">
+              Or {formatRupees(proYearlyPrice)}/year on Pro Annual — one payment for the whole year.
+            </p>
           </div>
 
           <p className="text-[11px] text-center text-muted-foreground mt-1">

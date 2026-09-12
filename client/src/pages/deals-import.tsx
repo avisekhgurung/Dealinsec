@@ -42,16 +42,16 @@ const TEMPLATE_HEADERS = [
 function downloadTemplate() {
   const rows = [
     [
-      "Skyline Developers LLP", "3BHK Turnkey Interiors", "Interior Design", "850000",
-      "2026-09-01", "2026-12-31", "all",
-      "Full home interiors", "Turnkey design & execution", "1", "One-time", "Modular kitchen included",
-      "3D renders", "Design visualisation", "4", "One-time", "",
+      "Mehta Spice Co.", "Logo & brand identity", "Design", "35000",
+      "2026-10-01", "2026-10-31", "all",
+      "Brand identity", "Fixed scope deliverable", "1", "One-time", "Logo, colours & fonts — 2 revision rounds",
+      "Social media creatives", "Per design", "10", "One-time", "Launch posts for Instagram",
       "", "", "", "", "",
     ],
     [
-      "Verma Constructions", "Site Supervision Phase 2", "Construction", "460000",
-      "2026-09-15", "2027-03-31", "all",
-      "Site supervision", "Monthly supervision", "6", "Per month", "",
+      "Greenleaf Cafe", "Monthly Reels editing", "Video & Photo", "36000",
+      "2026-10-01", "2026-12-31", "all",
+      "Video editing — Reels / Shorts", "Per asset", "12", "Per month", "Raw footage shared on Google Drive",
       "", "", "", "", "",
       "", "", "", "", "",
     ],
@@ -71,6 +71,8 @@ interface ParsedDeal {
   deliverableMode: "all" | "any_one";
   deliverables: { id: string; platform: string; contentType: string; quantity: number; frequency: string; notes?: string }[];
   errors: string[];
+  /** Non-blocking notes — the row still imports, but something was changed. */
+  warnings: string[];
 }
 
 /** Accepts YYYY-MM-DD, DD-MM-YYYY or DD/MM/YYYY → ISO, else null. */
@@ -88,12 +90,20 @@ function parseRows(records: Record<string, string>[]): ParsedDeal[] {
   return records.map((r, i) => {
     const get = (k: string) => unguardCell((r[k] ?? "").trim());
     const errors: string[] = [];
+    const warnings: string[] = [];
     const brandName = get("client_name");
     const dealTitle = get("deal_title");
     if (!brandName) errors.push("client_name is required");
     if (!dealTitle) errors.push("deal_title is required");
-    let dealType = get("deal_type") || "Custom";
-    if (!typeSet.has(dealType)) dealType = "Custom";
+    // A retired type (e.g. a CSV exported before the pivot) is coerced so the
+    // POST stays valid — but say so, or the row imports with its type silently
+    // changed. A warning, not an error: the row must still import.
+    const rawType = get("deal_type") || "Custom";
+    let dealType = rawType;
+    if (!typeSet.has(dealType)) {
+      dealType = "Custom";
+      warnings.push(`deal_type "${rawType}" is no longer available — imported as Custom`);
+    }
     const dealAmount = parseInt(get("amount").replace(/[^0-9]/g, ""), 10);
     if (!Number.isFinite(dealAmount) || dealAmount <= 0) errors.push("amount must be a positive number");
     const startDate = normalizeDate(get("start_date"));
@@ -122,7 +132,7 @@ function parseRows(records: Record<string, string>[]): ParsedDeal[] {
       brandName, dealTitle, dealType,
       dealAmount: Number.isFinite(dealAmount) ? dealAmount : 0,
       startDate: startDate ?? "", endDate: endDate ?? "",
-      deliverableMode, deliverables, errors,
+      deliverableMode, deliverables, errors, warnings,
     };
   });
 }
@@ -323,7 +333,7 @@ export default function DealsImportPage() {
                     </thead>
                     <tbody className="divide-y divide-border/50">
                       {parsed.map((d) => (
-                        <tr key={d.row} className={d.errors.length ? "bg-rose-500/[0.04]" : ""}>
+                        <tr key={d.row} className={d.errors.length ? "bg-rose-500/[0.04]" : d.warnings.length ? "bg-amber-500/[0.04]" : ""}>
                           <td className="px-3 py-2.5 text-muted-foreground tabular-nums">{d.row}</td>
                           <td className="px-3 py-2.5 font-medium whitespace-nowrap max-w-[160px] truncate">{d.brandName || "—"}</td>
                           <td className="px-3 py-2.5 whitespace-nowrap max-w-[200px] truncate">{d.dealTitle || "—"}</td>
@@ -337,9 +347,16 @@ export default function DealsImportPage() {
                                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {d.errors.join("; ")}
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                                <CheckCircle2 className="w-3.5 h-3.5" /> Ready
-                              </span>
+                              <div className="space-y-1">
+                                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> Ready
+                                </span>
+                                {d.warnings.length > 0 && (
+                                  <span className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400 max-w-[240px]">
+                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {d.warnings.join("; ")}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </td>
                         </tr>

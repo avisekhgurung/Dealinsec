@@ -3,7 +3,7 @@
  *
  * Server-rendered content + in-browser quotation builder (line items, optional
  * GST, standard T&Cs, amount in words, PDF via print). Funnels into signup:
- * turn a quotation into a signed deal + GST invoice inside DealInSec.
+ * turn a quotation into a signed deal + invoice inside DealInSec.
  */
 import { renderToolPage, SITE_ORIGIN } from "./layout";
 import { COMMON_JS, ITEMS_JS, MEDIA_JS, EXPORT_JS } from "./client-lib";
@@ -12,7 +12,7 @@ import { STANDARD_TERMS } from "@shared/schema";
 const PATH = "/tools/quotation-maker";
 const TITLE = "Online Quotation Maker — Make a Quotation Free (India) | DealInSec";
 const DESC =
-  "Make a quotation online free: line items, optional GST, standard terms, amount in words and an instant PDF — no sign-up. The online quotation maker for Indian freelancers & service businesses.";
+  "Make a quotation online free: line items, optional GST, standard terms, amount in words and an instant PDF — no sign-up. The online quotation maker for India's freelancers.";
 
 const FAQ: { q: string; a: string }[] = [
   {
@@ -37,7 +37,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Can I turn a quotation into a signed deal?",
-    a: "Yes. Create a free DealInSec account to send the quotation, convert it into an e-signable agreement, and raise the GST invoice — all tracked in one place.",
+    a: "Yes. In DealInSec the quotation becomes an agreement your client accepts online, and then the invoice — all on one thread for that client, with the figures carried across. The free plan covers 4 deals a month with their quotations; e-signed agreements, invoices and payment tracking are part of Pro (₹99/month), and every new account starts with a 7-day Pro trial, no card.",
   },
 ];
 

@@ -14,7 +14,7 @@ import { renderToolPage, SITE_ORIGIN, esc } from "./layout";
 export interface ProfessionSpec {
   slug: string;
   name: string; // "Photography"
-  who: string; // "a photographer / photography studio"
+  who: string; // "a freelance photographer"
   sacCode: string;
   sacDescription: string;
   gstRate: number;
@@ -272,128 +272,6 @@ export const PROFESSION_SPECS: ProfessionSpec[] = [
       }
     ],
     "metaDescription": "Content writer invoice format for India: correct SAC code (998399), 18% GST, sample line items with realistic rates, advance-payment rules and freelancer FAQs."
-  },
-  {
-    "slug": "digital-marketing-agencies",
-    "name": "Digital Marketing",
-    "who": "a digital marketing agency / freelancer",
-    "sacCode": "998361",
-    "sacDescription": "Advertising Services (full-service advertising and marketing: campaign planning, creative development, media strategy and digital campaign execution)",
-    "gstRate": 18,
-    "intro": "A digital marketing invoice in India should clearly separate your agency retainer/service fees from any ad spend (media budget) you pass through, because GST treatment differs for each. List SAC code 998361 (Advertising Services) with 18% GST on your service fees, add both your and the client's GSTIN, and show a HSN/SAC-wise tax summary. Since most agencies work on monthly retainers with an advance, mark clearly whether the invoice is an advance/proforma or a final tax invoice.",
-    "sampleItems": [
-      {
-        "desc": "Monthly SEO retainer (on-page, technical, link building & reporting)",
-        "unit": "per month",
-        "typicalRate": 25000
-      },
-      {
-        "desc": "Social media management (content calendar, 12-15 posts + engagement) — per platform",
-        "unit": "per month",
-        "typicalRate": 18000
-      },
-      {
-        "desc": "Google Ads / Meta Ads campaign management fee",
-        "unit": "per month",
-        "typicalRate": 20000
-      },
-      {
-        "desc": "Ad spend / media budget (pass-through, billed separately)",
-        "unit": "per month",
-        "typicalRate": 50000
-      },
-      {
-        "desc": "Website landing page design & development",
-        "unit": "per project",
-        "typicalRate": 35000
-      },
-      {
-        "desc": "Content writing / blog articles (SEO-optimised)",
-        "unit": "per article",
-        "typicalRate": 1500
-      }
-    ],
-    "paymentNorm": "Most agencies work on monthly retainers billed in advance, typically taking 50% advance to start a project and the balance on delivery, with retainers invoiced at the start of each month and Net 7-15 day terms.",
-    "faq": [
-      {
-        "q": "Should I show ad spend (Google/Meta budget) on the same invoice as my service fee?",
-        "a": "Best practice is to separate them. Your management/service fee is your taxable supply under SAC 998361 at 18% GST. If you merely pass through the client's ad budget, keep it as a distinct line (ideally a pure agent/reimbursement or a separate invoice); if you bill the ad spend as part of your own supply, 18% GST applies to the full value. Keep the platform's billing receipts as backup."
-      },
-      {
-        "q": "What SAC code and GST rate do I put on a digital marketing invoice?",
-        "a": "Use SAC 998361 (Advertising Services) for full-service agency work — strategy, creative, campaign setup, optimisation and reporting — at 18% GST. If you are only reselling internet ad inventory/space, that falls under SAC 998365 (still 18%). Most agencies bill under 998361."
-      },
-      {
-        "q": "How do I invoice foreign clients paying in USD — do I charge GST?",
-        "a": "If it qualifies as export of service (recipient outside India, payment in convertible foreign exchange, and place of supply outside India), you can invoice with 0% GST under an LUT (Letter of Undertaking) without paying IGST, or pay IGST and claim a refund. Mention 'Supply meant for export under LUT without payment of IGST' on the invoice and keep your FIRC/bank realisation proof."
-      },
-      {
-        "q": "Do I need to raise a proforma invoice for the advance retainer?",
-        "a": "For an advance, issue a proforma or advance-receipt voucher — it is not a tax invoice and does not let the client claim ITC. Once the service is delivered (or the month is billed), raise the final GST tax invoice so the client can claim input tax credit. Never label a proforma as 'Tax Invoice'."
-      }
-    ],
-    "metaDescription": "Digital marketing invoice format for Indian agencies & freelancers — correct SAC code 998361, 18% GST, sample line items, retainer & ad-spend billing, and export-invoice FAQs."
-  },
-  {
-    "slug": "interior-designers",
-    "name": "Interior Design",
-    "who": "an interior designer",
-    "sacCode": "998391",
-    "sacDescription": "Specialty design services including interior design, fashion design, industrial design and other specialty design services",
-    "gstRate": 18,
-    "intro": "An interior designer's invoice in India should clearly separate professional design fees from any furniture, materials, or execution charges, because they can attract different treatment under GST. Design and consultancy services fall under SAC 998391 and are taxed at 18% GST, and your invoice must carry your GSTIN, the SAC code, and a clear tax break-up so business clients can claim input tax credit. Since interior projects run over months, most designers bill in stages against an advance, so a good invoice also states the milestone and adjusts any retainer already received.",
-    "sampleItems": [
-      {
-        "desc": "Interior design consultancy & concept development",
-        "unit": "per project",
-        "typicalRate": 75000
-      },
-      {
-        "desc": "2D layout & working drawings",
-        "unit": "per sq ft",
-        "typicalRate": 45
-      },
-      {
-        "desc": "3D visualisation / photorealistic renders",
-        "unit": "per view",
-        "typicalRate": 3500
-      },
-      {
-        "desc": "Site visits & execution supervision",
-        "unit": "per visit",
-        "typicalRate": 4000
-      },
-      {
-        "desc": "Turnkey design & fit-out fee",
-        "unit": "per sq ft",
-        "typicalRate": 350
-      },
-      {
-        "desc": "Design retainer / consultation",
-        "unit": "per hour",
-        "typicalRate": 2500
-      }
-    ],
-    "paymentNorm": "Interior projects are typically billed in milestones — commonly a 30-50% advance to lock the booking, further stages on design sign-off and mid-execution, and the balance (often a 5-10% retention) released after final handover.",
-    "faq": [
-      {
-        "q": "What SAC code and GST rate should an interior designer use on invoices?",
-        "a": "Pure design, consultancy and drawing services fall under SAC 998391 (Specialty design services including interior design) and attract 18% GST. Mention the SAC code and the 18% break-up on every invoice so business clients can claim input tax credit."
-      },
-      {
-        "q": "I do turnkey projects with furniture and civil work — is it still 18%?",
-        "a": "When you supply materials and execute the fit-out, it is treated as a works contract, not pure design, and is billed under SAC 9954 (works contract services) at 18%. Many designers keep the design fee (998391) and the execution/works-contract portion as separate line items so the tax treatment is clean."
-      },
-      {
-        "q": "How do I show the advance I collected on the final invoice?",
-        "a": "If you were unregistered when you took the advance, no GST applied then; if registered, GST is due on advances for services. On the final milestone invoice, list the total fee, charge 18% GST, then deduct the advance already received (and its GST) so the client pays only the balance."
-      },
-      {
-        "q": "Do I charge GST if the client is an individual homeowner, not a business?",
-        "a": "Yes. Once your turnover crosses the 20 lakh threshold (10 lakh in special-category states) you must register and charge 18% GST to everyone, including individual homeowners. A homeowner cannot claim input tax credit, but you are still legally required to collect and deposit the tax."
-      }
-    ],
-    "metaDescription": "Interior design invoice format for India with the correct SAC code 998391, 18% GST break-up, sample line items with realistic rates, and milestone payment terms."
   },
   {
     "slug": "consultants",
@@ -762,67 +640,6 @@ export const PROFESSION_SPECS: ProfessionSpec[] = [
     "metaDescription": "Free tutoring & coaching invoice format for India with the correct SAC code 999293, 18% GST, sample fee line items, advance/monthly billing norms and tutor GST FAQs."
   },
   {
-    "slug": "architects",
-    "name": "Architecture",
-    "who": "an architect / architecture firm",
-    "sacCode": "998322",
-    "sacDescription": "Architectural services for residential building projects",
-    "gstRate": 18,
-    "intro": "Architectural services in India are professional services taxed at the standard 18% GST — there is no concessional rate or exemption, so your invoice must carry the correct SAC code and full CGST/SGST (or IGST) breakup. Building-design work sits under SAC group 99832: use 998321 for pure advisory/consultancy, 998322 for residential building projects, and 998323 for non-residential/commercial projects. Because clients often claim input tax credit, a clean invoice with your GSTIN, SAC, stage-wise fees and RERA/COA registration details protects both sides.",
-    "sampleItems": [
-      {
-        "desc": "Concept design & schematic drawings (per sq.ft of built-up area)",
-        "unit": "per sq.ft",
-        "typicalRate": 45
-      },
-      {
-        "desc": "Full architectural design & consultancy — % of project cost",
-        "unit": "% of construction cost",
-        "typicalRate": 8
-      },
-      {
-        "desc": "Working drawings & GFC (Good for Construction) set",
-        "unit": "per project",
-        "typicalRate": 85000
-      },
-      {
-        "desc": "Site supervision & periodic construction inspection visit",
-        "unit": "per visit",
-        "typicalRate": 6000
-      },
-      {
-        "desc": "3D visualization / photorealistic render",
-        "unit": "per view",
-        "typicalRate": 4500
-      },
-      {
-        "desc": "Municipal / RERA drawing sanction & liaison",
-        "unit": "per project",
-        "typicalRate": 40000
-      }
-    ],
-    "paymentNorm": "Architects typically bill in stages tied to project milestones — commonly 10% on concept, 25% on schematic/design development, 40% on working drawings/GFC, and the balance across construction and completion. A retainer or mobilisation advance of 10-15% at signing is standard, and fees are often structured as a percentage of construction cost (roughly 5-10% for residential) or a per-sq.ft rate. Net 15-30 day payment terms per stage invoice are usual.",
-    "faq": [
-      {
-        "q": "What GST rate and SAC code apply to an architect's invoice?",
-        "a": "Architectural services attract 18% GST — there is no lower rate or exemption. Use SAC 998321 for advisory/consultancy, 998322 for residential building design, and 998323 for non-residential/commercial projects (all at 18%). Split it as 9% CGST + 9% SGST for in-state clients, or 18% IGST for out-of-state."
-      },
-      {
-        "q": "Do I need GST registration to invoice as an architect?",
-        "a": "Registration is mandatory once your aggregate turnover crosses Rs 20 lakh (Rs 10 lakh in special-category states). Below that you can invoice without charging GST, but you also cannot collect it or claim input tax credit. Many architects register voluntarily because corporate and builder clients prefer a GST invoice they can claim ITC on."
-      },
-      {
-        "q": "Should GST be charged on reimbursements like sanction fees or printing?",
-        "a": "Genuine pure-agent reimbursements — municipal sanction fees, RERA charges, statutory payments made on the client's behalf at actual cost with supporting receipts — can be excluded from the taxable value and billed separately without GST. But your professional fee, printing, travel and any marked-up expenses are part of the service value and attract 18% GST."
-      },
-      {
-        "q": "How should percentage-of-cost fees be shown on the invoice?",
-        "a": "State the basis clearly — e.g. '8% of estimated construction cost of Rs 60,00,000 = Rs 4,80,000' — then apply 18% GST on that professional fee. For stage-wise billing, invoice only the milestone percentage due, reference the stage, and show cumulative fees billed to date so the client can reconcile against the total contract."
-      }
-    ],
-    "metaDescription": "Free architecture invoice format for Indian architects and firms. Correct SAC code (998321/998322), 18% GST breakup, stage-wise fees, sample line items and RERA-ready FAQs."
-  },
-  {
     "slug": "chartered-accountants",
     "name": "CA & Accounting",
     "who": "a chartered accountant / accounting firm",
@@ -1006,67 +823,6 @@ export const PROFESSION_SPECS: ProfessionSpec[] = [
     "metaDescription": "Free GST-ready translation invoice format for Indian freelance translators & interpreters. Correct SAC code 998395, 18% GST, export-of-service (zero-rated) rules, sample per-word rates and payment terms."
   },
   {
-    "slug": "real-estate-agents",
-    "name": "Real Estate",
-    "who": "a real estate agent / property broker",
-    "sacCode": "997222",
-    "sacDescription": "Building sales on a fee/commission or contract basis",
-    "gstRate": 18,
-    "intro": "Real estate agents and property brokers in India bill clients for brokerage on property sales, rentals, and related advisory work — not the property value itself, only your commission. Your service is taxed at 18% GST under SAC 9972 (997222 for building sales, 997223 for land, 997221 for property/rental management). GST registration is mandatory once your annual commission income crosses Rs 20 lakh (Rs 10 lakh in special-category states), and a proper tax invoice with your SAC code is what lets developer and corporate clients claim input credit.",
-    "sampleItems": [
-      {
-        "desc": "Brokerage on residential property sale (typically 1-2% of deal value)",
-        "unit": "% of sale value",
-        "typicalRate": 100000
-      },
-      {
-        "desc": "Rental brokerage / tenant sourcing (usually 1 month's rent)",
-        "unit": "per deal",
-        "typicalRate": 25000
-      },
-      {
-        "desc": "Commercial property sale brokerage",
-        "unit": "% of sale value",
-        "typicalRate": 200000
-      },
-      {
-        "desc": "Property management / rent collection service",
-        "unit": "per month",
-        "typicalRate": 5000
-      },
-      {
-        "desc": "Property advisory & site visit / consultation",
-        "unit": "per session",
-        "typicalRate": 2000
-      },
-      {
-        "desc": "Documentation & agreement drafting assistance",
-        "unit": "per deal",
-        "typicalRate": 5000
-      }
-    ],
-    "paymentNorm": "Brokerage is customarily due on successful closure — at agreement-to-sale or token/registration for sales, and on signing the lease for rentals. Standard residential brokerage is 1-2% of deal value from each side (buyer and seller) or one month's rent for rentals; commercial deals often carry higher slabs. Invoice immediately on closure with payment expected within 7-15 days.",
-    "faq": [
-      {
-        "q": "What GST rate and SAC code do I put on a real estate brokerage invoice?",
-        "a": "Charge 18% GST under SAC 9972. Use 997222 for brokerage on building/flat sales, 997223 for land sales, and 997221 for property/rental management. GST applies only to your commission, never to the property's sale value."
-      },
-      {
-        "q": "Do I need GST registration as a property broker?",
-        "a": "Yes, once your total commission income in a financial year exceeds Rs 20 lakh (Rs 10 lakh in special-category states). Below that you can invoice without GST, but many developers and corporate clients prefer a GST-registered broker so they can claim input tax credit on your brokerage."
-      },
-      {
-        "q": "Is GST charged on the property price or only my commission?",
-        "a": "Only on your commission/brokerage. The property's sale consideration is a separate transaction (with its own stamp duty and, for under-construction property, its own GST paid by the buyer to the developer). As the agent you raise a tax invoice solely for your service fee plus 18% GST."
-      },
-      {
-        "q": "Can I collect brokerage from both the buyer and the seller?",
-        "a": "Yes — dual brokerage is common in Indian real estate, but you must raise a separate GST invoice to each party for the amount they pay, each charged at 18% GST under SAC 9972. Disclose the arrangement to avoid disputes over your commission."
-      }
-    ],
-    "metaDescription": "Free real estate invoice format for Indian property agents and brokers. Correct GST rate (18%), SAC code 9972/997222, sample brokerage line items, and FAQs on commission invoicing."
-  },
-  {
     "slug": "makeup-artists",
     "name": "Makeup Artistry",
     "who": "a freelance makeup artist",
@@ -1134,7 +890,7 @@ export const PROFESSION_SPECS: ProfessionSpec[] = [
     "sacCode": "999723",
     "sacDescription": "Physical well-being services including health club and fitness centre",
     "gstRate": 18,
-    "intro": "As a personal trainer or fitness coach in India, your services fall under SAC 999723 (\"physical well-being services including health club and fitness centre\") and attract 18% GST. Unlike medical or healthcare services (which are GST-exempt), fitness coaching is fully taxable, so once your annual turnover crosses Rs. 20 lakh (Rs. 10 lakh in special-category states) you must register for GST and charge it on every invoice. A clean, GST-compliant invoice with your SAC code, session details, and clear payment terms keeps your training practice audit-ready.",
+    "intro": "As a personal trainer or fitness coach in India, your services fall under SAC 999723 (\"physical well-being services including health club and fitness centre\") and attract 18% GST. Unlike medical or healthcare services (which are GST-exempt), fitness coaching is fully taxable, so once your annual turnover crosses Rs. 20 lakh (Rs. 10 lakh in special-category states) you must register for GST and charge it on every invoice. A clean, GST-ready invoice with your SAC code, session details, and clear payment terms keeps your training practice audit-ready.",
     "sampleItems": [
       {
         "desc": "Personal training session (1-on-1, 60 min)",
@@ -1248,128 +1004,6 @@ export const PROFESSION_SPECS: ProfessionSpec[] = [
       }
     ],
     "metaDescription": "Free astrology invoice format for Indian astrologers and consultants. Correct GST (18%, SAC 999799), sample line items, payment norms, and FAQs on export of services."
-  },
-  {
-    "slug": "tour-operators",
-    "name": "Travel & Tours",
-    "who": "a travel agent / tour operator",
-    "sacCode": "998555",
-    "sacDescription": "Tour operator services",
-    "gstRate": 5,
-    "intro": "As a travel agent or tour operator in India, your invoices sit under SAC 998552 with a special GST treatment: most packaged tours are taxed at just 5% GST (without input tax credit) rather than the usual 18%. Your invoice must clearly show the gross package amount inclusive of accommodation and transport, and note that ITC is not being claimed. This format helps you bill domestic and international packages, ticketing commissions, and add-on services cleanly and GST-compliantly.",
-    "sampleItems": [
-      {
-        "desc": "Domestic tour package (per person, 3N/4D — hotel, transfers, sightseeing)",
-        "unit": "per person",
-        "typicalRate": 18000
-      },
-      {
-        "desc": "International tour package (per person, land + air, all-inclusive)",
-        "unit": "per person",
-        "typicalRate": 85000
-      },
-      {
-        "desc": "Air ticket booking / handling charge (service fee)",
-        "unit": "per ticket",
-        "typicalRate": 500
-      },
-      {
-        "desc": "Hotel booking arrangement fee",
-        "unit": "per booking",
-        "typicalRate": 750
-      },
-      {
-        "desc": "Private cab / airport transfer (per day)",
-        "unit": "per day",
-        "typicalRate": 3500
-      },
-      {
-        "desc": "Visa assistance & documentation fee",
-        "unit": "per applicant",
-        "typicalRate": 2000
-      }
-    ],
-    "paymentNorm": "Tour operators typically collect a 25-50% advance at booking to block hotels and flights, with the balance due 15-30 days before departure. Air-ticket and visa components are usually paid in full upfront since they are non-refundable.",
-    "faq": [
-      {
-        "q": "What GST rate should a tour operator charge — 5% or 18%?",
-        "a": "For a packaged tour (accommodation + transport bundled), the standard rate is 5% GST without input tax credit (ITC) under SAC 998552. You may instead opt for 18% with full ITC, but you must apply your chosen model consistently across all invoices, books and GST returns. Most operators use 5% without ITC as it keeps package prices competitive."
-      },
-      {
-        "q": "What must my invoice specifically state to qualify for the 5% rate?",
-        "a": "The invoice must show the gross amount charged and clearly indicate that it is inclusive of accommodation and transportation charges, and that no ITC has been claimed on hotels, air tickets or similar inputs. Without this declaration you cannot avail the concessional 5% rate."
-      },
-      {
-        "q": "How is a pure commission (agent) service taxed differently from a package?",
-        "a": "When you act only as an agent — earning commission on air tickets, rail, or hotel bookings rather than selling a bundled package — that commission is a separate support service taxed at 18% GST with ITC. So a single business can have 5% package invoices and 18% commission invoices; keep them distinct."
-      },
-      {
-        "q": "Can I claim input tax credit on my costs under the 5% scheme?",
-        "a": "No. Under the 5% without-ITC model you cannot claim credit on hotel stays, airfare or other inputs — the one exception is ITC on tour operator services bought from another tour operator. If claiming full ITC on your rent, software and other costs matters more to you, choose the 18% option instead."
-      }
-    ],
-    "metaDescription": "Free Travel & Tours invoice format for Indian tour operators. Correct SAC code 998552, the special 5% GST (no ITC) treatment, sample line items, payment norms and FAQs."
-  },
-  {
-    "slug": "caterers",
-    "name": "Catering",
-    "who": "a caterer / catering business",
-    "sacCode": "996334",
-    "sacDescription": "Catering services at events, marriage halls and outdoor/indoor functions",
-    "gstRate": 5,
-    "intro": "A catering invoice (or \"bill\") is the tax document you hand a client after a wedding, corporate event, or private function — it lists the menu packages, guest count (per-plate), service charges, and GST. For most caterers in India the correct classification is SAC 996334, and outdoor/event catering is taxed at 5% GST without input tax credit, not the 18% many assume. A clean, GST-ready invoice speeds up payment from banquet halls, event planners, and corporate clients who need it for their own books.",
-    "sampleItems": [
-      {
-        "desc": "Standard veg plate menu (per guest)",
-        "unit": "plate",
-        "typicalRate": 450
-      },
-      {
-        "desc": "Premium/deluxe menu with live counters (per guest)",
-        "unit": "plate",
-        "typicalRate": 850
-      },
-      {
-        "desc": "Non-veg buffet menu (per guest)",
-        "unit": "plate",
-        "typicalRate": 650
-      },
-      {
-        "desc": "Welcome drinks & starters counter",
-        "unit": "counter",
-        "typicalRate": 8000
-      },
-      {
-        "desc": "Service staff / waiters (bearers)",
-        "unit": "person/day",
-        "typicalRate": 900
-      },
-      {
-        "desc": "Crockery, cutlery & setup charges",
-        "unit": "event",
-        "typicalRate": 15000
-      }
-    ],
-    "paymentNorm": "Caterers typically collect a 30-50% advance to confirm the booking, with the balance due on or within a few days of the event. Final guest count (and per-plate billing) is locked 24-48 hours before the function. Corporate and banquet-tie-up clients often pay on 15-30 day credit terms.",
-    "faq": [
-      {
-        "q": "What GST rate should a caterer charge — 5% or 18%?",
-        "a": "For outdoor and event catering (weddings, parties, functions in marriage/banquet halls) the rate is 5% GST without input tax credit under SAC 996334. The 18% rate with ITC only applies when catering is supplied inside 'specified premises' — a hotel where any room tariff is Rs 7,500 or more per day. Most standalone caterers fall in the 5% bracket."
-      },
-      {
-        "q": "Which SAC code do I put on a catering invoice?",
-        "a": "Use SAC 996334 — 'catering services in exhibition halls, events, marriage halls and other outdoor/indoor functions'. If you run a contract/canteen food service (e.g. office canteens on a contract), SAC 996337 may apply instead."
-      },
-      {
-        "q": "Can I claim input tax credit on my catering purchases?",
-        "a": "No. Because outdoor catering is taxed at the concessional 5% rate, you cannot claim ITC on your inputs (raw material, rentals, staff, etc.). If your business genuinely operates from specified premises and charges 18%, ITC becomes available — but that is the exception, not the norm."
-      },
-      {
-        "q": "Do I need GST registration to run a catering business?",
-        "a": "GST registration is mandatory once your annual turnover crosses Rs 20 lakh (Rs 10 lakh in special-category states). Below that you can invoice without charging GST, but many corporate and banquet clients prefer a GST-registered caterer so they get a proper tax invoice."
-      }
-    ],
-    "metaDescription": "Free catering invoice format for Indian caterers with correct GST (SAC 996334, 5% without ITC), sample per-plate line items, payment terms and FAQs."
   },
   {
     "slug": "dj-services",
@@ -1492,67 +1126,6 @@ export const PROFESSION_SPECS: ProfessionSpec[] = [
       }
     ],
     "metaDescription": "Free voice-over artist invoice format for India with the correct GST SAC code (999631, 18%), sample line items with realistic rates, usage-rights billing, TDS guidance, and FAQs."
-  },
-  {
-    "slug": "construction-contractors",
-    "name": "Construction",
-    "who": "a construction contractor / works contractor",
-    "sacCode": "9954",
-    "sacDescription": "Construction services (works contract)",
-    "gstRate": 18,
-    "intro": "A construction contractor's invoice is really a works contract bill: GST treats the entire contract — material plus labour — as a single composite supply of construction services under SAC 9954 (995411 for residential buildings, 995414 for commercial, 995419 for renovation/repair work), taxed at a flat 18% with full input tax credit on your cement, steel, tiles and fittings. Because the place of supply for construction is where the site is located, charge CGST+SGST for a site in your own state and IGST when the site is in another state — regardless of where the client's office is registered. A proper construction invoice also carries the work order/agreement reference, RA bill number, gross value of work certified, deductions for mobilisation advance recovered and retention held, and the net amount payable, so your bill reconciles line-by-line with the client's or architect's certified measurements.",
-    "sampleItems": [
-      {
-        "desc": "Turnkey construction of residential building — material + labour, structure to finishes (built-up area)",
-        "unit": "per sq ft",
-        "typicalRate": 1850
-      },
-      {
-        "desc": "Brickwork in cement mortar 1:6, 230 mm thick walls, incl. bricks and scaffolding (BOQ item rate)",
-        "unit": "per cu m",
-        "typicalRate": 6500
-      },
-      {
-        "desc": "Internal cement plastering, 12 mm thick in CM 1:4, finished smooth",
-        "unit": "per sq ft",
-        "typicalRate": 42
-      },
-      {
-        "desc": "Vitrified tile flooring 600x600 mm, incl. tiles, adhesive and laying",
-        "unit": "per sq ft",
-        "typicalRate": 130
-      },
-      {
-        "desc": "Labour-only contract for civil structure work — all labour excl. materials",
-        "unit": "per sq ft",
-        "typicalRate": 300
-      },
-      {
-        "desc": "Bathroom renovation — demolition, waterproofing, tiling, plumbing and CP fittings installation",
-        "unit": "per bathroom",
-        "typicalRate": 85000
-      }
-    ],
-    "paymentNorm": "Construction billing runs on a mobilisation advance (typically 5-10% of contract value) followed by stage payments claimed through RA (running account) bills tied to milestones — plinth, slab castings, brickwork, finishes — with the client usually holding 5-10% retention from each bill, released only after the defect liability period (commonly 6-12 months after handover).",
-    "faq": [
-      {
-        "q": "How do I raise RA (running account) bills under GST?",
-        "a": "Construction is a 'continuous supply of services' under GST, so every RA bill must be a proper tax invoice, not just a measurement statement. Number them sequentially against the same work order (RA-01, RA-02...), show cumulative value of work done, less previous RA bills, less mobilisation advance recovered and retention held, to arrive at the net payable — and charge 18% GST on the value of work certified in that bill. Where the contract fixes payment due dates or milestones, the invoice must be issued on or before that due date or milestone completion; GST is also payable on any advance in the month you receive it, against a receipt voucher."
-      },
-      {
-        "q": "My client holds 5-10% retention money on every bill — do I pay GST on it now or when it is released?",
-        "a": "You pay GST now. Tax is due on the full certified value of each RA bill including the retention portion, because retention is only a delayed payment, not a reduction in taxable value. When the retention is released after the defect liability period, no fresh invoice or GST arises. If the client permanently deducts part of the retention for defects or liquidated damages, issue a GST credit note for that amount to reduce your tax liability. Show 'retention held' as a deduction below the taxable value on the invoice — never reduce the GST base by it."
-      },
-      {
-        "q": "Do I charge GST separately on materials (cement, steel) and labour?",
-        "a": "No. A works contract is a composite supply taxed as a service — one 18% rate on the entire bill value, whatever the material-to-labour split, and you claim input tax credit on cement, steel, tiles and fittings you purchase. The quirks: pure labour contracts for constructing a single residential unit (not part of a complex) and pure labour work under PMAY are fully exempt, while other pure labour contracts are 18%. Government works contracts enjoyed 12% only until 18 July 2022 — since 22 September 2025 the 12% slab has been scrapped altogether, so effectively all works contracts are 18% today. Also note the regular 1% composition scheme is not available for works contract services; contractors under Rs. 50 lakh turnover can opt for the 6% service-composition scheme, but then cannot charge GST on invoices or claim ITC."
-      },
-      {
-        "q": "How does TDS under Section 194C affect my contractor payments?",
-        "a": "Business clients — companies, firms, and individuals/HUFs covered by tax audit — must deduct TDS under Section 194C when a single bill exceeds Rs. 30,000 or annual payments exceed Rs. 1,00,000: 1% if you bill as an individual/HUF, 2% if as a firm or company. TDS is deducted on the taxable value excluding GST, provided GST is shown separately on the invoice (CBDT Circular 23/2017) — one more reason to always break out GST as a separate line. On government/PSU contracts above Rs. 2.5 lakh, a separate GST-TDS of 2% is also deducted, which flows to your GST cash ledger and can be used to pay your output tax."
-      }
-    ],
-    "metaDescription": "Construction invoice format for India: SAC 9954, 18% GST on works contracts, RA bills, retention money, TDS 194C, plus realistic turnkey, BOQ and labour-rate line items."
   }
 ];
 
@@ -1625,14 +1198,14 @@ function professionInvoicePage(s: ProfessionSpec): string {
     </div>
     <div style="text-align:center;margin-top:22px">
       <button class="btn" id="make-invoice" type="button">Create a ${esc(s.name)} invoice free →</button>
-      <p class="muted" style="font-size:12.5px;margin-top:8px">Opens the free GST invoice generator, pre-filled with these items.</p>
+      <p class="muted" style="font-size:12.5px;margin-top:8px">Opens the free GST invoice generator, pre-filled with these line items — swap in your own rates, add your GSTIN, and download the PDF.</p>
     </div>
   </div></section>
 
   <section id="how"><div class="wrap">
     <h2>How to make a ${esc(lower)} invoice</h2>
     <div class="steps">
-      <div class="step"><div class="n">1</div><b>Add your details</b><p class="muted">Your name / business, GSTIN if registered, and the client's details.</p></div>
+      <div class="step"><div class="n">1</div><b>Add your details</b><p class="muted">Your name (or the name you freelance under), your GSTIN if you're registered, and the client's details.</p></div>
       <div class="step"><div class="n">2</div><b>Add your work</b><p class="muted">List what you delivered — use the items above as a starting point — under SAC ${esc(s.sacCode)}.</p></div>
       <div class="step"><div class="n">3</div><b>Set GST &amp; download</b><p class="muted">Pick ${esc(String(s.gstRate))}% GST, choose CGST+SGST or IGST, and download the PDF.</p></div>
     </div>
@@ -1640,7 +1213,7 @@ function professionInvoicePage(s: ProfessionSpec): string {
 
   <section><div class="wrap">
     <div class="card">
-      <h2>What a GST-compliant ${esc(lower)} invoice must include</h2>
+      <h2>What a GST-ready ${esc(lower)} invoice must include</h2>
       <p class="muted">A GST tax invoice should carry: your name, address and GSTIN; a unique invoice number and date; the client's name, address and GSTIN (if registered); a description of the service with its SAC code (${esc(s.sacCode)} for ${esc(lower)}); the taxable value; the GST rate and amount split as CGST + SGST (same state) or IGST (inter-state); the total in words; and your signature. ${esc(s.paymentNorm)}</p>
     </div>
   </div></section>

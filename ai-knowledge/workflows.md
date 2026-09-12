@@ -4,9 +4,9 @@ Stages, in order. Each stage's action needs the matching role permission, and
 Pro features need an active Pro plan or trial.
 
 1. **Deal** — create from Deals → New Deal (or dashboard "New Deal"). Pick the
-   deal type (Real Estate, Interior Design, Architecture, Agency, Construction,
-   Custom), client name, title, amount, dates, deliverables. Free plan: 4 deals
-   per month for the whole organization; Pro/trial/Deal Boost: unlimited.
+   deal type (Design, Development, Writing, Marketing, Video & Photo,
+   Consulting, Custom), client name, title, amount, dates, deliverables. Free
+   plan: 4 deals per month for the whole organization; Pro/trial: unlimited.
    A deal starts as Pending. It can only be edited while Pending.
 2. **Quotation** — open the deal → Generate Quote. Included with the deal (no
    extra credit). Re-generating after edits creates a new version; the old one

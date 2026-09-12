@@ -47,8 +47,8 @@ const columns: ColumnDef<Deal>[] = [
   },
   {
     accessorKey: "brandName",
-    header: "Brand",
-    meta: { label: "Brand", filter: "text" },
+    header: "Client",
+    meta: { label: "Client", filter: "text" },
     cell: ({ row }) => <span className="font-semibold text-foreground">{row.original.brandName}</span>,
   },
   {
@@ -239,7 +239,7 @@ export default function DealsPage() {
             <CardContent className="py-12 text-center">
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted mx-auto mb-4"><Briefcase className="w-8 h-8 text-muted-foreground" /></div>
               <h3 className="font-semibold mb-1">No deals yet</h3>
-              <p className="text-sm text-muted-foreground mb-4">Create your first brand deal to get started</p>
+              <p className="text-sm text-muted-foreground mb-4">Create your first client deal to get started</p>
               {canCreateDeal && (
                 <Link href="/deals/new">
                   <Button className="gradient-btn text-white" data-testid="button-create-deal-empty"><Plus className="w-4 h-4 mr-2" />Create Deal</Button>

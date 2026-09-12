@@ -43,8 +43,8 @@ const columns: ColumnDef<Contract>[] = [
   },
   {
     accessorKey: "brandName",
-    header: "Brand",
-    meta: { label: "Brand", filter: "text" },
+    header: "Client",
+    meta: { label: "Client", filter: "text" },
     cell: ({ row }) => <span className="text-muted-foreground">{row.original.brandName}</span>,
   },
   {
