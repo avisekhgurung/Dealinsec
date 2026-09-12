@@ -379,6 +379,14 @@ export default function LandingPage() {
           onPrimaryClick={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
         />
         <TrustStrip />
+        {/* The two things no competitor does come FIRST — the generic
+            workflow sections below are supporting evidence, not the pitch. */}
+        <ProtectionSection />
+        {/* The chat sits open in the page — a visitor who never clicks a
+            floating bubble still finds something they can use right now. */}
+        <LandingCopilotSection
+          onCta={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
+        />
         <WhoWeServeSection />
         <FreeToolsSection />
         <FeatureGrid />
@@ -386,12 +394,6 @@ export default function LandingPage() {
         <ProductShowcase />
         <StatsSection />
         <WatchesSection />
-
-        {/* The chat sits open in the page — a visitor who never clicks a
-            floating bubble still finds something they can use right now. */}
-        <LandingCopilotSection
-          onCta={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
-        />
         {/* Testimonials hidden until we have real users. Re-enable <Testimonials /> once you have genuine quotes. */}
         <MadeInIndiaSection />
         <PricingPreview onCTA={() => (isAuthenticated ? setLocation("/pricing") : openAuth("signup"))} />
@@ -829,9 +831,9 @@ function Hero({
             </motion.h1>
 
             <motion.p variants={heroFadeUp} className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
-              One simple workflow — quotation, e-signed agreement, professional invoice, payment tracking —{" "}
-              <span className="font-semibold text-neutral-900 dark:text-white">so the scope is in writing, the invoice goes out on time, and you always know who still owes you.</span>{" "}
-              Built for India's freelancers — designers, developers, writers, video editors &amp; photographers, marketers and consultants.
+              Paste the client&apos;s chat and it drafts the deal.{" "}
+              <span className="font-semibold text-neutral-900 dark:text-white">Then it reads your terms like a sceptic — flagging &ldquo;unlimited revisions&rdquo;, a missing advance, &ldquo;as per requirement&rdquo; — before you sign.</span>{" "}
+              Quotation, agreement and invoice follow on one thread, and it chases the payment for you. Built for India&apos;s freelancers — designers, developers, writers, video editors &amp; photographers, marketers and consultants.
             </motion.p>
 
             <motion.div variants={heroFadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
@@ -1235,6 +1237,101 @@ function FreeToolsSection() {
             </a>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function ProtectionSection() {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-100px" });
+
+  // Every line below is something server/copilot/riskcheck.ts actually
+  // detects — the page must never promise a check the scanner doesn't run.
+  const FLAGS = [
+    { phrase: "\u201cAs per requirement\u201d", why: "Scope grows with no paper trail — every addition becomes an argument." },
+    { phrase: "\u201cUnlimited revisions\u201d", why: "The project ends when the client feels like it. Cap it, price the rest." },
+    { phrase: "\u201cWe\u2019ll pay when our client pays\u201d", why: "Your money is tied to someone else\u2019s — their delay becomes yours." },
+    { phrase: "\u201cTo be decided later\u201d", why: "Open-ended clauses decide themselves, in the client\u2019s favour." },
+    { phrase: "Retention with no release date", why: "It quietly becomes an interest-free loan to your client." },
+    { phrase: "Terms that contradict themselves", why: "Two payment promises in one document — the cheaper one wins the argument." },
+  ];
+  const MISSING = [
+    { gap: "No advance", term: "50% advance payment is required to confirm the project; work begins on receipt." },
+    { gap: "No balance timeline", term: "The remaining balance is due within 7 days of final delivery." },
+    { gap: "No revision limit", term: "Two rounds of revisions are included; further revisions are billed per round." },
+    { gap: "Nothing excluded", term: "Anything not listed in the deliverables is excluded and quoted separately." },
+    { gap: "No late-payment consequence", term: "If a payment is delayed beyond 7 days, work may be paused until the account is settled." },
+  ];
+
+  return (
+    <section id="protection" className="py-20 sm:py-28 relative border-t border-neutral-200 dark:border-neutral-800">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center max-w-3xl mx-auto mb-12">
+          <p className="text-xs uppercase tracking-widest font-semibold text-emerald-600 dark:text-emerald-400 mb-3">
+            Protection Check
+          </p>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-4 text-balance">
+            Every other tool writes your contract.
+            <br className="hidden sm:block" /> This one argues with it.
+          </h2>
+          <p className="text-base sm:text-lg text-neutral-600 dark:text-neutral-400 leading-relaxed">
+            Before you send the terms, DealInSec reads them the way a client&apos;s lawyer would —
+            and tells you which words are going to cost you money.
+          </p>
+        </div>
+
+        <div ref={ref} className="grid lg:grid-cols-2 gap-6 lg:gap-8">
+          {/* What it flags */}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="rounded-2xl border border-rose-200/70 dark:border-rose-900/40 bg-rose-50/40 dark:bg-rose-950/10 p-6 sm:p-7"
+          >
+            <p className="flex items-center gap-2 text-sm font-bold text-rose-700 dark:text-rose-400 mb-5">
+              <Shield className="w-4 h-4" /> It flags what will cost you
+            </p>
+            <ul className="space-y-4">
+              {FLAGS.map((f) => (
+                <li key={f.phrase}>
+                  <p className="text-sm font-semibold text-neutral-900 dark:text-white">{f.phrase}</p>
+                  <p className="text-[13px] text-neutral-600 dark:text-neutral-400 leading-relaxed mt-0.5">{f.why}</p>
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+
+          {/* What it adds back */}
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.6, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+            className="rounded-2xl border border-emerald-200/70 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-950/10 p-6 sm:p-7"
+          >
+            <p className="flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-5">
+              <ShieldCheck className="w-4 h-4" /> And writes what&apos;s missing
+            </p>
+            <ul className="space-y-4">
+              {MISSING.map((m) => (
+                <li key={m.gap}>
+                  <p className="text-sm font-semibold text-neutral-900 dark:text-white">{m.gap}</p>
+                  <p className="text-[13px] text-neutral-600 dark:text-neutral-400 leading-relaxed mt-0.5 italic">
+                    &ldquo;{m.term}&rdquo;
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-neutral-500 dark:text-neutral-500 mt-5 pt-4 border-t border-emerald-200/60 dark:border-emerald-900/40">
+              One tap adds a suggested term to your deal. You stay the author — nothing is added without you.
+            </p>
+          </motion.div>
+        </div>
+
+        <p className="text-center text-sm text-neutral-500 dark:text-neutral-500 mt-8 max-w-2xl mx-auto">
+          Not legal advice, and we&apos;re not a law firm — it&apos;s a second pair of eyes on the words
+          that decide whether you get paid.
+        </p>
       </div>
     </section>
   );
