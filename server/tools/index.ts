@@ -17,6 +17,7 @@ import { serviceAgreementPage, serviceAgreementMeta } from "./service-agreement"
 import { gstCalculatorPage, gstCalculatorMeta } from "./gst-calculator";
 import { proformaInvoicePage, proformaInvoiceMeta } from "./proforma-invoice";
 import { purchaseOrderPage, purchaseOrderMeta } from "./purchase-order";
+import { ukLatePaymentPage, ukLatePaymentMeta } from "./uk-late-payment";
 import { registerProgrammaticPages, programmaticSitemapPaths } from "./programmatic";
 
 // html-to-image UMD bundle (for PNG export), read once and served self-hosted
@@ -48,6 +49,7 @@ export const TOOLS: ToolDef[] = [
   { ...gstCalculatorMeta, render: gstCalculatorPage },
   { ...proformaInvoiceMeta, render: proformaInvoicePage },
   { ...purchaseOrderMeta, render: purchaseOrderPage },
+  { ...ukLatePaymentMeta, render: ukLatePaymentPage },
 ];
 
 /** Public paths for the sitemap (the /tools index + each tool). */
@@ -57,6 +59,7 @@ export function toolSitemapPaths(): string[] {
 
 // Distinct line icons per tool (lucide-style), rendered inside the card badge.
 const ICONS: Record<string, string> = {
+  "uk-late-payment-calculator": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M5 3 2.5 5.5M19 3l2.5 2.5"/></svg>`,
   "gst-invoice-generator": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg>`,
   "bill-generator": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h5"/></svg>`,
   "quotation-maker": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>`,
