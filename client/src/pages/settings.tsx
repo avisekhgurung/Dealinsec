@@ -1,5 +1,5 @@
 /**
- * Settings — Organization, Team Members, Invitations, Activity, Subscription.
+ * Settings — Business profile, Team, Invitations, Activity, Plan & billing.
  *
  * One page with a left tab rail (desktop) / top tab strip (mobile). What each
  * member can DO is role-gated with the shared permission map; the server is
@@ -323,14 +323,22 @@ export default function SettingsPage() {
   });
 
   const TABS: { key: Tab; label: string; icon: typeof Building2; show: boolean }[] = [
-    { key: "organization", label: "Organization", icon: Building2, show: true },
-    { key: "team", label: "Team Members", icon: Users, show: true },
-    { key: "activity", label: "Activity Logs", icon: ScrollText, show: canActivity },
-    { key: "subscription", label: "Subscription", icon: CreditCard, show: true },
+    { key: "organization", label: "Business profile", icon: Building2, show: true },
+    { key: "team", label: "Team", icon: Users, show: true },
+    { key: "activity", label: "Activity log", icon: ScrollText, show: canActivity },
+    { key: "subscription", label: "Plan & billing", icon: CreditCard, show: true },
     { key: "preferences", label: "Preferences", icon: SlidersHorizontal, show: true },
   ];
 
   const seatsFree = org ? Math.max(0, org.seatLimit - org.seatsUsed - org.pendingInvites) : 0;
+  // Most accounts are one freelancer. Seat counts, role matrices and "team"
+  // language are noise until a second person exists, so they stay out of the
+  // way until the first invite (or bought seats) — nothing is removed.
+  const isSolo = org ? org.seatsUsed <= 1 && org.pendingInvites === 0 && org.extraSeats === 0 : false;
+  const openInvite = () =>
+    seatsFree > 0
+      ? setInviteOpen(true)
+      : (setSeatMessage(`Your current plan allows ${org?.seatLimit ?? 1} team member${(org?.seatLimit ?? 1) === 1 ? "" : "s"}. Upgrade your plan or purchase additional seats.`), setSeatDialogOpen(true));
 
 
   /** Erasure. The server anonymises the row rather than dropping it, because
@@ -364,7 +372,7 @@ export default function SettingsPage() {
           <h1 className="text-xl lg:text-2xl font-semibold leading-tight">Settings</h1>
           {org && <p className="text-xs text-muted-foreground">{org.name}</p>}
         </div>
-        {org && (
+        {org && !isSolo && (
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-sm font-bold text-primary">
             <Users className="w-3.5 h-3.5" />
             {org.seatsUsed} / {org.seatLimit}
@@ -401,15 +409,19 @@ export default function SettingsPage() {
               <Card className="glass-card">
                 <CardContent className="p-5 lg:p-6 space-y-5">
                   <div>
-                    <h2 className="font-bold text-lg">Organization profile</h2>
-                    <p className="text-sm text-muted-foreground">The name your team and clients see.</p>
+                    <h2 className="font-bold text-lg">Business profile</h2>
+                    <p className="text-sm text-muted-foreground">
+                      How your business is named inside DealInSec{isSolo ? "" : " and to your team"}. Freelancing under your
+                      own name? Use it here. Your contact, tax and bank details for documents live in your{" "}
+                      <Link href="/profile" className="text-primary font-medium hover:underline">profile</Link>.
+                    </p>
                   </div>
                   {orgLoading ? (
                     <Skeleton className="h-24 w-full rounded-xl" />
                   ) : (
                     <div className="space-y-4 max-w-md">
                       <div className="space-y-1.5">
-                        <Label htmlFor="org-name">Organization name</Label>
+                        <Label htmlFor="org-name">Business or trading name</Label>
                         <Input
                           id="org-name"
                           value={orgName ?? org?.name ?? ""}
@@ -419,7 +431,7 @@ export default function SettingsPage() {
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <Label htmlFor="org-industry">Industry</Label>
+                        <Label htmlFor="org-industry">What you do</Label>
                         <Input
                           id="org-industry"
                           placeholder="e.g. Design, Development, Video editing"
@@ -440,7 +452,7 @@ export default function SettingsPage() {
                         </Button>
                       )}
                       {!canEditOrg && (
-                        <p className="text-xs text-muted-foreground">Only the Owner or an Admin can edit the organization.</p>
+                        <p className="text-xs text-muted-foreground">Only the Owner or an Admin can edit the business profile.</p>
                       )}
                     </div>
                   )}
@@ -508,7 +520,40 @@ export default function SettingsPage() {
             )}
 
             {/* ── Team ── */}
-            {tab === "team" && (
+            {tab === "team" && isSolo && (
+              <Card className="glass-card" data-testid="team-solo">
+                <CardContent className="p-5 lg:p-6 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-lg">Working solo</h2>
+                      <p className="text-sm text-muted-foreground max-w-xl">
+                        You don't need a team to use DealInSec. When you bring someone in — an assistant, a
+                        subcontractor or your accountant — they get their own login and a role that decides what
+                        they can do. Billing and your plan stay with you as the Owner.
+                      </p>
+                    </div>
+                  </div>
+                  <ul className="text-sm text-muted-foreground space-y-1.5 max-w-xl list-disc pl-5">
+                    <li>Give your accountant the <strong className="text-foreground">Accounts</strong> role: they raise invoices and track payments, but can't create or edit deals.</li>
+                    <li>Give an assistant the <strong className="text-foreground">Sales</strong> role: they create deals and quotations, but can't touch invoices.</li>
+                    <li>Pro — and your free trial — includes up to 5 people, you included.</li>
+                  </ul>
+                  {canInvite ? (
+                    <Button className="gradient-btn text-white" onClick={openInvite} data-testid="button-invite-member">
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Invite someone
+                    </Button>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Only the Owner or an Admin can invite people.</p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {tab === "team" && !isSolo && (
               <>
                 <Card className="glass-card">
                   <CardContent className="p-5 lg:p-6">
@@ -522,7 +567,7 @@ export default function SettingsPage() {
                       {canInvite && (
                         <Button
                           className="gradient-btn text-white flex-shrink-0"
-                          onClick={() => (seatsFree > 0 ? setInviteOpen(true) : (setSeatMessage(`Your current plan allows ${org?.seatLimit ?? 1} team member${(org?.seatLimit ?? 1) === 1 ? "" : "s"}. Upgrade your plan or purchase additional seats.`), setSeatDialogOpen(true)))}
+                          onClick={openInvite}
                           data-testid="button-invite-member"
                         >
                           <UserPlus className="w-4 h-4 mr-2" />
@@ -872,8 +917,8 @@ export default function SettingsPage() {
             {tab === "subscription" && org && (
               <Card className="glass-card">
                 <CardContent className="p-5 lg:p-6 space-y-4">
-                  <h2 className="font-bold text-lg">Subscription & seats</h2>
-                  <div className="grid grid-cols-2 gap-3 max-w-md">
+                  <h2 className="font-bold text-lg">{isSolo ? "Plan & billing" : "Subscription & seats"}</h2>
+                  <div className={`grid gap-3 max-w-md ${isSolo ? "grid-cols-1" : "grid-cols-2"}`}>
                     <div className="rounded-xl border border-border/60 p-3.5">
                       <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">Plan</p>
                       <p className="text-xl font-bold mt-0.5 flex items-center gap-1.5">
@@ -889,22 +934,31 @@ export default function SettingsPage() {
                         <p className="text-[11px] text-muted-foreground">until {fmtDate(org.ownerTrialEndsAt, locale)}</p>
                       ) : null}
                     </div>
-                    <div className="rounded-xl border border-border/60 p-3.5">
-                      <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">Seats</p>
-                      <p className="text-xl font-bold mt-0.5">{org.seatsUsed} / {org.seatLimit}</p>
-                      {org.extraSeats > 0 && (
-                        <p className="text-[11px] text-muted-foreground">
-                          incl. {org.extraSeats} extra · until {fmtDate(org.extraSeatsExpiresAt, locale)}
-                        </p>
-                      )}
-                    </div>
+                    {!isSolo && (
+                      <div className="rounded-xl border border-border/60 p-3.5">
+                        <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">Seats</p>
+                        <p className="text-xl font-bold mt-0.5">{org.seatsUsed} / {org.seatLimit}</p>
+                        {org.extraSeats > 0 && (
+                          <p className="text-[11px] text-muted-foreground">
+                            incl. {org.extraSeats} extra · until {fmtDate(org.extraSeatsExpiresAt, locale)}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <p className="text-sm text-muted-foreground max-w-md">
-                    Free plan includes 1 user. Pro — and your free trial — includes 5 team members.
-                    {checkoutAvailable
-                      ? <>Need more? Extra seats are {formatRupees(extraSeatPrice)}/seat per month.</>
-                      : <>Need more? Extra seats — international checkout coming soon.</>}
-                  </p>
+                  {isSolo ? (
+                    <p className="text-sm text-muted-foreground max-w-md">
+                      The free plan covers 4 deals a month with their quotations. Pro adds signed agreements,
+                      invoices and payment tracking — and room for up to 5 people if you ever need help.
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground max-w-md">
+                      Free plan includes 1 user. Pro — and your free trial — includes 5 team members.{" "}
+                      {checkoutAvailable
+                        ? <>Need more? Extra seats are {formatRupees(extraSeatPrice)}/seat per month.</>
+                        : <>Need more? Extra seats — international checkout coming soon.</>}
+                    </p>
+                  )}
                   {canBilling ? (
                     <div className="flex flex-wrap gap-2">
                       <Link href="/pricing">
@@ -912,14 +966,16 @@ export default function SettingsPage() {
                           <Sparkles className="w-4 h-4 mr-2" /> Manage plan
                         </Button>
                       </Link>
-                      <Link href="/pricing#seats">
-                        <Button variant="outline" data-testid="button-buy-seats">
-                          <Rocket className="w-4 h-4 mr-2" /> Buy extra seats
-                        </Button>
-                      </Link>
+                      {!isSolo && (
+                        <Link href="/pricing#seats">
+                          <Button variant="outline" data-testid="button-buy-seats">
+                            <Rocket className="w-4 h-4 mr-2" /> Buy extra seats
+                          </Button>
+                        </Link>
+                      )}
                     </div>
                   ) : (
-                    <p className="text-xs text-muted-foreground">Only the Owner can manage billing and seats.</p>
+                    <p className="text-xs text-muted-foreground">Only the Owner can manage billing{isSolo ? "" : " and seats"}.</p>
                   )}
                 </CardContent>
               </Card>
