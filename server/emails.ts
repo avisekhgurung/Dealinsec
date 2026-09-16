@@ -12,6 +12,8 @@
  *   APP_URL           (used for links/buttons; default https://www.dealinsec.com)
  */
 import { Resend } from "resend";
+import { getLocaleSettings, toMinor, type LocaleFields } from "@shared/schema";
+import { formatMoney } from "@shared/money";
 
 let _resend: Resend | null = null;
 
@@ -68,8 +70,18 @@ const COLORS = {
   white: "#FFFFFF",
 };
 
-function inr(n: number): string {
-  return "₹" + Number(n).toLocaleString("en-IN");
+/**
+ * Money in an email is written exactly as it is written in the app and on the
+ * PDF — same formatter, same rules. The receipt a user forwards to their
+ * accountant must match the invoice it is a receipt for.
+ *
+ * `locale` is optional and omitting it means India, which is what every row
+ * held before the expansion: a caller that hasn't been taught to pass the
+ * organisation's settings yet keeps sending exactly the email it sends today.
+ */
+function money(minor: number, locale?: LocaleFields | null): string {
+  const s = getLocaleSettings(locale);
+  return formatMoney(minor, s.currency, s.locale);
 }
 
 function layout(opts: { preview: string; bodyHtml: string }): string {
@@ -223,22 +235,31 @@ export function passwordResetEmail(args: {
   return { subject, html };
 }
 
+// ── DealInSec's OWN billing (not the user's money) ─────────────────────
+// These two receipts are for what the user paid US, on the India-only
+// Razorpay rail. `payu_orders.amount` is whole rupees and was deliberately
+// left out of the minor-units migration (server/routes.ts multiplies it by
+// 100 when it hands the order to Razorpay — that IS the conversion), so the
+// unit is in the parameter name and the conversion happens here, once.
+
 export function paymentReceiptEmail(args: {
   firstName?: string;
   product: string;
-  amount: number;
+  /** Whole rupees, straight off payu_orders.amount. */
+  amountRupees: number;
   paymentId: string;
   date: string;
 }): { subject: string; html: string } {
+  const paid = money(toMinor(args.amountRupees, "INR"));
   const subject = `Payment received — ${args.product}`;
   const html = layout({
-    preview: `Your payment of ${inr(args.amount)} was successful.`,
+    preview: `Your payment of ${paid} was successful.`,
     bodyHtml: `
       ${heading("Payment successful ✅")}
       ${para(`Hi${args.firstName ? " " + args.firstName : ""}, your purchase is confirmed and ready to use.`)}
       ${infoCard(
         infoRow("Purchase", args.product) +
-        infoRow("Amount paid", inr(args.amount)) +
+        infoRow("Amount paid", paid) +
         infoRow("Payment ID", args.paymentId) +
         infoRow("Date", args.date),
       )}
@@ -251,24 +272,26 @@ export function paymentReceiptEmail(args: {
 
 export function proPlanReceiptEmail(args: {
   firstName?: string;
-  amount: number;
+  /** Whole rupees, straight off payu_orders.amount. */
+  amountRupees: number;
   paymentId: string;
   date: string;
   term: "monthly" | "yearly";
   expiresOn: string;
 }): { subject: string; html: string } {
+  const paid = money(toMinor(args.amountRupees, "INR"));
   const termLabel = args.term === "monthly" ? "Monthly" : "1 year";
   const covered = args.term === "monthly" ? "this month" : "the next year";
   const subject = "Welcome to DealInSec Pro — the full workflow is unlocked";
   const html = layout({
-    preview: `Your payment of ${inr(args.amount)} was successful. DealInSec Pro is now active.`,
+    preview: `Your payment of ${paid} was successful. DealInSec Pro is now active.`,
     bodyHtml: `
       ${heading("You're on Pro 🎉")}
       ${para(`Hi${args.firstName ? " " + args.firstName : ""}, your DealInSec Pro plan is active. Unlimited deals, quotations, agreements and invoices for ${covered} — plus payment tracking.`)}
       ${infoCard(
         infoRow("Plan", `DealInSec Pro — ${termLabel}`) +
         infoRow("Workflow", "Unlimited") +
-        infoRow("Amount paid", inr(args.amount)) +
+        infoRow("Amount paid", paid) +
         (args.expiresOn ? infoRow("Valid until", args.expiresOn) : "") +
         infoRow("Payment ID", args.paymentId) +
         infoRow("Date", args.date),
@@ -280,11 +303,17 @@ export function proPlanReceiptEmail(args: {
   return { subject, html };
 }
 
+// ── The USER's money ───────────────────────────────────────────────────
+// Minor units, formatted in the ORGANISATION's currency — the same locale
+// the agreement and the invoice were printed in. Pass
+// resolveLocaleSettings(org, user); omitting it means India.
+
 export function contractSignedEmail(args: {
   firstName?: string;
   brandName: string;
-  contractValue: number;
+  contractValueMinor: number;
   contractId: number;
+  locale?: LocaleFields | null;
 }): { subject: string; html: string } {
   const subject = `Agreement created — ${args.brandName}`;
   const html = layout({
@@ -294,7 +323,7 @@ export function contractSignedEmail(args: {
       ${para(`Your contract with <strong>${args.brandName}</strong> has been generated and signed.`)}
       ${infoCard(
         infoRow("Client / Brand", args.brandName) +
-        infoRow("Contract value", inr(args.contractValue)),
+        infoRow("Contract value", money(args.contractValueMinor, args.locale)),
       )}
       ${button("View agreement", `${appUrl()}/contracts/${args.contractId}`)}
       ${para("You can download the signed PDF and upload a counter-signed proof anytime.")}
@@ -306,10 +335,12 @@ export function contractSignedEmail(args: {
 export function paymentReceivedEmail(args: {
   firstName?: string;
   brandName: string;
-  amount: number;
+  amountMinor: number;
   invoiceNumber: string;
+  locale?: LocaleFields | null;
 }): { subject: string; html: string } {
-  const subject = `You've been paid — ${inr(args.amount)} from ${args.brandName} 💰`;
+  const received = money(args.amountMinor, args.locale);
+  const subject = `You've been paid — ${received} from ${args.brandName} 💰`;
   const html = layout({
     preview: `${args.brandName} paid invoice ${args.invoiceNumber}.`,
     bodyHtml: `
@@ -318,7 +349,7 @@ export function paymentReceivedEmail(args: {
       ${infoCard(
         infoRow("From", args.brandName) +
         infoRow("Invoice", args.invoiceNumber) +
-        infoRow("Amount", inr(args.amount)),
+        infoRow("Amount", received),
       )}
       ${button("View billing", `${appUrl()}/invoices`)}
     `,

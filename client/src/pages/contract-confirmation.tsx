@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useMoney } from "@/hooks/use-locale";
 import { ArrowLeft, Shield, AlertTriangle, PenLine, Loader2, CreditCard, CheckCircle, Upload, FileText, Plus, Trash2, Crown } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { CreditAnimationOverlay } from "@/components/credit-animation-overlay";
@@ -16,19 +17,38 @@ import { trackEvent } from "@/lib/analytics";
 import { STANDARD_TERMS, hasActivePro, hasProAccess, hasActiveTrial } from "@shared/schema";
 import type { Deal, Contract } from "@shared/schema";
 import { useUpgradeModal } from "@/components/upgrade-modal";
-import { parseApiError, isUpgradeError } from "@/lib/api-error";
+import { parseApiError, isUpgradeError, currencyChangedToast } from "@/lib/api-error";
 
 type Phase = "reserving" | "creating" | "done";
+
+/** EU member states (ISO-3166 alpha-2), for the "VAT number" label. */
+const EU_COUNTRIES = "AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE".split(" ");
+
+/**
+ * What the tax registration is called outside India. The agreement prints the
+ * number under this same label, so the table is kept in step with
+ * contract-pdf.tsx (and profile.tsx, which edits the same field).
+ */
+const TAX_ID_LABELS: Readonly<Record<string, string>> = {
+  GB: "VAT number",
+  ...Object.fromEntries(EU_COUNTRIES.map((c) => [c, "VAT number"])),
+  US: "EIN / Tax ID",
+  AU: "ABN",
+  CA: "GST/HST number",
+};
+const taxIdLabel = (country: string): string => TAX_ID_LABELS[country] ?? "Tax registration number";
 
 export default function ContractConfirmationPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const fmt = useMoney();
   const { openUpgradeModal } = useUpgradeModal();
   const [agreed, setAgreed] = useState(false);
   const [billingAddress, setBillingAddress] = useState("");
   const [panNumber, setPanNumber] = useState("");
+  const [taxId, setTaxId] = useState("");
   const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
   const signatureInputRef = useRef<HTMLInputElement>(null);
@@ -53,7 +73,18 @@ export default function ContractConfirmationPage() {
   const isPaidPro = hasActivePro(user);
   const onTrial = hasActiveTrial(user);
   const needsBillingAddress = !user?.billingAddress;
-  const needsPan = !user?.panNumber;
+  // The org's country, which is the one the agreement is issued under (see
+  // issuedCountry in contract-pdf.tsx). A PAN is an Indian tax ID: requiring
+  // one elsewhere made a UK freelancer type a fake Indian number that then
+  // printed on their agreement. India keeps the required PAN exactly as before.
+  const country = fmt.settings.country;
+  const isIndia = country === "IN";
+  const needsPan = isIndia && !user?.panNumber;
+  // Outside India the registration is OPTIONAL — most freelancers have none —
+  // so it is offered only inside the card that is already asking for something
+  // required, never as a card of its own on every new agreement. It is stored
+  // in `gstNumber`, the slot the invoice already prints a VAT number from.
+  const offerTaxId = !isIndia && !user?.gstNumber;
   const needsSignature = !user?.digitalSignature;
 
   const { data: deal, isLoading } = useQuery<Deal>({
@@ -80,7 +111,7 @@ export default function ContractConfirmationPage() {
   }, [deal, termsInitialized]);
 
   const updateProfile = useMutation({
-    mutationFn: async (profileData: { billingAddress?: string; panNumber?: string; digitalSignature?: string }) => {
+    mutationFn: async (profileData: { billingAddress?: string; panNumber?: string; gstNumber?: string; digitalSignature?: string }) => {
       const res = await apiRequest("PATCH", "/api/profile", profileData);
       return res.json();
     },
@@ -126,9 +157,12 @@ export default function ContractConfirmationPage() {
       }
 
       // Save missing profile fields
-      const profileUpdates: { billingAddress?: string; panNumber?: string; digitalSignature?: string } = {};
+      const profileUpdates: { billingAddress?: string; panNumber?: string; gstNumber?: string; digitalSignature?: string } = {};
       if (needsBillingAddress && billingAddress.trim()) profileUpdates.billingAddress = billingAddress.trim();
       if (needsPan && panNumber.trim()) profileUpdates.panNumber = panNumber.trim();
+      // Only while the profile has no number of its own: this screen fills a
+      // gap, it never replaces a registration saved from the profile.
+      if (offerTaxId && taxId.trim()) profileUpdates.gstNumber = taxId.trim();
       if (digitalSignaturePath) profileUpdates.digitalSignature = digitalSignaturePath;
       if (Object.keys(profileUpdates).length > 0) await updateProfile.mutateAsync(profileUpdates);
 
@@ -157,7 +191,8 @@ export default function ContractConfirmationPage() {
         dealId: deal.id,
         startDate: deal.startDate,
         endDate: deal.endDate,
-        contractValue: deal.dealAmount,
+        contractValueMinor: deal.dealAmountMinor,
+        currency: fmt.currency,
         status: "Signed" as const,
         exclusive: true,
       };
@@ -168,7 +203,10 @@ export default function ContractConfirmationPage() {
     onSuccess: (contract) => {
       // Key conversion event: an agreement was signed (a core Pro action).
       trackEvent("sign_agreement", {
-        contract_value: contract?.contractValue,
+        // Major units plus the currency, the way analytics tools expect a
+        // monetary value — reporting paise as `value` would show 100x revenue.
+        contract_value: fmt.major(contract?.contractValueMinor ?? 0),
+        currency: fmt.currency,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
@@ -185,6 +223,10 @@ export default function ContractConfirmationPage() {
       if (isUpgradeError(parsed)) {
         openUpgradeModal({ feature: "agreements" });
         queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      } else if (currencyChangedToast(error)) {
+        // A CURRENCY_CHANGED refusal is also a 409. Reporting it as a duplicate
+        // agreement told the user one existed when none had been created.
+        toast({ ...currencyChangedToast(error)!, variant: "destructive" });
       } else if (error?.message?.includes("409")) {
         // Deal already has an agreement (e.g. created in another tab). No credit
         // was charged — send the user to the existing agreement.
@@ -394,7 +436,7 @@ export default function ContractConfirmationPage() {
                 </div>
                 <div className="flex-shrink-0 text-right">
                   <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">cost</div>
-                  <div className="text-lg font-black text-emerald-700 dark:text-emerald-300">₹0</div>
+                  <div className="text-lg font-black text-emerald-700 dark:text-emerald-300">{fmt.money(0)}</div>
                 </div>
               </div>
             </div>
@@ -405,7 +447,7 @@ export default function ContractConfirmationPage() {
             const has = (id: string) => standardTermIds.includes(id);
             const addTerm = (id: string) => setStandardTermIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
             const checks: { label: string; ok: boolean; fixId?: string }[] = [
-              { label: "Pricing defined", ok: Number(deal.dealAmount) > 0 },
+              { label: "Pricing defined", ok: Number(deal.dealAmountMinor) > 0 },
               { label: "Deliverables defined", ok: deal.deliverables.length > 0 },
               { label: "Timeline defined", ok: !!deal.startDate && !!deal.endDate },
               { label: "Advance payment term", ok: has("advance_50"), fixId: "advance_50" },
@@ -497,6 +539,18 @@ export default function ContractConfirmationPage() {
             </CardContent>
           </Card>
 
+          {/* Honesty, outside India only: the Indian clauses are the ones this
+              product was built around; everywhere else the agreement carries a
+              neutral governing-law clause nobody has checked against that
+              country's law. Said here, before creating — not on the PDF, which
+              the client reads. */}
+          {!isIndia && (
+            <p className="text-xs text-muted-foreground leading-relaxed px-1" data-testid="text-agreement-template-note">
+              This agreement uses general template wording that hasn't been reviewed against your country's
+              law. For an important contract, have it checked by a local lawyer before you rely on it.
+            </p>
+          )}
+
           <Card className="glass-card border-0">
             <CardContent className="p-5 space-y-3">
               <h3 className="font-semibold text-sm">Agreement Details</h3>
@@ -504,10 +558,10 @@ export default function ContractConfirmationPage() {
                 {[
                   { label: "Client", value: deal.brandName },
                   { label: "Deal", value: deal.dealTitle },
-                  { label: "Value", value: `₹${Number(deal.dealAmount).toLocaleString("en-IN")}`, bold: true },
+                  { label: "Value", value: fmt.money(deal.dealAmountMinor), bold: true },
                   {
                     label: "Period",
-                    value: `${new Date(deal.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} – ${new Date(deal.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`,
+                    value: `${new Date(deal.startDate).toLocaleDateString(fmt.locale, { day: "numeric", month: "short" })} – ${new Date(deal.endDate).toLocaleDateString(fmt.locale, { day: "numeric", month: "short", year: "numeric" })}`,
                   },
                   { label: "Deliverables", value: `${deal.deliverables.length} items` },
                 ].map(({ label, value, bold }) => (
@@ -556,6 +610,26 @@ export default function ContractConfirmationPage() {
                       className="glass-card border-white/10 uppercase"
                       data-testid="input-pan-number"
                     />
+                  </div>
+                )}
+
+                {offerTaxId && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="taxId" className="text-sm font-medium">
+                      {taxIdLabel(country)} <span className="font-normal text-muted-foreground">(optional)</span>
+                    </Label>
+                    {/* No placeholder, pattern or length limit: formats differ
+                        by country and we validate none of them. */}
+                    <Input
+                      id="taxId"
+                      value={taxId}
+                      onChange={(e) => setTaxId(e.target.value)}
+                      className="glass-card border-white/10"
+                      data-testid="input-tax-id"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Printed on the agreement if you add one. Leave it blank if you aren't registered.
+                    </p>
                   </div>
                 )}
 
@@ -670,7 +744,10 @@ export default function ContractConfirmationPage() {
                           onChange={(e) =>
                             setCustomTermsList((cur) => cur.map((t, j) => (j === i ? e.target.value : t)))
                           }
-                          placeholder={i === 0 ? "e.g. Content must be posted by 5pm IST" : "Add another clause"}
+                          placeholder={i === 0
+                            // IST is India's clock; elsewhere the example names none.
+                            ? isIndia ? "e.g. Content must be posted by 5pm IST" : "e.g. Final files delivered by 5pm on the due date"
+                            : "Add another clause"}
                           className="h-9"
                           data-testid={`input-agreement-custom-term-${i}`}
                         />

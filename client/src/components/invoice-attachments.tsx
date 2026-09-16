@@ -9,6 +9,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useLocale, useMoney } from "@/hooks/use-locale";
+import { formatDate } from "@/lib/money";
 import { useConfirm } from "@/components/confirm-dialog";
 import { queryClient } from "@/lib/queryClient";
 import { useUpgradeModal } from "@/components/upgrade-modal";
@@ -35,15 +37,6 @@ function formatSize(bytes?: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function formatDate(dateStr?: string | null) {
-  if (!dateStr) return "";
-  return new Date(dateStr).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
 // Colour accent per document category so the list scans quickly.
 const categoryStyle: Record<string, string> = {
   "GST Invoice": "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
@@ -55,12 +48,33 @@ const categoryStyle: Record<string, string> = {
   Other: "bg-gray-100 text-gray-600 dark:bg-gray-800/40 dark:text-gray-300",
 };
 
+/** Indian tax paperwork. Offered, and named in the copy, only where the
+ *  invoice's organisation is in India — a UK freelancer has no GST invoice or
+ *  TDS certificate to attach. An attachment already filed under one of these
+ *  keeps its stored label wherever it is shown. */
+const INDIA_ONLY_CATEGORIES: ReadonlySet<InvoiceDocumentCategory> = new Set<InvoiceDocumentCategory>([
+  "GST Invoice",
+  "TDS Certificate",
+  "Form 16A",
+]);
+
 export function InvoiceAttachments({ invoiceId }: { invoiceId: number | string }) {
+  const { locale, timezone } = useLocale();
+  // The ORG's country, the one the invoice is issued under — the same rule the
+  // e-stamp card on the agreement follows. Indian accounts see the list, the
+  // default and the copy exactly as before.
+  const isIndia = useMoney().settings.country === "IN";
+  const categories: readonly InvoiceDocumentCategory[] = isIndia
+    ? invoiceDocumentCategories
+    : invoiceDocumentCategories.filter((c) => !INDIA_ONLY_CATEGORIES.has(c));
   const { toast } = useToast();
   const confirm = useConfirm();
   const { openUpgradeModal } = useUpgradeModal();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [category, setCategory] = useState<InvoiceDocumentCategory>("GST Invoice");
+  // Derived rather than stored, so a default picked before the org's country
+  // loaded can never submit a category this country is not offered.
+  const [picked, setCategory] = useState<InvoiceDocumentCategory | null>(null);
+  const category: InvoiceDocumentCategory = picked && categories.includes(picked) ? picked : categories[0];
 
   const listKey = ["/api/brand-invoices", invoiceId, "attachments"];
 
@@ -144,7 +158,9 @@ export function InvoiceAttachments({ invoiceId }: { invoiceId: number | string }
         <div>
           <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">Tax Documents</h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            Keep the GST invoice, TDS certificate &amp; receipts together for easy tax filing.
+            {isIndia
+              ? <>Keep the GST invoice, TDS certificate &amp; receipts together for easy tax filing.</>
+              : <>Keep receipts, statements &amp; purchase orders together for easy tax filing.</>}
           </p>
         </div>
       </div>
@@ -156,7 +172,7 @@ export function InvoiceAttachments({ invoiceId }: { invoiceId: number | string }
             <SelectValue placeholder="Document type" />
           </SelectTrigger>
           <SelectContent>
-            {invoiceDocumentCategories.map((c) => (
+            {categories.map((c) => (
               <SelectItem key={c} value={c}>
                 {c}
               </SelectItem>
@@ -202,7 +218,7 @@ export function InvoiceAttachments({ invoiceId }: { invoiceId: number | string }
             </div>
             <p className="text-sm font-medium text-gray-700 dark:text-gray-300">No documents yet</p>
             <p className="text-xs text-gray-400 mt-0.5 max-w-xs mx-auto">
-              Attach your GST invoice, TDS certificate or payment proof so everything for
+              {isIndia ? "Attach your GST invoice, TDS certificate or payment proof" : "Attach your payment proof or other paperwork"} so everything for
               this deal lives in one place.
             </p>
           </div>
@@ -228,7 +244,7 @@ export function InvoiceAttachments({ invoiceId }: { invoiceId: number | string }
                     <span className="text-xs text-gray-400">
                       {formatSize(a.fileSize)}
                       {a.fileSize ? " · " : ""}
-                      {formatDate(a.createdAt as unknown as string)}
+                      {formatDate(a.createdAt as unknown as string, locale, { day: "numeric", timezone })}
                     </span>
                   </div>
                   <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate mt-0.5">

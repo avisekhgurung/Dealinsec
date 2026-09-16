@@ -10,7 +10,11 @@
 
 export interface ParsedApiError {
   status: number | null;
-  code: "NO_CREDITS" | "UPGRADE_REQUIRED" | null;
+  /** CURRENCY_CHANGED (409): a money write converted in a currency the org no
+   *  longer uses. Nothing was saved; the org row has already been refetched
+   *  (lib/queryClient.ts), so the screen should show `error` and let the user
+   *  re-check the amount rather than retry for them. */
+  code: "NO_CREDITS" | "UPGRADE_REQUIRED" | "CURRENCY_CHANGED" | null;
   feature?: string;
   error?: string;
   credits?: { monthly: number; purchased: number; resetsAt: string | null };
@@ -25,7 +29,9 @@ export function parseApiError(err: unknown): ParsedApiError {
     const body = JSON.parse(match[2]);
     return {
       status,
-      code: body?.code === "NO_CREDITS" || body?.code === "UPGRADE_REQUIRED" ? body.code : null,
+      code: body?.code === "NO_CREDITS" || body?.code === "UPGRADE_REQUIRED" || body?.code === "CURRENCY_CHANGED"
+        ? body.code
+        : null,
       feature: body?.feature,
       error: body?.error,
       credits: body?.credits,
@@ -33,6 +39,17 @@ export function parseApiError(err: unknown): ParsedApiError {
   } catch {
     return { status, code: null };
   }
+}
+
+/** The toast for a CURRENCY_CHANGED refusal, or null for any other error. Kept
+ *  here so every money form words it the same way. */
+export function currencyChangedToast(err: unknown): { title: string; description: string } | null {
+  const parsed = parseApiError(err);
+  if (parsed.code !== "CURRENCY_CHANGED") return null;
+  return {
+    title: "Your organisation's currency changed",
+    description: parsed.error || "Nothing was saved. Please check the amount and try again.",
+  };
 }
 
 /** True when the error should open the upgrade modal rather than a toast. */

@@ -1,7 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertFeedbackSchema, feedback, insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, newsletterSubscribers, invoiceDocumentCategories, invoiceLineItemSchema, brandInvoiceTypeOptions, hasActivePro, hasActiveDealBoost, hasProAccess, hasActiveTrial, getTrialDaysLeft, getDealCredits } from "@shared/schema";
+import { insertFeedbackSchema, feedback, insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, organizations as organizationsTable, newsletterSubscribers, invoiceDocumentCategories, invoiceLineItemSchema, brandInvoiceTypeOptions, hasActivePro, hasActiveDealBoost, hasProAccess, hasActiveTrial, getTrialDaysLeft, getDealCredits, amountMinorSchema, getCurrency, fromMinor, CURRENCIES, type User, type Contract, type LocaleSettings, type CurrencyCode, type InvoiceLineItem } from "@shared/schema";
+import { documentLocaleSettings, formatMoney, splitMinor } from "@shared/money";
+import { isCountryCode, normalizeTimeZone } from "@shared/region";
+import { isoDateInZone, wouldRenumberIssuedInvoice, withoutInvoiceNumber } from "@shared/invoice-numbering";
+import { bankRoutingLabel, invoiceTaxProfile } from "@shared/invoice-tax";
 import { eq, sql } from "drizzle-orm";
 import { db } from "./db";
 import { setupAuth, isAuthenticated } from "./auth";
@@ -101,6 +105,404 @@ function getPayuConfig() {
   return { key, salt, url, price };
 }
 
+// ── Money at the API boundary ─────────────────────────────────────────────
+// Every amount a request carries is already MINOR units under a `*Minor` key:
+// the client converts once, where the human typed it (see useMoney().minor).
+// The server never multiplies a request amount — a second conversion here is
+// exactly the 100× error the property renames exist to prevent.
+
+/** Keys that carried WHOLE RUPEES before money moved to minor units. A tab
+ *  loaded before that deploy still sends them. Reading one would store rupees
+ *  as paise (₹65,000 saved as ₹650); ignoring it would drop the user's edit
+ *  while reporting success. Refusing is the only outcome that is neither, and
+ *  the fix for the user is a refresh. */
+const LEGACY_MONEY_KEYS = ["dealAmount", "contractValue", "estampAmount"] as const;
+
+function rejectStaleMoneyBody(body: unknown, res: any): boolean {
+  const legacy = LEGACY_MONEY_KEYS.find((k) => (body as Record<string, unknown> | null)?.[k] !== undefined);
+  if (!legacy) return false;
+  // 422, deliberately not 400 or 409. These routes already answer 400 for
+  // business rules (over the agreement ceiling, zero amount, paid lock), so a
+  // caller asserting one of those would pass for the wrong reason; and the
+  // agreement screen reads any 409 as "an agreement already exists".
+  res.status(422).json({
+    code: "STALE_CLIENT",
+    error: "DealInSec was just updated. Please refresh the page and try again — nothing was saved.",
+  });
+  return true;
+}
+
+/**
+ * Refuses a money write whose `*Minor` amounts were converted in a currency
+ * other than the one they would be stored in. Returns true when it answered.
+ *
+ * WHY: the client turns "65000" into minor units with the exponent of the
+ * currency IT believes the org uses (useMoney caches /api/org for minutes), and
+ * the server used to store the result in whatever the org's currency is NOW.
+ * An admin switching INR to JPY while a teammate had the deal form open made
+ * the teammate's ₹65,000 (6500000 paise) a ¥6,500,000 deal, 100x too large,
+ * and between two 2-decimal currencies silently relabelled ₹65,000 as $65,000.
+ * That first record then locks the region, so it could not be switched back.
+ *
+ * So every money write names the currency it converted in, and a missing one
+ * counts as a mismatch: a caller that does not say cannot be shown to agree.
+ * Compared as the raw upper-cased code, never through getCurrency(), which
+ * maps an unknown code to INR and would let "XYZ" pass for an Indian org.
+ *
+ * 409 with a machine-readable code, answered BEFORE any Deal Credit or invoice
+ * number is spent. The client invalidates /api/org on it (lib/queryClient.ts)
+ * so the form re-renders in the real currency for the user to re-check.
+ */
+function rejectCurrencyMismatch(body: unknown, expected: string, res: any): boolean {
+  const raw = (body as { currency?: unknown } | null | undefined)?.currency;
+  const sent = typeof raw === "string" ? raw.trim().toUpperCase() : "";
+  if (sent && sent === expected.toUpperCase()) return false;
+  res.status(409).json({
+    code: "CURRENCY_CHANGED",
+    currency: expected,
+    error:
+      `This amount is recorded in ${expected}, which is not the currency this page was using. ` +
+      "Nothing was saved — please check the amount and try again.",
+  });
+  return true;
+}
+
+/** The locale an org's stored amounts are denominated and printed in — the same
+ *  resolution useMoney() does on the client, so an error message or an email
+ *  quotes a figure exactly as the screen beside it shows it. Pass the contract
+ *  or invoice being talked about as `issuedRow`: an amount already issued is
+ *  quoted in the currency it was issued in, not the org's current one. */
+async function documentLocaleFor(reqUser: User, issuedRow?: object | null): Promise<LocaleSettings> {
+  const org = reqUser.organizationId ? await storage.getOrganization(reqUser.organizationId) : undefined;
+  const currency = issuedCurrency(issuedRow);
+  return documentLocaleSettings(org, reqUser, currency ? { currency } : null);
+}
+
+/** The currency a contract or invoice row was ISSUED in: its `currency` column,
+ *  stamped by issuingContext() at insert. Every row that predates the column
+ *  was backfilled 'INR', which is what its org was. Null only for a row that
+ *  is not a contract or invoice (or a caller passing nothing), which
+ *  documentLocaleSettings reads as "the org's". */
+function issuedCurrency(row: object | null | undefined): CurrencyCode | null {
+  const code = (row as { currency?: unknown } | null | undefined)?.currency;
+  return typeof code === "string" && code ? (getCurrency(code).code as CurrencyCode) : null;
+}
+
+// ── Region fields: country / currency / locale / timezone ─────────────────
+// Written by onboarding (PATCH /api/org, then PATCH /api/profile) and by the
+// Settings region control. These four decide how every amount and date prints,
+// and the currency decides what every stored minor-unit amount MEANS, so each
+// is validated here rather than trusted: a stored "US$" or "Mars/Olympus"
+// would reach Intl on every render and either throw or silently fall back.
+
+const REGION_KEYS = ["country", "currency", "locale", "timezone"] as const;
+type RegionKey = (typeof REGION_KEYS)[number];
+type RegionUpdates = Partial<Record<RegionKey, string>>;
+
+type RegionParse =
+  | { ok: true; updates: RegionUpdates }
+  | { ok: false; field: RegionKey; error: string };
+
+/** The canonical spelling of a BCP-47 tag this runtime can format, or null. */
+function canonicalLocale(raw: string): string | null {
+  try {
+    const [tag] = Intl.getCanonicalLocales(raw.trim());
+    // supportedLocalesOf rejects a structurally valid tag no formatter knows
+    // ("zz-ZZ"), which Intl would otherwise quietly render as en-US.
+    return tag && tag.length <= 35 && Intl.NumberFormat.supportedLocalesOf(tag).length > 0 ? tag : null;
+  } catch {
+    return null;
+  }
+}
+
+/** An IANA zone name this runtime can use, in the spelling the region picker
+ *  offers, or null. */
+function validTimeZone(raw: string): string | null {
+  const tz = raw.trim();
+  // IANA names start with a letter. Intl also accepts UTC offsets ("+05:30"),
+  // which are not zones: they have no DST rules and name no place.
+  if (!tz || tz.length > 64 || !/^[A-Za-z]/.test(tz)) return null;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+  } catch {
+    return null;
+  }
+  // Deliberately NOT resolvedOptions().timeZone: ICU canonicalises
+  // Asia/Kolkata to the retired Asia/Calcutta, which would rewrite India's
+  // stored zone. normalizeTimeZone maps any accepted spelling onto the IANA
+  // name in the picker's list; a valid zone outside that list ("UTC") is kept
+  // as sent.
+  return normalizeTimeZone(tz) ?? tz;
+}
+
+/** Reads and validates whichever region keys `body` carries. An absent key is
+ *  left alone; a present one must be valid, and the 400 names it. */
+function parseRegionFields(body: unknown): RegionParse {
+  const src = (body ?? {}) as Record<string, unknown>;
+  const updates: RegionUpdates = {};
+  for (const key of REGION_KEYS) {
+    const raw = src[key];
+    if (raw === undefined) continue;
+    const text = typeof raw === "string" ? raw.trim() : "";
+    switch (key) {
+      case "country": {
+        const cc = text.toUpperCase();
+        if (!/^[A-Z]{2}$/.test(cc) || !isCountryCode(cc)) {
+          return { ok: false, field: key, error: "country must be an ISO-3166-1 alpha-2 country code, such as IN or GB." };
+        }
+        updates.country = cc;
+        break;
+      }
+      case "currency": {
+        const code = text.toUpperCase();
+        if (!Object.prototype.hasOwnProperty.call(CURRENCIES, code)) {
+          return { ok: false, field: key, error: `currency must be one of ${Object.keys(CURRENCIES).join(", ")}.` };
+        }
+        updates.currency = code;
+        break;
+      }
+      case "locale": {
+        const tag = text ? canonicalLocale(text) : null;
+        if (!tag) {
+          return { ok: false, field: key, error: "locale must be a valid BCP-47 language tag, such as en-IN or en-GB." };
+        }
+        updates.locale = tag;
+        break;
+      }
+      case "timezone": {
+        const tz = text ? validTimeZone(text) : null;
+        if (!tz) {
+          return { ok: false, field: key, error: "timezone must be a valid IANA time zone, such as Asia/Kolkata or Europe/London." };
+        }
+        updates.timezone = tz;
+        break;
+      }
+    }
+  }
+  return { ok: true, updates };
+}
+
+/** The region keys in `updates` whose value differs from what `current` stores.
+ *  Compared in canonical form, so re-sending the stored region is never a change. */
+function changedRegionKeys(current: Record<string, unknown>, updates: RegionUpdates): RegionKey[] {
+  const stored = (key: RegionKey): string => {
+    const raw = typeof current[key] === "string" ? (current[key] as string).trim() : "";
+    if (key === "country" || key === "currency") return raw.toUpperCase();
+    if (key === "locale") return (raw && canonicalLocale(raw)) || raw;
+    return (raw && normalizeTimeZone(raw)) || raw;
+  };
+  return REGION_KEYS.filter((key) => updates[key] !== undefined && updates[key] !== stored(key));
+}
+
+/**
+ * SQL: does the organization already hold a deal, agreement or invoice?
+ *
+ * The region locks at the first deal. Stored amounts are minor units of the
+ * org's currency, so a currency change would relabel ₹65,000 as $65,000 on
+ * every deal already quoted, and the locale, time zone and country re-render
+ * issued documents too (digit grouping, dates, tax-ID labels). Legacy rows
+ * that predate organizations (organization_id NULL) count for the org of the
+ * member who created them — the same org-or-own rule the list queries use,
+ * widened to every member so the lock fails closed.
+ */
+function orgHasRecordsSql(orgId: string) {
+  const own = (table: string) => sql.raw(table);
+  const clause = (table: string) => sql`EXISTS (
+    SELECT 1 FROM ${own(table)} r
+     WHERE r.organization_id = ${orgId}
+        OR (r.organization_id IS NULL
+            AND r.user_id IN (SELECT u.id FROM users u WHERE u.organization_id = ${orgId})))`;
+  return sql`(${clause("deals")} OR ${clause("contracts")} OR ${clause("brand_invoices")})`;
+}
+
+async function orgHasRecords(orgId: string): Promise<boolean> {
+  const result = await db.execute(sql`SELECT ${orgHasRecordsSql(orgId)} AS locked`);
+  return Boolean((result.rows?.[0] as { locked?: unknown } | undefined)?.locked);
+}
+
+/** A solo account (no organization) is its own document locale — see
+ *  documentLocaleSettings — so its region locks at its own first deal. */
+async function soloUserHasRecords(userId: string): Promise<boolean> {
+  const result = await db.execute(sql`
+    SELECT (EXISTS (SELECT 1 FROM deals          WHERE user_id = ${userId})
+         OR EXISTS (SELECT 1 FROM contracts      WHERE user_id = ${userId})
+         OR EXISTS (SELECT 1 FROM brand_invoices WHERE user_id = ${userId})) AS locked`);
+  return Boolean((result.rows?.[0] as { locked?: unknown } | undefined)?.locked);
+}
+
+/** The 409 for a region change on a workspace that already has records. */
+function regionLockedResponse(res: any, changed: RegionKey[], current: Record<string, unknown>, updates: RegionUpdates) {
+  const currencyChange = changed.includes("currency");
+  const error = currencyChange
+    ? `Your currency can't be changed from ${String(current.currency ?? "").toUpperCase()} to ${updates.currency} ` +
+      `because this workspace already has deals. Every amount you've already quoted, signed and invoiced is ` +
+      `stored in ${String(current.currency ?? "").toUpperCase()}, and changing the currency would relabel those ` +
+      `amounts rather than convert them. Need to change it? Email support@dealinsec.com.`
+    : `Your country, language and time zone are fixed once this workspace has deals, so everything you've ` +
+      `already quoted, signed and invoiced keeps printing exactly as it was issued. ` +
+      `Need to change them? Email support@dealinsec.com.`;
+  return res.status(409).json({ code: "REGION_LOCKED", fields: changed, error });
+}
+
+// ── Issuer snapshot ───────────────────────────────────────────────────────
+// A document is evidence of what was agreed or billed ON THE DAY it was issued.
+// Rendering the supplier block from the live profile meant an invoice issued in
+// 2025 re-rendered with the GSTIN and bank account the owner had typed in 2026 —
+// a client paying an old invoice could be sent to a closed account. So the
+// issuer is frozen onto the row at issue time, the same way contracts already
+// freeze their signer and signature.
+//
+// Mirrored by `IssuerSnapshot` in client/src/hooks/useIssuer.ts, which must be
+// able to read every version ever written — issued documents are never
+// rewritten. Both belong in shared/schema.ts beside the column once it exists.
+
+interface IssuerTaxId {
+  /** The profile field it was read from. Readers match on this, never on the
+   *  label text, so relabelling a country later cannot orphan old documents. */
+  field: "gstNumber" | "panNumber";
+  /** The label as it applied when the document was issued. */
+  label: string;
+  number: string;
+}
+
+interface IssuerSnapshot {
+  /** Shape version: a later shape (IBAN/BIC, several tax IDs) is read beside
+   *  v1 rows rather than migrating them. */
+  v: 1;
+  capturedAt: string;
+  /** The issuing org's country at issue — the reason the labels say what they say. */
+  country: string;
+  name: string;
+  email: string;
+  phone: string;
+  billingAddress: string;
+  /** Only registrations that were actually filled in. */
+  taxIds: IssuerTaxId[];
+  bank: {
+    accountHolderName: string;
+    accountNumber: string;
+    bankName: string;
+    routingLabel: string;
+    routingCode: string;
+  };
+  digitalSignature: string;
+  companySeal: string;
+}
+
+/** Labels for the profile's tax and bank-routing fields, by country — read from
+ *  the ONE shared table the documents print from (shared/invoice-tax.ts:
+ *  invoiceTaxProfile's registrations and bankRoutingLabel), so a snapshot can
+ *  never freeze a label the invoice itself would not have printed. India is
+ *  "GSTIN", "PAN" and "IFSC" there, exactly as this table had it. A field the
+ *  country's profile does not print (a PAN outside India) is still frozen if
+ *  it was filled in, under a label that asserts no particular scheme. */
+function issuerFieldLabels(country: string): { gstNumber: string; panNumber: string; routing: string } {
+  const registered = (field: "gstNumber" | "panNumber") =>
+    invoiceTaxProfile(country).registrations.find((r) => r.field === field)?.label;
+  return {
+    gstNumber: registered("gstNumber") ?? "Tax registration no.",
+    panNumber: registered("panNumber") ?? "Tax ID",
+    routing: bankRoutingLabel(country),
+  };
+}
+
+/** The org issuer's details as documents print them. The exact body of
+ *  GET /api/org/issuer — kept flat, because that response is a contract four
+ *  document screens already render from. */
+function issuerProfile(owner: User) {
+  return {
+    name: [owner.firstName, owner.lastName].filter(Boolean).join(" ") || owner.email || "",
+    email: owner.email ?? "",
+    phone: owner.phone ?? "",
+    panNumber: owner.panNumber ?? "",
+    gstNumber: owner.gstNumber ?? "",
+    billingAddress: owner.billingAddress ?? "",
+    digitalSignature: owner.digitalSignature ?? "",
+    companySeal: owner.companySeal ?? "",
+    accountHolderName: owner.accountHolderName ?? "",
+    accountNumber: owner.accountNumber ?? "",
+    ifscCode: owner.ifscCode ?? "",
+    bankName: owner.bankName ?? "",
+  };
+}
+
+/** Values are copied verbatim, untrimmed: the snapshot must render exactly what
+ *  the live profile rendered on the day, and the document screens test these
+ *  fields for truthiness, not for trimmed content. */
+function buildIssuerSnapshot(owner: User, settings: LocaleSettings): IssuerSnapshot {
+  const p = issuerProfile(owner);
+  const labels = issuerFieldLabels(settings.country);
+  const taxIds: IssuerTaxId[] = [
+    { field: "gstNumber" as const, label: labels.gstNumber, number: p.gstNumber },
+    { field: "panNumber" as const, label: labels.panNumber, number: p.panNumber },
+  ].filter((t) => t.number);
+  return {
+    v: 1,
+    capturedAt: new Date().toISOString(),
+    country: settings.country,
+    name: p.name,
+    email: p.email,
+    phone: p.phone,
+    billingAddress: p.billingAddress,
+    taxIds,
+    bank: {
+      accountHolderName: p.accountHolderName,
+      accountNumber: p.accountNumber,
+      bankName: p.bankName,
+      routingLabel: labels.routing,
+      routingCode: p.ifscCode,
+    },
+    digitalSignature: p.digitalSignature,
+    companySeal: p.companySeal,
+  };
+}
+
+/**
+ * Everything a document freezes at the moment it is issued: who issued it and
+ * in which currency. Spread `issued` into the row being inserted.
+ *
+ * The keys are column names. `currency` (varchar(3) on contracts and
+ * brand_invoices) exists: it is read fresh from the org at this call, so every
+ * agreement and invoice records the currency its amounts are in, and keeps
+ * printing in it whatever the org's setting later says. `issuerSnapshot`
+ * (jsonb) is still requested from the schema owner; Drizzle's insert walks the
+ * TABLE's columns and ignores any other key, so until that column exists the
+ * issuer keeps rendering live, and the moment it lands every newly issued
+ * document is snapshotted with no change here.
+ */
+async function issuingContext(reqUser: User) {
+  const [owner, settings] = await Promise.all([getBillingUser(reqUser), documentLocaleFor(reqUser)]);
+  return {
+    owner,
+    settings,
+    issued: {
+      issuerSnapshot: buildIssuerSnapshot(owner, settings),
+      currency: settings.currency,
+    },
+  };
+}
+
+/**
+ * What is still invoiceable on an agreement, in its minor units. An invoice may
+ * not bill more than its agreement is worth, minus what has already been
+ * invoiced against it — the scope-protection promise applied to money.
+ *
+ * Minor against minor, never a mixed pair. `excludeInvoiceId` leaves out the
+ * invoice being edited, so raising an invoice from ₹30,000 to ₹32,500 is
+ * measured against the other invoices only.
+ */
+async function invoiceableRemainingMinor(
+  contract: Contract,
+  reqUser: User,
+  excludeInvoiceId?: number,
+): Promise<number> {
+  const siblings = await storage.getBrandInvoicesByDealIdForOrg(contract.dealId, reqUser.organizationId!, reqUser.id);
+  const alreadyInvoiced = siblings
+    .filter((i) => i.contractId === contract.id && i.id !== excludeInvoiceId)
+    .reduce((sum, i) => sum + (i.dealAmountMinor || 0), 0);
+  return Number(contract.contractValueMinor) - alreadyInvoiced;
+}
+
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -126,7 +528,57 @@ const upload = multer({
   },
 });
 
+/**
+ * Rupee-era READ compatibility, for the release that moves money to minor
+ * units. Remove once that release has been live for a few days.
+ *
+ * WHY: a browser tab opened before the deploy keeps running the old bundle,
+ * which reads `dealAmount`, `contractValue`, `estampAmount` and line-item
+ * `rate`/`amount` as WHOLE RUPEES. The API now sends `*Minor` fields only, so
+ * that tab would print ₹0 totals on quotations, agreements and invoices —
+ * including PDFs a freelancer sends to a client — until someone refreshes.
+ * Writes from such a tab are already refused (rejectStaleMoneyBody).
+ *
+ * The current bundle marks itself with `X-DealInSec-Money: minor` and gets the
+ * responses untouched. Any other GET gets the old fields added back. Only rows
+ * in INR are translated: no non-INR workspace existed before this release, so a
+ * rupee-era tab can only ever be looking at rupees, and inventing a "rupee"
+ * figure for another currency would be wrong rather than compatible.
+ */
+function addLegacyMoneyFields(value: unknown, inherited = "INR"): unknown {
+  if (Array.isArray(value)) return value.map((v) => addLegacyMoneyFields(v, inherited));
+  if (!value || typeof value !== "object" || value instanceof Date) return value;
+  const row = value as Record<string, unknown>;
+  // A row's own currency wins; children inherit it (line items carry none of
+  // their own, so a JPY invoice's lines must be skipped WITH their invoice).
+  // "INR" at the top is not an assumption about the data: only a bundle from
+  // before this release omits the header, and no non-INR workspace existed then.
+  const currency = typeof row.currency === "string" ? row.currency.toUpperCase() : inherited;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(row)) {
+    out[k] = v && typeof v === "object" ? addLegacyMoneyFields(v, currency) : v;
+  }
+  if (currency !== "INR") return out;
+  const factor = 10 ** getCurrency(currency).exponent;
+  const major = (m: unknown) => (typeof m === "number" ? m / factor : m);
+  if ("dealAmountMinor" in row && !("dealAmount" in row)) out.dealAmount = major(row.dealAmountMinor);
+  if ("contractValueMinor" in row && !("contractValue" in row)) out.contractValue = major(row.contractValueMinor);
+  if ("estampAmountMinor" in row && !("estampAmount" in row)) out.estampAmount = major(row.estampAmountMinor);
+  if ("rateMinor" in row && !("rate" in row)) out.rate = major(row.rateMinor);
+  if ("amountMinor" in row && !("amount" in row)) out.amount = major(row.amountMinor);
+  return out;
+}
+
+function legacyMoneyReadCompat(req: any, res: any, next: () => void) {
+  if (req.method !== "GET" || req.get("X-DealInSec-Money") === "minor") return next();
+  const send = res.json.bind(res);
+  res.json = (body: unknown) => send(addLegacyMoneyFields(body));
+  next();
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Before every route, so no GET can answer a stale tab without it.
+  app.use("/api", legacyMoneyReadCompat);
   await setupAuth(app);
   registerCopilotRoutes(app);
 
@@ -218,6 +670,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/deals", isAuthenticated, requireOrgPermission("deals.create"), async (req: any, res) => {
     try {
       const userId = req.user.id;
+      // `dealAmountMinor` arrives in minor units and insertDealSchema holds it
+      // to an integer; a stale tab's rupee `dealAmount` is refused by name
+      // rather than surfacing as a bare "Required" zod error.
+      if (rejectStaleMoneyBody(req.body, res)) return;
+      // Before validation and the credit spend below: a refused write must cost
+      // nothing. A deal has no currency column; it is denominated in the org's.
+      if (rejectCurrencyMismatch(req.body, (await documentLocaleFor(req.user)).currency, res)) return;
       const parsed = insertDealSchema.safeParse({
         ...req.body,
         userId,
@@ -281,11 +740,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Only pending deals can be edited" });
       }
 
-      const { brandName, dealTitle, dealAmount, startDate, endDate, deliverables, brandUserId, deliverableMode, standardTermIds, customTerms } = req.body;
+      // This destructure is invisible to the compiler (`updates: any`): when the
+      // column became dealAmountMinor, reading `dealAmount` here kept compiling
+      // and silently dropped every amount edit. Refuse the old key outright.
+      if (rejectStaleMoneyBody(req.body, res)) return;
+      const { brandName, dealTitle, dealAmountMinor, startDate, endDate, deliverables, brandUserId, deliverableMode, standardTermIds, customTerms } = req.body;
       const updates: any = {};
       if (brandName !== undefined) updates.brandName = brandName;
       if (dealTitle !== undefined) updates.dealTitle = dealTitle;
-      if (dealAmount !== undefined) updates.dealAmount = dealAmount;
+      if (dealAmountMinor !== undefined) {
+        // Only an amount edit has to name its currency; a title or terms edit
+        // carries no conversion to disagree about.
+        if (rejectCurrencyMismatch(req.body, (await documentLocaleFor(req.user)).currency, res)) return;
+        // Same rule the create path enforces through insertDealSchema. This
+        // route used to write the amount unvalidated; with minor units a
+        // fractional value would be a unit bug upstream, not a price.
+        const amount = amountMinorSchema.safeParse(dealAmountMinor);
+        if (!amount.success) {
+          return res.status(400).json({ error: "Enter a valid deal amount" });
+        }
+        updates.dealAmountMinor = amount.data;
+      }
       if (startDate !== undefined) updates.startDate = startDate;
       if (endDate !== undefined) updates.endDate = endDate;
       if (deliverables !== undefined) updates.deliverables = deliverables;
@@ -417,12 +892,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
 
+      if (rejectStaleMoneyBody(req.body, res)) return;
+      // The client's `currency` is checked here, then dropped below: it must
+      // AGREE with the org's (the contract value was converted in it), but the
+      // currency stamped on the agreement is always the org's own.
+      if (rejectCurrencyMismatch(req.body, (await documentLocaleFor(req.user)).currency, res)) return;
+
       // Snapshot WHO signs and WITH WHICH signature — the document must
       // never render the current viewer's profile signature (see
       // migrate-document-authenticity.ts).
       const signerName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.email || null;
+      // The issued currency is the org's, stamped below; a client-sent one is
+      // dropped before validation so it can neither set it nor fail the request.
+      const { currency: _clientCurrency, ...contractBody } = req.body ?? {};
       const parsed = insertContractSchema.safeParse({
-        ...req.body,
+        ...contractBody,
         signerUserId: req.user.id,
         signerName,
         signatureUrl: req.user.digitalSignature ?? null,
@@ -451,9 +935,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const user = req.user;
+      const { settings, issued } = await issuingContext(req.user);
 
       const contractData = {
         ...parsed.data,
+        // Spread AFTER the parsed body: the insert schema accepts `currency`
+        // (and will accept the issuer snapshot) from a client, and neither the
+        // currency nor the issuer of a signed agreement may be something the
+        // request chose.
+        ...issued,
         signedByInfluencer: true,
         signedByInfluencerDate: new Date().toISOString(),
       };
@@ -467,8 +957,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { subject, html } = contractSignedEmail({
           firstName: user.firstName || undefined,
           brandName: contract.brandName,
-          contractValue: contract.contractValue,
+          contractValueMinor: contract.contractValueMinor,
           contractId: contract.id,
+          locale: settings,
         });
         void sendEmail({ to: user.email, subject, html });
       }
@@ -540,19 +1031,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!clear && certificateNo.length > 60) {
         return res.status(400).json({ error: "Certificate number looks too long — check and re-enter it." });
       }
-      const amountRaw = req.body?.estampAmount;
-      const amount = amountRaw === "" || amountRaw === null || amountRaw === undefined
-        ? null : Math.round(Number(amountRaw));
-      if (amount !== null && (!Number.isFinite(amount) || amount < 0)) {
-        return res.status(400).json({ error: "Stamp duty amount must be a positive number" });
+      if (rejectStaleMoneyBody(req.body, res)) return;
+      // Minor units, converted by the client where the duty was typed. No
+      // Math.round here any more: rounding a fractional minor amount would hide
+      // a unit bug upstream, so a non-integer is refused instead.
+      const amountRaw = req.body?.estampAmountMinor;
+      let amount: number | null = null;
+      if (!(amountRaw === "" || amountRaw === null || amountRaw === undefined)) {
+        // Measured against the currency the AGREEMENT was issued in: the duty
+        // is printed on that document, beside its contract value.
+        const agreementCurrency = (await documentLocaleFor(req.user, contract)).currency;
+        if (rejectCurrencyMismatch(req.body, agreementCurrency, res)) return;
+        const parsedAmount = amountMinorSchema.safeParse(Number(amountRaw));
+        if (!parsedAmount.success) {
+          return res.status(400).json({ error: "Stamp duty amount must be a positive number" });
+        }
+        amount = parsedAmount.data;
       }
 
+      // Typed, not `as any`: the cast is what let the rupee-era key keep
+      // compiling after the column was renamed.
       const updated = await storage.updateContract(parseInt(req.params.id), {
         estampCertificateNo: clear ? null : certificateNo,
         estampDate: clear ? null : (String(req.body?.estampDate ?? "").trim() || null),
-        estampAmount: clear ? null : amount,
+        estampAmountMinor: clear ? null : amount,
         estampAuthority: clear ? null : (String(req.body?.estampAuthority ?? "").trim().slice(0, 120) || null),
-      } as any);
+      });
 
       logOrgActivity(req.user, clear ? "removed the e-stamp reference from" : "recorded an e-stamp certificate on",
         "agreement", contract.id, clear ? contract.brandName : `${certificateNo} · ${contract.brandName}`);
@@ -721,7 +1225,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Brand access required" });
       }
       const deals = await storage.getDealsForBrand(userId);
-      res.json(deals);
+      // Each deal belongs to ANOTHER workspace, so it must be shown in that
+      // workspace's currency — never the viewing brand's (a ₹65,000 deal
+      // rendered through a JPY viewer's formatter reads ¥6,500,000). Deals
+      // carry no currency column, so resolve it from the owner, once per owner.
+      const ownerCurrency = new Map<string, string>();
+      const withCurrency = [];
+      for (const d of deals as any[]) {
+        const key = d.organizationId ? `org:${d.organizationId}` : `user:${d.userId}`;
+        if (!ownerCurrency.has(key)) {
+          const owner: any = d.organizationId
+            ? await storage.getOrganization(d.organizationId)
+            : await storage.getUser(d.userId);
+          ownerCurrency.set(key, owner?.currency ?? "INR");
+        }
+        withCurrency.push({ ...d, currency: ownerCurrency.get(key) });
+      }
+      res.json(withCurrency);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch brand deals" });
     }
@@ -814,42 +1334,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!parentDeal || !inOrg(parentDeal, req.user)) {
         return res.status(403).json({ error: "Not authorized for this deal" });
       }
+      let parentContract: Contract | undefined;
       if (req.body?.contractId) {
-        const parentContract = await storage.getContract(parseInt(req.body.contractId, 10));
+        parentContract = await storage.getContract(parseInt(req.body.contractId, 10));
         if (!parentContract || !inOrg(parentContract, req.user)) {
           return res.status(403).json({ error: "Not authorized for this agreement" });
         }
+        // The ceiling below counts invoices on the agreement's own deal. An
+        // agreement paired with a different dealId would be measured against
+        // the wrong invoice list and could be billed past its value.
+        if (parentContract.dealId !== parentDealId) {
+          return res.status(400).json({ error: "This agreement belongs to a different deal" });
+        }
       }
 
+      if (rejectStaleMoneyBody(req.body, res)) return;
+
       // The supplier on the document is the ORG's issuer (owner), not whichever
-      // teammate happened to press the button — same rule the PDF follows.
-      const issuer = await getBillingUser(req.user);
+      // teammate happened to press the button — same rule the PDF follows. The
+      // same call freezes that issuer onto the row (see issuingContext).
+      const { owner: issuer, settings, issued } = await issuingContext(req.user);
       const influencerName =
         [issuer.firstName, issuer.lastName].filter(Boolean).join(" ") || issuer.email || "Influencer";
 
+      // The composer converted the total and every line in the currency it
+      // had loaded; this invoice is stamped in `settings.currency`. They must
+      // be the same, and this must be decided before an invoice number is
+      // spent by generateOrgInvoiceNumber below.
+      if (rejectCurrencyMismatch(req.body, settings.currency, res)) return;
+
       // Whitelist: never spread req.body into a row. It previously let a client
       // set any column, including amounts unrelated to the agreement.
-      const amount = Math.round(Number(req.body?.dealAmount));
-      if (!Number.isFinite(amount) || amount <= 0) {
+      // Minor units, already converted by the composer; an integer is required
+      // rather than rounded, for the same reason as the e-stamp amount.
+      const parsedAmount = amountMinorSchema.safeParse(Number(req.body?.dealAmountMinor));
+      if (!parsedAmount.success || parsedAmount.data <= 0) {
         return res.status(400).json({ error: "Invoice amount must be greater than zero" });
       }
+      const amount = parsedAmount.data;
 
-      // An invoice may not bill more than its agreement is worth, minus what
-      // has already been invoiced against it. This is the scope-protection
-      // promise applied to money.
-      if (req.body?.contractId) {
-        const contractId = parseInt(req.body.contractId, 10);
-        const parentContract = await storage.getContract(contractId);
-        const existing = await storage.getBrandInvoicesByDealIdForOrg(parentDealId, req.user.organizationId);
-        const alreadyInvoiced = existing
-          .filter((i) => i.contractId === contractId)
-          .reduce((sum, i) => sum + (i.dealAmount || 0), 0);
-        const remaining = Number(parentContract!.contractValue) - alreadyInvoiced;
+      if (parentContract) {
+        // Amounts in two currencies are not comparable, and the composer built
+        // this total in the ORG's current currency. An agreement signed before
+        // the org changed currency must be invoiced in the currency it was
+        // signed in, which this request cannot express — refuse rather than
+        // compare ₹ against $. Unreachable while the region locks at the first
+        // deal; kept so the invariant does not rest on that lock alone.
+        const agreementCurrency = issuedCurrency(parentContract);
+        if (agreementCurrency && agreementCurrency !== settings.currency) {
+          return res.status(409).json({
+            error: `This agreement was issued in ${agreementCurrency}, but your organization now uses ${settings.currency}. Invoice it in ${agreementCurrency}.`,
+          });
+        }
+        const remaining = await invoiceableRemainingMinor(parentContract, req.user);
         if (amount > remaining) {
           return res.status(400).json({
             error:
               remaining > 0
-                ? `Only ₹${remaining.toLocaleString("en-IN")} is left to invoice on this agreement.`
+                ? `Only ${formatMoney(remaining, settings.currency, settings.locale)} is left to invoice on this agreement.`
                 : "This agreement is already fully invoiced.",
           });
         }
@@ -857,11 +1399,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let lineItems: unknown = null;
       if (Array.isArray(req.body?.lineItems) && req.body.lineItems.length) {
+        // A stale composer sends `rate`/`amount` in rupees; the schema requires
+        // `rateMinor`/`amountMinor`, so those lines fail here rather than being
+        // stored at 1/100th of their value.
         const parsed = z.array(invoiceLineItemSchema).min(1).max(50).safeParse(req.body.lineItems);
         if (!parsed.success) {
           return res.status(400).json({ error: "Invoice lines are invalid", details: parsed.error.flatten() });
         }
-        const linesTotal = parsed.data.reduce((sum: number, l) => sum + l.amount, 0);
+        const linesTotal = parsed.data.reduce((sum: number, l) => sum + l.amountMinor, 0);
         if (linesTotal !== amount) {
           return res.status(400).json({ error: "Invoice lines must add up to the invoice total" });
         }
@@ -871,10 +1416,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const invoiceNumber = await storage.generateOrgInvoiceNumber(req.user.organizationId);
 
       const invoiceData = {
+        ...issued,
         dealId: parentDealId,
-        contractId: req.body?.contractId ? parseInt(req.body.contractId, 10) : null,
+        contractId: parentContract ? parentContract.id : null,
         brandName: String(req.body?.brandName ?? parentDeal.brandName),
-        dealAmount: amount,
+        dealAmountMinor: amount,
         invoiceType: brandInvoiceTypeOptions.includes(req.body?.invoiceType) ? req.body.invoiceType : "full",
         splitPercentage: null,
         dueDate: typeof req.body?.dueDate === "string" && req.body.dueDate ? req.body.dueDate : null,
@@ -883,7 +1429,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId,
         organizationId: req.user.organizationId,
         invoiceNumber,
-        invoiceDate: req.body.invoiceDate || new Date().toISOString().split("T")[0],
+        // Today in the ORG's zone — the clock the invoice number's period was
+        // just read on (generateOrgInvoiceNumber), so the two cannot straddle
+        // a year boundary. UTC here once dated an IST 1-April invoice 31 March.
+        invoiceDate: req.body.invoiceDate || isoDateInZone(settings.timezone),
         influencerName,
         influencerEmail: issuer.email || null,
         status: "Unpaid",
@@ -908,10 +1457,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Access denied" });
       }
 
+      // Before the paid lock, so a stale tab's rupee amount is never compared
+      // against a paise column and misreported as an attempted edit.
+      if (rejectStaleMoneyBody(req.body, res)) return;
+
+      // An issued number and an issued currency are final (see
+      // shared/invoice-numbering.ts). Refused by name rather than dropped by
+      // the allowlist alone, so a caller trying to renumber learns it did not
+      // happen instead of receiving a 200.
+      if (wouldRenumberIssuedInvoice(invoice.invoiceNumber, req.body)) {
+        return res.status(409).json({ error: "An issued invoice number can't be changed." });
+      }
+      // With an amount, `currency` is the currency that amount was converted in
+      // and a mismatch is answered below as CURRENCY_CHANGED, so the client
+      // reloads the org and re-asks. Without one, it can only be an attempt to
+      // restamp the invoice.
+      if (req.body?.currency !== undefined && req.body?.dealAmountMinor === undefined &&
+          String(req.body.currency).trim().toUpperCase() !== String(invoice.currency).trim().toUpperCase()) {
+        return res.status(409).json({ error: "An issued invoice's currency can't be changed." });
+      }
+
       // Paid invoices are locked — only status changes are allowed (e.g. accidental undo).
       // Amount/notes edits are rejected to prevent retroactive accounting surprises.
       if (invoice.status === "Paid") {
-        const amountChange = req.body.dealAmount !== undefined && req.body.dealAmount !== invoice.dealAmount;
+        const amountChange = req.body.dealAmountMinor !== undefined && Number(req.body.dealAmountMinor) !== invoice.dealAmountMinor;
         const notesChange = req.body.notes !== undefined && req.body.notes !== invoice.notes;
         if (amountChange || notesChange) {
           return res.status(400).json({ error: "Paid invoices cannot be edited. Mark it Unpaid first or delete and recreate." });
@@ -922,8 +1491,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // organizationId) and identity fields (invoiceNumber, dealId, contractId)
       // must not be client-writable: setting organizationId would move the
       // invoice into another org (or hide it from its own by nulling it).
+      // Nor may the issuer snapshot or issued currency ever be listed here:
+      // they are what the document said on the day it was issued.
       const EDITABLE = [
-        "status", "dealAmount", "notes", "dueDate", "invoiceDate",
+        "status", "dealAmountMinor", "notes", "dueDate", "invoiceDate",
         "brandName", "brandEmail", "invoiceType", "splitPercentage",
       ] as const;
       const updates: any = {};
@@ -933,12 +1504,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!Object.keys(updates).length) {
         return res.status(400).json({ error: "Nothing to update" });
       }
-      if (updates.dealAmount !== undefined) {
-        const n = typeof updates.dealAmount === "string" ? parseInt(updates.dealAmount, 10) : updates.dealAmount;
-        if (!Number.isFinite(n) || n < 1) {
+      if (updates.dealAmountMinor !== undefined) {
+        // An issued invoice's amount is in the currency it was ISSUED in, not
+        // the org's current one, so that is what the edit must have converted
+        // in. Status-only updates (mark paid / unpaid) carry no amount and are
+        // never asked for a currency.
+        const invoiceCurrency = issuedCurrency(invoice) ?? (await documentLocaleFor(req.user)).currency;
+        if (rejectCurrencyMismatch(req.body, invoiceCurrency, res)) return;
+        // Minor units, integer required — the old parseInt would have quietly
+        // truncated a fractional amount instead of exposing the unit bug.
+        const parsedAmount = amountMinorSchema.safeParse(Number(updates.dealAmountMinor));
+        if (!parsedAmount.success || parsedAmount.data < 1) {
           return res.status(400).json({ error: "Invoice amount must be a positive number" });
         }
-        updates.dealAmount = n;
+        const n = parsedAmount.data;
+        updates.dealAmountMinor = n;
+
+        // The agreement ceiling applies to edits too: without this, an invoice
+        // created within its agreement could be raised past it afterwards.
+        // Only increases are checked, so an org already over its ceiling (split
+        // invoices are not capped) can always correct downwards.
+        if (invoice.contractId && n > invoice.dealAmountMinor) {
+          const contract = await storage.getContract(invoice.contractId);
+          if (contract) {
+            const remaining = await invoiceableRemainingMinor(contract, req.user, invoice.id);
+            if (n > remaining) {
+              const settings = await documentLocaleFor(req.user, contract);
+              return res.status(400).json({
+                error:
+                  remaining > 0
+                    ? `Only ${formatMoney(remaining, settings.currency, settings.locale)} can be invoiced on this agreement.`
+                    : "This agreement is already fully invoiced.",
+              });
+            }
+          }
+        }
       }
 
       // paid_at is server-owned: stamp it when the payment is recorded,
@@ -949,11 +1549,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (updates as any).paidAt = null;
       }
 
-      const updated = await storage.updateBrandInvoice(parseInt(req.params.id), updates);
+      // Belt and braces for the allowlist above: whatever it grows to list, the
+      // number and the issued currency never reach the UPDATE.
+      const { currency: _issuedCurrency, ...safeUpdates } = withoutInvoiceNumber(updates);
+      const updated = await storage.updateBrandInvoice(parseInt(req.params.id), safeUpdates);
+      const recordedPayment = invoice.status !== "Paid" && updates.status === "Paid" && updated;
+      // Resolved only when a payment is recorded: the activity line and the
+      // email are the only places this route prints money. The activity detail
+      // is stored text, so for INR it must stay byte-for-byte the "₹65,000"
+      // the feed has always held — formatMoney guarantees exactly that.
+      const paidLocale = recordedPayment ? await documentLocaleFor(req.user, updated) : null;
 
-      if (invoice.status !== "Paid" && updates.status === "Paid" && updated) {
+      if (recordedPayment && paidLocale) {
         logOrgActivity(req.user, "recorded payment for", "invoice", invoice.id,
-          `₹${Number(updated.dealAmount || 0).toLocaleString("en-IN")} from ${invoice.brandName}`);
+          `${formatMoney(updated.dealAmountMinor || 0, paidLocale.currency, paidLocale.locale)} from ${invoice.brandName}`);
       }
 
       // Reversing a payment is a money event too — it must leave the same trail
@@ -964,14 +1573,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // "Payment received" email — only when transitioning Unpaid -> Paid
-      if (invoice.status !== "Paid" && updates.status === "Paid" && updated) {
+      if (recordedPayment && paidLocale) {
         const owner = await storage.getUser(req.user.id);
         if (owner?.email) {
           const { subject, html } = paymentReceivedEmail({
             firstName: owner.firstName || undefined,
             brandName: updated.brandName,
-            amount: updated.dealAmount,
+            amountMinor: updated.dealAmountMinor,
             invoiceNumber: updated.invoiceNumber,
+            locale: paidLocale,
           });
           void sendEmail({ to: owner.email, subject, html });
         }
@@ -1118,51 +1728,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!deal) return res.status(404).json({ error: "Deal not found" });
       if (!inOrg(deal, req.user)) return res.status(403).json({ error: "Not authorized" });
 
-      const { advancePercentage } = req.body;
-      if (!advancePercentage || advancePercentage < 1 || advancePercentage > 99) {
+      // Number() so a "50" from a form and a 50 from JSON are the same request;
+      // splitMinor deliberately refuses strings. An integer is required because
+      // split_percentage is an integer column: a 33.5 used to pass this check
+      // and then fail the insert after an invoice number had been spent.
+      const pct = Number(req.body?.advancePercentage);
+      if (!Number.isInteger(pct) || pct < 1 || pct > 99) {
         return res.status(400).json({ error: "advancePercentage must be between 1 and 99" });
       }
 
       // Allow multiple invoice sets per deal — invoices can be regenerated as the deal evolves.
       const userId = req.user.id;
-      const user = await storage.getUser(userId);
-      const influencerName = user?.firstName && user?.lastName
-        ? `${user.firstName} ${user.lastName}`
-        : user?.email || "Influencer";
-
-      const advanceAmount = Math.round(deal.dealAmount * advancePercentage / 100);
-      const finalAmount = deal.dealAmount - advanceAmount;
+      // The supplier is the ORG's issuer, as on the single-invoice route. This
+      // route used to name whichever member pressed the button, so the same
+      // org's advance invoice and full invoice could carry different suppliers.
+      const { owner: issuer, settings, issued } = await issuingContext(req.user);
+      const influencerName =
+        [issuer.firstName, issuer.lastName].filter(Boolean).join(" ") || issuer.email || "Influencer";
 
       // Find contractId for this deal (org-wide — a teammate may have signed it)
       const contract = await storage.getContractByDealId(dealId);
+      // Same refusal as the single-invoice route: these invoices are stamped
+      // in the org's current currency, and an agreement issued in another one
+      // cannot be billed in it. Unreachable while the region locks at the first
+      // deal; kept so the invariant does not rest on that lock alone.
+      const agreementCurrency = issuedCurrency(contract);
+      if (agreementCurrency && agreementCurrency !== settings.currency) {
+        return res.status(409).json({
+          error: `This agreement was issued in ${agreementCurrency}, but your organization now uses ${settings.currency}. Invoice it in ${agreementCurrency}.`,
+        });
+      }
+
+      // The ONE split rule, shared with the invoice composer's preview so the
+      // pair it shows is the pair created here, to the minor unit. A whole-rupee
+      // deal splits in whole rupees exactly as this route always has
+      // (₹65,001 at 50% → ₹32,501 + ₹32,500); the advance takes the rounding and
+      // the final takes the remainder, so the pair always sums to the deal.
+      const { advanceMinor: advanceAmount, finalMinor: finalAmount } =
+        splitMinor(deal.dealAmountMinor, pct, settings.currency);
 
       const baseData = {
+        ...issued,
         userId,
         organizationId: req.user.organizationId,
-        invoiceDate: new Date().toISOString().split("T")[0],
+        // Same clock as the numbers minted below — see the single-invoice route.
+        invoiceDate: isoDateInZone(settings.timezone),
         dealId,
         contractId: contract?.id || null,
         brandName: deal.brandName,
         influencerName,
-        influencerEmail: user?.email || null,
+        influencerEmail: issuer.email || null,
         status: "Unpaid" as const,
       };
 
       const advanceInvoice = await storage.createBrandInvoice({
         ...baseData,
         invoiceNumber: await storage.generateOrgInvoiceNumber(req.user.organizationId),
-        dealAmount: advanceAmount,
+        dealAmountMinor: advanceAmount,
         invoiceType: "advance",
-        splitPercentage: advancePercentage,
+        splitPercentage: pct,
         status: "Unpaid" as const,
       });
 
       const finalInvoice = await storage.createBrandInvoice({
         ...baseData,
         invoiceNumber: await storage.generateOrgInvoiceNumber(req.user.organizationId),
-        dealAmount: finalAmount,
+        dealAmountMinor: finalAmount,
         invoiceType: "final",
-        splitPercentage: 100 - advancePercentage,
+        splitPercentage: 100 - pct,
         status: "Unpaid" as const,
       });
 
@@ -1218,6 +1851,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (accountNumber !== undefined) updates.accountNumber = accountNumber;
       if (ifscCode !== undefined) updates.ifscCode = ifscCode ? ifscCode.toUpperCase() : ifscCode;
       if (bankName !== undefined) updates.bankName = bankName;
+
+      // Region. Onboarding and the Settings region control both send it here
+      // for the person's own row; this destructure used to omit the four keys,
+      // so the choice was silently dropped and every account stayed IN/INR.
+      // Validated before anything is written, so a bad value saves nothing.
+      const region = parseRegionFields(req.body);
+      if (!region.ok) {
+        return res.status(400).json({ field: region.field, error: region.error });
+      }
+      const changedRegion = changedRegionKeys(req.user, region.updates);
+      // A member of an organization prints documents in the ORG's region, so
+      // their own row is personal display only and never locks. An account
+      // with no organization IS its documents' region (documentLocaleSettings
+      // falls through to the user row), so it locks at its first deal exactly
+      // as an organization does.
+      if (changedRegion.length && !req.user.organizationId && (await soloUserHasRecords(userId))) {
+        return regionLockedResponse(res, changedRegion, req.user, region.updates);
+      }
+      Object.assign(updates, region.updates);
 
       const wasOnboarded = !!req.user.onboardingComplete;
       let user = await storage.updateUser(userId, updates);
@@ -1404,24 +2056,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uid = req.user.id;
 
       const canRead = (m: "deals" | "quotations" | "agreements" | "invoices") => canReadModule(req.user, m);
-      const [deals, quotes, contracts, invoices] = await Promise.all([
+      const [deals, quotes, contracts, invoices, settings] = await Promise.all([
         orgId && canRead("deals") ? storage.getDealsByOrg(orgId, uid) : Promise.resolve([]),
         orgId && canRead("quotations") ? storage.getQuotesByOrg(orgId, uid) : Promise.resolve([]),
         orgId && canRead("agreements") ? storage.getContractsByOrg(orgId, uid) : Promise.resolve([]),
         orgId && canRead("invoices") ? storage.getBrandInvoicesByOrg(orgId, uid) : Promise.resolve([]),
+        documentLocaleFor(req.user),
       ]);
 
       const stamp = new Date().toISOString();
+
+      // A person reading their own data should read their MONEY: storage holds
+      // minor units, and `"dealAmountMinor": 6500000` with no context reads as
+      // ₹65 lakh rather than ₹65,000. So every amount leaves in major units
+      // (65000), named without the "Minor" suffix, beside the ISO code it is in.
+      // Deals carry no currency of their own — they are the org's; agreements
+      // and invoices carry the currency they were issued in.
+      const major = (minor: number | null | undefined, currency: string) =>
+        minor === null || minor === undefined ? null : fromMinor(Number(minor), currency);
+      const exportDeal = <T extends { dealAmountMinor: number }>(d: T) => {
+        const { dealAmountMinor, ...rest } = d;
+        return { ...rest, dealAmount: major(dealAmountMinor, settings.currency), currency: settings.currency };
+      };
+      const exportContract = (c: Contract) => {
+        const { contractValueMinor, estampAmountMinor, ...rest } = c;
+        const currency = issuedCurrency(c) ?? settings.currency;
+        return {
+          ...rest,
+          contractValue: major(contractValueMinor, currency),
+          estampAmount: major(estampAmountMinor, currency),
+          currency,
+        };
+      };
+      const exportInvoice = (i: (typeof invoices)[number]) => {
+        const { dealAmountMinor, lineItems, ...rest } = i;
+        const currency = issuedCurrency(i) ?? settings.currency;
+        return {
+          ...rest,
+          dealAmount: major(dealAmountMinor, currency),
+          lineItems: Array.isArray(lineItems)
+            ? lineItems.map((line: InvoiceLineItem) => {
+                const { rateMinor, amountMinor, ...lineRest } = line;
+                return { ...lineRest, rate: major(rateMinor, currency), amount: major(amountMinor, currency) };
+              })
+            : lineItems,
+          currency,
+        };
+      };
+
+      const sampleMinor = 65000 * 10 ** getCurrency(settings.currency).exponent;
       res.setHeader("Content-Type", "application/json; charset=utf-8");
       res.setHeader("Content-Disposition", `attachment; filename="dealinsec-export-${stamp.slice(0, 10)}.json"`);
       res.send(JSON.stringify({
         exportedAt: stamp,
-        notice: "Personal data export under the Digital Personal Data Protection Act, 2023.",
+        // The DPDP Act is Indian law; it is not the basis for anyone else's export.
+        notice: settings.country === "IN"
+          ? "Personal data export under the Digital Personal Data Protection Act, 2023."
+          : "Personal data export.",
+        money: {
+          currency: settings.currency,
+          note: `Amounts are in ordinary currency units, and each record names its currency in its "currency" field (an ISO 4217 code). Example: a dealAmount of 65000 with currency ${settings.currency} is ${formatMoney(sampleMinor, settings.currency, settings.locale)}.`,
+        },
         profile,
-        deals,
-        quotations: quotes,
-        agreements: contracts,
-        invoices,
+        deals: deals.map(exportDeal),
+        quotations: quotes.map((q) => ({ ...q, deal: q.deal ? exportDeal(q.deal) : null })),
+        agreements: contracts.map(exportContract),
+        invoices: invoices.map(exportInvoice),
       }, null, 2));
     } catch (error) {
       console.error("Account export error:", error);
@@ -1486,23 +2186,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // account and signature to each member. Returns only fields that legitimately
   // appear on an invoice or agreement.
   // No withOrg: a solo account has no organisation and is its own issuer.
+  //
+  // These are the LIVE values — right for composing a new document and for the
+  // quotation, wrong for one already issued. Issued documents carry their own
+  // frozen copy (see buildIssuerSnapshot), built from this same function so
+  // the two can never disagree about what a field means.
   app.get("/api/org/issuer", isAuthenticated, async (req: any, res) => {
     try {
       const owner = await getBillingUser(req.user);
-      res.json({
-        name: [owner.firstName, owner.lastName].filter(Boolean).join(" ") || owner.email || "",
-        email: owner.email ?? "",
-        phone: owner.phone ?? "",
-        panNumber: owner.panNumber ?? "",
-        gstNumber: owner.gstNumber ?? "",
-        billingAddress: owner.billingAddress ?? "",
-        digitalSignature: owner.digitalSignature ?? "",
-        companySeal: (owner as any).companySeal ?? "",
-        accountHolderName: (owner as any).accountHolderName ?? "",
-        accountNumber: (owner as any).accountNumber ?? "",
-        ifscCode: (owner as any).ifscCode ?? "",
-        bankName: (owner as any).bankName ?? "",
-      });
+      res.json(issuerProfile(owner));
     } catch (error) {
       console.error("Org issuer fetch error:", error);
       res.status(500).json({ error: "Failed to load issuer details" });
@@ -1516,9 +2208,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (typeof name === "string" && name.trim()) updates.name = name.trim().slice(0, 80);
       if (typeof industry === "string") updates.industry = industry.trim().slice(0, 60) || null;
       if (typeof logo === "string") updates.logo = logo.trim().slice(0, 500) || null;
+
+      // Region: what every document this org issues is denominated and printed
+      // in. Onboarding sends it here first; without these keys that request
+      // was a 400 "Nothing to update" and every workspace stayed IN/INR.
+      const region = parseRegionFields(req.body);
+      if (!region.ok) {
+        return res.status(400).json({ field: region.field, error: region.error });
+      }
+      Object.assign(updates, region.updates);
       if (!Object.keys(updates).length) return res.status(400).json({ error: "Nothing to update" });
-      const org = await storage.updateOrganization(req.org.id, updates);
-      logOrgActivity(req.user, "updated", "organization", req.org.id, `Organization settings`);
+
+      // The region locks at the first deal — enforced HERE, not only by the
+      // Settings screen disabling its control, because a disabled control is
+      // not a guarantee. Re-sending the stored values is not a change.
+      const changed = changedRegionKeys(req.org, region.updates);
+      let org;
+      if (changed.length) {
+        if (await orgHasRecords(req.org.id)) {
+          return regionLockedResponse(res, changed, req.org, region.updates);
+        }
+        // Checked again inside the UPDATE itself, so a deal committed between
+        // the check above and this write still blocks the change instead of
+        // being relabelled by it.
+        [org] = await db.update(organizationsTable)
+          .set({ ...updates, updatedAt: new Date() })
+          .where(sql`${organizationsTable.id} = ${req.org.id} AND NOT ${orgHasRecordsSql(req.org.id)}`)
+          .returning();
+        if (!org) return regionLockedResponse(res, changed, req.org, region.updates);
+      } else {
+        org = await storage.updateOrganization(req.org.id, updates);
+      }
+      logOrgActivity(req.user, "updated", "organization", req.org.id,
+        changed.length ? `Organization settings (${changed.join(", ")})` : `Organization settings`);
       res.json(org);
     } catch (error) {
       res.status(500).json({ error: "Failed to update organization" });
@@ -2080,6 +2802,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // International checkout is not open yet (pending Razorpay International
+      // approval). The pricing page already hides the buy buttons outside
+      // India, but that is a UI rule: an account calling this route directly
+      // would otherwise be charged in RUPEES for a plan priced for its own
+      // currency. Both the workspace and the buyer must be in India.
+      const region = await documentLocaleFor(user);
+      // COUNTRY only — deliberately not currency. The region picker supports an
+      // Indian freelancer who invoices overseas clients in USD; their plan is
+      // still charged in ₹, and requiring INR here locked them out of checkout
+      // while the pricing page still showed them the buy buttons.
+      if (region.country !== "IN" || ((user as any).country ?? "IN") !== "IN") {
+        return res.status(403).json({
+          code: "CHECKOUT_UNAVAILABLE_IN_REGION",
+          error: "International checkout isn't open yet — plans can currently only be bought by accounts in India.",
+        });
+      }
+
       let sku: "pro_monthly" | "pro_yearly" | "deal_boost" | "extra_seat";
       switch (req.body.plan) {
         case "pro_monthly": sku = "pro_monthly"; break;
@@ -2218,7 +2957,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           throw grantError;
         }
 
-        // Payment receipt email — best-effort
+        // Payment receipt email — best-effort. `order.amount` is WHOLE RUPEES:
+        // payu_orders was deliberately left out of the minor-units migration
+        // (the Razorpay client converts it), so it goes in as amountRupees and
+        // the email converts once.
         const buyer = await storage.getUser(order.userId);
         if (buyer?.email) {
           const date = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
@@ -2227,7 +2969,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const { subject, html } = granted.kind === "pro"
             ? proPlanReceiptEmail({
                 firstName: buyer.firstName || undefined,
-                amount: order.amount,
+                amountRupees: order.amount,
                 paymentId: razorpay_payment_id,
                 date,
                 term: granted.term,
@@ -2237,7 +2979,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? paymentReceiptEmail({
                 firstName: buyer.firstName || undefined,
                 product: "Deal Boost — unlimited deals & quotations for 1 month",
-                amount: order.amount,
+                amountRupees: order.amount,
                 paymentId: razorpay_payment_id,
                 date,
               })
@@ -2245,14 +2987,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ? paymentReceiptEmail({
                 firstName: buyer.firstName || undefined,
                 product: `${granted.qty} extra team seat${granted.qty > 1 ? "s" : ""} — 1 month`,
-                amount: order.amount,
+                amountRupees: order.amount,
                 paymentId: razorpay_payment_id,
                 date,
               })
             : paymentReceiptEmail({
                 firstName: buyer.firstName || undefined,
                 product: `${order.credits} Deal Credit${order.credits > 1 ? "s" : ""}`,
-                amount: order.amount,
+                amountRupees: order.amount,
                 paymentId: razorpay_payment_id,
                 date,
               });

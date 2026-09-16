@@ -5,20 +5,40 @@
  * as one product. Styles live in doc.css.
  */
 import type { ReactNode } from "react";
+import type { LocaleSettings } from "@shared/schema";
+import { formatDate, formatMoney, type MoneyOptions } from "@/lib/format";
 import type { DocBlock } from "./paged";
+import { useDocFormat } from "./locale";
 
-/* ── Formatting — Indian conventions, used by every document ───────────── */
+/* ── Formatting — the document's locale, whatever it is ────────────────── */
+//
+// These replace `inr()` and the old India-only `docDate()`. The rename is the
+// point: a function called `inr` that renders dollars is a lie the compiler
+// cannot catch, and the old one-argument shape had nowhere to say which
+// currency an amount was in. Every call site now states the locale it is
+// printing in, the way every amount now states the unit it is counted in
+// (`contractValueMinor`, not `contractValue`).
+//
+// `loc` comes from `documentLocaleSettings(org, user)` — the ORG's settings,
+// so the document does not change currency depending on who opened it.
+// Inside the document tree, prefer `useDocFormat()`: it is the same
+// formatters, already bound.
 
-export const inr = (n: number | string | null | undefined): string =>
-  `₹${Math.round(Number(n || 0)).toLocaleString("en-IN")}`;
+/** MINOR units → the document's currency: `docMoney(6500000, loc)` is ₹65,000,
+ *  not ₹65,00,000. Pass the stored `*Minor` value, never a rupee figure. */
+export const docMoney = (
+  minorUnits: number | string | null | undefined,
+  loc: LocaleSettings,
+  opts?: MoneyOptions,
+): string => formatMoney(minorUnits, loc.currency, loc.locale, opts);
 
-export const docDate = (d: string | Date | null | undefined): string => {
-  if (!d) return "—";
-  const dt = new Date(d);
-  return isNaN(dt.getTime())
-    ? "—"
-    : dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-};
+/** ISO date or timestamp → the document's date format, or "—". */
+export const docDate = (
+  d: string | Date | null | undefined,
+  loc: LocaleSettings,
+): string => formatDate(d, loc.locale, { timezone: loc.timezone });
+
+export { useDocFormat };
 
 /* ── Status badge ──────────────────────────────────────────────────────── */
 
@@ -210,13 +230,19 @@ export function tableBlocks<T>({
 /* ── Ledger + prominent total ──────────────────────────────────────────── */
 
 export function TotalBlock({
-  label, amount, note, ledger = [],
+  label, amountMinor, note, ledger = [],
 }: {
   label: string;
-  amount: number;
+  /** The headline figure in MINOR units. Formatted here, in the document's own
+   *  currency — the caller must not pre-format it, or the biggest number on
+   *  the page becomes the one place the locale can drift. */
+  amountMinor: number;
   note?: string;
+  /** Pre-formatted rows above the total (subtotal, and the tax lines to come).
+   *  Format them with `useDocFormat().money()` so they match. */
   ledger?: { label: string; value: string }[];
 }) {
+  const fmt = useDocFormat();
   return (
     <div>
       {ledger.length > 0 && (
@@ -234,7 +260,7 @@ export function TotalBlock({
           <div className="doc-label" style={{ color: "var(--doc-brand)" }}>{label}</div>
           {note && <div className="doc-small doc-muted-t" style={{ marginTop: "0.6mm" }}>{note}</div>}
         </div>
-        <div className="doc-total-amount doc-num">{inr(amount)}</div>
+        <div className="doc-total-amount doc-num">{fmt.money(amountMinor)}</div>
       </div>
     </div>
   );

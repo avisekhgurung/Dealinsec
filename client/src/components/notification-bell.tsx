@@ -19,8 +19,11 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  Bell, IndianRupee, FileCheck, FileText, Briefcase, Users, Building2, CheckCircle2,
+  Bell, FileCheck, FileText, Briefcase, Users, Building2, CheckCircle2, type LucideIcon,
 } from "lucide-react";
+import { useLocale, useMoney } from "@/hooks/use-locale";
+import { moneyIcon } from "@/components/money-icon";
+import { formatDate } from "@/lib/money";
 
 interface Activity {
   id: number;
@@ -34,15 +37,16 @@ interface Activity {
 
 const SEEN_KEY = "dis_notifications_seen_at";
 
-/** Entity → icon + tint. Money events read green, everything else neutral-brand. */
-function iconFor(a: Activity) {
+/** Entity → icon + tint. Money events read green, everything else neutral-brand.
+ *  `MoneyIcon` is the org currency's (see moneyIcon) — the rupee for India. */
+function iconFor(a: Activity, MoneyIcon: LucideIcon) {
   const isPayment = a.action.includes("payment");
-  if (isPayment) return { Icon: IndianRupee, cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" };
+  if (isPayment) return { Icon: MoneyIcon, cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" };
   switch (a.entityType) {
     case "deal": return { Icon: a.action === "completed" ? CheckCircle2 : Briefcase, cls: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400" };
     case "quotation": return { Icon: FileText, cls: "bg-teal-100 text-teal-700 dark:bg-teal-950/50 dark:text-teal-400" };
     case "agreement": return { Icon: FileCheck, cls: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400" };
-    case "invoice": return { Icon: IndianRupee, cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" };
+    case "invoice": return { Icon: MoneyIcon, cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" };
     case "member": return { Icon: Users, cls: "bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-400" };
     default: return { Icon: Building2, cls: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300" };
   }
@@ -60,7 +64,7 @@ function linkFor(a: Activity): string {
   }
 }
 
-function relativeTime(iso: string): string {
+function relativeTime(iso: string, locale: string, timezone: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
   if (m < 1) return "just now";
@@ -69,11 +73,13 @@ function relativeTime(iso: string): string {
   if (h < 24) return `${h}h ago`;
   const d = Math.floor(h / 24);
   if (d < 7) return `${d}d ago`;
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  return formatDate(iso, locale, { day: "numeric", year: false, timezone });
 }
 
 export function NotificationBell({ className = "" }: { className?: string }) {
   const { isAuthenticated } = useAuth();
+  const { locale, timezone } = useLocale();
+  const MoneyIcon = moneyIcon(useMoney().currency);
   const [open, setOpen] = useState(false);
   const [seenAt, setSeenAt] = useState<number>(() => {
     try { return parseInt(localStorage.getItem(SEEN_KEY) || "0", 10) || 0; } catch { return 0; }
@@ -151,7 +157,7 @@ export function NotificationBell({ className = "" }: { className?: string }) {
           <ScrollArea className="max-h-[380px]">
             <div className="divide-y divide-border/50">
               {activity.slice(0, 25).map((a) => {
-                const { Icon, cls } = iconFor(a);
+                const { Icon, cls } = iconFor(a, MoneyIcon);
                 const isUnread = new Date(a.createdAt).getTime() > seenAt;
                 return (
                   <Link key={a.id} href={linkFor(a)}>
@@ -173,7 +179,7 @@ export function NotificationBell({ className = "" }: { className?: string }) {
                           </span>
                         )}
                         <span className="block text-[11px] text-muted-foreground/80 mt-1">
-                          {relativeTime(a.createdAt)}
+                          {relativeTime(a.createdAt, locale, timezone)}
                         </span>
                       </span>
                       {isUnread && <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0 mt-2" />}

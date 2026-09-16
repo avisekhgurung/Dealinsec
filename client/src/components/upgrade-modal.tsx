@@ -19,9 +19,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Check, Crown, Sparkles } from "lucide-react";
+import { Check, Crown, Globe, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { usePlanPrices, formatRupees } from "@/hooks/use-plan-prices";
+import { usePlanPrices, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
 import { hasLapsedTrial } from "@shared/schema";
 import { trackEvent } from "@/lib/analytics";
 
@@ -52,9 +52,11 @@ const FEATURE_COPY: Record<UpgradeFeature, string> = {
 
 // Only what ships today — reminders and custom branding are still "coming
 // soon" on /pricing, so they're not promised here.
-const PRO_FEATURES = [
+// "GST-ready" is India's promise; outside India the line drops the word, as
+// /pricing does.
+const proFeatures = (india: boolean) => [
   "Unlimited deals & quotations",
-  "Unlimited e-signed agreements & GST-ready invoices",
+  india ? "Unlimited e-signed agreements & GST-ready invoices" : "Unlimited e-signed agreements & invoices",
   "Payment tracking — see which client owes you what",
   "Priority email support",
 ];
@@ -69,6 +71,12 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
   const trialEnded = hasLapsedTrial(user);
   // Fetched only once the modal opens; the defaults are the list prices.
   const { proMonthlyPrice, proYearlyPrice } = usePlanPrices({ enabled: open });
+  // Plans can only be bought from India until international checkout is live
+  // (see usePlanCheckoutAvailable). Elsewhere the button still leads to
+  // /pricing, which explains that, but it does not quote a rupee price nothing
+  // can charge. Always true for an Indian account, so India sees the modal
+  // exactly as before.
+  const checkoutAvailable = usePlanCheckoutAvailable();
 
   const openUpgradeModal = useCallback((options: UpgradeModalOptions = {}) => {
     setFeature(options.feature ?? "deals");
@@ -96,7 +104,7 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
           </DialogHeader>
 
           <ul className="space-y-2 my-1">
-            {PRO_FEATURES.map((f) => (
+            {proFeatures(checkoutAvailable).map((f) => (
               <li key={f} className="flex items-start gap-2.5 text-sm">
                 <div className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center mt-px">
                   <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" strokeWidth={3} />
@@ -116,20 +124,30 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
               data-testid="upgrade-modal-pro"
             >
               <Crown className="w-4 h-4 mr-2 text-amber-300" />
-              Upgrade to Pro — {formatRupees(proMonthlyPrice)}/month
-              <span className="absolute -top-2 right-3 px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 text-[9px] font-black uppercase tracking-wide flex items-center gap-0.5">
-                <Sparkles className="w-2.5 h-2.5" /> Recommended
-              </span>
+              {checkoutAvailable ? <>Upgrade to Pro — {formatRupees(proMonthlyPrice)}/month</> : <>See Pro plans</>}
+              {checkoutAvailable && (
+                <span className="absolute -top-2 right-3 px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 text-[9px] font-black uppercase tracking-wide flex items-center gap-0.5">
+                  <Sparkles className="w-2.5 h-2.5" /> Recommended
+                </span>
+              )}
             </Button>
 
-            <p className="text-[11px] text-center text-muted-foreground">
-              Or {formatRupees(proYearlyPrice)}/year on Pro Annual — one payment for the whole year.
-            </p>
+            {checkoutAvailable ? (
+              <p className="text-[11px] text-center text-muted-foreground">
+                Or {formatRupees(proYearlyPrice)}/year on Pro Annual — one payment for the whole year.
+              </p>
+            ) : (
+              <p className="text-[11px] text-center text-muted-foreground flex items-center justify-center gap-1.5" data-testid="upgrade-modal-intl-soon">
+                <Globe className="w-3 h-3" /> International checkout coming soon
+              </p>
+            )}
           </div>
 
-          <p className="text-[11px] text-center text-muted-foreground mt-1">
-            One-time payments · no auto-debit · 7-day refund
-          </p>
+          {checkoutAvailable && (
+            <p className="text-[11px] text-center text-muted-foreground mt-1">
+              One-time payments · no auto-debit · 7-day refund
+            </p>
+          )}
         </DialogContent>
       </Dialog>
     </UpgradeModalContext.Provider>

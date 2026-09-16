@@ -10,7 +10,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { useMemo, useState, useEffect, useRef } from "react";
 import {
   Plus, Briefcase, FileCheck, Receipt, ChevronRight, LogOut,
-  TrendingUp, IndianRupee, Clock, CheckCircle2,
+  TrendingUp, IndianRupee, Banknote, Clock, CheckCircle2,
   UserCircle, MapPin, FileText, PenTool, Landmark, X as XIcon, Sparkles,
   Crown, Rocket, Users2, UserPlus2, Settings as SettingsIcon,
   Zap, FileSignature, ArrowUpRight
@@ -20,10 +20,11 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import {
-  hasActivePro, hasActiveDealBoost, hasActiveTrial, hasLapsedTrial, getSubscriptionType,
+  hasActivePro, hasActiveDealBoost, hasActiveTrial, hasLapsedTrial, getSubscriptionType, minorUnitFactor,
 } from "@shared/schema";
 import { TrialCountdown } from "@/components/trial-countdown";
 import { memberCan } from "@shared/permissions";
+import { useLocale, useMoney, type MoneyFormat } from "@/hooks/use-locale";
 import type { Deal, Contract, Invoice, BrandInvoice, Quote, User } from "@shared/schema";
 
 // ─── Team seats strip ────────────────────────────────────────────────────────
@@ -68,8 +69,10 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
   const proActive = hasActivePro(user);
   const boostActive = hasActiveDealBoost(user);
   const trialActive = hasActiveTrial(user);
+  // The viewer's own locale: a renewal date is about them, not about the org.
+  const { locale } = useLocale();
   const fmtDate = (d: Date | string | null | undefined) =>
-    d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null;
+    d ? new Date(d).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : null;
 
   if (proActive) {
     const tier = getSubscriptionType(user) === "PRO_MONTHLY" ? "Monthly" : "Annual";
@@ -209,14 +212,14 @@ function avatarTone(name: string): string {
   return AVATAR_TONES[Math.abs(h) % AVATAR_TONES.length];
 }
 
-function getMonthLabel(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+function getMonthLabel(dateStr: string, locale: string) {
+  return new Date(dateStr).toLocaleDateString(locale, { month: "short", year: "2-digit" });
 }
 
-function buildDealsOverTime(deals: Deal[]) {
+function buildDealsOverTime(deals: Deal[], locale: string) {
   const map: Record<string, number> = {};
   deals.forEach(d => {
-    const key = getMonthLabel(d.startDate);
+    const key = getMonthLabel(d.startDate, locale);
     map[key] = (map[key] ?? 0) + 1;
   });
   return Object.entries(map).slice(-6).map(([month, count]) => ({ month, count }));
@@ -224,14 +227,14 @@ function buildDealsOverTime(deals: Deal[]) {
 
 /** Last 6 calendar months, deals started + quotations issued per month —
  *  two counts, same unit, so they may share one axis (never two scales). */
-function buildMonthlyActivity(deals: Deal[], quotes: { createdAt?: Date | string | null }[]) {
+function buildMonthlyActivity(deals: Deal[], quotes: { createdAt?: Date | string | null }[], locale: string) {
   const months: { key: string; month: string; deals: number; quotations: number }[] = [];
   const now = new Date();
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push({
       key: `${d.getFullYear()}-${d.getMonth()}`,
-      month: d.toLocaleDateString("en-IN", { month: "short" }),
+      month: d.toLocaleDateString(locale, { month: "short" }),
       deals: 0,
       quotations: 0,
     });
@@ -251,11 +254,13 @@ function buildMonthlyActivity(deals: Deal[], quotes: { createdAt?: Date | string
   return months;
 }
 
-function buildRevenueOverTime(deals: Deal[]) {
+/** Series values are MINOR units — summed as integers, formatted once at the
+ *  axis and the tooltip. Summing majors would drift by a fraction a month. */
+function buildRevenueOverTime(deals: Deal[], locale: string) {
   const map: Record<string, number> = {};
   deals.forEach(d => {
-    const key = getMonthLabel(d.startDate);
-    map[key] = (map[key] ?? 0) + Number(d.dealAmount);
+    const key = getMonthLabel(d.startDate, locale);
+    map[key] = (map[key] ?? 0) + Number(d.dealAmountMinor);
   });
   return Object.entries(map).slice(-6).map(([month, amount]) => ({ month, amount }));
 }
@@ -337,14 +342,84 @@ function colorForPlatform(name: string, fallbackIndex: number): string {
 
 // ─── custom tooltip ──────────────────────────────────────────────────────────
 
-function CustomTooltip({ active, payload, label, prefix = "" }: any) {
+/* Compact labels. INR keeps the EXACT lakh logic the dashboard has always
+ * shipped — character for character, including its quirks ("65k" with a
+ * lowercase k, "150L" not "1.5Cr", a donut centre that always carries one
+ * decimal: "₹0.7L", "₹125.0L"). Intl's en-IN compact ladder is a different
+ * one ("65K", "1.5Cr", "₹65K"), and every Indian user would see their
+ * dashboard change for no reason of theirs. Every other currency has no such
+ * history, so it gets the locale's own ladder: "150K" in the US, "1,5 Mio." in
+ * Germany. Compact notation is the one money shape shared/money.ts does not
+ * offer, which is the only reason these are local. All take MINOR units. */
+
+const isInr = (fmt: MoneyFormat) => fmt.currency === "INR";
+
+/** Chart axis ticks: a bare number, since the chart is titled as money. */
+function compactAmount(minor: number, fmt: MoneyFormat): string {
+  const v = fmt.major(minor);
+  if (isInr(fmt)) {
+    // The shipped tick formatter, verbatim, on the same rupee figure.
+    return v >= 100000 ? `${(v / 100000).toFixed(v % 100000 ? 1 : 0)}L` : v >= 1000 ? `${Math.round(v / 1000)}k` : String(v);
+  }
+  return new Intl.NumberFormat(fmt.locale, { notation: "compact", maximumFractionDigits: 1 }).format(v);
+}
+
+/** The same WITH the currency, for a headline that stands alone, where a bare
+ *  "1.5L" would not say it is money. For non-INR the locale places the glyph;
+ *  `minimumFractionDigits: 0` stops Intl padding "$500" out to "$500.0". */
+function compactMoney(minor: number, fmt: MoneyFormat): string {
+  const v = fmt.major(minor);
+  if (isInr(fmt)) {
+    // The shipped donut-centre expression, verbatim. Its first branch is
+    // effectively unreachable (toFixed(1) always has a point, toFixed(0)
+    // never does), so this always prints one decimal of a lakh — and it is
+    // kept that way because that is what Indian users see today. The glyph
+    // is `fmt.symbol`, which comes from the same Intl call as fmt.money(),
+    // so it can never disagree with the amounts beside it ("₹" in en-IN).
+    return `${fmt.symbol}${(v / 100000).toFixed(1) === (v / 100000).toFixed(0)
+      ? v.toLocaleString("en-IN")
+      : `${(v / 100000).toFixed(1)}L`}`;
+  }
+  return new Intl.NumberFormat(fmt.locale, {
+    style: "currency",
+    currency: fmt.currency,
+    notation: "compact",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  }).format(v);
+}
+
+/** A count-up frame, in whole major units until the last frame.
+ *
+ *  useCountUp steps through integers, which are now paise/cents, so every
+ *  intermediate frame would flash a fraction — "₹12,345.67" — that no amount
+ *  ever had, and the tile would change width mid-animation. Rounding frames to
+ *  whole units keeps the count-up reading the way it always has; the real
+ *  value, fraction and all, lands on the final frame.
+ *
+ *  Integer arithmetic on the currency's factor rather than `fmt.minor()`:
+ *  that one is for WRITES and refuses until the org's currency has loaded,
+ *  and a dashboard tile is display. */
+function moneyFrame(animatedMinor: number, targetMinor: number, fmt: MoneyFormat): string {
+  if (animatedMinor === targetMinor) return fmt.money(targetMinor);
+  const factor = minorUnitFactor(fmt.currency);
+  return fmt.money(Math.round(animatedMinor / factor) * factor);
+}
+
+/** The Pipeline Value tile's icon. India keeps the rupee glyph it has always
+ *  shown; a generic note elsewhere, rather than a rupee on a dollar tile. */
+const pipelineIcon = (fmt: MoneyFormat) => (isInr(fmt) ? IndianRupee : Banknote);
+
+// `format` is passed only by the money charts; counts render bare. Branching
+// on a "₹" prefix, as this did, made the rupee the only currency a chart knew.
+function CustomTooltip({ active, payload, label, format }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-background/95 backdrop-blur border border-white/20 rounded-lg p-3 shadow-lg text-xs">
       <p className="font-semibold mb-1">{label}</p>
       {payload.map((p: any, i: number) => (
         <p key={i} style={{ color: p.color }} className="font-medium">
-          {p.name}: {prefix}{typeof p.value === "number" && prefix === "₹" ? p.value.toLocaleString("en-IN") : p.value}
+          {p.name}: {format && typeof p.value === "number" ? format(p.value) : p.value}
         </p>
       ))}
     </div>
@@ -389,8 +464,9 @@ const TONE_STYLES: Record<StatTone, { bg: string; text: string }> = {
 function StatCard({ title, value, format, icon: Icon, tone, href, loading, sub, trendUp }: {
   title: string;
   value: number;
-  /** Optional numeral formatter (e.g. ₹ + Indian grouping). Applied to the
-   *  animated value each frame, so currency counts up too. */
+  /** Optional formatter — pass `fmt.money` for a money tile, and `value` in
+   *  minor units. Applied to the animated value each frame, so money counts up
+   *  too. */
   format?: (n: number) => string;
   icon: any;
   tone: StatTone;
@@ -421,7 +497,7 @@ function StatCard({ title, value, format, icon: Icon, tone, href, loading, sub, 
         ) : (() => {
           const text = format ? format(animated) : String(animated);
           // Long currency strings step down instead of truncating —
-          // "₹15,50,000" must never render as "₹15,50,0…".
+          // "₹15,50,000" and "$1,250,000.00" must never render clipped.
           const size =
             text.length > 11 ? "text-base sm:text-lg lg:text-xl"
             : text.length > 8 ? "text-lg sm:text-xl lg:text-2xl"
@@ -460,15 +536,22 @@ const MONEY_TINTS = {
   },
 } as const;
 
-function MoneyTile({ label, amount, icon: Icon, tint }: {
+function MoneyTile({ label, amountMinor, icon: Icon, tint, fmt }: {
   label: string;
-  amount: number;
+  /** Minor units — formatted here, never before. */
+  amountMinor: number;
   icon: any;
   tint: keyof typeof MONEY_TINTS;
+  fmt: MoneyFormat;
 }) {
   const t = MONEY_TINTS[tint];
-  const animated = useCountUp(amount);
-  const long = amount.toLocaleString("en-IN").length > 7;
+  const animated = useCountUp(amountMinor);
+  const text = moneyFrame(animated, amountMinor, fmt);
+  // Measure the FINAL string, not a rupee-shaped guess at it ("$1,250,000.50"
+  // is longer than "₹12,50,000" for similar money) and not the animating one,
+  // so the size is settled before the count-up starts rather than jumping
+  // down a step halfway through it.
+  const long = fmt.money(amountMinor).length > 8;
   return (
     <div className={`rounded-xl p-3 lg:p-5 overflow-hidden ${t.card}`}>
       <div className="flex items-center gap-2 mb-1.5 lg:mb-2.5">
@@ -478,7 +561,7 @@ function MoneyTile({ label, amount, icon: Icon, tint }: {
         <span className="text-xs lg:text-sm text-muted-foreground uppercase tracking-wider font-semibold">{label}</span>
       </div>
       <p className={`font-bold truncate leading-tight tabular-nums ${t.amount} ${long ? "text-base lg:text-2xl" : "text-xl lg:text-3xl"}`}>
-        ₹{animated.toLocaleString("en-IN")}
+        {text}
       </p>
     </div>
   );
@@ -488,22 +571,26 @@ function MoneyTile({ label, amount, icon: Icon, tint }: {
 // "How much money am I leaving on the table?" — three deterministic buckets
 // from the insights engine; every number clickable, none invented.
 function MoneyRadarCard() {
+  // Mirrors the Radar shape in server/copilot/insights.ts. This is a hand-typed
+  // response, so the compiler cannot see a rename on the server — the `Minor`
+  // suffixes must match there exactly, or every bucket reads `undefined` and
+  // the card silently shows nothing collectible.
   const { data } = useQuery<{
     radar: {
-      overdue: { total: number; count: number };
-      dueThisWeek: { total: number; count: number };
-      readyToInvoice: { total: number; count: number };
-      collectible: number;
+      overdue: { totalMinor: number; count: number };
+      dueThisWeek: { totalMinor: number; count: number };
+      readyToInvoice: { totalMinor: number; count: number };
+      collectibleMinor: number;
     };
   }>({ queryKey: ["/api/copilot/briefing"], staleTime: 60_000 });
+  const fmt = useMoney();
   const radar = data?.radar;
-  if (!radar || radar.collectible <= 0) return null;
-  const inrFmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+  if (!radar || !(radar.collectibleMinor > 0)) return null;
   const buckets = [
-    { label: "Overdue", total: radar.overdue.total, count: radar.overdue.count, href: "/invoices", dot: "bg-rose-500", cls: "text-rose-600 dark:text-rose-400", tint: "bg-rose-500/[0.04] border-rose-500/20 hover:border-rose-500/40" },
-    { label: "Due this week", total: radar.dueThisWeek.total, count: radar.dueThisWeek.count, href: "/invoices", dot: "bg-amber-500", cls: "text-amber-600 dark:text-amber-400", tint: "bg-amber-500/[0.04] border-amber-500/20 hover:border-amber-500/40" },
-    { label: "Ready to invoice", total: radar.readyToInvoice.total, count: radar.readyToInvoice.count, href: "/contracts", dot: "bg-emerald-500", cls: "text-emerald-600 dark:text-emerald-400", tint: "bg-emerald-500/[0.04] border-emerald-500/20 hover:border-emerald-500/40" },
-  ].filter((b) => b.total > 0);
+    { label: "Overdue", totalMinor: radar.overdue.totalMinor, count: radar.overdue.count, href: "/invoices", dot: "bg-rose-500", cls: "text-rose-600 dark:text-rose-400", tint: "bg-rose-500/[0.04] border-rose-500/20 hover:border-rose-500/40" },
+    { label: "Due this week", totalMinor: radar.dueThisWeek.totalMinor, count: radar.dueThisWeek.count, href: "/invoices", dot: "bg-amber-500", cls: "text-amber-600 dark:text-amber-400", tint: "bg-amber-500/[0.04] border-amber-500/20 hover:border-amber-500/40" },
+    { label: "Ready to invoice", totalMinor: radar.readyToInvoice.totalMinor, count: radar.readyToInvoice.count, href: "/contracts", dot: "bg-emerald-500", cls: "text-emerald-600 dark:text-emerald-400", tint: "bg-emerald-500/[0.04] border-emerald-500/20 hover:border-emerald-500/40" },
+  ].filter((b) => b.totalMinor > 0);
   return (
     <Card className="glass-card border-emerald-300/40 dark:border-emerald-800/40 relative overflow-hidden" data-testid="money-radar">
       {/* Ambient wash + soft corner glow — the hero card of the dashboard. */}
@@ -518,7 +605,7 @@ function MoneyRadarCard() {
           Money Radar
         </p>
         <p className="mt-2 text-[2.35rem] leading-[1.05] lg:text-[3.25rem] font-black tracking-tight tabular-nums text-foreground">
-          {inrFmt(radar.collectible)}
+          {fmt.money(radar.collectibleMinor)}
         </p>
         <p className="text-sm text-muted-foreground mt-1 mb-5">
           potentially collectible right now
@@ -533,7 +620,7 @@ function MoneyRadarCard() {
                 <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-semibold uppercase tracking-wide">
                   <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`} /> {b.label} · {b.count}
                 </p>
-                <p className={`font-bold text-xl lg:text-2xl tabular-nums mt-1 ${b.cls}`}>{inrFmt(b.total)}</p>
+                <p className={`font-bold text-xl lg:text-2xl tabular-nums mt-1 ${b.cls}`}>{fmt.money(b.totalMinor)}</p>
               </button>
             </Link>
           ))}
@@ -547,6 +634,7 @@ function MoneyRadarCard() {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const fmt = useMoney();
   const canCreateDeal = memberCan(user as any, "deals.create");
   const displayName = user?.firstName && user?.lastName
     ? `${user.firstName} ${user.lastName}`
@@ -556,7 +644,7 @@ export default function DashboardPage() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const firstNameOnly = user?.firstName || displayName.split(" ")[0];
-  const todayLabel = new Date().toLocaleDateString("en-IN", {
+  const todayLabel = new Date().toLocaleDateString(fmt.locale, {
     weekday: "long", day: "numeric", month: "long",
   });
 
@@ -586,12 +674,13 @@ export default function DashboardPage() {
   const totalDeals = deals.length;
   const signedContracts = contracts.filter(c => c.status === "Signed" || c.status === "Active").length;
   const paidInvoices = invoices.filter(i => i.status === "Paid").length;
-  const totalRevenue = deals
+  // Minor units throughout; formatted only where they reach the screen.
+  const totalRevenueMinor = deals
     .filter(d => d.status === "Completed" || d.status === "Active")
-    .reduce((s, d) => s + Number(d.dealAmount), 0);
-  const pendingRevenue = deals
+    .reduce((s, d) => s + Number(d.dealAmountMinor), 0);
+  const pendingRevenueMinor = deals
     .filter(d => d.status === "Pending")
-    .reduce((s, d) => s + Number(d.dealAmount), 0);
+    .reduce((s, d) => s + Number(d.dealAmountMinor), 0);
 
   // Stat-card sub-metrics (trend lines under each number)
   const now = new Date();
@@ -620,10 +709,14 @@ export default function DashboardPage() {
     // Deep links land straight in EDIT mode on the right section — never on
     // the read-only page with an Edit button to hunt for.
     { key: "billingAddress",     label: "Billing address",  icon: MapPin,      done: Boolean(user?.billingAddress),     href: "/profile?edit=1&section=business",  hint: "Appears on every invoice" },
-    { key: "panNumber",          label: "PAN number",       icon: FileText,    done: Boolean(user?.panNumber),          href: "/profile?edit=1&section=business",  hint: "Required for contracts & GST" },
+    // PAN is an Indian tax ID. Outside India profile.tsx hides the field, so
+    // the task could never be completed and would nag forever.
+    ...(fmt.settings.country === "IN"
+      ? [{ key: "panNumber",     label: "PAN number",       icon: FileText,    done: Boolean(user?.panNumber),          href: "/profile?edit=1&section=business",  hint: "Required for contracts & GST" }]
+      : []),
     { key: "digitalSignature",   label: "Digital signature",icon: PenTool,     done: Boolean(user?.digitalSignature),   href: "/profile?edit=1&section=signature", hint: "Auto-applied on agreements" },
-    { key: "bank",               label: "Bank details",     icon: Landmark,    done: Boolean(user?.accountNumber && user?.ifscCode && user?.accountHolderName), href: "/profile?edit=1&section=bank", hint: "So brands can pay you" },
-  ], [user?.billingAddress, user?.panNumber, user?.digitalSignature, user?.accountNumber, user?.ifscCode, user?.accountHolderName]);
+    { key: "bank",               label: "Bank details",     icon: Landmark,    done: Boolean(user?.accountNumber && user?.ifscCode && user?.accountHolderName), href: "/profile?edit=1&section=bank", hint: "So clients can pay you" },
+  ], [fmt.settings.country, user?.billingAddress, user?.panNumber, user?.digitalSignature, user?.accountNumber, user?.ifscCode, user?.accountHolderName]);
 
   const profileDone = profileChecklist.filter(i => i.done).length;
   const profileTotal = profileChecklist.length;
@@ -852,9 +945,9 @@ export default function DashboardPage() {
             trendUp={paidThisWeek > 0} />
           <StatCard
             title="Pipeline Value"
-            value={totalRevenue + pendingRevenue}
-            format={(n) => `₹${n.toLocaleString("en-IN")}`}
-            icon={IndianRupee}
+            value={totalRevenueMinor + pendingRevenueMinor}
+            format={(n) => moneyFrame(n, totalRevenueMinor + pendingRevenueMinor, fmt)}
+            icon={pipelineIcon(fmt)}
             tone="slate"
             href="/deals"
             loading={isLoading}
@@ -932,19 +1025,21 @@ export default function DashboardPage() {
         })()}
 
         {/* ── Revenue summary strip — money reads as money: tinted tiles ── */}
-        {!isLoading && (totalRevenue > 0 || pendingRevenue > 0) && (
+        {!isLoading && (totalRevenueMinor > 0 || pendingRevenueMinor > 0) && (
           <div className="grid grid-cols-2 gap-3 lg:gap-5">
             <MoneyTile
               label="Earned"
-              amount={totalRevenue}
+              amountMinor={totalRevenueMinor}
               icon={TrendingUp}
               tint="emerald"
+              fmt={fmt}
             />
             <MoneyTile
               label="Pending"
-              amount={pendingRevenue}
+              amountMinor={pendingRevenueMinor}
               icon={Clock}
               tint="amber"
+              fmt={fmt}
             />
           </div>
         )}
@@ -953,8 +1048,8 @@ export default function DashboardPage() {
             #059669/#F59E0B validated (CVD + normal-vision pass); counts
             share one axis, money gets its own chart — never dual axes. ── */}
         {!isLoading && (() => {
-          const revenue = buildRevenueOverTime(deals);
-          const activity = buildMonthlyActivity(deals, quotes);
+          const revenue = buildRevenueOverTime(deals, fmt.locale);
+          const activity = buildMonthlyActivity(deals, quotes, fmt.locale);
           const quotedDeals = new Set(quotes.map((q) => q.dealId)).size;
           const invoicedDeals = new Set(brandInvoices.map((i) => i.dealId)).size;
           const paidDeals = new Set(brandInvoices.filter((i) => i.status === "Paid").map((i) => i.dealId)).size;
@@ -1001,8 +1096,8 @@ export default function DashboardPage() {
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.6)" vertical={false} />
                           <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
                           <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false}
-                            tickFormatter={(v: number) => (v >= 100000 ? `${(v / 100000).toFixed(v % 100000 ? 1 : 0)}L` : v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))} />
-                          <Tooltip content={<CustomTooltip prefix="₹" />} />
+                            tickFormatter={(v: number) => compactAmount(v, fmt)} />
+                          <Tooltip content={<CustomTooltip format={fmt.money} />} />
                           <Area type="monotone" dataKey="amount" name="Revenue" stroke="#059669" strokeWidth={2}
                             fill="url(#dis-rev-fill)" dot={{ r: 3, fill: "#059669", strokeWidth: 2, stroke: "hsl(var(--background))" }}
                             activeDot={{ r: 5 }} />
@@ -1101,19 +1196,19 @@ export default function DashboardPage() {
 
             {/* Bottom row — Platform bar (wide) + Invoice Money pie (compact) */}
             {(platformDist.length > 0 || brandInvoices.length > 0) && (() => {
-              const paidValue = brandInvoices
+              const paidValueMinor = brandInvoices
                 .filter(bi => bi.status === "Paid")
-                .reduce((s, bi) => s + Number(bi.dealAmount || 0), 0);
-              const unpaidValue = brandInvoices
+                .reduce((s, bi) => s + Number(bi.dealAmountMinor || 0), 0);
+              const unpaidValueMinor = brandInvoices
                 .filter(bi => bi.status !== "Paid")
-                .reduce((s, bi) => s + Number(bi.dealAmount || 0), 0);
-              const totalInvoiceValue = paidValue + unpaidValue;
+                .reduce((s, bi) => s + Number(bi.dealAmountMinor || 0), 0);
+              const totalInvoiceValueMinor = paidValueMinor + unpaidValueMinor;
               const paidCount = brandInvoices.filter(bi => bi.status === "Paid").length;
               const unpaidCount = brandInvoices.length - paidCount;
-              const moneyPie = totalInvoiceValue > 0
+              const moneyPie = totalInvoiceValueMinor > 0
                 ? [
-                    { name: "Received", value: paidValue, fill: "#10B981", count: paidCount },
-                    { name: "Pending",  value: unpaidValue, fill: "#F59E0B", count: unpaidCount },
+                    { name: "Received", value: paidValueMinor, fill: "#10B981", count: paidCount },
+                    { name: "Pending",  value: unpaidValueMinor, fill: "#F59E0B", count: unpaidCount },
                   ].filter(s => s.value > 0)
                 : [];
               return (
@@ -1192,7 +1287,7 @@ export default function DashboardPage() {
                                     return (
                                       <div className="bg-background/95 border border-border/60 rounded-lg p-2.5 text-xs shadow-lg">
                                         <p style={{ color: d.fill }} className="font-semibold mb-0.5">{d.name}</p>
-                                        <p className="font-bold text-foreground">₹{Number(d.value).toLocaleString("en-IN")}</p>
+                                        <p className="font-bold text-foreground">{fmt.money(d.value)}</p>
                                         <p className="text-muted-foreground">{d.count} invoice{d.count !== 1 ? "s" : ""}</p>
                                       </div>
                                     );
@@ -1203,13 +1298,11 @@ export default function DashboardPage() {
                             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                               <span className="text-[10px] lg:text-xs uppercase tracking-wider font-semibold text-muted-foreground">Total billed</span>
                               <span className="text-lg lg:text-2xl font-bold text-foreground leading-tight">
-                                ₹{(totalInvoiceValue / 100000).toFixed(1) === (totalInvoiceValue / 100000).toFixed(0)
-                                  ? totalInvoiceValue.toLocaleString("en-IN")
-                                  : `${(totalInvoiceValue / 100000).toFixed(1)}L`}
+                                {compactMoney(totalInvoiceValueMinor, fmt)}
                               </span>
                             </div>
                           </div>
-                          {/* Stacked rows: a ₹ amount and a label can't share one
+                          {/* Stacked rows: an amount and a label can't share one
                               line in a ~180px legend without truncating the name. */}
                           <div className="w-full xl:flex-1 min-w-0 self-stretch flex flex-col justify-center gap-3">
                             {moneyPie.map((entry, i) => (
@@ -1217,10 +1310,10 @@ export default function DashboardPage() {
                                 <div className="flex items-baseline gap-2 text-xs lg:text-[13px]">
                                   <span className="w-2 h-2 rounded-full shrink-0 translate-y-[-1px]" style={{ backgroundColor: entry.fill }} />
                                   <span className="flex-1 min-w-0 truncate text-foreground">{entry.name}</span>
-                                  <span className="text-muted-foreground/80 tabular-nums shrink-0">{Math.round((entry.value / totalInvoiceValue) * 100)}%</span>
+                                  <span className="text-muted-foreground/80 tabular-nums shrink-0">{Math.round((entry.value / totalInvoiceValueMinor) * 100)}%</span>
                                 </div>
                                 <div className="pl-4 font-semibold text-foreground tabular-nums text-sm lg:text-[15px] leading-tight">
-                                  ₹{Number(entry.value).toLocaleString("en-IN")}
+                                  {fmt.money(entry.value)}
                                 </div>
                               </div>
                             ))}
@@ -1269,7 +1362,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-2.5 lg:gap-3.5 shrink-0">
                       <span className="text-sm lg:text-base font-bold text-foreground tabular-nums">
-                        ₹{Number(deal.dealAmount).toLocaleString("en-IN")}
+                        {fmt.money(deal.dealAmountMinor)}
                       </span>
                       <StatusBadge status={deal.status} size="compact" />
                       <ChevronRight className="hidden lg:block w-4 h-4 text-muted-foreground/50 group-hover:text-foreground group-hover:translate-x-0.5 transition-all" />

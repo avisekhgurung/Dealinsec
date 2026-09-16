@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, text, integer, boolean, json, serial, varchar, timestamp, index, jsonb, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, bigint, boolean, json, serial, varchar, timestamp, index, jsonb, unique, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { dealTypeOptions as TAXONOMY_DEAL_TYPES } from "./dealTypeTaxonomy";
@@ -40,6 +40,228 @@ export const dealStatusOptions = ["Pending", "Active", "Completed"] as const;
 export const contractStatusOptions = ["Signed", "Active", "Completed"] as const;
 export const invoiceStatusOptions = ["Unpaid", "Paid"] as const;
 export const userRoleOptions = ["influencer", "brand"] as const;
+
+// ═══════════════════════════════════════════════════════════════════════
+// LOCALE + MONEY PRIMITIVES
+//
+// DealInSec is no longer India-only. A freelancer picks a country and every
+// amount, document and message follows that country's conventions. India is
+// one country among many here — it is the DEFAULT, never a special case, so
+// every row written before these columns existed reads back as IN/INR/en-IN/
+// Asia/Kolkata and behaves exactly as it does today.
+// ═══════════════════════════════════════════════════════════════════════
+
+export interface CurrencyMeta {
+  /** ISO-4217 alphabetic code. */
+  code: string;
+  /** Glyph for tight spaces only — input adornments, table headers. Real
+   *  formatting goes through Intl with the user's locale, never this alone
+   *  (locale decides symbol placement, grouping and the space, not us). */
+  symbol: string;
+  /** ISO-4217 minor-unit exponent — the number of decimal places the currency
+   *  actually has. 2 for most, 0 for JPY (a yen has no sub-unit), 3 for the
+   *  Gulf dinars. Anything converting between major and minor units MUST read
+   *  this. `* 100` is the bug this field exists to prevent. */
+  exponent: number;
+  name: string;
+}
+
+/** The currencies we support. Adding one is a data row, not a code change —
+ *  including a 0-exponent or 3-exponent currency, because every conversion
+ *  derives its factor from `exponent`. */
+export const CURRENCIES = {
+  INR: { code: "INR", symbol: "₹",   exponent: 2, name: "Indian Rupee" },
+  USD: { code: "USD", symbol: "$",   exponent: 2, name: "US Dollar" },
+  GBP: { code: "GBP", symbol: "£",   exponent: 2, name: "Pound Sterling" },
+  EUR: { code: "EUR", symbol: "€",   exponent: 2, name: "Euro" },
+  AUD: { code: "AUD", symbol: "A$",  exponent: 2, name: "Australian Dollar" },
+  CAD: { code: "CAD", symbol: "C$",  exponent: 2, name: "Canadian Dollar" },
+  NZD: { code: "NZD", symbol: "NZ$", exponent: 2, name: "New Zealand Dollar" },
+  SGD: { code: "SGD", symbol: "S$",  exponent: 2, name: "Singapore Dollar" },
+  AED: { code: "AED", symbol: "د.إ", exponent: 2, name: "UAE Dirham" },
+  CHF: { code: "CHF", symbol: "CHF", exponent: 2, name: "Swiss Franc" },
+  ZAR: { code: "ZAR", symbol: "R",   exponent: 2, name: "South African Rand" },
+  // Added Sep 2026 to bill the large freelance markets in their own money
+  // (ISO-4217 exponents: VND/KRW/CLP are 0; KWD/BHD/OMR are 3).
+  PKR: { code: "PKR", symbol: "Rs", exponent: 2, name: "Pakistani Rupee" },
+  BDT: { code: "BDT", symbol: "৳", exponent: 2, name: "Bangladeshi Taka" },
+  NPR: { code: "NPR", symbol: "Rs", exponent: 2, name: "Nepalese Rupee" },
+  LKR: { code: "LKR", symbol: "Rs", exponent: 2, name: "Sri Lankan Rupee" },
+  PHP: { code: "PHP", symbol: "₱", exponent: 2, name: "Philippine Peso" },
+  IDR: { code: "IDR", symbol: "Rp", exponent: 2, name: "Indonesian Rupiah" },
+  VND: { code: "VND", symbol: "₫", exponent: 0, name: "Vietnamese Dong" },
+  THB: { code: "THB", symbol: "฿", exponent: 2, name: "Thai Baht" },
+  MYR: { code: "MYR", symbol: "RM", exponent: 2, name: "Malaysian Ringgit" },
+  HKD: { code: "HKD", symbol: "HK$", exponent: 2, name: "Hong Kong Dollar" },
+  CNY: { code: "CNY", symbol: "CN¥", exponent: 2, name: "Chinese Yuan" },
+  KRW: { code: "KRW", symbol: "₩", exponent: 0, name: "South Korean Won" },
+  TWD: { code: "TWD", symbol: "NT$", exponent: 2, name: "New Taiwan Dollar" },
+  SAR: { code: "SAR", symbol: "SAR", exponent: 2, name: "Saudi Riyal" },
+  QAR: { code: "QAR", symbol: "QAR", exponent: 2, name: "Qatari Riyal" },
+  KWD: { code: "KWD", symbol: "KWD", exponent: 3, name: "Kuwaiti Dinar" },
+  BHD: { code: "BHD", symbol: "BHD", exponent: 3, name: "Bahraini Dinar" },
+  OMR: { code: "OMR", symbol: "OMR", exponent: 3, name: "Omani Rial" },
+  ILS: { code: "ILS", symbol: "₪", exponent: 2, name: "Israeli New Shekel" },
+  TRY: { code: "TRY", symbol: "₺", exponent: 2, name: "Turkish Lira" },
+  EGP: { code: "EGP", symbol: "E£", exponent: 2, name: "Egyptian Pound" },
+  NGN: { code: "NGN", symbol: "₦", exponent: 2, name: "Nigerian Naira" },
+  KES: { code: "KES", symbol: "KSh", exponent: 2, name: "Kenyan Shilling" },
+  GHS: { code: "GHS", symbol: "GH₵", exponent: 2, name: "Ghanaian Cedi" },
+  MAD: { code: "MAD", symbol: "MAD", exponent: 2, name: "Moroccan Dirham" },
+  BRL: { code: "BRL", symbol: "R$", exponent: 2, name: "Brazilian Real" },
+  MXN: { code: "MXN", symbol: "MX$", exponent: 2, name: "Mexican Peso" },
+  COP: { code: "COP", symbol: "COL$", exponent: 2, name: "Colombian Peso" },
+  CLP: { code: "CLP", symbol: "CLP$", exponent: 0, name: "Chilean Peso" },
+  ARS: { code: "ARS", symbol: "ARS$", exponent: 2, name: "Argentine Peso" },
+  PEN: { code: "PEN", symbol: "S/", exponent: 2, name: "Peruvian Sol" },
+  PLN: { code: "PLN", symbol: "zł", exponent: 2, name: "Polish Złoty" },
+  SEK: { code: "SEK", symbol: "kr", exponent: 2, name: "Swedish Krona" },
+  NOK: { code: "NOK", symbol: "kr", exponent: 2, name: "Norwegian Krone" },
+  DKK: { code: "DKK", symbol: "kr", exponent: 2, name: "Danish Krone" },
+  CZK: { code: "CZK", symbol: "Kč", exponent: 2, name: "Czech Koruna" },
+  HUF: { code: "HUF", symbol: "Ft", exponent: 2, name: "Hungarian Forint" },
+  RON: { code: "RON", symbol: "lei", exponent: 2, name: "Romanian Leu" },
+  // Exponent 0 — ¥1,250 is 1250 minor units, not 125000. Kept in the supported
+  // set deliberately: it is the row that keeps the exponent logic honest.
+  JPY: { code: "JPY", symbol: "¥",   exponent: 0, name: "Japanese Yen" },
+} as const satisfies Record<string, CurrencyMeta>;
+
+export type CurrencyCode = keyof typeof CURRENCIES;
+export const currencyOptions = Object.keys(CURRENCIES) as CurrencyCode[];
+
+/** India, and the exact values every pre-expansion row backfills to. */
+export const DEFAULT_LOCALE_SETTINGS = {
+  country: "IN",
+  currency: "INR",
+  locale: "en-IN",
+  timezone: "Asia/Kolkata",
+} as const satisfies LocaleSettings;
+
+export interface LocaleSettings {
+  /** ISO-3166-1 alpha-2. */
+  country: string;
+  currency: CurrencyCode;
+  /** BCP-47. */
+  locale: string;
+  /** IANA tz database name. */
+  timezone: string;
+}
+
+/** The columns carrying locale, on `users` and on `organizations` alike. */
+export type LocaleFields = {
+  country?: string | null;
+  currency?: string | null;
+  locale?: string | null;
+  timezone?: string | null;
+};
+
+/** Currency metadata for a code, falling back to INR.
+ *
+ *  The fallback is deliberate and load-bearing: an unrecognised code can only
+ *  mean corrupt or hand-edited data, and a money screen that renders in the
+ *  wrong currency is recoverable while one that throws is not. Callers that
+ *  need to KNOW a code is supported should test `code in CURRENCIES`. */
+export function getCurrency(code?: string | null): CurrencyMeta {
+  const normalized = code?.trim().toUpperCase();
+  const key = (normalized && normalized in CURRENCIES ? normalized : DEFAULT_LOCALE_SETTINGS.currency) as CurrencyCode;
+  return CURRENCIES[key];
+}
+
+/** The effective locale for a user or an organization row.
+ *
+ *  Each field falls back independently, because "existing Indian behaviour
+ *  stays bit-identical" has to hold for half-populated rows too. */
+export function getLocaleSettings(source?: LocaleFields | null): LocaleSettings {
+  return {
+    country: source?.country?.trim().toUpperCase() || DEFAULT_LOCALE_SETTINGS.country,
+    currency: getCurrency(source?.currency).code as CurrencyCode,
+    locale: source?.locale?.trim() || DEFAULT_LOCALE_SETTINGS.locale,
+    timezone: source?.timezone?.trim() || DEFAULT_LOCALE_SETTINGS.timezone,
+  };
+}
+
+/** Which locale a DOCUMENT prints in when a user belongs to an organization.
+ *
+ *  The org wins. Deals, agreements and invoices are owned by the organization
+ *  (see the organizations comment below), so a member in Berlin raising an
+ *  invoice for a Mumbai agency must not quietly print euros. A member's own
+ *  row still drives their personal UI — pass the user alone for that. */
+export function resolveLocaleSettings(
+  org?: LocaleFields | null,
+  user?: LocaleFields | null,
+): LocaleSettings {
+  return getLocaleSettings({
+    country: org?.country || user?.country,
+    currency: org?.currency || user?.currency,
+    locale: org?.locale || user?.locale,
+    timezone: org?.timezone || user?.timezone,
+  });
+}
+
+// ── Minor units ────────────────────────────────────────────────────────
+// EVERY money value stored, transported or validated by this app is an
+// integer count of MINOR units — paise, cents, yen. Never a float, never a
+// major unit. Whole rupees could not represent $1,250.50 or a €18.81 VAT
+// line; floats cannot represent money at all.
+//
+// The property names carry the unit (`dealAmountMinor`, `rateMinor`) so a
+// reader can never mistake one for the other, and so the compiler flags every
+// site that still thinks in rupees rather than letting it be wrong silently.
+
+/** 10**exponent for a currency: 100 for INR/USD/GBP, 1 for JPY. */
+export function minorUnitFactor(currency?: string | null): number {
+  return 10 ** getCurrency(currency).exponent;
+}
+
+/** Upper bound on any stored money value, in minor units.
+ *
+ *  1e11 minor units is ₹1,000,000,000 — the exact ceiling the whole-rupee
+ *  schema enforced before this migration, preserved rather than widened. Well
+ *  inside both int8 and Number.MAX_SAFE_INTEGER, so sums and tax products stay
+ *  exact. Its real job is rejecting a fat-fingered extra zero. */
+export const MAX_AMOUNT_MINOR = 100_000_000_000;
+
+/** Major units as a human types them (1250.50) → minor units (125050).
+ *
+ *  Rounds, because binary floats cannot hold 19.99: `19.99 * 100` is
+ *  1998.9999999999998, and truncating there loses a cent on every such amount.
+ *  Throws rather than coercing a non-finite input — a money function that
+ *  quietly returns 0 writes a free deal to the database. */
+export function toMinor(major: number, currency?: string | null): number {
+  if (!Number.isFinite(major)) {
+    throw new RangeError(`toMinor: ${major} is not a finite amount`);
+  }
+  return Math.round(major * minorUnitFactor(currency));
+}
+
+/** Minor units → major, for DISPLAY and for seeding an edit field only.
+ *
+ *  The result is a float. Never store it, never sum a list of them — sum in
+ *  minor units and convert once at the end, and send anything a human edited
+ *  back through toMinor(). */
+export function fromMinor(minor: number, currency?: string | null): number {
+  return minor / minorUnitFactor(currency);
+}
+
+/** The shape every money field in a request body must satisfy: a non-negative
+ *  integer count of minor units. The `.int()` is what stops a "1250.50" from
+ *  ever reaching a bigint column. */
+export const amountMinorSchema = z.number().int().nonnegative().max(MAX_AMOUNT_MINOR);
+
+// ── Migration ledger ───────────────────────────────────────────────────
+// One row per one-way data migration that has already run. Boot migrations
+// that merely ADD something are naturally idempotent and need no entry; this
+// table exists for the ones that REWRITE existing rows, where "has this run?"
+// cannot be answered by looking at the data. A value heuristic ("this number
+// looks too small to be paise") is not an answer — it guesses, and guessing
+// wrong multiplies someone's invoices by a hundred twice.
+//
+// Declared here rather than left as a raw-SQL orphan so `drizzle-kit push`
+// sees it and never proposes dropping it.
+export const appMigrations = pgTable("app_migrations", {
+  key: text("key").primaryKey(),
+  appliedAt: timestamp("applied_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const sessions = pgTable(
   "sessions",
@@ -124,6 +346,15 @@ export const users = pgTable("users", {
   invitedBy: varchar("invited_by"),
   joinedAt: timestamp("joined_at"),
   role: varchar("role").notNull().default("influencer"),
+  // ── Locale (see CURRENCIES / getLocaleSettings above) ──
+  // Seeded at signup from the browser's resolved timezone plus an IP hint,
+  // always user-editable. NOT NULL with the India defaults so every row that
+  // predates these columns — and every insert from the deployed build, which
+  // does not supply them — is IN/INR/en-IN/Asia/Kolkata and unchanged.
+  country: varchar("country", { length: 2 }).notNull().default(DEFAULT_LOCALE_SETTINGS.country),
+  currency: varchar("currency", { length: 3 }).notNull().default(DEFAULT_LOCALE_SETTINGS.currency),
+  locale: varchar("locale", { length: 35 }).notNull().default(DEFAULT_LOCALE_SETTINGS.locale),
+  timezone: varchar("timezone", { length: 64 }).notNull().default(DEFAULT_LOCALE_SETTINGS.timezone),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -153,6 +384,15 @@ export const organizations = pgTable("organizations", {
   // One-shot latch for seeding the default editable roles (Admin/Sales/
   // Accounts) into org_roles — a deleted default must never resurrect.
   rolesSeeded: boolean("roles_seeded").notNull().default(false),
+  // ── Locale ──
+  // The org's settings, not the member's, are what a DOCUMENT prints in — the
+  // business data belongs to the organization, so the currency on an invoice
+  // must not follow whichever member happened to raise it. See
+  // resolveLocaleSettings(). Same India defaults, same reason.
+  country: varchar("country", { length: 2 }).notNull().default(DEFAULT_LOCALE_SETTINGS.country),
+  currency: varchar("currency", { length: 3 }).notNull().default(DEFAULT_LOCALE_SETTINGS.currency),
+  locale: varchar("locale", { length: 35 }).notNull().default(DEFAULT_LOCALE_SETTINGS.locale),
+  timezone: varchar("timezone", { length: 64 }).notNull().default(DEFAULT_LOCALE_SETTINGS.timezone),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -234,7 +474,15 @@ export const invoiceCounters = pgTable("invoice_counters", {
   organizationId: varchar("organization_id").notNull(),
   fy: varchar("fy", { length: 9 }).notNull(),
   lastNo: integer("last_no").notNull().default(0),
-});
+}, (t) => ({
+  // Production has carried this composite key since the table was created, but
+  // it was never declared here — so a database built from this schema had no
+  // key at all, and generateOrgInvoiceNumber's ON CONFLICT (organization_id,
+  // fy) upsert failed with "no unique or exclusion constraint matching", 500ing
+  // every invoice. Declared so a fresh environment matches production; the
+  // boot-gate migration adds it where it is missing.
+  pk: primaryKey({ columns: [t.organizationId, t.fy] }),
+}));
 
 /** "2627" for FY 2026-27 — the label that goes in the invoice number. */
 export function financialYearCode(d: Date = new Date()): string {
@@ -368,7 +616,11 @@ export const deals = pgTable("deals", {
   brandName: text("brand_name").notNull(),
   dealTitle: text("deal_title").notNull(),
   dealType: varchar("deal_type").notNull().default("Custom"),
-  dealAmount: integer("deal_amount").notNull(),
+  /** Deal value in MINOR units of the owning org's currency — paise, cents.
+   *  bigint, not integer: ×100 puts a ₹30 lakh deal at 3e8 and an int4 column
+   *  tops out just past ₹2.14 crore. The SQL column name is unchanged; only
+   *  the TS property is renamed, so the compiler flags every rupee-era read. */
+  dealAmountMinor: bigint("deal_amount", { mode: "number" }).notNull(),
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),
   deliverables: json("deliverables").$type<Deliverable[]>().notNull(),
@@ -418,7 +670,8 @@ export const contracts = pgTable("contracts", {
   brandName: text("brand_name").notNull(),
   startDate: text("start_date").notNull(),
   endDate: text("end_date").notNull(),
-  contractValue: integer("contract_value").notNull(),
+  /** Agreed fee in MINOR units. See deals.dealAmountMinor. */
+  contractValueMinor: bigint("contract_value", { mode: "number" }).notNull(),
   status: text("status").notNull().default("Pending"),
   exclusive: boolean("exclusive").notNull().default(true),
   proofFileName: text("proof_file_name"),
@@ -440,12 +693,26 @@ export const contracts = pgTable("contracts", {
   // honest; generating one would not be.
   estampCertificateNo: varchar("estamp_certificate_no"),
   estampDate: varchar("estamp_date"),
-  estampAmount: integer("estamp_amount"),
+  /** Duty paid, in MINOR units. Migrated alongside contractValueMinor rather
+   *  than left in rupees because contract-pdf.tsx prints both through the SAME
+   *  money formatter — a mixed pair there renders ₹500 of duty as ₹5.00. */
+  estampAmountMinor: bigint("estamp_amount", { mode: "number" }),
   estampAuthority: varchar("estamp_authority"),
   signedByInfluencer: boolean("signed_by_influencer").notNull().default(false),
   signedByInfluencerDate: text("signed_by_influencer_date"),
   signedByBrand: boolean("signed_by_brand").notNull().default(false),
   signedDate: text("signed_date"),
+  /** ISO-4217 code contractValueMinor and estampAmountMinor are denominated
+   *  in, frozen when the agreement is created (issuingContext() in
+   *  server/routes.ts). A signed agreement is evidence of what was agreed ON
+   *  THE DAY, so it must keep printing ₹ even if the org's currency setting
+   *  later reads something else — and a minor-unit amount means nothing
+   *  without the currency it counts. Never client-writable.
+   *
+   *  Default 'INR' is what the additive migration backfills: every row that
+   *  predates this column was issued by an INR org, which the minor-units
+   *  migration's guard proves before it runs. */
+  currency: varchar("currency", { length: 3 }).notNull().default(DEFAULT_LOCALE_SETTINGS.currency),
 });
 
 export const invoices = pgTable("invoices", {
@@ -464,11 +731,24 @@ export const invoices = pgTable("invoices", {
   status: text("status").notNull().default("Unpaid"),
 });
 
-export const insertDealSchema = createInsertSchema(deals).omit({ id: true, status: true });
+// The money fields are re-stated on every insert schema below. drizzle-zod
+// infers a bare z.number() from a bigint column, which would accept 1250.50
+// and hand Postgres a value it silently truncates; amountMinorSchema adds the
+// .int() and the ceiling that make "minor units" enforceable rather than a
+// naming convention.
+
+export const insertDealSchema = createInsertSchema(deals)
+  .omit({ id: true, status: true })
+  .extend({ dealAmountMinor: amountMinorSchema });
 export type InsertDeal = z.infer<typeof insertDealSchema>;
 export type Deal = typeof deals.$inferSelect;
 
-export const insertContractSchema = createInsertSchema(contracts).omit({ id: true });
+export const insertContractSchema = createInsertSchema(contracts)
+  .omit({ id: true })
+  .extend({
+    contractValueMinor: amountMinorSchema,
+    estampAmountMinor: amountMinorSchema.nullable().optional(),
+  });
 export type InsertContract = z.infer<typeof insertContractSchema>;
 export type Contract = typeof contracts.$inferSelect;
 
@@ -480,7 +760,12 @@ export const brandInvoices = pgTable("brand_invoices", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").notNull().references(() => users.id),
   organizationId: varchar("organization_id"),
-  invoiceNumber: text("invoice_number").notNull().unique(),
+  // NOT globally unique: every organisation runs its own series, so two
+  // workspaces legitimately both hold INV-2627-0001. Uniqueness is the
+  // (organization_id, invoice_number) constraint below — which is what
+  // production has. A global unique here made the SECOND workspace's first
+  // invoice fail on any database built from this schema.
+  invoiceNumber: text("invoice_number").notNull(),
   invoiceDate: text("invoice_date").notNull(),
   dueDate: text("due_date"),
   dealId: integer("deal_id").notNull().references(() => deals.id),
@@ -488,7 +773,8 @@ export const brandInvoices = pgTable("brand_invoices", {
   brandName: text("brand_name").notNull(),
   influencerName: text("influencer_name").notNull(),
   influencerEmail: text("influencer_email"),
-  dealAmount: integer("deal_amount").notNull(),
+  /** Invoice total in MINOR units. See deals.dealAmountMinor. */
+  dealAmountMinor: bigint("deal_amount", { mode: "number" }).notNull(),
   invoiceType: varchar("invoice_type").notNull().default("full"),
   splitPercentage: integer("split_percentage"),
   notes: text("notes"),
@@ -501,6 +787,11 @@ export const brandInvoices = pgTable("brand_invoices", {
   /** Set by the server on Unpaid→Paid, cleared on undo. Never client-writable —
    *  a paid invoice printing "PAID · date" must reflect a recorded payment. */
   paidAt: timestamp("paid_at"),
+  /** ISO-4217 code dealAmountMinor and every line item are denominated in,
+   *  frozen at issue. Same reason and same 'INR' backfill as
+   *  contracts.currency. Never client-writable: it is deliberately absent
+   *  from the invoice PATCH allowlist. */
+  currency: varchar("currency", { length: 3 }).notNull().default(DEFAULT_LOCALE_SETTINGS.currency),
 }, (t) => ({
   // Per-ORG uniqueness, not global: INV-2627-0001 restarts for every business
   // each financial year. A global unique meant the second organisation to
@@ -508,27 +799,36 @@ export const brandInvoices = pgTable("brand_invoices", {
   orgInvoiceNumber: unique("brand_invoices_org_invoice_number_unique").on(t.organizationId, t.invoiceNumber),
 }));
 
-/** One billable row on an invoice. Amounts are whole rupees, matching
- *  dealAmount — paise precision arrives with the GST tax build. */
+/** One billable row on an invoice. Amounts are MINOR units, matching
+ *  dealAmountMinor — sub-unit precision is what makes a VAT line expressible.
+ *
+ *  The JSON keys were renamed from `rate`/`amount` along with the columns, and
+ *  the stored documents were rewritten by the same migration. jsonb gets no
+ *  help from the compiler at the storage layer, so the key rename is the only
+ *  thing that turns a stale writer into a loud validation failure instead of a
+ *  silent 100× error. */
 export interface InvoiceLineItem {
   description: string;
   hsnSac?: string;
+  /** A count of things, not money — never scaled by the minor-unit factor. */
   quantity: number;
-  rate: number;
-  amount: number;
+  rateMinor: number;
+  amountMinor: number;
 }
 
 export const invoiceLineItemSchema = z.object({
   description: z.string().trim().min(1, "Description is required").max(300),
   hsnSac: z.string().trim().max(12).optional(),
   quantity: z.number().int().positive().max(100000),
-  rate: z.number().int().nonnegative().max(1_000_000_000),
-  amount: z.number().int().nonnegative().max(1_000_000_000),
+  rateMinor: amountMinorSchema,
+  amountMinor: amountMinorSchema,
 });
 
 export const brandInvoiceTypeOptions = ["full", "advance", "final"] as const;
 
-export const insertBrandInvoiceSchema = createInsertSchema(brandInvoices).omit({ id: true });
+export const insertBrandInvoiceSchema = createInsertSchema(brandInvoices)
+  .omit({ id: true })
+  .extend({ dealAmountMinor: amountMinorSchema });
 export type InsertBrandInvoice = z.infer<typeof insertBrandInvoiceSchema>;
 export type BrandInvoice = typeof brandInvoices.$inferSelect;
 

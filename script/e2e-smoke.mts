@@ -1,28 +1,49 @@
 /**
- * End-to-end smoke of the whole money path, against the PRODUCTION build.
+ * End-to-end smoke of the whole money path, against a local dev server backed
+ * by the LOCAL test database.
  *
  * Drives the real HTTP API exactly as the browser does — signup, onboarding,
  * deal, quotation, agreement, invoice, payment, undo, team permissions, DPDP
- * export/erasure — then deletes everything it made. prod and dev share the
- * Neon database, so cleanup is not optional.
+ * export/erasure — then deletes everything it made.
  *
- * Run against the DEV server (npm run dev). The production build marks the
- * session cookie Secure, so it cannot be set over plain HTTP on localhost —
- * that is correct behaviour, not a failure; production over HTTPS is verified
- * separately.
+ * LOCAL ONLY. Dev and production share one Neon database, and a dev server
+ * started with plain `npm run dev` reads `.env`, which points at it. So this
+ * script refuses a non-local DATABASE_URL, then proves the server writes to
+ * that same local database (requireServerOnLocalDatabase) before any signup.
+ *
+ * Run against the DEV server. The production build marks the session cookie
+ * Secure, so it cannot be set over plain HTTP on localhost — that is correct
+ * behaviour, not a failure; production over HTTPS is verified separately.
+ *
+ * Money is sent in MINOR units under the new field names (dealAmountMinor,
+ * contractValueMinor, rateMinor/amountMinor). The rupee-era names are sent on
+ * purpose in two checks, to prove the server refuses them rather than storing
+ * a rupee figure in a paise column.
  *
  * Signup is rate-limited to 5 per IP per 15 minutes, so back-to-back runs will
  * fail at step 1 with a 429. That is the brute-force throttle working. Wait it
  * out rather than "fixing" it.
  *
- * Run:  npx tsx --env-file=.env script/e2e-smoke.mts
+ * Run (the `dealinsec-local-db` launch config starts the server exactly so):
+ *   DATABASE_URL=postgresql://dealtest@localhost:5544/dealinsec_pdftest PORT=3000 npm run dev
+ *   DATABASE_URL=postgresql://dealtest@localhost:5544/dealinsec_pdftest npx tsx script/e2e-smoke.mts
  */
 import pg from "pg";
+import bcrypt from "bcrypt";
+import { randomUUID } from "crypto";
+import { LOCAL_TEST_DATABASE_URL, inr, requireLocalDatabaseUrl } from "./local-db-guard.ts";
+import { isoDateInZone } from "../shared/invoice-numbering.ts";
+import { financialYearCode } from "../shared/schema.ts";
+
+// First statement that runs: nothing below may touch a database or the API
+// until the URL is known to be local.
+const DATABASE_URL = requireLocalDatabaseUrl("e2e-smoke.mts");
 
 const BASE = "http://localhost:3000";
 const STAMP = Date.now();
 const OWNER = { email: `e2e-owner-${STAMP}@dealinsec.invalid`, password: "E2ePass#2026", firstName: "Eee", lastName: "Owner" };
 const MEMBER = { email: `e2e-member-${STAMP}@dealinsec.invalid`, password: "E2ePass#2026" };
+const UK_OWNER = { email: `e2e-owner-uk-${STAMP}@dealinsec.invalid`, password: "E2ePass#2026", firstName: "Uk", lastName: "Owner" };
 
 let pass = 0, fail = 0;
 const failures: string[] = [];
@@ -62,6 +83,49 @@ function jar() {
 const owner = jar();
 const member = jar();
 
+/**
+ * Exits unless the server at BASE reads the same database as DATABASE_URL.
+ *
+ * requireLocalDatabaseUrl only vouches for THIS process. The server under test
+ * has its own DATABASE_URL, and if it came from `.env` every signup, deal and
+ * invoice below would be written among production's real deals. A throwaway
+ * login is planted directly in the local database, and the server must accept
+ * it. A server on any other database has never seen that row and answers 401,
+ * before the smoke has made a single write through the API.
+ */
+async function requireServerOnLocalDatabase(): Promise<void> {
+  const pool = new pg.Pool({ connectionString: DATABASE_URL });
+  const id = randomUUID();
+  const email = `e2e-canary-${STAMP}@dealinsec.invalid`;
+  const password = `Canary#${STAMP}`;
+  let outcome = "server unreachable";
+  try {
+    await pool.query(
+      `INSERT INTO users (id,email,email_canonical,password) VALUES ($1,$2,$2,$3)`,
+      [id, email, await bcrypt.hash(password, 10)],
+    );
+    try {
+      const res = await fetch(BASE + "/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+        redirect: "manual",
+      });
+      outcome = `login answered ${res.status}`;
+      if (res.status === 200) return;
+    } catch { /* outcome stays "server unreachable" */ }
+  } finally {
+    await pool.query(`DELETE FROM users WHERE id=$1`, [id]).catch(() => {});
+    await pool.end();
+  }
+  console.error(
+    `REFUSING: the server at ${BASE} is not using this script's local database (${outcome}).\n` +
+    `Start it with the same DATABASE_URL this script was given, then re-run. For the standard local DB:\n` +
+    `    DATABASE_URL=${LOCAL_TEST_DATABASE_URL} PORT=3000 npm run dev`,
+  );
+  process.exit(1);
+}
+
 async function main() {
   console.log(`\n━━ 1. Account creation & onboarding ━━`);
   let r = await owner.req("POST", "/api/auth/signup", OWNER);
@@ -87,16 +151,45 @@ async function main() {
     !!r.json?.trialEndsAt || r.json?.entitlements?.trial === true,
     `trialEndsAt=${r.json?.trialEndsAt} trial=${r.json?.entitlements?.trial}`);
 
+  // Every amount below is INR paise. India is the default, and a new account
+  // that silently landed on another currency would break the "zero visible
+  // change for India" promise before any of the money checks could notice.
+  r = await owner.req("GET", "/api/org");
+  check("new organisation defaults to India / INR",
+    r.json?.country === "IN" && r.json?.currency === "INR" && r.json?.locale === "en-IN",
+    `country=${r.json?.country} currency=${r.json?.currency} locale=${r.json?.locale}`);
+
   console.log(`\n━━ 2. Deal → Quotation ━━`);
-  r = await owner.req("POST", "/api/deals", {
-    brandName: "E2E Client", dealTitle: "Office interior fitout", dealAmount: 200000,
+  const dealBody = {
+    brandName: "E2E Client", dealTitle: "Office interior fitout",
     startDate: new Date().toISOString().slice(0, 10),
     endDate: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10),
     dealType: "service", status: "Pending",
     deliverables: [{ platform: "Site", contentType: "Design", quantity: 1 }],
-  });
+    // The currency the amounts were converted in. The server refuses a money
+    // write that does not declare it — omitting it here is what let a release
+    // ship in which EVERY write 409'd. The next check pins that down.
+    currency: "INR",
+  };
+  // A tab opened before the deploy still posts rupees as `dealAmount`. It must
+  // be refused by name, never stored as 1/100th of the deal.
+  r = await owner.req("POST", "/api/deals", { ...dealBody, dealAmount: 200000 });
+  check("stale rupee field (dealAmount) is refused", r.status === 422 && r.json?.code === "STALE_CLIENT",
+    `got ${r.status} ${r.text}`);
+
+  // REGRESSION GUARD: a write with no currency must be refused, and a write
+  // WITH it must succeed. One release had the server demanding this field and
+  // no client sending it, which silently broke every save in the product.
+  const { currency: _omit, ...noCurrency } = dealBody;
+  r = await owner.req("POST", "/api/deals", { ...noCurrency, dealAmountMinor: inr(200000) });
+  check("money write without a currency is refused", r.status === 409 && r.json?.code === "CURRENCY_CHANGED",
+    `got ${r.status} ${r.text}`);
+
+  r = await owner.req("POST", "/api/deals", { currency: "INR", ...dealBody, dealAmountMinor: inr(200000) });
   const dealId = r.json?.id;
   check("deal created", (r.status === 200 || r.status === 201) && !!dealId, `got ${r.status} ${r.text}`);
+  check("deal amount stored in minor units", r.json?.dealAmountMinor === inr(200000),
+    `got ${r.json?.dealAmountMinor}`);
 
   r = await owner.req("POST", `/api/deals/${dealId}/quote`, {});
   check("quotation generated", r.status === 200 || r.status === 201, `got ${r.status} ${r.text}`);
@@ -107,7 +200,8 @@ async function main() {
   console.log(`\n━━ 3. Agreement + execution record ━━`);
   r = await owner.req("POST", "/api/contracts", {
     dealId, brandName: "E2E Client", contractName: "E2E Client - Office interior fitout",
-    contractValue: 200000,
+    contractValueMinor: inr(200000),
+    currency: "INR",
     startDate: new Date().toISOString().slice(0, 10),
     endDate: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10),
     status: "Signed",
@@ -120,44 +214,74 @@ async function main() {
 
   console.log(`\n━━ 4. Invoice composer + money guards ━━`);
   r = await owner.req("POST", "/api/brand-invoices", {
-    dealId, contractId, brandName: "E2E Client", dealAmount: 120000,
+    currency: "INR",
+    dealId, contractId, brandName: "E2E Client", dealAmountMinor: inr(120000),
     invoiceDate: new Date().toISOString().slice(0, 10),
     dueDate: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10),
     notes: "Phase 1",
     lineItems: [
-      { description: "Design & drawings", hsnSac: "9954", quantity: 1, rate: 80000, amount: 80000 },
-      { description: "Site supervision", quantity: 2, rate: 20000, amount: 40000 },
+      { description: "Design & drawings", hsnSac: "9954", quantity: 1, rateMinor: inr(80000), amountMinor: inr(80000) },
+      { description: "Site supervision", quantity: 2, rateMinor: inr(20000), amountMinor: inr(40000) },
     ],
   });
   const invoiceId = r.json?.id;
   check("invoice created with line items", (r.status === 200 || r.status === 201) && !!invoiceId, `got ${r.status} ${r.text}`);
   check("FY invoice number format INV-YYYY-NNNN", /^INV-\d{4}-\d{4}$/.test(r.json?.invoiceNumber || ""), `got ${r.json?.invoiceNumber}`);
+  {
+    // The period is India's financial year read in IST — the same clock as the
+    // default invoice date below. Rebuilt as a mid-month local date, exactly as
+    // shared/invoice-numbering.ts does, so this agrees whatever zone runs it.
+    const [y, m] = isoDateInZone("Asia/Kolkata").split("-").map(Number);
+    const fy = financialYearCode(new Date(y, m - 1, 15));
+    check("Indian number carries the IST financial-year code", (r.json?.invoiceNumber || "").startsWith(`INV-${fy}-`),
+      `expected INV-${fy}-…, got ${r.json?.invoiceNumber}`);
+  }
   check("line items persisted", Array.isArray(r.json?.lineItems) && r.json.lineItems.length === 2,
     `got ${JSON.stringify(r.json?.lineItems)?.slice(0, 60)}`);
+  check("invoice total and lines stored in minor units",
+    r.json?.dealAmountMinor === inr(120000) && r.json?.lineItems?.[0]?.amountMinor === inr(80000)
+      && r.json?.lineItems?.[1]?.rateMinor === inr(20000) && r.json?.lineItems?.[1]?.quantity === 2,
+    `total=${r.json?.dealAmountMinor} lines=${JSON.stringify(r.json?.lineItems)?.slice(0, 120)}`);
   check("due date persisted", !!r.json?.dueDate);
   const firstNumber = r.json?.invoiceNumber;
 
-  r = await owner.req("POST", "/api/brand-invoices", { dealId, contractId, brandName: "E2E Client", dealAmount: 500000 });
+  r = await owner.req("POST", "/api/brand-invoices", { currency: "INR", dealId, contractId, brandName: "E2E Client", dealAmountMinor: inr(500000) });
   check("cannot invoice beyond the agreement value", r.status === 400, `got ${r.status} ${r.text}`);
 
   r = await owner.req("POST", "/api/brand-invoices", {
-    dealId, contractId, brandName: "E2E Client", dealAmount: 5000,
-    lineItems: [{ description: "x", quantity: 1, rate: 10, amount: 10 }],
+    currency: "INR",
+    dealId, contractId, brandName: "E2E Client", dealAmountMinor: inr(5000),
+    lineItems: [{ description: "x", quantity: 1, rateMinor: inr(10), amountMinor: inr(10) }],
   });
   check("line items must sum to the total", r.status === 400, `got ${r.status} ${r.text}`);
 
-  r = await owner.req("POST", "/api/brand-invoices", { dealId, contractId, brandName: "E2E Client", dealAmount: 0 });
+  // The lines DO add up here (in rupees), so a 400 can only come from the
+  // rupee-era `rate`/`amount` keys being refused.
+  r = await owner.req("POST", "/api/brand-invoices", {
+    currency: "INR",
+    dealId, contractId, brandName: "E2E Client", dealAmountMinor: inr(5000),
+    lineItems: [{ description: "x", quantity: 1, rate: 5000, amount: 5000 }],
+  });
+  check("stale line item keys (rate/amount) are refused", r.status === 400, `got ${r.status} ${r.text}`);
+
+  r = await owner.req("POST", "/api/brand-invoices", { currency: "INR", dealId, contractId, brandName: "E2E Client", dealAmountMinor: 0 });
   check("zero amount rejected", r.status === 400, `got ${r.status}`);
 
+  // Minor units are integers by definition; a fraction here means a caller
+  // did major→minor wrong, and Postgres would otherwise truncate it silently.
+  r = await owner.req("POST", "/api/brand-invoices", { currency: "INR", dealId, contractId, brandName: "E2E Client", dealAmountMinor: 125050.5 });
+  check("fractional minor units rejected", r.status === 400, `got ${r.status} ${r.text}`);
+
   r = await owner.req("POST", "/api/brand-invoices", {
-    dealId, contractId, brandName: "E2E Client", dealAmount: 1000, organizationId: "hijacked-org", userId: "hijacked-user",
+    currency: "INR",
+    dealId, contractId, brandName: "E2E Client", dealAmountMinor: inr(1000), organizationId: "hijacked-org", userId: "hijacked-user",
   });
   check("tenancy fields are not client-writable",
     r.status !== 200 || (r.json?.organizationId === orgId && r.json?.userId === ownerId),
     `org=${r.json?.organizationId}`);
   const secondInvoiceId = r.json?.id;
 
-  r = await owner.req("POST", "/api/brand-invoices", { dealId, contractId, brandName: "E2E Client", dealAmount: 5000 });
+  r = await owner.req("POST", "/api/brand-invoices", { currency: "INR", dealId, contractId, brandName: "E2E Client", dealAmountMinor: inr(5000) });
   check("invoice numbers increment", r.json?.invoiceNumber !== firstNumber && /^INV-\d{4}-\d{4}$/.test(r.json?.invoiceNumber || ""),
     `first=${firstNumber} next=${r.json?.invoiceNumber}`);
   const thirdInvoiceId = r.json?.id;
@@ -166,8 +290,12 @@ async function main() {
   r = await owner.req("PATCH", `/api/brand-invoices/${invoiceId}`, { status: "Paid" });
   check("mark as paid", r.status === 200 && r.json?.status === "Paid", `got ${r.status} ${r.text}`);
 
-  r = await owner.req("PATCH", `/api/brand-invoices/${invoiceId}`, { dealAmount: 1 });
+  r = await owner.req("PATCH", `/api/brand-invoices/${invoiceId}`, { currency: "INR", dealAmountMinor: inr(1) });
   check("paid invoice amount is locked", r.status === 400, `got ${r.status} ${r.text}`);
+
+  r = await owner.req("PATCH", `/api/brand-invoices/${invoiceId}`, { dealAmount: 1 });
+  check("stale rupee edit is refused before the paid lock", r.status === 422 && r.json?.code === "STALE_CLIENT",
+    `got ${r.status} ${r.text}`);
 
   r = await owner.req("PATCH", `/api/brand-invoices/${invoiceId}`, { status: "Unpaid" });
   check("payment can be undone", r.status === 200 && r.json?.status === "Unpaid", `got ${r.status}`);
@@ -193,24 +321,68 @@ async function main() {
   check("second org signs up", r.status === 200 || r.status === 201, `got ${r.status}`);
   await org2.req("PATCH", "/api/profile", { phone: "9000000000", onboardingComplete: true });
 
-  r = await org2.req("POST", "/api/deals", {
-    brandName: "Second Client", dealTitle: "Second job", dealAmount: 50000,
+  r = await org2.req("POST", "/api/deals", { currency: "INR",
+    brandName: "Second Client", dealTitle: "Second job", dealAmountMinor: inr(50000),
     startDate: new Date().toISOString().slice(0, 10),
     endDate: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10),
     dealType: "service", status: "Pending", deliverables: [],
   });
   const deal2 = r.json?.id;
-  r = await org2.req("POST", "/api/contracts", {
+  r = await org2.req("POST", "/api/contracts", { currency: "INR",
     dealId: deal2, brandName: "Second Client", contractName: "Second Client - Second job",
-    contractValue: 50000,
+    contractValueMinor: inr(50000),
     startDate: new Date().toISOString().slice(0, 10),
     endDate: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10),
     status: "Signed",
   });
   const contract2 = r.json?.id;
-  r = await org2.req("POST", "/api/brand-invoices", { dealId: deal2, contractId: contract2, brandName: "Second Client", dealAmount: 25000 });
+  r = await org2.req("POST", "/api/brand-invoices", { currency: "INR", dealId: deal2, contractId: contract2, brandName: "Second Client", dealAmountMinor: inr(25000) });
   check("second org's FIRST invoice succeeds", r.status === 200 || r.status === 201, `got ${r.status} ${r.text}`);
   check("both orgs may hold INV-…-0001", /^INV-\d{4}-0001$/.test(r.json?.invoiceNumber || ""), `got ${r.json?.invoiceNumber}`);
+
+  console.log(`\n━━ 6c. A UK organisation (calendar-year numbering, region lock) ━━`);
+  const uk = jar();
+  r = await uk.req("POST", "/api/auth/signup", UK_OWNER);
+  check("UK org signs up", r.status === 200 || r.status === 201, `got ${r.status}`);
+  // Onboarding's order: the org first, then the owner's own row.
+  const ukRegion = { country: "GB", currency: "GBP", locale: "en-GB", timezone: "Europe/London" };
+  r = await uk.req("PATCH", "/api/org", ukRegion);
+  check("UK region saves on an org with no records", r.status === 200 && r.json?.country === "GB", `got ${r.status} ${r.text}`);
+  await uk.req("PATCH", "/api/profile", { ...ukRegion, phone: "7700900123", onboardingComplete: true });
+
+  r = await uk.req("POST", "/api/deals", { currency: "GBP",
+    brandName: "UK Client", dealTitle: "Brand refresh", dealAmountMinor: 125050, // £1,250.50 in pence
+    startDate: new Date().toISOString().slice(0, 10),
+    endDate: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10),
+    dealType: "service", status: "Pending", deliverables: [],
+  });
+  const ukDeal = r.json?.id;
+  check("UK deal created", !!ukDeal, `got ${r.status} ${r.text}`);
+  r = await uk.req("POST", "/api/contracts", { currency: "GBP",
+    dealId: ukDeal, brandName: "UK Client", contractName: "UK Client - Brand refresh",
+    contractValueMinor: 125050,
+    startDate: new Date().toISOString().slice(0, 10),
+    endDate: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10),
+    status: "Signed",
+  });
+  const ukContract = r.json?.id;
+  check("UK agreement stamped GBP", !!ukContract && r.json?.currency === "GBP", `got ${r.status} currency=${r.json?.currency}`);
+  // No invoiceDate sent: the server's default must be today in the ORG's zone.
+  r = await uk.req("POST", "/api/brand-invoices", { currency: "GBP", dealId: ukDeal, contractId: ukContract, brandName: "UK Client", dealAmountMinor: 50000 });
+  const ukYear = isoDateInZone("Europe/London").slice(0, 4);
+  check("UK first invoice is calendar-year INV-YYYY-0001", r.json?.invoiceNumber === `INV-${ukYear}-0001`,
+    `expected INV-${ukYear}-0001, got ${r.status} ${r.json?.invoiceNumber}`);
+  check("UK invoice stamped GBP", r.json?.currency === "GBP", `got ${r.json?.currency}`);
+  check("default invoice date is today in the org's zone", r.json?.invoiceDate === isoDateInZone("Europe/London"),
+    `expected ${isoDateInZone("Europe/London")}, got ${r.json?.invoiceDate}`);
+
+  // Once records exist the WHOLE region locks — the Settings screen disables
+  // all of it to match — and re-sending the stored values is not a change.
+  r = await uk.req("PATCH", "/api/org", { ...ukRegion, timezone: "America/New_York" });
+  check("region change refused once the org has records", r.status === 409 && r.json?.code === "REGION_LOCKED",
+    `got ${r.status} ${r.text}`);
+  r = await uk.req("PATCH", "/api/org", ukRegion);
+  check("re-sending the stored region is allowed", r.status === 200, `got ${r.status} ${r.text}`);
 
   r = await org2.req("GET", "/api/brand-invoices");
   const org2Sees = Array.isArray(r.json) ? r.json : [];
@@ -261,9 +433,9 @@ async function main() {
 }
 
 async function cleanup(ids: any) {
-  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  const pool = new pg.Pool({ connectionString: DATABASE_URL });
   const c = await pool.connect();
-  const emails = [OWNER.email, MEMBER.email, `e2e-owner2-${STAMP}@dealinsec.invalid`];
+  const emails = [OWNER.email, MEMBER.email, `e2e-owner2-${STAMP}@dealinsec.invalid`, UK_OWNER.email];
   const rows = (await c.query(`SELECT id, organization_id FROM users WHERE email = ANY($1)`, [emails])).rows;
   const users = rows.map((x) => x.id);
   const orgIds = [...new Set(rows.map((x) => x.organization_id).filter(Boolean).concat(ids?.orgId ? [ids.orgId] : []))];
@@ -296,6 +468,10 @@ async function cleanup(ids: any) {
   console.log(" ", left.rows[0]);
   c.release(); await pool.end();
 }
+
+// Outside the try: a refusal must exit before cleanup() runs, since nothing
+// was created and cleanup would be one more write to a database not proven local.
+await requireServerOnLocalDatabase();
 
 let ids: any = null;
 try {

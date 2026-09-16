@@ -7,9 +7,11 @@
  * per-invoice notes — and made "raise an invoice" a detour through Agreements.
  *
  * The agreement link stays mandatory (you cannot bill for something you never
- * agreed); only the workspace moved. Line items are itemised from day one, each
- * carrying an optional HSN/SAC, so Rule 46 GST columns are an extension of this
- * screen rather than a rewrite of it.
+ * agreed); only the workspace moved. Line items are itemised from day one, and
+ * tax is a list of issuer-entered rates over the subtotal (shared/invoice-tax.ts)
+ * — the same rows for a GST, VAT or sales-tax invoice, so no country's tax is a
+ * rewrite of this screen. What prints under "From" and beneath the total follows
+ * the organization's country; no rate is ever filled in for the user.
  *
  * Entry: /brand-invoices/new?contractId=<id>&mode=full|custom|split
  */
@@ -32,31 +34,29 @@ import { parseApiError, isUpgradeError } from "@/lib/api-error";
 import {
   ArrowLeft, Plus, Trash2, Loader2, Receipt, Scissors, AlertTriangle, Lock,
 } from "lucide-react";
-import type { BrandInvoice, Contract, Deal, InvoiceLineItem } from "@shared/schema";
+import { toMinor, type BrandInvoice, type Contract, type Deal, type InvoiceLineItem } from "@shared/schema";
+import { splitMinor } from "@/lib/format";
+import { MoneyCurrencyPendingError, useMoney, type MoneyFormat } from "@/hooks/use-locale";
+import {
+  INVOICE_TAX_LINES_ENABLED, MAX_TAX_LINES, cleanTaxRateInput, computeTaxLines, formatTaxRegistration,
+  invoiceTaxLinesSchema, invoiceTaxProfile, invoiceTaxTotalMinor, parseTaxRatePercent, readInvoiceTaxLines,
+  taxLineLabel, taxRegistrations, type TaxRate,
+} from "@shared/invoice-tax";
+import { addDaysToIsoDate, isoDateInZone } from "@shared/invoice-numbering";
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 
-const inr = (n: number) => `₹${Math.round(n || 0).toLocaleString("en-IN")}`;
-
-function todayISO(): string {
-  return new Date().toISOString().split("T")[0];
-}
-
-function addDaysISO(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split("T")[0];
-}
-
-function fmtDate(iso?: string | null): string {
+function fmtDate(iso: string | null | undefined, locale: string): string {
   if (!iso) return "—";
   const d = new Date(iso);
   return isNaN(d.getTime())
     ? "—"
-    : d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    : d.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" });
 }
 
-/** A row while it's being edited — strings so fields can be emptied mid-typing. */
+/** A row while it's being edited — strings so fields can be emptied mid-typing.
+ *  `rate` holds MAJOR units, exactly as typed; nothing here is ever a minor
+ *  value, so there is no half-converted state to get wrong. */
 interface DraftLine {
   description: string;
   hsnSac: string;
@@ -64,8 +64,44 @@ interface DraftLine {
   rate: string;
 }
 
-const lineAmount = (l: DraftLine) =>
-  Math.max(0, Math.round((parseFloat(l.quantity) || 0) * (parseFloat(l.rate) || 0)));
+/** A typed rate → minor units in `currency`, for the live figures on screen.
+ *
+ *  Not `fmt.minor()`: that refuses until the org's currency has loaded, which
+ *  is right for a save and wrong for a render — this runs on every keystroke,
+ *  including the first render. The save path is gated on `fmt.ready` instead,
+ *  and by then `fmt.currency` is the org's, so the figures shown and the
+ *  figures sent are the same numbers. A runaway field that parses to Infinity
+ *  counts as nothing rather than throwing mid-render. */
+const typedRateMinor = (raw: string, currency: string): number => {
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? toMinor(n, currency) : 0;
+};
+
+/** A draft row's line total, in MINOR units.
+ *
+ *  The rate crosses to minor BEFORE the multiplication: `qty × 1250.50` in
+ *  major units is a float that then has to be rounded to a currency precision
+ *  we would have to guess at, while `qty × 125050` is exact integer arithmetic.
+ *  Minor units everywhere also means this total can be compared straight
+ *  against the agreement's `contractValueMinor` with no unit bookkeeping. */
+const lineAmountMinor = (l: DraftLine, currency: string) =>
+  Math.max(0, Math.round((parseFloat(l.quantity) || 0) * typedRateMinor(l.rate, currency)));
+
+/** A tax row while it's being edited. `rate` is the percentage as typed
+ *  ("8.875"); it becomes thousandths of a percent only through
+ *  parseTaxRatePercent, never through a float. */
+interface DraftTax {
+  label: string;
+  rate: string;
+}
+
+const draftTaxRate = (t: DraftTax): TaxRate | null => {
+  const rateMilliPercent = parseTaxRatePercent(t.rate);
+  return t.label.trim() && rateMilliPercent !== null ? { label: t.label, rateMilliPercent } : null;
+};
+
+/** Stable identity, so the memoised tax lines are not rebuilt every render. */
+const NO_TAXES: DraftTax[] = [];
 
 /* ── page ────────────────────────────────────────────────────────────── */
 
@@ -73,6 +109,9 @@ export default function BrandInvoiceNewPage() {
   const [location, setLocation] = useLocation();
   const { user } = useAuth();
   const issuer = useIssuer();
+  // The ORG's locale — the invoice is the org's document, not the composer's.
+  const fmt = useMoney();
+  const taxProfile = invoiceTaxProfile(fmt.settings.country);
   const { toast } = useToast();
   const { openUpgradeModal } = useUpgradeModal();
 
@@ -94,26 +133,45 @@ export default function BrandInvoiceNewPage() {
     queryKey: ["/api/brand-invoices"],
   });
 
-  /** Already billed against THIS agreement — the ceiling for a new invoice. */
-  const alreadyInvoiced = useMemo(
+  /** Already billed against THIS agreement — the ceiling for a new invoice.
+   *  Net of tax: an invoice's amount includes any tax on it, and that tax is
+   *  not a draw on the agreed fee. Invoices without tax lines count in full,
+   *  exactly as before. */
+  const alreadyInvoicedMinor = useMemo(
     () =>
       allInvoices
         .filter((i) => i.contractId === contractId)
-        .reduce((sum, i) => sum + (i.dealAmount || 0), 0),
+        .reduce((sum, i) => sum + (i.dealAmountMinor || 0) - invoiceTaxTotalMinor(readInvoiceTaxLines(i)), 0),
     [allInvoices, contractId],
   );
-  const agreementValue = Number(contract?.contractValue || 0);
-  const remaining = Math.max(0, agreementValue - alreadyInvoiced);
+  const agreementValueMinor = Number(contract?.contractValueMinor || 0);
+  const remainingMinor = Math.max(0, agreementValueMinor - alreadyInvoicedMinor);
 
   /* ── form state ── */
   const [mode, setMode] = useState<"single" | "split">(initialMode === "split" ? "split" : "single");
-  const [invoiceDate, setInvoiceDate] = useState(todayISO());
-  const [dueDate, setDueDate] = useState(addDaysISO(30));
+  // Default dates are "today" in the ORG's zone — the clock the server reads
+  // the invoice number's period on (isoDateInZone). On UTC, a new Indian
+  // invoice at 00:30 IST on 1 April was dated 31 March but numbered in the new
+  // financial year.
+  const [invoiceDate, setInvoiceDate] = useState(() => isoDateInZone(fmt.settings.timezone));
+  const [dueDate, setDueDate] = useState(() => addDaysToIsoDate(isoDateInZone(fmt.settings.timezone), 30));
+  const [datesEdited, setDatesEdited] = useState(false);
+  // The zone above is the member's own until the org loads; re-derive once it
+  // has, unless the user has already picked a date — theirs is never replaced.
+  useEffect(() => {
+    if (!fmt.ready || datesEdited) return;
+    const today = isoDateInZone(fmt.settings.timezone);
+    setInvoiceDate(today);
+    setDueDate(addDaysToIsoDate(today, 30));
+  }, [fmt.ready, fmt.settings.timezone, datesEdited]);
   const [notes, setNotes] = useState("");
   const [splitPct, setSplitPct] = useState("50");
   const [lines, setLines] = useState<DraftLine[]>([
     { description: "", hsnSac: "", quantity: "1", rate: "" },
   ]);
+  // Empty by default everywhere: the no-tax invoice is correct for most
+  // freelancers in most countries, and only the issuer knows otherwise.
+  const [taxes, setTaxes] = useState<DraftTax[]>([]);
   const [seeded, setSeeded] = useState(false);
 
   /* Seed the first line from the agreement once it loads: the common case is
@@ -123,7 +181,13 @@ export default function BrandInvoiceNewPage() {
     // name and locks before the (better) deal title arrives.
     if (seeded || !contract) return;
     if (contract.dealId && !dealFetched) return;
-    const seedRate = initialMode === "custom" ? "" : String(remaining || agreementValue);
+    // And for the org's currency: the seed is a MAJOR-unit string, so seeding
+    // with a member's different exponent would type the wrong figure into the
+    // field, and the save would then send it in the org's.
+    if (!fmt.ready) return;
+    // The field holds MAJOR units, so the stored minor value converts back on
+    // the way in — ungrouped, or it round-trips through parseFloat as NaN.
+    const seedRate = initialMode === "custom" ? "" : fmt.input(remainingMinor || agreementValueMinor);
     setLines([
       {
         description: deal?.dealTitle || contract.contractName || "Professional services",
@@ -133,16 +197,61 @@ export default function BrandInvoiceNewPage() {
       },
     ]);
     setSeeded(true);
-  }, [contract, deal, dealFetched, remaining, agreementValue, initialMode, seeded]);
+  }, [contract, deal, dealFetched, remainingMinor, agreementValueMinor, initialMode, seeded, fmt]);
 
-  const total = useMemo(() => lines.reduce((s, l) => s + lineAmount(l), 0), [lines]);
-  const advanceAmount = Math.round((total * (parseInt(splitPct) || 50)) / 100);
-  const finalAmount = total - advanceAmount;
+  // `totalMinor` is the SUBTOTAL — the sum of the billable lines, before tax.
+  // It is what counts against the agreement: an agreement's value is the fee,
+  // and tax is owed onward, not billed against the fee.
+  const totalMinor = useMemo(
+    () => lines.reduce((s, l) => s + lineAmountMinor(l, fmt.currency), 0),
+    [lines, fmt.currency],
+  );
 
-  const overBudget = total > remaining && remaining > 0;
-  const fullyInvoiced = remaining <= 0 && agreementValue > 0;
+  // The split preview must be what POST /api/deals/:id/split-invoices will
+  // create, to the minor unit — so it splits what the SERVER splits (the deal's
+  // stored amount, not the line typed on this screen, which split mode hides)
+  // with the server's own rule. splitMinor keeps a whole-rupee deal in whole
+  // rupees: ₹65,001 at 50% previews ₹32,501 + ₹32,500, as it is issued.
+  const splitAdvancePct = parseInt(splitPct) || 50;
+  const splitBaseMinor = Number(deal?.dealAmountMinor);
+  const split =
+    deal && Number.isSafeInteger(splitBaseMinor) && splitBaseMinor >= 0
+      ? splitMinor(splitBaseMinor, splitAdvancePct, fmt.currency)
+      : null;
+
+  // Tax applies to single invoices only: the split endpoint creates both
+  // invoices server-side from the deal value and carries no lines to tax.
+  const taxRows = INVOICE_TAX_LINES_ENABLED && mode === "single" ? taxes : NO_TAXES;
+  // computeTaxLines refuses an unsafe base rather than round it, and a
+  // runaway rate field can type one; tax that base as zero on screen instead
+  // of throwing mid-render. Such a total can never be saved anyway.
+  const taxBaseMinor = Number.isSafeInteger(totalMinor) ? totalMinor : 0;
+  const taxLines = useMemo(
+    () => computeTaxLines(taxBaseMinor, taxRows.flatMap((t) => draftTaxRate(t) ?? [])),
+    [taxBaseMinor, taxRows],
+  );
+  const grossMinor = totalMinor + invoiceTaxTotalMinor(taxLines);
+  // Every row with anything typed in it must be complete, and the set must
+  // pass the same schema the server writes with — a half-typed rate must block
+  // the save, not be silently left off the client's invoice. A row still
+  // entirely blank is simply not a tax yet.
+  const taxInvalid =
+    taxRows.some((t) => (t.label.trim() || t.rate) && draftTaxRate(t) === null) ||
+    !invoiceTaxLinesSchema.safeParse(taxLines).success;
+
+  const overBudget = totalMinor > remainingMinor && remainingMinor > 0;
+  const fullyInvoiced = remainingMinor <= 0 && agreementValueMinor > 0;
   const blankLine = lines.some((l) => !l.description.trim());
-  const canSubmit = total > 0 && !overBudget && !fullyInvoiced && !blankLine && canCreate;
+  // `fmt.ready`: never save an amount before the org's currency is known.
+  // A split is only offered once its preview can show what it will create.
+  const canSubmit =
+    totalMinor > 0 && !overBudget && !fullyInvoiced && !blankLine && !taxInvalid && canCreate &&
+    fmt.ready && (mode !== "split" || split !== null);
+
+  const updateTax = (i: number, patch: Partial<DraftTax>) =>
+    setTaxes((prev) => prev.map((t, idx) => (idx === i ? { ...t, ...patch } : t)));
+  const addTax = () => setTaxes((prev) => (prev.length >= MAX_TAX_LINES ? prev : [...prev, { label: "", rate: "" }]));
+  const removeTax = (i: number) => setTaxes((prev) => prev.filter((_, idx) => idx !== i));
 
   const updateLine = (i: number, patch: Partial<DraftLine>) =>
     setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -154,9 +263,13 @@ export default function BrandInvoiceNewPage() {
   /* ── save ── */
   const create = useMutation({
     mutationFn: async () => {
+      // canSubmit already waits for this; checked again because the typed
+      // figures below are converted with fmt.currency, which is only the
+      // org's currency once it has loaded.
+      if (!fmt.ready) throw new MoneyCurrencyPendingError();
       if (mode === "split") {
         const res = await apiRequest("POST", `/api/deals/${contract!.dealId}/split-invoices`, {
-          advancePercentage: parseInt(splitPct) || 50,
+          advancePercentage: splitAdvancePct,
         });
         return { split: true, data: await res.json() };
       }
@@ -164,18 +277,24 @@ export default function BrandInvoiceNewPage() {
         description: l.description.trim(),
         ...(l.hsnSac.trim() ? { hsnSac: l.hsnSac.trim() } : {}),
         quantity: Math.max(1, Math.round(parseFloat(l.quantity) || 1)),
-        rate: Math.round(parseFloat(l.rate) || 0),
-        amount: lineAmount(l),
+        rateMinor: typedRateMinor(l.rate, fmt.currency),
+        amountMinor: lineAmountMinor(l, fmt.currency),
       }));
       const res = await apiRequest("POST", "/api/brand-invoices", {
+        currency: fmt.currency,
         dealId: contract!.dealId,
         contractId: contract!.id,
         brandName: contract!.brandName,
-        dealAmount: total,
+        // What the client owes: subtotal plus tax. With no tax lines this is
+        // exactly the sum of the lines, as it has always been.
+        dealAmountMinor: grossMinor,
         invoiceDate,
         dueDate,
         notes: notes.trim() || undefined,
         lineItems: payload,
+        // The key is absent, not an empty array, on an untaxed invoice — the
+        // request body stays byte-for-byte what the server already accepts.
+        ...(taxLines.length > 0 ? { taxLines } : {}),
       });
       return { split: false, data: await res.json() };
     },
@@ -272,12 +391,12 @@ export default function BrandInvoiceNewPage() {
             {/* Billable ceiling */}
             <section className="glass-card rounded-xl p-4 sm:p-5">
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-                <Stat label="Agreement value" value={inr(agreementValue)} />
-                <Stat label="Already invoiced" value={inr(alreadyInvoiced)} />
+                <Stat label="Agreement value" value={fmt.money(agreementValueMinor)} />
+                <Stat label="Already invoiced" value={fmt.money(alreadyInvoicedMinor)} />
                 <Stat
                   label="Left to invoice"
-                  value={inr(remaining)}
-                  tone={remaining <= 0 ? "danger" : "good"}
+                  value={fmt.money(remainingMinor)}
+                  tone={remainingMinor <= 0 ? "danger" : "good"}
                 />
               </div>
               {!issuer.accountNumber && !issuer.bankName && (
@@ -326,7 +445,7 @@ export default function BrandInvoiceNewPage() {
                     id="invoiceDate"
                     type="date"
                     value={invoiceDate}
-                    onChange={(e) => setInvoiceDate(e.target.value)}
+                    onChange={(e) => { setDatesEdited(true); setInvoiceDate(e.target.value); }}
                     data-testid="input-invoice-date"
                   />
                 </div>
@@ -337,7 +456,7 @@ export default function BrandInvoiceNewPage() {
                     type="date"
                     value={dueDate}
                     min={invoiceDate}
-                    onChange={(e) => setDueDate(e.target.value)}
+                    onChange={(e) => { setDatesEdited(true); setDueDate(e.target.value); }}
                     data-testid="input-due-date"
                   />
                   <p className="text-[11px] text-muted-foreground">
@@ -353,7 +472,7 @@ export default function BrandInvoiceNewPage() {
                 <SectionHead
                   step="Step 3"
                   title="What are you billing for?"
-                  aside="HSN/SAC optional"
+                  aside={taxProfile.hsnSac ? "HSN/SAC optional" : undefined}
                 />
 
                 <div className="space-y-3">
@@ -391,18 +510,22 @@ export default function BrandInvoiceNewPage() {
                         </Button>
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pl-8">
-                        <div className="space-y-1.5">
-                          <Label htmlFor={`hsn-${i}`} className="text-xs">HSN/SAC</Label>
-                          <Input
-                            id={`hsn-${i}`}
-                            value={line.hsnSac}
-                            placeholder="9954"
-                            inputMode="numeric"
-                            onChange={(e) => updateLine(i, { hsnSac: e.target.value })}
-                            data-testid={`input-line-hsn-${i}`}
-                          />
-                        </div>
+                      <div className={`grid grid-cols-2 ${taxProfile.hsnSac ? "sm:grid-cols-4" : "sm:grid-cols-3"} gap-2 pl-8`}>
+                        {/* HSN/SAC is India's classification code; elsewhere
+                            the field would only invite a number nobody asked for. */}
+                        {taxProfile.hsnSac && (
+                          <div className="space-y-1.5">
+                            <Label htmlFor={`hsn-${i}`} className="text-xs">HSN/SAC</Label>
+                            <Input
+                              id={`hsn-${i}`}
+                              value={line.hsnSac}
+                              placeholder="9954"
+                              inputMode="numeric"
+                              onChange={(e) => updateLine(i, { hsnSac: e.target.value })}
+                              data-testid={`input-line-hsn-${i}`}
+                            />
+                          </div>
+                        )}
                         <div className="space-y-1.5">
                           <Label htmlFor={`qty-${i}`} className="text-xs">Qty</Label>
                           <Input
@@ -414,20 +537,22 @@ export default function BrandInvoiceNewPage() {
                           />
                         </div>
                         <div className="space-y-1.5">
-                          <Label htmlFor={`rate-${i}`} className="text-xs">Rate (₹)</Label>
+                          <Label htmlFor={`rate-${i}`} className="text-xs">Rate ({fmt.symbol})</Label>
                           <Input
                             id={`rate-${i}`}
                             value={line.rate}
-                            inputMode="numeric"
+                            // "decimal", not "numeric": a phone's numeric pad
+                            // has no "." key, so ₹1,250.50 could not be typed.
+                            inputMode="decimal"
                             placeholder="0"
-                            onChange={(e) => updateLine(i, { rate: e.target.value.replace(/[^\d]/g, "") })}
+                            onChange={(e) => updateLine(i, { rate: fmt.cleanInput(e.target.value) })}
                             data-testid={`input-line-rate-${i}`}
                           />
                         </div>
                         <div className="space-y-1.5">
                           <Label className="text-xs">Amount</Label>
                           <div className="h-10 flex items-center px-3 rounded-md border border-border bg-muted/40 text-sm font-semibold tabular-nums">
-                            {inr(lineAmount(line))}
+                            {fmt.money(lineAmountMinor(line, fmt.currency))}
                           </div>
                         </div>
                       </div>
@@ -447,19 +572,98 @@ export default function BrandInvoiceNewPage() {
                   Add another line
                 </Button>
 
+                {/* Until tax lines can be stored, say so where a VAT-registered
+                    freelancer would look for them, rather than leave them
+                    hunting. Not shown in India, whose composer is unchanged and
+                    whose disclaimer below already states there is no GST. */}
+                {!INVOICE_TAX_LINES_ENABLED && fmt.settings.country !== "IN" && (
+                  <p className="text-[11px] text-muted-foreground leading-relaxed pt-2 border-t border-border" data-testid="tax-lines-unsupported">
+                    Tax lines (such as VAT or sales tax) can't be added to an invoice yet. This invoice is issued for the
+                    agreed value with no tax added.
+                  </p>
+                )}
+                {INVOICE_TAX_LINES_ENABLED && (
+                  <div className="space-y-2 pt-2 border-t border-border" data-testid="tax-lines">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-sm font-semibold">Tax</span>
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Optional</span>
+                    </div>
+                    {/* No rate is suggested, looked up or pre-filled. Whether a
+                        tax applies, and at what rate, is the issuer's call. */}
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Only add a tax you are registered to charge, at the rate that applies to you.
+                      DealInSec calculates the amount but does not decide the rate.
+                    </p>
+                    {taxes.map((t, i) => {
+                      const rate = draftTaxRate(t);
+                      return (
+                        <div key={i} className="flex items-end gap-2" data-testid={`tax-line-${i}`}>
+                          <div className="flex-1 min-w-0 space-y-1.5">
+                            <Label htmlFor={`tax-label-${i}`} className="text-xs">Name</Label>
+                            <Input
+                              id={`tax-label-${i}`}
+                              value={t.label}
+                              placeholder={taxProfile.taxLabelHint}
+                              maxLength={40}
+                              onChange={(e) => updateTax(i, { label: e.target.value })}
+                              data-testid={`input-tax-label-${i}`}
+                            />
+                          </div>
+                          <div className="w-24 space-y-1.5">
+                            <Label htmlFor={`tax-rate-${i}`} className="text-xs">Rate (%)</Label>
+                            <Input
+                              id={`tax-rate-${i}`}
+                              value={t.rate}
+                              inputMode="decimal"
+                              placeholder="0"
+                              onChange={(e) => updateTax(i, { rate: cleanTaxRateInput(e.target.value) })}
+                              data-testid={`input-tax-rate-${i}`}
+                            />
+                          </div>
+                          <div className="w-28 h-10 flex items-center justify-end px-3 rounded-md border border-border bg-muted/40 text-sm font-semibold tabular-nums">
+                            {rate ? fmt.money(computeTaxLines(taxBaseMinor, [rate])[0].amountMinor) : "—"}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="shrink-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => removeTax(i)}
+                            aria-label="Remove tax"
+                            data-testid={`button-remove-tax-${i}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                    {taxes.length < MAX_TAX_LINES && (
+                      <Button type="button" variant="ghost" size="sm" onClick={addTax} data-testid="button-add-tax">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add tax
+                      </Button>
+                    )}
+                    {taxInvalid && (
+                      <Notice tone="danger">
+                        Give every tax a name and a rate between 0 and 100%, and list each one once.
+                      </Notice>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between pt-2 border-t border-border">
                   <span className="text-sm font-semibold">Invoice total</span>
                   <span
                     className={`text-xl font-extrabold tabular-nums ${overBudget ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}
                     data-testid="text-invoice-total"
                   >
-                    {inr(total)}
+                    {fmt.money(grossMinor)}
                   </span>
                 </div>
 
                 {overBudget && (
                   <Notice tone="danger">
-                    That's {inr(total - remaining)} more than this agreement has left. Lower the amount, or raise a
+                    That's {fmt.money(totalMinor - remainingMinor)} more than this agreement has left. Lower the amount, or raise a
                     fresh agreement for the extra scope.
                   </Notice>
                 )}
@@ -484,11 +688,11 @@ export default function BrandInvoiceNewPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-xl border border-border p-3">
                     <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Advance</p>
-                    <p className="text-lg font-bold tabular-nums">{inr(advanceAmount)}</p>
+                    <p className="text-lg font-bold tabular-nums">{split ? fmt.money(split.advanceMinor) : "—"}</p>
                   </div>
                   <div className="rounded-xl border border-border p-3">
                     <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Final</p>
-                    <p className="text-lg font-bold tabular-nums">{inr(finalAmount)}</p>
+                    <p className="text-lg font-bold tabular-nums">{split ? fmt.money(split.finalMinor) : "—"}</p>
                   </div>
                 </div>
                 <Notice tone="muted">
@@ -527,8 +731,16 @@ export default function BrandInvoiceNewPage() {
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 mb-1">From</p>
                   <p className="font-bold">{issuer.name || "—"}</p>
-                  {issuer.gstNumber && <p className="text-muted-foreground mt-0.5">GSTIN: {issuer.gstNumber}</p>}
-                  {issuer.panNumber && <p className="text-muted-foreground">PAN: {issuer.panNumber}</p>}
+                  {/* The preview has always led with the indirect-tax number
+                      (GSTIN, VAT number) — the one a client's accounts team
+                      looks for first — so it sorts ahead of PAN here. */}
+                  {taxRegistrations(taxProfile, issuer)
+                    .sort((a, b) => Number(b.field === "gstNumber") - Number(a.field === "gstNumber"))
+                    .map((r) => (
+                      <p key={r.field} className={`text-muted-foreground${r.field === "gstNumber" ? " mt-0.5" : ""}`}>
+                        {formatTaxRegistration(r)}
+                      </p>
+                    ))}
                 </div>
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-teal-600 mb-1">Bill To</p>
@@ -540,11 +752,11 @@ export default function BrandInvoiceNewPage() {
               <div className="px-5 py-3 grid grid-cols-2 gap-4 border-b border-border text-xs">
                 <div>
                   <p className="text-muted-foreground">Invoice date</p>
-                  <p className="font-semibold">{fmtDate(invoiceDate)}</p>
+                  <p className="font-semibold">{fmtDate(invoiceDate, fmt.locale)}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Due</p>
-                  <p className="font-semibold">{mode === "split" ? "30 days" : fmtDate(dueDate)}</p>
+                  <p className="font-semibold">{mode === "split" ? "30 days" : fmtDate(dueDate, fmt.locale)}</p>
                 </div>
               </div>
 
@@ -564,21 +776,35 @@ export default function BrandInvoiceNewPage() {
                             <p className="font-medium">{l.description || <span className="text-muted-foreground italic">Untitled line</span>}</p>
                             <p className="text-[10px] text-muted-foreground">
                               {l.hsnSac ? `HSN/SAC ${l.hsnSac} · ` : ""}
-                              {parseFloat(l.quantity) || 0} × {inr(parseFloat(l.rate) || 0)}
+                              {parseFloat(l.quantity) || 0} × {fmt.money(typedRateMinor(l.rate, fmt.currency))}
                             </p>
                           </td>
                           <td className="py-2 text-right font-semibold tabular-nums whitespace-nowrap">
-                            {inr(lineAmount(l))}
+                            {fmt.money(lineAmountMinor(l, fmt.currency))}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
+                      {taxLines.length > 0 && (
+                        <>
+                          <tr>
+                            <td className="pt-3 text-right text-muted-foreground pr-3">Subtotal</td>
+                            <td className="pt-3 text-right font-semibold tabular-nums whitespace-nowrap">{fmt.money(totalMinor)}</td>
+                          </tr>
+                          {taxLines.map((t, i) => (
+                            <tr key={i}>
+                              <td className="pt-1 text-right text-muted-foreground pr-3">{taxLineLabel(t, fmt.locale)}</td>
+                              <td className="pt-1 text-right font-semibold tabular-nums whitespace-nowrap">{fmt.money(t.amountMinor)}</td>
+                            </tr>
+                          ))}
+                        </>
+                      )}
                       <tr>
                         <td className="pt-3 text-right font-bold pr-3">Total</td>
                         <td className="pt-3 text-right">
                           <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                            {inr(total)}
+                            {fmt.money(grossMinor)}
                           </span>
                         </td>
                       </tr>
@@ -586,8 +812,8 @@ export default function BrandInvoiceNewPage() {
                   </table>
                 ) : (
                   <div className="space-y-2 text-xs">
-                    <PreviewRow label={`Advance invoice (${parseInt(splitPct) || 50}%)`} value={inr(advanceAmount)} />
-                    <PreviewRow label="Final invoice" value={inr(finalAmount)} />
+                    <PreviewRow label={`Advance invoice (${splitAdvancePct}%)`} value={split ? fmt.money(split.advanceMinor) : "—"} />
+                    <PreviewRow label="Final invoice" value={split ? fmt.money(split.finalMinor) : "—"} />
                   </div>
                 )}
               </div>
@@ -601,8 +827,7 @@ export default function BrandInvoiceNewPage() {
 
               <div className="px-5 py-3 bg-muted/40 border-t border-border">
                 <p className="text-[10px] text-muted-foreground leading-relaxed">
-                  Amounts are the agreed contract value and carry no GST computation — this is not a tax invoice
-                  under Rule 46 of the CGST Rules, 2017.
+                  {taxLines.length > 0 ? taxProfile.taxNote : taxProfile.noTaxExplainer}
                 </p>
               </div>
             </div>
@@ -613,7 +838,8 @@ export default function BrandInvoiceNewPage() {
                 pending={create.isPending}
                 disabled={!canSubmit || create.isPending}
                 mode={mode}
-                total={total}
+                totalMinor={grossMinor}
+                fmt={fmt}
                 onClick={() => create.mutate()}
               />
             </div>
@@ -627,7 +853,8 @@ export default function BrandInvoiceNewPage() {
           pending={create.isPending}
           disabled={!canSubmit || create.isPending}
           mode={mode}
-          total={total}
+          totalMinor={grossMinor}
+          fmt={fmt}
           onClick={() => create.mutate()}
         />
       </div>
@@ -639,8 +866,9 @@ export default function BrandInvoiceNewPage() {
 
 /* ── small pieces ────────────────────────────────────────────────────── */
 
-function SaveButton({ pending, disabled, mode, total, onClick }: {
-  pending: boolean; disabled: boolean; mode: "single" | "split"; total: number; onClick: () => void;
+function SaveButton({ pending, disabled, mode, totalMinor, fmt, onClick }: {
+  pending: boolean; disabled: boolean; mode: "single" | "split";
+  totalMinor: number; fmt: MoneyFormat; onClick: () => void;
 }) {
   return (
     <Button
@@ -651,10 +879,14 @@ function SaveButton({ pending, disabled, mode, total, onClick }: {
     >
       {pending ? (
         <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating…</>
+      ) : !fmt.ready ? (
+        // Saving waits for the org's currency (see useMoney().ready). Said on
+        // the button itself, so a disabled button is never a silent mystery.
+        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Loading currency…</>
       ) : mode === "split" ? (
         <>Create advance + final invoices</>
       ) : (
-        <>Create invoice · {inr(total)}</>
+        <>Create invoice · {fmt.money(totalMinor)}</>
       )}
     </Button>
   );

@@ -22,8 +22,9 @@ import {
 } from "@/components/ui/select";
 import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocale } from "@/hooks/use-locale";
 import { useToast } from "@/hooks/use-toast";
-import { usePlanPrices, formatRupees } from "@/hooks/use-plan-prices";
+import { usePlanPrices, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
 import { useConfirm } from "@/components/confirm-dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { parseApiError } from "@/lib/api-error";
@@ -41,6 +42,9 @@ import { getThemePref, setThemePref, type ThemePref } from "@/lib/theme";
 import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
 import { pageNumbers } from "@/components/data-table/data-table";
 import { FeedbackCard } from "@/components/feedback-card";
+import { RegionFields } from "@/components/region-fields";
+import { getLocaleSettings, type LocaleFields, type LocaleSettings } from "@shared/schema";
+import { sameRegion } from "@shared/region";
 
 /** Entity tints for the activity table — money events read green, documents
  *  blue/teal, people violet; everything else stays neutral. */
@@ -62,7 +66,7 @@ const ACTION_TONE = (action: string) => {
 
 type Tab = "organization" | "team" | "activity" | "subscription" | "preferences";
 
-interface OrgSummary {
+interface OrgSummary extends LocaleFields {
   id: string; name: string; slug: string | null; industry: string | null;
   seatLimit: number; seatsUsed: number; pendingInvites: number;
   ownerPlan: string; ownerPlanExpiresAt: string | null;
@@ -86,11 +90,14 @@ interface Activity {
   detail: string | null; createdAt: string;
 }
 
-const fmtDate = (d?: string | null) =>
-  d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
+const fmtDate = (d: string | null | undefined, locale: string) =>
+  d ? new Date(d).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : "—";
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  // Dates follow the VIEWER's locale: a date is the same day for everyone, only
+  // how it is written differs. (Currency is the opposite — it follows the money.)
+  const { locale, country: accountCountry } = useLocale();
   const { toast } = useToast();
   const confirm = useConfirm();
   const [tab, setTab] = useState<Tab>("organization");
@@ -113,6 +120,10 @@ export default function SettingsPage() {
 
   const { data: org, isLoading: orgLoading } = useQuery<OrgSummary>({ queryKey: ["/api/org"] });
   const { extraSeatPrice } = usePlanPrices();
+  // Seats, like plans, can only be bought from India for now; elsewhere no
+  // rupee seat price is quoted (see usePlanCheckoutAvailable). Always true for
+  // Indian accounts.
+  const checkoutAvailable = usePlanCheckoutAvailable();
   const { data: members = [] } = useQuery<Member[]>({ queryKey: ["/api/org/members"] });
   const { data: invites = [] } = useQuery<Invite[]>({
     queryKey: ["/api/org/invitations"],
@@ -180,6 +191,65 @@ export default function SettingsPage() {
       toast({ title: "Organization updated" });
     },
     onError: () => toast({ title: "Could not update organization", variant: "destructive" }),
+  });
+
+  // ── Country & currency ──
+  // Stored amounts carry no currency of their own: a deal's value is minor
+  // units of whatever the org's currency currently IS, and the country, locale
+  // and time zone decide how issued documents re-render (tax-ID labels,
+  // governing-law clause, digit grouping, dates). So the WHOLE region locks at
+  // the first record — exactly what PATCH /api/org enforces (orgHasRecords in
+  // server/routes.ts). An earlier version locked only the currency here while
+  // the server refused any region change, so a Save looked possible and was
+  // refused. This screen only avoids offering a control the server would
+  // refuse; the server is the authority.
+  const [regionDraft, setRegionDraft] = useState<LocaleSettings | null>(null);
+  const orgRegion = getLocaleSettings(org);
+  // The owner's own row, which saveRegion keeps in step with the org.
+  const ownRegion = getLocaleSettings(user as LocaleFields | undefined);
+  const { data: orgDeals, isError: dealsCheckFailed } = useQuery<unknown[]>({
+    queryKey: ["/api/deals"],
+    enabled: canEditOrg && tab === "organization",
+  });
+  // Fails closed: if we cannot see the deals, we cannot promise there are none.
+  const regionLock: "checking" | "has-deals" | "unverifiable" | null = !canEditOrg
+    ? null
+    : dealsCheckFailed
+      ? "unverifiable"
+      : !orgDeals
+        ? "checking"
+        : orgDeals.length > 0 ? "has-deals" : null;
+  // A locked region is the stored one, whatever draft was typed before the
+  // deals check answered.
+  const region: LocaleSettings = regionDraft && !regionLock ? regionDraft : orgRegion;
+  // The owner's personal row can have drifted from the org's (a save refused
+  // half-way by an older build wrote the profile first). Comparing against it
+  // too keeps Save available to repair that, even while the region is locked:
+  // re-sending the org's own values is not a change, so the server allows it.
+  const regionUnchanged = sameRegion(region, orgRegion) && (!isOwner || sameRegion(region, ownRegion));
+  const saveRegion = useMutation({
+    mutationFn: async (next: LocaleSettings) => {
+      const fields = { country: next.country, currency: next.currency, locale: next.locale, timezone: next.timezone };
+      // The org FIRST. It is the write that can be refused (REGION_LOCKED), and
+      // the owner's row must not change unless it succeeds: a refused save that
+      // had already moved the owner to GB hid Indian checkout from a paying
+      // customer and had no screen to undo it. The owner's own row is the
+      // issuer profile and drives their personal screens, so it follows. An
+      // Admin changing the workspace's region is not changing where they work.
+      await apiRequest("PATCH", "/api/org", fields);
+      if (isOwner) await apiRequest("PATCH", "/api/profile", fields);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/org"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      setRegionDraft(null);
+      toast({ title: "Country & currency updated" });
+    },
+    onError: (err) => toast({
+      title: "Could not update country & currency",
+      description: parseApiError(err).error || "Please try again.",
+      variant: "destructive",
+    }),
   });
 
   // ── Invite flow ──
@@ -327,6 +397,7 @@ export default function SettingsPage() {
           <div className="flex-1 min-w-0 space-y-4">
             {/* ── Organization ── */}
             {tab === "organization" && (
+              <>
               <Card className="glass-card">
                 <CardContent className="p-5 lg:p-6 space-y-5">
                   <div>
@@ -375,6 +446,65 @@ export default function SettingsPage() {
                   )}
                 </CardContent>
               </Card>
+
+              <Card className="glass-card">
+                <CardContent className="p-5 lg:p-6 space-y-5">
+                  <div>
+                    <h2 className="font-bold text-lg">Country &amp; currency</h2>
+                    <p className="text-sm text-muted-foreground">
+                      What your quotations, agreements and invoices are issued in.
+                    </p>
+                  </div>
+                  {orgLoading ? (
+                    <Skeleton className="h-32 w-full rounded-xl" />
+                  ) : (
+                    <div className="space-y-4 max-w-md">
+                      {/* Keyed on the org so the currency's "picked by hand"
+                          memory never carries over from another workspace. */}
+                      <RegionFields
+                        key={org?.id}
+                        value={region}
+                        onChange={setRegionDraft}
+                        disabled={!canEditOrg || saveRegion.isPending || regionLock !== null}
+                        showTimeZone
+                        idPrefix="org-region"
+                      />
+                      {regionLock === "has-deals" && (
+                        <p className="text-xs text-muted-foreground" data-testid="region-locked">
+                          Fixed once your first deal exists, so everything already quoted, signed and invoiced keeps
+                          printing exactly as it was issued. Need to change it? Email support@dealinsec.com.
+                        </p>
+                      )}
+                      {regionLock === "unverifiable" && (
+                        <p className="text-xs text-muted-foreground" data-testid="region-locked">
+                          We couldn't check whether this workspace has deals, so the country and currency stay locked. Refresh to try again.
+                        </p>
+                      )}
+                      {canEditOrg && isOwner && regionLock !== null && regionLock !== "checking" && !regionUnchanged && (
+                        <p className="text-xs text-muted-foreground" data-testid="region-owner-drift">
+                          Your own profile doesn't match this workspace's country and currency. Save to bring it back in line —
+                          the workspace itself won't change.
+                        </p>
+                      )}
+                      {canEditOrg && (
+                        <Button
+                          onClick={() => saveRegion.mutate(region)}
+                          disabled={saveRegion.isPending || regionLock === "checking" || regionUnchanged}
+                          className="gradient-btn text-white"
+                          data-testid="button-save-region"
+                        >
+                          {saveRegion.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                          Save changes
+                        </Button>
+                      )}
+                      {!canEditOrg && (
+                        <p className="text-xs text-muted-foreground">Only the Owner or an Admin can change this.</p>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              </>
             )}
 
             {/* ── Team ── */}
@@ -417,7 +547,7 @@ export default function SettingsPage() {
                               {m.orgRole === "OWNER" && <Crown className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />}
                               {m.id === (user as any)?.id && <Badge variant="secondary" className="text-[10px] px-1.5">You</Badge>}
                             </div>
-                            <p className="text-xs text-muted-foreground truncate">{m.email} · joined {fmtDate(m.joinedAt)}</p>
+                            <p className="text-xs text-muted-foreground truncate">{m.email} · joined {fmtDate(m.joinedAt, locale)}</p>
                           </div>
                           {canManageTeam && m.orgRole !== "OWNER" && m.id !== (user as any)?.id ? (
                             <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -484,7 +614,7 @@ export default function SettingsPage() {
                               <p className="text-xs text-muted-foreground">
                                 {ROLE_META[inv.orgRole]?.label
                                   ?? customRoles.find((r) => r.id === (inv as any).customRoleId)?.name
-                                  ?? "Custom role"} · invited {fmtDate(inv.createdAt)} · expires {fmtDate(inv.expiresAt)}
+                                  ?? "Custom role"} · invited {fmtDate(inv.createdAt, locale)} · expires {fmtDate(inv.expiresAt, locale)}
                               </p>
                             </div>
                             <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -635,7 +765,7 @@ export default function SettingsPage() {
                                     </td>
                                     <td className="px-3 py-2.5 text-muted-foreground max-w-[280px] truncate">{a.detail || "—"}</td>
                                     <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap text-xs">
-                                      {new Date(a.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                                      {new Date(a.createdAt).toLocaleString(locale, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
                                     </td>
                                   </tr>
                                 );
@@ -754,9 +884,9 @@ export default function SettingsPage() {
                             : "Free"}
                       </p>
                       {org.ownerPlan === "pro" && org.ownerPlanExpiresAt ? (
-                        <p className="text-[11px] text-muted-foreground">until {fmtDate(org.ownerPlanExpiresAt)}</p>
+                        <p className="text-[11px] text-muted-foreground">until {fmtDate(org.ownerPlanExpiresAt, locale)}</p>
                       ) : org.ownerOnTrial && org.ownerTrialEndsAt ? (
-                        <p className="text-[11px] text-muted-foreground">until {fmtDate(org.ownerTrialEndsAt)}</p>
+                        <p className="text-[11px] text-muted-foreground">until {fmtDate(org.ownerTrialEndsAt, locale)}</p>
                       ) : null}
                     </div>
                     <div className="rounded-xl border border-border/60 p-3.5">
@@ -764,14 +894,16 @@ export default function SettingsPage() {
                       <p className="text-xl font-bold mt-0.5">{org.seatsUsed} / {org.seatLimit}</p>
                       {org.extraSeats > 0 && (
                         <p className="text-[11px] text-muted-foreground">
-                          incl. {org.extraSeats} extra · until {fmtDate(org.extraSeatsExpiresAt)}
+                          incl. {org.extraSeats} extra · until {fmtDate(org.extraSeatsExpiresAt, locale)}
                         </p>
                       )}
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground max-w-md">
                     Free plan includes 1 user. Pro — and your free trial — includes 5 team members.
-                    Need more? Extra seats are {formatRupees(extraSeatPrice)}/seat per month.
+                    {checkoutAvailable
+                      ? <>Need more? Extra seats are {formatRupees(extraSeatPrice)}/seat per month.</>
+                      : <>Need more? Extra seats — international checkout coming soon.</>}
                   </p>
                   {canBilling ? (
                     <div className="flex flex-wrap gap-2">
@@ -802,7 +934,9 @@ export default function SettingsPage() {
                 <div>
                   <h2 className="font-semibold">Your data</h2>
                   <p className="text-sm text-muted-foreground mt-1 max-w-md">
-                    Your rights under the Digital Personal Data Protection Act, 2023.
+                    {accountCountry === "IN"
+                      ? "Your rights under the Digital Personal Data Protection Act, 2023."
+                      : "Your data protection rights."}
                   </p>
                 </div>
 
@@ -840,7 +974,9 @@ export default function SettingsPage() {
                       const ok = await confirm({
                         title: "Delete your account?",
                         description:
-                          "This cannot be undone. Your name, email, PAN, GSTIN, bank details and signature are erased, and you are signed out immediately. Download your data first if you want a copy.",
+                          accountCountry === "IN"
+                            ? "This cannot be undone. Your name, email, PAN, GSTIN, bank details and signature are erased, and you are signed out immediately. Download your data first if you want a copy."
+                            : "This cannot be undone. Your name, email, tax ID, bank details and signature are erased, and you are signed out immediately. Download your data first if you want a copy.",
                         confirmText: "Delete my account",
                         cancelText: "Keep my account",
                         destructive: true,
@@ -987,7 +1123,11 @@ export default function SettingsPage() {
                   <Button className="w-full gradient-btn text-white">Upgrade Plan</Button>
                 </Link>
                 <Link href="/pricing#seats">
-                  <Button variant="outline" className="w-full">Buy Additional Seats — {formatRupees(extraSeatPrice)}/seat</Button>
+                  <Button variant="outline" className="w-full">
+                    {checkoutAvailable
+                      ? <>Buy Additional Seats — {formatRupees(extraSeatPrice)}/seat</>
+                      : <>Additional seats — international checkout coming soon</>}
+                  </Button>
                 </Link>
               </>
             ) : (

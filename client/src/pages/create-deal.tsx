@@ -38,12 +38,17 @@ import {
   type DealType,
 } from "@shared/dealTypeTaxonomy";
 import { trackEvent } from "@/lib/analytics";
+import { MoneyCurrencyPendingError, useMoney } from "@/hooks/use-locale";
 
-const formSchema = insertDealSchema.omit({ userId: true }).extend({
+// The form collects MAJOR units from a human — `dealAmount`, what they type —
+// and the stored column is `dealAmountMinor`. Omitting the minor field and
+// adding the major one keeps the two from ever being confused: there is no
+// point in this file where a value of the wrong unit would still typecheck.
+const formSchema = insertDealSchema.omit({ userId: true, dealAmountMinor: true }).extend({
   brandName: z.string().min(1, "Client / brand name is required"),
   dealTitle: z.string().min(1, "Deal title is required"),
   dealType: z.enum(dealTypeOptions).default(dealTypeOptions[0]),
-  dealAmount: z.coerce.number().min(1, "Deal amount must be positive"),
+  dealAmount: z.coerce.number().positive("Deal amount must be positive"),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
   brandUserId: z.string().optional().nullable(),
@@ -109,6 +114,7 @@ function rememberedDealType(): DealType | null {
 export default function CreateDealPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const fmt = useMoney();
   const { openUpgradeModal } = useUpgradeModal();
 
   // Two-step wizard: an app-like full-screen type picker, then the form.
@@ -168,7 +174,16 @@ export default function CreateDealPage() {
 
   const createDeal = useMutation({
     mutationFn: async (data: FormData) => {
-      const res = await apiRequest("POST", "/api/deals", data);
+      // The one place major units become minor. `dealAmount` never leaves.
+      const { dealAmount, ...rest } = data;
+      const res = await apiRequest("POST", "/api/deals", {
+        ...rest,
+        dealAmountMinor: fmt.minor(dealAmount),
+        // The currency those minor units are IN. The server refuses the write
+        // if the workspace has since moved to another one (CURRENCY_CHANGED),
+        // rather than storing ₹65,000 as $65,000.
+        currency: fmt.currency,
+      });
       return res.json();
     },
     onSuccess: (deal) => {
@@ -187,6 +202,10 @@ export default function CreateDealPage() {
       else setLocation(`/deals/${deal.id}`);
     },
     onError: (err) => {
+      if (err instanceof MoneyCurrencyPendingError) {
+        toast({ title: "Nothing was saved", description: err.message, variant: "destructive" });
+        return;
+      }
       const parsed = parseApiError(err);
       if (isUpgradeError(parsed)) {
         // Out of monthly Deal Credits — offer Pro.
@@ -203,6 +222,21 @@ export default function CreateDealPage() {
   });
 
   const onSubmit = (data: FormData) => {
+    // fmt.minor() throws until the org's currency is known, and a throw here
+    // is an unhandled rejection inside handleSubmit: no save, no toast. The
+    // button waits for `ready`; this catches the Enter key and a failed load.
+    if (!fmt.ready) {
+      toast({ title: "Nothing was saved", description: new MoneyCurrencyPendingError().message, variant: "destructive" });
+      if (fmt.failed) fmt.retry();
+      return;
+    }
+    // A sub-unit amount (₹0.004, and every amount at all in a 0-decimal
+    // currency like JPY) rounds to zero minor units. Caught here rather than
+    // at the server, where "positive" has already been satisfied by 0.004.
+    if (fmt.minor(data.dealAmount) < 1) {
+      form.setError("dealAmount", { message: "Deal amount must be positive" });
+      return;
+    }
     createDeal.mutate(data);
   };
 
@@ -446,10 +480,14 @@ export default function CreateDealPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dealAmount">Deal Amount (₹)</Label>
+              <Label htmlFor="dealAmount">Deal Amount ({fmt.symbol})</Label>
               <Input
                 id="dealAmount"
                 type="number"
+                // One minor unit, not the default 1: a currency with decimals
+                // must accept 1250.50, but not a third place that would be
+                // silently rounded on save (see useMoney().inputStep).
+                step={fmt.inputStep}
                 placeholder="50000"
                 className="h-12"
                 data-testid="input-deal-amount"
@@ -728,13 +766,22 @@ export default function CreateDealPage() {
           <Button
             type="submit"
             className="w-full h-14 text-base font-semibold rounded-xl gradient-btn text-white"
-            disabled={createDeal.isPending}
+            // Waits for the org's currency (useMoney().ready). A failed load
+            // stays clickable: onSubmit retries it and says why nothing saved.
+            disabled={createDeal.isPending || (!fmt.ready && !fmt.failed)}
             data-testid="button-submit-deal"
           >
             {createDeal.isPending ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Creating...
+              </>
+            ) : fmt.failed ? (
+              "Couldn't load your currency — try again"
+            ) : !fmt.ready ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Loading currency…
               </>
             ) : (
               "Create Deal"

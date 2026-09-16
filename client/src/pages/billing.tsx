@@ -14,6 +14,7 @@ import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components
 import { PickParentDialog } from "@/components/pick-parent-dialog";
 import { memberCan } from "@shared/permissions";
 import { useAuth } from "@/hooks/useAuth";
+import { useMoney, type MoneyFormat } from "@/hooks/use-locale";
 import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table/data-table";
@@ -22,12 +23,13 @@ import type { Deal, BrandInvoice } from "@shared/schema";
 
 type FilterType = "all" | "paid" | "unpaid";
 
-const fmtDate = (s: string | null | undefined) =>
-  s ? new Date(s).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
+const fmtDate = (s: string | null | undefined, locale: string) =>
+  s ? new Date(s).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : "—";
 
 const typeLabel = (t: string) => (t === "advance" ? "Advance" : t === "final" ? "Final" : "Full");
 
-const columns: ColumnDef<BrandInvoice>[] = [
+// A factory, because money and dates need the org's currency and locale.
+const makeColumns = (fmt: MoneyFormat): ColumnDef<BrandInvoice>[] => [
   {
     accessorKey: "invoiceNumber",
     header: "Invoice No.",
@@ -62,16 +64,17 @@ const columns: ColumnDef<BrandInvoice>[] = [
   },
   {
     id: "amount",
-    accessorFn: (i) => Number(i.dealAmount),
+    accessorFn: (i) => Number(i.dealAmountMinor),
     header: "Amount",
-    meta: { label: "Amount", align: "right", exportValue: (i) => Number(i.dealAmount) },
-    cell: ({ row }) => <span className="font-semibold text-primary tabular-nums">₹{Number(row.original.dealAmount).toLocaleString("en-IN")}</span>,
+    // Export stays in MAJOR units — the CSV is reconciled against bank rows.
+    meta: { label: "Amount", align: "right", exportValue: (i) => fmt.major(i.dealAmountMinor) },
+    cell: ({ row }) => <span className="font-semibold text-primary tabular-nums">{fmt.money(row.original.dealAmountMinor)}</span>,
   },
   {
     accessorKey: "invoiceDate",
     header: "Date",
     meta: { label: "Date", exportValue: (i) => i.invoiceDate },
-    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.invoiceDate)}</span>,
+    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.invoiceDate, fmt.locale)}</span>,
   },
   {
     id: "dueDate",
@@ -79,7 +82,7 @@ const columns: ColumnDef<BrandInvoice>[] = [
     header: "Due",
     meta: { label: "Due", exportValue: (i) => i.dueDate ?? "" },
     enableGlobalFilter: false,
-    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.dueDate)}</span>,
+    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.dueDate, fmt.locale)}</span>,
   },
   {
     accessorKey: "status",
@@ -98,6 +101,8 @@ export default function BillingPage() {
   const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME);
   const [pickOpen, setPickOpen] = useState(false);
   const { user } = useAuth();
+  const fmt = useMoney();
+  const columns = useMemo(() => makeColumns(fmt), [fmt]);
   const canCreate = memberCan(user as any, "invoices.create");
   const [, setLocation] = useLocation();
 
@@ -117,12 +122,13 @@ export default function BillingPage() {
           invoice.brandName.toLowerCase().includes(q) ||
           (deal?.dealTitle || "").toLowerCase().includes(q) ||
           invoice.invoiceNumber.toLowerCase().includes(q) ||
-          invoice.dealAmount.toString().includes(q)
+          // Match the amount on screen (major units), not the stored paise.
+          String(fmt.major(invoice.dealAmountMinor)).includes(q)
         );
       }
       return true;
     });
-  }, [brandInvoices, filter, search, deals, dateRange]);
+  }, [brandInvoices, filter, search, deals, dateRange, fmt]);
 
   const groupedByDeal = useMemo(() => {
     const groups = new Map<number, BrandInvoice[]>();
@@ -134,8 +140,10 @@ export default function BillingPage() {
     return Array.from(groups.entries());
   }, [filteredInvoices]);
 
-  const totalPaid = brandInvoices.filter((i) => i.status === "Paid").reduce((s, i) => s + Number(i.dealAmount), 0);
-  const totalUnpaid = brandInvoices.filter((i) => i.status === "Unpaid").reduce((s, i) => s + Number(i.dealAmount), 0);
+  // Summed in MINOR units and formatted once — adding floats of rupees would
+  // drift, adding integers of paise cannot.
+  const totalPaidMinor = brandInvoices.filter((i) => i.status === "Paid").reduce((s, i) => s + Number(i.dealAmountMinor), 0);
+  const totalUnpaidMinor = brandInvoices.filter((i) => i.status === "Unpaid").reduce((s, i) => s + Number(i.dealAmountMinor), 0);
 
   const filters: { value: FilterType; label: string }[] = [
     { value: "all", label: "All" },
@@ -235,7 +243,7 @@ export default function BillingPage() {
                 <div className="flex flex-col gap-6">
                   {groupedByDeal.map(([dealId, invoices]) => {
                     const deal = getDeal(dealId);
-                    const totalDealAmount = invoices.reduce((s, inv) => s + Number(inv.dealAmount), 0);
+                    const totalDealAmountMinor = invoices.reduce((s, inv) => s + Number(inv.dealAmountMinor), 0);
                     return (
                       <Card key={dealId} className="glass-card border-0 rounded-2xl overflow-hidden">
                         <div className="bg-muted/40 px-4 py-3 border-b border-white/10">
@@ -247,7 +255,7 @@ export default function BillingPage() {
                                 <p className="text-[11px] text-muted-foreground truncate">{deal?.brandName || invoices[0]?.brandName}</p>
                               </div>
                             </div>
-                            <p className="text-sm font-bold text-primary flex-shrink-0 ml-3">₹{totalDealAmount.toLocaleString("en-IN")}</p>
+                            <p className="text-sm font-bold text-primary flex-shrink-0 ml-3">{fmt.money(totalDealAmountMinor)}</p>
                           </div>
                         </div>
                         <CardContent className="p-0">
@@ -271,11 +279,11 @@ export default function BillingPage() {
                                     </div>
                                     <div className="flex items-center gap-2 mt-0.5">
                                       <span className="text-[11px] text-muted-foreground">{invoice.invoiceNumber}</span>
-                                      <span className="text-[11px] text-muted-foreground">· {fmtDate(invoice.invoiceDate)}</span>
+                                      <span className="text-[11px] text-muted-foreground">· {fmtDate(invoice.invoiceDate, fmt.locale)}</span>
                                     </div>
                                   </div>
                                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                                    <span className="text-sm font-bold text-primary">₹{Number(invoice.dealAmount).toLocaleString("en-IN")}</span>
+                                    <span className="text-sm font-bold text-primary">{fmt.money(invoice.dealAmountMinor)}</span>
                                     <StatusBadge status={invoice.status} />
                                   </div>
                                   <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />

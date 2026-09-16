@@ -13,7 +13,8 @@
  * "protections missing", we do not emit pseudo-precise risk scores, and
  * nothing here claims legal sufficiency.
  */
-import { STANDARD_TERMS, type Deal } from "@shared/schema";
+import { STANDARD_TERMS, type Deal, type LocaleSettings } from "@shared/schema";
+import { formatMoney } from "@shared/money";
 
 export interface ProtectionFlag {
   id: string;
@@ -42,7 +43,26 @@ const uniqMatches = (re: RegExp, text: string): string[] => {
   return seen;
 };
 
-export function analyzeDealProtections(deal: Deal): ProtectionReport {
+/** "₹[amount]", "£[amount]", "[amount] €" — a price placeholder written the way
+ *  the org's own money is written, because the suggested term is pasted into
+ *  the user's terms and printed on their quotation and agreement.
+ *
+ *  For INR this is "₹[amount]", the exact text Indian users have always been
+ *  offered and may already have in issued documents. It is cut out of
+ *  formatMoney()'s own rendering of zero, so glyph side and spacing come from
+ *  the same formatter as every amount on those documents. Anything that does
+ *  not come out as one clean substitution (a locale with its own digits, bidi
+ *  marks) gets the bare placeholder: a blank the user fills is better than a
+ *  garbled glyph in a contract. */
+function pricePlaceholder(settings: LocaleSettings): string {
+  const zero = formatMoney(0, settings.currency, settings.locale).replace(/[\u00A0\u202F]/g, " ");
+  if (/[\u200E\u200F\u061C]/.test(zero) || (zero.match(/0/g) ?? []).length !== 1) return "[amount]";
+  return zero.replace("0", "[amount]");
+}
+
+/** `settings` is the ORG's locale (see copilotSettings) — the one the deal's
+ *  documents print in, which is where a suggested term ends up. */
+export function analyzeDealProtections(deal: Deal, settings: LocaleSettings): ProtectionReport {
   const selectedIds = (deal.standardTermIds as string[] | null) ?? [];
   const standardText = STANDARD_TERMS.filter((t) => selectedIds.includes(t.id))
     .map((t) => t.label)
@@ -133,7 +153,9 @@ export function analyzeDealProtections(deal: Deal): ProtectionReport {
       severity: "gap",
       title: "No revision limit",
       detail: '"Just one more small change" is the most expensive sentence in service work. Cap it in writing.',
-      suggestedTerm: "Two rounds of revisions are included; further revisions are billed at ₹[amount] per round.",
+      // The org's own glyph, never a hardcoded ₹: this string is pasted into the
+      // user's own contract, and a ₹ in a British freelancer's terms is wrong.
+      suggestedTerm: `Two rounds of revisions are included; further revisions are billed at ${pricePlaceholder(settings)} per round.`,
     });
   }
   if (!has(/exclud|not includ|out of scope|extra work|additional work/i)) {

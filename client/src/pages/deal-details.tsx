@@ -11,10 +11,12 @@ import { PlatformIcon } from "@/components/platform-icon";
 import { dealTypeMeta } from "@shared/dealTypeTaxonomy";
 import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
+import { useMoney } from "@/hooks/use-locale";
+import { moneyIcon } from "@/components/money-icon";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { trackEvent } from "@/lib/analytics";
-import { ArrowLeft, Calendar, IndianRupee, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle, ChevronRight, Crown, Briefcase, ScrollText, ListChecks, Copy, Zap, ShieldAlert, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowLeft, Calendar, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle, ChevronRight, Crown, Briefcase, ScrollText, ListChecks, Copy, Zap, ShieldAlert, ShieldCheck, Sparkles } from "lucide-react";
 import { hasProAccess, STANDARD_TERMS } from "@shared/schema";
 import { memberCan } from "@shared/permissions";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
@@ -25,6 +27,7 @@ export default function DealDetailsPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const fmt = useMoney();
   // Role capabilities — the server enforces these too; hiding the button
   // just stops a member walking into a guaranteed 403.
   const canQuote = memberCan(user as any, "quotations.create");
@@ -64,7 +67,7 @@ export default function DealDetailsPage() {
   const { data: quote, isLoading: quoteLoading } = useQuery<Quote | null>({
     queryKey: ["/api/deals", params.id, "quote"],
     queryFn: async () => {
-      const res = await fetch(`/api/deals/${params.id}/quote`, { credentials: "include" });
+      const res = await fetch(`/api/deals/${params.id}/quote`, { credentials: "include", headers: { "X-DealInSec-Money": "minor" } });
       if (res.status === 404) return null;
       if (!res.ok) return null;
       return res.json();
@@ -75,7 +78,7 @@ export default function DealDetailsPage() {
   const { data: dealBrandInvoices = [] } = useQuery<BrandInvoice[]>({
     queryKey: ["/api/deals", params.id, "brand-invoices"],
     queryFn: async () => {
-      const res = await fetch(`/api/deals/${params.id}/brand-invoices`, { credentials: "include" });
+      const res = await fetch(`/api/deals/${params.id}/brand-invoices`, { credentials: "include", headers: { "X-DealInSec-Money": "minor" } });
       if (!res.ok) return [];
       return res.json();
     },
@@ -163,7 +166,7 @@ export default function DealDetailsPage() {
   const backPath = "/deals";
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("en-IN", {
+    return new Date(dateStr).toLocaleDateString(fmt.locale, {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -271,7 +274,7 @@ export default function DealDetailsPage() {
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 py-4">
               {([
-                { label: "Deal Value", icon: IndianRupee, iconCls: "text-primary", value: `₹${deal.dealAmount.toLocaleString("en-IN")}`, big: true, testid: "text-deal-amount" },
+                { label: "Deal Value", icon: moneyIcon(fmt.currency), iconCls: "text-primary", value: fmt.money(deal.dealAmountMinor), big: true, testid: "text-deal-amount" },
                 { label: "Duration", icon: Calendar, iconCls: "text-muted-foreground", value: `${formatDate(deal.startDate)} – ${formatDate(deal.endDate)}` },
                 { label: "Deal Type", icon: Briefcase, iconCls: "text-muted-foreground", value: `${(dealTypeMeta as any)[(deal as any).dealType]?.emoji ?? "·"} ${(deal as any).dealType || "Custom"}` },
                 { label: "Deliverables", icon: ListChecks, iconCls: "text-muted-foreground", value: `${deal.deliverables.length} item${deal.deliverables.length !== 1 ? "s" : ""} · ${(deal as any).deliverableMode === "any_one" ? "any one" : "all required"}` },
@@ -582,15 +585,16 @@ export default function DealDetailsPage() {
           <Card className="glass-card border-0">
             <CardContent className="p-5">
               {(() => {
-                const totalInvoiced = dealBrandInvoices.reduce((sum, i) => sum + Number(i.dealAmount || 0), 0);
-                const paid = dealBrandInvoices.filter((i) => i.status === "Paid").reduce((sum, i) => sum + Number(i.dealAmount || 0), 0);
+                // Every total here is MINOR units: integers add exactly, and
+                // the percentage below stays a true ratio at any scale.
+                const totalInvoicedMinor = dealBrandInvoices.reduce((sum, i) => sum + Number(i.dealAmountMinor || 0), 0);
+                const paidMinor = dealBrandInvoices.filter((i) => i.status === "Paid").reduce((sum, i) => sum + Number(i.dealAmountMinor || 0), 0);
                 const now = Date.now();
-                const overdue = dealBrandInvoices
+                const overdueMinor = dealBrandInvoices
                   .filter((i) => i.status !== "Paid" && i.dueDate && new Date(i.dueDate as any).getTime() < now)
-                  .reduce((sum, i) => sum + Number(i.dealAmount || 0), 0);
-                const pending = totalInvoiced - paid - overdue;
-                const pct = deal.dealAmount > 0 ? Math.min(100, Math.round((totalInvoiced / deal.dealAmount) * 100)) : 0;
-                const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+                  .reduce((sum, i) => sum + Number(i.dealAmountMinor || 0), 0);
+                const pendingMinor = totalInvoicedMinor - paidMinor - overdueMinor;
+                const pct = deal.dealAmountMinor > 0 ? Math.min(100, Math.round((totalInvoicedMinor / deal.dealAmountMinor) * 100)) : 0;
                 return (
                   <>
                     <div className="flex items-center justify-between mb-4">
@@ -612,11 +616,11 @@ export default function DealDetailsPage() {
                         <div className="flex items-end justify-between gap-3 mb-2">
                           <div>
                             <p className="text-xs text-muted-foreground">Deal Value</p>
-                            <p className="font-bold text-lg tabular-nums">{inr(deal.dealAmount)}</p>
+                            <p className="font-bold text-lg tabular-nums">{fmt.money(deal.dealAmountMinor)}</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Total Invoiced</p>
-                            <p className="font-bold text-lg tabular-nums">{inr(totalInvoiced)}</p>
+                            <p className="font-bold text-lg tabular-nums">{fmt.money(totalInvoicedMinor)}</p>
                           </div>
                           <span className="text-xs font-bold px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 tabular-nums">
                             {pct}%
@@ -627,15 +631,15 @@ export default function DealDetailsPage() {
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                           {([
-                            { label: "Paid", value: paid, dot: "bg-emerald-500", cls: "text-emerald-600 dark:text-emerald-400" },
-                            { label: "Pending", value: pending, dot: "bg-amber-500", cls: "text-amber-600 dark:text-amber-400" },
-                            { label: "Overdue", value: overdue, dot: "bg-rose-500", cls: "text-rose-600 dark:text-rose-400" },
+                            { label: "Paid", value: paidMinor, dot: "bg-emerald-500", cls: "text-emerald-600 dark:text-emerald-400" },
+                            { label: "Pending", value: pendingMinor, dot: "bg-amber-500", cls: "text-amber-600 dark:text-amber-400" },
+                            { label: "Overdue", value: overdueMinor, dot: "bg-rose-500", cls: "text-rose-600 dark:text-rose-400" },
                           ] as const).map((t) => (
                             <div key={t.label} className="rounded-lg border border-border/60 p-2.5 min-w-0">
                               <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                                 <span className={`w-1.5 h-1.5 rounded-full ${t.dot}`} /> {t.label}
                               </p>
-                              <p className={`font-bold text-sm tabular-nums mt-0.5 truncate ${t.cls}`}>{inr(t.value)}</p>
+                              <p className={`font-bold text-sm tabular-nums mt-0.5 truncate ${t.cls}`}>{fmt.money(t.value)}</p>
                             </div>
                           ))}
                         </div>

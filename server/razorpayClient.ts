@@ -18,6 +18,28 @@
  *                                       Retired from every UI surface; the SKU
  *                                       stays for cached clients and refunds.
  * The client mirrors these defaults in client/src/hooks/use-plan-prices.ts.
+ *
+ * GLOBAL PRICING — NOT LIVE (Sep 2026). Every order this file creates is in ₹ on
+ * the domestic Razorpay account, so today only a customer in India can buy. The
+ * pricing page shows everyone else an "international checkout is coming soon"
+ * note in place of a buy button (usePlanCheckoutAvailable in
+ * client/src/hooks/use-plan-prices.ts), and createRazorpayOrder refuses any
+ * other currency. International checkout is pending Razorpay International
+ * approval.
+ *
+ * GLOBAL_PLANS below is the agreed price list for when it opens: India keeps
+ * monthly + annual in ₹, everywhere else is ANNUAL ONLY in a local currency.
+ * Nothing reads it yet. Annual-only abroad is deliberate: a card charge carries
+ * a fixed per-transaction cost, which is trivial once a year and punitive
+ * twelve times a year on a small ticket.
+ *
+ * To be confirmed on activation, not assumed: how international payments settle
+ * to us and what export paperwork they produce. Razorpay's pricing page
+ * (https://razorpay.com/pricing/) lists an auto-generated eFIRC for
+ * international bank transfers; that says nothing about card payments. Any
+ * plain gateway also leaves us the seller of record, so foreign VAT/sales-tax
+ * exposure would be ours and grows with volume — weigh a Merchant of Record
+ * before wiring this.
  */
 import Razorpay from "razorpay";
 import crypto from "crypto";
@@ -61,6 +83,42 @@ export function getExtraSeatPrice(): number {
   return parseInt(process.env.EXTRA_SEAT_PRICE ?? "99", 10);
 }
 
+export interface PlanPrice {
+  /** Amount in MAJOR units of the currency (99 = ₹99 / $99). */
+  amount: number;
+  currency: string;
+  /** Term length in days, mirroring PRO_*_DAYS. */
+  days: number;
+}
+
+/**
+ * NOT WIRED — the agreed price list for international checkout, which is
+ * pending Razorpay International approval (see the header). No route, order or
+ * screen reads this. Do not quote or charge from it until checkout is live
+ * end to end: order creation, the pricing page and the grant path together.
+ *
+ * Local round numbers beat a live FX conversion: "£79" reads as a price,
+ * "£78.43" reads as a glitch — and a price that moves with the exchange rate
+ * can silently contradict the marketing page.
+ *
+ * India is the only market with a monthly plan. Everywhere else is annual only.
+ * The INR row records the list price; live ₹ orders read the env-driven
+ * getters above instead, so a ₹1 test-mode run keeps working.
+ */
+export const GLOBAL_PLANS: Readonly<Record<string, { monthly?: PlanPrice; yearly: PlanPrice }>> = {
+  INR: {
+    monthly: { amount: 99, currency: "INR", days: PRO_MONTHLY_DAYS },
+    yearly: { amount: 999, currency: "INR", days: PRO_YEARLY_DAYS },
+  },
+  USD: { yearly: { amount: 99, currency: "USD", days: PRO_YEARLY_DAYS } },
+  GBP: { yearly: { amount: 79, currency: "GBP", days: PRO_YEARLY_DAYS } },
+  EUR: { yearly: { amount: 89, currency: "EUR", days: PRO_YEARLY_DAYS } },
+  AUD: { yearly: { amount: 149, currency: "AUD", days: PRO_YEARLY_DAYS } },
+  CAD: { yearly: { amount: 139, currency: "CAD", days: PRO_YEARLY_DAYS } },
+  SGD: { yearly: { amount: 129, currency: "SGD", days: PRO_YEARLY_DAYS } },
+  AED: { yearly: { amount: 369, currency: "AED", days: PRO_YEARLY_DAYS } },
+};
+
 function getClient(): Razorpay {
   if (_client) return _client;
   if (!isRazorpayConfigured()) {
@@ -78,6 +136,10 @@ function getClient(): Razorpay {
 export interface CreateOrderArgs {
   /** Amount in INR (rupees) — converted to paise internally */
   amountInRupees: number;
+  /** ISO-4217. Only INR is accepted until international checkout is live (see
+   *  the header); anything else throws before Razorpay is called. Optional so
+   *  existing callers are untouched. */
+  currency?: string;
   /** Our internal receipt id (we store the same on payu_orders.orderId) */
   receipt: string;
   notes?: Record<string, string>;
@@ -85,10 +147,18 @@ export interface CreateOrderArgs {
 
 /** Create a Razorpay order. Returns the order with razorpay order_id. */
 export async function createRazorpayOrder(args: CreateOrderArgs) {
+  const currency = (args.currency || "INR").toUpperCase();
+  // Fail closed. International checkout is not wired: no screen quotes a
+  // foreign price, the grant path has never seen one, and the ×100 below is
+  // wrong for a zero-decimal currency like JPY. A non-INR order would either be
+  // refused by Razorpay mid-checkout or charge a figure nobody was shown.
+  if (currency !== "INR") {
+    throw new Error(`International checkout is not live yet, so a ${currency} order cannot be created.`);
+  }
   const client = getClient();
   return client.orders.create({
     amount: Math.round(args.amountInRupees * 100), // paise
-    currency: "INR",
+    currency,
     receipt: args.receipt,
     notes: args.notes,
   });

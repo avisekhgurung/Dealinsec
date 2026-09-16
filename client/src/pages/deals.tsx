@@ -15,6 +15,7 @@ import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components
 import { PickParentDialog } from "@/components/pick-parent-dialog";
 import { memberCan } from "@shared/permissions";
 import { useAuth } from "@/hooks/useAuth";
+import { useMoney, type MoneyFormat } from "@/hooks/use-locale";
 import { DataTable } from "@/components/data-table/data-table";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { unguardCell } from "@/lib/csv";
@@ -27,20 +28,27 @@ import type { Deal } from "@shared/schema";
 
 type FilterType = "all" | "pending" | "active" | "completed";
 
-const fmtDate = (s: string) =>
-  new Date(s).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+const fmtDate = (s: string, locale: string) =>
+  new Date(s).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" });
 
 function uuid(): string {
   try { return crypto.randomUUID(); } catch { return `id-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
 }
 
-// Desktop table columns.
-const columns: ColumnDef<Deal>[] = [
+/** A deal plus its amount as the user reads it. The table's text search
+ *  matches raw row keys, and the stored key is minor units — searching
+ *  "650000" would find a ₹6,500 deal (650000 paise). This key is what the
+ *  search looks at instead. */
+type DealRow = Deal & { amountMajor: string };
+
+// Desktop table columns. A factory rather than a constant because money and
+// dates now need the org's currency and locale, which only a hook can supply.
+const makeColumns = (fmt: MoneyFormat): ColumnDef<DealRow>[] => [
   {
     id: "dealNo",
     header: "Deal No.",
     meta: { label: "Deal No.", filter: "text", filterPlaceholder: "DL-…" },
-    accessorFn: (d: Deal) => recordNo("deal", d.id),
+    accessorFn: (d: DealRow) => recordNo("deal", d.id),
     cell: ({ row }) => (
       <span className="font-mono text-[11px] text-muted-foreground tabular-nums">{recordNo("deal", row.original.id)}</span>
     ),
@@ -71,22 +79,24 @@ const columns: ColumnDef<Deal>[] = [
     },
   },
   {
-    accessorKey: "dealAmount",
+    accessorKey: "dealAmountMinor",
     header: "Amount",
-    meta: { label: "Amount", align: "right", exportValue: (d) => d.dealAmount },
-    cell: ({ row }) => <span className="font-semibold text-primary tabular-nums">₹{row.original.dealAmount.toLocaleString("en-IN")}</span>,
+    // The CSV keeps exporting MAJOR units — a spreadsheet column of paise
+    // would be a silent 100x change to a file users already reconcile against.
+    meta: { label: "Amount", align: "right", exportValue: (d) => fmt.major(d.dealAmountMinor) },
+    cell: ({ row }) => <span className="font-semibold text-primary tabular-nums">{fmt.money(row.original.dealAmountMinor)}</span>,
   },
   {
     accessorKey: "startDate",
     header: "Start",
     meta: { label: "Start", exportValue: (d) => d.startDate },
-    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.startDate)}</span>,
+    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.startDate, fmt.locale)}</span>,
   },
   {
     accessorKey: "endDate",
     header: "End",
     meta: { label: "End", exportValue: (d) => d.endDate },
-    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.endDate)}</span>,
+    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.endDate, fmt.locale)}</span>,
   },
   {
     id: "deliverables",
@@ -118,6 +128,8 @@ export default function DealsPage() {
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME);
   const { user } = useAuth();
+  const fmt = useMoney();
+  const columns = useMemo(() => makeColumns(fmt), [fmt]);
   const canCreateDeal = memberCan(user as any, "deals.create");
   // ?pick=agreement — arrived from the invoice picker's "create an agreement".
   const [pickAgreement, setPickAgreement] = useState(
@@ -142,12 +154,19 @@ export default function DealsPage() {
         return (
           deal.dealTitle.toLowerCase().includes(q) ||
           deal.brandName.toLowerCase().includes(q) ||
-          deal.dealAmount.toString().includes(q)
+          // Match the amount the user can SEE (major units), not the stored
+          // paise — "65000" must still find a ₹65,000 deal.
+          String(fmt.major(deal.dealAmountMinor)).includes(q)
         );
       }
       return true;
     });
-  }, [deals, filter, search, dateRange]);
+  }, [deals, filter, search, dateRange, fmt]);
+
+  const tableRows = useMemo<DealRow[]>(
+    () => filteredDeals.map((d) => ({ ...d, amountMajor: String(fmt.major(d.dealAmountMinor)) })),
+    [filteredDeals, fmt],
+  );
 
   const filters: { value: FilterType; label: string }[] = [
     { value: "all", label: "All" },
@@ -253,9 +272,9 @@ export default function DealsPage() {
             <div className="hidden lg:block">
               <DataTable
                 columns={columns}
-                data={filteredDeals}
+                data={tableRows}
                 searchPlaceholder="Search deals..."
-                searchKeys={["brandName", "dealTitle", "dealAmount"]}
+                searchKeys={["brandName", "dealTitle", "amountMajor"]}
                 facetedFilters={[{
                   columnId: "status",
                   title: "Status",
@@ -297,10 +316,10 @@ export default function DealsPage() {
                           </div>
                           <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
                             <Calendar className="w-3.5 h-3.5" />
-                            <span>{fmtDate(deal.startDate)} - {fmtDate(deal.endDate)}</span>
+                            <span>{fmtDate(deal.startDate, fmt.locale)} - {fmtDate(deal.endDate, fmt.locale)}</span>
                           </div>
                           <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/10">
-                            <span className="text-lg font-bold text-primary">₹{deal.dealAmount.toLocaleString()}</span>
+                            <span className="text-lg font-bold text-primary">{fmt.money(deal.dealAmountMinor)}</span>
                             <div className="flex items-center gap-1 text-muted-foreground">
                               <span className="text-xs">{deal.deliverables.length} deliverable{deal.deliverables.length !== 1 ? "s" : ""}</span>
                               <ChevronRight className="w-4 h-4" />

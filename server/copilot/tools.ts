@@ -12,12 +12,22 @@
  *   proposes one, the user clicks a confirm button, and /api/copilot/execute
  *   re-validates everything. No sending, deleting, billing or permission tools exist.
  * - Results are size-capped: the model sees summaries, not row dumps.
+ * - Money reaches the model as printed labels (formatMoney) or as
+ *   amountForModel() — NEVER a minor-unit number (see ./voice). Money the
+ *   model sends back (minAmount, dealAmount) is MAJOR units and goes through
+ *   toMinor() once, here.
  */
 import { storage } from "../storage";
 import { memberCan } from "@shared/permissions";
-import { hasProAccess, hasActiveDealBoost, insertDealSchema, dealTypeOptions, type User, type Deliverable } from "@shared/schema";
+import {
+  hasProAccess, hasActiveDealBoost, insertDealSchema, dealTypeOptions,
+  resolveLocaleSettings, toMinor, MAX_AMOUNT_MINOR,
+  type User, type Deliverable, type LocaleSettings,
+} from "@shared/schema";
+import { formatMoney, formatDate } from "@shared/money";
 import { getBillingUser, logOrgActivity } from "../entitlements";
-import { getDealJourney } from "./workflow";
+import { copilotSettings, getDealJourney } from "./workflow";
+import { amountVoice, speaksNativeMoney, voiceFor } from "./voice";
 
 const inOrg = (
   resource: { organizationId?: string | null; userId?: string | null } | null | undefined,
@@ -28,11 +38,28 @@ const inOrg = (
   return resource.userId === user.id;
 };
 
-const fmtINR = (n: number) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 const cap = <T,>(rows: T[], n = 8) => rows.slice(0, n);
 
-/** OpenAI-compatible tool definitions sent to the model. */
-export const TOOL_DEFS = [
+/** The zone `Date#toLocaleDateString` used when no zone was passed — the
+ *  server process's. Read once; only the Indian trial line still needs it. */
+const SERVER_TIME_ZONE = (() => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+})();
+
+/** A money value the model sent, read as MAJOR units. Only a number or a
+ *  numeric string counts — `Number(true)` is 1 and `Number([65000])` is 65000,
+ *  and neither is an amount anyone stated. NaN for anything else. */
+const majorFromModel = (x: unknown): number =>
+  typeof x === "number" || typeof x === "string" ? Number(x) : NaN;
+
+/** OpenAI-compatible tool definitions sent to the model. A function of the
+ *  locale because search_deals has to say which currency `minAmount` is in:
+ *  for an Indian account that is "in rupees", the description that shipped. */
+export const toolDefs = (settings: LocaleSettings) => [
   {
     type: "function",
     function: {
@@ -51,7 +78,7 @@ export const TOOL_DEFS = [
     function: {
       name: "search_deals",
       description:
-        "Search the organization's deals by free text (client/title), optional status (Pending|Active|Completed) and optional minimum amount in rupees. Returns id, title, client, amount, status and route.",
+        `Search the organization's deals by free text (client/title), optional status (Pending|Active|Completed) and optional minimum amount in ${amountVoice(voiceFor(settings.country), settings).unitName}. Returns id, title, client, amount, status and route.`,
       parameters: {
         type: "object",
         properties: {
@@ -127,30 +154,45 @@ export const TOOL_DEFS = [
 
 type ToolResult = string;
 
-/** Execute a read tool. Returns a compact string for the model. */
-export async function runTool(name: string, args: any, user: User): Promise<ToolResult> {
+/** Execute a read tool. Returns a compact string for the model.
+ *  `settings` is the chat turn's copilotSettings(): passed in so the prompt
+ *  and every tool result in that turn describe the same currency. */
+export async function runTool(name: string, args: any, user: User, settings?: LocaleSettings): Promise<ToolResult> {
   const orgId = user.organizationId;
   if (!orgId) return "No organization on this account.";
+  const turnSettings = () => (settings ? Promise.resolve(settings) : copilotSettings(user));
 
   switch (name) {
     case "get_workflow_status": {
-      const journey = await getDealJourney(Number(args?.dealId), user);
+      // Safe to stringify whole: DealJourney carries money only as a
+      // ModelAmount (major units + code + label).
+      const journey = await getDealJourney(Number(args?.dealId), user, await turnSettings());
       if (!journey) return "Deal not found in your organization.";
       return JSON.stringify(journey);
     }
 
     case "search_deals": {
-      const all = await storage.getDealsByOrg(orgId, user.id);
+      const [all, { currency, locale }] = await Promise.all([
+        storage.getDealsByOrg(orgId, user.id),
+        turnSettings(),
+      ]);
       const q = String(args?.query || "").toLowerCase();
+      // The model says "deals over 50000" in major units; the column holds
+      // minor units. Convert the THRESHOLD once rather than the rows, or every
+      // deal matches every threshold. A missing/zero minAmount filters nothing
+      // and a non-numeric one matches nothing — exactly as the rupee version
+      // behaved, so the same model call gets the same rows.
+      const rawMin = Number(args?.minAmount);
+      const minAmountMinor = Number.isFinite(rawMin) ? toMinor(rawMin, currency) : NaN;
       const rows = all.filter(
         (d) =>
           (!q || d.brandName.toLowerCase().includes(q) || d.dealTitle.toLowerCase().includes(q)) &&
           (!args?.status || d.status === args.status) &&
-          (!args?.minAmount || Number(d.dealAmount) >= Number(args.minAmount)),
+          (!args?.minAmount || d.dealAmountMinor >= minAmountMinor),
       );
       if (!rows.length) return "No matching deals.";
       return cap(rows)
-        .map((d) => `#${d.id} "${d.dealTitle}" · ${d.brandName} · ${fmtINR(Number(d.dealAmount))} · ${d.status} · route:/deals/${d.id}`)
+        .map((d) => `#${d.id} "${d.dealTitle}" · ${d.brandName} · ${formatMoney(d.dealAmountMinor, currency, locale)} · ${d.status} · route:/deals/${d.id}`)
         .join("\n") + (rows.length > 8 ? `\n(+${rows.length - 8} more — suggest opening /deals)` : "");
     }
 
@@ -170,7 +212,10 @@ export async function runTool(name: string, args: any, user: User): Promise<Tool
     }
 
     case "search_agreements": {
-      const all = await storage.getContractsByOrg(orgId, user.id);
+      const [all, { currency, locale }] = await Promise.all([
+        storage.getContractsByOrg(orgId, user.id),
+        turnSettings(),
+      ]);
       const q = String(args?.query || "").toLowerCase();
       const rows = all.filter(
         (c) =>
@@ -179,12 +224,15 @@ export async function runTool(name: string, args: any, user: User): Promise<Tool
       );
       if (!rows.length) return "No matching agreements.";
       return cap(rows)
-        .map((c) => `Agreement #${c.id} "${c.contractName}" · ${fmtINR(Number(c.contractValue))} · ${c.status} · route:/contracts/${c.id}`)
+        .map((c) => `Agreement #${c.id} "${c.contractName}" · ${formatMoney(c.contractValueMinor, currency, locale)} · ${c.status} · route:/contracts/${c.id}`)
         .join("\n");
     }
 
     case "search_invoices": {
-      const all = await storage.getBrandInvoicesByOrg(orgId, user.id);
+      const [all, { currency, locale }] = await Promise.all([
+        storage.getBrandInvoicesByOrg(orgId, user.id),
+        turnSettings(),
+      ]);
       const q = String(args?.query || "").toLowerCase();
       const now = Date.now();
       const rows = all.filter((i) => {
@@ -198,15 +246,16 @@ export async function runTool(name: string, args: any, user: User): Promise<Tool
       });
       if (!rows.length) return "No matching invoices.";
       return cap(rows)
-        .map((i) => `${i.invoiceNumber} · ${i.brandName} · ${fmtINR(Number(i.dealAmount))} · ${i.status}${i.dueDate ? ` · due ${i.dueDate}` : ""} · route:/brand-invoices/${i.id}`)
+        .map((i) => `${i.invoiceNumber} · ${i.brandName} · ${formatMoney(i.dealAmountMinor, currency, locale)} · ${i.status}${i.dueDate ? ` · due ${i.dueDate}` : ""} · route:/brand-invoices/${i.id}`)
         .join("\n");
     }
 
     case "get_pending_work": {
-      const [deals, contracts, invoices] = await Promise.all([
+      const [deals, contracts, invoices, { currency, locale }] = await Promise.all([
         storage.getDealsByOrg(orgId, user.id),
         storage.getContractsByOrg(orgId, user.id),
         storage.getBrandInvoicesByOrg(orgId, user.id),
+        turnSettings(),
       ]);
       const pendingDeals = deals.filter((d) => d.status === "Pending");
       const awaitingProof = contracts.filter((c) => c.status !== "Signed" && !(c as any).signedByBrand);
@@ -217,7 +266,7 @@ export async function runTool(name: string, args: any, user: User): Promise<Tool
       if (awaitingProof.length)
         parts.push(`Agreements awaiting signed proof (${awaitingProof.length}): ` + cap(awaitingProof, 5).map((c) => `#${c.id} ${c.contractName} route:/contracts/${c.id}`).join("; "));
       if (unpaid.length)
-        parts.push(`Unpaid invoices (${unpaid.length}, ${fmtINR(unpaid.reduce((s, i) => s + Number(i.dealAmount || 0), 0))} outstanding): ` + cap(unpaid, 5).map((i) => `${i.invoiceNumber} ${i.brandName} route:/brand-invoices/${i.id}`).join("; "));
+        parts.push(`Unpaid invoices (${unpaid.length}, ${formatMoney(unpaid.reduce((s, i) => s + (i.dealAmountMinor || 0), 0), currency, locale)} outstanding): ` + cap(unpaid, 5).map((i) => `${i.invoiceNumber} ${i.brandName} route:/brand-invoices/${i.id}`).join("; "));
       return parts.length ? parts.join("\n") : "Nothing pending — all deals, agreements and invoices are up to date. 🎉";
     }
 
@@ -227,9 +276,19 @@ export async function runTool(name: string, args: any, user: User): Promise<Tool
       const members = await storage.countActiveMembers(orgId);
       const trialEnds = billing.trialEndsAt ? new Date(billing.trialEndsAt as any) : null;
       const trialActive = !!trialEnds && trialEnds.getTime() > Date.now();
+      // The trial is the CALLER's, not the org's — their own locale and zone
+      // write it. `year: false` because this line has always read "ends 20
+      // Sept"; formatDate prints a year unless told not to.
+      //
+      // An account on the shipped Indian voice keeps the zone this line has
+      // always been read in — the server process's own (UTC on Render) — so
+      // its Copilot says exactly what it said before, day included. Everyone
+      // else gets their own zone.
+      const own = resolveLocaleSettings(null, user);
+      const trialZone = speaksNativeMoney(own) ? SERVER_TIME_ZONE : own.timezone;
       const plan = hasProAccess(billing)
         ? trialActive && billing.plan !== "pro"
-          ? `Pro trial (ends ${trialEnds!.toLocaleDateString("en-IN", { day: "numeric", month: "short" })})`
+          ? `Pro trial (ends ${formatDate(trialEnds, own.locale, { day: "numeric", month: "short", year: false, timezone: trialZone })})`
           : "DealInSec Pro"
         : "Free";
       return `Organization: ${org?.name ?? "?"} · Plan: ${plan} · Your role: ${user.orgRole}${(user as any).customPermissions ? ` (custom permissions: ${((user as any).customPermissions as string[]).join(", ") || "view-only"})` : ""} · Members: ${members}`;
@@ -273,11 +332,28 @@ export async function executeCreateDeal(rawArgs: any, user: User) {
   const today = new Date();
   const iso = (d: Date) => d.toISOString().slice(0, 10);
 
+  // Re-read at execution time, never carried in the confirm button's args: the
+  // currency the amount is denominated in is the org's, not the client's say.
+  const settings = await copilotSettings(user);
+  const { currency, locale } = settings;
+
   const brandName = str(rawArgs?.brandName, 120);
   if (!brandName) return { ok: false as const, message: "I need the client's name to create a deal." };
-  const amountNum = Math.round(Number(rawArgs?.dealAmount));
-  if (!Number.isFinite(amountNum) || amountNum <= 0 || amountNum > 1_000_000_000) {
-    return { ok: false as const, message: "I need a valid deal amount (in rupees) to create the deal." };
+  // The model reports the amount as the user said it, in MAJOR units — the
+  // prompt tells it to expand "1.5 lakh" to 150000 (or "5k" to 5000) before it
+  // proposes, and never to send a count of paise or cents. This is the single
+  // toMinor() boundary for the Copilot's create path; converting before the
+  // range check means the check guards the value the column actually receives.
+  const rawAmount = majorFromModel(rawArgs?.dealAmount);
+  // India shipped whole rupees: "1,50,000.4" stored ₹1,50,000, never ₹1,50,000.40.
+  // Keep that for INR; currencies where sub-units are everyday money keep theirs.
+  const amountMajor = currency === "INR" && Number.isFinite(rawAmount) ? Math.round(rawAmount) : rawAmount;
+  const dealAmountMinor = Number.isFinite(amountMajor) ? toMinor(amountMajor, currency) : NaN;
+  if (!(dealAmountMinor > 0) || dealAmountMinor > MAX_AMOUNT_MINOR) {
+    // One message for missing, non-numeric and out-of-range alike, as before —
+    // and for an Indian account still "(in rupees)", word for word.
+    const { unitShort } = amountVoice(voiceFor(settings.country), settings);
+    return { ok: false as const, message: `I need a valid deal amount (in ${unitShort}) to create the deal.` };
   }
   const dealTitle = str(rawArgs?.dealTitle, 200) || `Work for ${brandName}`;
   // Only an ACTIVE deal type is accepted (case-insensitive); legacy, misspelt
@@ -314,7 +390,7 @@ export async function executeCreateDeal(rawArgs: any, user: User) {
     brandName,
     dealTitle,
     dealType,
-    dealAmount: amountNum,
+    dealAmountMinor,
     startDate,
     endDate,
     deliverables,
@@ -342,7 +418,7 @@ export async function executeCreateDeal(rawArgs: any, user: User) {
     logOrgActivity(user, "created", "deal", deal.id, `Deal: ${deal.dealTitle || deal.brandName} (via Copilot)`);
     return {
       ok: true as const,
-      message: `Deal created: "${deal.dealTitle}" for ${deal.brandName} — ${fmtINR(Number(deal.dealAmount))}. Next step: generate its quotation.`,
+      message: `Deal created: "${deal.dealTitle}" for ${deal.brandName} — ${formatMoney(deal.dealAmountMinor, currency, locale)}. Next step: generate its quotation.`,
       route: `/deals/${deal.id}`,
     };
   } catch (err) {

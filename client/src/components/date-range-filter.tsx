@@ -12,6 +12,8 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { CalendarDays, ChevronDown, X } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
+import { formatDate } from "@/lib/money";
 
 export interface DateRange {
   from: Date | null;
@@ -54,11 +56,11 @@ export function inRange(dateLike: Date | string | null | undefined, range: DateR
   return true;
 }
 
-const fmt = (d: Date) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-
 export function DateRangeFilter({
   value, onChange,
 }: { value: DateRange; onChange: (r: DateRange) => void }) {
+  const { locale, timezone } = useLocale();
+  const fmt = (d: Date) => formatDate(d, locale, { day: "numeric", year: false, timezone });
   const [open, setOpen] = useState(false);
   const [customFrom, setCustomFrom] = useState<Date | undefined>();
   const [customTo, setCustomTo] = useState<Date | undefined>();

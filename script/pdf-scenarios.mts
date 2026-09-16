@@ -1,6 +1,12 @@
 /**
- * Seeds the PDF test scenarios (shared Neon DB — ALWAYS clean up with
- * `npx tsx --env-file=.env script/pdf-scenarios.mts clean`).
+ * Seeds the PDF test scenarios into the LOCAL test database.
+ *
+ * LOCAL ONLY — refuses to run unless DATABASE_URL points at localhost. Dev and
+ * production share one Neon database, and this script deletes and inserts rows
+ * by fixed ids, so it must never see `.env`.
+ *
+ *   DATABASE_URL=postgresql://dealtest@localhost:5544/dealinsec_pdftest npx tsx script/pdf-scenarios.mts
+ *   DATABASE_URL=postgresql://dealtest@localhost:5544/dealinsec_pdftest npx tsx script/pdf-scenarios.mts clean
  *
  * One org, one owner (with signature + seal + full billing identity), and the
  * scenario matrix from the PDF-redesign spec:
@@ -8,10 +14,18 @@
  *   deal B: 10 deliverables, long client name, long custom terms → quotation + agreement (signed, e-stamp) + itemised invoice
  *   deal C: short agreement awaiting counterparty signature, minimal optionals (no bank details on invoice path)
  *
+ * Every amount is written in MINOR units (paise), including estamp_amount,
+ * which contract-pdf.tsx prints through the same formatter as the contract
+ * value. Invoice lines use the stored `rateMinor`/`amountMinor` keys. Seeding
+ * requires the local database to be migrated first; `clean` does not.
+ *
  * Prints JSON ids for the shot harness.
  */
 import pg from "pg";
 import bcrypt from "bcrypt";
+import { INDIA_LOCALE, inr, requireLocalDatabaseUrl, requireMinorUnitMoney } from "./local-db-guard.ts";
+
+const SCRIPT = "pdf-scenarios.mts";
 
 const ORG = "00000000-0000-4000-8000-00000000pdf1".replace("pdf1", "0d01");
 const UID = "00000000-0000-4000-8000-00000000pdf2".replace("pdf2", "0d02");
@@ -31,8 +45,19 @@ const LONG_TERMS = [
   "The provider may reference the completed work in their portfolio unless the client opts out in writing.",
 ].join("\n");
 
+/** One invoice line in the stored shape. quantity is a count, never scaled. */
+const line = (description: string, quantity: number, rateRupees: number, hsnSac?: string) => ({
+  description,
+  ...(hsnSac ? { hsnSac } : {}),
+  quantity,
+  rateMinor: inr(rateRupees),
+  amountMinor: inr(rateRupees * quantity),
+});
+
 async function main(clean: boolean) {
-  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  // Before the pool exists: a refused URL must never open a connection.
+  const url = requireLocalDatabaseUrl(SCRIPT);
+  const pool = new pg.Pool({ connectionString: url });
   const c = await pool.connect();
   try {
     if (clean) {
@@ -54,17 +79,26 @@ async function main(clean: boolean) {
       return;
     }
 
+    await requireMinorUnitMoney(c, SCRIPT);
+
+    // The locale columns are re-pinned to India on conflict: every amount below
+    // is INR paise, and an org left on another currency would misprint them all.
     const pw = await bcrypt.hash("SmokeTest#2026", 10);
-    await c.query(`INSERT INTO organizations (id,name) VALUES ($1,'PDF Studio') ON CONFLICT (id) DO NOTHING`, [ORG]);
+    const loc = [INDIA_LOCALE.country, INDIA_LOCALE.currency, INDIA_LOCALE.locale, INDIA_LOCALE.timezone];
+    await c.query(
+      `INSERT INTO organizations (id,name,country,currency,locale,timezone) VALUES ($1,'PDF Studio',$2,$3,$4,$5)
+       ON CONFLICT (id) DO UPDATE SET country=EXCLUDED.country, currency=EXCLUDED.currency, locale=EXCLUDED.locale, timezone=EXCLUDED.timezone`,
+      [ORG, ...loc],
+    );
     await c.query(
       `INSERT INTO users (id,email,email_canonical,password,first_name,last_name,organization_id,org_role,plan,plan_expires_at,onboarding_complete,
         phone,pan_number,gst_number,billing_address,digital_signature,company_seal,
-        account_holder_name,account_number,ifsc_code,bank_name)
+        account_holder_name,account_number,ifsc_code,bank_name,country,currency,locale,timezone)
        VALUES ($1,$2,$2,$3,'Anaya','Deshpande',$4,'OWNER','pro',now()+interval '30 days',true,
         '9876543210','ABCDE1234F','19ABCDE1234F1Z5','2nd Floor, Laxmi Niwas, Hill Cart Road, Darjeeling, West Bengal 734101',$5,$6,
-        'Anaya Deshpande','50100123456789','HDFC0001234','HDFC Bank, Darjeeling Branch')
-       ON CONFLICT (id) DO NOTHING`,
-      [UID, EMAIL, pw, ORG, SIG, SEAL],
+        'Anaya Deshpande','50100123456789','HDFC0001234','HDFC Bank, Darjeeling Branch',$7,$8,$9,$10)
+       ON CONFLICT (id) DO UPDATE SET country=EXCLUDED.country, currency=EXCLUDED.currency, locale=EXCLUDED.locale, timezone=EXCLUDED.timezone`,
+      [UID, EMAIL, pw, ORG, SIG, SEAL, ...loc],
     );
 
     const mkDeliv = (n: number) =>
@@ -93,8 +127,8 @@ async function main(clean: boolean) {
     // Deal A — simple
     const a = await c.query(
       `INSERT INTO deals (user_id,organization_id,brand_name,deal_title,deal_amount,start_date,end_date,status,deal_type,deliverables,custom_terms)
-       VALUES ($1,$2,'Verma Residence','2BHK interior styling',90000,CURRENT_DATE,CURRENT_DATE+45,'Pending','service',$3::jsonb,NULL) RETURNING id`,
-      [UID, ORG, mkDeliv(1)],
+       VALUES ($1,$2,'Verma Residence','2BHK interior styling',$4,CURRENT_DATE,CURRENT_DATE+45,'Pending','service',$3::jsonb,NULL) RETURNING id`,
+      [UID, ORG, mkDeliv(1), inr(90000)],
     );
     await c.query(
       `INSERT INTO quotes (user_id,organization_id,deal_id,version,status) VALUES ($1,$2,$3,1,'draft')
@@ -105,8 +139,8 @@ async function main(clean: boolean) {
     // Deal B — heavy
     const b = await c.query(
       `INSERT INTO deals (user_id,organization_id,brand_name,deal_title,deal_amount,start_date,end_date,status,deal_type,deliverables,custom_terms)
-       VALUES ($1,$2,$3,'Full home interior — 4BHK duplex, Salt Lake',940000,CURRENT_DATE,CURRENT_DATE+120,'Signed','service',$4::jsonb,$5) RETURNING id`,
-      [UID, ORG, LONG_CLIENT, mkDeliv(10), LONG_TERMS],
+       VALUES ($1,$2,$3,'Full home interior — 4BHK duplex, Salt Lake',$6,CURRENT_DATE,CURRENT_DATE+120,'Signed','service',$4::jsonb,$5) RETURNING id`,
+      [UID, ORG, LONG_CLIENT, mkDeliv(10), LONG_TERMS, inr(940000)],
     );
     const dealB = b.rows[0].id;
     await c.query(
@@ -117,37 +151,42 @@ async function main(clean: boolean) {
       `INSERT INTO contracts (user_id,organization_id,deal_id,brand_name,contract_name,contract_value,start_date,end_date,status,
          signed_date,signed_by_brand,signer_user_id,signer_name,signature_url,seal_url,
          estamp_certificate_no,estamp_date,estamp_amount,estamp_authority,exclusive)
-       VALUES ($1,$2,$3,$4,$5,940000,CURRENT_DATE,CURRENT_DATE+120,'Signed',
+       VALUES ($1,$2,$3,$4,$5,$8,CURRENT_DATE,CURRENT_DATE+120,'Signed',
          CURRENT_DATE,true,$1,'Anaya Deshpande',$6,$7,
-         'IN-WB98765432109876K',CURRENT_DATE::text,1000,'SHCIL',true) RETURNING id`,
-      [UID, ORG, dealB, LONG_CLIENT, `${LONG_CLIENT} — Full home interior`, SIG, SEAL],
+         'IN-WB98765432109876K',CURRENT_DATE::text,$9,'SHCIL',true) RETURNING id`,
+      [UID, ORG, dealB, LONG_CLIENT, `${LONG_CLIENT} — Full home interior`, SIG, SEAL, inr(940000), inr(1000)],
     );
     const contractB = cb.rows[0].id;
+    // Lines sum to the invoice total (₹4,70,000), exactly as the server requires
+    // of a composed invoice: 3,20,000 + 85,000 + 4 × 12,500 + 15,000.
+    const linesB = [
+      line("Design fee — concept, drawings & 3D views (50% advance)", 1, 320000, "998391"),
+      line("Modular kitchen — design & BOQ preparation", 1, 85000, "9954"),
+      line("Site supervision retainer", 4, 12500, "9954"),
+      line("Documentation & handover set", 1, 15000),
+    ];
+    const totalB = inr(470000);
+    if (linesB.reduce((sum, l) => sum + l.amountMinor, 0) !== totalB) {
+      throw new Error("pdf-scenarios: invoice B lines no longer add up to its total");
+    }
     const inv = await c.query(
       `INSERT INTO brand_invoices (user_id,organization_id,invoice_number,invoice_date,due_date,deal_id,contract_id,brand_name,influencer_name,influencer_email,deal_amount,invoice_type,notes,line_items,status)
-       VALUES ($1,$2,'INV-2627-0042',CURRENT_DATE,CURRENT_DATE+15,$3,$4,$5,'Anaya Deshpande',$6,470000,'advance',
+       VALUES ($1,$2,'INV-2627-0042',CURRENT_DATE,CURRENT_DATE+15,$3,$4,$5,'Anaya Deshpande',$6,$8,'advance',
         'Advance for phase 1 as per agreement. Please quote the invoice number in the transfer reference.',
         $7::jsonb,'Unpaid') RETURNING id`,
-      [UID, ORG, dealB, contractB, LONG_CLIENT, EMAIL,
-        JSON.stringify([
-          { description: "Design fee — concept, drawings & 3D views (50% advance)", hsnSac: "998391", quantity: 1, rate: 320000, amount: 320000 },
-          { description: "Modular kitchen — design & BOQ preparation", hsnSac: "9954", quantity: 1, rate: 85000, amount: 85000 },
-          { description: "Site supervision retainer", hsnSac: "9954", quantity: 4, rate: 12500, amount: 50000 },
-          { description: "Documentation & handover set", quantity: 1, rate: 15000, amount: 15000 },
-        ]),
-      ],
+      [UID, ORG, dealB, contractB, LONG_CLIENT, EMAIL, JSON.stringify(linesB), totalB],
     );
 
     // Deal C — minimal agreement awaiting signature (no proof, not signedByBrand)
     const cD = await c.query(
       `INSERT INTO deals (user_id,organization_id,brand_name,deal_title,deal_amount,start_date,end_date,status,deal_type,deliverables)
-       VALUES ($1,$2,'Rai & Co','Brand refresh — logo and stationery',60000,CURRENT_DATE,CURRENT_DATE+30,'Active','service',$3::jsonb) RETURNING id`,
-      [UID, ORG, mkDeliv(2)],
+       VALUES ($1,$2,'Rai & Co','Brand refresh — logo and stationery',$4,CURRENT_DATE,CURRENT_DATE+30,'Active','service',$3::jsonb) RETURNING id`,
+      [UID, ORG, mkDeliv(2), inr(60000)],
     );
     const cc = await c.query(
       `INSERT INTO contracts (user_id,organization_id,deal_id,brand_name,contract_name,contract_value,start_date,end_date,status,signer_user_id,signer_name)
-       VALUES ($1,$2,$3,'Rai & Co','Rai & Co — Brand refresh',60000,CURRENT_DATE,CURRENT_DATE+30,'Pending',$1,'Anaya Deshpande') RETURNING id`,
-      [UID, ORG, cD.rows[0].id],
+       VALUES ($1,$2,$3,'Rai & Co','Rai & Co — Brand refresh',$4,CURRENT_DATE,CURRENT_DATE+30,'Pending',$1,'Anaya Deshpande') RETURNING id`,
+      [UID, ORG, cD.rows[0].id, inr(60000)],
     );
 
     console.log(JSON.stringify({

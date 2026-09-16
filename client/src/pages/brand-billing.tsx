@@ -6,14 +6,18 @@ import { BrandBottomNav } from "@/components/brand-bottom-nav";
 import { StatusBadge } from "@/components/status-badge";
 import { ArrowLeft, Receipt, Calendar, ChevronRight } from "lucide-react";
 import type { Invoice } from "@shared/schema";
+import { toMinor } from "@shared/schema";
+import { formatMoney } from "@/lib/format";
+import { useLocale } from "@/hooks/use-locale";
 
 export default function BrandBillingPage() {
+  const { locale } = useLocale();
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
     queryKey: ["/api/brand/received-invoices"],
   });
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("en-IN", {
+    return new Date(dateStr).toLocaleDateString(locale, {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -82,7 +86,11 @@ export default function BrandBillingPage() {
 
                     <div className="flex items-center justify-between pt-3 border-t border-border">
                       <span className="text-2xl font-bold">
-                        ₹{invoice.totalAmount.toLocaleString()}
+                        {/* The legacy DealInSec platform-fee invoice: whole
+                            rupees on the Stripe rail, not the user's own money
+                            (see shared/schema.ts). Pinned to INR because that
+                            is the currency it was charged in. */}
+                        {formatMoney(toMinor(invoice.totalAmount, "INR"), "INR", locale)}
                       </span>
                       <ChevronRight className="w-5 h-5 text-muted-foreground" />
                     </div>

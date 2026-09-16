@@ -13,6 +13,7 @@
  * Warnings are surfaced on screen (never printed) and never invent or pick a
  * value — resolving a contradiction is the user's call.
  */
+import { splitMinor } from "@/lib/format";
 
 export interface DocWarning { severity: "error" | "warning"; message: string }
 
@@ -60,11 +61,24 @@ export function termsMentionPayment(customTerms: string | null | undefined): boo
  * Conservative payment-schedule derivation for the quotation: only when the
  * terms state exactly one advance percentage. The amounts are arithmetic on
  * figures the user wrote — never invented.
+ *
+ * The arithmetic is splitMinor() — the same rule the split-invoice route uses.
+ * A whole-rupee deal splits to whole rupees exactly as every quotation already
+ * issued printed it (₹12,345 at 30% is ₹3,704 / ₹8,641, never ₹3,703.50), and
+ * the balance is the remainder, so the two rows always add back to the total.
+ *
+ * `currency` is the document's (`loc.currency`) and is REQUIRED. It was once
+ * optional with an INR fallback, and the quotation called it without one: a
+ * JPY deal then split on INR's factor of 100, so ¥15,000 at 33% printed an
+ * advance of ¥5,000 where the invoices the server creates say ¥4,950. A
+ * missing currency is now a compile error instead of a wrong client-facing
+ * figure.
  */
 export function deriveSchedule(
   customTerms: string | null | undefined,
-  total: number,
-): { label: string; amount: number }[] | null {
+  totalMinor: number,
+  currency: string,
+): { label: string; amountMinor: number }[] | null {
   const text = customTerms ?? "";
   const seen: number[] = [];
   let m: RegExpExecArray | null;
@@ -75,11 +89,13 @@ export function deriveSchedule(
   }
   if (seen.length !== 1) return null;
   const pct = seen[0];
-  if (!(pct > 0 && pct < 100) || !(total > 0)) return null;
-  const advance = Math.round((total * pct) / 100);
+  // A non-integer total would make splitMinor throw mid-render; the stored
+  // column is an integer, so this only refuses corrupt data, quietly.
+  if (!(pct > 0 && pct < 100) || !(totalMinor > 0) || !Number.isSafeInteger(totalMinor)) return null;
+  const { advanceMinor, finalMinor } = splitMinor(totalMinor, pct, currency);
   return [
-    { label: `Advance (${pct}%)`, amount: advance },
-    { label: `Balance (${100 - pct}%)`, amount: total - advance },
+    { label: `Advance (${pct}%)`, amountMinor: advanceMinor },
+    { label: `Balance (${100 - pct}%)`, amountMinor: finalMinor },
   ];
 }
 
@@ -87,7 +103,9 @@ export function deriveSchedule(
 export function validateDocData(d: {
   clientName?: string | null;
   sellerName?: string | null;
-  amount?: number | null;
+  /** Minor units — the check is unit-agnostic, the name is not, so a caller
+   *  cannot hand it a rupee figure without noticing. */
+  amountMinor?: number | null;
   startDate?: string | null;
   endDate?: string | null;
   dueDate?: string | null;
@@ -96,7 +114,7 @@ export function validateDocData(d: {
   const out: DocWarning[] = [];
   if (!d.clientName?.trim()) out.push({ severity: "error", message: "Client name is missing — the document will print without a recipient." });
   if (!d.sellerName?.trim()) out.push({ severity: "warning", message: "Your name is missing from your profile — the document has no sender identity." });
-  if (d.amount != null && !(Number(d.amount) > 0)) out.push({ severity: "error", message: "The amount is zero or invalid." });
+  if (d.amountMinor != null && !(Number(d.amountMinor) > 0)) out.push({ severity: "error", message: "The amount is zero or invalid." });
   const t = (x?: string | null) => (x ? new Date(x).getTime() : NaN);
   if (d.startDate && d.endDate && t(d.endDate) < t(d.startDate)) {
     out.push({ severity: "error", message: "The end date is before the start date." });

@@ -37,6 +37,7 @@ import {
   type AnyDealType,
 } from "@shared/dealTypeTaxonomy";
 import { TaxonomyCombobox } from "@/components/taxonomy-combobox";
+import { MoneyCurrencyPendingError, useMoney } from "@/hooks/use-locale";
 
 const formSchema = z.object({
   brandName: z.string().min(1, "Client / brand name is required"),
@@ -44,7 +45,9 @@ const formSchema = z.object({
   // Accept legacy types so pre-pivot deals can still be edited; the type
   // selector grid only offers the Phase-1 sectors.
   dealType: z.enum([...dealTypeOptions, ...legacyDealTypeOptions] as [string, ...string[]]).default("Custom"),
-  dealAmount: z.coerce.number().min(1, "Deal amount must be positive"),
+  // MAJOR units, as a human types them. The column is `dealAmountMinor`; the
+  // conversion happens once on seed and once on save, nowhere else.
+  dealAmount: z.coerce.number().positive("Deal amount must be positive"),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
   brandUserId: z.string().optional().nullable(),
@@ -69,6 +72,7 @@ export default function EditDealPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const fmt = useMoney();
 
   const { data: deal, isLoading: isDealLoading } = useQuery<Deal>({
     queryKey: ["/api/deals", params.id],
@@ -137,14 +141,21 @@ export default function EditDealPage() {
     form.setValue("customTerms", next.map(t => t.trim()).filter(Boolean).join("\n"));
   };
 
+  // Seeded once per deal, and only once the org's currency is known.
+  // `dealAmount` is MAJOR units, so seeding before `ready` converts with the
+  // member's own exponent — an invitee (whose row defaults to INR) in a JPY org
+  // would see ¥65,000 pre-filled as 650 and save ¥650. Depending on `fmt`
+  // itself also re-ran this when `ready` flipped, wiping edits in progress.
+  const [seededDealId, setSeededDealId] = useState<number | null>(null);
   useEffect(() => {
-    if (deal) {
+    if (deal && fmt.ready && seededDealId !== deal.id) {
+      setSeededDealId(deal.id);
       const rawCustomTerms = (deal as any).customTerms ?? "";
       form.reset({
         brandName: deal.brandName,
         dealTitle: deal.dealTitle,
         dealType: ((deal as any).dealType as AnyDealType) ?? "Custom",
-        dealAmount: deal.dealAmount,
+        dealAmount: fmt.major(deal.dealAmountMinor),
         startDate: deal.startDate,
         endDate: deal.endDate,
         brandUserId: deal.brandUserId ?? undefined,
@@ -165,7 +176,8 @@ export default function EditDealPage() {
       const parts = String(rawCustomTerms).split(/\n+/).map(s => s.trim()).filter(Boolean);
       setCustomTermsList(parts.length > 0 ? parts : [""]);
     }
-  }, [deal]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deal, fmt.ready, seededDealId]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -174,7 +186,13 @@ export default function EditDealPage() {
 
   const updateDeal = useMutation({
     mutationFn: async (data: FormData) => {
-      const res = await apiRequest("PATCH", `/api/deals/${params.id}`, data);
+      // The one place major units become minor. `dealAmount` never leaves.
+      const { dealAmount, ...rest } = data;
+      const res = await apiRequest("PATCH", `/api/deals/${params.id}`, {
+        ...rest,
+        dealAmountMinor: fmt.minor(dealAmount),
+        currency: fmt.currency,
+      });
       return res.json();
     },
     onSuccess: () => {
@@ -186,16 +204,28 @@ export default function EditDealPage() {
       });
       setLocation(`/deals/${params.id}`);
     },
-    onError: () => {
+    onError: (err) => {
       toast({
         title: "Error",
-        description: "Failed to update deal. Please try again.",
+        description: err instanceof MoneyCurrencyPendingError ? err.message : "Failed to update deal. Please try again.",
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: FormData) => {
+    // fmt.minor() throws until the org's currency is known — see create-deal.
+    // Also refuses a form that was never seeded, whose amount is a placeholder.
+    if (!fmt.ready || seededDealId === null) {
+      toast({ title: "Nothing was saved", description: new MoneyCurrencyPendingError().message, variant: "destructive" });
+      if (fmt.failed) fmt.retry();
+      return;
+    }
+    // Sub-minor-unit amounts round to zero; caught here, not at the server.
+    if (fmt.minor(data.dealAmount) < 1) {
+      form.setError("dealAmount", { message: "Deal amount must be positive" });
+      return;
+    }
     updateDeal.mutate(data);
   };
 
@@ -376,10 +406,14 @@ export default function EditDealPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dealAmount">Deal Amount (&#8377;)</Label>
+              <Label htmlFor="dealAmount">Deal Amount ({fmt.symbol})</Label>
               <Input
                 id="dealAmount"
                 type="number"
+                // One minor unit, not the default 1: a currency with decimals
+                // must accept 1250.50, but not a third place that would be
+                // silently rounded on save (see useMoney().inputStep).
+                step={fmt.inputStep}
                 placeholder="50000"
                 className="h-12"
                 data-testid="input-deal-amount"
@@ -624,7 +658,7 @@ export default function EditDealPage() {
                     <Input
                       value={term}
                       onChange={(e) => syncCustomTerms(customTermsList.map((t, j) => j === i ? e.target.value : t))}
-                      placeholder={i === 0 ? "e.g. Content must be posted by 5pm IST" : "Add another clause"}
+                      placeholder={i === 0 ? "e.g. 2 revision rounds included; extra rounds billed separately" : "Add another clause"}
                       className="h-9"
                       data-testid={`input-custom-term-${i}`}
                     />
@@ -664,13 +698,22 @@ export default function EditDealPage() {
           <Button
             type="submit"
             className="w-full h-14 text-base font-semibold rounded-xl gradient-btn text-white"
-            disabled={updateDeal.isPending}
+            // Waits for the org's currency and the seeded form; a failed load
+            // stays clickable so onSubmit can retry it and say why.
+            disabled={updateDeal.isPending || (!fmt.failed && (!fmt.ready || seededDealId === null))}
             data-testid="button-submit-deal"
           >
             {updateDeal.isPending ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Saving...
+              </>
+            ) : fmt.failed ? (
+              "Couldn't load your currency — try again"
+            ) : !fmt.ready ? (
+              <>
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Loading currency…
               </>
             ) : (
               "Save Changes"

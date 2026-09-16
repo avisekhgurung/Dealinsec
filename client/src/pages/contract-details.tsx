@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/status-badge";
 import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocale, useMoney } from "@/hooks/use-locale";
 import { memberCan } from "@shared/permissions";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -29,8 +30,8 @@ import {
   Receipt,
   Trash2,
   Pencil,
-  IndianRupee,
 } from "lucide-react";
+import { moneyIcon } from "@/components/money-icon";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -44,6 +45,8 @@ export default function ContractDetailsPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const fmt = useMoney();
+  const MoneyIcon = moneyIcon(fmt.currency);
   const canInvoice = memberCan(user as any, "invoices.create");
   const canAgree = memberCan(user as any, "agreements.create");
   const confirm = useConfirm();
@@ -69,7 +72,7 @@ export default function ContractDetailsPage() {
   const { data: dealBrandInvoices = [] } = useQuery<BrandInvoice[]>({
     queryKey: ["/api/deals", contract?.dealId, "brand-invoices"],
     queryFn: async () => {
-      const res = await fetch(`/api/deals/${contract?.dealId}/brand-invoices`, { credentials: "include" });
+      const res = await fetch(`/api/deals/${contract?.dealId}/brand-invoices`, { credentials: "include", headers: { "X-DealInSec-Money": "minor" } });
       if (!res.ok) return [];
       return res.json();
     },
@@ -81,7 +84,7 @@ export default function ContractDetailsPage() {
     queryKey: ["/api/deals", contract?.dealId, "quote"],
     enabled: !!contract?.dealId,
     queryFn: async () => {
-      const res = await fetch(`/api/deals/${contract?.dealId}/quote`, { credentials: "include" });
+      const res = await fetch(`/api/deals/${contract?.dealId}/quote`, { credentials: "include", headers: { "X-DealInSec-Money": "minor" } });
       return res.ok ? res.json() : null;
     },
   });
@@ -93,20 +96,32 @@ export default function ContractDetailsPage() {
   const [estampAmount, setEstampAmount] = useState("");
   const [estampAuthority, setEstampAuthority] = useState("");
   useEffect(() => {
-    if (!contract) return;
+    // Not until the org's currency is known: the seeded figure depends on its
+    // exponent, and seeding with the member's own (an invitee's row says INR
+    // whatever the org uses) and re-seeding once it loads would both show a
+    // wrong figure and wipe anything typed in between. The card is not shown
+    // until then, so there is nothing to wipe.
+    if (!contract || !fmt.ready) return;
     setEstampNo((contract as any).estampCertificateNo || "");
     setEstampDate((contract as any).estampDate || "");
-    setEstampAmount((contract as any).estampAmount != null ? String((contract as any).estampAmount) : "");
+    // Seed the field in MAJOR units — the number the user typed, not paise.
+    setEstampAmount((contract as any).estampAmountMinor != null ? fmt.input((contract as any).estampAmountMinor) : "");
     setEstampAuthority((contract as any).estampAuthority || "");
-  }, [contract]);
+    // `fmt.input` keeps its identity unless the org's locale actually changes.
+  }, [contract, fmt.ready, fmt.input]);
 
   const saveEstamp = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("PATCH", `/api/contracts/${params.id}/estamp`, {
         estampCertificateNo: estampNo.trim(),
         estampDate: estampDate || null,
-        estampAmount: estampAmount === "" ? null : Number(estampAmount),
+        // A lone "." survives cleanInput mid-typing; it means "nothing entered",
+        // and must not reach minor(), which throws on NaN.
+        estampAmountMinor: Number.isFinite(parseFloat(estampAmount)) ? fmt.minor(parseFloat(estampAmount)) : null,
         estampAuthority: estampAuthority.trim(),
+        // The agreement's ISSUED currency — what the server compares an e-stamp
+        // edit against, not whatever the workspace uses today.
+        currency: (contract as { currency?: string | null } | undefined)?.currency ?? fmt.currency,
       });
       return res.json();
     },
@@ -194,8 +209,13 @@ export default function ContractDetailsPage() {
   });
 
   const updateInvoiceAmount = useMutation({
-    mutationFn: async ({ invoiceId, amount }: { invoiceId: number; amount: number }) => {
-      const res = await apiRequest("PATCH", `/api/brand-invoices/${invoiceId}`, { dealAmount: amount });
+    // `amount` is MAJOR units as typed; it crosses to minor exactly once, here.
+    mutationFn: async ({ invoiceId, amount, currency }: { invoiceId: number; amount: number; currency?: string | null }) => {
+      const res = await apiRequest("PATCH", `/api/brand-invoices/${invoiceId}`, {
+        dealAmountMinor: fmt.minor(amount),
+        // The invoice's own issued currency, for the same reason as above.
+        currency: currency ?? fmt.currency,
+      });
       return res.json();
     },
     onSuccess: () => {
@@ -251,7 +271,7 @@ export default function ContractDetailsPage() {
   };
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("en-IN", {
+    return new Date(dateStr).toLocaleDateString(fmt.locale, {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -381,7 +401,7 @@ export default function ContractDetailsPage() {
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 py-4">
               <div className="rounded-xl border border-border/60 bg-card/40 p-3.5">
                 <p className="text-xs text-muted-foreground mb-1.5">Contract Value</p>
-                <p className="font-bold text-xl text-primary tabular-nums">₹{contract.contractValue.toLocaleString("en-IN")}</p>
+                <p className="font-bold text-xl text-primary tabular-nums">{fmt.money(contract.contractValueMinor)}</p>
               </div>
               <div className="rounded-xl border border-border/60 bg-card/40 p-3.5">
                 <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Contract Period</p>
@@ -553,7 +573,7 @@ export default function ContractDetailsPage() {
                             </div>
                             <div className="min-w-0">
                               <span className="text-sm font-medium block truncate">{typeLabel}</span>
-                              <span className="text-xs text-muted-foreground">₹{inv.dealAmount.toLocaleString()} · {inv.invoiceNumber}</span>
+                              <span className="text-xs text-muted-foreground">{fmt.money(inv.dealAmountMinor)} · {inv.invoiceNumber}</span>
                             </div>
                           </Link>
                           <div className="flex items-center gap-1 ml-2">
@@ -571,8 +591,13 @@ export default function ContractDetailsPage() {
                                   className="h-8 w-8 text-muted-foreground hover:text-primary"
                                   onClick={() => {
                                     setEditingInvoiceId(inv.id);
-                                    setEditAmount(String(inv.dealAmount));
+                                    setEditAmount(fmt.input(inv.dealAmountMinor));
                                   }}
+                                  // Seeding before the org's currency loads
+                                  // converts with the member's exponent: a
+                                  // stored ¥65,000 would pre-fill as "650" and
+                                  // save as ¥650.
+                                  disabled={!fmt.ready}
                                   data-testid={`button-edit-invoice-${inv.id}`}
                                   aria-label="Edit amount"
                                   title="Edit amount"
@@ -586,7 +611,7 @@ export default function ContractDetailsPage() {
                                   onClick={async () => {
                                     const ok = await confirm({
                                       title: "Delete this invoice?",
-                                      description: `Invoice ${inv.invoiceNumber} for ₹${inv.dealAmount.toLocaleString("en-IN")} will be permanently deleted. This cannot be undone.`,
+                                      description: `Invoice ${inv.invoiceNumber} for ${fmt.money(inv.dealAmountMinor)} will be permanently deleted. This cannot be undone.`,
                                       confirmText: "Delete invoice",
                                       destructive: true,
                                     });
@@ -607,13 +632,14 @@ export default function ContractDetailsPage() {
                         {isEditing && (
                           <div className="flex items-center gap-2 pt-2 border-t border-border/60">
                             <div className="relative flex-1">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">{fmt.symbol}</span>
                               <Input
                                 type="text"
-                                inputMode="numeric"
+                                inputMode="decimal"
                                 value={editAmount}
-                                onChange={(e) => setEditAmount(e.target.value.replace(/\D/g, ""))}
-                                className="pl-7 h-9"
+                                onChange={(e) => setEditAmount(fmt.cleanInput(e.target.value))}
+                                // Room for the glyph: "₹" fits pl-7, "NZ$" does not.
+                                className={`${fmt.symbol.length > 1 ? "pl-11" : "pl-7"} h-9`}
                                 autoFocus
                                 data-testid={`input-edit-invoice-${inv.id}`}
                               />
@@ -622,14 +648,18 @@ export default function ContractDetailsPage() {
                               size="sm"
                               className="gradient-btn text-white h-9"
                               onClick={() => {
-                                const n = parseInt(editAmount, 10);
-                                if (!Number.isFinite(n) || n < 1) {
+                                const n = Number(editAmount);
+                                // `minor(n) < 1` also refuses "0.004", which
+                                // passes `n > 0` and would save a zero invoice.
+                                if (!Number.isFinite(n) || fmt.minor(n) < 1) {
                                   toast({ title: "Invalid amount", description: "Enter a positive number.", variant: "destructive" });
                                   return;
                                 }
-                                updateInvoiceAmount.mutate({ invoiceId: inv.id, amount: n });
+                                updateInvoiceAmount.mutate({ invoiceId: inv.id, amount: n, currency: (inv as { currency?: string | null }).currency });
                               }}
-                              disabled={updateInvoiceAmount.isPending}
+                              // fmt.minor() throws until the currency is known;
+                              // a disabled button cannot reach it.
+                              disabled={updateInvoiceAmount.isPending || !fmt.ready}
                               data-testid={`button-save-invoice-${inv.id}`}
                             >
                               {updateInvoiceAmount.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
@@ -683,7 +713,7 @@ export default function ContractDetailsPage() {
                 <div className="mb-3 flex items-center justify-between rounded-lg border border-input/60 bg-muted/30 px-3 py-2.5">
                   <span className="text-xs text-muted-foreground">Agreement value</span>
                   <span className="text-sm font-semibold text-foreground">
-                    ₹{Number(contract.contractValue).toLocaleString("en-IN")}
+                    {fmt.money(contract.contractValueMinor)}
                   </span>
                 </div>
                 <Button
@@ -711,7 +741,7 @@ export default function ContractDetailsPage() {
                     disabled={contract.status !== "Signed"}
                     data-testid="button-show-custom-invoice"
                   >
-                    <IndianRupee className="w-4 h-4 mr-2" />
+                    <MoneyIcon className="w-4 h-4 mr-2" />
                     Custom amount
                   </Button>
                 </div>
@@ -725,8 +755,13 @@ export default function ContractDetailsPage() {
         <div className="lg:col-span-1 space-y-6 mt-6 lg:mt-0">
           {/* e-Stamp certificate. We record the certificate the user bought;
               we do not issue, sell or verify stamp duty — and the copy says so,
-              because an uploaded picture of stamp paper is not stamping. */}
-          {canAgree && (
+              because an uploaded picture of stamp paper is not stamping.
+              India only: the card sends people to India's e-stamping portal
+              and asks for a certificate that only exists there. It waits for
+              the org's settings, since before they load the country is the
+              viewer's own row. A certificate already recorded still prints on
+              the agreement either way. */}
+          {canAgree && fmt.ready && fmt.settings.country === "IN" && (
             <Card className="glass-card border-0">
               <CardContent className="p-5">
                 <h3 className="font-semibold mb-1 pb-2 border-b-2 border-emerald-500/60 inline-block">Stamp Duty</h3>
@@ -761,9 +796,9 @@ export default function ContractDetailsPage() {
                         data-testid="input-estamp-date" />
                     </div>
                     <div className="space-y-1.5">
-                      <Label htmlFor="estamp-amt" className="text-xs">Duty paid (₹)</Label>
-                      <Input id="estamp-amt" inputMode="numeric" value={estampAmount}
-                        onChange={(e) => setEstampAmount(e.target.value.replace(/[^\d]/g, ""))}
+                      <Label htmlFor="estamp-amt" className="text-xs">Duty paid ({fmt.symbol})</Label>
+                      <Input id="estamp-amt" inputMode="decimal" value={estampAmount}
+                        onChange={(e) => setEstampAmount(fmt.cleanInput(e.target.value))}
                         placeholder="500" className="h-9 text-sm" data-testid="input-estamp-amount" />
                     </div>
                   </div>
@@ -777,7 +812,7 @@ export default function ContractDetailsPage() {
                   <Button
                     className="w-full h-9 text-sm gradient-btn text-white"
                     onClick={() => saveEstamp.mutate()}
-                    disabled={saveEstamp.isPending}
+                    disabled={saveEstamp.isPending || !fmt.ready}
                     data-testid="button-save-estamp"
                   >
                     {saveEstamp.isPending
@@ -799,7 +834,7 @@ export default function ContractDetailsPage() {
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <dt className="text-muted-foreground">Contract Value</dt>
-                  <dd className="font-bold tabular-nums">₹{contract.contractValue.toLocaleString("en-IN")}</dd>
+                  <dd className="font-bold tabular-nums">{fmt.money(contract.contractValueMinor)}</dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <dt className="text-muted-foreground">Contract Period</dt>
@@ -915,6 +950,9 @@ export default function ContractDetailsPage() {
 // Agreement-scoped slice of the org activity log. Hidden entirely for members
 // whose role lacks activity.view (the query 403s and we render nothing).
 function ActivityRail({ contractId }: { contractId: number }) {
+  // A timestamp in the viewer's own locale — when something happened is about
+  // them reading it, not about the org's currency.
+  const { locale } = useLocale();
   const { data: activity = [], isError } = useQuery<{
     id: number; userName: string | null; action: string; entityType: string;
     entityId: string | null; createdAt: string;
@@ -937,7 +975,7 @@ function ActivityRail({ contractId }: { contractId: number }) {
                   <span className="text-muted-foreground"> by {a.userName ?? "someone"}</span>
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {new Date(a.createdAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                  {new Date(a.createdAt).toLocaleString(locale, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
                 </p>
               </div>
             </li>

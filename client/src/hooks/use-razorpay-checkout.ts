@@ -8,6 +8,7 @@
 import { useState, useCallback } from "react";
 import { queryClient } from "@/lib/queryClient";
 import { trackEvent } from "@/lib/analytics";
+import { fromMinor } from "@shared/schema";
 
 const RAZORPAY_SCRIPT = "https://checkout.razorpay.com/v1/checkout.js";
 
@@ -96,10 +97,14 @@ export function useRazorpayCheckout() {
             });
             if (!verifyRes.ok) throw new Error("Verification failed");
 
-            // GA4 ecommerce purchase — key conversion event.
+            // GA4 ecommerce purchase — key conversion event. The order states
+            // its own currency and amount in its minor units; reading both from
+            // it (rather than assuming INR and /100) keeps the event right if
+            // the order currency ever changes. Today it is always INR.
+            const orderCurrency = order.currency || "INR";
             trackEvent("purchase", {
-              currency: "INR",
-              value: order.amount / 100,
+              currency: orderCurrency,
+              value: fromMinor(order.amount, orderCurrency),
               item: plan,
             });
 

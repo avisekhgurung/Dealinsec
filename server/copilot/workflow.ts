@@ -8,7 +8,18 @@
  * workflow changes there, change it here in the same commit.
  */
 import { storage } from "../storage";
-import type { User } from "@shared/schema";
+import { resolveLocaleSettings, type LocaleSettings, type User } from "@shared/schema";
+import { contextAmountForModel, type ModelAmount } from "./voice";
+
+/** The locale the Copilot works in: the ORG's, falling back to the member's —
+ *  the same resolution the documents use. The prompt, every tool result and
+ *  the create_deal conversion all read this one function, so the currency the
+ *  model is told about and the currency of the numbers it is shown can never
+ *  disagree. */
+export async function copilotSettings(user: User): Promise<LocaleSettings> {
+  const org = user.organizationId ? await storage.getOrganization(user.organizationId) : undefined;
+  return resolveLocaleSettings(org, user);
+}
 
 export const WORKFLOW_STAGES = [
   { stage: "deal", label: "Deal", permission: "deals.create", pro: false },
@@ -27,21 +38,30 @@ const inOrg = (
   return resource.userId === user.id;
 };
 
-export interface DealJourney {
+/** MODEL CONTEXT: this object is JSON.stringify'd whole into the prompt (the
+ *  chat route's CONTEXT block and the get_workflow_status tool). So its money
+ *  is major units — with the ISO code and printed label beside it outside the
+ *  native voice (see contextAmountForModel) — and it must never gain a
+ *  minor-unit field: a bare 6500000 beside "use ₹ Indian formatting" is quoted
+ *  back to the user as ₹65,00,000. */
+export interface DealJourney extends Pick<ModelAmount, "amount">, Partial<Omit<ModelAmount, "amount">> {
   dealId: number;
   dealTitle: string;
   brandName: string;
-  amount: number;
   status: string;
   checklist: { stage: string; label: string; done: boolean }[];
   nextAction: { stage: string; description: string; route: string } | null;
 }
 
 /** Live journey for one deal, org-checked. Returns null when the deal isn't
- *  visible to this user's organization (indistinguishable from missing). */
-export async function getDealJourney(dealId: number, user: User): Promise<DealJourney | null> {
+ *  visible to this user's organization (indistinguishable from missing).
+ *  Pass the caller's settings when it already has them, so one chat turn reads
+ *  the org once and every amount in it shares that snapshot. */
+export async function getDealJourney(dealId: number, user: User, settings?: LocaleSettings): Promise<DealJourney | null> {
   const deal = await storage.getDeal(dealId);
   if (!deal || !inOrg(deal, user)) return null;
+
+  const locale = settings ?? await copilotSettings(user);
 
   const quote = await storage.getQuoteByDealId(dealId);
   const contracts = await storage.getContractsByOrg(user.organizationId!, user.id);
@@ -77,7 +97,10 @@ export async function getDealJourney(dealId: number, user: User): Promise<DealJo
     dealId,
     dealTitle: deal.dealTitle,
     brandName: deal.brandName,
-    amount: Number(deal.dealAmount),
+    // Spread where `amount: 65000` always sat. An Indian account gets exactly
+    // that key and nothing else, so its context is unchanged; others get the
+    // currency and label beside it.
+    ...contextAmountForModel(deal.dealAmountMinor, locale),
     status: deal.status,
     checklist,
     nextAction,

@@ -31,8 +31,12 @@ import { getAgreementCopy, getDeliverableLabels } from "@shared/dealTypeTaxonomy
 import { PagedDocument, type DocBlock } from "@/components/document/paged";
 import {
   DocHeader, docFooter, SectionTitle, TwoParties, Party, KV, tableBlocks,
-  SignatureCell, DocWarnings, inr, docDate,
+  SignatureCell, DocWarnings, docMoney, docDate,
 } from "@/components/document/primitives";
+import { currencyProseName, documentLocaleSettings, formatAmount } from "@/lib/format";
+import { useMoney } from "@/hooks/use-locale";
+import { DocLocalePending } from "@/components/document/locale-pending";
+import { countryName } from "@shared/region";
 import {
   detectPaymentConflicts, termsMentionPayment, validateDocData,
 } from "@/components/document/checks";
@@ -40,6 +44,115 @@ import {
 function slugify(s: string): string {
   return (s || "").normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
 }
+
+/**
+ * The country the agreement was ISSUED under — Party A's, the freelancer's.
+ *
+ * The issuer snapshot freezes it at creation (buildIssuerSnapshot in
+ * server/routes.ts), so an agreement made as an Indian freelancer keeps its
+ * Indian governing-law clause even if the organisation moves country later. A
+ * row without a snapshot falls back to the org's CURRENT country; every row
+ * issued so far belongs to an Indian org, so it resolves to India and prints
+ * exactly what it always has.
+ */
+function issuedCountry(contract: object | undefined, fallback: string): string {
+  const raw = (contract as { issuerSnapshot?: { country?: unknown } } | undefined)?.issuerSnapshot?.country;
+  return typeof raw === "string" && /^[A-Za-z]{2}$/.test(raw.trim()) ? raw.trim().toUpperCase() : fallback;
+}
+
+/** EU member states (ISO-3166 alpha-2), for the "VAT number" label. Same list
+ *  as shared/invoice-tax.ts, so an agreement and an invoice from one freelancer
+ *  name the same registration the same way. */
+const EU_COUNTRIES = "AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE".split(" ");
+
+/**
+ * What a non-Indian freelancer's tax registration is called on the agreement.
+ * It is the one number stored in the profile's `gstNumber` slot outside India
+ * — the slot shared/invoice-tax.ts already prints a UK VAT number from — and it
+ * is optional, because most freelancers outside India have no registration to
+ * show. Kept in step with contract-confirmation.tsx and profile.tsx, which ask
+ * for the same field under the same label.
+ */
+const TAX_ID_LABELS: Readonly<Record<string, string>> = {
+  GB: "VAT number",
+  ...Object.fromEntries(EU_COUNTRIES.map((c) => [c, "VAT number"])),
+  US: "EIN / Tax ID",
+  AU: "ABN",
+  CA: "GST/HST number",
+};
+const taxIdLabel = (country: string): string => TAX_ID_LABELS[country] ?? "Tax registration number";
+
+/**
+ * A country as English legal prose names it, for "the laws of …".
+ *
+ * CLDR's display names are UI labels — "Bosnia & Herzegovina", "St. Lucia",
+ * "Hong Kong SAR China" — and carry no article, which would print "the laws of
+ * United Kingdom". Countries CLDR has renamed within recent browser versions
+ * (Türkiye, Czechia, Eswatini, North Macedonia) are pinned too: the name inside
+ * a signed agreement must not change with the reader's browser. Every other
+ * country's CLDR name already is its plain English name.
+ */
+const LEGAL_COUNTRY_NAMES: Readonly<Record<string, string>> = {
+  AE: "the United Arab Emirates",
+  AG: "Antigua and Barbuda",
+  AX: "the Åland Islands",
+  BA: "Bosnia and Herzegovina",
+  BL: "Saint Barthélemy",
+  BQ: "the Caribbean Netherlands",
+  BS: "the Bahamas",
+  CC: "the Cocos (Keeling) Islands",
+  CD: "the Democratic Republic of the Congo",
+  CF: "the Central African Republic",
+  CG: "the Republic of the Congo",
+  CI: "Côte d’Ivoire",
+  CK: "the Cook Islands",
+  CV: "Cabo Verde",
+  CZ: "the Czech Republic",
+  DO: "the Dominican Republic",
+  FK: "the Falkland Islands",
+  FM: "the Federated States of Micronesia",
+  FO: "the Faroe Islands",
+  // England & Wales, Scotland and Northern Ireland are separate legal systems;
+  // "the laws of the United Kingdom" names no jurisdiction at all.
+  GB: "England and Wales",
+  GM: "the Gambia",
+  HK: "Hong Kong",
+  IM: "the Isle of Man",
+  KM: "the Comoros",
+  KN: "Saint Kitts and Nevis",
+  KP: "North Korea",
+  KR: "the Republic of Korea",
+  KY: "the Cayman Islands",
+  LC: "Saint Lucia",
+  MF: "Saint Martin",
+  MH: "the Marshall Islands",
+  MK: "North Macedonia",
+  MM: "Myanmar",
+  MO: "Macao",
+  MP: "the Northern Mariana Islands",
+  MV: "the Maldives",
+  NL: "the Netherlands",
+  PH: "the Philippines",
+  PM: "Saint Pierre and Miquelon",
+  PN: "the Pitcairn Islands",
+  PS: "the Palestinian Territories",
+  SB: "Solomon Islands",
+  SH: "Saint Helena",
+  SJ: "Svalbard and Jan Mayen",
+  ST: "São Tomé and Príncipe",
+  SZ: "Eswatini",
+  TC: "the Turks and Caicos Islands",
+  TL: "Timor-Leste",
+  TR: "Türkiye",
+  TT: "Trinidad and Tobago",
+  US: "the United States",
+  VA: "Vatican City",
+  VC: "Saint Vincent and the Grenadines",
+  VG: "the British Virgin Islands",
+  VI: "the United States Virgin Islands",
+  WF: "Wallis and Futuna",
+};
+const legalCountryName = (code: string): string => LEGAL_COUNTRY_NAMES[code] ?? countryName(code);
 
 function Clause({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
   return (
@@ -56,12 +169,35 @@ function Clause({ n, title, children }: { n: number; title: string; children: Re
 export default function ContractPdfPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
-  const issuer = useIssuer();
+  // The ORG's locale, not the viewer's — an agreement must print the same
+  // currency for every teammate who opens it.
+  const fmt = useMoney();
   const backPath = `/contracts/${id}`;
 
   const { data: contract, isLoading } = useQuery<Contract>({
     queryKey: ["/api/contracts", id],
   });
+  // The currency is the one STAMPED on the agreement when it was issued, not
+  // the org's current setting, so a signed agreement re-renders in the
+  // currency it was signed in by construction rather than only because the
+  // region locks. Every existing row was backfilled 'INR', which is what its
+  // org uses, so nothing issued so far changes.
+  // Memoised: `loc` is a dependency of the paginated blocks below, and a fresh
+  // object every render would re-paginate the document on every render.
+  const issuedCurrency = contract?.currency;
+  const loc = useMemo(
+    () => documentLocaleSettings(fmt.settings, null, { currency: issuedCurrency }),
+    [fmt.settings, issuedCurrency],
+  );
+
+  // The issuer frozen onto the agreement when it was created, once rows carry
+  // a snapshot; until then (and for every agreement issued so far) the live
+  // profile, which is exactly what this page has always printed.
+  const issuer = useIssuer(contract);
+  // India prints the clauses every existing agreement was signed with, byte
+  // for byte. Anywhere else gets wording that cites no Indian statute.
+  const country = issuedCountry(contract, loc.country);
+  const isIndia = country === "IN";
 
   const { data: deal } = useQuery<Deal>({
     queryKey: ["/api/deals", contract?.dealId],
@@ -74,7 +210,7 @@ export default function ContractPdfPage() {
     queryKey: ["/api/deals", contract?.dealId, "quote"],
     enabled: !!contract?.dealId,
     queryFn: async () => {
-      const res = await fetch(`/api/deals/${contract?.dealId}/quote`, { credentials: "include" });
+      const res = await fetch(`/api/deals/${contract?.dealId}/quote`, { credentials: "include", headers: { "X-DealInSec-Money": "minor" } });
       return res.ok ? res.json() : null;
     },
   });
@@ -124,8 +260,8 @@ export default function ContractPdfPage() {
           docNo={agreementNo}
           status={c.status === "Signed" ? "Signed" : "Pending"}
           meta={[
-            { label: "Effective", value: docDate(c.startDate) },
-            { label: "Ends", value: docDate(c.endDate) },
+            { label: "Effective", value: docDate(c.startDate, loc) },
+            { label: "Ends", value: docDate(c.endDate, loc) },
             ...(c.exclusive ? [{ label: "Type", value: "Exclusive" }] : []),
             ...(refQuote ? [{ label: "Based on", value: recordNo("quotation", refQuote.id) }] : []),
           ]}
@@ -143,10 +279,17 @@ export default function ContractPdfPage() {
               <Party
                 heading={`Party A — ${copy.providerRole}`}
                 name={signerLabel}
-                lines={[
+                lines={isIndia ? [
                   issuer.billingAddress,
                   issuer.panNumber && `PAN: ${issuer.panNumber}`,
                   issuer.gstNumber && `GSTIN: ${issuer.gstNumber}`,
+                  issuer.email,
+                  issuer.phone,
+                ] : [
+                  issuer.billingAddress,
+                  // A PAN means nothing outside India, so it never prints here,
+                  // even if one is left on a profile from before a move.
+                  issuer.gstNumber && `${taxIdLabel(country)}: ${issuer.gstNumber}`,
                   issuer.email,
                   issuer.phone,
                 ]}
@@ -168,10 +311,10 @@ export default function ContractPdfPage() {
       key: "details",
       node: (
         <div className="doc-panel-subtle" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "4mm" }}>
-          <KV label="Effective date" strong>{docDate(c.startDate)}</KV>
-          <KV label="End date" strong>{docDate(c.endDate)}</KV>
+          <KV label="Effective date" strong>{docDate(c.startDate, loc)}</KV>
+          <KV label="End date" strong>{docDate(c.endDate, loc)}</KV>
           <KV label="Agreement value" strong>
-            <span style={{ color: "var(--doc-brand)", fontWeight: 700 }}>{inr(c.contractValue)}</span>
+            <span style={{ color: "var(--doc-brand)", fontWeight: 700 }}>{docMoney(c.contractValueMinor, loc)}</span>
           </KV>
           <KV label="Type" strong>{c.exclusive ? "Exclusive" : "Non-exclusive"}</KV>
         </div>
@@ -241,17 +384,17 @@ export default function ContractPdfPage() {
           scheduled delivery or publication date. The {copy.clientNoun} shall provide approval or revision
           requests within 24 hours of receipt. The {copy.providerNoun} shall incorporate up to two (2) rounds
           of revisions at no additional charge. This Agreement is effective from{" "}
-          <strong>{docDate(c.startDate)}</strong> through <strong>{docDate(c.endDate)}</strong>.
+          <strong>{docDate(c.startDate, loc)}</strong> through <strong>{docDate(c.endDate, loc)}</strong>.
         </Clause>
       ),
     });
     out.push({
       key: "c3",
       node: (
-        <Clause n={3} title={`Compensation (${inr(c.contractValue)})`}>
+        <Clause n={3} title={`Compensation (${docMoney(c.contractValueMinor, loc)})`}>
           In consideration for the services rendered, the {copy.clientNoun} shall pay the {copy.providerNoun} a
-          total fee of <strong>{inr(c.contractValue)}</strong> (Indian Rupees{" "}
-          {Number(c.contractValue).toLocaleString("en-IN")} only).{" "}
+          total fee of <strong>{docMoney(c.contractValueMinor, loc)}</strong> ({currencyProseName(loc.currency)}{" "}
+          {formatAmount(c.contractValueMinor, loc.currency, loc.locale)} only).{" "}
           {hasOwnPaymentTerms ? (
             <>Payment shall follow the schedule agreed between the parties as set out in the Deal-Specific
             Terms (Section 7) of this Agreement.</>
@@ -277,13 +420,24 @@ export default function ContractPdfPage() {
     });
     out.push({
       key: "c6",
-      node: (
+      node: isIndia ? (
         <Clause n={6} title="Governing Law (Indian Contract Act 1872)">
           This Agreement shall be governed by and construed in accordance with the laws of India,
           including the Indian Contract Act, 1872. Any disputes shall first be attempted to be resolved
           through good-faith negotiation for 30 days, failing which disputes shall be submitted to
           binding arbitration under the Arbitration and Conciliation Act, 1996. The courts of India
           shall have exclusive jurisdiction for any legal proceedings.
+        </Clause>
+      ) : (
+        // Deliberately names no statute and no arbitration scheme: we have not
+        // verified which apply in each country, and a wrong citation in a
+        // contract is worse than none. The creation screen tells the user this
+        // wording is a general template (contract-confirmation.tsx).
+        <Clause n={6} title="Governing Law">
+          This Agreement shall be governed by and construed in accordance with the laws of{" "}
+          {legalCountryName(country)}. Any disputes shall first be attempted to be resolved through
+          good-faith negotiation for 30 days, failing which the courts of {legalCountryName(country)}
+          {" "}shall have exclusive jurisdiction for any legal proceedings.
         </Clause>
       ),
     });
@@ -337,8 +491,8 @@ export default function ContractPdfPage() {
             <div className="doc-label" style={{ marginBottom: "2mm" }}>Stamp duty</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "4mm" }}>
               <KV label="Certificate no." strong><span className="doc-mono" style={{ fontSize: "8.5pt" }}>{(c as any).estampCertificateNo}</span></KV>
-              {(c as any).estampDate && <KV label="Dated" strong>{docDate((c as any).estampDate)}</KV>}
-              {(c as any).estampAmount != null && <KV label="Duty paid" strong>{inr((c as any).estampAmount)}</KV>}
+              {(c as any).estampDate && <KV label="Dated" strong>{docDate((c as any).estampDate, loc)}</KV>}
+              {(c as any).estampAmountMinor != null && <KV label="Duty paid" strong>{docMoney((c as any).estampAmountMinor, loc)}</KV>}
               {(c as any).estampAuthority && <KV label="Issued by" strong>{(c as any).estampAuthority}</KV>}
             </div>
           </div>
@@ -357,14 +511,14 @@ export default function ContractPdfPage() {
             <SignatureCell
               heading={`Party A — ${copy.providerRole}`}
               name={signerLabel}
-              date={c.signedDate ? docDate(c.signedDate) : docDate(c.startDate)}
+              date={c.signedDate ? docDate(c.signedDate, loc) : docDate(c.startDate, loc)}
               signatureUrl={signatureSrc}
               sealUrl={sealSrc}
             />
             <SignatureCell
               heading={`Party B — ${copy.clientRole}`}
               name={c.brandName}
-              date={c.signedByBrand && c.signedDate ? docDate(c.signedDate) : null}
+              date={c.signedByBrand && c.signedDate ? docDate(c.signedDate, loc) : null}
               signatureUrl={null}
               note={c.signedByBrand ? "Accepted electronically — signed copy on record" : undefined}
             />
@@ -382,18 +536,32 @@ export default function ContractPdfPage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "4mm", marginBottom: "2.5mm" }}>
             <KV label="Document ref" strong><span className="doc-mono" style={{ fontSize: "8.5pt" }}>{agreementNo}</span></KV>
             <KV label="Prepared by" strong>{signerLabel}</KV>
-            <KV label="Effective from" strong>{docDate(c.startDate)}</KV>
-            <KV label="Status" strong>{c.status}{c.signedDate ? ` · ${docDate(c.signedDate)}` : ""}</KV>
+            <KV label="Effective from" strong>{docDate(c.startDate, loc)}</KV>
+            <KV label="Status" strong>{c.status}{c.signedDate ? ` · ${docDate(c.signedDate, loc)}` : ""}</KV>
           </div>
-          <p className="doc-small doc-muted-t">
-            This agreement was prepared and accepted electronically. The signature shown for Party A is the
-            image on file for the named signatory, captured when this document was created. This is an
-            electronic acceptance with an audit record — it is not a Digital Signature Certificate issued
-            under the Information Technology Act, 2000, and no certifying-authority verification is claimed.
-            Parties may additionally execute a physically signed counterpart. Stamp duty and registration,
-            where applicable, are the responsibility of the parties — DealInSec does not pay, issue or
-            verify them.
-          </p>
+          {isIndia ? (
+            <p className="doc-small doc-muted-t">
+              This agreement was prepared and accepted electronically. The signature shown for Party A is the
+              image on file for the named signatory, captured when this document was created. This is an
+              electronic acceptance with an audit record — it is not a Digital Signature Certificate issued
+              under the Information Technology Act, 2000, and no certifying-authority verification is claimed.
+              Parties may additionally execute a physically signed counterpart. Stamp duty and registration,
+              where applicable, are the responsibility of the parties — DealInSec does not pay, issue or
+              verify them.
+            </p>
+          ) : (
+            // The same disclosure without India's IT Act: it says what this
+            // acceptance is not, in terms that hold in any country.
+            <p className="doc-small doc-muted-t">
+              This agreement was prepared and accepted electronically. The signature shown for Party A is the
+              image on file for the named signatory, captured when this document was created. This is an
+              electronic acceptance with an audit record — it is not a certificate-based digital signature,
+              and no certifying-authority verification is claimed.
+              Parties may additionally execute a physically signed counterpart. Stamp duty and registration,
+              where applicable, are the responsibility of the parties — DealInSec does not pay, issue or
+              verify them.
+            </p>
+          )}
         </div>
       ),
     });
@@ -402,13 +570,15 @@ export default function ContractPdfPage() {
       key: "closing",
       node: (
         <p className="doc-small" style={{ textAlign: "center", color: "var(--doc-faint)" }}>
-          Electronic acceptance with audit record · Indian Contract Act, 1872
+          {isIndia
+            ? "Electronic acceptance with audit record · Indian Contract Act, 1872"
+            : "Electronic acceptance with audit record"}
         </p>
       ),
     });
 
     return out;
-  }, [contract, deal, refQuote, issuer, copy, dLabels, agreementNo, signatureSrc, sealSrc, signerLabel]);
+  }, [contract, deal, refQuote, issuer, copy, dLabels, agreementNo, signatureSrc, sealSrc, signerLabel, loc, country, isIndia]);
 
   /* ── Screen states ───────────────────────────────────────────────────── */
   if (isLoading) {
@@ -435,12 +605,17 @@ export default function ContractPdfPage() {
       </div>
     );
   }
+  // Until the org's settings load, `loc` falls back to the viewer's own row:
+  // an invitee of a UK org would see — and could print — the Indian clauses.
+  if (!fmt.ready) {
+    return <DocLocalePending failed={fmt.failed} onRetry={fmt.retry} />;
+  }
 
   const warnings = [
     ...validateDocData({
       clientName: contract.brandName,
       sellerName: signerLabel === "—" ? "" : signerLabel,
-      amount: contract.contractValue,
+      amountMinor: contract.contractValueMinor,
       startDate: contract.startDate,
       endDate: contract.endDate,
     }),
@@ -469,6 +644,7 @@ export default function ContractPdfPage() {
 
         <PagedDocument
           blocks={blocks}
+          locale={loc}
           footer={docFooter(agreementNo, contract.contractName)}
         />
 

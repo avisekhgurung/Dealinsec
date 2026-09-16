@@ -13,6 +13,7 @@ import {
   Crown,
   Rocket,
   Users,
+  Globe,
   Infinity as InfinityIcon,
 } from "lucide-react";
 import {
@@ -30,9 +31,25 @@ import { BottomNav } from "@/components/bottom-nav";
 import { queryClient } from "@/lib/queryClient";
 import { PaymentResult } from "@/components/payment-result";
 import { useRazorpayCheckout, type CheckoutPlan } from "@/hooks/use-razorpay-checkout";
-import { PLAN_PRICE_DEFAULTS } from "@/hooks/use-plan-prices";
+import { PLAN_PRICE_DEFAULTS, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
+import { useLocale } from "@/hooks/use-locale";
 
 const REDIRECT_KEY = "postPaymentRedirect";
+
+/** Stands where a buy control would be when checkout isn't open for this
+ *  account. Deliberately not a <Button>: a disabled button still reads as
+ *  "something to buy, just not right now"; this reads as a statement. */
+function CheckoutComingSoon({ testId }: { testId: string }) {
+  return (
+    <div
+      className="w-full h-12 rounded-xl bg-muted/60 flex items-center justify-center gap-2 px-3 text-sm font-semibold text-muted-foreground text-center"
+      data-testid={testId}
+    >
+      <Globe className="h-4 w-4 flex-shrink-0" />
+      International checkout coming soon
+    </div>
+  );
+}
 
 export default function PricingPage() {
   const { user } = useAuth();
@@ -60,7 +77,17 @@ export default function PricingPage() {
       })
       .catch(() => {});
   }, []);
-  const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+  // Every plan order is created in rupees, so the price is quoted in rupees —
+  // see formatRupees. The user's own deals follow their own currency; our
+  // price is our price.
+  const fmt = formatRupees;
+  const { locale } = useLocale();
+  // International checkout is not live. Outside India the plans still show,
+  // with a "coming soon" note where every buy control would be — never a
+  // button that fails at Razorpay or quietly charges rupees. Always true for an
+  // Indian account, so every `checkoutAvailable ? … : …` below renders exactly
+  // what India saw before.
+  const checkoutAvailable = usePlanCheckoutAvailable();
 
   const proActive = hasActivePro(user);
   const boostActive = hasActiveDealBoost(user);
@@ -72,10 +99,10 @@ export default function PricingPage() {
   const trialLapsed = hasLapsedTrial(user);
   const subType = getSubscriptionType(user);
   const proExpiryLabel = user?.planExpiresAt
-    ? new Date(user.planExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    ? new Date(user.planExpiresAt).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })
     : null;
   const boostExpiryLabel = user?.dealBoostExpiresAt
-    ? new Date(user.dealBoostExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    ? new Date(user.dealBoostExpiresAt).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })
     : null;
   // Annual vs 12 × monthly (₹1,188 − ₹999 = ₹189 at list prices). Always shown
   // as a rupee amount — it is less than two months, so never "2 months free".
@@ -92,6 +119,9 @@ export default function PricingPage() {
   }, []);
 
   const handlePurchase = (plan: CheckoutPlan) => {
+    // No buy control renders when checkout is unavailable; this catches the
+    // one path that doesn't go through a button (PaymentResult's retry).
+    if (!checkoutAvailable) return;
     setPurchasedPlan(plan);
     checkout(plan, {
       onSuccess: () => {
@@ -129,7 +159,9 @@ export default function PricingPage() {
   const PRO_FEATURES = [
     "Unlimited deals & quotations",
     "Unlimited signed agreements with e-signature",
-    "Unlimited GST-ready invoices",
+    // GST is India's tax. Invoices outside India carry their own country's
+    // labels, so they are not described in GST terms there.
+    checkoutAvailable ? "Unlimited GST-ready invoices" : "Unlimited invoices",
     "Payment tracking — know who owes you",
     "Payment reminders (coming soon)",
     "Custom branding (coming soon)",
@@ -205,7 +237,9 @@ export default function PricingPage() {
               </p>
               {proExpiryLabel && (
                 <p className="text-xs text-emerald-700/70 dark:text-emerald-400/70">
-                  Valid until {proExpiryLabel} · renewing extends your term
+                  {checkoutAvailable
+                    ? <>Valid until {proExpiryLabel} · renewing extends your term</>
+                    : <>Valid until {proExpiryLabel}</>}
                 </p>
               )}
             </div>
@@ -220,7 +254,9 @@ export default function PricingPage() {
                 Pro trial · {trialDaysLeft === 1 ? "last day" : `${trialDaysLeft} days left`}
               </p>
               <p className="text-xs text-emerald-700/70 dark:text-emerald-400/70">
-                Everything is unlocked. Upgrade below to keep the full workflow when your trial ends.
+                {checkoutAvailable
+                  ? "Everything is unlocked. Upgrade below to keep the full workflow when your trial ends."
+                  : "Everything is unlocked until your trial ends."}
               </p>
             </div>
           </div>
@@ -244,6 +280,38 @@ export default function PricingPage() {
           </div>
         )}
 
+        {/* ── Outside India: say plainly why there is nothing to buy ── */}
+        {!checkoutAvailable && (
+          <div
+            className="rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4 flex items-start gap-3"
+            data-testid="notice-international-checkout"
+          >
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Globe className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-sm">International checkout is coming soon</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Plans can only be bought from India for now, so the prices below are in rupees and are
+                what customers in India pay. Checkout for your country isn't open yet, so there is
+                nothing to pay here.
+                {/* Same precedence as the plan strip above. */}
+                {proActive
+                  ? ""
+                  : trialActive
+                  ? " Your Pro trial keeps everything unlocked until it ends."
+                  : " The Free plan keeps working in the meantime."}
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-1.5">
+                Based in India and seeing this?{" "}
+                <a href="mailto:support@dealinsec.com" className="font-semibold text-primary hover:underline">
+                  Email support@dealinsec.com
+                </a>
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* ── The 3 plans ── */}
         <div className="grid lg:grid-cols-3 gap-4 lg:gap-5 items-stretch">
 
@@ -251,7 +319,7 @@ export default function PricingPage() {
           <Card className="glass-card relative overflow-hidden flex flex-col p-5 lg:p-6">
             <p className="text-[11px] uppercase tracking-[0.1em] font-bold text-muted-foreground mb-1">Free</p>
             <div className="flex items-baseline gap-1 mb-1">
-              <span className="text-4xl font-black text-foreground leading-none">₹0</span>
+              <span className="text-4xl font-black text-foreground leading-none">{fmt(0)}</span>
               <span className="text-sm text-muted-foreground font-medium">/ forever</span>
             </div>
             <p className="text-xs text-muted-foreground mb-4">Quote every new client properly, free</p>
@@ -306,24 +374,28 @@ export default function PricingPage() {
                   </li>
                 ))}
               </ul>
-              <Button
-                className="w-full text-white h-12 text-base font-bold rounded-xl shadow-lg shadow-emerald-500/30 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
-                onClick={() => handlePurchase("pro_monthly")}
-                disabled={isLoading}
-                data-testid="button-buy-pro-monthly"
-              >
-                {isLoading && activePlan === "pro_monthly" ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                    Opening checkout…
-                  </>
-                ) : (
-                  <>
-                    <Crown className="h-5 w-5 mr-2 text-amber-300" />
-                    {proActive ? `Extend 1 month — ${fmt(proMonthlyPrice)}` : `Go Pro — ${fmt(proMonthlyPrice)}/month`}
-                  </>
-                )}
-              </Button>
+              {checkoutAvailable ? (
+                <Button
+                  className="w-full text-white h-12 text-base font-bold rounded-xl shadow-lg shadow-emerald-500/30 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                  onClick={() => handlePurchase("pro_monthly")}
+                  disabled={isLoading}
+                  data-testid="button-buy-pro-monthly"
+                >
+                  {isLoading && activePlan === "pro_monthly" ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                      Opening checkout…
+                    </>
+                  ) : (
+                    <>
+                      <Crown className="h-5 w-5 mr-2 text-amber-300" />
+                      {proActive ? `Extend 1 month — ${fmt(proMonthlyPrice)}` : `Go Pro — ${fmt(proMonthlyPrice)}/month`}
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <CheckoutComingSoon testId="coming-soon-pro-monthly" />
+              )}
             </div>
           </Card>
 
@@ -364,25 +436,29 @@ export default function PricingPage() {
                   </li>
                 ))}
               </ul>
-              <Button
-                className="gradient-btn w-full text-white h-12 text-base font-bold rounded-xl shadow-lg shadow-primary/30"
-                onClick={() => handlePurchase("pro_yearly")}
-                disabled={isLoading}
-                data-testid="button-buy-pro-yearly"
-              >
-                {isLoading && activePlan === "pro_yearly" ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                    Opening checkout…
-                  </>
-                ) : (
-                  <>
-                    <Zap className="h-5 w-5 mr-2" />
-                    {proActive ? `Extend 1 year — ${fmt(proYearlyPrice)}` : `Go Annual — ${fmt(proYearlyPrice)}/year`}
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </>
-                )}
-              </Button>
+              {checkoutAvailable ? (
+                <Button
+                  className="gradient-btn w-full text-white h-12 text-base font-bold rounded-xl shadow-lg shadow-primary/30"
+                  onClick={() => handlePurchase("pro_yearly")}
+                  disabled={isLoading}
+                  data-testid="button-buy-pro-yearly"
+                >
+                  {isLoading && activePlan === "pro_yearly" ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                      Opening checkout…
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-5 w-5 mr-2" />
+                      {proActive ? `Extend 1 year — ${fmt(proYearlyPrice)}` : `Go Annual — ${fmt(proYearlyPrice)}/year`}
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <CheckoutComingSoon testId="coming-soon-pro-yearly" />
+              )}
             </div>
           </Card>
         </div>
@@ -402,30 +478,36 @@ export default function PricingPage() {
                 Only if someone else needs their own login — say your CA or a collaborator. Pro includes 5; extra seats renew together as one pack.
               </p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <select
-                value={seatQty}
-                onChange={(e) => setSeatQty(parseInt(e.target.value, 10))}
-                className="h-11 rounded-xl border border-input bg-background px-3 text-sm font-semibold"
-                data-testid="select-seat-qty"
-              >
-                {[1, 2, 3, 4, 5, 8, 10].map((n) => (
-                  <option key={n} value={n}>{n} seat{n > 1 ? "s" : ""}</option>
-                ))}
-              </select>
-              <Button
-                variant="outline"
-                className="h-11 rounded-xl font-semibold border-primary/40 text-primary"
-                onClick={() => handlePurchase("extra_seat")}
-                disabled={isLoading}
-                data-testid="button-buy-seats"
-              >
-                {isLoading && activePlan === "extra_seat" ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : null}
-                Buy — {fmt(extraSeatPrice * seatQty)}
-              </Button>
-            </div>
+            {checkoutAvailable ? (
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <select
+                  value={seatQty}
+                  onChange={(e) => setSeatQty(parseInt(e.target.value, 10))}
+                  className="h-11 rounded-xl border border-input bg-background px-3 text-sm font-semibold"
+                  data-testid="select-seat-qty"
+                >
+                  {[1, 2, 3, 4, 5, 8, 10].map((n) => (
+                    <option key={n} value={n}>{n} seat{n > 1 ? "s" : ""}</option>
+                  ))}
+                </select>
+                <Button
+                  variant="outline"
+                  className="h-11 rounded-xl font-semibold border-primary/40 text-primary"
+                  onClick={() => handlePurchase("extra_seat")}
+                  disabled={isLoading}
+                  data-testid="button-buy-seats"
+                >
+                  {isLoading && activePlan === "extra_seat" ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : null}
+                  Buy — {fmt(extraSeatPrice * seatQty)}
+                </Button>
+              </div>
+            ) : (
+              <div className="flex-shrink-0 sm:w-64">
+                <CheckoutComingSoon testId="coming-soon-seats" />
+              </div>
+            )}
           </div>
         </Card>
 
@@ -437,7 +519,11 @@ export default function PricingPage() {
               { step: "1", title: "Create a Deal", desc: "Free plan covers 4 deals every month" },
               { step: "2", title: "Generate its Quotation", desc: "Included with the deal — no extra cost" },
               { step: "3", title: "Sign the Agreement", desc: "Pro — scope & terms your client accepts with an e-signature" },
-              { step: "4", title: "Invoice & track payment", desc: "Pro — GST-ready invoice + payment tracking" },
+              {
+                step: "4",
+                title: "Invoice & track payment",
+                desc: checkoutAvailable ? "Pro — GST-ready invoice + payment tracking" : "Pro — invoice + payment tracking",
+              },
             ].map(({ step, title, desc }) => (
               <div key={step} className="flex items-start gap-3">
                 <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center mt-0.5">
@@ -455,18 +541,21 @@ export default function PricingPage() {
           </p>
         </div>
 
-        {/* Trust signals row */}
-        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <Shield className="w-3 h-3 text-emerald-500" /> 7-day refund
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Lock className="w-3 h-3 text-emerald-500" /> One-time payment · no auto-debit
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Check className="w-3 h-3 text-emerald-500" /> UPI · Cards · NetBanking via Razorpay
-          </span>
-        </div>
+        {/* Trust signals row — every item describes paying, which isn't open
+            outside India yet, so it only shows where checkout is. */}
+        {checkoutAvailable && (
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <Shield className="w-3 h-3 text-emerald-500" /> 7-day refund
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Lock className="w-3 h-3 text-emerald-500" /> One-time payment · no auto-debit
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Check className="w-3 h-3 text-emerald-500" /> UPI · Cards · NetBanking via Razorpay
+            </span>
+          </div>
+        )}
       </main>
 
       <BottomNav />

@@ -20,6 +20,8 @@ import { parseCsv, toCsv, downloadCsv, unguardCell } from "@/lib/csv";
 import { dealTypeOptions } from "@shared/dealTypeTaxonomy";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { parseApiError, isUpgradeError } from "@/lib/api-error";
+import { useMoney } from "@/hooks/use-locale";
+import { getCurrency } from "@shared/schema";
 import {
   ArrowLeft, UploadCloud, Download, FileSpreadsheet, CheckCircle2,
   AlertTriangle, Loader2, ChevronRight, Plus, X,
@@ -65,7 +67,10 @@ interface ParsedDeal {
   brandName: string;
   dealTitle: string;
   dealType: string;
-  dealAmount: number;
+  /** MINOR units, converted ONCE, at parse time, in the org currency the file
+   *  was checked against. The preview shows it and the import sends it, so the
+   *  figure reviewed is the figure created. 0 on a row with an amount error. */
+  dealAmountMinor: number;
   startDate: string;
   endDate: string;
   deliverableMode: "all" | "any_one";
@@ -73,6 +78,93 @@ interface ParsedDeal {
   errors: string[];
   /** Non-blocking notes — the row still imports, but something was changed. */
   warnings: string[];
+}
+
+/** A spreadsheet amount cell → MAJOR units, or the reason it is not one.
+ *
+ *  THE RULE: an amount that could honestly be read two ways is REFUSED with a
+ *  row-level error, never picked between. An import is the one money path with
+ *  no human looking at each figure as it is typed, so a guess that is wrong
+ *  lands on dozens of deals at once — and the review table only helps if the
+ *  person notices ₹12.50 where they meant ₹12,500. A refusal names the cell.
+ *
+ *  Currency glyphs, spaces, apostrophes and thousands commas are stripped, and
+ *  a DECIMAL POINT is a decimal point. Refused as ambiguous:
+ *   • a decimal comma — "1250,50" is 1250.50 in half of Europe and 125050 if
+ *     the comma is read as grouping. Two shapes give it away, and neither can
+ *     occur in valid thousands grouping, Western or Indian (both put exactly
+ *     three digits after the last comma, so "1,00,000" is untouched): a comma
+ *     after the point, or one to two digits after the final comma;
+ *   • dots used as grouping — "1.250.000", and the single-dot "12.500", which
+ *     is ₹12,500 to a European spreadsheet and ₹12.50 to an English one: a
+ *     1000× difference either way, so it is exactly the case that must not be
+ *     guessed;
+ *   • more decimal places than the currency has — "12.345" in rupees, or any
+ *     fraction at all in yen — which could only be rounded, silently;
+ *   • a second number in the cell ("35,000 (2 posts)", "1e5"), or a minus sign.
+ *
+ *  INDIA'S OLD FILES: the importer that shipped read EVERY digit in the cell as
+ *  one whole number of rupees (`parseInt` of the digits, dot included). Every
+ *  CSV an Indian freelancer has already imported was read that way, so for INR
+ *  an amount is accepted only when this reading and that one give the SAME
+ *  figure — which is every whole-rupee amount, however it is decorated
+ *  ("35000", "₹35,000", "Rs. 35,000", "35,000/-", "1,00,000"). Where they
+ *  differ ("1250.50" was 125050, "35000.00" was 3500000), the same file would
+ *  now import a different amount, so it is refused rather than reinterpreted.
+ */
+function parseAmountMajor(raw: string, currency: string): { major: number } | { error: string } {
+  const invalid = { error: "amount must be a positive number" };
+  // The number starts at the first DIGIT, so the dot in "Rs. 35,000" is never
+  // read as a decimal point (0.35), and runs through whatever grouping follows
+  // — commas, dots, spaces ("35 000"), apostrophes ("1’250") — stopping at the
+  // "/-" of "35,000/-" or a trailing "INR".
+  const match = raw.match(/\d[\d.,'’\s]*/);
+  if (!match) return invalid;
+  const prefix = raw.slice(0, match.index);
+  const rest = raw.slice((match.index ?? 0) + match[0].length);
+  const core = match[0].replace(/['’\s]/g, "");
+  const shown = core.replace(/[.,]+$/, "");
+
+  if (prefix.includes("-")) return invalid;
+  if (/\d/.test(rest)) {
+    return { error: "amount has more than one number in it — put only the amount in this cell" };
+  }
+  if (/\.\d*,/.test(core) || /,\d{1,2}$/.test(core)) {
+    return { error: `amount "${shown}" uses a comma for decimals — write 1250.50, not 1250,50` };
+  }
+  const dots = core.match(/\./g)?.length ?? 0;
+  if (dots > 1) {
+    return { error: `amount "${shown}" uses dots to group thousands — write 1250000 or 1,250,000` };
+  }
+  const fraction = dots === 1 ? core.slice(core.indexOf(".") + 1).replace(/,/g, "") : "";
+  if (dots === 1 && fraction.length === 3 && !core.includes(",")) {
+    const whole = shown.replace(".", "");
+    return {
+      error: `amount "${shown}" is ambiguous — it could mean ${whole} or ${shown.replace(/0+$/, "").replace(/\.$/, "")}. Write ${whole} without the dot, or use two decimals`,
+    };
+  }
+  const { code, exponent } = getCurrency(currency);
+  if (fraction.length > exponent) {
+    return {
+      error: exponent === 0
+        ? `amount "${shown}" has decimals, but ${code} amounts are whole numbers`
+        : `amount "${shown}" has more than ${exponent} decimal places`,
+    };
+  }
+
+  const n = Number(core.replace(/,/g, ""));
+  if (!(Number.isFinite(n) && n > 0)) return invalid;
+
+  if (code === "INR") {
+    // Exactly what the shipped importer computed for this cell.
+    const legacy = parseInt(raw.replace(/[^0-9]/g, ""), 10);
+    if (legacy !== n) {
+      return {
+        error: `amount "${shown}" is ambiguous — earlier imports read it as ${legacy}. Write the amount in whole rupees without a decimal point`,
+      };
+    }
+  }
+  return { major: n };
 }
 
 /** Accepts YYYY-MM-DD, DD-MM-YYYY or DD/MM/YYYY → ISO, else null. */
@@ -85,7 +177,17 @@ function normalizeDate(raw: string): string | null {
   return null;
 }
 
-function parseRows(records: Record<string, string>[]): ParsedDeal[] {
+/** `currency` and `toMinor` are the ORG's (useMoney, once `ready`): the
+ *  currency decides which amounts are ambiguous (a fraction in yen, the old
+ *  whole-rupee reading in INR), and the amount is converted to minor units
+ *  here, once, so the review table and the POST carry the same integer. The
+ *  `< 1` check still refuses anything that rounds to nothing, which would
+ *  otherwise POST as a free deal. */
+function parseRows(
+  records: Record<string, string>[],
+  currency: string,
+  toMinor: (major: number) => number,
+): ParsedDeal[] {
   const typeSet = new Set<string>(dealTypeOptions as readonly string[]);
   return records.map((r, i) => {
     const get = (k: string) => unguardCell((r[k] ?? "").trim());
@@ -104,8 +206,14 @@ function parseRows(records: Record<string, string>[]): ParsedDeal[] {
       dealType = "Custom";
       warnings.push(`deal_type "${rawType}" is no longer available — imported as Custom`);
     }
-    const dealAmount = parseInt(get("amount").replace(/[^0-9]/g, ""), 10);
-    if (!Number.isFinite(dealAmount) || dealAmount <= 0) errors.push("amount must be a positive number");
+    const amount = parseAmountMajor(get("amount"), currency);
+    let dealAmountMinor = 0;
+    if ("error" in amount) {
+      errors.push(amount.error);
+    } else {
+      dealAmountMinor = toMinor(amount.major);
+      if (dealAmountMinor < 1) errors.push("amount must be a positive number");
+    }
     const startDate = normalizeDate(get("start_date"));
     const endDate = normalizeDate(get("end_date"));
     if (!startDate) errors.push("start_date must be YYYY-MM-DD or DD-MM-YYYY");
@@ -130,7 +238,7 @@ function parseRows(records: Record<string, string>[]): ParsedDeal[] {
     return {
       row: i + 2, // +1 header, +1 human 1-indexing
       brandName, dealTitle, dealType,
-      dealAmount: Number.isFinite(dealAmount) ? dealAmount : 0,
+      dealAmountMinor,
       startDate: startDate ?? "", endDate: endDate ?? "",
       deliverableMode, deliverables, errors, warnings,
     };
@@ -143,6 +251,7 @@ type ImportResult = { row: number; title: string; ok: boolean; reason?: string }
 export default function DealsImportPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const fmt = useMoney();
   const { openUpgradeModal } = useUpgradeModal();
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -150,6 +259,10 @@ export default function DealsImportPage() {
   const [parsed, setParsed] = useState<ParsedDeal[]>([]);
   const [importing, setImporting] = useState(false);
   const [results, setResults] = useState<ImportResult[] | null>(null);
+  // The currency the parsed rows were converted in. If the org's currency is
+  // somehow different by the time Import is pressed, the minor units in
+  // `parsed` mean something else, so the import refuses instead of sending.
+  const [parsedCurrency, setParsedCurrency] = useState<string | null>(null);
 
   const valid = useMemo(() => parsed.filter((p) => p.errors.length === 0), [parsed]);
   const invalid = parsed.length - valid.length;
@@ -157,6 +270,12 @@ export default function DealsImportPage() {
   const readFile = (file: File) => {
     if (!file.name.toLowerCase().endsWith(".csv")) {
       toast({ title: "CSV only", description: "Download the template and fill it in — Excel/Sheets can save as CSV.", variant: "destructive" });
+      return;
+    }
+    // Amounts are converted as the file is read, so the org's currency must be
+    // known first — see useMoney().ready. Practically always already true.
+    if (!fmt.ready) {
+      toast({ title: "One moment", description: "Still loading your organisation's currency — try the file again in a second.", variant: "destructive" });
       return;
     }
     const reader = new FileReader();
@@ -168,12 +287,17 @@ export default function DealsImportPage() {
       }
       setFileName(file.name);
       setResults(null);
-      setParsed(parseRows(records));
+      setParsedCurrency(fmt.currency);
+      setParsed(parseRows(records, fmt.currency, fmt.minor));
     };
     reader.readAsText(file);
   };
 
   const runImport = async () => {
+    if (!fmt.ready || parsedCurrency !== fmt.currency) {
+      toast({ title: "Please re-upload the file", description: "Your organisation's currency changed since the file was checked — nothing was imported.", variant: "destructive" });
+      return;
+    }
     setImporting(true);
     const out: ImportResult[] = [];
     let stoppedForCredits = false;
@@ -187,7 +311,8 @@ export default function DealsImportPage() {
           brandName: d.brandName,
           dealTitle: d.dealTitle,
           dealType: d.dealType,
-          dealAmount: d.dealAmount,
+          dealAmountMinor: d.dealAmountMinor,
+          currency: fmt.currency,
           startDate: d.startDate,
           endDate: d.endDate,
           deliverables: d.deliverables,
@@ -293,7 +418,7 @@ export default function DealsImportPage() {
               {fileName && (
                 <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 mt-2 inline-flex items-center gap-1.5">
                   <CheckCircle2 className="w-3.5 h-3.5" /> {fileName}
-                  <button onClick={() => { setFileName(null); setParsed([]); setResults(null); }} aria-label="Remove file" className="text-muted-foreground hover:text-foreground"><X className="w-3 h-3" /></button>
+                  <button onClick={() => { setFileName(null); setParsed([]); setResults(null); setParsedCurrency(null); }} aria-label="Remove file" className="text-muted-foreground hover:text-foreground"><X className="w-3 h-3" /></button>
                 </p>
               )}
             </div>
@@ -313,7 +438,7 @@ export default function DealsImportPage() {
                 </div>
                 <Button
                   className="gradient-btn text-white font-bold"
-                  disabled={!valid.length || importing}
+                  disabled={!valid.length || importing || !fmt.ready}
                   onClick={runImport}
                   data-testid="run-import"
                 >
@@ -338,7 +463,7 @@ export default function DealsImportPage() {
                           <td className="px-3 py-2.5 font-medium whitespace-nowrap max-w-[160px] truncate">{d.brandName || "—"}</td>
                           <td className="px-3 py-2.5 whitespace-nowrap max-w-[200px] truncate">{d.dealTitle || "—"}</td>
                           <td className="px-3 py-2.5 whitespace-nowrap">{d.dealType}</td>
-                          <td className="px-3 py-2.5 tabular-nums whitespace-nowrap">₹{d.dealAmount.toLocaleString("en-IN")}</td>
+                          <td className="px-3 py-2.5 tabular-nums whitespace-nowrap">{fmt.money(d.dealAmountMinor)}</td>
                           <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">{d.startDate || "?"} → {d.endDate || "?"}</td>
                           <td className="px-3 py-2.5 tabular-nums">{d.deliverables.length}</td>
                           <td className="px-3 py-2.5">

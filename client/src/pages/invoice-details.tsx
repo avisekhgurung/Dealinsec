@@ -8,6 +8,9 @@ import { StatusBadge } from "@/components/status-badge";
 import { BottomNav } from "@/components/bottom-nav";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useMoney } from "@/hooks/use-locale";
+import { formatMoney } from "@/lib/format";
+import { toMinor } from "@shared/schema";
 import {
   ArrowLeft,
   Sparkles,
@@ -23,6 +26,7 @@ export default function InvoiceDetailsPage() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const fmt = useMoney();
 
   const { data: invoice, isLoading } = useQuery<Invoice>({
     queryKey: ["/api/invoices", params.id],
@@ -53,7 +57,7 @@ export default function InvoiceDetailsPage() {
   });
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString("en-IN", {
+    return new Date(dateStr).toLocaleDateString(fmt.locale, {
       day: "numeric",
       month: "long",
       year: "numeric",
@@ -185,7 +189,15 @@ export default function InvoiceDetailsPage() {
               <div className="flex justify-between items-center">
                 <span className="font-semibold">Deal Amount</span>
                 <span className="text-2xl font-bold text-primary" data-testid="text-total-amount">
-                  ₹{deal ? Number(deal.dealAmount).toLocaleString("en-IN") : invoice.totalAmount.toLocaleString("en-IN")}
+                  {/* Two different units meet here. The deal is the user's own
+                      money in minor units; `invoice.totalAmount` is the legacy
+                      DealInSec platform-fee invoice, still whole rupees on the
+                      Stripe rail (see shared/schema.ts) — so it is pinned to
+                      INR rather than rendered in the user's currency, because
+                      that is the currency it was actually charged in. */}
+                  {deal
+                    ? fmt.money(deal.dealAmountMinor)
+                    : formatMoney(toMinor(invoice.totalAmount, "INR"), "INR", fmt.locale)}
                 </span>
               </div>
             </div>

@@ -9,15 +9,25 @@
  * and Next Best Action.
  */
 import { storage } from "../storage";
-import type { User, Deal, Contract, BrandInvoice } from "@shared/schema";
+import { resolveLocaleSettings, type User, type Deal, type Contract, type BrandInvoice, type LocaleSettings } from "@shared/schema";
+import { formatMoney } from "@shared/money";
 
 const DAY = 86_400_000;
 
+// Every amount crossing this module's boundary is MINOR units and says so in
+// its name. The briefing is JSON on the wire: without the suffix the client
+// would render 6_500_000 paise as "₹65,00,000" with nothing to warn it.
+//
+// NOT MODEL CONTEXT. The briefing and deal intel go to the browser, which
+// formats them; nothing here is ever handed to the model. A tool or prompt
+// that wants these figures must send the strings (health `detail`, next-action
+// `action` — already formatted) or amountForModel() from ./voice, never these
+// objects: a model reading `totalMinor: 6500000` quotes ₹65,00,000.
 export interface MoneyRadar {
-  overdue: { total: number; count: number; invoices: { id: number; brandName: string; amount: number; daysOverdue: number; invoiceNumber: string }[] };
-  dueThisWeek: { total: number; count: number; invoices: { id: number; brandName: string; amount: number; dueDate: string; invoiceNumber: string }[] };
-  readyToInvoice: { total: number; count: number; contracts: { id: number; dealId: number; brandName: string; remaining: number; contractName: string }[] };
-  collectible: number;
+  overdue: { totalMinor: number; count: number; invoices: { id: number; brandName: string; amountMinor: number; daysOverdue: number; invoiceNumber: string }[] };
+  dueThisWeek: { totalMinor: number; count: number; invoices: { id: number; brandName: string; amountMinor: number; dueDate: string; invoiceNumber: string }[] };
+  readyToInvoice: { totalMinor: number; count: number; contracts: { id: number; dealId: number; brandName: string; remainingMinor: number; contractName: string }[] };
+  collectibleMinor: number;
 }
 
 export interface HealthSignal {
@@ -46,22 +56,27 @@ interface OrgData {
   deals: Deal[];
   contracts: Contract[];
   invoices: BrandInvoice[];
+  /** The ORG's locale, not the reader's — these amounts are denominated in the
+   *  currency the organisation stored them in. A member abroad reading the
+   *  briefing sees the agency's money, correctly labelled. */
+  settings: LocaleSettings;
 }
 
 async function loadOrg(user: User): Promise<OrgData> {
   const orgId = user.organizationId!;
-  const [deals, contracts, invoices] = await Promise.all([
+  const [deals, contracts, invoices, org] = await Promise.all([
     storage.getDealsByOrg(orgId, user.id),
     storage.getContractsByOrg(orgId, user.id),
     storage.getBrandInvoicesByOrg(orgId, user.id),
+    storage.getOrganization(orgId),
   ]);
-  return { deals, contracts, invoices };
+  return { deals, contracts, invoices, settings: resolveLocaleSettings(org, user) };
 }
 
 import { analyzeDealProtections, type ProtectionReport } from "./riskcheck";
 
 const signed = (c: Contract) => c.status === "Signed" || !!c.signedByBrand;
-const invAmount = (i: BrandInvoice) => Number(i.dealAmount || 0);
+const invAmountMinor = (i: BrandInvoice) => i.dealAmountMinor || 0;
 
 export function computeMoneyRadar(data: OrgData): MoneyRadar {
   const now = Date.now();
@@ -84,52 +99,53 @@ export function computeMoneyRadar(data: OrgData): MoneyRadar {
     .map((c) => {
       const invoiced = data.invoices
         .filter((i) => i.contractId === c.id || i.dealId === c.dealId)
-        .reduce((s, i) => s + invAmount(i), 0);
-      return { c, remaining: Number(c.contractValue) - invoiced };
+        .reduce((s, i) => s + invAmountMinor(i), 0);
+      return { c, remainingMinor: c.contractValueMinor - invoiced };
     })
-    .filter((x) => x.remaining > 0);
+    .filter((x) => x.remainingMinor > 0);
 
   const radar: MoneyRadar = {
     overdue: {
-      total: overdueInv.reduce((s, i) => s + invAmount(i), 0),
+      totalMinor: overdueInv.reduce((s, i) => s + invAmountMinor(i), 0),
       count: overdueInv.length,
       invoices: overdueInv.map((i) => ({
         id: i.id,
         brandName: i.brandName,
-        amount: invAmount(i),
+        amountMinor: invAmountMinor(i),
         daysOverdue: Math.max(1, Math.floor((now - new Date(i.dueDate as any).getTime()) / DAY)),
         invoiceNumber: i.invoiceNumber,
       })).sort((a, b) => b.daysOverdue - a.daysOverdue).slice(0, 10),
     },
     dueThisWeek: {
-      total: dueWeekInv.reduce((s, i) => s + invAmount(i), 0),
+      totalMinor: dueWeekInv.reduce((s, i) => s + invAmountMinor(i), 0),
       count: dueWeekInv.length,
       invoices: dueWeekInv.map((i) => ({
-        id: i.id, brandName: i.brandName, amount: invAmount(i),
+        id: i.id, brandName: i.brandName, amountMinor: invAmountMinor(i),
         dueDate: String(i.dueDate), invoiceNumber: i.invoiceNumber,
       })).slice(0, 10),
     },
     readyToInvoice: {
-      total: ready.reduce((s, x) => s + x.remaining, 0),
+      totalMinor: ready.reduce((s, x) => s + x.remainingMinor, 0),
       count: ready.length,
       contracts: ready.map((x) => ({
         id: x.c.id, dealId: x.c.dealId, brandName: x.c.brandName,
-        remaining: x.remaining, contractName: x.c.contractName,
+        remainingMinor: x.remainingMinor, contractName: x.c.contractName,
       })).slice(0, 10),
     },
-    collectible: 0,
+    collectibleMinor: 0,
   };
-  radar.collectible = radar.overdue.total + radar.dueThisWeek.total + radar.readyToInvoice.total;
+  radar.collectibleMinor = radar.overdue.totalMinor + radar.dueThisWeek.totalMinor + radar.readyToInvoice.totalMinor;
   return radar;
 }
 
 /** Explainable health score — every point traces to a visible signal. */
 export function computeDealHealth(deal: Deal, data: OrgData): DealHealth {
   const now = Date.now();
+  const money = (minor: number) => formatMoney(minor, data.settings.currency, data.settings.locale);
   const contract = data.contracts.find((c) => c.dealId === deal.id) ?? null;
   const dealInvoices = data.invoices.filter((i) => i.dealId === deal.id);
-  const invoicedTotal = dealInvoices.reduce((s, i) => s + invAmount(i), 0);
-  const paidTotal = dealInvoices.filter((i) => i.status === "Paid").reduce((s, i) => s + invAmount(i), 0);
+  const invoicedTotal = dealInvoices.reduce((s, i) => s + invAmountMinor(i), 0);
+  const paidTotal = dealInvoices.filter((i) => i.status === "Paid").reduce((s, i) => s + invAmountMinor(i), 0);
   const overdue = dealInvoices.filter((i) => i.status !== "Paid" && i.dueDate && new Date(i.dueDate as any).getTime() < now);
   const ended = new Date(deal.endDate).getTime() < now;
 
@@ -155,8 +171,8 @@ export function computeDealHealth(deal: Deal, data: OrgData): DealHealth {
     if (invoicedTotal === 0) {
       signals.push({ label: "Invoicing", state: ended ? "bad" : "warn", detail: ended ? "Deal ended with nothing invoiced" : "Nothing invoiced yet" });
       score -= ended ? 25 : 10;
-    } else if (invoicedTotal < Number(deal.dealAmount)) {
-      signals.push({ label: "Invoicing", state: "warn", detail: `₹${(Number(deal.dealAmount) - invoicedTotal).toLocaleString("en-IN")} not yet invoiced` });
+    } else if (invoicedTotal < deal.dealAmountMinor) {
+      signals.push({ label: "Invoicing", state: "warn", detail: `${money(deal.dealAmountMinor - invoicedTotal)} not yet invoiced` });
       score -= 8;
     } else {
       signals.push({ label: "Invoicing", state: "good", detail: "Fully invoiced" });
@@ -164,14 +180,14 @@ export function computeDealHealth(deal: Deal, data: OrgData): DealHealth {
   }
 
   if (overdue.length) {
-    const amt = overdue.reduce((s, i) => s + invAmount(i), 0);
+    const amt = overdue.reduce((s, i) => s + invAmountMinor(i), 0);
     const worst = Math.max(...overdue.map((i) => Math.floor((now - new Date(i.dueDate as any).getTime()) / DAY)));
-    signals.push({ label: "Payment risk", state: worst > 14 ? "bad" : "warn", detail: `₹${amt.toLocaleString("en-IN")} overdue (${worst} day${worst !== 1 ? "s" : ""})` });
+    signals.push({ label: "Payment risk", state: worst > 14 ? "bad" : "warn", detail: `${money(amt)} overdue (${worst} day${worst !== 1 ? "s" : ""})` });
     score -= worst > 14 ? 30 : 15;
   } else if (invoicedTotal > 0 && paidTotal >= invoicedTotal) {
     signals.push({ label: "Payments", state: "good", detail: "All invoices paid" });
   } else if (invoicedTotal > 0) {
-    signals.push({ label: "Payments", state: "warn", detail: `₹${(invoicedTotal - paidTotal).toLocaleString("en-IN")} awaiting payment (not overdue)` });
+    signals.push({ label: "Payments", state: "warn", detail: `${money(invoicedTotal - paidTotal)} awaiting payment (not overdue)` });
     score -= 5;
   }
 
@@ -194,13 +210,14 @@ export function computeDealHealth(deal: Deal, data: OrgData): DealHealth {
 export function computeNextBestAction(deal: Deal, data: OrgData): NextBestAction | null {
   if (deal.status === "Completed") return null;
   const now = Date.now();
+  const money = (minor: number) => formatMoney(minor, data.settings.currency, data.settings.locale);
   const contract = data.contracts.find((c) => c.dealId === deal.id) ?? null;
   const dealInvoices = data.invoices.filter((i) => i.dealId === deal.id);
   const overdue = dealInvoices.find((i) => i.status !== "Paid" && i.dueDate && new Date(i.dueDate as any).getTime() < now);
   const base = { dealId: deal.id, dealTitle: deal.dealTitle, brandName: deal.brandName };
 
   if (overdue) {
-    return { ...base, action: `Follow up on ₹${invAmount(overdue).toLocaleString("en-IN")} overdue`, route: `/brand-invoices/${overdue.id}`, urgency: "red" };
+    return { ...base, action: `Follow up on ${money(invAmountMinor(overdue))} overdue`, route: `/brand-invoices/${overdue.id}`, urgency: "red" };
   }
   if (!contract) {
     return { ...base, action: "Get the agreement signed", route: `/deals/${deal.id}/contract`, urgency: "yellow" };
@@ -208,10 +225,10 @@ export function computeNextBestAction(deal: Deal, data: OrgData): NextBestAction
   if (!signed(contract)) {
     return { ...base, action: "Upload the signed proof", route: `/contracts/${contract.id}`, urgency: "yellow" };
   }
-  const invoicedTotal = dealInvoices.reduce((s, i) => s + invAmount(i), 0);
-  if (invoicedTotal < Number(contract.contractValue)) {
-    const remaining = Number(contract.contractValue) - invoicedTotal;
-    return { ...base, action: `Invoice the remaining ₹${remaining.toLocaleString("en-IN")}`, route: `/contracts/${contract.id}`, urgency: "green" };
+  const invoicedTotal = dealInvoices.reduce((s, i) => s + invAmountMinor(i), 0);
+  if (invoicedTotal < contract.contractValueMinor) {
+    const remaining = contract.contractValueMinor - invoicedTotal;
+    return { ...base, action: `Invoice the remaining ${money(remaining)}`, route: `/contracts/${contract.id}`, urgency: "green" };
   }
   const unpaid = dealInvoices.find((i) => i.status !== "Paid");
   if (unpaid) {
@@ -254,7 +271,7 @@ export async function computeDealIntel(dealId: number, user: User): Promise<{ he
   return {
     health: computeDealHealth(deal, data),
     nextAction: computeNextBestAction(deal, data),
-    protection: analyzeDealProtections(deal),
+    protection: analyzeDealProtections(deal, data.settings),
     dealStatus: deal.status,
   };
 }

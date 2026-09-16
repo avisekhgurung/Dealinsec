@@ -6,17 +6,72 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { parseApiError } from "@/lib/api-error";
+import { RegionFields, browserRegion } from "@/components/region-fields";
+import { getLocaleSettings, type LocaleFields, type LocaleSettings } from "@shared/schema";
+import { sameRegion } from "@shared/region";
 import { useLocation } from "wouter";
+
+/**
+ * What the chosen country changes on this screen. Data, not a branch: a country
+ * without a row gets the international rules, and giving a country its own is
+ * adding a row.
+ */
+interface CountryFormRules {
+  /** Tested against the number after `normalizePhone`. */
+  phonePattern: RegExp;
+  phoneMaxLength: number;
+  phonePlaceholder: string;
+  phoneInvalid: string;
+  normalizePhone: (raw: string) => string;
+  addressPlaceholder: string;
+  /** What the profile's tax registration is called in the copy. A label only:
+   *  which registrations a country requires is not decided here. */
+  taxIdLabel: string;
+}
+
+const INTERNATIONAL_FORM_RULES: CountryFormRules = {
+  // E.164 caps a number at 15 digits. The floor of 6 catches a half-typed
+  // number without pretending to know every country's numbering plan.
+  phonePattern: /^\+?\d{6,15}$/,
+  phoneMaxLength: 20,
+  phonePlaceholder: "+ country code and number",
+  phoneInvalid: "Enter your phone number, including the country code",
+  // Spaces and punctuation go; a leading "+" stays, because without it an
+  // international number cannot be told apart from a national one.
+  normalizePhone: (raw) => raw.trim().replace(/[\s().-]/g, ""),
+  addressPlaceholder: "Street, city, postcode (you can add this later)",
+  taxIdLabel: "tax ID",
+};
+
+const FORM_RULES_BY_COUNTRY: Record<string, CountryFormRules> = {
+  IN: {
+    phonePattern: /^[6-9]\d{9}$/,
+    phoneMaxLength: 10,
+    phonePlaceholder: "9876543210",
+    phoneInvalid: "Enter a valid 10-digit Indian mobile number",
+    normalizePhone: (raw) => raw.replace(/\D/g, ""),
+    addressPlaceholder: "Street, city, state, PIN (you can add this later)",
+    taxIdLabel: "PAN",
+  },
+};
 
 export default function OnboardingPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [billingAddress, setBillingAddress] = useState("");
+  // Pre-filled from the browser, so an Indian signup is already on India / INR
+  // and presses Continue exactly as before. Nothing is stored until submit.
+  const [region, setRegion] = useState<LocaleSettings>(browserRegion);
+
+  const rules = FORM_RULES_BY_COUNTRY[region.country] ?? INTERNATIONAL_FORM_RULES;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,8 +80,8 @@ export default function OnboardingPage() {
       toast({ title: "Full name is required", variant: "destructive" });
       return;
     }
-    if (!/^[6-9]\d{9}$/.test(phone.replace(/\D/g, ""))) {
-      toast({ title: "Enter a valid 10-digit Indian mobile number", variant: "destructive" });
+    if (!rules.phonePattern.test(rules.normalizePhone(phone))) {
+      toast({ title: rules.phoneInvalid, variant: "destructive" });
       return;
     }
     // Billing address is OPTIONAL during onboarding — collected later when
@@ -34,6 +89,38 @@ export default function OnboardingPage() {
 
     setIsLoading(true);
     try {
+      // Documents print in the ORGANIZATION's region, not the member's (see
+      // resolveLocaleSettings), so the workspace has to carry the choice too,
+      // or a freelancer in Berlin issues their first invoice in rupees. This is
+      // the one moment it is safe to set: onboarding is reached only by the
+      // owner of a brand-new workspace (invitees are marked onboarded when they
+      // accept), and a new workspace holds no amounts a currency change could
+      // relabel. Skipped when nothing differs, so an Indian signup never writes
+      // to its workspace at all.
+      //
+      // Deliberately BEFORE the profile write. That write finishes onboarding
+      // and starts the trial; were the workspace write to fail after it, the
+      // person would be let in with every document in the wrong currency, and
+      // once their first deal exists the region is locked.
+      if (user?.organizationId && user.orgRole === "OWNER") {
+        const org = await queryClient
+          .ensureQueryData<LocaleFields>({ queryKey: ["/api/org"] })
+          .catch(() => undefined);
+        if (!sameRegion(getLocaleSettings(org), region)) {
+          try {
+            await apiRequest("PATCH", "/api/org", region);
+          } catch (error) {
+            toast({
+              title: "Couldn't save your country and currency",
+              description: parseApiError(error).error || "Please try again.",
+              variant: "destructive",
+            });
+            return;
+          }
+          await queryClient.invalidateQueries({ queryKey: ["/api/org"] });
+        }
+      }
+
       const nameParts = fullName.trim().split(" ");
       const firstName = nameParts[0];
       const lastName = nameParts.slice(1).join(" ") || null;
@@ -41,13 +128,20 @@ export default function OnboardingPage() {
       await apiRequest("PATCH", "/api/profile", {
         firstName,
         lastName,
-        phone: phone.replace(/\D/g, ""),
+        phone: rules.normalizePhone(phone),
         billingAddress: billingAddress.trim() || undefined,
+        // The person's own row drives their personal screens (dates in their
+        // activity feed) and is the issuer profile, so it records the same
+        // choice the workspace does.
+        country: region.country,
+        currency: region.currency,
+        locale: region.locale,
+        timezone: region.timezone,
         onboardingComplete: true,
       });
 
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      toast({ title: "You're in!", description: "We'll ask for PAN, bank & signature only when you need them." });
+      toast({ title: "You're in!", description: `We'll ask for ${rules.taxIdLabel}, bank & signature only when you need them.` });
       setLocation("/dashboard");
     } catch (error: any) {
       toast({
@@ -66,7 +160,7 @@ export default function OnboardingPage() {
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Welcome to Dealinsec</CardTitle>
           <CardDescription>
-            Just 3 quick details to start. We'll ask for the rest right when you need them.
+            A few quick details to start. We'll ask for the rest right when you need them.
           </CardDescription>
           <div className="mx-auto mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
             <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -90,15 +184,19 @@ export default function OnboardingPage() {
               />
             </div>
 
+            {/* Before the phone field, because the country decides what a
+                valid phone number looks like. */}
+            <RegionFields value={region} onChange={setRegion} idPrefix="onboarding-region" />
+
             <div className="space-y-2">
               <Label htmlFor="phone">Phone Number *</Label>
               <Input
                 id="phone"
                 type="tel"
-                placeholder="9876543210"
+                placeholder={rules.phonePlaceholder}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                maxLength={10}
+                maxLength={rules.phoneMaxLength}
                 required
                 data-testid="input-phone"
               />
@@ -111,7 +209,7 @@ export default function OnboardingPage() {
               </div>
               <Textarea
                 id="billingAddress"
-                placeholder="Street, city, state, PIN (you can add this later)"
+                placeholder={rules.addressPlaceholder}
                 value={billingAddress}
                 onChange={(e) => setBillingAddress(e.target.value)}
                 rows={3}
@@ -122,7 +220,7 @@ export default function OnboardingPage() {
             <div className="rounded-xl bg-primary/5 border border-primary/15 p-3.5 flex gap-2.5">
               <Sparkles className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
               <p className="text-xs text-muted-foreground leading-relaxed">
-                <span className="font-semibold text-foreground">Billing address, PAN &amp; signature</span> are collected right before your first agreement.{" "}
+                <span className="font-semibold text-foreground">Billing address, {rules.taxIdLabel} &amp; signature</span> are collected right before your first agreement.{" "}
                 <span className="font-semibold text-foreground">Bank details</span> are collected right before your first invoice. No mid-flow surprises.
               </p>
             </div>

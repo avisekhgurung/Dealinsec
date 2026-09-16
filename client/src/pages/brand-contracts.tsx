@@ -7,8 +7,16 @@ import { StatusBadge } from "@/components/status-badge";
 import { BrandBottomNav } from "@/components/brand-bottom-nav";
 import { ArrowLeft, FileCheck } from "lucide-react";
 import type { Contract } from "@shared/schema";
+import { useMoney } from "@/hooks/use-locale";
+import { formatMoney } from "@shared/money";
 
 export default function BrandContractsPage() {
+  // NOTE: this resolves the VIEWER's currency. Today every organization is INR
+  // so the output is unchanged, but a brand and the freelancer who invoiced
+  // them can belong to different countries. The real fix is the issued-currency
+  // snapshot on the deal/contract row (GLOBAL_EXPANSION.md item (f)); until it
+  // lands there is nothing better to read here.
+  const fmt = useMoney();
   const { data: contracts = [], isLoading } = useQuery<Contract[]>({
     queryKey: ["/api/brand/contracts"],
   });
@@ -53,7 +61,7 @@ export default function BrandContractsPage() {
                   </div>
                   <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/10">
                     <span className="text-lg font-bold text-primary">
-                      {"\u20B9"}{contract.contractValue.toLocaleString()}
+                      {formatMoney(contract.contractValueMinor, (contract as { currency?: string | null }).currency ?? "INR", fmt.locale)}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {contract.startDate} - {contract.endDate}

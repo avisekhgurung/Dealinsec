@@ -16,6 +16,9 @@ import { registerToolPages, toolSitemapPaths } from './tools';
 import { registerBlogPages, blogSitemapPaths } from './blog';
 import { registerCategoryPages, categorySitemapPaths } from './category-pages';
 import { registerLegacyRedirects } from './legacy-redirects';
+// The ledger key only, from a module with no side effects. NEVER import
+// script/migrate-money-minor-units.ts here: that bundles its CLI into the server.
+import { MONEY_MINOR_UNITS_KEY } from '@shared/migration-keys';
 
 const app = express();
 
@@ -292,6 +295,84 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
     log("boot migration: brand_invoices.paid_at ready");
   } catch (err) {
     console.error("BOOT MIGRATION FAILED (paid_at) — mark-paid will error until this runs:", err);
+  }
+
+  // Money + locale schema GATE — the server never migrates on boot.
+  //
+  // Dev and production share ONE Neon database (see .env), and every local
+  // `npm run dev` boots this file. A boot-time migration therefore meant that
+  // anyone starting a dev server without overriding DATABASE_URL would silently
+  // multiply every production amount by 100. It also opened a deploy window
+  // where the previous instance, still serving, read paise as rupees.
+  //
+  // So the migration is a deliberate, one-time operator step, run while the
+  // live instance is stopped:
+  //     npx tsx --env-file=.env script/migrate-money-minor-units.ts --apply
+  // and boot only VERIFIES it happened. Fail closed: serving rupee-scaled rows
+  // through minor-unit code shows every amount at 1/100th and, worse, writes
+  // real paise into rupee rows that nobody can later tell apart. A refused boot
+  // is recoverable; a mixed-unit money table is not.
+  try {
+    // Every column this build SELECTs that the migration adds. Checking only
+    // users.country let through a database whose ledger key was claimed by an
+    // earlier revision of the script, before it added the issued-currency
+    // columns: the gate passed, then every contract and invoice read was a 500.
+    // Read-only — information_schema, never DDL.
+    const requiredColumns: readonly (readonly [table: string, column: string])[] = [
+      ...["users", "organizations"].flatMap((table) =>
+        ["country", "currency", "locale", "timezone"].map((column) => [table, column] as const)),
+      ["contracts", "currency"],
+      ["brand_invoices", "currency"],
+    ];
+    // Scoped to current_schema(), the schema the migration's DDL writes into
+    // (its statements are unqualified). Without it a same-named table in any
+    // other schema that happened to have a `currency` column satisfied the gate.
+    const presentCols = await db.execute(sql`
+      SELECT table_name, column_name FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name IN ('users', 'organizations', 'contracts', 'brand_invoices')
+        AND column_name IN ('country', 'currency', 'locale', 'timezone')`);
+    const present = new Set(
+      (presentCols.rows ?? []).map((r: any) => `${r.table_name}.${r.column_name}`),
+    );
+    const missingColumns = requiredColumns
+      .map(([table, column]) => `${table}.${column}`)
+      .filter((name) => !present.has(name));
+    // Unqualified, like the migration's CREATE TABLE and the SELECT below, so
+    // all three resolve the ledger through the same search_path. A hardcoded
+    // 'public.' could find a different table than the one the SELECT reads.
+    const ledger = await db.execute(sql`
+      SELECT to_regclass('app_migrations') IS NOT NULL AS present`);
+    const ledgerPresent = Boolean((ledger.rows?.[0] as any)?.present);
+    let moneyMigrated = false;
+    if (ledgerPresent) {
+      const row = await db.execute(sql`
+        SELECT 1 FROM app_migrations WHERE key = ${MONEY_MINOR_UNITS_KEY}`);
+      moneyMigrated = (row.rows?.length ?? 0) > 0;
+    }
+    if (missingColumns.length || !moneyMigrated) {
+      console.error(
+        (moneyMigrated
+          // Money is already in minor units; only additive columns are absent.
+          // Re-running the script adds them and leaves the amounts alone (the
+          // ledger key makes the money step a no-op).
+          ? `REFUSING TO SERVE: this database is missing ${missingColumns.join(", ")}, which this build ` +
+            "reads on every request. Run once (additive, safe to repeat):\n"
+          : "REFUSING TO SERVE: this database has not been migrated to minor-unit money " +
+            "and locale columns. This build reads amounts in paise/cents; the database " +
+            "still holds whole rupees" +
+            (missingColumns.length ? ` (missing ${missingColumns.join(", ")})` : "") +
+            ". Stop the live instance, then run once:\n") +
+        "    npx tsx --env-file=.env script/migrate-money-minor-units.ts --apply\n" +
+        "(If you are a developer seeing this locally, you are probably pointed at the " +
+        "shared production database — set DATABASE_URL to your local test DB.)",
+      );
+      process.exit(1);
+    }
+    log("schema gate: money in minor units and locale columns present");
+  } catch (err) {
+    console.error("REFUSING TO SERVE: could not verify the money/locale schema:", err);
+    process.exit(1);
   }
 
   const httpServer = await registerRoutes(app);

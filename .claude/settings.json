@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(export PATH=\"$HOME/.nvm/versions/node/v22.22.2/bin:$PATH\")",
+      "Bash(export PATH=\"/Users/avisekhgurung/.nvm/versions/node/v22.22.2/bin:$PATH\")",
+      "Bash(npx tsc --noEmit)",
+      "mcp__Claude_Preview__preview_screenshot",
+      "mcp__Claude_Browser__read_page",
+      "mcp__Claude_Preview__preview_resize",
+      "mcp__Claude_Preview__preview_logs",
+      "mcp__Claude_Browser__resize_window"
+    ]
+  }
+}

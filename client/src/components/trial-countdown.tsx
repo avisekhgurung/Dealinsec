@@ -12,6 +12,8 @@ import { Link } from "wouter";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TRIAL_DAYS } from "@shared/schema";
+import { useLocale } from "@/hooks/use-locale";
+import { formatDate } from "@/lib/money";
 
 const DAY_MS = 86_400_000;
 const RING_R = 26;
@@ -42,6 +44,7 @@ function Unit({ v, label }: { v: number; label: string }) {
 }
 
 export function TrialCountdown({ trialEndsAt }: { trialEndsAt: Date | string }) {
+  const { locale, timezone, country } = useLocale();
   const endsAtMs = new Date(trialEndsAt).getTime();
   const [t, setT] = useState(() => partsLeft(endsAtMs));
 
@@ -58,10 +61,7 @@ export function TrialCountdown({ trialEndsAt }: { trialEndsAt: Date | string }) 
   // Ceil-style day count so day 7 reads "7", matching getTrialDaysLeft.
   const daysCeil = Math.min(TRIAL_DAYS, Math.max(1, Math.ceil(t.left / DAY_MS)));
   const lastDay = t.left <= DAY_MS;
-  const endsLabel = new Date(endsAtMs).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-  });
+  const endsLabel = formatDate(new Date(endsAtMs), locale, { day: "numeric", year: false, timezone });
 
   return (
     <div
@@ -118,7 +118,7 @@ export function TrialCountdown({ trialEndsAt }: { trialEndsAt: Date | string }) 
             {lastDay ? "Last day — everything unlocked" : "Everything unlocked"}
           </p>
           <p className="text-xs text-white/70 mt-0.5">
-            Agreements, GST invoices &amp; payment tracking — free until {endsLabel}.
+            Agreements, {country === "IN" ? "GST invoices" : "invoices"} &amp; payment tracking — free until {endsLabel}.
           </p>
         </div>
 

@@ -22,6 +22,7 @@ import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components
 import { PickParentDialog } from "@/components/pick-parent-dialog";
 import { memberCan } from "@shared/permissions";
 import { useAuth } from "@/hooks/useAuth";
+import { useMoney, type MoneyFormat } from "@/hooks/use-locale";
 import { dealTypeMeta } from "@shared/dealTypeTaxonomy";
 import type { Quote, Deal } from "@shared/schema";
 import { FileText, Search, X, ChevronRight, Plus } from "lucide-react";
@@ -30,12 +31,13 @@ type QuoteRow = Quote & { deal: Deal | null };
 // Flat search fields for the table's global filter (it reads top-level keys).
 type QuoteTableRow = QuoteRow & { clientName: string; dealName: string; quoteNo: string };
 
-const fmtDate = (s?: string | Date | null) =>
-  s ? new Date(s).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
+const fmtDate = (s: string | Date | null | undefined, locale: string) =>
+  s ? new Date(s).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : "—";
 
 // Desktop table columns — same register conventions as Deals: mono record
-// number, bold client, tinted type chip, tabular ₹, compact badges.
-const columns: ColumnDef<QuoteTableRow>[] = [
+// number, bold client, tinted type chip, tabular amount, compact badges.
+// A factory, because money and dates need the org's currency and locale.
+const makeColumns = (fmt: MoneyFormat): ColumnDef<QuoteTableRow>[] => [
   {
     id: "quoteNo",
     header: "Quotation No.",
@@ -76,10 +78,11 @@ const columns: ColumnDef<QuoteTableRow>[] = [
   {
     id: "value",
     header: "Value",
-    meta: { label: "Value", align: "right", exportValue: (r: QuoteRow) => r.deal?.dealAmount ?? 0 },
-    accessorFn: (r) => Number(r.deal?.dealAmount ?? 0),
+    // Export stays in MAJOR units; sorting stays on the stored minor value.
+    meta: { label: "Value", align: "right", exportValue: (r: QuoteRow) => fmt.major(r.deal?.dealAmountMinor ?? 0) },
+    accessorFn: (r) => Number(r.deal?.dealAmountMinor ?? 0),
     cell: ({ row }) => (
-      <span className="font-semibold text-primary tabular-nums">₹{Number(row.original.deal?.dealAmount || 0).toLocaleString("en-IN")}</span>
+      <span className="font-semibold text-primary tabular-nums">{fmt.money(row.original.deal?.dealAmountMinor)}</span>
     ),
   },
   {
@@ -94,7 +97,7 @@ const columns: ColumnDef<QuoteTableRow>[] = [
     header: "Issued",
     meta: { label: "Issued", exportValue: (r: QuoteRow) => (r.createdAt ? String(r.createdAt) : "") },
     accessorFn: (r) => (r.createdAt ? new Date(r.createdAt as any).getTime() : 0),
-    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.createdAt)}</span>,
+    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.createdAt, fmt.locale)}</span>,
   },
 ];
 
@@ -104,6 +107,8 @@ export default function QuotationsPage() {
   const [pickOpen, setPickOpen] = useState(false);
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const fmt = useMoney();
+  const columns = useMemo(() => makeColumns(fmt), [fmt]);
   const canCreate = memberCan(user as any, "quotations.create");
   const { data: quotes = [], isLoading } = useQuery<QuoteRow[]>({ queryKey: ["/api/quotes"] });
 
@@ -265,7 +270,7 @@ export default function QuotationsPage() {
                         </span>
                         {/* Value */}
                         <span className="block text-sm font-semibold text-primary tabular-nums mt-1 lg:mt-0">
-                          ₹{Number(r.deal?.dealAmount || 0).toLocaleString("en-IN")}
+                          {fmt.money(r.deal?.dealAmountMinor)}
                         </span>
                         {/* Version */}
                         <span className="hidden lg:block">
@@ -273,7 +278,7 @@ export default function QuotationsPage() {
                         </span>
                         {/* Issued */}
                         <span className="block text-xs text-muted-foreground mt-1 lg:mt-0 whitespace-nowrap">
-                          {fmtDate(r.createdAt)}
+                          {fmtDate(r.createdAt, fmt.locale)}
                         </span>
                         <ChevronRight className="hidden lg:block w-4 h-4 text-muted-foreground" />
                       </button>

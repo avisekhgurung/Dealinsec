@@ -18,6 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useIssuer } from "@/hooks/useIssuer";
+import { useMoney } from "@/hooks/use-locale";
 import { Button } from "@/components/ui/button";
 import { BottomNav } from "@/components/bottom-nav";
 import { ArrowLeft, Download, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
@@ -27,11 +28,13 @@ import { getDeliverableLabels } from "@shared/dealTypeTaxonomy";
 import { PagedDocument, type DocBlock } from "@/components/document/paged";
 import {
   DocHeader, docFooter, SectionTitle, TwoParties, Party, tableBlocks, TotalBlock,
-  DocWarnings, inr, docDate,
+  DocWarnings, docMoney, docDate,
 } from "@/components/document/primitives";
 import {
   detectPaymentConflicts, deriveSchedule, validateDocData,
 } from "@/components/document/checks";
+import { DocLocalePending } from "@/components/document/locale-pending";
+import { formatTaxRegistration, invoiceTaxProfile, taxRegistrations } from "@shared/invoice-tax";
 
 function slugify(s: string): string {
   return (s || "").normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
@@ -48,6 +51,9 @@ export default function QuotePreviewPage() {
   const params = useParams<{ id: string }>();
   const { user } = useAuth();
   const issuer = useIssuer();
+  // The ORG's locale — a quotation prints the same currency for every teammate.
+  const fmt = useMoney();
+  const loc = fmt.settings;
 
   const { data: deal, isLoading: dealLoading } = useQuery<Deal>({
     queryKey: ["/api/deals", params.id],
@@ -57,7 +63,7 @@ export default function QuotePreviewPage() {
   const { data: quote } = useQuery<Quote | null>({
     queryKey: ["/api/deals", params.id, "quote"],
     queryFn: async () => {
-      const res = await fetch(`/api/deals/${params.id}/quote`, { credentials: "include" });
+      const res = await fetch(`/api/deals/${params.id}/quote`, { credentials: "include", headers: { "X-DealInSec-Money": "minor" } });
       if (!res.ok) return null;
       return res.json();
     },
@@ -96,8 +102,8 @@ export default function QuotePreviewPage() {
           docNo={quoteNumber}
           status={quote?.status === "revised" ? "Revised" : undefined}
           meta={[
-            { label: "Date", value: docDate(issuedOn) },
-            { label: "Valid until", value: docDate(validUntil) },
+            { label: "Date", value: docDate(issuedOn, loc) },
+            { label: "Valid until", value: docDate(validUntil, loc) },
             ...(quote && quote.version > 1 ? [{ label: "Version", value: `v${quote.version}` }] : []),
           ]}
         />
@@ -112,14 +118,18 @@ export default function QuotePreviewPage() {
             <Party
               heading="Prepared by"
               name={fullName}
-              lines={[issuer.email, issuer.phone, issuer.panNumber && `PAN: ${issuer.panNumber}`, issuer.gstNumber && `GSTIN: ${issuer.gstNumber}`]}
+              // The same registrations, labels and order the invoice prints
+              // (shared/invoice-tax.ts). Outside India the gstNumber slot holds
+              // a VAT or other number, which "GSTIN:" mislabelled. India's
+              // profile is PAN then GSTIN, so its quotation is unchanged.
+              lines={[issuer.email, issuer.phone, ...taxRegistrations(invoiceTaxProfile(loc.country), issuer).map(formatTaxRegistration)]}
             />
           }
           right={
             <Party
               heading="Prepared for"
               name={deal.brandName}
-              lines={[deal.dealTitle, `Engagement: ${docDate(deal.startDate)} – ${docDate(deal.endDate)}`]}
+              lines={[deal.dealTitle, `Engagement: ${docDate(deal.startDate, loc)} – ${docDate(deal.endDate, loc)}`]}
             />
           }
         />
@@ -163,14 +173,16 @@ export default function QuotePreviewPage() {
       }),
     );
 
-    const schedule = deriveSchedule((deal as any).customTerms, deal.dealAmount);
+    // The currency decides the split's rounding factor (1 for JPY, 100 for
+    // INR), so it must be the document's — the one the server's split uses.
+    const schedule = deriveSchedule((deal as any).customTerms, deal.dealAmountMinor, loc.currency);
     out.push({
       key: "total",
       node: (
         <TotalBlock
           label="Total deal value"
-          amount={deal.dealAmount}
-          note="Subject to applicable taxes · INR"
+          amountMinor={deal.dealAmountMinor}
+          note={`Subject to applicable taxes · ${loc.currency}`}
         />
       ),
     });
@@ -186,7 +198,7 @@ export default function QuotePreviewPage() {
                 {schedule.map((s) => (
                   <tr key={s.label}>
                     <td>{s.label}</td>
-                    <td className="doc-td-r doc-num" style={{ fontWeight: 600, width: "40mm" }}>{inr(s.amount)}</td>
+                    <td className="doc-td-r doc-num" style={{ fontWeight: 600, width: "40mm" }}>{docMoney(s.amountMinor, loc)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -230,15 +242,22 @@ export default function QuotePreviewPage() {
       key: "closing",
       node: (
         <p className="doc-small doc-muted-t" style={{ textAlign: "center" }}>
-          This quotation is an offer, not an invoice. Prices are in Indian Rupees and valid until {docDate(validUntil)}.
+          {/* The currency's name, not its code: quotations already in clients'
+              hands read "Indian Rupees" here and must re-render unchanged. */}
+          This quotation is an offer, not an invoice. Prices are in {fmt.currencyName} and valid until {docDate(validUntil, loc)}.
         </p>
       ),
     });
 
     return out;
-  }, [deal, quote, issuer, fullName, quoteNumber]);
+  }, [deal, quote, issuer, fullName, quoteNumber, loc, fmt]);
 
   /* ── Screen states ───────────────────────────────────────────────────── */
+  // Not before the org's settings load: until then `loc` is the viewer's own
+  // row, which prints the wrong currency and tax labels for an invitee.
+  if (!dealLoading && deal && !fmt.ready) {
+    return <DocLocalePending failed={fmt.failed} onRetry={fmt.retry} />;
+  }
   if (dealLoading) {
     return (
       <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
@@ -262,7 +281,7 @@ export default function QuotePreviewPage() {
     ...validateDocData({
       clientName: deal.brandName,
       sellerName: fullName === "—" ? "" : fullName,
-      amount: deal.dealAmount,
+      amountMinor: deal.dealAmountMinor,
       startDate: deal.startDate,
       endDate: deal.endDate,
     }),
@@ -329,6 +348,7 @@ export default function QuotePreviewPage() {
 
         <PagedDocument
           blocks={blocks}
+          locale={loc}
           footer={docFooter(quoteNumber, `Deal ${recordNo("deal", deal.id)}`)}
         />
 

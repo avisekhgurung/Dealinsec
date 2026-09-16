@@ -21,16 +21,16 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Search, Plus, ArrowRight, FileText, FileCheck, Receipt, Crown,
-  AlertTriangle, Scissors, IndianRupee,
+  AlertTriangle, Scissors,
 } from "lucide-react";
 import { hasProAccess } from "@shared/schema";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
+import { useMoney } from "@/hooks/use-locale";
 import { useUpgradeModal } from "@/components/upgrade-modal";
+import { moneyIcon } from "@/components/money-icon";
 
 export type PickKind = "quotation" | "agreement" | "invoice";
-
-const inr = (n: number) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
 
 const COPY: Record<PickKind, { title: string; description: string; icon: any; newParent: string }> = {
   quotation: {
@@ -68,10 +68,11 @@ export function PickParentDialog({
 }: { kind: PickKind; open: boolean; onOpenChange: (v: boolean) => void }) {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const { money, settings: moneySettings } = useMoney();
   const { openUpgradeModal } = useUpgradeModal();
   const [search, setSearch] = useState("");
   /** invoice flow: agreement chosen, now pick how much */
-  const [chosenContract, setChosenContract] = useState<{ id: number; dealId: number; remaining: number; name: string } | null>(null);
+  const [chosenContract, setChosenContract] = useState<{ id: number; dealId: number; remainingMinor: number; name: string } | null>(null);
 
   const enabled = open;
   const { data: deals = [], isLoading: l1 } = useQuery<Deal[]>({ queryKey: ["/api/deals"], enabled });
@@ -95,7 +96,7 @@ export function PickParentDialog({
           route: `/deals/${d.id}`,
           title: d.brandName,
           subtitle: d.dealTitle,
-          amountLabel: inr(Number(d.dealAmount)),
+          amountLabel: money(d.dealAmountMinor),
           group: "ready",
         })),
         excludedNote: quotedDealIds.size
@@ -112,7 +113,7 @@ export function PickParentDialog({
           route: `/deals/${d.id}/contract`,
           title: d.brandName,
           subtitle: d.dealTitle,
-          amountLabel: inr(Number(d.dealAmount)),
+          amountLabel: money(d.dealAmountMinor),
           group: quotedDealIds.has(d.id) ? "ready" : "second",
         })),
         excludedNote: contracts.length
@@ -125,17 +126,19 @@ export function PickParentDialog({
     let fullyInvoiced = 0;
     const out: Row[] = [];
     for (const c of contracts) {
+      // Summed in MINOR units and formatted once at the end — never a running
+      // total of floats.
       const invoiced = invoices
         .filter((i) => i.contractId === c.id || i.dealId === c.dealId)
-        .reduce((s, i) => s + Number(i.dealAmount || 0), 0);
-      const remaining = Number(c.contractValue) - invoiced;
+        .reduce((s, i) => s + (i.dealAmountMinor || 0), 0);
+      const remaining = c.contractValueMinor - invoiced;
       if (remaining <= 0) { fullyInvoiced++; continue; }
       out.push({
         id: c.id,
         route: `/contracts/${c.id}`,
         title: c.brandName,
         subtitle: c.contractName,
-        amountLabel: `${inr(remaining)} remaining`,
+        amountLabel: `${money(remaining)} remaining`,
         group: isSigned(c) ? "ready" : "second",
         warn: isSigned(c) ? undefined : "Signed proof not uploaded yet",
       });
@@ -144,7 +147,7 @@ export function PickParentDialog({
       rows: out,
       excludedNote: fullyInvoiced ? `${fullyInvoiced} agreement${fullyInvoiced !== 1 ? "s" : ""} fully invoiced` : "",
     };
-  }, [kind, deals, quotes, contracts, invoices]);
+  }, [kind, deals, quotes, contracts, invoices, money]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -167,8 +170,8 @@ export function PickParentDialog({
       const c = contracts.find((x) => x.id === row.id)!;
       const invoiced = invoices
         .filter((i) => i.contractId === c.id || i.dealId === c.dealId)
-        .reduce((s, i) => s + Number(i.dealAmount || 0), 0);
-      setChosenContract({ id: c.id, dealId: c.dealId, remaining: Number(c.contractValue) - invoiced, name: c.brandName });
+        .reduce((s, i) => s + (i.dealAmountMinor || 0), 0);
+      setChosenContract({ id: c.id, dealId: c.dealId, remainingMinor: c.contractValueMinor - invoiced, name: c.brandName });
       return;
     }
     close();
@@ -219,7 +222,10 @@ export function PickParentDialog({
                   {kind === "agreement" ? "Agreements" : "Invoices"} are a Pro feature
                 </p>
                 <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
-                  Your 7-day trial unlocks the full workflow — agreements, GST-ready invoices and payment tracking.
+                  {/* "GST-ready" is India's promise and Indian accounts keep reading
+                      it; elsewhere GST is not the tax, so it is not named. */}
+                  Your 7-day trial unlocks the full workflow — agreements,{" "}
+                  {moneySettings.country === "IN" ? "GST-ready invoices" : "invoices"} and payment tracking.
                 </p>
                 <Button
                   className="mt-4 gradient-btn text-white font-semibold"
@@ -333,19 +339,20 @@ function PickGroup({ rows, onPick, label, muted }: {
 
 /** Step 2 of the invoice flow — amount mode, pre-filled from remaining value. */
 function InvoiceAmountStep({ contract, onBack, onGo }: {
-  contract: { id: number; remaining: number; name: string };
+  contract: { id: number; remainingMinor: number; name: string };
   onBack: () => void;
   onGo: (mode: "full" | "split" | "custom") => void;
 }) {
+  const { money, currency } = useMoney();
   const options = [
-    { mode: "full" as const, icon: IndianRupee, title: `Full — ${inr(contract.remaining)}`, sub: "One invoice for the remaining value" },
+    { mode: "full" as const, icon: moneyIcon(currency), title: `Full — ${money(contract.remainingMinor)}`, sub: "One invoice for the remaining value" },
     { mode: "split" as const, icon: Scissors, title: "Split — advance + final", sub: "Two invoices, percentage you choose" },
     { mode: "custom" as const, icon: FileText, title: "Custom amount", sub: "Bill a milestone or part payment" },
   ];
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{inr(contract.remaining)} remaining</DialogTitle>
+        <DialogTitle>{money(contract.remainingMinor)} remaining</DialogTitle>
         <DialogDescription>{contract.name} — how do you want to bill it?</DialogDescription>
       </DialogHeader>
       <div className="space-y-1.5">

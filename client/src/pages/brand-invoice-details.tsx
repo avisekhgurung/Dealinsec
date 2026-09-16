@@ -6,6 +6,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useIssuer } from "@/hooks/useIssuer";
+import { useMoney } from "@/hooks/use-locale";
+import { documentLocaleSettings, formatDate, makeFormatters } from "@/lib/money";
 import { memberCan } from "@shared/permissions";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -17,10 +19,15 @@ import { useUpgradeModal } from "@/components/upgrade-modal";
 import { PagedDocument, type DocBlock } from "@/components/document/paged";
 import {
   DocHeader, docFooter, SectionTitle, TwoParties, Party, KV, tableBlocks, TotalBlock,
-  SignatureCell, DocWarnings, inr, docDate,
+  SignatureCell, DocWarnings, docMoney, docDate,
 } from "@/components/document/primitives";
 import { validateDocData } from "@/components/document/checks";
+import { DocLocalePending } from "@/components/document/locale-pending";
 import { recordNo } from "@shared/schema";
+import {
+  bankRoutingLabel, formatTaxRegistration, invoiceTaxProfile, invoiceTaxTotalMinor, readInvoiceTaxLines, taxLineLabel,
+  taxRegistrations,
+} from "@shared/invoice-tax";
 import { parseApiError, isUpgradeError } from "@/lib/api-error";
 
 function slugify(s: string): string {
@@ -35,12 +42,25 @@ export default function BrandInvoiceDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const issuer = useIssuer();
+  // The ORG's locale — an issued invoice must read the same to every teammate.
+  const fmt = useMoney();
   const canRecordPayment = memberCan(user as any, "payments.manage");
 
   const { data: invoice, isLoading } = useQuery<BrandInvoice>({
     queryKey: ["/api/brand-invoices", id],
   });
+  // ...in the currency STAMPED on the invoice when it was issued, not the org's
+  // current setting, so an issued invoice keeps its currency by construction
+  // rather than only because the region locks. Every existing row was
+  // backfilled 'INR', which is what its org uses, so nothing issued changes.
+  // `docFmt` is the same formatters bound to that locale, for the prose line
+  // that names the currency.
+  const loc = documentLocaleSettings(fmt.settings, null, invoice);
+  const docFmt = makeFormatters(loc);
+  // The issuer frozen onto this invoice when it was issued, where there is
+  // one — the registration numbers under "From" are part of what was billed.
+  // Rows issued before snapshotting get the live profile, as they always have.
+  const issuer = useIssuer(invoice);
 
   const { data: deal } = useQuery<Deal>({
     queryKey: ["/api/deals", invoice?.dealId],
@@ -96,19 +116,12 @@ export default function BrandInvoiceDetailsPage() {
     },
   });
 
-  const fmt = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-
+  // Through the shared formatter, not toLocaleDateString: the period line sits
+  // on the same document as docDate()'s invoice date, and a date-only string
+  // rendered in the browser's zone lands a day early west of UTC — the two
+  // would disagree on one page. Same output as before in India.
   const fmtShort = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
+    formatDate(dateStr, loc.locale, { day: "numeric", timezone: loc.timezone });
 
   useEffect(() => {
     if (!invoice) return;
@@ -156,16 +169,30 @@ export default function BrandInvoiceDetailsPage() {
     );
   }
 
+  // Until the org's settings load, `loc` falls back to the viewer's own row —
+  // an invitee of a UK org would see India's tax labels and disclaimer.
+  if (!fmt.ready) {
+    return <DocLocalePending failed={fmt.failed} onRetry={fmt.retry} />;
+  }
+
   /* ── Amount ───────────────────────────── */
-  const totalAmount = invoice.dealAmount;
+  // dealAmountMinor is what the client owes, tax included. The tax lines are
+  // the snapshot the client was sent — never recomputed here — and every
+  // invoice issued before they existed has none, so for those the subtotal IS
+  // the total and the document is unchanged.
+  const totalAmountMinor = invoice.dealAmountMinor;
+  const taxLines = readInvoiceTaxLines(invoice);
+  const subtotalMinor = totalAmountMinor - invoiceTaxTotalMinor(taxLines);
   const lineItems: InvoiceLineItem[] = Array.isArray(invoice.lineItems) ? invoice.lineItems : [];
+
+  // How tax is presented follows the country the document prints in: which
+  // registrations appear under "From", and whose rules the disclaimer cites.
+  const taxProfile = invoiceTaxProfile(loc.country);
 
   // Supplier details come from the ORG's issuer, never the viewer — see useIssuer.
   const influencerName = issuer.name || invoice.influencerName || "—";
   const influencerEmail = issuer.email || invoice.influencerEmail || "";
   const influencerPhone = issuer.phone;
-  const influencerPan = issuer.panNumber;
-  const influencerGst = issuer.gstNumber;
   const influencerAddress = issuer.billingAddress;
   const signatureUrl = issuer.digitalSignature;
   const sealUrl = issuer.companySeal;
@@ -176,24 +203,24 @@ export default function BrandInvoiceDetailsPage() {
   const hasBankDetails = bankAccountHolder || bankAccountNumber || bankIfsc || bankName;
 
   /* ── Document blocks — one A4 page whenever the content fits ─────────── */
-  const invoiceRows: { description: string; hsnSac?: string; period?: string; qty: number; rate: number; amount: number }[] =
+  const invoiceRows: { description: string; hsnSac?: string; period?: string; qty: number; rateMinor: number; amountMinor: number }[] =
     lineItems.length > 0
       ? lineItems.map((li) => ({
           description: li.description, hsnSac: li.hsnSac,
-          qty: li.quantity, rate: li.rate, amount: li.amount,
+          qty: li.quantity, rateMinor: li.rateMinor, amountMinor: li.amountMinor,
         }))
       : [{
           // Invoices raised before the composer derive their single line from
           // the deal — appearance unchanged for documents clients already hold.
           description: deal?.dealTitle || "Professional services",
           period: deal ? `${fmtShort(deal.startDate)} – ${fmtShort(deal.endDate)}` : undefined,
-          qty: 1, rate: totalAmount, amount: totalAmount,
+          qty: 1, rateMinor: subtotalMinor, amountMinor: subtotalMinor,
         }];
 
   const docWarnings = validateDocData({
     clientName: invoice.brandName,
     sellerName: influencerName === "—" ? "" : influencerName,
-    amount: totalAmount,
+    amountMinor: totalAmountMinor,
     invoiceDate: invoice.invoiceDate,
     dueDate: invoice.dueDate,
   });
@@ -209,10 +236,10 @@ export default function BrandInvoiceDetailsPage() {
           docNo={invoice.invoiceNumber}
           status={invoice.status}
           meta={[
-            { label: "Invoice date", value: docDate(invoice.invoiceDate) },
+            { label: "Invoice date", value: docDate(invoice.invoiceDate, loc) },
             ...(invoice.status === "Paid" && (invoice as any).paidAt
-              ? [{ label: "Paid on", value: docDate((invoice as any).paidAt) }]
-              : [{ label: "Due", value: invoice.dueDate ? docDate(invoice.dueDate) : "On receipt" }]),
+              ? [{ label: "Paid on", value: docDate((invoice as any).paidAt, loc) }]
+              : [{ label: "Due", value: invoice.dueDate ? docDate(invoice.dueDate, loc) : "On receipt" }]),
             ...(invoice.invoiceType && invoice.invoiceType !== "full"
               ? [{ label: "Type", value: invoice.invoiceType === "advance" ? "Advance" : "Final" }]
               : []),
@@ -232,8 +259,7 @@ export default function BrandInvoiceDetailsPage() {
                 influencerAddress,
                 influencerEmail,
                 influencerPhone,
-                influencerPan && `PAN: ${influencerPan}`,
-                influencerGst && `GSTIN: ${influencerGst}`,
+                ...taxRegistrations(taxProfile, issuer).map(formatTaxRegistration),
               ]}
             />
           }
@@ -274,17 +300,26 @@ export default function BrandInvoiceDetailsPage() {
             </div>
           )
         : ci === 2 ? <span className="doc-num">{r.qty}</span>
-        : ci === 3 ? inr(r.rate)
-        : <span style={{ fontWeight: 600 }}>{inr(r.amount)}</span>,
+        : ci === 3 ? docMoney(r.rateMinor, loc)
+        : <span style={{ fontWeight: 600 }}>{docMoney(r.amountMinor, loc)}</span>,
     }),
     {
       key: "total",
       node: (
         <TotalBlock
           label="Total amount due"
-          amount={totalAmount}
-          note="Contract value — no GST computation. Not a tax invoice under Rule 46 of the CGST Rules, 2017."
-          ledger={invoiceRows.length > 1 ? [{ label: "Subtotal", value: inr(totalAmount) }] : []}
+          amountMinor={totalAmountMinor}
+          note={taxLines.length > 0 ? taxProfile.taxNote : taxProfile.noTaxNote}
+          ledger={
+            taxLines.length > 0
+              ? [
+                  { label: "Subtotal", value: docMoney(subtotalMinor, loc) },
+                  ...taxLines.map((t) => ({ label: taxLineLabel(t, loc.locale), value: docMoney(t.amountMinor, loc) })),
+                ]
+              // No tax row at all when there is no tax — a "Tax: 0%" line
+              // reads as a registration the issuer may not have.
+              : invoiceRows.length > 1 ? [{ label: "Subtotal", value: docMoney(totalAmountMinor, loc) }] : []
+          }
         />
       ),
     },
@@ -297,7 +332,7 @@ export default function BrandInvoiceDetailsPage() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "4mm" }}>
                 {bankAccountHolder && <KV label="Account holder" strong>{bankAccountHolder}</KV>}
                 {bankAccountNumber && <KV label="Account number" strong><span className="doc-mono" style={{ fontSize: "9pt" }}>{bankAccountNumber}</span></KV>}
-                {bankIfsc && <KV label="IFSC" strong><span className="doc-mono" style={{ fontSize: "9pt" }}>{bankIfsc}</span></KV>}
+                {bankIfsc && <KV label={bankRoutingLabel(loc.country)} strong><span className="doc-mono" style={{ fontSize: "9pt" }}>{bankIfsc}</span></KV>}
                 {bankName && <KV label="Bank" strong>{bankName}</KV>}
               </div>
             </div>
@@ -315,9 +350,12 @@ export default function BrandInvoiceDetailsPage() {
           <div>
             <div className="doc-label" style={{ marginBottom: "1.5mm" }}>Payment terms</div>
             <ul className="doc-small doc-muted-t" style={{ margin: 0, paddingLeft: "5mm", listStyleType: "disc", display: "grid", gap: "1mm" }}>
-              <li>{invoice.dueDate ? <>Payment due by <strong>{docDate(invoice.dueDate)}</strong></> : "Payment due within 30 days of invoice date"}</li>
+              <li>{invoice.dueDate ? <>Payment due by <strong>{docDate(invoice.dueDate, loc)}</strong></> : "Payment due within 30 days of invoice date"}</li>
               <li>Please quote invoice number <strong>{invoice.invoiceNumber}</strong> with your payment</li>
-              <li>All amounts are in Indian Rupees (₹ / INR)</li>
+              {/* Name, glyph and code — issued invoices read "Indian Rupees
+                  (₹ / INR)" and must re-render unchanged. The glyph is dropped
+                  where it IS the code (CHF), rather than printing it twice. */}
+              <li>{`All amounts are in ${docFmt.currencyName} (${docFmt.symbol === docFmt.currency ? docFmt.currency : `${docFmt.symbol} / ${docFmt.currency}`})`}</li>
             </ul>
             {invoice.notes && (
               <p className="doc-small doc-muted-t" style={{ marginTop: "2mm", whiteSpace: "pre-wrap" }}>
@@ -328,7 +366,7 @@ export default function BrandInvoiceDetailsPage() {
           <SignatureCell
             heading="Authorised signatory"
             name={influencerName}
-            date={docDate(invoice.invoiceDate)}
+            date={docDate(invoice.invoiceDate, loc)}
             signatureUrl={signatureUrl || null}
             sealUrl={sealUrl || null}
             note="Valid without signature"
@@ -370,7 +408,7 @@ export default function BrandInvoiceDetailsPage() {
         {/* ─────────────────── INVOICE DOCUMENT ─────────────────── */}
         <main className="px-4 py-6 max-w-2xl lg:max-w-4xl mx-auto animate-fade-in">
           <DocWarnings warnings={docWarnings} />
-          <PagedDocument blocks={docBlocks} footer={docFooter(invoice.invoiceNumber)} />
+          <PagedDocument blocks={docBlocks} locale={loc} footer={docFooter(invoice.invoiceNumber)} />
 
 
           {/* ── Tax documents (GST / TDS / receipts) ─ hidden in print ── */}
@@ -421,8 +459,10 @@ export default function BrandInvoiceDetailsPage() {
                         title: "Mark this invoice unpaid?",
                         description: (
                           <>
-                            {invoice.invoiceNumber} goes back to Unpaid and its
-                            ₹{Number(invoice.dealAmount || 0).toLocaleString("en-IN")} returns to your
+                            {/* The {" "} is load-bearing: JSX drops a line break
+                                between text and an expression, which printed "its₹65,000". */}
+                            {invoice.invoiceNumber} goes back to Unpaid and its{" "}
+                            {docFmt.money(invoice.dealAmountMinor)} returns to your
                             outstanding total. Use this if you marked it paid by mistake — the change is
                             recorded in your activity log either way.
                           </>

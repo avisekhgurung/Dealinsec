@@ -2,8 +2,11 @@
  * Generates the business-document PDFs exactly the way a user does — Chrome's
  * print engine against the running dev server — and reports page geometry.
  *
- * Usage:
- *   npx tsx --env-file=.env script/pdf-shot.mts '<ids-json-from-pdf-scenarios>' <outdir>
+ * Usage (after seeding with pdf-scenarios.mts, with the dev server started on
+ * the same LOCAL database — the `dealinsec-local-db` launch config):
+ *   npx tsx script/pdf-shot.mts '<ids-json-from-pdf-scenarios>' <outdir>
+ * No --env-file: this script never touches a database itself, and `.env`
+ * points at the Neon database production shares.
  *
  * Produces <outdir>/<name>.pdf plus a geometry report (page count + size in
  * points per page; A4 = 595.28 × 841.89pt). Visual inspection happens by

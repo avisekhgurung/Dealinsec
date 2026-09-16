@@ -14,6 +14,7 @@ import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components
 import { PickParentDialog } from "@/components/pick-parent-dialog";
 import { memberCan } from "@shared/permissions";
 import { useAuth } from "@/hooks/useAuth";
+import { useMoney, type MoneyFormat } from "@/hooks/use-locale";
 import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table/data-table";
@@ -22,10 +23,12 @@ import type { Contract, Deal } from "@shared/schema";
 
 type FilterType = "all" | "active" | "completed";
 
-const fmtDate = (s: string) =>
-  new Date(s).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+const fmtDate = (s: string, locale: string) =>
+  new Date(s).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" });
 
-const columns: ColumnDef<Contract>[] = [
+// A factory, not a constant: money and dates now need the org's currency and
+// locale, which only a hook can supply.
+const makeColumns = (fmt: MoneyFormat): ColumnDef<Contract>[] => [
   {
     id: "agreementNo",
     header: "Agreement No.",
@@ -48,22 +51,24 @@ const columns: ColumnDef<Contract>[] = [
     cell: ({ row }) => <span className="text-muted-foreground">{row.original.brandName}</span>,
   },
   {
-    accessorKey: "contractValue",
+    accessorKey: "contractValueMinor",
     header: "Value",
-    meta: { label: "Value", align: "right", exportValue: (c) => c.contractValue },
-    cell: ({ row }) => <span className="font-semibold text-primary tabular-nums">₹{row.original.contractValue.toLocaleString("en-IN")}</span>,
+    // CSV keeps exporting MAJOR units — the file users reconcile against must
+    // not silently become 100x larger.
+    meta: { label: "Value", align: "right", exportValue: (c) => fmt.major(c.contractValueMinor) },
+    cell: ({ row }) => <span className="font-semibold text-primary tabular-nums">{fmt.money(row.original.contractValueMinor)}</span>,
   },
   {
     accessorKey: "startDate",
     header: "Start",
     meta: { label: "Start", exportValue: (c) => c.startDate },
-    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.startDate)}</span>,
+    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.startDate, fmt.locale)}</span>,
   },
   {
     accessorKey: "endDate",
     header: "End",
     meta: { label: "End", exportValue: (c) => c.endDate },
-    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.endDate)}</span>,
+    cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.endDate, fmt.locale)}</span>,
   },
   {
     id: "exclusive",
@@ -102,6 +107,8 @@ export default function ContractsPage() {
   const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME);
   const [pickOpen, setPickOpen] = useState(false);
   const { user } = useAuth();
+  const fmt = useMoney();
+  const columns = useMemo(() => makeColumns(fmt), [fmt]);
   const canCreate = memberCan(user as any, "agreements.create");
   const [, setLocation] = useLocation();
 
@@ -235,7 +242,7 @@ export default function ContractsPage() {
                           </div>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
                             <Calendar className="w-3.5 h-3.5" />
-                            <span>{fmtDate(contract.startDate)} - {fmtDate(contract.endDate)}</span>
+                            <span>{fmtDate(contract.startDate, fmt.locale)} - {fmtDate(contract.endDate, fmt.locale)}</span>
                           </div>
                           <div className="flex items-center justify-between pt-3 border-t border-white/10">
                             <div className="flex items-center gap-1.5 flex-wrap">
@@ -243,7 +250,7 @@ export default function ContractsPage() {
                               {contract.proofFileName && <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 no-default-hover-elevate no-default-active-elevate"><FileCheck className="w-3 h-3 mr-1" />Proof</Badge>}
                             </div>
                             <div className="flex items-center gap-1">
-                              <span className="font-bold text-primary">₹{contract.contractValue.toLocaleString()}</span>
+                              <span className="font-bold text-primary">{fmt.money(contract.contractValueMinor)}</span>
                               <ChevronRight className="w-4 h-4 text-muted-foreground" />
                             </div>
                           </div>

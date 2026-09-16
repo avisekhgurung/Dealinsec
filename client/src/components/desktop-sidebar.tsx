@@ -45,7 +45,7 @@ import {
   TRIAL_DAYS,
 } from "@shared/schema";
 import { canSeeModule } from "@shared/permissions";
-import { usePlanPrices, formatRupees } from "@/hooks/use-plan-prices";
+import { usePlanPrices, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
 
 interface NavItem {
   path: string;
@@ -167,6 +167,9 @@ export function DesktopSidebar() {
   // Live Pro price for the trial-ended CTA (shared cached query; above the
   // auth guard so hook order is stable, but idle on marketing routes).
   const { proMonthlyPrice } = usePlanPrices({ enabled: isAuthenticated });
+  // No rupee price on the CTA where no plan can be bought yet — see
+  // usePlanCheckoutAvailable. Always true for Indian accounts.
+  const checkoutAvailable = usePlanCheckoutAvailable();
 
   // Hide sidebar entirely if not logged in (landing/onboarding/marketing routes)
   if (!isAuthenticated) return null;
@@ -204,6 +207,13 @@ export function DesktopSidebar() {
     try {
       await apiRequest("POST", "/api/auth/logout", {});
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      // Every other cached answer belonged to the account that just left. This
+      // logout stays in the tab (no reload), so without this a different
+      // account signing in within minutes read the previous one's /api/org —
+      // and useMoney() treats a cached org as `ready`, converting and printing
+      // in the wrong currency. The auth query is kept: it now says "signed
+      // out", which is what routes the tab.
+      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== "/api/auth/user" });
       setLocation("/");
     } catch {
       toast({ title: "Logout failed", description: "Please try again", variant: "destructive" });
@@ -369,7 +379,7 @@ export function DesktopSidebar() {
               Your 7-day trial has ended. Your deals and documents are safe.
             </div>
             <span className="gradient-btn block w-full text-center text-[12px] font-semibold text-white rounded-lg py-2">
-              Upgrade to Pro — {formatRupees(proMonthlyPrice)}/mo
+              {checkoutAvailable ? <>Upgrade to Pro — {formatRupees(proMonthlyPrice)}/mo</> : <>See Pro plans</>}
             </span>
           </Link>
         );

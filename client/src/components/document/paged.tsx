@@ -23,6 +23,8 @@
 import {
   useLayoutEffect, useEffect, useMemo, useRef, useState, type ReactNode,
 } from "react";
+import type { LocaleSettings } from "@shared/schema";
+import { DocLocaleProvider } from "./locale";
 import "./doc.css";
 
 export interface DocBlock {
@@ -40,11 +42,23 @@ const BLOCK_GAP_MM = 3.2;
 export function PagedDocument({
   blocks,
   footer,
+  locale,
   className = "",
 }: {
   blocks: DocBlock[];
   /** Rendered at the bottom of every sheet. Page numbers are exact. */
   footer: (page: number, total: number) => ReactNode;
+  /**
+   * The country, currency, locale and timezone this document prints in —
+   * `documentLocaleSettings(org, user)`, so the ORG's conventions win over
+   * whichever teammate opened it.
+   *
+   * Required, not defaulted. A document is not renderable until someone has
+   * said what currency it is in, and the compiler asking that question at
+   * every call site is cheaper than discovering the answer on a client's
+   * invoice.
+   */
+  locale: LocaleSettings;
   className?: string;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -142,6 +156,7 @@ export function PagedDocument({
   const pageWmm = 210;
 
   return (
+    <DocLocaleProvider settings={locale}>
     <div ref={wrapRef} className={`doc-pages doc-print-root ${className}`}>
       {/* Offscreen measurer at exact printable width */}
       <div className="doc-measurer" aria-hidden="true">
@@ -179,5 +194,6 @@ export function PagedDocument({
       </div>
       </div>
     </div>
+    </DocLocaleProvider>
   );
 }

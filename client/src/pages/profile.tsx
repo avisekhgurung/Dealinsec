@@ -9,9 +9,35 @@ import { Loader2, Upload, ArrowLeft, Edit, LogOut, CreditCard, Copy, Share2, Use
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocale, useMoney } from "@/hooks/use-locale";
 import { useLocation, Link } from "wouter";
 import { BottomNav } from "@/components/bottom-nav";
 import { hasActivePro, hasActiveTrial, hasLapsedTrial, getTrialDaysLeft } from "@shared/schema";
+import { bankRoutingLabel } from "@shared/invoice-tax";
+
+// ─── Country-specific field labels ───────────────────────────────────────────
+// India keeps PAN, GSTIN and IFSC exactly as before. Elsewhere a PAN has no
+// meaning and is hidden (never relabelled — its stored value is left alone);
+// the `gstNumber` slot holds the country's one tax registration and `ifscCode`
+// its bank routing code, under the names that country uses. Data, not a
+// branch: a country is a row, and an unlisted one gets the generic names.
+
+/** EU member states (ISO-3166 alpha-2). */
+const EU_COUNTRIES = "AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE".split(" ");
+
+/** Kept in step with contract-confirmation.tsx and contract-pdf.tsx: the
+ *  agreement prints this number under exactly this label. */
+const TAX_ID_LABELS: Readonly<Record<string, string>> = {
+  GB: "VAT number",
+  ...Object.fromEntries(EU_COUNTRIES.map((c) => [c, "VAT number"])),
+  US: "EIN / Tax ID",
+  AU: "ABN",
+  CA: "GST/HST number",
+};
+const taxIdLabel = (country: string): string => TAX_ID_LABELS[country] ?? "Tax registration number";
+
+/** Shared with the invoice, which prints this field under the same label. */
+const routingLabel = bankRoutingLabel;
 
 // ─── Account-setup stepper ───────────────────────────────────────────────────
 // Clickable progress: each step jumps STRAIGHT into edit mode at its section.
@@ -89,6 +115,11 @@ function SetupStepper({ steps, onStepClick }: {
 
 export default function ProfilePage() {
   const { user } = useAuth();
+  const { locale } = useLocale();
+  // These fields print on the ORGANISATION's documents, so they are named for
+  // the country those documents are issued in — the org's, not the member's.
+  const docCountry = useMoney().settings.country;
+  const isIndia = docCountry === "IN";
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
@@ -239,8 +270,13 @@ export default function ProfilePage() {
         firstName: firstName || null,
         lastName: lastName || null,
         phone: phone || null,
-        panNumber: panNumber ? panNumber.toUpperCase() : null,
-        gstNumber: gstNumber ? gstNumber.toUpperCase() : null,
+        // Outside India the PAN field is hidden, so it is not sent at all
+        // (undefined is dropped by JSON.stringify and the server skips the
+        // key): a field nobody can see must never be the one a save clears.
+        panNumber: isIndia ? (panNumber ? panNumber.toUpperCase() : null) : undefined,
+        // A GSTIN is upper-case by definition; another country's registration
+        // is stored as typed, the same as the agreement screen stores it.
+        gstNumber: isIndia ? (gstNumber ? gstNumber.toUpperCase() : null) : (gstNumber.trim() || null),
         billingAddress: billingAddress.trim() || null,
         accountHolderName: accountHolderName.trim() || null,
         accountNumber: accountNumber.replace(/\s/g, "") || null,
@@ -507,7 +543,9 @@ export default function ProfilePage() {
         <SetupStepper
           steps={[
             { key: "identity",  label: "Personal",      icon: User,     done: Boolean(user?.firstName && user?.phone) },
-            { key: "business",  label: "Business info", icon: Building, done: Boolean(user?.panNumber && (user as any)?.billingAddress) },
+            // Outside India there is no required tax ID (the PAN field is
+            // hidden there), so the address alone completes the step.
+            { key: "business",  label: "Business info", icon: Building, done: Boolean((isIndia ? user?.panNumber : true) && (user as any)?.billingAddress) },
             { key: "bank",      label: "Bank details",  icon: Landmark, done: Boolean((user as any)?.accountNumber && (user as any)?.ifscCode && (user as any)?.accountHolderName) },
             { key: "signature", label: "Signature",     icon: PenTool,  done: Boolean(user?.digitalSignature) },
           ]}
@@ -566,9 +604,14 @@ export default function ProfilePage() {
                 <Building className="h-4 w-4 text-primary" />
                 <div>
                   <h4 className="font-semibold text-sm">Business info</h4>
-                  <p className="text-xs text-muted-foreground">PAN &amp; billing address go on your agreements and GST invoices.</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isIndia
+                      ? <>PAN &amp; billing address go on your agreements and GST invoices.</>
+                      : "Your billing address goes on your agreements and invoices, with your tax number if you have one."}
+                  </p>
                 </div>
               </div>
+            {isIndia && (
             <div className="space-y-2">
               <Label htmlFor="panNumber">PAN Number</Label>
               <Input
@@ -580,7 +623,9 @@ export default function ProfilePage() {
                 data-testid="input-pan"
               />
             </div>
+            )}
 
+            {isIndia ? (
             <div className="space-y-2">
               <Label htmlFor="gstNumber">GST Number</Label>
               <Input
@@ -592,6 +637,22 @@ export default function ProfilePage() {
                 data-testid="input-gst"
               />
             </div>
+            ) : (
+            // Same stored field, no Indian format: no GSTIN placeholder, and no
+            // 15-character cap sized for a GSTIN that could cut another
+            // country's number short. Case is left as typed.
+            <div className="space-y-2">
+              <Label htmlFor="gstNumber">
+                {taxIdLabel(docCountry)} <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
+              <Input
+                id="gstNumber"
+                value={gstNumber}
+                onChange={(e) => setGstNumber(e.target.value)}
+                data-testid="input-gst"
+              />
+            </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="billingAddress">Billing Address</Label>
@@ -599,7 +660,9 @@ export default function ProfilePage() {
                 id="billingAddress"
                 value={billingAddress}
                 onChange={(e) => setBillingAddress(e.target.value)}
-                placeholder="Full address for invoices (street, city, state, PIN)"
+                placeholder={isIndia
+                  ? "Full address for invoices (street, city, state, PIN)"
+                  : "Full address for invoices (street, city, postcode)"}
                 rows={3}
                 data-testid="input-billing-address"
               />
@@ -628,6 +691,7 @@ export default function ProfilePage() {
 
               <div className="space-y-2">
                 <Label htmlFor="accountNumber">Account Number</Label>
+                {isIndia ? (
                 <Input
                   id="accountNumber"
                   value={accountNumber}
@@ -636,9 +700,21 @@ export default function ProfilePage() {
                   inputMode="numeric"
                   data-testid="input-account-number"
                 />
+                ) : (
+                // Letters allowed: where the routing field is an IBAN, people
+                // often put the IBAN here too, and digits-only would mangle it.
+                <Input
+                  id="accountNumber"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value.replace(/[^0-9A-Za-z]/g, ""))}
+                  placeholder="XXXXXXXXXXXX"
+                  data-testid="input-account-number"
+                />
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
+                {isIndia ? (
                 <div className="space-y-2">
                   <Label htmlFor="ifscCode">IFSC</Label>
                   <Input
@@ -650,13 +726,26 @@ export default function ProfilePage() {
                     data-testid="input-ifsc"
                   />
                 </div>
+                ) : (
+                // Same stored field. No IFSC placeholder and no 11-character
+                // cap, which would cut an IBAN off mid-number.
+                <div className="space-y-2">
+                  <Label htmlFor="ifscCode">{routingLabel(docCountry)}</Label>
+                  <Input
+                    id="ifscCode"
+                    value={ifscCode}
+                    onChange={(e) => setIfscCode(e.target.value.toUpperCase())}
+                    data-testid="input-ifsc"
+                  />
+                </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="bankName">Bank Name</Label>
                   <Input
                     id="bankName"
                     value={bankName}
                     onChange={(e) => setBankName(e.target.value)}
-                    placeholder="HDFC Bank"
+                    placeholder={isIndia ? "HDFC Bank" : "Your bank"}
                     data-testid="input-bank-name"
                   />
                 </div>
@@ -827,6 +916,7 @@ export default function ProfilePage() {
                 <h3 className="font-semibold">Business Info</h3>
               </div>
               <div className="space-y-3">
+                {isIndia && (
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                     <FileText className="h-4 w-4 text-primary" />
@@ -836,12 +926,13 @@ export default function ProfilePage() {
                     <p className="font-medium" data-testid="text-pan">{user?.panNumber || "Not set"}</p>
                   </div>
                 </div>
+                )}
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                     <FileText className="h-4 w-4 text-primary" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">GST Number</p>
+                    <p className="text-xs text-muted-foreground">{isIndia ? "GST Number" : taxIdLabel(docCountry)}</p>
                     <p className="font-medium" data-testid="text-gst">{user?.gstNumber || "Not set"}</p>
                   </div>
                 </div>
@@ -900,7 +991,7 @@ export default function ProfilePage() {
                     <FileText className="h-4 w-4 text-primary" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">IFSC</p>
+                    <p className="text-xs text-muted-foreground">{isIndia ? "IFSC" : routingLabel(docCountry)}</p>
                     <p className="font-medium font-mono" data-testid="text-ifsc">{(user as any)?.ifscCode || "Not set"}</p>
                   </div>
                 </div>
@@ -986,7 +1077,7 @@ export default function ProfilePage() {
                     </p>
                     <p className="text-sm text-white/60 mt-1">
                       {hasActivePro(user)
-                        ? `Unlimited workflow${user?.planExpiresAt ? ` · until ${new Date(user.planExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : ""}`
+                        ? `Unlimited workflow${user?.planExpiresAt ? ` · until ${new Date(user.planExpiresAt).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}` : ""}`
                         : hasActiveTrial(user)
                           ? `${getTrialDaysLeft(user) === 1 ? "Last day" : `${getTrialDaysLeft(user)} days left`} · everything unlocked`
                           : hasLapsedTrial(user)

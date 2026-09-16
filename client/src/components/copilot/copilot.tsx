@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { useMoney } from "@/hooks/use-locale";
 import { useToast } from "@/hooks/use-toast";
 
 /* ── types mirrored from server/copilot/insights.ts ── */
@@ -24,10 +25,10 @@ interface Briefing {
   greetingName: string;
   attentionCount: number;
   radar: {
-    overdue: { total: number; count: number; invoices: { id: number; brandName: string; amount: number; daysOverdue: number; invoiceNumber: string }[] };
-    dueThisWeek: { total: number; count: number; invoices: { id: number; brandName: string; amount: number; dueDate: string; invoiceNumber: string }[] };
-    readyToInvoice: { total: number; count: number; contracts: { id: number; dealId: number; brandName: string; remaining: number; contractName: string }[] };
-    collectible: number;
+    overdue: { totalMinor: number; count: number; invoices: { id: number; brandName: string; amountMinor: number; daysOverdue: number; invoiceNumber: string }[] };
+    dueThisWeek: { totalMinor: number; count: number; invoices: { id: number; brandName: string; amountMinor: number; dueDate: string; invoiceNumber: string }[] };
+    readyToInvoice: { totalMinor: number; count: number; contracts: { id: number; dealId: number; brandName: string; remainingMinor: number; contractName: string }[] };
+    collectibleMinor: number;
   };
   nextActions: { dealId: number; dealTitle: string; brandName: string; action: string; route: string; urgency: "red" | "yellow" | "green" }[];
 }
@@ -45,19 +46,23 @@ interface Msg {
   content: string;
   actions?: CopilotAction[];
   done?: boolean;
-  /** chaser draft card */
-  chaser?: { invoiceId: number; tone: string };
+  /** chaser draft card. `tones` is the retone row, as the server sent it. */
+  chaser?: { invoiceId: number; tone: string; tones: string[] };
 }
 
-const TONES = ["Friendly", "Professional", "Firm", "Final reminder", "Hinglish"] as const;
+/** Only a fallback for a response that lacks `tones`. The real list comes from
+ *  the server with every draft, because which tones exist depends on the org's
+ *  country (Hinglish is offered to Indian orgs only) and the server is what
+ *  enforces it — a second country table here would drift from that one. The
+ *  fallback is the set every country gets, so it can never offer a tone the
+ *  server would refuse. */
+const UNIVERSAL_TONES = ["Friendly", "Professional", "Firm", "Final reminder"];
 
 const LOADING_STAGES = [
   "Reviewing your active deals…",
   "Checking payment status…",
   "Totalling what's collectible…",
 ];
-
-const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -90,6 +95,7 @@ function StagedLoading() {
 
 export function Copilot() {
   const { isAuthenticated, user } = useAuth();
+  const { money } = useMoney();
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const [open, setOpen] = useState(false);
@@ -150,7 +156,11 @@ export function Copilot() {
     try {
       const res = await apiRequest("POST", "/api/copilot/chaser", { invoiceId, tone });
       const data = await res.json();
-      setMessages((cur) => [...cur, { role: "assistant", content: data.message, chaser: { invoiceId, tone } }]);
+      // Label the card with the tone the server actually drafted in — it
+      // downgrades a tone this org isn't offered to Professional.
+      const tones: string[] = Array.isArray(data.tones) ? data.tones : UNIVERSAL_TONES;
+      const drafted = typeof data.tone === "string" ? data.tone : tone;
+      setMessages((cur) => [...cur, { role: "assistant", content: data.message, chaser: { invoiceId, tone: drafted, tones } }]);
     } catch {
       setMessages((cur) => [...cur, { role: "assistant", content: "Couldn't draft that message right now — try again in a moment." }]);
     } finally {
@@ -273,7 +283,7 @@ export function Copilot() {
                   <div className="rounded-xl border border-rose-300/50 dark:border-rose-900/50 bg-rose-500/[0.05] p-3.5" data-testid="briefing-overdue">
                     <div className="flex items-center gap-2 mb-1">
                       <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
-                      <p className="text-sm font-bold text-rose-600 dark:text-rose-400 tabular-nums">{inr(radar.overdue.total)} overdue</p>
+                      <p className="text-sm font-bold text-rose-600 dark:text-rose-400 tabular-nums">{money(radar.overdue.totalMinor)} overdue</p>
                     </div>
                     {worstOverdue && (
                       <p className="text-xs text-muted-foreground mb-2.5">
@@ -298,7 +308,7 @@ export function Copilot() {
                   <div className="rounded-xl border border-emerald-300/50 dark:border-emerald-800/50 bg-emerald-500/[0.05] p-3.5" data-testid="briefing-ready">
                     <div className="flex items-center gap-2 mb-1">
                       <Receipt className="w-4 h-4 text-emerald-500 shrink-0" />
-                      <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{inr(radar.readyToInvoice.total)} ready to invoice</p>
+                      <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{money(radar.readyToInvoice.totalMinor)} ready to invoice</p>
                     </div>
                     <p className="text-xs text-muted-foreground mb-2.5">
                       {radar.readyToInvoice.count} signed agreement{radar.readyToInvoice.count !== 1 ? "s" : ""} with uninvoiced value
@@ -306,7 +316,7 @@ export function Copilot() {
                     <div className="flex flex-wrap gap-1.5">
                       {radar.readyToInvoice.contracts.slice(0, 2).map((c) => (
                         <Button key={c.id} size="sm" variant="outline" className="h-7 text-xs font-semibold border-emerald-300/60 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300" onClick={() => go(`/contracts/${c.id}`)}>
-                          {c.brandName}: {inr(c.remaining)} <ArrowRight className="w-3 h-3 ml-1" />
+                          {c.brandName}: {money(c.remainingMinor)} <ArrowRight className="w-3 h-3 ml-1" />
                         </Button>
                       ))}
                     </div>
@@ -317,7 +327,7 @@ export function Copilot() {
                   <div className="rounded-xl border border-amber-300/50 dark:border-amber-900/50 bg-amber-500/[0.05] p-3.5" data-testid="briefing-due">
                     <div className="flex items-center gap-2 mb-1">
                       <Clock className="w-4 h-4 text-amber-500 shrink-0" />
-                      <p className="text-sm font-bold text-amber-600 dark:text-amber-400 tabular-nums">{inr(radar.dueThisWeek.total)} due this week</p>
+                      <p className="text-sm font-bold text-amber-600 dark:text-amber-400 tabular-nums">{money(radar.dueThisWeek.totalMinor)} due this week</p>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {radar.dueThisWeek.invoices.slice(0, 2).map((i) => i.brandName).join(", ")}
@@ -437,7 +447,7 @@ function Bubble({ msg, onCopy, onRetone }: {
             <Button size="sm" className="h-7 text-xs font-bold gradient-btn text-white" onClick={onCopy} data-testid="chaser-copy">
               <CopyIcon className="w-3 h-3 mr-1" /> Copy
             </Button>
-            {TONES.filter((t) => t !== msg.chaser!.tone).map((t) => (
+            {msg.chaser.tones.filter((t) => t !== msg.chaser!.tone).map((t) => (
               <button key={t} type="button" onClick={() => onRetone(t)} className="text-[11px] font-medium px-2 py-1 rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors inline-flex items-center gap-1">
                 <RefreshCw className="w-2.5 h-2.5" /> {t}
               </button>

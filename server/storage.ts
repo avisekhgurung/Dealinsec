@@ -5,7 +5,7 @@ import { canonicalEmail } from "@shared/email";
 import { DEFAULT_ROLE_SEEDS } from "@shared/permissions";
 import {
   users, deals, contracts, invoices, brandInvoices, invoiceAttachments, creditTransactions, payuOrders, quotes, referrals,
-  organizations, invitations, activityLogs, orgRoles, invoiceCounters, financialYearCode,
+  organizations, invitations, activityLogs, orgRoles, invoiceCounters,
   type OrgCustomRole,
   type User, type UpsertUser,
   type Deal, type InsertDeal,
@@ -20,6 +20,7 @@ import {
   type Organization, type Invitation, type InsertInvitation,
   type ActivityLog, type InsertActivityLog
 } from "@shared/schema";
+import { formatInvoiceNumber, invoiceSeriesPeriod, resolveInvoiceSeries } from "@shared/invoice-numbering";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -266,21 +267,33 @@ export class DatabaseStorage implements IStorage {
     await db.delete(brandInvoices).where(eq(brandInvoices.id, id));
   }
 
-  /** Per-org, per-FY sequential number: INV-2627-0001. Atomic upsert, so two
-   *  simultaneous invoices can never take the same number. Falls back to the
-   *  legacy generator only if the org is unknown. */
+  /** Per-org sequential number in the org's invoice series — INV-2627-0001 for
+   *  every existing organization, INV-2026-0001 for a new one outside India. The
+   *  shape and the period are decided in shared/invoice-numbering.ts; this
+   *  method owns only the atomic upsert, so two simultaneous invoices can
+   *  never take the same number. Falls back to the legacy generator only if
+   *  the org id is missing.
+   *
+   *  The org's existing counter rows are read first because they ARE the pin:
+   *  an organization keeps numbering in the series it has already issued in,
+   *  whatever its country says today. */
   async generateOrgInvoiceNumber(orgId: string | null | undefined): Promise<string> {
     if (!orgId) return this.generateBrandInvoiceNumber();
-    const fy = financialYearCode();
+    const [org, counters] = await Promise.all([
+      this.getOrganization(orgId),
+      db.select({ key: invoiceCounters.fy }).from(invoiceCounters).where(eq(invoiceCounters.organizationId, orgId)),
+    ]);
+    const series = resolveInvoiceSeries(org, counters.map((c) => c.key));
+    const period = invoiceSeriesPeriod(series, new Date());
     const [row] = await db
       .insert(invoiceCounters)
-      .values({ organizationId: orgId, fy, lastNo: 1 })
+      .values({ organizationId: orgId, fy: period.counterKey, lastNo: 1 })
       .onConflictDoUpdate({
         target: [invoiceCounters.organizationId, invoiceCounters.fy],
         set: { lastNo: sql`${invoiceCounters.lastNo} + 1` },
       })
       .returning();
-    return `INV-${fy}-${String(row.lastNo).padStart(4, "0")}`;
+    return formatInvoiceNumber(series, period, row.lastNo);
   }
 
   async generateBrandInvoiceNumber(): Promise<string> {
