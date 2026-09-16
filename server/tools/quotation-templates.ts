@@ -22,6 +22,8 @@ interface Tpl {
   key: string;
   name: string;
   file: string;
+  /** Country-neutral copy (script/make-intl-quotation-templates.py). */
+  intlFile?: string;
   kind: "Word (.docx)" | "Excel (.xlsx)";
   bestFor: string;
   includes: string[];
@@ -34,6 +36,7 @@ const TEMPLATES: Tpl[] = [
     key: "simple",
     name: "Simple Service Quotation",
     file: "/templates/quotation-format-simple.docx",
+    intlFile: "/templates/quotation-format-simple-intl.docx",
     kind: "Word (.docx)",
     bestFor: "Any freelance project — the clean, universal format",
     includes: ["Itemised work table", "Validity & advance terms", "Amount in words", "Signature block"],
@@ -62,6 +65,7 @@ const TEMPLATES: Tpl[] = [
     key: "freelancer",
     name: "Freelancer Quotation",
     file: "/templates/quotation-format-freelancer.docx",
+    intlFile: "/templates/quotation-format-freelancer-intl.docx",
     kind: "Word (.docx)",
     bestFor: "Designers, developers, writers — compact one-pager",
     includes: ["Hourly or per-project rows", "50% advance terms", "Revision-limit clause", "Files-on-payment clause"],
@@ -77,9 +81,10 @@ const TEMPLATES: Tpl[] = [
     key: "excel",
     name: "Excel Quotation (auto-totals)",
     file: "/templates/quotation-format-excel.xlsx",
+    intlFile: "/templates/quotation-format-excel-intl.xlsx",
     kind: "Excel (.xlsx)",
     bestFor: "Spreadsheet workflows — formulas do the math",
-    includes: ["Amount = Qty × Rate formulas", "Subtotal & GST computed", "₹ number formatting", "Terms included"],
+    includes: ["Amount = Qty × Rate formulas", "Subtotal & tax computed", "India (₹) and international versions", "Terms included"],
   },
 ];
 
@@ -160,7 +165,10 @@ function cards(): string {
         <p class="tpl-best">${esc(tp.bestFor)}</p>
         <ul class="tpl-inc">${inc}</ul>
         <div class="tpl-actions">
-          <a class="btn" href="${esc(tp.file)}" download>⬇ Download free</a>
+          ${tp.intlFile
+            ? `<a class="btn" href="${esc(tp.intlFile)}" download>⬇ International</a>
+          <a class="btn" href="${esc(tp.file)}" download>⬇ India (₹)</a>`
+            : `<a class="btn" href="${esc(tp.file)}" download>⬇ Download free</a>`}
           ${online}
         </div>
       </div>
@@ -187,7 +195,7 @@ const BODY = `
 
 <section><div class="wrap">
   <h2>Template or online maker?</h2>
-  <p class="muted" style="max-width:720px">A template is perfect when you want full control in Word or Excel. The <a href="/tools/quotation-maker">free online quotation maker</a> is faster when you want the math and tax done for you, in any currency — it produces the same professional format as these files and exports straight to PDF. The Word and Excel files are laid out in rupees (₹); outside India, swap in your own currency symbol, or use the online maker. Either way, send your client a PDF, never an editable file.</p>
+  <p class="muted" style="max-width:720px">A template is perfect when you want full control in Word or Excel. The <a href="/tools/quotation-maker">free online quotation maker</a> is faster when you want the math and tax done for you, in any currency — it produces the same professional format as these files and exports straight to PDF. Each file comes in two versions: an India one in rupees (₹) with amount in words, and an international one with no currency symbol baked in, a currency line and a generic tax row. Either way, send your client a PDF, never an editable file.</p>
 </div></section>
 
 <section><div class="wrap">
