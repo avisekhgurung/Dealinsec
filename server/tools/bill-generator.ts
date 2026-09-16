@@ -9,16 +9,18 @@
  * bill, handwritten-vs-computer bill.
  *
  * Deliberately simpler than the GST invoice tool: a shop/service bill with
- * items, optional GST, amount in words and a PAID/DUE stamp. GST-heavy needs
- * funnel to the invoice generator; deal-shaped needs funnel to the app.
+ * items, optional tax (GST in India, VAT or sales tax elsewhere), amount in
+ * words for rupee bills and a PAID/DUE stamp. GST-heavy needs funnel to the
+ * invoice generator; deal-shaped needs funnel to the app.
  */
 import { renderToolPage, SITE_ORIGIN } from "./layout";
 import { COMMON_JS, ITEMS_JS, MEDIA_JS, EXPORT_JS } from "./client-lib";
+import { REGION_JS, regionFieldsHtml, intlTaxFieldsHtml } from "./region-lib";
 
 const PATH = "/tools/bill-generator";
-const TITLE = "Free Bill Generator — Create a Bill Online (India) | DealInSec";
+const TITLE = "Free Bill & Invoice Generator — Create a Bill Online | DealInSec";
 const DESC =
-  "Create a bill online free: item-wise bill with total, amount in words, optional GST, logo, signature and a PAID stamp — instant PDF, no sign-up. The online bill maker for India's freelancers and small sellers.";
+  "Create a bill online free in any currency: item-wise bill with total, optional GST, VAT or sales tax, logo, signature and a PAID stamp — instant PDF, no sign-up. The online bill maker for freelancers and small sellers.";
 
 const FAQ: { q: string; a: string }[] = [
   {
@@ -27,15 +29,15 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "How do I create a bill online?",
-    a: "Enter your business name, add a bill number and date, list the items with quantity and rate, choose GST if it applies, and download the finished bill. The preview updates live and the whole thing takes about a minute.",
+    a: "Pick your country and currency, enter your business name, add a bill number and date, list the items with quantity and rate, add GST, VAT or sales tax if it applies, and download the finished bill. The preview updates live and the whole thing takes about a minute.",
   },
   {
     q: "What is the difference between a bill and an invoice?",
-    a: "In everyday Indian usage they're the same document — a request for payment listing what was sold and for how much. 'Bill' is the common word in shops and local services; 'invoice' is the formal word in business paperwork and GST law. If you need a GST tax invoice with CGST/SGST/IGST computed and your GSTIN shown, use our free GST invoice generator.",
+    a: "For most purposes they're the same document — a request for payment listing what was sold and for how much. In India, 'bill' is the everyday word in shops and local services, while 'invoice' is the formal word in business paperwork and GST law; elsewhere most people simply say invoice. If you're GST-registered in India and need a GST tax invoice with CGST/SGST/IGST computed and your GSTIN shown, use our free GST invoice generator.",
   },
   {
     q: "Is a handwritten bill valid? Should I switch to computer bills?",
-    a: "Handwritten bills from a bill book are perfectly legal and millions of Indian businesses use them daily. The case for a computer-made bill is practical, not legal: totals are calculated for you, the bill is legible, it looks professional on WhatsApp, and you always have a copy. This tool gives you that without buying software.",
+    a: "In India, handwritten bills from a bill book are perfectly legal and millions of businesses use them daily. The case for a computer-made bill is practical, not legal: totals are calculated for you, the bill is legible, it looks professional on WhatsApp or email, and you always have a copy. This tool gives you that without buying software.",
   },
   {
     q: "Can I mark a bill as paid?",
@@ -73,13 +75,13 @@ function jsonLd(): object[] {
 const BODY = `
 <div class="hero"><div class="wrap">
   <h1>Free Online Bill Maker</h1>
-  <p class="sub">Create a bill online in under a minute — items, total, amount in words, optional GST and a PAID stamp. No sign-up, no cost.</p>
+  <p class="sub">Create a bill online in under a minute, in your own currency — items, total, optional GST, VAT or sales tax and a PAID stamp. No sign-up, no cost.</p>
   <div class="chips">
     <span class="chip">100% free</span>
     <span class="chip">No sign-up</span>
     <span class="chip">PAID / DUE stamp</span>
     <span class="chip">Instant PDF</span>
-    <span class="chip">Made for India</span>
+    <span class="chip">Any country · any currency</span>
   </div>
 </div></div>
 
@@ -88,14 +90,16 @@ const BODY = `
     <div class="card" id="form-card">
       <h2 style="font-size:18px">Bill details</h2>
 
+      ${regionFieldsHtml()}
+
       <label>Your business / shop name</label>
-      <input class="f" id="bizName" placeholder="e.g. Sharma Electricals" />
+      <input class="f" id="bizName" placeholder="e.g. Sharma Electricals" data-ph-intl="e.g. Corner Electricals" />
       <div class="row2">
-        <div><label>Phone (optional)</label><input class="f" id="bizPhone" placeholder="e.g. 98300 12345" /></div>
+        <div><label>Phone (optional)</label><input class="f" id="bizPhone" placeholder="e.g. 98300 12345" data-ph-intl="Phone, with country code" /></div>
         <div><label>Bill number</label><input class="f" id="billNo" placeholder="BILL-001" /></div>
       </div>
       <label>Address (optional)</label>
-      <textarea class="f" id="bizAddr" rows="2" placeholder="Street, City, State, PIN"></textarea>
+      <textarea class="f" id="bizAddr" rows="2" placeholder="Street, City, State, PIN" data-ph-intl="Street, city, postcode, country"></textarea>
 
       <label>Business logo (optional)</label>
       <div class="logo-preview" id="logo-preview" style="display:none"></div>
@@ -108,14 +112,14 @@ const BODY = `
 
       <div class="row2">
         <div><label>Bill date</label><input class="f" id="billDate" type="date" /></div>
-        <div><label>Customer name (optional)</label><input class="f" id="cliName" placeholder="e.g. Rahul Verma" /></div>
+        <div><label>Customer name (optional)</label><input class="f" id="cliName" placeholder="e.g. Rahul Verma" data-ph-intl="e.g. Alex Morgan" /></div>
       </div>
 
       <label>Items</label>
       <div id="items"></div>
       <button class="btn ghost" id="addItem" type="button" style="margin-top:10px">+ Add item</button>
 
-      <div class="row2" style="margin-top:16px">
+      <div class="row2" id="tax-in" style="margin-top:16px">
         <div>
           <label>GST rate</label>
           <select class="f" id="gstRate">
@@ -133,6 +137,7 @@ const BODY = `
           </select>
         </div>
       </div>
+      ${intlTaxFieldsHtml()}
 
       <div class="row2" style="margin-top:4px">
         <div>
@@ -167,17 +172,17 @@ const BODY = `
 <section><div class="wrap">
   <h2>How to create a bill online</h2>
   <div class="steps">
-    <div class="step"><div class="n">1</div><b>Add your details</b><p class="muted">Business name, bill number, date — and the customer's name if you want it on the bill.</p></div>
-    <div class="step"><div class="n">2</div><b>List the items</b><p class="muted">Description, quantity and rate — the total and amount in words are calculated for you.</p></div>
+    <div class="step"><div class="n">1</div><b>Add your details</b><p class="muted">Country and currency, business name, bill number, date — and the customer's name if you want it on the bill.</p></div>
+    <div class="step"><div class="n">2</div><b>List the items</b><p class="muted">Description, quantity and rate — the total (and, on rupee bills, the amount in words) is calculated for you.</p></div>
     <div class="step"><div class="n">3</div><b>Download &amp; share</b><p class="muted">Save the bill as a PDF or PNG, print it, or share it straight to WhatsApp.</p></div>
   </div>
 </div></section>
 
 <section><div class="wrap">
   <h2>Handwritten bill vs computer-made bill</h2>
-  <p class="muted" style="max-width:720px">The bill book is not broken — handwritten bills are legal and half of India runs on them. But a computer-made bill fixes the four things that go wrong with handwriting:</p>
+  <p class="muted" style="max-width:720px">The bill book is not broken — in India, handwritten bills are legal and plenty of shops still run on them. But wherever you are, a computer-made bill fixes the four things that go wrong with handwriting:</p>
   <ul style="max-width:720px;color:var(--ink)">
-    <li><b>The math is done for you</b> — no totalling mistakes at a busy counter, and the amount in words is generated automatically.</li>
+    <li><b>The math is done for you</b> — no totalling mistakes at a busy counter, and on rupee bills the amount in words is generated automatically.</li>
     <li><b>Everyone can read it</b> — customers, your accountant, and you, three months later.</li>
     <li><b>It shares cleanly</b> — a crisp PDF or image on WhatsApp instead of a photo of a carbon copy.</li>
     <li><b>You always have a copy</b> — the bill book's carbon page fades; a file doesn't.</li>
@@ -187,7 +192,7 @@ const BODY = `
 
 <section><div class="wrap">
   <h2>Need a GST invoice instead?</h2>
-  <p class="muted" style="max-width:720px">A simple bill is fine for counter sales and everyday services. If you're GST-registered and the buyer needs to claim input credit, issue a proper tax invoice with CGST/SGST/IGST computed and your GSTIN shown — our <a href="/tools/gst-invoice-generator">free GST invoice generator</a> does that, also without a sign-up. And if you freelance — quotation first, then a signed agreement, then the invoice — that's what <a href="/">DealInSec</a> itself is for.</p>
+  <p class="muted" style="max-width:720px">A simple bill is fine for counter sales and everyday services. This one is for GST-registered sellers in India: if the buyer needs to claim input credit, issue a proper tax invoice with CGST/SGST/IGST computed and your GSTIN shown — our <a href="/tools/gst-invoice-generator">free GST invoice generator</a> does that, also without a sign-up. Outside India, pick your country above and add your VAT or sales tax right on this bill. And if you freelance — quotation first, then a signed agreement, then the invoice — that's what <a href="/">DealInSec</a> itself is for.</p>
 </div></section>
 
 <section><div class="wrap faq">
@@ -198,20 +203,22 @@ const BODY = `
 
 const PAGE_JS = `
   var STORE='dis_bill_v1';
+  var RG=initRegion(function(){ render(); save(); });
   var IT=initItems(function(){ render(); save(); });
   var LOGO=initLogo('logo-input','logo-preview',function(){ render(); save(); });
   var SIG=initSignature('sig-pad',function(){ render(); save(); });
   var EX=initExport(function(){ return $('invoice-preview'); }, function(){ return $('billNo').value||'Bill'; });
   initBranding(function(){ render(); });
   var LASTTOTAL=0;
-  function saveData(){ return { type:'bill', docNumber:$('billNo').value, partyName:$('cliName').value, total:LASTTOTAL, payload:collect() }; }
+  function saveData(){ return { type:'bill', docNumber:$('billNo').value, partyName:$('cliName').value, total:LASTTOTAL, currency:REG.cur, payload:collect() }; }
 
   function collect(){
     return {
       bizName:$('bizName').value, bizPhone:$('bizPhone').value, bizAddr:$('bizAddr').value,
       billNo:$('billNo').value, billDate:$('billDate').value, cliName:$('cliName').value,
       gstRate:$('gstRate').value, taxType:$('taxType').value, payStatus:$('payStatus').value,
-      notes:$('notes').value, items:IT.get(), logo:LOGO.get(), sig:SIG.get()
+      notes:$('notes').value, items:IT.get(), logo:LOGO.get(), sig:SIG.get(),
+      country:REG.cc, currency:REG.cur, taxName:$('taxName').value, taxPct:$('taxPct').value
     };
   }
   function save(){ try{ localStorage.setItem(STORE, JSON.stringify(collect())); }catch(e){} }
@@ -226,12 +233,17 @@ const PAGE_JS = `
         '<td style="padding:7px 8px;border-bottom:1px solid #EEF2F6;text-align:right">'+money(amt)+'</td></tr>';
     }).join('');
     subtotal=round2(subtotal);
+    var isIN=REG.cc==='IN';
     var rate=num($('gstRate').value), taxType=$('taxType').value;
-    var taxTotal=round2(subtotal*rate/100);
+    var it=intlTax(subtotal);
+    var taxTotal=isIN ? round2(subtotal*rate/100) : it.amount;
+    var hasTax=isIN ? rate>0 : it.rate>0;
     var total=round2(subtotal+taxTotal);
     LASTTOTAL=total;
     var taxRows='';
-    if(rate>0){
+    if(!isIN){
+      if(it.rate>0) taxRows='<tr><td colspan="3" style="padding:5px 8px;text-align:right;color:#64748B">'+esc(it.label)+'</td><td style="padding:5px 8px;text-align:right">'+money(taxTotal)+'</td></tr>';
+    }else if(rate>0){
       if(taxType==='igst'){
         taxRows='<tr><td colspan="3" style="padding:5px 8px;text-align:right;color:#64748B">IGST ('+rate+'%)</td><td style="padding:5px 8px;text-align:right">'+money(taxTotal)+'</td></tr>';
       }else{
@@ -269,27 +281,28 @@ const PAGE_JS = `
           '<th style="padding:8px;text-align:right;border-radius:0 8px 0 0">Amount</th>'+
         '</tr></thead><tbody>'+(rows||'<tr><td colspan="4" style="padding:14px;text-align:center;color:#94A3B8">Add an item to begin</td></tr>')+'</tbody>'+
         '<tfoot>'+
-          (rate>0?'<tr><td colspan="3" style="padding:8px;text-align:right;color:#64748B">Subtotal</td><td style="padding:8px;text-align:right">'+money(subtotal)+'</td></tr>':'')+
+          (hasTax?'<tr><td colspan="3" style="padding:8px;text-align:right;color:#64748B">Subtotal</td><td style="padding:8px;text-align:right">'+money(subtotal)+'</td></tr>':'')+
           taxRows+
           '<tr><td colspan="3" style="padding:10px 8px;text-align:right;font-weight:800;font-size:15px">Total</td><td style="padding:10px 8px;text-align:right;font-weight:800;font-size:15px;color:#0E8C5A">'+money(total)+'</td></tr>'+
         '</tfoot>'+
       '</table>'+
-      '<div style="margin-top:10px;font-size:12px;color:#475569"><b>Amount in words:</b> '+esc(words(total))+'</div>'+
+      wordsLine(total)+
       ($('notes').value?'<div style="margin-top:12px;padding-top:10px;border-top:1px dashed #E2E8F0;font-size:12px;color:#475569;white-space:pre-line">'+esc($('notes').value)+'</div>':'')+
       (SIG.get()?'<div style="margin-top:26px;display:flex;justify-content:flex-end"><div style="text-align:center;min-width:180px"><img src="'+SIG.get()+'" alt="signature" style="max-height:58px;max-width:190px;object-fit:contain" /><div style="border-top:1px solid #94A3B8;margin-top:2px;padding-top:4px;font-size:12px;font-weight:600;color:#0F172A">'+esc(bn)+'</div><div style="font-size:10px;color:#94A3B8">Authorised Signatory</div></div></div>':'')+
       brandFooter();
     $('invoice-preview').innerHTML=html;
   }
 
-  ['bizName','bizPhone','bizAddr','billNo','billDate','cliName','gstRate','taxType','payStatus','notes'].forEach(function(id){
+  ['bizName','bizPhone','bizAddr','billNo','billDate','cliName','gstRate','taxType','taxName','taxPct','payStatus','notes'].forEach(function(id){
     $(id).addEventListener('input',function(){ render(); save(); });
   });
   $('sig-upload').addEventListener('change',function(e){ SIG.upload(e.target.files && e.target.files[0]); e.target.value=''; });
   $('sig-clear').addEventListener('click',function(){ SIG.clear(); });
   $('reset').addEventListener('click',function(){
     try{localStorage.removeItem(STORE);}catch(e){}
-    ['bizName','bizPhone','bizAddr','billNo','billDate','cliName','notes'].forEach(function(id){$(id).value='';});
+    ['bizName','bizPhone','bizAddr','billNo','billDate','cliName','taxName','taxPct','notes'].forEach(function(id){$(id).value='';});
     $('gstRate').value='0'; $('taxType').value='cgst_sgst'; $('payStatus').value='';
+    RG.reset();
     LOGO.clear(); SIG.clear();
     IT.set([]); IT.render(); render(); save();
   });
@@ -297,11 +310,13 @@ const PAGE_JS = `
 
   var saved=null; try{ saved=JSON.parse(localStorage.getItem(STORE)||'null'); }catch(e){}
   if(saved){
-    ['bizName','bizPhone','bizAddr','billNo','billDate','cliName','gstRate','taxType','payStatus','notes'].forEach(function(id){ if(saved[id]!=null)$(id).value=saved[id]; });
+    ['bizName','bizPhone','bizAddr','billNo','billDate','cliName','gstRate','taxType','taxName','taxPct','payStatus','notes'].forEach(function(id){ if(saved[id]!=null)$(id).value=saved[id]; });
+    RG.set(saved.country, saved.currency);
     if(saved.logo)LOGO.set(saved.logo);
     if(saved.sig)SIG.set(saved.sig);
     IT.set(saved.items);
   }else{
+    RG.set();
     IT.set([{desc:'',qty:1,rate:0}]);
   }
   IT.render(); render();
@@ -314,7 +329,7 @@ export function billGeneratorPage(): string {
     canonicalPath: PATH,
     jsonLd: jsonLd(),
     bodyHtml: BODY,
-    bodyEndScripts: "<script>(function(){" + COMMON_JS + MEDIA_JS + EXPORT_JS + ITEMS_JS + PAGE_JS + "})();</script>",
+    bodyEndScripts: "<script>(function(){" + COMMON_JS + REGION_JS + MEDIA_JS + EXPORT_JS + ITEMS_JS + PAGE_JS + "})();</script>",
   });
 }
 
@@ -322,5 +337,5 @@ export const billGeneratorMeta = {
   slug: "bill-generator",
   path: PATH,
   title: "Free Bill Generator",
-  blurb: "Create a bill online in a minute — items, total, amount in words, optional GST and a PAID stamp. Free, no sign-up.",
+  blurb: "Create a bill online in a minute, in any currency — items, total, optional tax and a PAID stamp. Free, no sign-up.",
 };

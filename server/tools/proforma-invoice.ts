@@ -1,36 +1,38 @@
 /**
  * Free Proforma Invoice Generator — reuses the invoice rendering with proforma
- * framing (a preliminary bill / advance estimate, NOT a GST tax invoice). Strong
- * funnel: once the deal is confirmed, "convert" to a real GST tax invoice.
+ * framing (a preliminary bill / advance estimate, NOT a tax invoice). Strong
+ * funnel: once the deal is confirmed, "convert" to a real invoice (a GST tax
+ * invoice in India).
  */
 import { renderToolPage, SITE_ORIGIN } from "./layout";
 import { COMMON_JS, ITEMS_JS, MEDIA_JS, EXPORT_JS } from "./client-lib";
+import { REGION_JS, regionFieldsHtml, intlTaxFieldsHtml } from "./region-lib";
 
 const PATH = "/tools/proforma-invoice-generator";
-const TITLE = "Free Proforma Invoice Generator (India) — Download PDF | DealInSec";
+const TITLE = "Free Proforma Invoice Generator — Download PDF | DealInSec";
 const DESC =
-  "Create a professional proforma invoice online free. GST-ready format, amount in words, validity date, instant PDF — no sign-up. Made for India's freelancers.";
+  "Create a professional proforma invoice online free, in any currency. Optional GST, VAT or sales tax, validity date and an instant PDF — no sign-up. Made for freelancers.";
 
 const FAQ: { q: string; a: string }[] = [
   {
     q: "What is a proforma invoice?",
-    a: "A proforma invoice is a preliminary bill of sale sent to a buyer before the goods or services are supplied. It states the items, quantities, prices and estimated taxes so the buyer can arrange payment or approval. It is not a demand for payment and is not a valid GST tax invoice.",
+    a: "A proforma invoice is a preliminary bill of sale sent to a buyer before the goods or services are supplied. It states the items, quantities, prices and estimated taxes so the buyer can arrange payment or approval. It is not a demand for payment and is not a tax invoice — in India, for example, it is not a valid GST tax invoice.",
   },
   {
     q: "How is a proforma invoice different from a tax invoice?",
-    a: "A proforma invoice is an estimate issued before a sale to confirm price and terms; it does not create a tax liability. A GST tax invoice is issued after the sale is agreed and is the legal document used to claim input tax credit. Once your deal is confirmed, convert the proforma into a proper GST invoice.",
+    a: "A proforma invoice is an estimate issued before a sale to confirm price and terms. The tax invoice is issued once the sale is agreed and is the document buyers rely on to reclaim tax — in India, the GST tax invoice is what the buyer uses to claim input tax credit, and in VAT countries the VAT invoice plays the same role. Once your deal is confirmed, convert the proforma into a proper invoice.",
   },
   {
     q: "When should I use a proforma invoice?",
-    a: "Use it to confirm a firm price before you start, request an advance, or help a client's accounts team raise a purchase order. It signals intent to supply on stated terms without triggering GST until the actual invoice is raised.",
+    a: "Use it to confirm a firm price before you start, request an advance, or help a client's accounts team raise a purchase order. It signals intent to supply on stated terms; the tax itself goes on the actual invoice you raise once the order is confirmed.",
   },
   {
     q: "Is this proforma invoice generator free?",
     a: "Yes. Create and download unlimited proforma invoices as PDFs for free, with no sign-up. Everything is built in your browser and never sent to our servers.",
   },
   {
-    q: "Can I turn a proforma into a real GST invoice?",
-    a: "Yes — once the client confirms, use our free GST Invoice Generator for the tax invoice. And if you would rather keep a client's quotation, agreement, invoice and payments together instead of as loose files, that is what DealInSec does: one thread per deal.",
+    q: "Can I turn a proforma into a real invoice?",
+    a: "Yes — once the client confirms, use our free bill and invoice generator for the final invoice, or, if you are GST-registered in India, our free GST Invoice Generator for the tax invoice. And if you would rather keep a client's quotation, agreement, invoice and payments together instead of as loose files, that is what DealInSec does: one thread per deal.",
   },
 ];
 
@@ -64,13 +66,13 @@ function jsonLd(): object[] {
 const BODY = `
 <div class="hero"><div class="wrap">
   <h1>Free Proforma Invoice Generator</h1>
-  <p class="sub">Send a professional proforma invoice to confirm price and terms before the sale. GST-ready format, validity date, amount in words and an instant PDF — no sign-up, no cost.</p>
+  <p class="sub">Send a professional proforma invoice to confirm price and terms before the sale, in your own currency. Optional GST, VAT or sales tax, validity date and an instant PDF — no sign-up, no cost.</p>
   <div class="chips">
     <span class="chip">100% free</span>
     <span class="chip">No sign-up</span>
-    <span class="chip">GST-ready format</span>
+    <span class="chip">GST, VAT or sales tax</span>
     <span class="chip">Instant PDF</span>
-    <span class="chip">Made for India</span>
+    <span class="chip">Any country · any currency</span>
   </div>
 </div></div>
 
@@ -80,14 +82,16 @@ const BODY = `
     <div class="card" id="form-card">
       <h2 style="font-size:18px">Proforma details</h2>
 
+      ${regionFieldsHtml()}
+
       <label>Your business name</label>
       <input class="f" id="bizName" placeholder="e.g. Sunrise Studios" />
       <div class="row2">
-        <div><label>Your GSTIN (optional)</label><input class="f" id="bizGstin" placeholder="e.g. 07AABCU9603R1ZM" /></div>
+        <div data-taxid-wrap><label for="bizGstin" data-taxid-label>Your GSTIN (optional)</label><input class="f" id="bizGstin" data-taxid-input placeholder="e.g. 07AABCU9603R1ZM" /></div>
         <div><label>Proforma number</label><input class="f" id="invNo" placeholder="PI-001" /></div>
       </div>
       <label>Your address</label>
-      <textarea class="f" id="bizAddr" rows="2" placeholder="Street, City, State, PIN"></textarea>
+      <textarea class="f" id="bizAddr" rows="2" placeholder="Street, City, State, PIN" data-ph-intl="Street, city, postcode, country"></textarea>
 
       <label>Business logo (optional)</label>
       <div class="logo-preview" id="logo-preview" style="display:none"></div>
@@ -99,13 +103,13 @@ const BODY = `
       <hr style="border:none;border-top:1px solid var(--line);margin:18px 0" />
 
       <label>For (client name)</label>
-      <input class="f" id="cliName" placeholder="e.g. Nova Coaching Pvt Ltd" />
+      <input class="f" id="cliName" placeholder="e.g. Nova Coaching Pvt Ltd" data-ph-intl="e.g. Nova Coaching Ltd" />
       <div class="row2">
-        <div><label>Client GSTIN (optional)</label><input class="f" id="cliGstin" placeholder="Client GSTIN" /></div>
+        <div data-taxid-wrap><label for="cliGstin">Client <span data-taxid-label>GSTIN (optional)</span></label><input class="f" id="cliGstin" placeholder="Client GSTIN" data-ph-intl="Client tax ID" /></div>
         <div><label>Proforma date</label><input class="f" id="invDate" type="date" /></div>
       </div>
       <div class="row2">
-        <div><label>Client address</label><textarea class="f" id="cliAddr" rows="2" placeholder="Client street, city, state, PIN"></textarea></div>
+        <div><label>Client address</label><textarea class="f" id="cliAddr" rows="2" placeholder="Client street, city, state, PIN" data-ph-intl="Client street, city, postcode, country"></textarea></div>
         <div><label>Valid until (optional)</label><input class="f" id="validUntil" type="date" /></div>
       </div>
 
@@ -115,7 +119,7 @@ const BODY = `
       <div id="items"></div>
       <button class="btn ghost" id="addItem" type="button" style="margin-top:10px">+ Add item</button>
 
-      <div class="row2" style="margin-top:16px">
+      <div class="row2" id="tax-in" style="margin-top:16px">
         <div>
           <label>GST rate (estimated)</label>
           <select class="f" id="gstRate">
@@ -133,6 +137,7 @@ const BODY = `
           </select>
         </div>
       </div>
+      ${intlTaxFieldsHtml()}
 
       <label>Notes / terms (optional)</label>
       <textarea class="f" id="notes" rows="2" placeholder="e.g. 50% advance to confirm order. Prices valid for 15 days."></textarea>
@@ -162,8 +167,8 @@ const BODY = `
 <section><div class="wrap">
   <h2>How to create a proforma invoice</h2>
   <div class="steps">
-    <div class="step"><div class="n">1</div><b>Add details</b><p class="muted">Enter your business, your client, and a proforma number and date.</p></div>
-    <div class="step"><div class="n">2</div><b>Add items &amp; estimated GST</b><p class="muted">List what you'll supply, then pick the estimated GST rate and tax type.</p></div>
+    <div class="step"><div class="n">1</div><b>Add details</b><p class="muted">Pick your country and currency, then enter your business, your client, and a proforma number and date.</p></div>
+    <div class="step"><div class="n">2</div><b>Add items &amp; estimated tax</b><p class="muted">List what you'll supply, then add the estimated GST, VAT or sales tax.</p></div>
     <div class="step"><div class="n">3</div><b>Send it</b><p class="muted">Download the PDF and share it. When the client confirms, raise a tax invoice.</p></div>
   </div>
 </div></section>
@@ -171,7 +176,7 @@ const BODY = `
 <section><div class="wrap">
   <div class="card">
     <h2>Proforma invoice vs tax invoice</h2>
-    <p class="muted">A proforma invoice is a good-faith estimate you send <b>before</b> a sale is finalised — it confirms the items, prices and terms so a buyer can approve the order, arrange an advance or raise a purchase order. It does not create a GST liability and cannot be used to claim input tax credit. A <b>GST tax invoice</b> is issued <b>after</b> the sale is agreed and is the legal document for the transaction. This generator produces a clean, professional proforma; once your client confirms, convert it into a proper GST invoice.</p>
+    <p class="muted">A proforma invoice is a good-faith estimate you send <b>before</b> a sale is finalised — it confirms the items, prices and terms so a buyer can approve the order, arrange an advance or raise a purchase order. It is not a tax invoice — in India, for example, it does not create a GST liability and cannot be used to claim input tax credit. A <b>tax invoice</b> (a GST tax invoice in India, a VAT invoice in VAT countries) is issued <b>after</b> the sale is agreed and is the formal record of the transaction. This generator produces a clean, professional proforma; once your client confirms, convert it into a proper invoice.</p>
   </div>
 </div></section>
 
@@ -183,18 +188,19 @@ const BODY = `
 
 const PAGE_JS = `
   var STORE='dis_proforma_v1';
+  var RG=initRegion(function(){ render(); save(); });
   var IT=initItems(function(){ render(); save(); });
   var LOGO=initLogo('logo-input','logo-preview',function(){ render(); save(); });
   var SIG=initSignature('sig-pad',function(){ render(); save(); });
   var EX=initExport(function(){ return $('invoice-preview'); }, function(){ return $('invNo').value||'Proforma'; });
   initBranding(function(){ render(); });
   var LASTTOTAL=0;
-  function saveData(){ return { type:'proforma', docNumber:$('invNo').value, partyName:$('cliName').value, total:LASTTOTAL, payload:collect() }; }
+  function saveData(){ return { type:'proforma', docNumber:$('invNo').value, partyName:$('cliName').value, total:LASTTOTAL, currency:REG.cur, payload:collect() }; }
 
-  var FIELDS=['bizName','bizGstin','bizAddr','invNo','cliName','cliGstin','cliAddr','invDate','validUntil','gstRate','taxType','notes','sigName'];
+  var FIELDS=['bizName','bizGstin','bizAddr','invNo','cliName','cliGstin','cliAddr','invDate','validUntil','gstRate','taxType','taxName','taxPct','notes','sigName'];
 
   function collect(){
-    var o={ items:IT.get(), logo:LOGO.get(), sig:SIG.get() };
+    var o={ items:IT.get(), logo:LOGO.get(), sig:SIG.get(), country:REG.cc, currency:REG.cur };
     FIELDS.forEach(function(id){ o[id]=$(id).value; });
     return o;
   }
@@ -210,12 +216,16 @@ const PAGE_JS = `
         '<td style="padding:7px 8px;border-bottom:1px solid #EEF2F6;text-align:right">'+money(amt)+'</td></tr>';
     }).join('');
     subtotal=round2(subtotal);
+    var isIN=REG.cc==='IN';
     var rate=num($('gstRate').value), taxType=$('taxType').value;
-    var taxTotal=round2(subtotal*rate/100);
+    var it=intlTax(subtotal);
+    var taxTotal=isIN ? round2(subtotal*rate/100) : it.amount;
     var total=round2(subtotal+taxTotal);
     LASTTOTAL=total;
     var taxRows='';
-    if(rate>0){
+    if(!isIN){
+      if(it.rate>0) taxRows='<tr><td colspan="3" style="padding:5px 8px;text-align:right;color:#64748B">'+esc(it.label)+'</td><td style="padding:5px 8px;text-align:right">'+money(taxTotal)+'</td></tr>';
+    }else if(rate>0){
       if(taxType==='igst'){
         taxRows='<tr><td colspan="3" style="padding:5px 8px;text-align:right;color:#64748B">IGST ('+rate+'%)</td><td style="padding:5px 8px;text-align:right">'+money(taxTotal)+'</td></tr>';
       }else{
@@ -229,7 +239,7 @@ const PAGE_JS = `
     var html=''+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'+
         '<div>'+(LOGO.get()?'<img src="'+LOGO.get()+'" alt="" style="max-height:50px;max-width:180px;object-fit:contain;margin-bottom:8px;display:block" />':'')+'<div style="font-size:20px;font-weight:800;color:#0F172A">'+esc(bn)+'</div>'+
-          ($('bizGstin').value?'<div style="font-size:12px;color:#64748B">GSTIN: '+esc($('bizGstin').value)+'</div>':'')+
+          ($('bizGstin').value&&REG.taxId?'<div style="font-size:12px;color:#64748B">'+esc(REG.taxId)+': '+esc($('bizGstin').value)+'</div>':'')+
           '<div style="font-size:12px;color:#64748B;white-space:pre-line">'+esc($('bizAddr').value)+'</div></div>'+
         '<div style="text-align:right"><div style="font-size:20px;font-weight:800;letter-spacing:.03em;color:#0E8C5A">PROFORMA INVOICE</div>'+
           ($('invNo').value?'<div style="font-size:13px;color:#0F172A"># '+esc($('invNo').value)+'</div>':'')+
@@ -239,7 +249,7 @@ const PAGE_JS = `
       '<div style="margin:16px 0 10px;padding:10px 12px;background:#F8FAFC;border-radius:10px">'+
         '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8">For</div>'+
         '<div style="font-weight:700;color:#0F172A">'+esc($('cliName').value||'Client name')+'</div>'+
-        ($('cliGstin').value?'<div style="font-size:12px;color:#64748B">GSTIN: '+esc($('cliGstin').value)+'</div>':'')+
+        ($('cliGstin').value&&REG.taxId?'<div style="font-size:12px;color:#64748B">'+esc(REG.taxId)+': '+esc($('cliGstin').value)+'</div>':'')+
         '<div style="font-size:12px;color:#64748B;white-space:pre-line">'+esc($('cliAddr').value)+'</div>'+
       '</div>'+
       '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:6px">'+
@@ -255,9 +265,9 @@ const PAGE_JS = `
           '<tr><td colspan="3" style="padding:10px 8px;text-align:right;font-weight:800;font-size:15px">Estimated total</td><td style="padding:10px 8px;text-align:right;font-weight:800;font-size:15px;color:#0E8C5A">'+money(total)+'</td></tr>'+
         '</tfoot>'+
       '</table>'+
-      '<div style="margin-top:10px;font-size:12px;color:#475569"><b>Amount in words:</b> '+esc(words(total))+'</div>'+
+      wordsLine(total)+
       ($('notes').value?'<div style="margin-top:12px;padding-top:10px;border-top:1px dashed #E2E8F0;font-size:12px;color:#475569;white-space:pre-line"><b>Notes:</b> '+esc($('notes').value)+'</div>':'')+
-      '<div style="margin-top:10px;font-size:11px;color:#94A3B8;font-style:italic">This is a proforma invoice — an estimate of the goods/services and price. It is not a GST tax invoice and not a demand for payment.</div>'+
+      '<div style="margin-top:10px;font-size:11px;color:#94A3B8;font-style:italic">This is a proforma invoice — an estimate of the goods/services and price. It is not a '+(isIN?'GST tax invoice':'tax invoice')+' and not a demand for payment.</div>'+
       (SIG.get()?'<div style="margin-top:22px;display:flex;justify-content:flex-end"><div style="text-align:center;min-width:180px"><img src="'+SIG.get()+'" alt="signature" style="max-height:58px;max-width:190px;object-fit:contain" /><div style="border-top:1px solid #94A3B8;margin-top:2px;padding-top:4px;font-size:12px;font-weight:600;color:#0F172A">'+esc($('sigName').value||bn)+'</div><div style="font-size:10px;color:#94A3B8">Authorised Signatory</div></div></div>':'')+
       brandFooter();
     $('invoice-preview').innerHTML=html;
@@ -268,8 +278,9 @@ const PAGE_JS = `
   $('sig-clear').addEventListener('click',function(){ SIG.clear(); });
   $('reset').addEventListener('click',function(){
     try{localStorage.removeItem(STORE);}catch(e){}
-    ['bizName','bizGstin','bizAddr','invNo','cliName','cliGstin','cliAddr','invDate','validUntil','notes','sigName'].forEach(function(id){$(id).value='';});
+    ['bizName','bizGstin','bizAddr','invNo','cliName','cliGstin','cliAddr','invDate','validUntil','taxName','taxPct','notes','sigName'].forEach(function(id){$(id).value='';});
     $('gstRate').value='18'; $('taxType').value='cgst_sgst';
+    RG.reset();
     LOGO.clear(); SIG.clear();
     IT.set([]); IT.render(); render(); save();
   });
@@ -278,16 +289,18 @@ const PAGE_JS = `
   var saved=null; try{ saved=JSON.parse(localStorage.getItem(STORE)||'null'); }catch(e){}
   if(saved){
     FIELDS.forEach(function(id){ if(saved[id]!=null)$(id).value=saved[id]; });
+    RG.set(saved.country, saved.currency);
     if(saved.logo)LOGO.set(saved.logo);
     if(saved.sig)SIG.set(saved.sig);
     IT.set(saved.items);
   }else{
+    RG.set();
     IT.set([{desc:'',qty:1,rate:0}]);
   }
   IT.render(); render();
 `;
 
-const CLIENT_JS = "<script>(function(){" + COMMON_JS + MEDIA_JS + EXPORT_JS + ITEMS_JS + PAGE_JS + "})();</script>";
+const CLIENT_JS = "<script>(function(){" + COMMON_JS + REGION_JS + MEDIA_JS + EXPORT_JS + ITEMS_JS + PAGE_JS + "})();</script>";
 
 export function proformaInvoicePage(): string {
   return renderToolPage({
@@ -304,5 +317,5 @@ export const proformaInvoiceMeta = {
   slug: "proforma-invoice-generator",
   path: PATH,
   title: "Free Proforma Invoice Generator",
-  blurb: "Send a professional proforma invoice to confirm price and terms before the sale — GST-ready format, instant PDF, no sign-up.",
+  blurb: "Send a professional proforma invoice to confirm price and terms before the sale — any currency, GST, VAT or sales tax, instant PDF, no sign-up.",
 };

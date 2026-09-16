@@ -9,21 +9,44 @@
  */
 
 // Pure helpers: DOM lookup, HTML-escape (quotes included — attribute-safe),
-// number parsing, paise-safe rounding, ₹ formatting, and Indian amount-in-words
-// (handles paise and >99 crore). Depended on by every tool page.
+// number parsing, minor-unit-safe rounding, money formatting, and Indian
+// amount-in-words (handles paise and >99 crore). Depended on by every tool page.
+//
+// REG is the document's region. It starts as India, and the India-only tools
+// (GST invoice, GST calculator) never change it, so their output is unchanged.
+// Tools that include REGION_JS (region-lib.ts) move it with the Country and
+// Currency pickers.
 export const COMMON_JS = `
+  var REG={cc:'IN',cur:'INR',loc:'en-IN',dec:2,taxId:'GSTIN',taxHint:'GST'};
   function $(id){return document.getElementById(id);}
   function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
   function num(x){var v=parseFloat(x);return isFinite(v)?v:0;}
-  function round2(x){return Math.round((num(x)+Number.EPSILON)*100)/100;}
-  function money(x){return '\\u20B9'+(num(x)).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+  // Rounds to the currency's minor unit (paise, cents; none for yen). Named for
+  // the two-decimal currencies it was written for.
+  function round2(x){var f=Math.pow(10,REG.dec);return Math.round((num(x)+Number.EPSILON)*f)/f;}
+  function money(x){
+    if(REG.cur==='INR'&&REG.cc==='IN') return '\\u20B9'+(num(x)).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+    try{ return new Intl.NumberFormat(REG.loc,{style:'currency',currency:REG.cur,minimumFractionDigits:REG.dec,maximumFractionDigits:REG.dec}).format(num(x)); }
+    catch(e){ return REG.cur+' '+num(x).toFixed(REG.dec); }
+  }
   var ONES=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
   var TENS=['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
   function two(x){return x<20?ONES[x]:TENS[Math.floor(x/10)]+(x%10?' '+ONES[x%10]:'');}
   function three(x){var h=Math.floor(x/100),r=x%100;return (h?ONES[h]+' Hundred'+(r?' ':''):'')+(r?two(r):'');}
   function wordsInt(n){n=Math.floor(n);if(n===0)return 'Zero';var out='';var cr=Math.floor(n/10000000);n=n%10000000;var la=Math.floor(n/100000);n=n%100000;var th=Math.floor(n/1000);n=n%1000;if(cr)out+=(cr>99?wordsInt(cr):two(cr))+' Crore ';if(la)out+=two(la)+' Lakh ';if(th)out+=two(th)+' Thousand ';if(n)out+=three(n);return out.replace(/\\s+/g,' ').trim();}
   function words(x){var v=round2(x);var rup=Math.floor(v);var pai=Math.round((v-rup)*100);var w=wordsInt(rup)+' Rupees';if(pai>0)w+=' and '+wordsInt(pai)+' Paise';return w+' Only';}
-  function fmtDate(s){if(!s)return '';var p=String(s).split('-');return p.length===3?(p[2]+'/'+p[1]+'/'+p[0]):s;}
+  // The "Amount in words" line, as HTML. An Indian convention in lakh and crore,
+  // so it prints for rupee documents only; elsewhere it is empty.
+  function wordsLine(x, style){ return REG.cur==='INR' ? '<div style="'+(style||'margin-top:10px;font-size:12px;color:#475569')+'"><b>Amount in words:</b> '+esc(words(x))+'</div>' : ''; }
+  // India keeps DD/MM/YYYY. Elsewhere the month is spelled out, in the
+  // country's own order ("Sep 16, 2026" in the US, "16 Sept 2026" in the UK),
+  // so a client abroad cannot misread 04/05 as the wrong month.
+  function fmtDate(s){
+    if(!s)return '';var p=String(s).split('-');if(p.length!==3)return s;
+    if(REG.cc==='IN') return p[2]+'/'+p[1]+'/'+p[0];
+    try{ return new Date(Date.UTC(+p[0],+p[1]-1,+p[2])).toLocaleDateString(REG.loc,{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}); }
+    catch(e){ return p[2]+'/'+p[1]+'/'+p[0]; }
+  }
   // "Made with DealInSec" footer — omitted when a signed-in user has opted out
   // (window.__disNoBrand is set by initBranding). Single source of truth.
   function brandFooter(){ return window.__disNoBrand ? '' : '<div style="margin-top:18px;padding-top:10px;border-top:1px solid #EEF2F6;text-align:center;font-size:11px;color:#94A3B8">Made with DealInSec &middot; dealinsec.com</div>'; }

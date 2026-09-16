@@ -121,7 +121,7 @@ const ZONES_BY_COUNTRY: Record<string, string> = {
  * string. Derived by resolving every zone.tab name through Node 22's full ICU
  * and keeping the ones that came back different.
  */
-const ICU_TO_IANA_ZONE: Record<string, string> = {
+export const ICU_TO_IANA_ZONE: Readonly<Record<string, string>> = {
   "Africa/Asmera": "Africa/Asmara",
   "America/Buenos_Aires": "America/Argentina/Buenos_Aires",
   "America/Catamarca": "America/Argentina/Catamarca",
@@ -396,6 +396,54 @@ let regionNames: Intl.DisplayNames | null | undefined;
 
 /** "IN" → "India". English for the reason the locale is English; the code
  *  itself when the runtime has no DisplayNames, so nothing ever renders blank. */
+/**
+ * The flag emoji for an ISO-3166 alpha-2 code, computed rather than tabulated:
+ * a regional-indicator pair is just the letters offset into U+1F1E6..U+1F1FF.
+ * Purely decorative — never the only way a country is identified, because it
+ * renders as two letters on platforms without flag glyphs (Windows), which is
+ * a perfectly good fallback.
+ */
+export function flagEmoji(code?: string | null): string {
+  const cc = (code ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(cc)) return "";
+  return String.fromCodePoint(
+    0x1f1e6 + cc.charCodeAt(0) - 65,
+    0x1f1e6 + cc.charCodeAt(1) - 65,
+  );
+}
+
+/**
+ * ITU-T E.164 country calling codes, for pre-filling a phone field. Partial on
+ * purpose: a country without a row simply shows no prefix and asks for the code
+ * in the number, which is what the form did for everyone before.
+ */
+const DIAL_CODES: Readonly<Record<string, string>> = {
+  AE: "971", AF: "93", AL: "355", AM: "374", AO: "244", AR: "54", AT: "43", AU: "61", AZ: "994",
+  BA: "387", BD: "880", BE: "32", BF: "226", BG: "359", BH: "973", BI: "257", BJ: "229", BN: "673",
+  BO: "591", BR: "55", BT: "975", BW: "267", BY: "375", CA: "1", CD: "243", CF: "236", CG: "242",
+  CH: "41", CI: "225", CL: "56", CM: "237", CN: "86", CO: "57", CR: "506", CU: "53", CV: "238",
+  CY: "357", CZ: "420", DE: "49", DJ: "253", DK: "45", DZ: "213", EC: "593", EE: "372", EG: "20",
+  ER: "291", ES: "34", ET: "251", FI: "358", FJ: "679", FR: "33", GA: "241", GB: "44", GE: "995",
+  GH: "233", GM: "220", GN: "224", GR: "30", GT: "502", GY: "592", HK: "852", HN: "504", HR: "385",
+  HT: "509", HU: "36", ID: "62", IE: "353", IL: "972", IN: "91", IQ: "964", IR: "98", IS: "354",
+  IT: "39", JO: "962", JP: "81", KE: "254", KG: "996", KH: "855", KR: "82", KW: "965", KZ: "7",
+  LA: "856", LB: "961", LK: "94", LR: "231", LT: "370", LU: "352", LV: "371", LY: "218", MA: "212",
+  MD: "373", ME: "382", MG: "261", MK: "389", MM: "95", MN: "976", MT: "356", MU: "230", MV: "960",
+  MW: "265", MX: "52", MY: "60", MZ: "258", NA: "264", NE: "227", NG: "234", NI: "505", NL: "31",
+  NO: "47", NP: "977", NZ: "64", OM: "968", PA: "507", PE: "51", PG: "675", PH: "63", PK: "92",
+  PL: "48", PT: "351", PY: "595", QA: "974", RO: "40", RS: "381", RU: "7", RW: "250", SA: "966",
+  SD: "249", SE: "46", SG: "65", SI: "386", SK: "421", SN: "221", SO: "252", SR: "597", SV: "503",
+  SY: "963", TH: "66", TJ: "992", TM: "993", TN: "216", TR: "90", TW: "886", TZ: "255", UA: "380",
+  UG: "256", US: "1", UY: "598", UZ: "998", VE: "58", VN: "84", YE: "967", ZA: "27", ZM: "260",
+  ZW: "263",
+};
+
+/** "+44" for GB; "" where we do not have the code. */
+export function dialCodeForCountry(country?: string | null): string {
+  const code = DIAL_CODES[(country ?? "").trim().toUpperCase()];
+  return code ? `+${code}` : "";
+}
+
 export function countryName(code: string): string {
   if (regionNames === undefined) {
     try {

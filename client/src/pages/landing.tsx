@@ -29,7 +29,8 @@ import {
   FileCheck,
   UserCircle,
   LogOut,
-  IndianRupee,
+  Clock,
+  Globe,
   Lightbulb,
   Camera,
   PenTool,
@@ -116,7 +117,7 @@ const FEATURES = [
   {
     icon: Receipt,
     title: "Smart Invoices",
-    desc: "Advance & final invoices with your banking details baked in. Track every rupee of every milestone.",
+    desc: "Advance & final invoices with your bank details baked in. Track every payment on every milestone.",
     tint: "indigo",
   },
   {
@@ -163,8 +164,8 @@ const WORKFLOW_STEPS = [
 const STATS = [
   { value: "5-in-1", label: "One workflow", sub: "Deals · Quotes · Contracts · Invoices · Insights" },
   { value: "60s", label: "To your first invoice", sub: "From signup to sent" },
-  { value: "₹0", label: "Platform fee", sub: "On every deal you close" },
-  { value: "PAN·GSTIN", label: "On your documents", sub: "Bank details built in" },
+  { value: "0%", label: "Platform fee", sub: "On every deal you close" },
+  { value: "Your tax ID", label: "On every document", sub: "Bank details built in" },
 ];
 
 // Testimonials removed: the named people, cities and 5-star ratings here were
@@ -176,11 +177,11 @@ const STATS = [
 const FAQS = [
   {
     q: "Who is DealInSec built for?",
-    a: "India's freelancers — designers, developers, writers, video editors & photographers, marketers and consultants. If you quote, sign and bill your own clients, the workflow fits: deal → quotation → agreement → invoice → payment tracking. DealInSec never touches your client's money — you record the payment, we keep the register.",
+    a: "Freelancers everywhere — designers, developers, writers, video editors & photographers, marketers and consultants. If you quote, sign and bill your own clients, the workflow fits: deal → quotation → agreement → invoice → payment tracking. It works the same whether you bill in rupees from Pune or in dollars from Lisbon. DealInSec never touches your client's money — you record the payment, we keep the register.",
   },
   {
     q: "Is Dealinsec free to use?",
-    a: "Yes — every new account starts with a 7-day Pro trial: everything unlocked, no card needed. After that the free plan covers 4 deals every month, each with a professional quotation. Signed agreements, invoices and payment tracking are part of DealInSec Pro — ₹99/month, or ₹999 for a full year (about ₹83/month, which is ₹189 less than paying monthly). There are no platform fees on your deal value.",
+    a: "Yes — every new account starts with a 7-day Pro trial: everything unlocked, no card needed. After that the free plan covers 4 deals every month, each with a professional quotation. Signed agreements, invoices and payment tracking are part of DealInSec Pro — in India that is ₹99/month, or ₹999 for a full year (about ₹83/month, which is ₹189 less than paying monthly). Outside India, paid checkout is opening soon at $99, £79 or €89 a year; the free plan and the trial are open everywhere in the meantime. There are no platform fees on your deal value.",
   },
   {
     q: "Will DealInSec make a client pay me?",
@@ -196,11 +197,15 @@ const FAQS = [
   },
   {
     q: "How do I get paid?",
-    a: "Your banking details (account number, IFSC, PAN) live in your profile and are auto-filled into every invoice you send. Clients pay you directly — bank transfer or UPI — and you mark the invoice paid so the register always shows what is still outstanding.",
+    a: "Your bank details live in your profile and are auto-filled into every invoice you send, with the labels your country uses — IFSC and PAN in India, sort code and VAT number in the UK, routing number and EIN in the US. Clients pay you directly — bank transfer, UPI or whatever you already use — and you mark the invoice paid so the register always shows what is still outstanding.",
   },
   {
     q: "Are the invoices GST tax invoices?",
-    a: "In-app invoices are GST-ready professional invoices for your client and your own records — they are not Rule-46 GST tax invoices. If you need a full GST tax invoice, the free GST Invoice Generator in Free Tools is built for exactly that.",
+    a: "In-app invoices are GST-ready professional invoices for your client and your own records — they are not Rule-46 GST tax invoices. If you need a full GST tax invoice, the free GST Invoice Generator in Free Tools is built for exactly that. Outside India the same invoice carries the tax field your country expects instead — a VAT number in the UK and the EU, an EIN in the US — and numbering follows your country's convention: April–March in India, calendar year everywhere else.",
+  },
+  {
+    q: "Can I use DealInSec outside India?",
+    a: "Yes. Pick your country when you sign up and the product follows it: 50 currencies, 242 countries to choose from, the tax field your country expects on your documents, your country's bank labels, and agreement wording written to your country's law. The free plan and the 7-day Pro trial are open everywhere, so you can run real deals today. Paid checkout outside India is opening soon — international plans will be $99, £79 or €89 a year, annual only.",
   },
   {
     q: "Is my data secure?",
@@ -395,7 +400,7 @@ export default function LandingPage() {
         <StatsSection />
         <WatchesSection />
         {/* Testimonials hidden until we have real users. Re-enable <Testimonials /> once you have genuine quotes. */}
-        <MadeInIndiaSection />
+        <BuiltEverywhereSection />
         <PricingPreview onCTA={() => (isAuthenticated ? setLocation("/pricing") : openAuth("signup"))} />
         <FAQSection />
         <FinalCTA
@@ -800,7 +805,7 @@ function Hero({
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
               </span>
               <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                Deal · Sign · Secured · Made in India
+                Quote · Sign · Invoice · Get paid
               </span>
             </motion.div>
 
@@ -833,7 +838,7 @@ function Hero({
             <motion.p variants={heroFadeUp} className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
               Paste the client&apos;s chat and it drafts the deal.{" "}
               <span className="font-semibold text-neutral-900 dark:text-white">Then it reads your terms like a sceptic — flagging &ldquo;unlimited revisions&rdquo;, a missing advance, &ldquo;as per requirement&rdquo; — before you sign.</span>{" "}
-              Quotation, agreement and invoice follow on one thread, and it chases the payment for you. Built for India&apos;s freelancers — designers, developers, writers, video editors &amp; photographers, marketers and consultants.
+              Quotation, agreement and invoice follow on one thread, and it chases the payment for you. Built for freelancers anywhere — designers, developers, writers, video editors &amp; photographers, marketers and consultants.
             </motion.p>
 
             <motion.div variants={heroFadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
@@ -860,7 +865,7 @@ function Hero({
                 <Check className="w-3.5 h-3.5 text-emerald-500" /> 7-day Pro trial
               </span>
               <span className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500" /> ₹0 platform fee on your deals
+                <Check className="w-3.5 h-3.5 text-emerald-500" /> 0% platform fee on your deals
               </span>
               <span className="flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5 text-emerald-500" /> No credit card required
@@ -909,7 +914,7 @@ function ProductPreview() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <p className="text-xs text-neutral-500">Welcome back,</p>
-              <h3 className="text-lg sm:text-xl font-bold">Meera Nair</h3>
+              <h3 className="text-lg sm:text-xl font-bold">Lena Ortiz</h3>
             </div>
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold">
               <Sparkles className="w-3 h-3" />
@@ -922,8 +927,8 @@ function ProductPreview() {
             {[
               { label: "Deals", value: "12", change: "+3", tint: "emerald" },
               { label: "Agreements", value: "8", change: "+2", tint: "teal" },
-              { label: "Pipeline", value: "₹2.4L", change: "+18%", tint: "cyan" },
-              { label: "Paid this month", value: "₹86,000", change: "+42%", tint: "indigo" },
+              { label: "Pipeline", value: "$38,400", change: "+18%", tint: "cyan" },
+              { label: "Paid this month", value: "$9,700", change: "+42%", tint: "indigo" },
             ].map((s, i) => (
               <motion.div
                 key={s.label}
@@ -957,9 +962,9 @@ function ProductPreview() {
               <p className="text-xs font-semibold mb-3">Recent deals</p>
               <div className="space-y-2.5">
                 {[
-                  { name: "Café Aroma · Brand identity", status: "Paid", amount: "₹45,000" },
-                  { name: "Nimbus Labs · Website build", status: "Signed", amount: "₹1.2L" },
-                  { name: "Brightpath · 4 reels a month", status: "Quote", amount: "₹28,000" },
+                  { name: "Northwind Studio · Brand identity", status: "Paid", amount: "$4,200" },
+                  { name: "Cedar & Co · Website build", status: "Signed", amount: "$12,500" },
+                  { name: "Halo Fitness · 4 reels a month", status: "Quote", amount: "$1,800" },
                 ].map((d) => (
                   <div key={d.name} className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
@@ -986,7 +991,7 @@ function ProductPreview() {
         </div>
         <div>
           <p className="text-[10px] text-neutral-500">Agreement signed</p>
-          <p className="text-xs font-semibold">Nimbus Labs Pvt Ltd</p>
+          <p className="text-xs font-semibold">Cedar &amp; Co LLC</p>
         </div>
       </motion.div>
 
@@ -996,11 +1001,11 @@ function ProductPreview() {
         className="hidden md:flex absolute -right-6 bottom-16 items-center gap-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xl shadow-emerald-900/10 px-3.5 py-2.5"
       >
         <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center">
-          <IndianRupee className="w-4 h-4 text-emerald-600" />
+          <CreditCard className="w-4 h-4 text-emerald-600" />
         </div>
         <div>
           <p className="text-[10px] text-neutral-500">Payment received</p>
-          <p className="text-xs font-semibold">₹60,000</p>
+          <p className="text-xs font-semibold">$4,200</p>
         </div>
       </motion.div>
     </div>
@@ -1064,7 +1069,7 @@ function TrustStrip() {
           viewport={{ once: true }}
           className="text-center text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-6"
         >
-          Built for India's freelancers
+          Built for freelancers everywhere
         </motion.p>
         <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-5 opacity-70">
           {[
@@ -1104,12 +1109,12 @@ function WhoWeServeSection() {
             <>
               Built for{" "}
               <span style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                India's freelancers
+                freelancers everywhere
               </span>{" "}
               who bill their own clients
             </>
           }
-          subtitle="Designers, developers, writers, video editors &amp; photographers, marketers and consultants. One workflow from first quotation to final invoice — with every payment tracked."
+          subtitle="Designers, developers, writers, video editors &amp; photographers, marketers and consultants. One workflow from first quotation to final invoice — with every payment tracked, in your currency."
         />
 
         <motion.div
@@ -1152,7 +1157,7 @@ function WhoWeServeSection() {
         >
           <p className="text-sm sm:text-base text-neutral-200 font-medium leading-relaxed">
             <span className="text-emerald-400 font-semibold">One workflow.</span>{" "}
-            Every client you invoice. Whether it's a ₹5,000 logo or a ₹2,00,000 app build — quotation, signed scope, invoice, payment tracked. Pro is ₹99 a month.
+            Every client you invoice, in whichever currency you invoice them. A $400 logo, a £9,000 app build, a ₹35,000 monthly retainer — quotation, signed scope, invoice, payment tracked, the same way each time. Pro is ₹99 a month in India; plans for the rest of the world open soon.
           </p>
         </motion.div>
       </div>
@@ -1168,6 +1173,7 @@ const FREE_TOOLS = [
   { name: "Service Agreement", href: "/tools/service-agreement-template", desc: "A ready-to-sign contract — scope, fees, editable clauses.", icon: FileSignature },
   { name: "Proforma Invoice", href: "/tools/proforma-invoice-generator", desc: "Confirm price & terms before the sale.", icon: FileCheck },
   { name: "Purchase Order", href: "/tools/purchase-order-generator", desc: "Raise a clean PO for your vendor in a minute.", icon: ClipboardList },
+  { name: "UK Late Payment Calculator", href: "/tools/uk-late-payment-calculator", desc: "Work out the statutory interest and compensation a late-paying UK client owes.", icon: Clock },
 ];
 
 function FreeToolsSection() {
@@ -1184,7 +1190,7 @@ function FreeToolsSection() {
               </span>
             </>
           }
-          subtitle="Create GST invoices, quotations and agreements right in your browser — free, instant, no sign-up. Our gift to India's freelancers. When you're ready to run whole deals, the app is one click away."
+          subtitle="Free tools for freelancers, built in the browser and free of sign-up. Some are country-specific — GST invoices and the GST calculator for India, statutory late-payment interest for the UK. Quotations, agreements and purchase orders work wherever you bill from. When you're ready to run whole deals, the app is one click away."
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5 mt-14">
           {FREE_TOOLS.map((t) => (
@@ -1459,10 +1465,10 @@ function ProductShowcase() {
     },
     {
       eyebrow: "Invoices",
-      title: "Get paid, track every rupee",
-      desc: "Banking details, PAN, and IFSC are auto-filled into every invoice. Track advance and balance payments without digging through old emails.",
+      title: "Get paid, track every payment",
+      desc: "Your bank details and tax ID are auto-filled into every invoice, labelled the way your country labels them — IFSC and PAN in India, sort code and VAT number in the UK, routing number and EIN in the US. Track advance and balance payments without digging through old emails.",
       bullets: [
-        "Your banking details saved once, used everywhere",
+        "Your bank details saved once, used everywhere",
         "Advance + final invoice split",
         "Real-time payment status tracking",
       ],
@@ -1558,7 +1564,7 @@ function QuoteMockup() {
       <div className="space-y-3">
         <div className="flex justify-between text-xs">
           <span className="text-neutral-500">To</span>
-          <span className="font-semibold">Café Aroma</span>
+          <span className="font-semibold">Hartley Coffee Co, Bristol</span>
         </div>
         <div className="flex justify-between text-xs">
           <span className="text-neutral-500">Deliverable</span>
@@ -1581,7 +1587,7 @@ function QuoteMockup() {
       <div className="flex items-end justify-between mt-5 pt-4 border-t border-neutral-200 dark:border-neutral-800">
         <div>
           <p className="text-[10px] uppercase text-neutral-500">Total</p>
-          <p className="text-xl font-bold text-emerald-600">₹45,000</p>
+          <p className="text-xl font-bold text-emerald-600">£3,600</p>
         </div>
         <div className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-semibold">Send quote</div>
       </div>
@@ -1598,20 +1604,20 @@ function AgreementMockup() {
         </div>
         <div>
           <p className="text-sm font-bold">Service Agreement</p>
-          <p className="text-[10px] text-neutral-500">Between Meera Nair and Nimbus Labs Pvt Ltd</p>
+          <p className="text-[10px] text-neutral-500">Between Sofia Marchetti and Redpoint Analytics Inc.</p>
         </div>
       </div>
 
       <div className="space-y-2 text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed mb-5">
         <p>This agreement confirms the terms of work between the parties...</p>
         <p className="opacity-60">Section 1 — Scope of work · Section 2 — Fees &amp; payment...</p>
-        <p className="opacity-40">Section 3 — Revisions &amp; ownership...</p>
+        <p className="opacity-40">Section 3 — Revisions &amp; ownership · Section 4 — Governing law...</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/50 dark:bg-emerald-950/20 p-3">
           <p className="text-[9px] uppercase tracking-widest text-neutral-500 mb-1">Provider</p>
-          <p className="text-xs font-bold italic text-emerald-700 dark:text-emerald-300" style={{ fontFamily: "Georgia, serif" }}>Meera N.</p>
+          <p className="text-xs font-bold italic text-emerald-700 dark:text-emerald-300" style={{ fontFamily: "Georgia, serif" }}>Sofia M.</p>
           <div className="flex items-center gap-1 mt-1.5">
             <Check className="w-3 h-3 text-emerald-600" />
             <p className="text-[9px] text-emerald-700 dark:text-emerald-400 font-semibold">Signed · 22 Apr</p>
@@ -1641,7 +1647,7 @@ function InvoiceMockup() {
       <div className="flex items-start justify-between mb-5">
         <div>
           <p className="text-[10px] uppercase tracking-widest text-neutral-500">Invoice</p>
-          <p className="text-sm font-bold mt-1">INV-2026-0078</p>
+          <p className="text-sm font-bold mt-1">INV-2627-0078</p>
         </div>
         <div className="px-2 py-1 rounded-md bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold flex items-center gap-1">
           <Check className="w-3 h-3" /> PAID
@@ -1661,6 +1667,10 @@ function InvoiceMockup() {
         <div className="flex justify-between"><span className="text-neutral-500">IFSC</span><span className="font-semibold font-mono">HDFC0001234</span></div>
         <div className="flex justify-between"><span className="text-neutral-500">PAN</span><span className="font-semibold font-mono">ABCDE1234F</span></div>
       </div>
+
+      <p className="mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-800 text-[9px] text-neutral-500">
+        India · numbered by financial year. A UK invoice would read INV-2026-0078 with a sort code and VAT number instead.
+      </p>
     </div>
   );
 }
@@ -1712,7 +1722,7 @@ function Testimonials() {
         <div className="max-w-3xl mx-auto mt-12">
           <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-7 sm:p-9">
             <p className="text-[15px] leading-relaxed text-neutral-700 dark:text-neutral-300">
-              Most Indian freelancers lose money in the same three places: work that starts
+              Freelancers lose money in the same three places, in every country: work that starts
               without a written scope, invoices that go out late, and payments nobody follows up on.
               Not because anyone is careless — because the quotation is in WhatsApp, the agreement is in
               email, and the invoice is in someone's Downloads folder.
@@ -1746,7 +1756,28 @@ function Testimonials() {
 }
 
 
-function MadeInIndiaSection() {
+function BuiltEverywhereSection() {
+  // Only facts the product can back: 50 currencies, 242 countries selectable,
+  // 119 of them billed in their own currency. Do not inflate these numbers.
+  const LOCAL_RULES = [
+    {
+      label: "Your currency",
+      line: "50 currencies. 242 countries to pick from at signup, 119 of them billed in their own currency.",
+    },
+    {
+      label: "Your tax field",
+      line: "GSTIN in India, VAT number in the UK and the EU, EIN in the US — on the invoice, where your client's accountant looks for it.",
+    },
+    {
+      label: "Your numbering",
+      line: "April to March in India, because your CA expects the number to restart each April. Calendar year everywhere else.",
+    },
+    {
+      label: "Your law",
+      line: "Agreement wording follows the country you work from, so the governing-law clause names a court that can actually hear it.",
+    },
+  ];
+
   return (
     <section className="py-20 sm:py-24">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1756,43 +1787,58 @@ function MadeInIndiaSection() {
           viewport={{ once: true, margin: "-80px" }}
           className="relative rounded-3xl overflow-hidden border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60"
         >
-          {/* Tricolor ribbon */}
           <div
             className="h-1.5 w-full"
-            style={{ background: "linear-gradient(90deg, #FF9933 0%, #FF9933 33%, #FFFFFF 33%, #FFFFFF 66%, #138808 66%, #138808 100%)" }}
+            style={{ background: "linear-gradient(90deg, #059669 0%, #14B8A6 50%, #0D9488 100%)" }}
             aria-hidden="true"
           />
           <div className="p-8 sm:p-12 text-center">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/40 mb-5">
-              <span className="text-base leading-none">&#127470;&#127475;</span>
-              <span className="text-xs font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-300">Made in India</span>
+              <Globe className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-xs font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-300">Works where you work</span>
             </div>
             <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4" style={{ textWrap: "balance" }}>
-              Built in India, for the freelancers{" "}
+              One workflow.{" "}
               <span
                 style={{
-                  background: "linear-gradient(135deg, #FF9933 0%, #E01B6F 50%, #138808 100%)",
+                  background: "linear-gradient(135deg, #059669 0%, #14B8A6 50%, #0D9488 100%)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
                   backgroundClip: "text",
                 }}
               >
-                who do the work
+                Your country&apos;s rules.
               </span>
             </h2>
-            <p className="text-base sm:text-lg text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed mb-3">
-              The designer whose client said "loved it!" and then went quiet. The developer
-              still chasing the last 30% two months after launch. The writer invoicing from
-              a notes app. The video editor who has been told "next week" four weeks running.
+            <p className="text-base sm:text-lg text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
+              Pick your country once. The quotation, the agreement and the invoice come out in the
+              currency you charge in, carrying the fields your client&apos;s accountant expects to see.
+              Nothing to configure, nothing to explain away.
             </p>
-            <p className="text-base sm:text-lg text-neutral-700 dark:text-neutral-300 max-w-2xl mx-auto leading-relaxed font-medium">
-              You did the work. DealInSec puts the scope, the signature and the invoice on one
-              thread &mdash; GST-ready, &#8377;-first, and made for how Indian freelancing actually runs.
+
+            <div className="grid sm:grid-cols-2 gap-4 mt-9 text-left">
+              {LOCAL_RULES.map((r) => (
+                <div
+                  key={r.label}
+                  className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 p-5"
+                >
+                  <p className="text-xs font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-400 mb-1.5">
+                    {r.label}
+                  </p>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">{r.line}</p>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-base text-neutral-700 dark:text-neutral-300 max-w-2xl mx-auto leading-relaxed font-medium mt-8">
+              And when the money is late, the payment chaser is written from the real invoice, in your
+              own voice &mdash; you read it, you decide, you send it.
             </p>
+
             <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 mt-7 text-xs text-neutral-500">
-              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> GST-ready quotes &amp; invoices</span>
-              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> PAN &amp; IFSC on every invoice</span>
-              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> Priced in &#8377;, for India</span>
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> 50 currencies</span>
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> Your tax ID &amp; bank labels on every document</span>
+              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> GST-ready in India</span>
               <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> Built by a founder, not a giant</span>
             </div>
           </div>
@@ -1829,7 +1875,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
         <SectionHeader
           eyebrow="Simple pricing"
           title="Try everything free for 7 days."
-          subtitle="Every new account starts with a 7-day Pro trial — the full workflow, unlocked. After that, stay free with 4 deals a month or go Pro for unlimited everything."
+          subtitle="Every new account starts with a 7-day Pro trial — the full workflow, unlocked, no card. After that, stay free with 4 deals a month or go Pro for unlimited everything."
         />
 
         <motion.div
@@ -1944,7 +1990,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                   <Lock className="w-2.5 h-2.5 text-emerald-500" /> No auto-debit
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  <Check className="w-2.5 h-2.5 text-emerald-500" /> UPI · Cards · NetBanking
+                  <Check className="w-2.5 h-2.5 text-emerald-500" /> India: UPI · Cards · NetBanking
                 </span>
               </div>
             </div>
@@ -2019,6 +2065,25 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
           </div>
         </motion.div>
 
+        {/* Honest currency note: only Indian accounts can be charged today. */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mt-8 max-w-3xl mx-auto rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-5 sm:p-6"
+        >
+          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-400 mb-2.5">
+            <Globe className="w-3.5 h-3.5" /> Paying from outside India
+          </p>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+            The prices above are in rupees and can be paid from India today. International plans are
+            <span className="font-semibold text-neutral-900 dark:text-white"> $99, £79 or €89 a year</span>, annual
+            only, and checkout for them is opening soon — we will not take a foreign card until it can be
+            charged in your own currency. Until then the free plan and the 7-day Pro trial are open
+            everywhere, with no card, so you can run real deals from any of the 242 countries at signup.
+          </p>
+        </motion.div>
+
       </div>
     </section>
   );
@@ -2086,7 +2151,7 @@ function FinalCTA({ isAuthenticated, onCTA }: { isAuthenticated: boolean; onCTA:
               Deals in seconds.<br />Secured for life.
             </h2>
             <p className="text-base sm:text-lg text-emerald-100/90 max-w-xl mx-auto mb-8">
-              For freelancers who would rather be doing the work than chasing it — every client deal quoted, signed, invoiced and tracked in one place. Free to start, no credit card required.
+              For freelancers anywhere who would rather be doing the work than chasing it — every client deal quoted, signed, invoiced and tracked in one place, in your currency. Free to start, no credit card required.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Button
@@ -2122,7 +2187,7 @@ function Footer() {
           <div className="col-span-2 md:col-span-1">
             <DealinsecLogo size="md" withText />
             <p className="text-xs text-neutral-500 mt-4 leading-relaxed max-w-[240px]">
-              Deal management for India's freelancers — designers, developers, writers, video editors &amp; photographers, marketers and consultants. Quote, sign, bill and track every payment in one workflow.
+              Deal management for freelancers everywhere — designers, developers, writers, video editors &amp; photographers, marketers and consultants. Quote, sign, bill and track every payment in one workflow, in 50 currencies.
             </p>
             <div className="flex items-center gap-3 mt-5">
               {[
@@ -2181,8 +2246,8 @@ function Footer() {
           {[
             { Icon: Shield, text: "256-bit encrypted" },
             { Icon: Lock, text: "Pro purchases secured by Razorpay" },
-            { Icon: Check, text: "UPI · Cards · NetBanking" },
-            { Icon: Zap, text: "7-day Pro trial · Pro from ₹99/month" },
+            { Icon: Check, text: "India: UPI · Cards · NetBanking" },
+            { Icon: Zap, text: "7-day Pro trial everywhere · Pro from ₹99/month in India" },
           ].map(({ Icon, text }) => (
             <span key={text} className="inline-flex items-center gap-1.5 text-[11px] text-neutral-500">
               <Icon className="w-3.5 h-3.5 text-emerald-600" />
@@ -2309,7 +2374,7 @@ function WatchesSection() {
       Icon: Radar,
       title: "Money Radar",
       line: "One number for everything you can collect right now — overdue, due this week, and signed work you haven't invoiced yet.",
-      quote: "₹84,500 potentially collectible",
+      quote: "$9,240 potentially collectible",
     },
     {
       Icon: ShieldCheck,
@@ -2321,7 +2386,7 @@ function WatchesSection() {
       Icon: Navigation,
       title: "Next Best Action",
       line: "No more wondering what's pending. Each deal says exactly what to do next, in the order that gets you paid.",
-      quote: "Invoice the remaining ₹40,000",
+      quote: "Invoice the remaining £4,000",
     },
     {
       Icon: MessageSquare,
@@ -2359,7 +2424,7 @@ function WatchesSection() {
           ))}
         </motion.div>
         <p className="text-center text-xs text-neutral-500 mt-8 max-w-xl mx-auto">
-          Every figure comes from your own deals — DealInSec never invents numbers, and never messages a client without your approval.
+          Every figure comes from your own deals, in the currency you billed them in — DealInSec never invents numbers, and never messages a client without your approval.
         </p>
       </div>
     </section>

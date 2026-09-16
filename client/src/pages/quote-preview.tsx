@@ -28,7 +28,7 @@ import { getDeliverableLabels } from "@shared/dealTypeTaxonomy";
 import { PagedDocument, type DocBlock } from "@/components/document/paged";
 import {
   DocHeader, docFooter, SectionTitle, TwoParties, Party, tableBlocks, TotalBlock,
-  DocWarnings, docMoney, docDate,
+  SignatureCell, DocWarnings, docMoney, docDate,
 } from "@/components/document/primitives";
 import {
   detectPaymentConflicts, deriveSchedule, validateDocData,
@@ -122,7 +122,7 @@ export default function QuotePreviewPage() {
               // (shared/invoice-tax.ts). Outside India the gstNumber slot holds
               // a VAT or other number, which "GSTIN:" mislabelled. India's
               // profile is PAN then GSTIN, so its quotation is unchanged.
-              lines={[issuer.email, issuer.phone, ...taxRegistrations(invoiceTaxProfile(loc.country), issuer).map(formatTaxRegistration)]}
+              lines={[issuer.billingAddress, issuer.email, issuer.phone, ...taxRegistrations(invoiceTaxProfile(loc.country), issuer).map(formatTaxRegistration)]}
             />
           }
           right={
@@ -237,6 +237,30 @@ export default function QuotePreviewPage() {
         });
       }
     }
+
+    // Sign-off. A quotation that stopped at its terms left the client no
+    // obvious way to say yes; this is the acceptance section a printed
+    // quotation is expected to end with. Both pen lines print empty.
+    out.push({
+      key: "acceptance",
+      node: (
+        <div>
+          <SectionTitle>Acceptance</SectionTitle>
+          <p className="doc-small doc-muted-t" style={{ margin: "0 0 3mm" }}>
+            To accept this quotation, sign below and return a copy, or confirm in writing before {docDate(validUntil, loc)}.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14mm", alignItems: "start" }}>
+            <SignatureCell
+              heading="Prepared by"
+              name={fullName}
+              date={docDate(issuedOn, loc)}
+              signatureUrl={issuer.digitalSignature || null}
+            />
+            <SignatureCell heading={`Accepted for ${deal.brandName}`} />
+          </div>
+        </div>
+      ),
+    });
 
     out.push({
       key: "closing",

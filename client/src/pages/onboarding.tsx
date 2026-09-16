@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { parseApiError } from "@/lib/api-error";
 import { RegionFields, browserRegion } from "@/components/region-fields";
+import { dialCodeForCountry } from "@shared/region";
 import { getLocaleSettings, type LocaleFields, type LocaleSettings } from "@shared/schema";
 import { sameRegion } from "@shared/region";
 import { useLocation } from "wouter";
@@ -25,7 +26,8 @@ interface CountryFormRules {
   phoneMaxLength: number;
   phonePlaceholder: string;
   phoneInvalid: string;
-  normalizePhone: (raw: string) => string;
+  /** `dial` is the country's calling code, e.g. "+44" ("" when unknown). */
+  normalizePhone: (raw: string, dial: string) => string;
   addressPlaceholder: string;
   /** What the profile's tax registration is called in the copy. A label only:
    *  which registrations a country requires is not decided here. */
@@ -37,11 +39,17 @@ const INTERNATIONAL_FORM_RULES: CountryFormRules = {
   // number without pretending to know every country's numbering plan.
   phonePattern: /^\+?\d{6,15}$/,
   phoneMaxLength: 20,
-  phonePlaceholder: "+ country code and number",
-  phoneInvalid: "Enter your phone number, including the country code",
-  // Spaces and punctuation go; a leading "+" stays, because without it an
-  // international number cannot be told apart from a national one.
-  normalizePhone: (raw) => raw.trim().replace(/[\s().-]/g, ""),
+  phonePlaceholder: "7700 900123",
+  phoneInvalid: "Enter your phone number",
+  // Spaces and punctuation go. The field shows the country's calling code as a
+  // prefix, so a number typed without one is completed here rather than being
+  // stored as a national number nobody outside that country can dial.
+  normalizePhone: (raw, dial) => {
+    const cleaned = raw.trim().replace(/[\s().-]/g, "");
+    if (!cleaned) return cleaned;
+    if (cleaned.startsWith("+")) return cleaned;
+    return dial ? `${dial}${cleaned.replace(/^0+/, "")}` : cleaned;
+  },
   addressPlaceholder: "Street, city, postcode (you can add this later)",
   taxIdLabel: "tax ID",
 };
@@ -52,6 +60,7 @@ const FORM_RULES_BY_COUNTRY: Record<string, CountryFormRules> = {
     phoneMaxLength: 10,
     phonePlaceholder: "9876543210",
     phoneInvalid: "Enter a valid 10-digit Indian mobile number",
+    // India stores the bare 10 digits, exactly as it always has.
     normalizePhone: (raw) => raw.replace(/\D/g, ""),
     addressPlaceholder: "Street, city, state, PIN (you can add this later)",
     taxIdLabel: "PAN",
@@ -72,6 +81,7 @@ export default function OnboardingPage() {
   const [region, setRegion] = useState<LocaleSettings>(browserRegion);
 
   const rules = FORM_RULES_BY_COUNTRY[region.country] ?? INTERNATIONAL_FORM_RULES;
+  const dialCode = dialCodeForCountry(region.country);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +90,7 @@ export default function OnboardingPage() {
       toast({ title: "Full name is required", variant: "destructive" });
       return;
     }
-    if (!rules.phonePattern.test(rules.normalizePhone(phone))) {
+    if (!rules.phonePattern.test(rules.normalizePhone(phone, dialCode))) {
       toast({ title: rules.phoneInvalid, variant: "destructive" });
       return;
     }
@@ -128,7 +138,7 @@ export default function OnboardingPage() {
       await apiRequest("PATCH", "/api/profile", {
         firstName,
         lastName,
-        phone: rules.normalizePhone(phone),
+        phone: rules.normalizePhone(phone, dialCode),
         billingAddress: billingAddress.trim() || undefined,
         // The person's own row drives their personal screens (dates in their
         // activity feed) and is the issuer profile, so it records the same
@@ -190,16 +200,29 @@ export default function OnboardingPage() {
 
             <div className="space-y-2">
               <Label htmlFor="phone">Phone Number *</Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder={rules.phonePlaceholder}
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                maxLength={rules.phoneMaxLength}
-                required
-                data-testid="input-phone"
-              />
+              <div className="relative">
+                {dialCode && (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted-foreground tabular-nums"
+                  >
+                    {dialCode}
+                  </span>
+                )}
+                <Input
+                  id="phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel-national"
+                  placeholder={rules.phonePlaceholder}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  maxLength={rules.phoneMaxLength}
+                  required
+                  data-testid="input-phone"
+                  style={dialCode ? { paddingLeft: `${2.1 + dialCode.length * 0.52}rem` } : undefined}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">

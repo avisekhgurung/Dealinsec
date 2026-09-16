@@ -505,16 +505,18 @@ const EXT_ICON = `<svg class="ext" viewBox="0 0 24 24" fill="none" stroke="curre
 const AMBIENT = `<div class="ambient" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="ring r1"></span><span class="ring r2"></span><span class="dotpad d1"></span><span class="dotpad d2"></span></div>`;
 
 // Cross-tool navigation source of truth (label order = display order).
+// Tools that work in any country first, then the country-specific ones.
 const TOOL_LINKS: [string, string][] = [
   ["/tools", "All tools"],
-  ["/tools/gst-invoice-generator", "GST Invoice"],
-  ["/tools/bill-generator", "Bill Maker"],
   ["/tools/quotation-maker", "Quotation"],
-  ["/tools/quotation-templates", "Templates"],
+  ["/tools/bill-generator", "Invoice"],
   ["/tools/service-agreement-template", "Agreement"],
-  ["/tools/gst-calculator", "GST Calculator"],
   ["/tools/proforma-invoice-generator", "Proforma"],
   ["/tools/purchase-order-generator", "Purchase Order"],
+  ["/tools/quotation-templates", "Templates"],
+  ["/tools/uk-late-payment-calculator", "UK Late Payment"],
+  ["/tools/gst-invoice-generator", "GST Invoice 🇮🇳"],
+  ["/tools/gst-calculator", "GST Calculator 🇮🇳"],
 ];
 
 /** Sticky frosted sub-bar so users can hop between tools; marks the active one. */
@@ -560,7 +562,7 @@ function ctaBand(): string {
     <div class="cta-ico">${clock}</div>
     <div class="cta-copy">
       <h2>Get every deal in writing — and get paid on time</h2>
-      <p>Built for India's freelancers: quotation, e-signed agreement, invoice and payment tracking on one thread per client. Free to start, 7-day Pro trial with no card, then Pro at ₹99/month.</p>
+      <p>Built for freelancers, wherever you bill from: quotation, e-signed agreement, invoice and payment tracking on one thread per client, in your own currency. Free to start, with a 7-day Pro trial and no card. Pro is ₹99/month in India; plans for the rest of the world are opening soon.</p>
     </div>
     <a class="btn" href="${APP_LINK}">Start free →</a>
   </div></div>`;
@@ -604,7 +606,8 @@ function footer(): string {
       <div class="links" style="margin-bottom:0">
         <a href="/tools">Free Tools</a>
         <a href="/blog">Blog</a>
-        <a href="/tools/gst-invoice-generator">GST Invoice Generator</a>
+        <a href="/tools/quotation-maker">Quotation Maker</a>
+        <a href="/tools/bill-generator">Invoice Generator</a>
         <a href="/">Product</a>
         <a href="/terms">Terms</a>
         <a href="/privacy">Privacy</a>
@@ -612,7 +615,7 @@ function footer(): string {
       </div>
       ${SOCIALS}
     </div>
-    <div class="muted">© ${y} DealInSec — quotation, agreement and invoice software for India's freelancers. These free tools run in your browser; nothing you enter is stored on our servers.</div>
+    <div class="muted">© ${y} DealInSec — quotation, agreement and invoice software for freelancers. These free tools run in your browser; nothing you enter is stored on our servers.</div>
   </div></footer>`;
 }
 
@@ -632,7 +635,7 @@ function brandModal(): string {
         <ul class="bm-list">
           <li>Remove the &ldquo;Made with DealInSec&rdquo; footer</li>
           <li><b>4 free Deal Credits every month</b> &mdash; run real deals with quotations</li>
-          <li>E-signed agreements, invoices and payment tracking with Pro &mdash; ₹99/month</li>
+          <li>E-signed agreements, invoices and payment tracking with Pro &mdash; ₹99/month in India, world plans opening soon</li>
         </ul>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
           <a class="btn" href="${APP_SIGNUP}" style="flex:1;min-width:150px;justify-content:center">Sign up free →</a>

@@ -16,7 +16,7 @@ import { renderToolPage, esc, SITE_ORIGIN } from "./layout";
 const PATH = "/tools/quotation-templates";
 const TITLE = "Free Quotation Templates — Word & Excel Download | DealInSec";
 const DESC =
-  "Download free quotation templates for Indian freelancers: a simple service quotation, a GST quotation and a freelancer one-pager in Word, plus an Excel format with auto-totals. No sign-up — or edit online and export a PDF.";
+  "Download free quotation templates for freelancers: a simple service quotation, a GST quotation (India) and a freelancer one-pager in Word, plus an Excel format with auto-totals. No sign-up — or edit online in any currency and export a PDF.";
 
 interface Tpl {
   key: string;
@@ -47,13 +47,14 @@ const TEMPLATES: Tpl[] = [
   },
   {
     key: "gst",
-    name: "GST Quotation",
+    name: "GST Quotation (India)",
     file: "/templates/quotation-format-gst.docx",
     kind: "Word (.docx)",
-    bestFor: "GST-registered freelancers quoting with tax shown",
+    bestFor: "GST-registered freelancers in India quoting with tax shown",
     includes: ["GSTIN fields for both parties", "HSN/SAC column", "CGST/SGST rows (IGST note)", "Tax-estimate disclaimer"],
     seed: {
-      quoteNo: "QT-2026-001", gstRate: "18", taxType: "cgst_sgst",
+      // A GST quotation is an Indian document whoever opens it.
+      quoteNo: "QT-2026-001", gstRate: "18", taxType: "cgst_sgst", country: "IN", currency: "INR",
       items: [{ desc: "Service description", qty: 1, rate: 50000 }],
     },
   },
@@ -89,7 +90,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Should I use the Word, Excel or online format?",
-    a: "Word gives you full control over wording and layout. Excel computes the totals and GST for you. The free online quotation maker does both — live math, GST split, amount in words — and exports a clean PDF, which is the format clients should receive.",
+    a: "Word gives you full control over wording and layout. Excel computes the totals and GST for you. The free online quotation maker does both — live math in any currency, with GST, VAT or sales tax (and the CGST/SGST split and amount in words on Indian quotations) — and exports a clean PDF, which is the format clients should receive.",
   },
   {
     q: "How do I edit a template?",
@@ -97,11 +98,11 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Is the GST template a tax document?",
-    a: "No — a quotation never is. GST on a quotation is an estimate so the client sees the final payable amount; the tax event is the invoice you raise after the work. For a GST tax invoice with CGST/SGST/IGST computed, use the free GST invoice generator.",
+    a: "No — a quotation never is. The GST template is for India, and GST on a quotation is an estimate so the client sees the final payable amount; the tax event is the invoice you raise after the work. The same goes for VAT or sales tax shown on a quotation elsewhere. In India, for a GST tax invoice with CGST/SGST/IGST computed, use the free GST invoice generator.",
   },
   {
     q: "What must a quotation format include?",
-    a: "Your business details, a quotation number and date, a validity date, the client's details, an itemised work table, taxes if applicable, the total with amount in words, terms and conditions, and a signature. Every template here includes all nine — see the full quotation format guide for the reasoning.",
+    a: "Your business details, a quotation number and date, a validity date, the client's details, an itemised work table, taxes if applicable, the total (with the amount in words on Indian quotations), terms and conditions, and a signature. Every template here includes all nine — see the full quotation format guide for the reasoning.",
   },
 ];
 
@@ -170,13 +171,13 @@ function cards(): string {
 const BODY = `
 <div class="hero"><div class="wrap">
   <h1>Free Quotation Templates</h1>
-  <p class="sub">Download a professional quotation format in Word or Excel — or edit it online and export a PDF. Brand-neutral, made for India's freelancers, no sign-up.</p>
+  <p class="sub">Download a professional quotation format in Word or Excel — or edit it online in your own currency and export a PDF. Brand-neutral, made for freelancers, no sign-up.</p>
   <div class="chips">
     <span class="chip">100% free</span>
     <span class="chip">Word &amp; Excel</span>
     <span class="chip">No sign-up</span>
-    <span class="chip">GST-ready option</span>
-    <span class="chip">Made for India</span>
+    <span class="chip">GST option for India</span>
+    <span class="chip">Any country · any currency</span>
   </div>
 </div></div>
 
@@ -186,12 +187,12 @@ const BODY = `
 
 <section><div class="wrap">
   <h2>Template or online maker?</h2>
-  <p class="muted" style="max-width:720px">A template is perfect when you want full control in Word or Excel. The <a href="/tools/quotation-maker">free online quotation maker</a> is faster when you want the math, GST split and amount-in-words done for you — it produces the same professional format as these files and exports straight to PDF. Either way, send your client a PDF, never an editable file.</p>
+  <p class="muted" style="max-width:720px">A template is perfect when you want full control in Word or Excel. The <a href="/tools/quotation-maker">free online quotation maker</a> is faster when you want the math and tax done for you, in any currency — it produces the same professional format as these files and exports straight to PDF. The Word and Excel files are laid out in rupees (₹); outside India, swap in your own currency symbol, or use the online maker. Either way, send your client a PDF, never an editable file.</p>
 </div></section>
 
 <section><div class="wrap">
   <h2>What every quotation format must include</h2>
-  <p class="muted" style="max-width:720px">All the templates above carry the nine fields a professional quotation needs: your business details, a quotation number, the date, a <b>validity date</b> (the most-skipped field and the one that costs real money), client details, an itemised work table, taxes where applicable, the total with amount in words, and terms &amp; conditions with a signature. The reasoning behind each field is in the <a href="/blog/quotation-format">quotation format guide</a>.</p>
+  <p class="muted" style="max-width:720px">All the templates above carry the nine fields a professional quotation needs: your business details, a quotation number, the date, a <b>validity date</b> (the most-skipped field and the one that costs real money), client details, an itemised work table, taxes where applicable, the total (with the amount in words on Indian quotations), and terms &amp; conditions with a signature. The reasoning behind each field is in the <a href="/blog/quotation-format">quotation format guide</a>.</p>
 </div></section>
 
 <section><div class="wrap faq">
@@ -250,5 +251,5 @@ export const quotationTemplatesMeta = {
   slug: "quotation-templates",
   path: PATH,
   title: "Quotation Templates",
-  blurb: "Download free quotation formats in Word & Excel — or edit them online and export a PDF. Brand-neutral, GST-ready.",
+  blurb: "Download free quotation formats in Word & Excel — or edit them online in any currency and export a PDF. Brand-neutral, with a GST option for India.",
 };

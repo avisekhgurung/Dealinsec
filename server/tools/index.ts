@@ -38,19 +38,27 @@ interface ToolDef {
   title: string;
   blurb: string;
   render: () => string;
+  /** Set for a tool built on one country's rules; absent means any country. */
+  country?: "IN" | "GB";
 }
 
+// Order is display order on /tools: the tools that work anywhere first.
 export const TOOLS: ToolDef[] = [
-  { ...gstInvoiceMeta, render: gstInvoicePage },
-  { ...billGeneratorMeta, render: billGeneratorPage },
   { ...quotationMakerMeta, render: quotationMakerPage },
-  { ...quotationTemplatesMeta, render: quotationTemplatesPage },
+  { ...billGeneratorMeta, render: billGeneratorPage },
   { ...serviceAgreementMeta, render: serviceAgreementPage },
-  { ...gstCalculatorMeta, render: gstCalculatorPage },
   { ...proformaInvoiceMeta, render: proformaInvoicePage },
   { ...purchaseOrderMeta, render: purchaseOrderPage },
-  { ...ukLatePaymentMeta, render: ukLatePaymentPage },
+  { ...quotationTemplatesMeta, render: quotationTemplatesPage },
+  { ...ukLatePaymentMeta, render: ukLatePaymentPage, country: "GB" },
+  { ...gstInvoiceMeta, render: gstInvoicePage, country: "IN" },
+  { ...gstCalculatorMeta, render: gstCalculatorPage, country: "IN" },
 ];
+
+const COUNTRY_TAGS: Record<NonNullable<ToolDef["country"]>, string> = {
+  IN: "🇮🇳 India",
+  GB: "🇬🇧 United Kingdom",
+};
 
 /** Public paths for the sitemap (the /tools index + each tool). */
 export function toolSitemapPaths(): string[] {
@@ -72,31 +80,47 @@ const ICONS: Record<string, string> = {
 
 const INDEX_FAQ: { q: string; a: string }[] = [
   { q: "Are these tools really free?", a: "Yes — every tool is free to use with no sign-up. You can create and download unlimited invoices, quotations and agreements as PDFs." },
+  { q: "Do the tools work outside India?", a: "Yes. The quotation maker, invoice and bill generator, service agreement, proforma invoice and purchase order work in any country: pick your country and currency, and the document follows it — the currency, the date format, the name of your tax (GST, VAT or sales tax) and the tax number your clients expect. A few tools are built on one country's rules and say so: the GST invoice generator and GST calculator for India, and the late-payment calculator for the UK." },
   { q: "Is my data safe?", a: "Everything runs in your browser. What you type is saved only on your own device and is never sent to or stored on our servers." },
-  { q: "What do I get if I create an account?", a: "Every client project lives on one thread — quotation, agreement, invoice and payment tracking — instead of scattered across WhatsApp, email and your downloads folder. The free plan covers 4 deals a month, each with its quotation, and every new account starts with a 7-day Pro trial (no card) that unlocks e-signed agreements, invoices and payment tracking. Pro is ₹99 a month or ₹999 a year." },
+  { q: "What do I get if I create an account?", a: "Every client project lives on one thread — quotation, agreement, invoice and payment tracking — instead of scattered across WhatsApp, email and your downloads folder. The free plan covers 4 deals a month, each with its quotation, and every new account starts with a 7-day Pro trial (no card) that unlocks e-signed agreements, invoices and payment tracking. In India, Pro is ₹99 a month or ₹999 a year. Outside India the free plan and the trial are open today, and paid plans are opening soon at $99, £79 or €89 a year." },
 ];
 
-function toolsIndexPage(): string {
-  const cards = TOOLS.map(
-    (t) => `<a class="tool-card" href="${esc(t.path)}">
+function toolCard(t: ToolDef): string {
+  const tag = t.country
+    ? `<span class="chip" style="align-self:flex-start;margin-bottom:8px;font-size:12px">${COUNTRY_TAGS[t.country]}</span>`
+    : "";
+  return `<a class="tool-card" href="${esc(t.path)}">
       <div class="tool-ico">${ICONS[t.slug] || ""}</div>
+      ${tag}
       <h2>${esc(t.title)}</h2>
       <p>${esc(t.blurb)}</p>
       <span class="go">Open tool →</span>
-    </a>`,
-  ).join("\n");
+    </a>`;
+}
+
+function toolsIndexPage(): string {
+  const anywhere = TOOLS.filter((t) => !t.country).map(toolCard).join("\n");
+  const local = TOOLS.filter((t) => t.country).map(toolCard).join("\n");
 
   const faqHtml = INDEX_FAQ.map((f) => `<h3>${f.q}</h3><p>${f.a}</p>`).join("\n");
 
   const body = `
   <div class="hero"><div class="wrap">
     <span class="badge">🎁 100% Free · No sign-up · Instant download</span>
-    <h1>Free tools for Indian<br /><span class="accent">freelancers</span></h1>
-    <p class="sub">Practical, no-sign-up tools for designers, developers, writers, video editors &amp; photographers, marketers and consultants — invoices, quotations and agreements, done in your browser.</p>
+    <h1>Free tools for<br /><span class="accent">freelancers</span></h1>
+    <p class="sub">Quotations, invoices and agreements for designers, developers, writers, video editors, photographers, marketers and consultants — in your own currency, done in your browser, no sign-up.</p>
   </div></div>
 
   <section><div class="wrap">
-    <div class="tool-grid">${cards}</div>
+    <h2>Works in any country</h2>
+    <p class="muted" style="margin-top:-6px">Pick your country and currency; the document follows its money, dates and tax.</p>
+    <div class="tool-grid">${anywhere}</div>
+  </div></section>
+
+  <section><div class="wrap">
+    <h2>Built on one country's rules</h2>
+    <p class="muted" style="margin-top:-6px">Tools that apply a specific country's tax or payment law.</p>
+    <div class="tool-grid">${local}</div>
   </div></section>
 
   <section id="how"><div class="wrap">
@@ -114,9 +138,9 @@ function toolsIndexPage(): string {
   </div></section>`;
 
   return renderToolPage({
-    title: "Free Invoice & Quotation Tools for Freelancers (India) | DealInSec",
+    title: "Free Invoice, Quotation & Agreement Tools for Freelancers | DealInSec",
     description:
-      "Free, no-sign-up tools for Indian freelancers — GST invoice generator, quotation maker, bill maker, service agreement template and GST calculator. PDF in a minute.",
+      "Free, no-sign-up tools for freelancers in any country — quotation maker, invoice generator, service agreement, proforma invoice and purchase order in your own currency, plus GST tools for India and a UK late-payment calculator.",
     canonicalPath: "/tools",
     bodyHtml: body,
     jsonLd: [

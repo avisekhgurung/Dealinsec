@@ -8,11 +8,12 @@
  */
 import { renderToolPage, SITE_ORIGIN } from "./layout";
 import { COMMON_JS, MEDIA_JS, EXPORT_JS } from "./client-lib";
+import { REGION_JS, regionFieldsHtml } from "./region-lib";
 
 const PATH = "/tools/service-agreement-template";
-const TITLE = "Free Service Agreement Template (India) — Download PDF | DealInSec";
+const TITLE = "Free Service Agreement Template — Download PDF | DealInSec";
 const DESC =
-  "Create a free service agreement between a freelancer and their client — scope, deliverables, fees, revisions, cancellation and signatures. Download as PDF, no sign-up.";
+  "Create a free service agreement between a freelancer and their client, in any country and currency — scope, deliverables, fees, revisions, cancellation, governing law and signatures. Download as PDF, no sign-up.";
 
 const FAQ: { q: string; a: string }[] = [
   {
@@ -25,11 +26,11 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Is this service agreement legally valid?",
-    a: "Electronic contracts are recognised in India under Section 10A of the Information Technology Act, 2000. This template gives you a clear, professionally structured starting point; whether an agreement is enforceable depends on its specific terms and how it was signed. We are not a law firm and this tool does not provide legal advice — for high-value or complex work, have a lawyer review it.",
+    a: "Electronic signatures are generally recognised in many countries — for example India (Information Technology Act, 2000), the United States (ESIGN Act), the UK (Electronic Communications Act 2000) and the EU (eIDAS Regulation). This template gives you a clear, professionally structured starting point; whether an agreement is enforceable depends on its specific terms and how it was signed. We are not a law firm and this tool does not provide legal advice — for high-value or complex work, have a lawyer review it.",
   },
   {
     q: "How do I get it signed?",
-    a: "You can print and sign it, or send it from DealInSec: your client accepts it online and the agreement keeps an execution record — who accepted it, when, and with which signature — attached to the deal. Agreements are part of Pro (₹99/month), and every new account starts with a 7-day Pro trial, no card.",
+    a: "You can print and sign it, or send it from DealInSec: your client accepts it online and the agreement keeps an execution record — who accepted it, when, and with which signature — attached to the deal. Agreements are part of Pro (₹99/month in India; plans for the rest of the world are opening soon), and every new account starts with a 7-day Pro trial, no card.",
   },
 ];
 
@@ -69,7 +70,7 @@ const BODY = `
     <span class="chip">No sign-up</span>
     <span class="chip">Ready-to-sign</span>
     <span class="chip">Instant PDF</span>
-    <span class="chip">Made for India</span>
+    <span class="chip">Any country · any currency</span>
   </div>
 </div></div>
 
@@ -78,13 +79,15 @@ const BODY = `
     <div class="card" id="form-card">
       <h2 style="font-size:18px">Agreement details</h2>
 
+      ${regionFieldsHtml()}
+
       <div class="row2">
         <div><label>Service provider (you)</label><input class="f" id="spName" placeholder="Your name / business" /></div>
         <div><label>Client</label><input class="f" id="clName" placeholder="Client name / business" /></div>
       </div>
       <div class="row2">
-        <div><label>Your address</label><textarea class="f" id="spAddr" rows="2" placeholder="City, State"></textarea></div>
-        <div><label>Client address</label><textarea class="f" id="clAddr" rows="2" placeholder="City, State"></textarea></div>
+        <div><label>Your address</label><textarea class="f" id="spAddr" rows="2" placeholder="City, State" data-ph-intl="City, country"></textarea></div>
+        <div><label>Client address</label><textarea class="f" id="clAddr" rows="2" placeholder="City, State" data-ph-intl="City, country"></textarea></div>
       </div>
       <label>Effective date</label>
       <input class="f" id="effDate" type="date" />
@@ -104,9 +107,13 @@ const BODY = `
       <hr style="border:none;border-top:1px solid var(--line);margin:18px 0" />
 
       <div class="row2">
-        <div><label>Total fee (₹)</label><input class="f" id="fee" type="number" min="0" placeholder="50000" /></div>
+        <div><label for="fee">Total fee (<span id="fee-cur">₹</span>)</label><input class="f" id="fee" type="number" min="0" placeholder="50000" /></div>
         <div><label>Advance %</label><input class="f" id="advancePct" type="number" min="0" max="100" placeholder="50" /></div>
       </div>
+
+      <label for="govLaw">Governing law</label>
+      <input class="f" id="govLaw" maxlength="120" placeholder="e.g. England and Wales" />
+      <p class="muted" id="govLaw-hint" style="font-size:12.5px;margin:6px 0 0;display:none">Federal country? Name the state or province, e.g. “the State of New York”.</p>
 
       <hr style="border:none;border-top:1px solid var(--line);margin:18px 0" />
 
@@ -147,7 +154,7 @@ const BODY = `
 <section><div class="wrap">
   <h2>How to create a service agreement</h2>
   <div class="steps">
-    <div class="step"><div class="n">1</div><b>Name the parties</b><p class="muted">Add you, your client, and the effective date.</p></div>
+    <div class="step"><div class="n">1</div><b>Name the parties</b><p class="muted">Pick your country and currency, then add you, your client, and the effective date.</p></div>
     <div class="step"><div class="n">2</div><b>Define the work</b><p class="muted">Scope, deliverables, timeline, fee and payment split.</p></div>
     <div class="step"><div class="n">3</div><b>Download &amp; sign</b><p class="muted">Download the PDF, then print-and-sign or e-sign inside DealInSec.</p></div>
   </div>
@@ -190,28 +197,78 @@ const STYLE = `<style>
 
 const PAGE_JS = `
   var STORE='dis_agreement_v2';
+  var RG=initRegion(function(){ syncRegion(); commit(); });
   var LOGO=initLogo('logo-input','logo-preview',function(){ render(); save(); });
   var SIG=initSignature('sig-pad',function(){ render(); save(); });
   var EX=initExport(function(){ return $('doc-preview'); }, function(){ return 'Service Agreement'+($('clName').value?' - '+$('clName').value:''); });
   initBranding(function(){ render(); });
   var LASTTOTAL=0;
-  function saveData(){ return { type:'agreement', docNumber:'', partyName:$('clName').value, total:LASTTOTAL, payload:collect() }; }
+  function saveData(){ return { type:'agreement', docNumber:'', partyName:$('clName').value, total:LASTTOTAL, currency:REG.cur, payload:collect() }; }
 
-  var FIELDS=['spName','spAddr','clName','clAddr','effDate','scope','deliverables','startDate','endDate','fee','advancePct'];
+  var FIELDS=['spName','spAddr','clName','clAddr','effDate','scope','deliverables','startDate','endDate','fee','advancePct','govLaw'];
+
+  // ── Governing law ── follows the country until the user types their own.
+  var govTouched=false;
+  function govDefault(){
+    if(REG.cc==='IN') return 'India';
+    if(REG.cc==='GB') return 'England and Wales';
+    var s=$('country'), o=s && s.options[s.selectedIndex];
+    var name=o ? String(o.text||'').replace(/\\uD83C[\\uDDE6-\\uDDFF]/g,'').trim() : '';
+    return name || REG.cc;
+  }
+  function govLawText(){ return $('govLaw').value.trim() || govDefault(); }
+  function syncRegion(){
+    if(!govTouched) $('govLaw').value=govDefault();
+    $('govLaw-hint').style.display = (REG.cc==='IN' || REG.cc==='GB') ? 'none' : '';
+    $('fee-cur').textContent = REG.cur==='INR' ? '\\u20B9' : REG.cur;
+  }
+  $('govLaw').addEventListener('input', function(){
+    var v=$('govLaw').value.trim();
+    govTouched = !!v && v!==govDefault();
+    renderClauseList();
+  });
+
+  // Clauses whose wording follows the country. India keeps its original text;
+  // a clause stays automatic until the user rewrites it in the editor.
+  var LATE_IN='Invoices are payable within the agreed period. Overdue amounts may attract interest at 18% per annum, and the Service Provider may pause work until outstanding dues are cleared.';
+  var LATE_INTL='Invoices are payable within the agreed period. Overdue amounts may attract interest at the rate allowed under the governing law, and the Service Provider may pause work until overdue amounts are paid.';
+  var AUTO={
+    late:function(){ return REG.cc==='IN' ? LATE_IN : LATE_INTL; },
+    gov:function(){ return 'This Agreement is governed by the laws of '+govLawText()+', and the courts of the Service Provider\\'s city will have jurisdiction over any dispute.'; }
+  };
+  // Saved before the wording followed the country: the India text, verbatim.
+  var LEGACY={
+    late:LATE_IN,
+    gov:'This Agreement is governed by the laws of India, and the courts of the Service Provider\\'s city will have jurisdiction over any dispute.'
+  };
+  function isAuto(c){ return !!(c && c.auto && Object.prototype.hasOwnProperty.call(AUTO, c.auto)); }
+  function cBody(c){ return isAuto(c) ? AUTO[c.auto]() : String((c && c.body) || ''); }
 
   var DEFAULT_CLAUSES=[
     {title:'Revisions', body:'Up to 2 round(s) of revisions are included in the fee. All change requests should be submitted together. Additional revisions may be charged separately at the Service Provider\\'s standard rates.'},
     {title:'Cancellation', body:'Either party may end this Agreement with written notice. If the Client cancels after work has started, any advance paid is non-refundable, and any work already delivered remains payable.'},
-    {title:'Late Payment', body:'Invoices are payable within the agreed period. Overdue amounts may attract interest at 18% per annum, and the Service Provider may pause work until outstanding dues are cleared.'},
+    {title:'Late Payment', auto:'late'},
     {title:'Confidentiality', body:'Each party will keep the other party\\'s non-public information confidential and use it only to perform this Agreement.'},
     {title:'Intellectual Property', body:'On full payment of all fees, ownership of the final approved deliverables passes to the Client. The Service Provider may show the work in their portfolio unless agreed otherwise in writing.'},
-    {title:'Governing Law', body:'This Agreement is governed by the laws of India, and the courts of the Service Provider\\'s city will have jurisdiction over any dispute.'}
+    {title:'Governing Law', auto:'gov'}
   ];
+  function defClauses(){ return DEFAULT_CLAUSES.map(function(c){ var o={title:c.title, body:c.body||''}; if(c.auto) o.auto=c.auto; return o; }); }
+  function loadClauses(a){
+    return a.map(function(c){
+      var o={ title:String((c && c.title) || ''), body:String((c && c.body) || '') };
+      if(isAuto(c)) o.auto=c.auto;
+      else { for(var k in LEGACY){ if(o.body===LEGACY[k]) o.auto=k; } }
+      return o;
+    });
+  }
   var clauses=[];
   var editIdx=-1;
 
   function collect(){
-    var o={ clauses:clauses, logo:LOGO.get(), sig:SIG.get() };
+    var o={
+      clauses:clauses.map(function(c){ var x={title:c.title, body:cBody(c)}; if(isAuto(c)) x.auto=c.auto; return x; }),
+      logo:LOGO.get(), sig:SIG.get(), country:REG.cc, currency:REG.cur
+    };
     FIELDS.forEach(function(id){ o[id]=$(id).value; });
     return o;
   }
@@ -231,7 +288,7 @@ const PAGE_JS = `
     if(!clauses.length){ w.innerHTML='<div class="cl-empty">No extra clauses — the agreement shows only the core terms (parties, scope, deliverables, term, fees). Add clauses like Confidentiality or Cancellation whenever you want.</div>'; return; }
     w.innerHTML=clauses.map(function(c,i){
       return '<div class="cl-card">'+
-        '<div class="cl-main"><div class="cl-title">'+esc(c.title||'Untitled clause')+'</div><div class="cl-snip">'+esc(snip(c.body))+'</div></div>'+
+        '<div class="cl-main"><div class="cl-title">'+esc(c.title||'Untitled clause')+'</div><div class="cl-snip">'+esc(snip(cBody(c)))+'</div></div>'+
         '<div class="cl-btns">'+
           '<button type="button" class="cl-ico" data-a="up" data-i="'+i+'" aria-label="Move up"'+(i===0?' disabled':'')+'>'+ICO.up+'</button>'+
           '<button type="button" class="cl-ico" data-a="down" data-i="'+i+'" aria-label="Move down"'+(i===clauses.length-1?' disabled':'')+'>'+ICO.down+'</button>'+
@@ -265,7 +322,7 @@ const PAGE_JS = `
         '<div class="dlg-body"><label>Clause title</label><input class="f" id="dlg-title" maxlength="60" placeholder="e.g. Confidentiality" />'+
         '<label style="margin-top:10px">Clause text</label><textarea class="f" id="dlg-txt" rows="5" placeholder="Write the clause in plain language\\u2026"></textarea></div>'+
         '<div class="dlg-foot"><button type="button" class="btn ghost" data-x="cancel">Cancel</button><button type="button" class="btn" data-x="save">'+(isNew?'Add clause':'Save changes')+'</button></div>';
-      $('dlg-title').value=cc.title||''; $('dlg-txt').value=cc.body||'';
+      $('dlg-title').value=cc.title||''; $('dlg-txt').value=cBody(cc);
       $('dlg-txt').addEventListener('keydown', function(ev){ if((ev.metaKey||ev.ctrlKey)&&ev.key==='Enter') saveDlg(); });
       setTimeout(function(){ try{ $('dlg-title').focus(); }catch(e){} }, 60);
     }
@@ -277,6 +334,9 @@ const PAGE_JS = `
     var t=tt.value.trim(), body=bb.value.trim();
     if(!t && !body){ closeDlg(); return; }
     var obj={title:t||'Clause', body:body};
+    // Saved without rewording: the clause keeps following the country.
+    var prev=editIdx<0 ? null : clauses[editIdx];
+    if(isAuto(prev) && body===cBody(prev)) obj.auto=prev.auto;
     if(editIdx<0) clauses.push(obj); else clauses[editIdx]=obj;
     closeDlg(); commit();
   }
@@ -314,8 +374,9 @@ const PAGE_JS = `
     body+=clause(++n,'Scope of Services', para($('scope').value?esc($('scope').value):'The Service Provider will provide the services agreed between the parties.'));
     body+=clause(++n,'Deliverables', delivHtml);
     body+=clause(++n,'Term', para('This Agreement '+($('startDate').value?'begins on '+fmtDate($('startDate').value):'begins on the effective date')+($('endDate').value?' and continues until '+fmtDate($('endDate').value):' and continues until the services are completed')+', unless ended earlier under the terms below.'));
-    body+=clause(++n,'Fees & Payment', para('The total fee for the services is <b>'+money(fee)+'</b> ('+esc(words(fee))+').'+(pct>0?' An advance of '+money(adv)+' ('+pct+'%) is payable to confirm the engagement, and the balance of '+money(bal)+' is payable on completion / final delivery.':' Payment is due as agreed between the parties.')));
-    clauses.forEach(function(c){ if((c.title&&c.title.trim())||(c.body&&c.body.trim())){ body+=clause(++n, c.title||'Clause', '<div style="margin:8px 0;font-size:12.5px;color:#334155;line-height:1.6;white-space:pre-line">'+esc(c.body||'')+'</div>'); } });
+    // Amount in words is a rupee convention (lakh/crore), as in wordsLine().
+    body+=clause(++n,'Fees & Payment', para('The total fee for the services is <b>'+money(fee)+'</b>'+(REG.cur==='INR'?' ('+esc(words(fee))+')':'')+'.'+(pct>0?' An advance of '+money(adv)+' ('+pct+'%) is payable to confirm the engagement, and the balance of '+money(bal)+' is payable on completion / final delivery.':' Payment is due as agreed between the parties.')));
+    clauses.forEach(function(c){ var cb=cBody(c); if((c.title&&c.title.trim())||cb.trim()){ body+=clause(++n, c.title||'Clause', '<div style="margin:8px 0;font-size:12.5px;color:#334155;line-height:1.6;white-space:pre-line">'+esc(cb)+'</div>'); } });
 
     var spSignInk = SIG.get() ? '<img src="'+SIG.get()+'" alt="signature" style="max-height:42px;max-width:170px;object-fit:contain" />' : '';
     var sign='<div style="margin-top:22px;display:flex;gap:24px">'+
@@ -337,7 +398,8 @@ const PAGE_JS = `
     try{localStorage.removeItem(STORE);}catch(e){}
     FIELDS.forEach(function(id){$(id).value='';});
     LOGO.clear(); SIG.clear();
-    clauses=DEFAULT_CLAUSES.map(function(c){return {title:c.title, body:c.body};});
+    govTouched=false; RG.reset(); syncRegion();
+    clauses=defClauses();
     renderClauseList(); render(); save();
   });
   $('download').addEventListener('click',function(){ document.title=('Service Agreement'+($('clName').value?' - '+$('clName').value:'')); EX.open(); });
@@ -345,12 +407,16 @@ const PAGE_JS = `
   var saved=null; try{ saved=JSON.parse(localStorage.getItem(STORE)||'null'); }catch(e){}
   if(saved){
     FIELDS.forEach(function(id){ if(saved[id]!=null)$(id).value=saved[id]; });
+    RG.set(saved.country, saved.currency);
+    var gl=$('govLaw').value.trim(); govTouched = !!gl && gl!==govDefault();
     if(saved.logo)LOGO.set(saved.logo);
     if(saved.sig)SIG.set(saved.sig);
-    clauses = Array.isArray(saved.clauses) ? saved.clauses : DEFAULT_CLAUSES.map(function(c){return {title:c.title, body:c.body};});
+    clauses = Array.isArray(saved.clauses) ? loadClauses(saved.clauses) : defClauses();
   } else {
-    clauses = DEFAULT_CLAUSES.map(function(c){return {title:c.title, body:c.body};});
+    RG.set();
+    clauses = defClauses();
   }
+  syncRegion();
   renderClauseList(); render();
 `;
 
@@ -362,7 +428,7 @@ export function serviceAgreementPage(): string {
     jsonLd: jsonLd(),
     headExtra: STYLE,
     bodyHtml: BODY,
-    bodyEndScripts: "<script>(function(){" + COMMON_JS + MEDIA_JS + EXPORT_JS + PAGE_JS + "})();</script>",
+    bodyEndScripts: "<script>(function(){" + COMMON_JS + REGION_JS + MEDIA_JS + EXPORT_JS + PAGE_JS + "})();</script>",
   });
 }
 

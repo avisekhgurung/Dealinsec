@@ -26,7 +26,7 @@ import {
   type CurrencyCode, type LocaleSettings,
 } from "@shared/schema";
 import {
-  COUNTRY_CODES, allTimeZones, countryName, currencyForCountry, guessCountry,
+  COUNTRY_CODES, allTimeZones, countryName, currencyForCountry, flagEmoji, guessCountry,
   normalizeTimeZone, regionForCountry, timeZoneLabel, zonesForCountry,
 } from "@shared/region";
 
@@ -133,7 +133,10 @@ export function RegionFields({ value, onChange, disabled, showTimeZone, idPrefix
                 className="w-full justify-between px-3 font-normal"
                 data-testid={`${idPrefix}-country`}
               >
-                <span className="truncate">{countryName(value.country)}</span>
+                <span className="truncate">
+                  <span aria-hidden="true" className="mr-2">{flagEmoji(value.country)}</span>
+                  {countryName(value.country)}
+                </span>
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
@@ -152,6 +155,7 @@ export function RegionFields({ value, onChange, disabled, showTimeZone, idPrefix
                         data-testid={`${idPrefix}-country-${code}`}
                       >
                         <Check className={cn("h-4 w-4", value.country === code ? "opacity-100" : "opacity-0")} />
+                        <span aria-hidden="true" className="w-5 text-center">{flagEmoji(code)}</span>
                         <span className="truncate">{name}</span>
                       </CommandItem>
                     ))}

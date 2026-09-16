@@ -5,11 +5,12 @@
  */
 import { renderToolPage, SITE_ORIGIN } from "./layout";
 import { COMMON_JS, ITEMS_JS, MEDIA_JS, EXPORT_JS } from "./client-lib";
+import { REGION_JS, regionFieldsHtml, intlTaxFieldsHtml } from "./region-lib";
 
 const PATH = "/tools/purchase-order-generator";
-const TITLE = "Free Purchase Order Generator (India) — Download PDF | DealInSec";
+const TITLE = "Free Purchase Order Generator — Download PDF | DealInSec";
 const DESC =
-  "Create a professional purchase order (PO) online free. Vendor details, delivery date, GST-ready totals, amount in words, instant PDF — no sign-up. Made for India.";
+  "Create a professional purchase order (PO) online free, in any currency. Vendor details, delivery date, totals with GST, VAT or sales tax, and an instant PDF — no sign-up.";
 
 const FAQ: { q: string; a: string }[] = [
   {
@@ -22,7 +23,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "What should a purchase order include?",
-    a: "A clear PO includes the buyer and supplier details (with GSTIN where applicable), a unique PO number and date, an expected delivery date, a line-item list with quantities and rates, the total value, and any terms such as payment or delivery conditions.",
+    a: "A clear PO includes the buyer and supplier details (with a GSTIN, VAT number or other tax registration where applicable), a unique PO number and date, an expected delivery date, a line-item list with quantities and rates, the total value, and any terms such as payment or delivery conditions.",
   },
   {
     q: "Is this purchase order generator free?",
@@ -64,13 +65,13 @@ function jsonLd(): object[] {
 const BODY = `
 <div class="hero"><div class="wrap">
   <h1>Free Purchase Order Generator</h1>
-  <p class="sub">Raise a clean, professional purchase order for your vendor in under a minute. Delivery date, GST-ready totals, amount in words and an instant PDF — no sign-up, no cost.</p>
+  <p class="sub">Raise a clean, professional purchase order for your vendor in under a minute, in your own currency. Delivery date, GST, VAT or sales tax, and an instant PDF — no sign-up, no cost.</p>
   <div class="chips">
     <span class="chip">100% free</span>
     <span class="chip">No sign-up</span>
     <span class="chip">Vendor &amp; delivery</span>
     <span class="chip">Instant PDF</span>
-    <span class="chip">Made for India</span>
+    <span class="chip">Any country · any currency</span>
   </div>
 </div></div>
 
@@ -80,14 +81,16 @@ const BODY = `
     <div class="card" id="form-card">
       <h2 style="font-size:18px">Purchase order details</h2>
 
+      ${regionFieldsHtml()}
+
       <label>Your company (buyer)</label>
       <input class="f" id="bizName" placeholder="e.g. Sunrise Studios" />
       <div class="row2">
-        <div><label>Your GSTIN (optional)</label><input class="f" id="bizGstin" placeholder="e.g. 07AABCU9603R1ZM" /></div>
+        <div data-taxid-wrap><label for="bizGstin">Your GSTIN (optional)</label><input class="f" id="bizGstin" data-taxid-input placeholder="e.g. 07AABCU9603R1ZM" /></div>
         <div><label>PO number</label><input class="f" id="poNo" placeholder="PO-001" /></div>
       </div>
       <label>Your address</label>
-      <textarea class="f" id="bizAddr" rows="2" placeholder="Street, City, State, PIN"></textarea>
+      <textarea class="f" id="bizAddr" rows="2" placeholder="Street, City, State, PIN" data-ph-intl="Street, city, postcode, country"></textarea>
 
       <label>Business logo (optional)</label>
       <div class="logo-preview" id="logo-preview" style="display:none"></div>
@@ -99,13 +102,13 @@ const BODY = `
       <hr style="border:none;border-top:1px solid var(--line);margin:18px 0" />
 
       <label>Vendor / supplier name</label>
-      <input class="f" id="venName" placeholder="e.g. Apex Supplies Pvt Ltd" />
+      <input class="f" id="venName" placeholder="e.g. Apex Supplies Pvt Ltd" data-ph-intl="e.g. Apex Supplies Ltd" />
       <div class="row2">
-        <div><label>Vendor GSTIN (optional)</label><input class="f" id="venGstin" placeholder="Vendor GSTIN" /></div>
+        <div data-taxid-wrap><label for="venGstin">Vendor GSTIN (optional)</label><input class="f" id="venGstin" placeholder="Vendor GSTIN" /></div>
         <div><label>PO date</label><input class="f" id="poDate" type="date" /></div>
       </div>
       <div class="row2">
-        <div><label>Vendor address</label><textarea class="f" id="venAddr" rows="2" placeholder="Vendor street, city, state, PIN"></textarea></div>
+        <div><label>Vendor address</label><textarea class="f" id="venAddr" rows="2" placeholder="Vendor street, city, state, PIN" data-ph-intl="Vendor street, city, postcode, country"></textarea></div>
         <div><label>Expected delivery (optional)</label><input class="f" id="delDate" type="date" /></div>
       </div>
       <label>Ship to (optional — if different from your address)</label>
@@ -117,7 +120,7 @@ const BODY = `
       <div id="items"></div>
       <button class="btn ghost" id="addItem" type="button" style="margin-top:10px">+ Add item</button>
 
-      <div class="row2" style="margin-top:16px">
+      <div class="row2" id="tax-in" style="margin-top:16px">
         <div>
           <label>GST rate (optional)</label>
           <select class="f" id="gstRate">
@@ -135,6 +138,7 @@ const BODY = `
           </select>
         </div>
       </div>
+      ${intlTaxFieldsHtml()}
 
       <label>Notes / terms (optional)</label>
       <textarea class="f" id="notes" rows="2" placeholder="e.g. Delivery within 10 days. Payment 30 days from delivery. Quote PO number on invoice."></textarea>
@@ -164,8 +168,8 @@ const BODY = `
 <section><div class="wrap">
   <h2>How to create a purchase order</h2>
   <div class="steps">
-    <div class="step"><div class="n">1</div><b>Add buyer &amp; vendor</b><p class="muted">Enter your company, your supplier, and a PO number and date.</p></div>
-    <div class="step"><div class="n">2</div><b>Add items &amp; delivery</b><p class="muted">List what you're ordering with quantities and rates, and an expected delivery date.</p></div>
+    <div class="step"><div class="n">1</div><b>Add buyer &amp; vendor</b><p class="muted">Pick your country and currency, then enter your company, your supplier, and a PO number and date.</p></div>
+    <div class="step"><div class="n">2</div><b>Add items &amp; delivery</b><p class="muted">List what you're ordering with quantities and rates, add GST, VAT or sales tax if it applies, and set an expected delivery date.</p></div>
     <div class="step"><div class="n">3</div><b>Send it</b><p class="muted">Download the PDF and send it to your vendor to confirm the order.</p></div>
   </div>
 </div></section>
@@ -185,24 +189,38 @@ const BODY = `
 
 const PAGE_JS = `
   var STORE='dis_purchase_order_v1';
+  var RG=initRegion(function(){ render(); save(); });
   var IT=initItems(function(){ render(); save(); });
   var LOGO=initLogo('logo-input','logo-preview',function(){ render(); save(); });
   var SIG=initSignature('sig-pad',function(){ render(); save(); });
   var EX=initExport(function(){ return $('invoice-preview'); }, function(){ return $('poNo').value||'Purchase-Order'; });
   initBranding(function(){ render(); });
   var LASTTOTAL=0;
-  function saveData(){ return { type:'purchase_order', docNumber:$('poNo').value, partyName:$('venName').value, total:LASTTOTAL, payload:collect() }; }
+  function saveData(){ return { type:'purchase_order', docNumber:$('poNo').value, partyName:$('venName').value, total:LASTTOTAL, currency:REG.cur, payload:collect() }; }
 
-  var FIELDS=['bizName','bizGstin','bizAddr','poNo','venName','venGstin','venAddr','poDate','delDate','shipAddr','gstRate','taxType','notes','sigName'];
+  var FIELDS=['bizName','bizGstin','bizAddr','poNo','venName','venGstin','venAddr','poDate','delDate','shipAddr','gstRate','taxType','taxName','taxPct','notes','sigName'];
 
   function collect(){
-    var o={ items:IT.get(), logo:LOGO.get(), sig:SIG.get() };
+    var o={ items:IT.get(), logo:LOGO.get(), sig:SIG.get(), country:REG.cc, currency:REG.cur };
     FIELDS.forEach(function(id){ o[id]=$(id).value; });
     return o;
   }
   function save(){ try{ localStorage.setItem(STORE, JSON.stringify(collect())); }catch(e){} }
 
+  // Both parties have a tax-ID field, so the labels keep saying whose number it
+  // is ("Vendor VAT number") instead of taking the generic data-taxid-label text.
+  // India keeps "Your GSTIN" / "Vendor GSTIN" and the "Vendor GSTIN" placeholder.
+  function taxIdLabels(){
+    var t=REG.taxId||'Tax ID';
+    if(/^[A-Z][a-z]/.test(t)) t=t.charAt(0).toLowerCase()+t.slice(1);
+    var lb=document.querySelector('label[for="bizGstin"]'), lv=document.querySelector('label[for="venGstin"]');
+    if(lb) lb.textContent='Your '+t+' (optional)';
+    if(lv) lv.textContent='Vendor '+t+' (optional)';
+    $('venGstin').placeholder='Vendor '+t;
+  }
+
   function render(){
+    taxIdLabels();
     var subtotal=0;
     var rows=IT.get().map(function(it){
       var amt=round2(num(it.qty)*num(it.rate)); subtotal+=amt;
@@ -212,12 +230,16 @@ const PAGE_JS = `
         '<td style="padding:7px 8px;border-bottom:1px solid #EEF2F6;text-align:right">'+money(amt)+'</td></tr>';
     }).join('');
     subtotal=round2(subtotal);
+    var isIN=REG.cc==='IN';
     var rate=num($('gstRate').value), taxType=$('taxType').value;
-    var taxTotal=round2(subtotal*rate/100);
+    var it=intlTax(subtotal);
+    var taxTotal=isIN ? round2(subtotal*rate/100) : it.amount;
     var total=round2(subtotal+taxTotal);
     LASTTOTAL=total;
     var taxRows='';
-    if(rate>0){
+    if(!isIN){
+      if(it.rate>0) taxRows='<tr><td colspan="3" style="padding:5px 8px;text-align:right;color:#64748B">'+esc(it.label)+'</td><td style="padding:5px 8px;text-align:right">'+money(taxTotal)+'</td></tr>';
+    }else if(rate>0){
       if(taxType==='igst'){
         taxRows='<tr><td colspan="3" style="padding:5px 8px;text-align:right;color:#64748B">IGST ('+rate+'%)</td><td style="padding:5px 8px;text-align:right">'+money(taxTotal)+'</td></tr>';
       }else{
@@ -238,7 +260,7 @@ const PAGE_JS = `
     var html=''+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'+
         '<div>'+(LOGO.get()?'<img src="'+LOGO.get()+'" alt="" style="max-height:50px;max-width:180px;object-fit:contain;margin-bottom:8px;display:block" />':'')+'<div style="font-size:20px;font-weight:800;color:#0F172A">'+esc(bn)+'</div>'+
-          ($('bizGstin').value?'<div style="font-size:12px;color:#64748B">GSTIN: '+esc($('bizGstin').value)+'</div>':'')+
+          ($('bizGstin').value&&REG.taxId?'<div style="font-size:12px;color:#64748B">'+esc(REG.taxId)+': '+esc($('bizGstin').value)+'</div>':'')+
           '<div style="font-size:12px;color:#64748B;white-space:pre-line">'+esc($('bizAddr').value)+'</div></div>'+
         '<div style="text-align:right"><div style="font-size:21px;font-weight:800;letter-spacing:.03em;color:#0E8C5A">PURCHASE ORDER</div>'+metaRight+'</div>'+
       '</div>'+
@@ -246,7 +268,7 @@ const PAGE_JS = `
         '<div style="flex:1;min-width:150px;padding:10px 12px;background:#F8FAFC;border-radius:10px">'+
           '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8">Vendor</div>'+
           '<div style="font-weight:700;color:#0F172A">'+esc($('venName').value||'Vendor name')+'</div>'+
-          ($('venGstin').value?'<div style="font-size:12px;color:#64748B">GSTIN: '+esc($('venGstin').value)+'</div>':'')+
+          ($('venGstin').value&&REG.taxId?'<div style="font-size:12px;color:#64748B">'+esc(REG.taxId)+': '+esc($('venGstin').value)+'</div>':'')+
           '<div style="font-size:12px;color:#64748B;white-space:pre-line">'+esc($('venAddr').value)+'</div>'+
         '</div>'+
         (shipBox?'<div style="flex:1;min-width:150px;padding:10px 12px;background:#F8FAFC;border-radius:10px">'+
@@ -266,7 +288,7 @@ const PAGE_JS = `
           '<tr><td colspan="3" style="padding:10px 8px;text-align:right;font-weight:800;font-size:15px">Total</td><td style="padding:10px 8px;text-align:right;font-weight:800;font-size:15px;color:#0E8C5A">'+money(total)+'</td></tr>'+
         '</tfoot>'+
       '</table>'+
-      '<div style="margin-top:10px;font-size:12px;color:#475569"><b>Amount in words:</b> '+esc(words(total))+'</div>'+
+      wordsLine(total)+
       ($('notes').value?'<div style="margin-top:12px;padding-top:10px;border-top:1px dashed #E2E8F0;font-size:12px;color:#475569;white-space:pre-line"><b>Terms:</b> '+esc($('notes').value)+'</div>':'')+
       (SIG.get()?'<div style="margin-top:24px;display:flex;justify-content:flex-end"><div style="text-align:center;min-width:180px"><img src="'+SIG.get()+'" alt="signature" style="max-height:58px;max-width:190px;object-fit:contain" /><div style="border-top:1px solid #94A3B8;margin-top:2px;padding-top:4px;font-size:12px;font-weight:600;color:#0F172A">'+esc($('sigName').value||bn)+'</div><div style="font-size:10px;color:#94A3B8">Authorised Signatory</div></div></div>':'')+
       brandFooter();
@@ -278,8 +300,9 @@ const PAGE_JS = `
   $('sig-clear').addEventListener('click',function(){ SIG.clear(); });
   $('reset').addEventListener('click',function(){
     try{localStorage.removeItem(STORE);}catch(e){}
-    ['bizName','bizGstin','bizAddr','poNo','venName','venGstin','venAddr','poDate','delDate','shipAddr','notes','sigName'].forEach(function(id){$(id).value='';});
+    ['bizName','bizGstin','bizAddr','poNo','venName','venGstin','venAddr','poDate','delDate','shipAddr','taxName','taxPct','notes','sigName'].forEach(function(id){$(id).value='';});
     $('gstRate').value='0'; $('taxType').value='cgst_sgst';
+    RG.reset();
     LOGO.clear(); SIG.clear();
     IT.set([]); IT.render(); render(); save();
   });
@@ -288,16 +311,18 @@ const PAGE_JS = `
   var saved=null; try{ saved=JSON.parse(localStorage.getItem(STORE)||'null'); }catch(e){}
   if(saved){
     FIELDS.forEach(function(id){ if(saved[id]!=null)$(id).value=saved[id]; });
+    RG.set(saved.country, saved.currency);
     if(saved.logo)LOGO.set(saved.logo);
     if(saved.sig)SIG.set(saved.sig);
     IT.set(saved.items);
   }else{
+    RG.set();
     IT.set([{desc:'',qty:1,rate:0}]);
   }
   IT.render(); render();
 `;
 
-const CLIENT_JS = "<script>(function(){" + COMMON_JS + MEDIA_JS + EXPORT_JS + ITEMS_JS + PAGE_JS + "})();</script>";
+const CLIENT_JS = "<script>(function(){" + COMMON_JS + REGION_JS + MEDIA_JS + EXPORT_JS + ITEMS_JS + PAGE_JS + "})();</script>";
 
 export function purchaseOrderPage(): string {
   return renderToolPage({
@@ -314,5 +339,5 @@ export const purchaseOrderMeta = {
   slug: "purchase-order-generator",
   path: PATH,
   title: "Free Purchase Order Generator",
-  blurb: "Raise a professional purchase order for your vendor with delivery date and GST-ready totals — instant PDF, no sign-up.",
+  blurb: "Raise a professional purchase order for your vendor in any currency, with delivery date and GST, VAT or sales tax — instant PDF, no sign-up.",
 };

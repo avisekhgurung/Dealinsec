@@ -7,12 +7,13 @@
  */
 import { renderToolPage, SITE_ORIGIN } from "./layout";
 import { COMMON_JS, ITEMS_JS, MEDIA_JS, EXPORT_JS } from "./client-lib";
+import { REGION_JS, regionFieldsHtml, intlTaxFieldsHtml } from "./region-lib";
 import { STANDARD_TERMS } from "@shared/schema";
 
 const PATH = "/tools/quotation-maker";
-const TITLE = "Online Quotation Maker — Make a Quotation Free (India) | DealInSec";
+const TITLE = "Free Online Quotation Maker — Make a Quotation PDF | DealInSec";
 const DESC =
-  "Make a quotation online free: line items, optional GST, standard terms, amount in words and an instant PDF — no sign-up. The online quotation maker for India's freelancers.";
+  "Make a quotation online free in any currency: line items, optional GST, VAT or sales tax, standard terms and an instant PDF — no sign-up. The online quotation maker for freelancers.";
 
 const FAQ: { q: string; a: string }[] = [
   {
@@ -21,23 +22,23 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "How do I make a quotation online?",
-    a: "Fill in your business and client details, add each piece of work as a line item with a rate, pick a GST rate if you are registered, tick the terms that apply, and download the finished quotation as a PDF. The preview updates live as you type, and the whole process takes about five minutes.",
+    a: "Pick your country and currency, fill in your business and client details, add each piece of work as a line item with a rate, add GST, VAT or sales tax if you are registered for it, tick the terms that apply, and download the finished quotation as a PDF. The preview updates live as you type, and the whole process takes about five minutes.",
   },
   {
     q: "Can I make a sample or dummy quotation with this tool?",
-    a: "Yes — samples with fictional details are a normal way to learn the format, build a portfolio piece or demo software. But a fabricated quotation presented as a genuine offer (for reimbursements, insurance claims or three-quote procurement rules) can amount to cheating and forgery under Indian law. This tool is for real and sample quotations, not for deception.",
+    a: "Yes — samples with fictional details are a normal way to learn the format, build a portfolio piece or demo software. But a fabricated quotation presented as a genuine offer (for reimbursements, insurance claims or three-quote procurement rules) can amount to fraud or forgery in most countries — in India, for example, it can be cheating and forgery under criminal law. This tool is for real and sample quotations, not for deception.",
   },
   {
     q: "What should a quotation include?",
-    a: "A good quotation shows your business and client details, a quotation number and date, a validity date, an itemised list of the work with quantities and rates, any applicable GST, the total, and clear terms such as advance payment and revisions.",
+    a: "A good quotation shows your business and client details, a quotation number and date, a validity date, an itemised list of the work with quantities and rates, any tax that applies (GST, VAT or sales tax), the total, and clear terms such as advance payment and revisions.",
   },
   {
     q: "What is the difference between a quotation and an invoice?",
-    a: "A quotation is an offer sent before work begins, showing the estimated price and terms. An invoice is a bill sent to collect payment for work delivered. This tool makes quotations; you can generate the matching GST invoice with our free invoice generator.",
+    a: "A quotation is an offer sent before work begins, showing the estimated price and terms. An invoice is a bill sent to collect payment for work delivered. This tool makes quotations; you can make the matching invoice with our free bill and invoice generator.",
   },
   {
     q: "Can I turn a quotation into a signed deal?",
-    a: "Yes. In DealInSec the quotation becomes an agreement your client accepts online, and then the invoice — all on one thread for that client, with the figures carried across. The free plan covers 4 deals a month with their quotations; e-signed agreements, invoices and payment tracking are part of Pro (₹99/month), and every new account starts with a 7-day Pro trial, no card.",
+    a: "Yes. In DealInSec the quotation becomes an agreement your client accepts online, and then the invoice — all on one thread for that client, with the figures carried across. The free plan covers 4 deals a month with their quotations; e-signed agreements, invoices and payment tracking are part of Pro (₹99/month in India; plans for the rest of the world are opening soon), and every new account starts with a 7-day Pro trial, no card.",
   },
 ];
 
@@ -71,13 +72,13 @@ function jsonLd(): object[] {
 const BODY = `
 <div class="hero"><div class="wrap">
   <h1>Free Online Quotation Maker</h1>
-  <p class="sub">Make a quotation online in under a minute — line items, optional GST, standard terms and an instant PDF. No sign-up, no cost.</p>
+  <p class="sub">Make a quotation online in under a minute, in your own currency — line items, optional tax, standard terms and an instant PDF. No sign-up, no cost.</p>
   <div class="chips">
     <span class="chip">100% free</span>
     <span class="chip">No sign-up</span>
     <span class="chip">Standard T&amp;Cs built in</span>
     <span class="chip">Instant PDF</span>
-    <span class="chip">Made for India</span>
+    <span class="chip">Any country · any currency</span>
   </div>
 </div></div>
 
@@ -86,14 +87,16 @@ const BODY = `
     <div class="card" id="form-card">
       <h2 style="font-size:18px">Quotation details</h2>
 
+      ${regionFieldsHtml()}
+
       <label>Your business name</label>
       <input class="f" id="bizName" placeholder="e.g. Sunrise Studios" />
       <div class="row2">
-        <div><label>Your GSTIN (optional)</label><input class="f" id="bizGstin" placeholder="e.g. 07AABCU9603R1ZM" /></div>
+        <div data-taxid-wrap><label for="bizGstin" data-taxid-label>Your GSTIN (optional)</label><input class="f" id="bizGstin" data-taxid-input placeholder="e.g. 07AABCU9603R1ZM" /></div>
         <div><label>Quotation number</label><input class="f" id="quoteNo" placeholder="QUO-001" /></div>
       </div>
       <label>Your address</label>
-      <textarea class="f" id="bizAddr" rows="2" placeholder="Street, City, State, PIN"></textarea>
+      <textarea class="f" id="bizAddr" rows="2" placeholder="Street, City, State, PIN" data-ph-intl="Street, city, postcode, country"></textarea>
 
       <label>Business logo (optional)</label>
       <div class="logo-preview" id="logo-preview" style="display:none"></div>
@@ -111,7 +114,7 @@ const BODY = `
         <div><label>Valid until</label><input class="f" id="validUntil" type="date" /></div>
       </div>
       <label>Client address</label>
-      <textarea class="f" id="cliAddr" rows="2" placeholder="Client street, city, state, PIN"></textarea>
+      <textarea class="f" id="cliAddr" rows="2" placeholder="Client street, city, state, PIN" data-ph-intl="Client street, city, postcode, country"></textarea>
 
       <hr style="border:none;border-top:1px solid var(--line);margin:18px 0" />
 
@@ -119,7 +122,7 @@ const BODY = `
       <div id="items"></div>
       <button class="btn ghost" id="addItem" type="button" style="margin-top:10px">+ Add item</button>
 
-      <div class="row2" style="margin-top:16px">
+      <div class="row2" id="tax-in" style="margin-top:16px">
         <div>
           <label>GST rate</label>
           <select class="f" id="gstRate">
@@ -137,6 +140,7 @@ const BODY = `
           </select>
         </div>
       </div>
+      ${intlTaxFieldsHtml()}
 
       <label>Terms &amp; conditions</label>
       <div id="terms" style="display:flex;flex-direction:column;gap:8px">
@@ -171,8 +175,8 @@ const BODY = `
 <section><div class="wrap">
   <h2>How to make a quotation online</h2>
   <div class="steps">
-    <div class="step"><div class="n">1</div><b>Add details</b><p class="muted">Your business, your client, the quotation number, date and validity.</p></div>
-    <div class="step"><div class="n">2</div><b>Add items &amp; terms</b><p class="muted">List the work with rates, add GST if needed, and pick your terms.</p></div>
+    <div class="step"><div class="n">1</div><b>Add details</b><p class="muted">Your country and currency, your business, your client, the quotation number, date and validity.</p></div>
+    <div class="step"><div class="n">2</div><b>Add items &amp; terms</b><p class="muted">List the work with rates, add GST, VAT or sales tax if needed, and pick your terms.</p></div>
     <div class="step"><div class="n">3</div><b>Download PDF</b><p class="muted">The quotation updates live. Download and send it to your client.</p></div>
   </div>
 </div></section>
@@ -190,13 +194,14 @@ const BODY = `
 
 const PAGE_JS = `
   var STORE='dis_quote_v1';
+  var RG=initRegion(function(){ render(); save(); });
   var IT=initItems(function(){ render(); save(); });
   var LOGO=initLogo('logo-input','logo-preview',function(){ render(); save(); });
   var SIG=initSignature('sig-pad',function(){ render(); save(); });
   var EX=initExport(function(){ return $('invoice-preview'); }, function(){ return $('quoteNo').value||'Quotation'; });
   initBranding(function(){ render(); });
   var LASTTOTAL=0;
-  function saveData(){ return { type:'quotation', docNumber:$('quoteNo').value, partyName:$('cliName').value, total:LASTTOTAL, payload:collect() }; }
+  function saveData(){ return { type:'quotation', docNumber:$('quoteNo').value, partyName:$('cliName').value, total:LASTTOTAL, currency:REG.cur, payload:collect() }; }
 
   function collectTerms(){
     var out=[];
@@ -212,7 +217,8 @@ const PAGE_JS = `
       bizName:$('bizName').value, bizGstin:$('bizGstin').value, bizAddr:$('bizAddr').value, quoteNo:$('quoteNo').value,
       cliName:$('cliName').value, cliAddr:$('cliAddr').value, quoteDate:$('quoteDate').value, validUntil:$('validUntil').value,
       gstRate:$('gstRate').value, taxType:$('taxType').value, notes:$('notes').value, terms:termStates(), items:IT.get(),
-      logo:LOGO.get(), sig:SIG.get(), sigName:$('sigName').value
+      logo:LOGO.get(), sig:SIG.get(), sigName:$('sigName').value,
+      country:REG.cc, currency:REG.cur, taxName:$('taxName').value, taxPct:$('taxPct').value
     };
   }
   function save(){ try{ localStorage.setItem(STORE, JSON.stringify(collect())); }catch(e){} }
@@ -227,12 +233,16 @@ const PAGE_JS = `
         '<td style="padding:7px 8px;border-bottom:1px solid #EEF2F6;text-align:right">'+money(amt)+'</td></tr>';
     }).join('');
     subtotal=round2(subtotal);
+    var isIN=REG.cc==='IN';
     var rate=num($('gstRate').value), taxType=$('taxType').value;
-    var taxTotal=round2(subtotal*rate/100);
+    var it=intlTax(subtotal);
+    var taxTotal=isIN ? round2(subtotal*rate/100) : it.amount;
     var total=round2(subtotal+taxTotal);
     LASTTOTAL=total;
     var taxRows='';
-    if(rate>0){
+    if(!isIN){
+      if(it.rate>0) taxRows='<tr><td colspan="3" style="padding:5px 8px;text-align:right;color:#64748B">'+esc(it.label)+'</td><td style="padding:5px 8px;text-align:right">'+money(taxTotal)+'</td></tr>';
+    }else if(rate>0){
       if(taxType==='igst'){
         taxRows='<tr><td colspan="3" style="padding:5px 8px;text-align:right;color:#64748B">IGST ('+rate+'%)</td><td style="padding:5px 8px;text-align:right">'+money(taxTotal)+'</td></tr>';
       }else{
@@ -247,7 +257,7 @@ const PAGE_JS = `
     var html=''+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">'+
         '<div>'+(LOGO.get()?'<img src="'+LOGO.get()+'" alt="" style="max-height:50px;max-width:180px;object-fit:contain;margin-bottom:8px;display:block" />':'')+'<div style="font-size:20px;font-weight:800;color:#0F172A">'+esc(bn)+'</div>'+
-          ($('bizGstin').value?'<div style="font-size:12px;color:#64748B">GSTIN: '+esc($('bizGstin').value)+'</div>':'')+
+          ($('bizGstin').value&&REG.taxId?'<div style="font-size:12px;color:#64748B">'+esc(REG.taxId)+': '+esc($('bizGstin').value)+'</div>':'')+
           '<div style="font-size:12px;color:#64748B;white-space:pre-line">'+esc($('bizAddr').value)+'</div></div>'+
         '<div style="text-align:right"><div style="font-size:22px;font-weight:800;letter-spacing:.04em;color:#0E8C5A">QUOTATION</div>'+
           ($('quoteNo').value?'<div style="font-size:13px;color:#0F172A"># '+esc($('quoteNo').value)+'</div>':'')+
@@ -272,7 +282,7 @@ const PAGE_JS = `
           '<tr><td colspan="3" style="padding:10px 8px;text-align:right;font-weight:800;font-size:15px">Total</td><td style="padding:10px 8px;text-align:right;font-weight:800;font-size:15px;color:#0E8C5A">'+money(total)+'</td></tr>'+
         '</tfoot>'+
       '</table>'+
-      '<div style="margin-top:10px;font-size:12px;color:#475569"><b>Amount in words:</b> '+esc(words(total))+'</div>'+
+      wordsLine(total)+
       termsHtml+
       ($('notes').value?'<div style="margin-top:12px;padding-top:10px;border-top:1px dashed #E2E8F0;font-size:12px;color:#475569;white-space:pre-line"><b>Notes:</b> '+esc($('notes').value)+'</div>':'')+
       (SIG.get()?'<div style="margin-top:26px;display:flex;justify-content:flex-end"><div style="text-align:center;min-width:180px"><img src="'+SIG.get()+'" alt="signature" style="max-height:58px;max-width:190px;object-fit:contain" /><div style="border-top:1px solid #94A3B8;margin-top:2px;padding-top:4px;font-size:12px;font-weight:600;color:#0F172A">'+esc($('sigName').value||bn)+'</div><div style="font-size:10px;color:#94A3B8">Authorised Signatory</div></div></div>':'')+
@@ -280,7 +290,7 @@ const PAGE_JS = `
     $('invoice-preview').innerHTML=html;
   }
 
-  ['bizName','bizGstin','bizAddr','quoteNo','cliName','cliAddr','quoteDate','validUntil','gstRate','taxType','notes','sigName'].forEach(function(id){
+  ['bizName','bizGstin','bizAddr','quoteNo','cliName','cliAddr','quoteDate','validUntil','gstRate','taxType','taxName','taxPct','notes','sigName'].forEach(function(id){
     $(id).addEventListener('input',function(){ render(); save(); });
   });
   document.querySelectorAll('.tcbox').forEach(function(cb){ cb.addEventListener('change',function(){ render(); save(); }); });
@@ -288,8 +298,9 @@ const PAGE_JS = `
   $('sig-clear').addEventListener('click',function(){ SIG.clear(); });
   $('reset').addEventListener('click',function(){
     try{localStorage.removeItem(STORE);}catch(e){}
-    ['bizName','bizGstin','bizAddr','quoteNo','cliName','cliAddr','quoteDate','validUntil','notes','sigName'].forEach(function(id){$(id).value='';});
+    ['bizName','bizGstin','bizAddr','quoteNo','cliName','cliAddr','quoteDate','validUntil','taxName','taxPct','notes','sigName'].forEach(function(id){$(id).value='';});
     $('gstRate').value='0'; $('taxType').value='cgst_sgst';
+    RG.reset();
     document.querySelectorAll('.tcbox').forEach(function(cb){ cb.checked=true; });
     LOGO.clear(); SIG.clear();
     IT.set([]); IT.render(); render(); save();
@@ -298,12 +309,14 @@ const PAGE_JS = `
 
   var saved=null; try{ saved=JSON.parse(localStorage.getItem(STORE)||'null'); }catch(e){}
   if(saved){
-    ['bizName','bizGstin','bizAddr','quoteNo','cliName','cliAddr','quoteDate','validUntil','gstRate','taxType','notes','sigName'].forEach(function(id){ if(saved[id]!=null)$(id).value=saved[id]; });
+    ['bizName','bizGstin','bizAddr','quoteNo','cliName','cliAddr','quoteDate','validUntil','gstRate','taxType','taxName','taxPct','notes','sigName'].forEach(function(id){ if(saved[id]!=null)$(id).value=saved[id]; });
+    RG.set(saved.country, saved.currency);
     if(saved.terms){ var boxes=document.querySelectorAll('.tcbox'); saved.terms.forEach(function(v,i){ if(boxes[i])boxes[i].checked=!!v; }); }
     if(saved.logo)LOGO.set(saved.logo);
     if(saved.sig)SIG.set(saved.sig);
     IT.set(saved.items);
   }else{
+    RG.set();
     IT.set([{desc:'',qty:1,rate:0}]);
   }
   IT.render(); render();
@@ -316,7 +329,7 @@ export function quotationMakerPage(): string {
     canonicalPath: PATH,
     jsonLd: jsonLd(),
     bodyHtml: BODY,
-    bodyEndScripts: "<script>(function(){" + COMMON_JS + MEDIA_JS + EXPORT_JS + ITEMS_JS + PAGE_JS + "})();</script>",
+    bodyEndScripts: "<script>(function(){" + COMMON_JS + REGION_JS + MEDIA_JS + EXPORT_JS + ITEMS_JS + PAGE_JS + "})();</script>",
   });
 }
 
@@ -324,5 +337,5 @@ export const quotationMakerMeta = {
   slug: "quotation-maker",
   path: PATH,
   title: "Free Quotation Maker",
-  blurb: "Build a professional quotation with line items, GST and standard terms, then download it as a PDF — free, no sign-up.",
+  blurb: "Build a professional quotation in your own currency, with line items, tax and standard terms, then download it as a PDF — free, no sign-up.",
 };

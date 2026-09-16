@@ -1171,6 +1171,7 @@ function professionInvoicePage(s: ProfessionSpec): string {
   <div class="hero"><div class="wrap">
     <h1>${esc(s.name)} Invoice Format</h1>
     <p class="sub">A GST-ready invoice format for ${esc(s.who)} in India — with the correct SAC code, the right GST rate, and the line items you actually bill. Fill it in and download a PDF, free and no sign-up.</p>
+    <p class="muted" style="font-size:14px;margin-top:6px">Billing from outside India? The <a href="/tools/bill-generator">invoice generator</a> works in any country and currency.</p>
     <div class="chips">
       <span class="chip">100% free</span>
       <span class="chip">No sign-up</span>

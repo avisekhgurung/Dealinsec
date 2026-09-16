@@ -196,6 +196,8 @@ export default function BrandInvoiceDetailsPage() {
   const influencerAddress = issuer.billingAddress;
   const signatureUrl = issuer.digitalSignature;
   const sealUrl = issuer.companySeal;
+  const hasSignatory = Boolean(signatureUrl || sealUrl);
+  const isIndia = loc.country === "IN";
   const bankAccountHolder = issuer.accountHolderName;
   const bankAccountNumber = issuer.accountNumber;
   const bankIfsc = issuer.ifscCode;
@@ -346,7 +348,7 @@ export default function BrandInvoiceDetailsPage() {
       key: "closing-row",
       keepWithNext: true,
       node: (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 62mm", gap: "8mm", alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: hasSignatory ? "1fr 62mm" : "1fr", gap: "8mm", alignItems: "start" }}>
           <div>
             <div className="doc-label" style={{ marginBottom: "1.5mm" }}>Payment terms</div>
             <ul className="doc-small doc-muted-t" style={{ margin: 0, paddingLeft: "5mm", listStyleType: "disc", display: "grid", gap: "1mm" }}>
@@ -363,14 +365,20 @@ export default function BrandInvoiceDetailsPage() {
               </p>
             )}
           </div>
-          <SignatureCell
-            heading="Authorised signatory"
-            name={influencerName}
-            date={docDate(invoice.invoiceDate, loc)}
-            signatureUrl={signatureUrl || null}
-            sealUrl={sealUrl || null}
-            note="Valid without signature"
-          />
+          {/* Only with something to show. An empty signatory box under a
+              line that already says "valid without signature" read as a form
+              left unfinished, and invoices outside India carry no signature
+              block at all unless the issuer has one. */}
+          {hasSignatory && (
+            <SignatureCell
+              heading={isIndia ? "Authorised signatory" : "Issued by"}
+              name={influencerName}
+              date={docDate(invoice.invoiceDate, loc)}
+              signatureUrl={signatureUrl || null}
+              sealUrl={sealUrl || null}
+              note="Valid without signature"
+            />
+          )}
         </div>
       ),
     },
@@ -378,7 +386,7 @@ export default function BrandInvoiceDetailsPage() {
       key: "legal",
       node: (
         <p className="doc-small" style={{ textAlign: "center", color: "var(--doc-faint)" }}>
-          Computer-generated invoice — valid without signature.
+          {isIndia ? "Computer-generated invoice — valid without signature." : "Thank you for your business."}
         </p>
       ),
     },

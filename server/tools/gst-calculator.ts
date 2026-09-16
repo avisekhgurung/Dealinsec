@@ -63,6 +63,7 @@ const BODY = `
 <div class="hero"><div class="wrap">
   <h1>Free GST Calculator</h1>
   <p class="sub">Add or remove GST in a tap, with the correct CGST / SGST or IGST split. Updated for GST 2.0 rates. No sign-up, no cost.</p>
+  <p class="muted" style="font-size:14px;margin-top:6px">Billing from outside India? The <a href="/tools/bill-generator">invoice generator</a> works in any country and currency.</p>
   <div class="chips">
     <span class="chip">100% free</span>
     <span class="chip">Add &amp; remove GST</span>

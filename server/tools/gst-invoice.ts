@@ -89,6 +89,7 @@ const BODY = `
 <div class="hero"><div class="wrap">
   <h1>Free GST Invoice Generator</h1>
   <p class="sub">Create a professional, GST-ready invoice in under a minute. Auto CGST / SGST / IGST calculation, amount in words, and an instant PDF download — no sign-up, no cost.</p>
+  <p class="muted" style="font-size:14px;margin-top:6px">Billing from outside India? The <a href="/tools/bill-generator">invoice generator</a> works in any country and currency.</p>
   <div class="chips">
     <span class="chip">100% free</span>
     <span class="chip">No sign-up</span>
