@@ -4,7 +4,7 @@
  * The `dark` class on <html> is the single switch the whole stylesheet keys
  * off (.dark vars in index.css + dark: variants everywhere). The inline
  * bootstrap in index.html applies the stored preference BEFORE first paint
- * (same pattern as the sidebar collapse state) so there's never a flash;
+ * so there's never a flash;
  * this module is the runtime side: reading, setting, and following OS
  * changes while the "system" preference is active.
  *
@@ -26,16 +26,44 @@ export function getThemePref(): ThemePref {
   }
 }
 
+/** The signed-in workspace wears the ink-green of its top and bottom bars
+ *  in the phone's status bar too; the marketing pages keep the plain theme
+ *  colour. Matches the top of .dis-topnav / .dis-bottomnav in index.css. */
+const APP_STATUS_BAR = { light: "#163630", dark: "#12211f" };
+
+function isDark(): boolean {
+  return document.documentElement.classList.contains("dark");
+}
+
+/** Re-tint the status bar / PWA chrome for the current theme and page. */
+export function applyStatusBar() {
+  const dark = isDark();
+  const inApp = document.documentElement.hasAttribute("data-app-shell");
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) {
+    meta.setAttribute(
+      "content",
+      inApp ? (dark ? APP_STATUS_BAR.dark : APP_STATUS_BAR.light) : dark ? "#0B1220" : "#FFFFFF",
+    );
+  }
+  // iOS can only draw black or white here; keep its text readable.
+  const ios = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+  if (ios) ios.setAttribute("content", dark ? "black-translucent" : "default");
+}
+
+/** Mark the page as the signed-in workspace (or not) and re-tint. */
+export function setAppShell(on: boolean) {
+  document.documentElement.toggleAttribute("data-app-shell", on);
+  applyStatusBar();
+}
+
 function apply(pref: ThemePref) {
   const dark = pref === "dark" || (pref === "system" && mq().matches);
   document.documentElement.classList.toggle("dark", dark);
   // Keep the mobile status bar / PWA chrome in step with the theme —
   // otherwise Android shows an emerald bar over a dark app (and iOS keeps a
   // translucent bar with light text on a white page).
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", dark ? "#0B1220" : "#FFFFFF");
-  const ios = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
-  if (ios) ios.setAttribute("content", dark ? "black-translucent" : "default");
+  applyStatusBar();
 }
 
 export function setThemePref(pref: ThemePref) {

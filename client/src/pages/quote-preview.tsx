@@ -376,7 +376,8 @@ export default function QuotePreviewPage() {
           footer={docFooter(quoteNumber, `Deal ${recordNo("deal", deal.id)}`)}
         />
 
-        <div className="flex gap-3 pt-4 pb-2 print:hidden">
+        {/* Stacked on narrow phones: side by side, the two labels need ~420px. */}
+        <div className="flex flex-col min-[440px]:flex-row gap-3 pt-4 pb-2 print:hidden">
           <Button variant="outline" className="flex-1 h-12 rounded-xl font-semibold" onClick={() => window.print()}>
             <Download className="w-4 h-4 mr-2" /> Download PDF
           </Button>

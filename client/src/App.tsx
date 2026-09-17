@@ -6,12 +6,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { AppLoader, RouteLoader } from "@/components/app-loader";
-import { DesktopSidebar } from "@/components/desktop-sidebar";
+import { DesktopTopNav } from "@/components/desktop-topnav";
 import { InstallPrompt } from "@/components/install-prompt";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 import { UpgradeModalProvider } from "@/components/upgrade-modal";
 import { Copilot } from "@/components/copilot/copilot";
 import { trackPageView, trackEvent } from "@/lib/analytics";
+import { setAppShell } from "@/lib/theme";
 import { useLocation } from "wouter";
 
 // Eagerly loaded — always needed for first render
@@ -95,6 +96,12 @@ function Router() {
     }
   }, []);
 
+  // The phone's status bar wears the workspace green inside the app only.
+  const inAppShell = !isLoading && isAuthenticated && !!user?.onboardingComplete && !isFullBleedRoute(location);
+  useEffect(() => {
+    setAppShell(inAppShell);
+  }, [inAppShell]);
+
 
   // Initial app load (auth check) → full branded splash, shown once per session
   if (isLoading) {
@@ -149,12 +156,11 @@ function Router() {
 
   return (
     <>
-      {showShell && <DesktopSidebar />}
+      {showShell && <DesktopTopNav />}
       {/* Copilot floats on every authed workspace page (not on print/full-bleed views) */}
       {showShell && <Copilot />}
-      {/* Content offset tracks the sidebar width via --dis-sidebar-w
-          (see .app-shell in index.css) so the collapsible rail and the
-          content stay in lockstep. */}
+      {/* Content sits below the desktop top bar via --dis-topnav-h
+          (see .app-shell in index.css). */}
       <div className={showShell ? "app-shell" : ""}>
         <Suspense fallback={<RouteLoader />}>
           <Switch>

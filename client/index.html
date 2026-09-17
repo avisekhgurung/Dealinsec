@@ -92,13 +92,11 @@
         gtag("config", "G-W3VTLRH79B", { send_page_view: false });
       })();
     </script>
-    <!-- Pre-paint bootstraps: sidebar collapse + theme, applied before first
-         style resolution so neither ever flashes. Theme default is LIGHT —
+    <!-- Pre-paint bootstrap: theme, applied before first style resolution so
+         it never flashes. Theme default is LIGHT —
          "system" only applies when the user chose it in Settings. -->
     <script>
       try {
-        if (localStorage.getItem('dis_sidebar_collapsed') === '1')
-          document.documentElement.setAttribute('data-sidebar', 'collapsed');
         var t = localStorage.getItem('dis_theme');
         if (t === 'dark' || (t === 'system' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches))
           document.documentElement.classList.add('dark');

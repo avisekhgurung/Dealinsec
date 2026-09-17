@@ -82,7 +82,7 @@ function SetupStepper({ steps, onStepClick }: {
               <button
                 type="button"
                 onClick={() => onStepClick(step.key)}
-                className="group flex flex-col items-center gap-1.5 w-[72px] lg:w-24 shrink-0 rounded-lg focus-visible:outline-primary"
+                className="group flex flex-col items-center gap-1.5 w-[58px] min-[360px]:w-[72px] lg:w-24 shrink-0 rounded-lg focus-visible:outline-primary"
                 aria-label={`${step.label}${step.done ? " — complete, click to edit" : " — click to add"}`}
                 data-testid={`stepper-${step.key}`}
               >
@@ -435,9 +435,10 @@ export default function ProfilePage() {
                 size="sm"
                 className="text-white bg-black/25 hover:bg-black/45 backdrop-blur-sm rounded-full h-9 px-3.5 font-semibold"
                 data-testid="button-settings"
+                aria-label="Settings"
               >
-                <SettingsIcon className="h-4 w-4 mr-1.5" />
-                Settings
+                <SettingsIcon className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Settings</span>
               </Button>
             </Link>
             <Button

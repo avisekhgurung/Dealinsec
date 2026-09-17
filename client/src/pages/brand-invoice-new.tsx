@@ -717,7 +717,7 @@ export default function BrandInvoiceNewPage() {
           </div>
 
           {/* ══ Live preview ══ */}
-          <aside className="lg:sticky lg:top-24 space-y-3">
+          <aside className="lg:sticky lg:top-[calc(var(--dis-topnav-h)+6rem)] space-y-3">
             <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted-foreground px-1">
               Live preview
             </p>

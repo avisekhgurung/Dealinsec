@@ -12,56 +12,47 @@ const navItems = [
   { path: "/profile", label: "Profile", icon: UserCircle },
 ];
 
+/**
+ * Mobile tab bar — the same lit ink-green surface as the desktop top bar, so
+ * the phone app and the desktop app read as one product. Items share the
+ * width equally (flex-1, min-w-0) so six tabs fit a 320px phone without
+ * overflowing; styles live in index.css (.dis-bottomnav*).
+ */
 export function BottomNav() {
   const [location] = useLocation();
   const { user } = useAuth();
 
+  const isActive = (path: string) => {
+    if (/^\/deals\/[^/]+\/quote/.test(location)) return path === "/quotations";
+    if (location.startsWith("/brand-invoices")) return path === "/invoices";
+    return location === path || location.startsWith(path + "/");
+  };
+
   return (
-    <nav
-      className="fixed bottom-0 inset-x-0 z-50 safe-area-pb lg:hidden border-t border-white/35 dark:border-white/10 bg-white/80 dark:bg-zinc-950/85 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.45)]"
-      style={{ backdropFilter: "blur(28px)", WebkitBackdropFilter: "blur(28px)" }}
-    >
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-1">
+    <nav aria-label="Primary" className="dis-bottomnav fixed bottom-0 inset-x-0 z-50 safe-area-pb lg:hidden">
+      <div className="flex items-stretch h-16 max-w-lg mx-auto px-1.5">
         {navItems
-          .filter((item) => !(item as any).module || canSeeModule(user as any, (item as any).module))
+          .filter((item) => !item.module || canSeeModule(user as any, item.module))
           .map((item) => {
-          const onQuoteDoc = /^\/deals\/[^/]+\/quote/.test(location);
-          const isActive = onQuoteDoc
-            ? item.path === "/quotations"
-            : location === item.path ||
-              (item.path !== "/" && location.startsWith(item.path));
-          const Icon = item.icon;
-
-          return (
-            <Link key={item.path} href={item.path}>
-              <button
+            const active = isActive(item.path);
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
                 data-testid={`nav-${item.label.toLowerCase()}`}
-                className={`relative flex flex-col items-center justify-center gap-0.5 w-[58px] h-14 rounded-2xl transition-all duration-200 ${
-                  isActive
-                    ? "text-emerald-700 dark:text-emerald-400"
-                    : "text-slate-500 dark:text-zinc-400"
-                }`}
-
+                aria-current={active ? "page" : undefined}
+                className="dis-bottomnav-item relative flex-1 min-w-0 flex flex-col items-center justify-center gap-1 outline-none"
               >
-                {isActive && (
-                  <span
-                    className="absolute inset-x-1 top-1 bottom-1 rounded-xl"
-                    style={{ background: "linear-gradient(135deg, hsl(160 84% 40% / 0.14) 0%, hsl(174 77% 40% / 0.10) 100%)" }}
-                  />
-                )}
-                <div className="relative">
-                  <Icon
-                    className="relative w-5 h-5 transition-all duration-200"
-                    style={{ strokeWidth: isActive ? 2.5 : 1.75 }}
-                  />
-                </div>
-                <span className={`relative text-[9px] leading-tight tracking-tight max-w-full truncate transition-all duration-200 ${isActive ? "font-bold" : "font-medium"}`}>
+                <span className="dis-bottomnav-icon relative flex items-center justify-center w-11 h-7 rounded-full">
+                  <Icon className="w-[19px] h-[19px]" strokeWidth={active ? 2.4 : 1.8} />
+                </span>
+                <span className={`max-w-full truncate px-0.5 text-[10px] leading-none tracking-tight ${active ? "font-bold" : "font-medium"}`}>
                   {item.label}
                 </span>
-              </button>
-            </Link>
-          );
-        })}
+              </Link>
+            );
+          })}
       </div>
     </nav>
   );
