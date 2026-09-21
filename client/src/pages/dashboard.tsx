@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
+import { AiHome } from "@/components/ai-home";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -787,6 +788,9 @@ export default function DashboardPage() {
 
       <main className="px-4 py-5 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-6 lg:space-y-5 xl:px-10">
 
+        {/* ── AI home: the first thing you see is what you can ask for ── */}
+        <AiHome />
+
         {/* ── Profile completion nudge — top priority before any action ── */}
         {showProfileNudge && (
           <Card className="border-amber-200/70 dark:border-amber-900/40 bg-gradient-to-br from-amber-50 via-orange-50/40 to-white dark:from-amber-950/30 dark:via-orange-950/20 dark:to-transparent relative overflow-hidden">
@@ -891,37 +895,6 @@ export default function DashboardPage() {
         {/* ── Plan ── */}
         <SubscriptionCard user={user} />
         <TeamSeatsCard />
-
-        {/* ── Quick Actions — the six most common jumps, one tap away ── */}
-        <section className="grid grid-cols-3 lg:grid-cols-6 gap-2 lg:gap-3" aria-label="Quick actions">
-          {([
-            { label: "New Deal", icon: Plus, href: "/deals/new", chip: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400", primary: true, perm: "deals.create" },
-            { label: "Quotation", icon: FileText, href: "/deals", chip: "bg-teal-500/15 text-teal-600 dark:text-teal-400", perm: "quotations.create" },
-            { label: "Agreement", icon: FileSignature, href: "/deals", chip: "bg-blue-500/15 text-blue-600 dark:text-blue-400", perm: "agreements.create" },
-            { label: "Invoice", icon: Receipt, href: "/contracts", chip: "bg-amber-500/15 text-amber-600 dark:text-amber-400", perm: "invoices.create" },
-            { label: "Invite", icon: UserPlus2, href: "/settings", chip: "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400", perm: "team.invite" },
-            { label: "Plan", icon: Crown, href: "/pricing", chip: "bg-slate-500/15 text-slate-600 dark:text-slate-300", perm: null },
-          ] as const)
-            .filter((a) => !a.perm || memberCan(user as any, a.perm as any))
-            .map((a) => (
-            <Link key={a.label} href={a.href}>
-              <button
-                type="button"
-                className={`w-full flex flex-col items-center gap-1.5 rounded-2xl lg:rounded-xl border p-3 lg:p-3.5 transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md ${
-                  (a as any).primary
-                    ? "border-emerald-300/60 dark:border-emerald-800/60 bg-gradient-to-b from-emerald-500/[0.08] to-transparent hover:border-emerald-400/70"
-                    : "border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 hover:border-primary/40"
-                }`}
-                data-testid={`qa-${a.label.toLowerCase().replace(" ", "-")}`}
-              >
-                <span className={`flex items-center justify-center w-9 h-9 lg:w-8 lg:h-8 rounded-xl ${a.chip}`}>
-                  <a.icon className="w-4 h-4" strokeWidth={2.2} />
-                </span>
-                <span className="text-[11px] lg:text-xs font-semibold text-foreground">{a.label}</span>
-              </button>
-            </Link>
-          ))}
-        </section>
 
         <MoneyRadarCard />
 

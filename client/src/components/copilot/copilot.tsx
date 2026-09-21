@@ -19,6 +19,7 @@ import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useMoney } from "@/hooks/use-locale";
 import { useToast } from "@/hooks/use-toast";
+import { COPILOT_EVENT, takePendingCopilot } from "@/lib/copilot-bus";
 
 /* ── types mirrored from server/copilot/insights.ts ── */
 interface Briefing {
@@ -118,6 +119,22 @@ export function Copilot() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, busy]);
 
+  // The dashboard composer and quick-action chips hand work over through
+  // copilot-bus. This component is code-split, so a request made before it
+  // mounted is waiting there: take it on mount as well as on the event.
+  const sendRef = useRef<(text: string) => void>(() => {});
+  useEffect(() => {
+    const take = () => {
+      const req = takePendingCopilot();
+      if (!req) return;
+      setOpen(true);
+      if (req.message) sendRef.current(req.message);
+    };
+    take();
+    window.addEventListener(COPILOT_EVENT, take);
+    return () => window.removeEventListener(COPILOT_EVENT, take);
+  }, []);
+
   if (!isAuthenticated) return null;
 
   const go = (to: string) => {
@@ -145,6 +162,8 @@ export function Copilot() {
       setBusy(false);
     }
   };
+
+  sendRef.current = send;
 
   const draftChaser = async (invoiceId: number, tone: string) => {
     if (busy) return;

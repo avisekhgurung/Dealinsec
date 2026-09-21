@@ -10,7 +10,7 @@ import { DesktopTopNav } from "@/components/desktop-topnav";
 import { InstallPrompt } from "@/components/install-prompt";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 import { UpgradeModalProvider } from "@/components/upgrade-modal";
-import { Copilot } from "@/components/copilot/copilot";
+const Copilot = lazy(() => import("@/components/copilot/copilot").then((m) => ({ default: m.Copilot })));
 import { trackPageView, trackEvent } from "@/lib/analytics";
 import { setAppShell } from "@/lib/theme";
 import { useLocation } from "wouter";
@@ -158,7 +158,11 @@ function Router() {
     <>
       {showShell && <DesktopTopNav />}
       {/* Copilot floats on every authed workspace page (not on print/full-bleed views) */}
-      {showShell && <Copilot />}
+      {showShell && (
+        <Suspense fallback={null}>
+          <Copilot />
+        </Suspense>
+      )}
       {/* Content sits below the desktop top bar via --dis-topnav-h
           (see .app-shell in index.css). */}
       <div className={showShell ? "app-shell" : ""}>
