@@ -17,55 +17,9 @@
  * results.
  */
 
-interface Faq { q: string; a: string }
+import { LANDING_FAQS } from "@shared/landing-faqs";
 
-/** Kept short and specific — these mirror the on-page FAQ answers. */
-const FAQS: Faq[] = [
-  {
-    q: "What is DealInSec?",
-    a: "DealInSec is quotation, agreement and invoice software for freelancers, in 50 currencies. Every client project stays on one thread — quotation, e-signed agreement, invoice and payment tracking — so nothing is retyped and nothing is forgotten, and you can see what is collectible today.",
-  },
-  {
-    q: "Who is it for?",
-    a: "Freelancers anywhere — designers, developers, writers, video editors and photographers, marketers and consultants. It is built for solo independent professionals who quote, sign and bill their own clients, in 50 currencies. India is one of the markets it fits most closely: GSTIN and PAN fields, IFSC bank details, ₹ pricing and April–March invoice numbering are all built in.",
-  },
-  {
-    q: "Does DealInSec work outside India?",
-    a: "Yes. You pick your country at signup and the app follows it: 50 currencies across 242 countries and territories, 119 of them billed in their own currency. You get the tax field your country actually uses — GSTIN in India, VAT number in the UK and EU, EIN in the US — the right bank labels (IFSC, sort code, routing number), invoice numbering by calendar year outside India and by the April–March financial year inside it, and agreement wording that names your own country's law. The free plan and the 7-day Pro trial are available everywhere. Paid checkout is live for Indian accounts today at ₹99 a month or ₹999 a year; international checkout at $99, £79 or €89 a year, annual only, is opening soon.",
-  },
-  {
-    q: "Will DealInSec make sure my client pays?",
-    a: "No software can force an unwilling client to pay. What DealInSec prevents is the non-payment you cause by being disorganised: work starting without a written scope, the invoice going out late or never, follow-ups that feel too awkward to send, and scope creep nobody priced. Your client accepts the scope and fee before you start, the invoice comes off the same record, and Copilot drafts the reminder. If a client later disputes the work, you have a signed, timestamped record of what they agreed to.",
-  },
-  {
-    q: "How do I make a quotation for a client?",
-    a: "Create the deal with the client name, amount and deliverables, then generate the quotation from it. The figures carry across, so the quotation, the agreement and the invoice always agree with each other.",
-  },
-  {
-    q: "Can DealInSec create a deal from a WhatsApp chat?",
-    a: "Yes. Paste the client conversation into DealInSec Copilot and it extracts the client, scope, amount and payment terms, then drafts the deal for your confirmation — nothing is created until you approve it, and it never invents an amount that wasn't stated. Copilot also runs a Protection Check on every deal's terms (flagging things like unlimited revisions or a missing advance) and drafts payment reminders in English or Hinglish that you copy and send yourself.",
-  },
-  {
-    q: "Does DealInSec create GST invoices?",
-    a: "Our free browser tool at dealinsec.com/tools/gst-invoice-generator creates a GST invoice with CGST, SGST and IGST computed, with no sign-up. Invoices inside the app record the agreed contract value and print your PAN and GSTIN, but they do not carry a GST tax computation and are not tax invoices under Rule 46 of the CGST Rules.",
-  },
-  {
-    q: "Are the agreements legally valid?",
-    a: "Electronic contracts are recognised in India under Section 10A of the Information Technology Act, 2000. DealInSec records electronic acceptance with an audit record — who accepted the agreement, when, and with which signature. It is not a Digital Signature Certificate or an Aadhaar eSign, and every agreement says so on its face. We are not a law firm; have important agreements reviewed by a lawyer.",
-  },
-  {
-    q: "What does DealInSec cost?",
-    a: "Every new account gets a 7-day Pro trial with no card, in every country. After that the free plan is ₹0 and covers 4 deals a month, each with its quotation. In India, Pro is ₹99 a month or ₹999 a year (about ₹83 a month). Outside India, Pro is listed at $99, £79 or €89 a year — annual only — and international checkout is opening soon, so today payment can only be completed from an Indian account. Pro adds unlimited deals, e-signed agreements, invoices and payment tracking. There is no platform fee on your deal value.",
-  },
-  {
-    q: "Can I bill 50% advance and 50% on delivery?",
-    a: "Yes. An agreement can be billed as an advance invoice and a final invoice at any split you choose, or as separate milestone invoices. DealInSec will not let you invoice more than the agreement is worth.",
-  },
-  {
-    q: "How does it help with scope creep?",
-    a: "The quotation and the agreement list the deliverables, revision limit and fee your client accepted, so extra work is visibly extra. Before you send the terms, Copilot's Protection Check flags the things that cost freelancers money — unlimited revisions, no advance, a vague \"as per requirement\" scope, no balance timeline — and suggests wording to fix them. When the client asks for more, you quote the extra work instead of absorbing it.",
-  },
-];
+const FAQS = LANDING_FAQS;
 
 const escape = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -90,24 +44,43 @@ export function landingSeoBody(): string {
   ).join("");
 
   return `<div id="seo-fallback">
-<h1>Quotation, agreement and invoice software for freelancers — one thread per client</h1>
-<p>DealInSec keeps every client project on one thread — quotation, e-signed agreement, invoice and payment tracking — so the scope is agreed in writing before you start, the invoice goes out the day the work is done, and you always know who still owes you. It works in 50 currencies, for freelancers in any country: designers, developers, writers, video editors &amp; photographers, marketers and consultants. India is one of the markets it serves most closely, with GSTIN and PAN fields, ₹ pricing, April–March invoice numbering and free GST tools.</p>
+<h1>Freelance work, from deal to paid</h1>
+<p>DealInSec helps freelancers, independent consultants, creators and solo service professionals manage the whole client deal in one place: create the deal, send a professional quote, get the agreement signed, send the invoice and track every payment. It is freelance deal management built around what happens between getting a client and getting paid, for freelancers worldwide, in 50 currencies.</p>
 
-<h2>One workflow from quotation to payment</h2>
+<h2>Your freelance business shouldn't live across 7 different apps</h2>
+<p>Client messages in WhatsApp, scope in Google Docs, quotes in PDFs, invoices in another tool and payment tracking in a spreadsheet. DealInSec replaces the scatter with one connected workflow: quote, agreement, invoice, payment. One client, one deal, one source of truth.</p>
+
+<h2>From client conversation to paid</h2>
+<ol>
+<li><strong>Create a deal</strong> with the client, scope, timeline and fee.</li>
+<li><strong>Send a quote</strong> generated from the deal, with standard or custom terms.</li>
+<li><strong>Get the agreement signed</strong> online, with a dated record of who accepted.</li>
+<li><strong>Send the invoice</strong> as an advance, milestone or final invoice drawn from the agreement.</li>
+<li><strong>Track payment</strong> and see what is paid, pending or overdue.</li>
+</ol>
+
+<h2>Get the scope clear before the work begins</h2>
+<p>Define deliverables, timelines, revisions and payment terms before you start, so everyone is on the same page. Protection Check reads your terms and flags risky wording such as unlimited revisions or a missing advance. It is a written record of what was agreed, not legal advice, and it cannot force a client to pay.</p>
+
+<h2>Know exactly what you're owed</h2>
+<p>Track every invoice from sent to paid, so nothing gets lost in your inbox: total invoiced, paid, pending and overdue at a glance. DealInSec tracks payments but does not process them; your client pays you directly and you mark the invoice paid. When something is late, Copilot drafts the follow-up and you review and send it.</p>
+
+<h2>Look professional from the first quote to the final invoice</h2>
+<p>Give every client a clear, consistent experience with a professional quotation, agreement and invoice, all generated from the same deal.</p>
+
+<h2>Built for freelancers, wherever you work</h2>
+<p>Work with clients across borders while keeping your deals, documents and invoices organized in one place. Choose from 50 currencies, including USD, EUR, GBP, CAD, AUD, INR and AED. The tax field, bank labels, invoice numbering and agreement wording follow the country you work from.</p>
+
+<h2>Spend less time turning conversations into paperwork</h2>
+<p>Paste a client's message into Copilot and it drafts the deal: client, budget, timeline, deliverables and terms. It is AI-assisted, so you review and edit the draft, and nothing is created until you confirm.</p>
+
+<h2>Everything you need to manage the client deal</h2>
 <ul>
-<li><strong>Deals</strong> — client, value, deliverables and dates in one record.</li>
-<li><strong>Quotations</strong> — generated from the deal, so the numbers always match.</li>
-<li><strong>Agreements</strong> — e-signed, with an execution record naming who signed and when.</li>
-<li><strong>Invoices</strong> — itemised and numbered consecutively: INV-2026-0001 by calendar year outside India, INV-2627-0001 by the April–March financial year inside it.</li>
-<li><strong>Payment tracking</strong> — what is overdue, due this week, and signed but not yet invoiced.</li>
-<li><strong>Copilot AI</strong> — paste a WhatsApp chat to draft the deal, get a Protection Check on risky or missing terms, and payment reminders drafted in English or Hinglish. Numbers are computed from your records, never AI-generated, and every action needs your confirmation.</li>
+<li><strong>Win the deal</strong>: deals, quotes and your own terms.</li>
+<li><strong>Protect the work</strong>: agreements, scope and deliverables, online signatures.</li>
+<li><strong>Get paid</strong>: invoices, payment tracking and payment reminders.</li>
+<li><strong>Stay organized</strong>: a dashboard, and every document as a PDF.</li>
 </ul>
-
-<h2>Works in the country you invoice from</h2>
-<p>You pick your country at signup and the paperwork follows it — 50 currencies across 242 countries and territories, 119 of them billed in their own currency. The tax field is the one your country uses: GSTIN in India, VAT number in the UK and the EU, EIN in the US. Bank details are labelled the way your bank labels them — IFSC, sort code or routing number. Invoice numbering runs by calendar year outside India and by the April–March financial year inside it. Agreements name your own country's law. The free plan and the 7-day Pro trial are available everywhere; paid checkout is live in India today, with international checkout opening soon.</p>
-
-<h2>Why freelancers don't get paid</h2>
-<p>Unpaid freelance work starts the same way in every currency: a "go ahead" in a chat with no written scope, an invoice raised weeks after delivery, a follow-up that feels too awkward to send, and "one small change" that turns into a second project — because the quotation is in WhatsApp, the agreement is in email and the invoice is in your downloads folder. DealInSec puts the four documents on one thread and tells you what to do next. It cannot force an unwilling client to pay, but it removes the reasons you go unpaid through disorganisation, and leaves a signed, timestamped record if a client disputes what was agreed.</p>
 
 <h2>Free tools, no sign-up</h2>
 <p>Create a <a href="/tools/quotation-maker">quotation</a>, a <a href="/tools/bill-generator">bill</a>, a <a href="/tools/purchase-order-generator">purchase order</a>, a <a href="/tools/service-agreement-template">service agreement</a> or a
@@ -119,13 +92,13 @@ export function landingSeoBody(): string {
 <h2>Guides</h2>
 <p>From the <a href="/blog">DealInSec blog</a>: <a href="/blog/what-is-deal-management-software">what deal management software is</a>, the <a href="/blog/quotation-format">quotation format guide with a free sample</a>, <a href="/blog/how-to-make-a-quotation-online">how to make a quotation online</a>, <a href="/blog/quotation-software-vs-excel">quotation software vs Excel</a>, <a href="/blog/quotation-vs-proposal">quotation vs proposal</a>, <a href="/blog/how-to-manage-a-deal-from-quotation-to-invoice">managing a deal from quotation to invoice</a>, and <a href="/blog/fake-quotation">when a sample quotation is fine and when it's fraud</a>. For getting paid: <a href="/blog/client-not-paying">what to do when a client isn't paying</a>, <a href="/blog/payment-reminder-message-to-client">payment reminder messages that work</a>, and <a href="/blog/advance-payment-terms">advance payment terms</a>. Written for India: <a href="/blog/best-quotation-software-india">choosing quotation software in India</a> and <a href="/blog/msme-payment-rule-45-days-samadhaan">the MSME 45-day payment rule</a>.</p>
 
-<h2>Pricing</h2>
-<p>7-day Pro trial with no card, in every country. The free plan is ₹0 and covers 4 deals a month, each with its quotation. In India, Pro is ₹99 per month or ₹999 per year (about ₹83 per month). Outside India, Pro is listed at $99, £79 or €89 a year — annual only — and international checkout is opening soon, so today payment can only be completed from an Indian account. Pro includes unlimited deals, e-signed agreements, invoices and payment tracking. No platform fee on your deal value.</p>
+<h2>Start simple. Grow when you need to.</h2>
+<p>The free plan is permanent and covers 4 deals a month, each with its quotation. Every new account also starts with a 7-day Pro trial with no card, in every country. Pro adds unlimited deals, e-signed agreements, invoices and payment tracking. In India, Pro is ₹99 per month or ₹999 per year. Outside India, Pro is listed at $99, £79 or €89 a year, annual only, and international checkout is opening soon. No platform fee on your deal value.</p>
 
 <h2>Frequently asked questions</h2>
 ${faqs}
 
-<p><a href="/auth?mode=signup">Start your free trial</a> · <a href="/pricing">Pricing</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
+<p><a href="/auth?mode=signup">Start for free</a> · <a href="/pricing">Pricing</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
 </div>`;
 }
 

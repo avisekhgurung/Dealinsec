@@ -54,6 +54,18 @@ import { useAuth } from "@/hooks/useAuth";
 import { trackEvent } from "@/lib/analytics";
 import { LandingCopilot, LandingCopilotSection } from "@/components/landing-copilot";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
+import { BRAND_GRADIENT, GradientText, SectionHeader, fadeUp, stagger } from "@/components/landing-shared";
+import {
+  ProblemSection,
+  HowItWorksSection,
+  ScopeSection,
+  PaymentTrackingSection,
+  ProfessionalSection,
+  GlobalSection,
+  AiSection,
+  FeatureGroupsSection,
+} from "@/components/landing-sections";
+import { LANDING_FAQS } from "@shared/landing-faqs";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -78,10 +90,7 @@ const SERVER_ROUTE_PREFIXES = [
 const isServerRoute = (href: string) => SERVER_ROUTE_PREFIXES.some((p) => href.startsWith(p));
 
 const NAV_LINKS = [
-  { label: "Free Tools", href: "/tools" },
-  { label: "Blog", href: "/blog" },
-  { label: "Who it's for", href: "#who" },
-  { label: "Features", href: "#features" },
+  { label: "Product", href: "#features" },
   { label: "How it works", href: "#how" },
   { label: "Pricing", href: "#pricing" },
   { label: "FAQ", href: "#faq" },
@@ -95,78 +104,8 @@ const DASHBOARD_LINKS = [
   { label: "Profile", href: "/profile", icon: UserCircle },
 ];
 
-const FEATURES = [
-  {
-    icon: Briefcase,
-    title: "Deal Management",
-    desc: "Every project, retainer and one-off gig in one place — scope, deadline and fee, not four chat threads.",
-    tint: "emerald",
-  },
-  {
-    icon: FileText,
-    title: "Instant Quotations",
-    desc: "Fixed fee, per hour, per piece or milestone — a professional quote in under 60 seconds, on your terms.",
-    tint: "teal",
-  },
-  {
-    icon: FileSignature,
-    title: "Signed Agreements",
-    desc: "Your client accepts electronically and the record shows who signed, when — PDF for both sides.",
-    tint: "cyan",
-  },
-  {
-    icon: Receipt,
-    title: "Smart Invoices",
-    desc: "Advance & final invoices with your bank details baked in. Track every payment on every milestone.",
-    tint: "indigo",
-  },
-  {
-    icon: Activity,
-    title: "Deal Insights",
-    desc: "Monitor pipeline value, payment status, and deliverables at a glance.",
-    tint: "amber",
-  },
-  {
-    icon: Lock,
-    title: "Bank-Grade Security",
-    desc: "Encrypted storage, e-sign audit trails, and session-level data protection.",
-    tint: "rose",
-  },
-];
 
-const WORKFLOW_STEPS = [
-  {
-    step: "01",
-    icon: Briefcase,
-    title: "Create Deal",
-    desc: "Set up the deal — client, scope, timeline, payment terms.",
-  },
-  {
-    step: "02",
-    icon: FileText,
-    title: "Send Quotation",
-    desc: "Professional quote with selectable T&Cs. Save the PDF and send it.",
-  },
-  {
-    step: "03",
-    icon: FileSignature,
-    title: "Sign Agreement",
-    desc: "Your client accepts online — who, when and which signature, on record. PDF for both.",
-  },
-  {
-    step: "04",
-    icon: CreditCard,
-    title: "Get Paid",
-    desc: "Advance and final invoices. Track payments and close deals on time.",
-  },
-];
 
-const STATS = [
-  { value: "5-in-1", label: "One workflow", sub: "Deals · Quotes · Contracts · Invoices · Insights" },
-  { value: "60s", label: "To your first invoice", sub: "From signup to sent" },
-  { value: "0%", label: "Platform fee", sub: "On every deal you close" },
-  { value: "Your tax ID", label: "On every document", sub: "Bank details built in" },
-];
 
 // Testimonials removed: the named people, cities and 5-star ratings here were
 // invented, and presenting invented reviews as real customers is deceptive
@@ -174,44 +113,7 @@ const STATS = [
 // from real customers who agreed to be named. Until then the section below
 // says something true instead.
 
-const FAQS = [
-  {
-    q: "Who is DealInSec built for?",
-    a: "Freelancers everywhere — designers, developers, writers, video editors & photographers, marketers and consultants. If you quote, sign and bill your own clients, the workflow fits: deal → quotation → agreement → invoice → payment tracking. It works the same whether you bill in rupees from Pune or in dollars from Lisbon. DealInSec never touches your client's money — you record the payment, we keep the register.",
-  },
-  {
-    q: "Is Dealinsec free to use?",
-    a: "Yes — every new account starts with a 7-day Pro trial: everything unlocked, no card needed. After that the free plan covers 4 deals every month, each with a professional quotation. Signed agreements, invoices and payment tracking are part of DealInSec Pro — in India that is ₹99/month, or ₹999 for a full year (about ₹83/month, which is ₹189 less than paying monthly). Outside India, paid checkout is opening soon at $99, £79 or €89 a year; the free plan and the trial are open everywhere in the meantime. There are no platform fees on your deal value.",
-  },
-  {
-    q: "Will DealInSec make a client pay me?",
-    a: "No tool can force an unwilling client to pay, and we are not going to pretend otherwise. What DealInSec fixes is the half that sits with you: the scope nobody wrote down, the invoice that went out three weeks late, the follow-up you kept postponing. And if the client later disputes what was agreed, you have a signed, timestamped record instead of a WhatsApp thread.",
-  },
-  {
-    q: "What does an e-signed agreement actually give me?",
-    a: "Electronic acceptance with an audit record — who accepted, when, and which signature was used — plus a PDF both sides can keep. It is not a DSC or Aadhaar eSign, so have a lawyer look at anything high-value or unusual. For everyday client work it gives you a dated record of the scope and the fee you both agreed to.",
-  },
-  {
-    q: "Can I add my own terms and conditions?",
-    a: "Absolutely. You can select our standard T&Cs or add your own custom clauses to any deal or quotation.",
-  },
-  {
-    q: "How do I get paid?",
-    a: "Your bank details live in your profile and are auto-filled into every invoice you send, with the labels your country uses — IFSC and PAN in India, sort code and VAT number in the UK, routing number and EIN in the US. Clients pay you directly — bank transfer, UPI or whatever you already use — and you mark the invoice paid so the register always shows what is still outstanding.",
-  },
-  {
-    q: "Are the invoices GST tax invoices?",
-    a: "In-app invoices are GST-ready professional invoices for your client and your own records — they are not Rule-46 GST tax invoices. If you need a full GST tax invoice, the free GST Invoice Generator in Free Tools is built for exactly that. Outside India the same invoice carries the tax field your country expects instead — a VAT number in the UK and the EU, an EIN in the US — and numbering follows your country's convention: April–March in India, calendar year everywhere else.",
-  },
-  {
-    q: "Can I use DealInSec outside India?",
-    a: "Yes. Pick your country when you sign up and the product follows it: 50 currencies, 242 countries to choose from, the tax field your country expects on your documents, your country's bank labels, and agreement wording written to your country's law. The free plan and the 7-day Pro trial are open everywhere, so you can run real deals today. Paid checkout outside India is opening soon — international plans will be $99, £79 or €89 a year, annual only.",
-  },
-  {
-    q: "Is my data secure?",
-    a: "All data is encrypted in transit and at rest. Sessions are secured, and we never share your information with third parties.",
-  },
-];
+const FAQS = LANDING_FAQS;
 
 // The six craft deal types freelancers pick from (shared/dealTypeTaxonomy.ts),
 // in taxonomy order — Custom is intentionally omitted from marketing cards.
@@ -264,15 +166,6 @@ const WHO_WE_SERVE = [
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] } },
-};
-
-const stagger = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.08, delayChildren: 0.05 } },
-};
 
 // Above-the-fold HERO variants: opacity stays 1 so the LCP hero text paints
 // immediately (good for Core Web Vitals) and is never blank if animations are
@@ -383,24 +276,21 @@ export default function LandingPage() {
           isAuthenticated={isAuthenticated}
           onPrimaryClick={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
         />
-        <TrustStrip />
-        {/* The two things no competitor does come FIRST — the generic
-            workflow sections below are supporting evidence, not the pitch. */}
-        <ProtectionSection />
-        {/* The chat sits open in the page — a visitor who never clicks a
-            floating bubble still finds something they can use right now. */}
+        <ProblemSection />
+        <HowItWorksSection />
+        <ScopeSection />
+        <PaymentTrackingSection />
+        <ProfessionalSection />
+        <GlobalSection />
+        <AiSection onCta={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))} />
+        <FeatureGroupsSection />
+        <WhoWeServeSection />
+        <FreeToolsSection />
+        {/* A live, no-sign-up product guide — answers from the same knowledge
+            base the app uses, so marketing can't drift from the product. */}
         <LandingCopilotSection
           onCta={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
         />
-        <WhoWeServeSection />
-        <FreeToolsSection />
-        <FeatureGrid />
-        <WorkflowSection />
-        <ProductShowcase />
-        <StatsSection />
-        <WatchesSection />
-        {/* Testimonials hidden until we have real users. Re-enable <Testimonials /> once you have genuine quotes. */}
-        <BuiltEverywhereSection />
         <PricingPreview onCTA={() => (isAuthenticated ? setLocation("/pricing") : openAuth("signup"))} />
         <FAQSection />
         <FinalCTA
@@ -680,7 +570,7 @@ function Header({
                   style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
                   data-testid="button-nav-signup"
                 >
-                  Get started
+                  Start for free
                   <ArrowRight className="w-4 h-4 ml-1" />
                 </Button>
               </>
@@ -743,7 +633,7 @@ function Header({
                     className="w-full h-10 text-white border-0"
                     style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
                   >
-                    Get started
+                    Start for free
                   </Button>
                 </div>
               )}
@@ -786,34 +676,26 @@ function Hero({
 }) {
   const heroRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
-  const floatY = useTransform(scrollYProgress, [0, 1], [0, -60]);
-  const floatOpacity = useTransform(scrollYProgress, [0, 1], [1, 0.3]);
+  const floatY = useTransform(scrollYProgress, [0, 1], [0, -40]);
 
   return (
-    <section ref={heroRef} className="relative pt-12 sm:pt-20 lg:pt-28 pb-16 lg:pb-24">
+    <section ref={heroRef} className="relative pt-12 sm:pt-16 lg:pt-24 pb-16 lg:pb-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-4xl mx-auto">
-          <motion.div
-            variants={heroStagger}
-            initial="hidden"
-            animate="visible"
-            className="space-y-6"
-          >
-            <motion.div variants={heroFadeUp} className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm border border-emerald-200/70 dark:border-emerald-800/40 shadow-sm">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-              </span>
-              <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                Quote · Sign · Invoice · Get paid
-              </span>
-            </motion.div>
+          <motion.div variants={heroStagger} initial="hidden" animate="visible" className="space-y-6">
+            <motion.p
+              variants={heroFadeUp}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm border border-emerald-200/70 dark:border-emerald-800/40 shadow-sm text-[11px] font-bold tracking-[0.14em] text-emerald-700 dark:text-emerald-300"
+            >
+              <Globe className="w-3.5 h-3.5" />
+              BUILT FOR FREELANCERS WORLDWIDE
+            </motion.p>
 
             <motion.h1
               variants={heroFadeUp}
-              className="text-[2.5rem] sm:text-5xl lg:text-[4.5rem] font-bold tracking-tight leading-[1.02]"
+              className="text-[2.6rem] sm:text-6xl lg:text-[4.75rem] font-bold tracking-tight leading-[1.03] text-balance"
             >
-              Your deal manager for
+              Freelance work,
               <br />
               <span
                 className="relative inline-block"
@@ -824,7 +706,7 @@ function Hero({
                   backgroundClip: "text",
                 }}
               >
-                getting paid & staying protected.
+                from deal to paid.
                 <motion.span
                   className="absolute -bottom-1 left-0 right-0 h-[6px] rounded-full opacity-40"
                   style={{ background: "linear-gradient(90deg, transparent, #10B981, transparent)" }}
@@ -835,100 +717,124 @@ function Hero({
               </span>
             </motion.h1>
 
-            <motion.p variants={heroFadeUp} className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
-              Paste the client&apos;s chat and it drafts the deal.{" "}
-              <span className="font-semibold text-neutral-900 dark:text-white">Then it reads your terms like a sceptic — flagging &ldquo;unlimited revisions&rdquo;, a missing advance, &ldquo;as per requirement&rdquo; — before you sign.</span>{" "}
-              Quotation, agreement and invoice follow on one thread, and it chases the payment for you. Built for freelancers anywhere — designers, developers, writers, video editors &amp; photographers, marketers and consultants.
+            <motion.p
+              variants={heroFadeUp}
+              className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed text-pretty"
+            >
+              Create professional quotes, agreements and invoices &mdash; then track every client deal from one simple workspace.
             </motion.p>
 
             <motion.div variants={heroFadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
               <Button
                 onClick={onPrimaryClick}
-                className="h-12 px-6 text-sm font-semibold text-white border-0 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all w-full sm:w-auto"
-                style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
+                className="h-12 px-7 text-[15px] font-semibold text-white border-0 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all w-full sm:w-auto"
+                style={{ background: BRAND_GRADIENT }}
                 data-testid="button-hero-cta"
               >
-                {isAuthenticated ? "Go to Dashboard" : "Start managing deals"}
+                {isAuthenticated ? "Go to Dashboard" : "Start for free"}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
               <a
                 href="#how"
-                className="h-12 px-6 inline-flex items-center justify-center text-sm font-semibold rounded-md border border-neutral-300 dark:border-neutral-700 bg-white/60 dark:bg-neutral-900/60 backdrop-blur-sm hover:bg-white dark:hover:bg-neutral-900 w-full sm:w-auto transition-colors"
+                className="h-12 px-7 inline-flex items-center justify-center text-[15px] font-semibold rounded-md border border-neutral-300 dark:border-neutral-700 bg-white/60 dark:bg-neutral-900/60 backdrop-blur-sm hover:bg-white dark:hover:bg-neutral-900 w-full sm:w-auto transition-colors"
+                data-testid="link-hero-how"
               >
                 See how it works
                 <ChevronRight className="w-4 h-4 ml-1" />
               </a>
             </motion.div>
 
-            <motion.div variants={heroFadeUp} className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 pt-3 text-xs text-neutral-500">
-              <span className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500" /> 7-day Pro trial
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500" /> 0% platform fee on your deals
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500" /> No credit card required
-              </span>
-            </motion.div>
-          </motion.div>
-
-          {/* Floating product mockup */}
-          <motion.div
-            style={{ y: floatY, opacity: floatOpacity }}
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-            className="mt-14 lg:mt-20 relative"
-          >
-            <ProductPreview />
+            <motion.p variants={heroFadeUp} className="text-xs sm:text-sm text-neutral-500">
+              No credit card required · Professional documents · Multiple currencies
+            </motion.p>
           </motion.div>
         </div>
+
+        {/* Larger product preview — sits outside the text column so it can breathe */}
+        <motion.div
+          style={{ y: floatY }}
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+          className="mt-12 lg:mt-16 relative"
+        >
+          <ProductPreview />
+        </motion.div>
       </div>
     </section>
   );
 }
 
+const PREVIEW_STEPS = [
+  { label: "Client", state: "done" },
+  { label: "Quote", state: "done" },
+  { label: "Agreement", state: "done" },
+  { label: "Invoice", state: "done" },
+  { label: "Payment", state: "pending" },
+] as const;
+
 function ProductPreview() {
   return (
-    <div className="relative max-w-5xl mx-auto">
-      {/* Glow behind mockup */}
+    <div className="relative max-w-6xl mx-auto">
       <div
-        className="absolute inset-x-0 -top-12 h-64 blur-3xl opacity-60"
+        className="absolute inset-x-0 -top-12 h-64 blur-3xl opacity-60 pointer-events-none"
         style={{ background: "radial-gradient(60% 80% at 50% 50%, rgba(16,185,129,0.35), transparent)" }}
       />
 
-      {/* Browser chrome */}
-      <div className="relative rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-2xl shadow-emerald-900/10 overflow-hidden">
+      <div className="relative rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-2xl shadow-emerald-900/10 overflow-hidden text-left">
         <div className="flex items-center gap-2 px-4 py-3 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60">
           <span className="w-3 h-3 rounded-full bg-red-400/80" />
           <span className="w-3 h-3 rounded-full bg-amber-400/80" />
           <span className="w-3 h-3 rounded-full bg-emerald-400/80" />
           <div className="ml-3 flex-1 max-w-xs mx-auto h-6 rounded-md bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 flex items-center justify-center gap-1.5 text-[10px] text-neutral-500">
-            <Lock className="w-2.5 h-2.5" /> dealinsec.com/dashboard
+            <Lock className="w-2.5 h-2.5" /> dealinsec.com/deals
           </div>
         </div>
 
-        {/* Dashboard content */}
-        <div className="p-5 sm:p-8 bg-gradient-to-br from-white to-emerald-50/30 dark:from-neutral-900 dark:to-emerald-950/10">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <p className="text-xs text-neutral-500">Welcome back,</p>
-              <h3 className="text-lg sm:text-xl font-bold">Lena Ortiz</h3>
+        <div className="p-4 sm:p-7 lg:p-9 bg-gradient-to-br from-white to-emerald-50/30 dark:from-neutral-900 dark:to-emerald-950/10">
+          {/* One deal, end to end */}
+          <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/80 p-4 sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] uppercase tracking-wider text-neutral-500 font-semibold">Client · Cedar &amp; Co</p>
+                <h3 className="text-lg sm:text-2xl font-bold mt-0.5">Website redesign</h3>
+                <p className="text-xs text-neutral-500 mt-0.5">Deal DL-0007 · 4 weeks</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] uppercase tracking-wider text-neutral-500 font-semibold">Deal value</p>
+                <p className="text-xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">$3,200</p>
+              </div>
             </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-xs font-semibold">
-              <Sparkles className="w-3 h-3" />
-              Pro
-            </div>
+
+            <ol className="grid grid-cols-5 gap-1.5 sm:gap-3 mt-6">
+              {PREVIEW_STEPS.map((s, i) => (
+                <li key={s.label} className="min-w-0">
+                  <div
+                    className={`h-1.5 rounded-full ${s.state === "done" ? "" : "bg-amber-300 dark:bg-amber-500/70"}`}
+                    style={s.state === "done" ? { background: BRAND_GRADIENT } : undefined}
+                  />
+                  <p className="flex items-center gap-1 mt-2 text-[9px] sm:text-xs font-semibold truncate">
+                    {s.state === "done" ? (
+                      <Check className="hidden sm:block w-3 h-3 text-emerald-600 shrink-0" />
+                    ) : (
+                      <Clock className="hidden sm:block w-3 h-3 text-amber-500 shrink-0" />
+                    )}
+                    <span className="truncate">{s.label}</span>
+                  </p>
+                  <p className="hidden sm:block text-[10px] text-neutral-500 mt-0.5 truncate">
+                    {["Added", "Accepted", "Signed", "Sent · $1,600", "Pending"][i]}
+                  </p>
+                </li>
+              ))}
+            </ol>
           </div>
 
-          {/* Stat cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
             {[
-              { label: "Deals", value: "12", change: "+3", tint: "emerald" },
-              { label: "Agreements", value: "8", change: "+2", tint: "teal" },
-              { label: "Pipeline", value: "$38,400", change: "+18%", tint: "cyan" },
-              { label: "Paid this month", value: "$9,700", change: "+42%", tint: "indigo" },
+              { label: "Total invoiced", value: "$4,850", cls: "" },
+              { label: "Paid", value: "$3,200", cls: "text-emerald-600 dark:text-emerald-400" },
+              { label: "Pending", value: "$1,150", cls: "text-amber-600 dark:text-amber-400" },
+              { label: "Overdue", value: "$500", cls: "text-rose-600 dark:text-rose-400" },
             ].map((s, i) => (
               <motion.div
                 key={s.label}
@@ -939,163 +845,35 @@ function ProductPreview() {
                 className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/80 p-3.5"
               >
                 <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-medium">{s.label}</p>
-                <div className="flex items-end justify-between mt-1.5">
-                  <p className="text-lg sm:text-xl font-bold">{s.value}</p>
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300">
-                    {s.change}
-                  </span>
-                </div>
+                <p className={`text-lg sm:text-2xl font-bold mt-1 tabular-nums ${s.cls}`}>{s.value}</p>
               </motion.div>
             ))}
           </div>
-
-          {/* Chart area + recent deals */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/80 p-4 min-h-[180px] overflow-hidden">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold">Revenue trend</p>
-                <span className="text-[10px] text-neutral-500">Last 30 days</span>
-              </div>
-              <MiniChart />
-            </div>
-            <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/80 p-4">
-              <p className="text-xs font-semibold mb-3">Recent deals</p>
-              <div className="space-y-2.5">
-                {[
-                  { name: "Northwind Studio · Brand identity", status: "Paid", amount: "$4,200" },
-                  { name: "Cedar & Co · Website build", status: "Signed", amount: "$12,500" },
-                  { name: "Halo Fitness · 4 reels a month", status: "Quote", amount: "$1,800" },
-                ].map((d) => (
-                  <div key={d.name} className="flex items-center justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-medium truncate">{d.name}</p>
-                      <p className="text-[9px] text-neutral-500">{d.status}</p>
-                    </div>
-                    <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">{d.amount}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Floating badges */}
-      <motion.div
-        animate={{ y: [0, -8, 0] }}
-        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-        className="hidden md:flex absolute -left-8 top-20 items-center gap-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xl shadow-emerald-900/10 px-3.5 py-2.5"
-      >
-        <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center">
-          <FileSignature className="w-4 h-4 text-emerald-600" />
-        </div>
-        <div>
-          <p className="text-[10px] text-neutral-500">Agreement signed</p>
-          <p className="text-xs font-semibold">Cedar &amp; Co LLC</p>
-        </div>
-      </motion.div>
-
-      <motion.div
-        animate={{ y: [0, -8, 0] }}
-        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
-        className="hidden md:flex absolute -right-6 bottom-16 items-center gap-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xl shadow-emerald-900/10 px-3.5 py-2.5"
-      >
-        <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center">
-          <CreditCard className="w-4 h-4 text-emerald-600" />
-        </div>
-        <div>
-          <p className="text-[10px] text-neutral-500">Payment received</p>
-          <p className="text-xs font-semibold">$4,200</p>
-        </div>
-      </motion.div>
-    </div>
-  );
-}
-
-function MiniChart() {
-  const points = [30, 40, 38, 55, 50, 68, 62, 78, 72, 88, 82, 96];
-  const max = Math.max(...points);
-  const w = 100;
-  const h = 100;
-  const stepX = w / (points.length - 1);
-  const path = points
-    .map((p, i) => {
-      const x = i * stepX;
-      const y = h - (p / max) * h * 0.85;
-      return `${i === 0 ? "M" : "L"} ${x} ${y}`;
-    })
-    .join(" ");
-  const areaPath = `${path} L ${w} ${h} L 0 ${h} Z`;
-
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full h-32">
-      <defs>
-        <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#10B981" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#10B981" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <motion.path
-        d={areaPath}
-        fill="url(#chartFill)"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-        transition={{ duration: 1 }}
-      />
-      <motion.path
-        d={path}
-        stroke="#10B981"
-        strokeWidth="1.5"
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        initial={{ pathLength: 0 }}
-        whileInView={{ pathLength: 1 }}
-        viewport={{ once: true }}
-        transition={{ duration: 1.6, ease: "easeOut" }}
-      />
-    </svg>
-  );
-}
-
-function TrustStrip() {
-  return (
-    <section className="py-10 border-y border-neutral-200 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-900/30">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.p
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="text-center text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-6"
+      {/* Three quiet status chips straddling the card edge (never over content) — md+ only */}
+      {[
+        { Icon: FileSignature, small: "Agreement signed", big: "Cedar & Co", pos: "-top-5 left-[7%]", delay: 0 },
+        { Icon: Check, small: "Invoice paid", big: "$2,000", pos: "-top-5 right-[7%]", delay: 1 },
+        { Icon: Clock, small: "Payment pending", big: "$1,150", pos: "-bottom-5 right-[10%]", delay: 2 },
+      ].map(({ Icon, small, big, pos, delay }) => (
+        <motion.div
+          key={small}
+          animate={{ y: [0, -6, 0] }}
+          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay }}
+          className={`hidden md:flex absolute ${pos} items-center gap-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xl shadow-emerald-900/10 px-3 py-2`}
         >
-          Built for freelancers everywhere
-        </motion.p>
-        <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-5 opacity-70">
-          {[
-            { Icon: PenTool, name: "Designers" },
-            { Icon: Code2, name: "Developers" },
-            { Icon: PenLine, name: "Writers" },
-            { Icon: Clapperboard, name: "Video editors" },
-            { Icon: Camera, name: "Photographers" },
-            { Icon: Megaphone, name: "Marketers" },
-            { Icon: Lightbulb, name: "Consultants" },
-          ].map(({ Icon, name }, i) => (
-            <motion.div
-              key={name}
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 0.8, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.08 }}
-              className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400"
-            >
-              <Icon className="w-5 h-5" />
-              <span className="text-sm font-semibold">{name}</span>
-            </motion.div>
-          ))}
-        </div>
-      </div>
-    </section>
+          <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center">
+            <Icon className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div>
+            <p className="text-[10px] text-neutral-500">{small}</p>
+            <p className="text-xs font-semibold">{big}</p>
+          </div>
+        </motion.div>
+      ))}
+    </div>
   );
 }
 
@@ -1104,17 +882,13 @@ function WhoWeServeSection() {
     <section id="who" className="py-20 sm:py-28 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
-          eyebrow="Who we serve"
+          eyebrow="Who it's for"
           title={
             <>
-              Built for{" "}
-              <span style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                freelancers everywhere
-              </span>{" "}
-              who bill their own clients
+              Built for <GradientText>independent professionals</GradientText>
             </>
           }
-          subtitle="Designers, developers, writers, video editors &amp; photographers, marketers and consultants. One workflow from first quotation to final invoice — with every payment tracked, in your currency."
+          subtitle="If you quote, agree terms with and bill your own clients, the workflow fits. Pick the kind of work you do; it works the same way."
         />
 
         <motion.div
@@ -1157,7 +931,7 @@ function WhoWeServeSection() {
         >
           <p className="text-sm sm:text-base text-neutral-200 font-medium leading-relaxed">
             <span className="text-emerald-400 font-semibold">One workflow.</span>{" "}
-            Every client you invoice, in whichever currency you invoice them. A $400 logo, a £9,000 app build, a ₹35,000 monthly retainer — quotation, signed scope, invoice, payment tracked, the same way each time. Pro is ₹99 a month in India; plans for the rest of the world open soon.
+            A fixed-fee project, an hourly engagement or a monthly retainer: the quote, the signed scope, the invoice and the payment tracking work the same way each time, in the currency you charge in.
           </p>
         </motion.div>
       </div>
@@ -1166,14 +940,14 @@ function WhoWeServeSection() {
 }
 
 const FREE_TOOLS = [
-  { name: "GST Invoice Generator", href: "/tools/gst-invoice-generator", desc: "Auto CGST/SGST/IGST, amount in words, instant PDF.", icon: Receipt },
+  { name: "Quotation Maker", href: "/tools/quotation-maker", desc: "Professional quotations with line items, tax and terms.", icon: FileText },
+  { name: "Service Agreement", href: "/tools/service-agreement-template", desc: "A ready-to-sign contract with scope, fees and editable clauses.", icon: FileSignature },
   { name: "Bill Generator", href: "/tools/bill-generator", desc: "Create a bill online in a minute — with a PAID stamp.", icon: ReceiptText },
-  { name: "Quotation Maker", href: "/tools/quotation-maker", desc: "Professional quotations with line items, GST & terms.", icon: FileText },
-  { name: "GST Calculator", href: "/tools/gst-calculator", desc: "Add or remove GST with the CGST/SGST or IGST split.", icon: Calculator },
-  { name: "Service Agreement", href: "/tools/service-agreement-template", desc: "A ready-to-sign contract — scope, fees, editable clauses.", icon: FileSignature },
   { name: "Proforma Invoice", href: "/tools/proforma-invoice-generator", desc: "Confirm price & terms before the sale.", icon: FileCheck },
   { name: "Purchase Order", href: "/tools/purchase-order-generator", desc: "Raise a clean PO for your vendor in a minute.", icon: ClipboardList },
   { name: "UK Late Payment Calculator", href: "/tools/uk-late-payment-calculator", desc: "Work out the statutory interest and compensation a late-paying UK client owes.", icon: Clock },
+  { name: "GST Invoice Generator (India)", href: "/tools/gst-invoice-generator", desc: "Auto CGST/SGST/IGST, amount in words, instant PDF.", icon: Receipt },
+  { name: "GST Calculator (India)", href: "/tools/gst-calculator", desc: "Add or remove GST with the CGST/SGST or IGST split.", icon: Calculator },
 ];
 
 function FreeToolsSection() {
@@ -1184,13 +958,13 @@ function FreeToolsSection() {
           eyebrow="Free tools · No sign-up"
           title={
             <>
-              Try it free —{" "}
+              Start with a free tool,{" "}
               <span style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
                 no account needed
               </span>
             </>
           }
-          subtitle="Free tools for freelancers, built in the browser and free of sign-up. Some are country-specific — GST invoices and the GST calculator for India, statutory late-payment interest for the UK. Quotations, agreements and purchase orders work wherever you bill from. When you're ready to run whole deals, the app is one click away."
+          subtitle="Quotations, agreements and bills that work wherever you bill from, plus a few country-specific tools. Built in the browser, no sign-up. When you're ready to run whole deals, the app is one click away."
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5 mt-14">
           {FREE_TOOLS.map((t) => (
@@ -1248,606 +1022,6 @@ function FreeToolsSection() {
   );
 }
 
-function ProtectionSection() {
-  const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-100px" });
-
-  // Every line below is something server/copilot/riskcheck.ts actually
-  // detects — the page must never promise a check the scanner doesn't run.
-  const FLAGS = [
-    { phrase: "\u201cAs per requirement\u201d", why: "Scope grows with no paper trail — every addition becomes an argument." },
-    { phrase: "\u201cUnlimited revisions\u201d", why: "The project ends when the client feels like it. Cap it, price the rest." },
-    { phrase: "\u201cWe\u2019ll pay when our client pays\u201d", why: "Your money is tied to someone else\u2019s — their delay becomes yours." },
-    { phrase: "\u201cTo be decided later\u201d", why: "Open-ended clauses decide themselves, in the client\u2019s favour." },
-    { phrase: "Retention with no release date", why: "It quietly becomes an interest-free loan to your client." },
-    { phrase: "Terms that contradict themselves", why: "Two payment promises in one document — the cheaper one wins the argument." },
-  ];
-  const MISSING = [
-    { gap: "No advance", term: "50% advance payment is required to confirm the project; work begins on receipt." },
-    { gap: "No balance timeline", term: "The remaining balance is due within 7 days of final delivery." },
-    { gap: "No revision limit", term: "Two rounds of revisions are included; further revisions are billed per round." },
-    { gap: "Nothing excluded", term: "Anything not listed in the deliverables is excluded and quoted separately." },
-    { gap: "No late-payment consequence", term: "If a payment is delayed beyond 7 days, work may be paused until the account is settled." },
-  ];
-
-  return (
-    <section id="protection" className="py-20 sm:py-28 relative border-t border-neutral-200 dark:border-neutral-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-3xl mx-auto mb-12">
-          <p className="text-xs uppercase tracking-widest font-semibold text-emerald-600 dark:text-emerald-400 mb-3">
-            Protection Check
-          </p>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-4 text-balance">
-            Every other tool writes your contract.
-            <br className="hidden sm:block" /> This one argues with it.
-          </h2>
-          <p className="text-base sm:text-lg text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            Before you send the terms, DealInSec reads them the way a client&apos;s lawyer would —
-            and tells you which words are going to cost you money.
-          </p>
-        </div>
-
-        <div ref={ref} className="grid lg:grid-cols-2 gap-6 lg:gap-8">
-          {/* What it flags */}
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="rounded-2xl border border-rose-200/70 dark:border-rose-900/40 bg-rose-50/40 dark:bg-rose-950/10 p-6 sm:p-7"
-          >
-            <p className="flex items-center gap-2 text-sm font-bold text-rose-700 dark:text-rose-400 mb-5">
-              <Shield className="w-4 h-4" /> It flags what will cost you
-            </p>
-            <ul className="space-y-4">
-              {FLAGS.map((f) => (
-                <li key={f.phrase}>
-                  <p className="text-sm font-semibold text-neutral-900 dark:text-white">{f.phrase}</p>
-                  <p className="text-[13px] text-neutral-600 dark:text-neutral-400 leading-relaxed mt-0.5">{f.why}</p>
-                </li>
-              ))}
-            </ul>
-          </motion.div>
-
-          {/* What it adds back */}
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.6, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
-            className="rounded-2xl border border-emerald-200/70 dark:border-emerald-900/40 bg-emerald-50/40 dark:bg-emerald-950/10 p-6 sm:p-7"
-          >
-            <p className="flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-5">
-              <ShieldCheck className="w-4 h-4" /> And writes what&apos;s missing
-            </p>
-            <ul className="space-y-4">
-              {MISSING.map((m) => (
-                <li key={m.gap}>
-                  <p className="text-sm font-semibold text-neutral-900 dark:text-white">{m.gap}</p>
-                  <p className="text-[13px] text-neutral-600 dark:text-neutral-400 leading-relaxed mt-0.5 italic">
-                    &ldquo;{m.term}&rdquo;
-                  </p>
-                </li>
-              ))}
-            </ul>
-            <p className="text-xs text-neutral-500 dark:text-neutral-500 mt-5 pt-4 border-t border-emerald-200/60 dark:border-emerald-900/40">
-              One tap adds a suggested term to your deal. You stay the author — nothing is added without you.
-            </p>
-          </motion.div>
-        </div>
-
-        <p className="text-center text-sm text-neutral-500 dark:text-neutral-500 mt-8 max-w-2xl mx-auto">
-          Not legal advice, and we&apos;re not a law firm — it&apos;s a second pair of eyes on the words
-          that decide whether you get paid.
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function FeatureGrid() {
-  return (
-    <section id="features" className="py-20 sm:py-28 relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionHeader
-          eyebrow="Everything you need"
-          title={
-            <>
-              One platform for the{" "}
-              <span style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                entire deal lifecycle
-              </span>
-            </>
-          }
-          subtitle="From quotation to e-signed service agreement to invoice — manage every deal from one dashboard, and get paid on time."
-        />
-
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-80px" }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5 mt-14"
-        >
-          {FEATURES.map((f) => (
-            <motion.div
-              key={f.title}
-              variants={fadeUp}
-              whileHover={{ y: -4 }}
-              className="group relative rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-6 hover:border-emerald-300 dark:hover:border-emerald-700/70 hover:shadow-xl hover:shadow-emerald-500/10 transition-all duration-300"
-            >
-              <div
-                className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity"
-                style={{ background: "radial-gradient(400px at var(--x, 50%) var(--y, 50%), rgba(16,185,129,0.06), transparent 60%)" }}
-              />
-              <div className="relative">
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-4 bg-emerald-50 dark:bg-emerald-950/40 group-hover:scale-110 transition-transform">
-                  <f.icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <h3 className="text-base font-semibold mb-1.5">{f.title}</h3>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">{f.desc}</p>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-function WorkflowSection() {
-  return (
-    <section id="how" className="py-20 sm:py-28 border-t border-neutral-200 dark:border-neutral-800 bg-gradient-to-b from-neutral-50/50 to-white dark:from-neutral-900/30 dark:to-neutral-950">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionHeader
-          eyebrow="How it works"
-          title="From handshake to paid invoice in 4 steps"
-          subtitle="Every client deal moves cleanly through the Dealinsec pipeline — fewer awkward follow-ups, nothing lost in a WhatsApp thread."
-        />
-
-        <div className="mt-16 relative">
-          {/* Desktop connector line */}
-          <div className="hidden lg:block absolute top-[58px] left-[10%] right-[10%] h-0.5 bg-gradient-to-r from-transparent via-emerald-300/80 to-transparent dark:via-emerald-800/60" />
-
-          <motion.div
-            variants={stagger}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: "-80px" }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 relative"
-          >
-            {WORKFLOW_STEPS.map((s) => (
-              <motion.div key={s.step} variants={fadeUp} className="relative">
-                <div className="relative mx-auto w-[72px] h-[72px] rounded-2xl flex items-center justify-center mb-5 bg-white dark:bg-neutral-900 border border-emerald-200 dark:border-emerald-800/50 shadow-lg shadow-emerald-900/10">
-                  <div
-                    className="absolute inset-1 rounded-xl opacity-80"
-                    style={{ background: "linear-gradient(135deg, rgba(16,185,129,0.1), rgba(13,148,136,0.05))" }}
-                  />
-                  <s.icon className="relative w-7 h-7 text-emerald-600 dark:text-emerald-400" strokeWidth={2} />
-                  <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center shadow-md">
-                    {s.step}
-                  </div>
-                </div>
-                <div className="text-center">
-                  <h3 className="text-base font-semibold mb-1.5">{s.title}</h3>
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed max-w-[22ch] mx-auto">{s.desc}</p>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ProductShowcase() {
-  const items = [
-    {
-      eyebrow: "Quotations",
-      title: "Professional quotes in 60 seconds",
-      desc: "Send out quotations with standard or custom terms. Your client gets a clean PDF with the scope, the price and the payment terms in one place — no more quoting a number on WhatsApp.",
-      bullets: [
-        "Selectable standard T&Cs (30-day validity, 50% advance, etc.)",
-        "Custom terms — add your own clauses",
-        "Save the PDF and send it however your client reads things",
-      ],
-      mockup: <QuoteMockup />,
-    },
-    {
-      eyebrow: "Agreements",
-      title: "Scope and fee, signed before you start",
-      desc: "Turn the quote into an agreement your client accepts electronically. DealInSec records who accepted, when and which signature — so \"we never agreed to that\" has an answer.",
-      bullets: [
-        "Clearly-worded standard templates",
-        "Electronic acceptance with an audit record",
-        "Downloadable PDFs for both sides",
-      ],
-      mockup: <AgreementMockup />,
-    },
-    {
-      eyebrow: "Invoices",
-      title: "Get paid, track every payment",
-      desc: "Your bank details and tax ID are auto-filled into every invoice, labelled the way your country labels them — IFSC and PAN in India, sort code and VAT number in the UK, routing number and EIN in the US. Track advance and balance payments without digging through old emails.",
-      bullets: [
-        "Your bank details saved once, used everywhere",
-        "Advance + final invoice split",
-        "Real-time payment status tracking",
-      ],
-      mockup: <InvoiceMockup />,
-    },
-  ];
-
-  return (
-    <section id="showcase" className="py-20 sm:py-28">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionHeader
-          eyebrow="Product showcase"
-          title="Built like the tools you already love"
-          subtitle="Opinionated, fast, and designed for how freelancers actually work."
-        />
-
-        <div className="mt-16 space-y-20 lg:space-y-28">
-          {items.map((item, i) => (
-            <ShowcaseRow key={item.title} {...item} reverse={i % 2 === 1} />
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function ShowcaseRow({
-  eyebrow,
-  title,
-  desc,
-  bullets,
-  mockup,
-  reverse,
-}: {
-  eyebrow: string;
-  title: string;
-  desc: string;
-  bullets: string[];
-  mockup: React.ReactNode;
-  reverse?: boolean;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-100px" });
-
-  return (
-    <div ref={ref} className={`grid lg:grid-cols-2 gap-10 lg:gap-16 items-center ${reverse ? "lg:[&>*:first-child]:order-2" : ""}`}>
-      <motion.div
-        initial={{ opacity: 0, x: reverse ? 40 : -40 }}
-        animate={inView ? { opacity: 1, x: 0 } : {}}
-        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-      >
-        <p className="text-xs uppercase tracking-widest font-semibold text-emerald-600 dark:text-emerald-400 mb-3">{eyebrow}</p>
-        <h3 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-4">{title}</h3>
-        <p className="text-base text-neutral-600 dark:text-neutral-400 leading-relaxed mb-6">{desc}</p>
-        <ul className="space-y-2.5">
-          {bullets.map((b) => (
-            <li key={b} className="flex items-start gap-2.5 text-sm text-neutral-700 dark:text-neutral-300">
-              <div className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 mt-0.5 flex-shrink-0">
-                <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" strokeWidth={3} />
-              </div>
-              <span>{b}</span>
-            </li>
-          ))}
-        </ul>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0, x: reverse ? -40 : 40 }}
-        animate={inView ? { opacity: 1, x: 0 } : {}}
-        transition={{ duration: 0.7, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-        className="relative"
-      >
-        <div
-          className="absolute -inset-6 rounded-3xl blur-2xl opacity-40"
-          style={{ background: "radial-gradient(60% 60% at 50% 50%, rgba(16,185,129,0.25), transparent)" }}
-        />
-        <div className="relative">{mockup}</div>
-      </motion.div>
-    </div>
-  );
-}
-
-function QuoteMockup() {
-  return (
-    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xl shadow-emerald-900/10 p-6">
-      <div className="flex items-center justify-between mb-5 pb-4 border-b border-neutral-200 dark:border-neutral-800">
-        <div>
-          <p className="text-[10px] uppercase tracking-widest text-neutral-500">Quotation</p>
-          <p className="text-sm font-bold mt-1">QUO-2026-0042</p>
-        </div>
-        <DealinsecLogo size="sm" withText={false} />
-      </div>
-      <div className="space-y-3">
-        <div className="flex justify-between text-xs">
-          <span className="text-neutral-500">To</span>
-          <span className="font-semibold">Hartley Coffee Co, Bristol</span>
-        </div>
-        <div className="flex justify-between text-xs">
-          <span className="text-neutral-500">Deliverable</span>
-          <span className="font-semibold">Logo + brand guidelines</span>
-        </div>
-        <div className="flex justify-between text-xs">
-          <span className="text-neutral-500">Valid till</span>
-          <span className="font-semibold">22 May 2026</span>
-        </div>
-      </div>
-      <div className="mt-5 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
-        <p className="text-[10px] uppercase tracking-widest text-emerald-700 dark:text-emerald-300 font-semibold mb-2">Standard Terms ·  4 selected</p>
-        <ul className="text-[11px] space-y-1 text-neutral-700 dark:text-neutral-300">
-          <li>✓ Valid for 30 days</li>
-          <li>✓ 50% advance to confirm</li>
-          <li>✓ 50% balance in 7 days post-delivery</li>
-          <li>✓ Up to 2 revisions included</li>
-        </ul>
-      </div>
-      <div className="flex items-end justify-between mt-5 pt-4 border-t border-neutral-200 dark:border-neutral-800">
-        <div>
-          <p className="text-[10px] uppercase text-neutral-500">Total</p>
-          <p className="text-xl font-bold text-emerald-600">£3,600</p>
-        </div>
-        <div className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-semibold">Send quote</div>
-      </div>
-    </div>
-  );
-}
-
-function AgreementMockup() {
-  return (
-    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xl shadow-emerald-900/10 p-6">
-      <div className="flex items-center gap-2 mb-5">
-        <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center">
-          <FileSignature className="w-4 h-4 text-emerald-600" />
-        </div>
-        <div>
-          <p className="text-sm font-bold">Service Agreement</p>
-          <p className="text-[10px] text-neutral-500">Between Sofia Marchetti and Redpoint Analytics Inc.</p>
-        </div>
-      </div>
-
-      <div className="space-y-2 text-[11px] text-neutral-600 dark:text-neutral-400 leading-relaxed mb-5">
-        <p>This agreement confirms the terms of work between the parties...</p>
-        <p className="opacity-60">Section 1 — Scope of work · Section 2 — Fees &amp; payment...</p>
-        <p className="opacity-40">Section 3 — Revisions &amp; ownership · Section 4 — Governing law...</p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-lg border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/50 dark:bg-emerald-950/20 p-3">
-          <p className="text-[9px] uppercase tracking-widest text-neutral-500 mb-1">Provider</p>
-          <p className="text-xs font-bold italic text-emerald-700 dark:text-emerald-300" style={{ fontFamily: "Georgia, serif" }}>Sofia M.</p>
-          <div className="flex items-center gap-1 mt-1.5">
-            <Check className="w-3 h-3 text-emerald-600" />
-            <p className="text-[9px] text-emerald-700 dark:text-emerald-400 font-semibold">Signed · 22 Apr</p>
-          </div>
-        </div>
-        <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 p-3">
-          <p className="text-[9px] uppercase tracking-widest text-neutral-500 mb-1">Client</p>
-          <div className="h-4 rounded bg-neutral-100 dark:bg-neutral-800 animate-pulse" />
-          <div className="flex items-center gap-1 mt-1.5">
-            <div className="w-3 h-3 rounded-full border-2 border-amber-500 animate-pulse" />
-            <p className="text-[9px] text-amber-700 font-semibold">Awaiting signature</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-5 flex items-center justify-between text-[10px] text-neutral-500">
-        <span className="flex items-center gap-1"><Lock className="w-2.5 h-2.5" /> 256-bit encrypted</span>
-        <span>Download PDF →</span>
-      </div>
-    </div>
-  );
-}
-
-function InvoiceMockup() {
-  return (
-    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xl shadow-emerald-900/10 p-6">
-      <div className="flex items-start justify-between mb-5">
-        <div>
-          <p className="text-[10px] uppercase tracking-widest text-neutral-500">Invoice</p>
-          <p className="text-sm font-bold mt-1">INV-2627-0078</p>
-        </div>
-        <div className="px-2 py-1 rounded-md bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold flex items-center gap-1">
-          <Check className="w-3 h-3" /> PAID
-        </div>
-      </div>
-
-      <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 p-4 mb-5">
-        <p className="text-[10px] uppercase tracking-widest text-neutral-600 dark:text-neutral-400 font-semibold mb-1">Amount received</p>
-        <p className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">₹22,500</p>
-        <p className="text-[10px] text-neutral-500 mt-1">Balance 50% · 22 Apr 2026</p>
-      </div>
-
-      <div className="space-y-2 text-[11px]">
-        <p className="text-[10px] uppercase tracking-widest text-neutral-500 font-semibold mb-1">Paid to</p>
-        <div className="flex justify-between"><span className="text-neutral-500">Account holder</span><span className="font-semibold">Meera Nair</span></div>
-        <div className="flex justify-between"><span className="text-neutral-500">Account number</span><span className="font-semibold font-mono">XXXX 4521</span></div>
-        <div className="flex justify-between"><span className="text-neutral-500">IFSC</span><span className="font-semibold font-mono">HDFC0001234</span></div>
-        <div className="flex justify-between"><span className="text-neutral-500">PAN</span><span className="font-semibold font-mono">ABCDE1234F</span></div>
-      </div>
-
-      <p className="mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-800 text-[9px] text-neutral-500">
-        India · numbered by financial year. A UK invoice would read INV-2026-0078 with a sort code and VAT number instead.
-      </p>
-    </div>
-  );
-}
-
-function StatsSection() {
-  return (
-    <section className="py-20 sm:py-24 border-y border-neutral-200 dark:border-neutral-800 bg-gradient-to-r from-emerald-50/50 via-white to-teal-50/50 dark:from-emerald-950/20 dark:via-neutral-950 dark:to-teal-950/20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-10"
-        >
-          {STATS.map((s) => (
-            <motion.div key={s.label} variants={fadeUp} className="text-center">
-              <p
-                className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight"
-                style={{
-                  background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                {s.value}
-              </p>
-              <p className="text-sm font-semibold mt-2">{s.label}</p>
-              <p className="text-xs text-neutral-500 mt-0.5">{s.sub}</p>
-            </motion.div>
-          ))}
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-function Testimonials() {
-  return (
-    <section className="py-20 sm:py-28">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionHeader
-          eyebrow="Why this exists"
-          title="Built by someone who got tired of chasing payments."
-          subtitle="DealInSec is new and we are not going to pretend otherwise with invented reviews."
-        />
-
-        <div className="max-w-3xl mx-auto mt-12">
-          <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-7 sm:p-9">
-            <p className="text-[15px] leading-relaxed text-neutral-700 dark:text-neutral-300">
-              Freelancers lose money in the same three places, in every country: work that starts
-              without a written scope, invoices that go out late, and payments nobody follows up on.
-              Not because anyone is careless — because the quotation is in WhatsApp, the agreement is in
-              email, and the invoice is in someone's Downloads folder.
-            </p>
-            <p className="text-[15px] leading-relaxed text-neutral-700 dark:text-neutral-300 mt-4">
-              DealInSec puts those four documents on one thread, so every deal has a quotation, a signed
-              agreement and an invoice that reference each other — and a number on your dashboard telling
-              you what is collectible today.
-            </p>
-            <p className="text-[15px] leading-relaxed text-neutral-700 dark:text-neutral-300 mt-4">
-              We would rather you try it for seven days and decide for yourself than read a testimonial
-              from someone you have never met.
-            </p>
-            <div className="flex items-center gap-3 mt-7 pt-6 border-t border-neutral-200 dark:border-neutral-800">
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
-                style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
-              >
-                AG
-              </div>
-              <div>
-                <p className="text-sm font-semibold">Avisekh Gurung</p>
-                <p className="text-xs text-neutral-500">Founder, DealInSec</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-
-function BuiltEverywhereSection() {
-  // Only facts the product can back: 50 currencies, 242 countries selectable,
-  // 119 of them billed in their own currency. Do not inflate these numbers.
-  const LOCAL_RULES = [
-    {
-      label: "Your currency",
-      line: "50 currencies. 242 countries to pick from at signup, 119 of them billed in their own currency.",
-    },
-    {
-      label: "Your tax field",
-      line: "GSTIN in India, VAT number in the UK and the EU, EIN in the US — on the invoice, where your client's accountant looks for it.",
-    },
-    {
-      label: "Your numbering",
-      line: "April to March in India, because your CA expects the number to restart each April. Calendar year everywhere else.",
-    },
-    {
-      label: "Your law",
-      line: "Agreement wording follows the country you work from, so the governing-law clause names a court that can actually hear it.",
-    },
-  ];
-
-  return (
-    <section className="py-20 sm:py-24">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          className="relative rounded-3xl overflow-hidden border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60"
-        >
-          <div
-            className="h-1.5 w-full"
-            style={{ background: "linear-gradient(90deg, #059669 0%, #14B8A6 50%, #0D9488 100%)" }}
-            aria-hidden="true"
-          />
-          <div className="p-8 sm:p-12 text-center">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/40 mb-5">
-              <Globe className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span className="text-xs font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-300">Works where you work</span>
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4" style={{ textWrap: "balance" }}>
-              One workflow.{" "}
-              <span
-                style={{
-                  background: "linear-gradient(135deg, #059669 0%, #14B8A6 50%, #0D9488 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                Your country&apos;s rules.
-              </span>
-            </h2>
-            <p className="text-base sm:text-lg text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed">
-              Pick your country once. The quotation, the agreement and the invoice come out in the
-              currency you charge in, carrying the fields your client&apos;s accountant expects to see.
-              Nothing to configure, nothing to explain away.
-            </p>
-
-            <div className="grid sm:grid-cols-2 gap-4 mt-9 text-left">
-              {LOCAL_RULES.map((r) => (
-                <div
-                  key={r.label}
-                  className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/40 p-5"
-                >
-                  <p className="text-xs font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-400 mb-1.5">
-                    {r.label}
-                  </p>
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">{r.line}</p>
-                </div>
-              ))}
-            </div>
-
-            <p className="text-base text-neutral-700 dark:text-neutral-300 max-w-2xl mx-auto leading-relaxed font-medium mt-8">
-              And when the money is late, the payment chaser is written from the real invoice, in your
-              own voice &mdash; you read it, you decide, you send it.
-            </p>
-
-            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 mt-7 text-xs text-neutral-500">
-              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> 50 currencies</span>
-              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> Your tax ID &amp; bank labels on every document</span>
-              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> GST-ready in India</span>
-              <span className="flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-emerald-500" /> Built by a founder, not a giant</span>
-            </div>
-          </div>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
 function PricingPreview({ onCTA }: { onCTA: () => void }) {
   const freePerks = [
     "4 deals every month",
@@ -1859,7 +1033,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
     "Unlimited deals & quotations",
     "Unlimited signed agreements with e-signature",
     "Unlimited professional invoices",
-    "Payment tracking — know who still owes you",
+    "Payment tracking: paid, pending and overdue",
     "Priority email support",
   ];
   const proAnnualPerks = [
@@ -1873,17 +1047,34 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
     <section id="pricing" className="py-20 sm:py-28 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/20 scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
-          eyebrow="Simple pricing"
-          title="Try everything free for 7 days."
-          subtitle="Every new account starts with a 7-day Pro trial — the full workflow, unlocked, no card. After that, stay free with 4 deals a month or go Pro for unlimited everything."
+          eyebrow="Pricing"
+          title="Start simple. Grow when you need to."
+          subtitle="Try DealInSec free and manage your first client deals without adding another expensive tool to your stack."
         />
+
+        {/* Honest currency note: only Indian accounts can be charged today. */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mt-10 max-w-3xl mx-auto rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-5 sm:p-6"
+        >
+          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-400 mb-2.5">
+            <Globe className="w-3.5 h-3.5" /> Pricing around the world
+          </p>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+            New accounts start with a 7-day Pro trial, and the free plan stays free after it. Both are open everywhere, with no card. The prices below are in rupees and can be paid from India today. International plans will be
+            <span className="font-semibold text-neutral-900 dark:text-white"> $99, £79 or €89 a year</span>, annual
+            only. Checkout for them is opening soon, and we won&apos;t take a foreign card until it can be charged in your own currency.
+          </p>
+        </motion.div>
 
         <motion.div
           variants={stagger}
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-80px" }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-14 max-w-6xl mx-auto"
+          className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-8 max-w-6xl mx-auto"
         >
           {/* Free tier */}
           <motion.div
@@ -1921,12 +1112,12 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
           {/* Pro Monthly — recommended */}
           <motion.div
             variants={fadeUp}
-            className="relative rounded-2xl border border-violet-500 bg-white dark:bg-neutral-900 shadow-xl shadow-violet-500/15 scale-[1.02] overflow-hidden"
+            className="relative rounded-2xl border border-emerald-500 bg-white dark:bg-neutral-900 shadow-xl shadow-emerald-500/15 scale-[1.02] overflow-hidden"
           >
             {/* Promo bar */}
             <div
               className="px-4 py-2 text-center text-white text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-1.5"
-              style={{ background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)" }}
+              style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
             >
               <Sparkles className="w-3 h-3" />
               Recommended
@@ -1938,7 +1129,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                 <div className="flex items-center gap-2">
                   <div
                     className="w-8 h-8 rounded-lg flex items-center justify-center"
-                    style={{ background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)" }}
+                    style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
                   >
                     <FileSignature className="w-4 h-4 text-white" />
                   </div>
@@ -1950,7 +1141,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                 <span
                   className="text-4xl font-bold tracking-tight"
                   style={{
-                    background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)",
+                    background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                     backgroundClip: "text",
@@ -1960,12 +1151,12 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                 </span>
                 <span className="text-sm text-neutral-500">/ month</span>
               </div>
-              <p className="text-xs text-neutral-500 mt-1">The complete Deal → Quote → Agreement → Invoice → Payment workflow.</p>
+              <p className="text-xs text-neutral-500 mt-1">The complete workflow: quote, agreement, invoice and payment tracking.</p>
 
               <ul className="mt-5 space-y-2.5">
                 {proMonthlyPerks.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-                    <Check className="w-4 h-4 text-violet-600 flex-shrink-0 mt-0.5" />
+                    <Check className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
                     <span>{f}</span>
                   </li>
                 ))}
@@ -1973,8 +1164,8 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
 
               <Button
                 onClick={onCTA}
-                className="w-full mt-6 h-11 text-sm font-bold text-white border-0 shadow-md shadow-violet-500/30"
-                style={{ background: "linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)" }}
+                className="w-full mt-6 h-11 text-sm font-bold text-white border-0 shadow-md shadow-emerald-500/30"
+                style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
                 data-testid="button-go-pro-monthly"
               >
                 Go Pro — ₹99/month
@@ -2027,8 +1218,8 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
             </ul>
             <Button
               onClick={onCTA}
-              className="w-full mt-6 h-11 text-sm font-bold text-white border-0 shadow-md shadow-amber-500/30"
-              style={{ background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" }}
+              className="w-full mt-6 h-11 text-sm font-bold text-white border-0 shadow-md shadow-emerald-900/20"
+              style={{ background: "linear-gradient(135deg, #065F46 0%, #115E59 100%)" }}
               data-testid="button-go-pro"
             >
               Go Pro Annual — ₹999/year
@@ -2050,7 +1241,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
               { step: "1", title: "Create Deal", cost: "Free · 4/mo", icon: Briefcase },
               { step: "2", title: "Send Quote", cost: "Included", icon: FileText },
               { step: "3", title: "Sign Agreement", cost: "Pro", icon: FileSignature, highlight: true },
-              { step: "4", title: "Invoice & get paid", cost: "Pro", icon: Receipt, highlight: true },
+              { step: "4", title: "Invoice & track payment", cost: "Pro", icon: Receipt, highlight: true },
             ].map((s) => (
               <div key={s.step} className={`p-4 text-center ${s.highlight ? "bg-emerald-50/70 dark:bg-emerald-950/20" : ""}`}>
                 <div className={`w-9 h-9 mx-auto rounded-lg flex items-center justify-center mb-2 ${s.highlight ? "bg-emerald-600 text-white" : "bg-neutral-100 dark:bg-neutral-800 text-emerald-600"}`}>
@@ -2065,24 +1256,6 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
           </div>
         </motion.div>
 
-        {/* Honest currency note: only Indian accounts can be charged today. */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="mt-8 max-w-3xl mx-auto rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-5 sm:p-6"
-        >
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-400 mb-2.5">
-            <Globe className="w-3.5 h-3.5" /> Paying from outside India
-          </p>
-          <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            The prices above are in rupees and can be paid from India today. International plans are
-            <span className="font-semibold text-neutral-900 dark:text-white"> $99, £79 or €89 a year</span>, annual
-            only, and checkout for them is opening soon — we will not take a foreign card until it can be
-            charged in your own currency. Until then the free plan and the 7-day Pro trial are open
-            everywhere, with no card, so you can run real deals from any of the 242 countries at signup.
-          </p>
-        </motion.div>
 
       </div>
     </section>
@@ -2095,8 +1268,8 @@ function FAQSection() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
           eyebrow="FAQ"
-          title="Questions, answered"
-          subtitle="Still curious? Every email gets a reply, usually within a day."
+          title="Questions freelancers ask"
+          subtitle="Straight answers about what DealInSec does, and what it doesn't."
         />
 
         <motion.div
@@ -2143,15 +1316,11 @@ function FinalCTA({ isAuthenticated, onCTA }: { isAuthenticated: boolean; onCTA:
           <div className="absolute -bottom-20 -right-20 w-80 h-80 rounded-full blur-3xl opacity-30" style={{ background: "radial-gradient(circle, #5EEAD4, transparent)" }} />
 
           <div className="relative">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm mb-5">
-              <Zap className="w-3.5 h-3.5 text-emerald-200" />
-              <span className="text-xs font-semibold text-emerald-50">Your next deal is seconds away.</span>
-            </div>
-            <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-4">
-              Deals in seconds.<br />Secured for life.
+            <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-4 text-balance">
+              Ready to make your next deal easier?
             </h2>
             <p className="text-base sm:text-lg text-emerald-100/90 max-w-xl mx-auto mb-8">
-              For freelancers anywhere who would rather be doing the work than chasing it — every client deal quoted, signed, invoiced and tracked in one place, in your currency. Free to start, no credit card required.
+              Create your quote, agreement and invoice in one connected workflow.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Button
@@ -2159,16 +1328,17 @@ function FinalCTA({ isAuthenticated, onCTA }: { isAuthenticated: boolean; onCTA:
                 className="h-12 px-6 text-sm font-semibold bg-white text-emerald-700 hover:bg-neutral-100 border-0 shadow-xl"
                 data-testid="button-final-cta"
               >
-                {isAuthenticated ? "Go to Dashboard" : "Create free account"}
+                {isAuthenticated ? "Go to Dashboard" : "Start for free"}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
               <a
-                href="#features"
+                href="#how"
                 className="h-12 px-6 inline-flex items-center justify-center text-sm font-semibold rounded-md border border-white/30 text-white hover:bg-white/10 transition-colors"
               >
-                Explore features
+                See how it works
               </a>
             </div>
+            <p className="text-xs text-emerald-100/70 mt-6">Built for freelancers worldwide.</p>
           </div>
         </motion.div>
       </div>
@@ -2187,7 +1357,7 @@ function Footer() {
           <div className="col-span-2 md:col-span-1">
             <DealinsecLogo size="md" withText />
             <p className="text-xs text-neutral-500 mt-4 leading-relaxed max-w-[240px]">
-              Deal management for freelancers everywhere — designers, developers, writers, video editors &amp; photographers, marketers and consultants. Quote, sign, bill and track every payment in one workflow, in 50 currencies.
+              Quotes, agreements, invoices and payment tracking for freelancers worldwide, in 50 currencies.
             </p>
             <div className="flex items-center gap-3 mt-5">
               {[
@@ -2247,7 +1417,7 @@ function Footer() {
             { Icon: Shield, text: "256-bit encrypted" },
             { Icon: Lock, text: "Pro purchases secured by Razorpay" },
             { Icon: Check, text: "India: UPI · Cards · NetBanking" },
-            { Icon: Zap, text: "7-day Pro trial everywhere · Pro from ₹99/month in India" },
+            { Icon: Zap, text: "Free plan and 7-day Pro trial, worldwide" },
           ].map(({ Icon, text }) => (
             <span key={text} className="inline-flex items-center gap-1.5 text-[11px] text-neutral-500">
               <Icon className="w-3.5 h-3.5 text-emerald-600" />
@@ -2368,98 +1538,6 @@ function FooterColumn({ title, links }: { title: string; links: { label: string;
 }
 
 // ── The moat: DealInSec doesn't just store deals, it watches them ──
-function WatchesSection() {
-  const CAPABILITIES = [
-    {
-      Icon: Radar,
-      title: "Money Radar",
-      line: "One number for everything you can collect right now — overdue, due this week, and signed work you haven't invoiced yet.",
-      quote: "$9,240 potentially collectible",
-    },
-    {
-      Icon: ShieldCheck,
-      title: "Deal Health",
-      line: "Every deal scored on the signals that actually matter: agreement signed, money invoiced, payment overdue, timeline slipping.",
-      quote: "92 / 100 · Healthy",
-    },
-    {
-      Icon: Navigation,
-      title: "Next Best Action",
-      line: "No more wondering what's pending. Each deal says exactly what to do next, in the order that gets you paid.",
-      quote: "Invoice the remaining £4,000",
-    },
-    {
-      Icon: MessageSquare,
-      title: "Payment Chaser",
-      line: "Awkward follow-ups written for you from the real invoice — friendly to firm. You review, copy, send. Never automatic.",
-      quote: "\"Hi Rahul — quick follow-up on INV-1042…\"",
-    },
-  ];
-  return (
-    <section className="py-20 sm:py-28 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionHeader
-          eyebrow="Why DealInSec"
-          title="Most tools store your deals. DealInSec watches them."
-          subtitle="Spreadsheets and invoice apps wait for you to remember. DealInSec reviews every active deal and tells you what needs attention, what could cost you money, and what to do next."
-        />
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-80px" }}
-          className="grid sm:grid-cols-2 gap-5 mt-14 max-w-5xl mx-auto"
-        >
-          {CAPABILITIES.map((c) => (
-            <motion.div key={c.title} variants={fadeUp} className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-6">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center mb-4">
-                <c.Icon className="w-5 h-5 text-emerald-600" />
-              </div>
-              <h3 className="font-semibold text-lg">{c.title}</h3>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-1.5 leading-relaxed">{c.line}</p>
-              <p className="mt-4 text-sm font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50/70 dark:bg-emerald-950/30 rounded-lg px-3 py-2 tabular-nums">
-                {c.quote}
-              </p>
-            </motion.div>
-          ))}
-        </motion.div>
-        <p className="text-center text-xs text-neutral-500 mt-8 max-w-xl mx-auto">
-          Every figure comes from your own deals, in the currency you billed them in — DealInSec never invents numbers, and never messages a client without your approval.
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function SectionHeader({
-  eyebrow,
-  title,
-  subtitle,
-}: {
-  eyebrow: string;
-  title: React.ReactNode;
-  subtitle: string;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-80px" }}
-      className="text-center max-w-2xl mx-auto"
-    >
-      <p className="text-xs uppercase tracking-widest font-semibold text-emerald-600 dark:text-emerald-400 mb-3">
-        {eyebrow}
-      </p>
-      <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight leading-[1.1] mb-4">
-        {title}
-      </h2>
-      <p className="text-base text-neutral-600 dark:text-neutral-400 leading-relaxed">
-        {subtitle}
-      </p>
-    </motion.div>
-  );
-}
-
 // ────────────────────────────────────────────────────────────────────────────
 // Small form helpers
 // ────────────────────────────────────────────────────────────────────────────
