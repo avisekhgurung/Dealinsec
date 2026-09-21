@@ -21,8 +21,8 @@ const PLACEHOLDERS = [
   "Check my active deals for risks…",
 ];
 
-// The Copilot truncates each message at 2,000 characters (server/copilot/routes.ts).
-const MAX_LEN = 2000;
+// The Copilot truncates each message at 4,000 characters (server/copilot/routes.ts).
+const MAX_LEN = 4000;
 
 interface Chip {
   label: string;

@@ -183,3 +183,29 @@ export function analyzeDealProtections(deal: Deal, settings: LocaleSettings): Pr
     gaps: flags.filter((f) => f.severity === "gap").length,
   };
 }
+
+/** How loudly a flag should be shown. Broken money terms and dangerous
+ *  phrases are high priority; the other gaps are worth attention. */
+export type FlagPriority = "high" | "attention";
+
+const HIGH_GAPS = new Set(["no_advance", "no_balance_timeline"]);
+
+export const flagPriority = (f: ProtectionFlag): FlagPriority =>
+  f.severity === "risk" || HIGH_GAPS.has(f.id) ? "high" : "attention";
+
+/** The protections a gap-check looks for, phrased as what is already in place.
+ *  A check that raised no flag is a check the terms passed. */
+const PASS_LABELS: Record<string, string> = {
+  no_advance: "Advance payment is defined",
+  no_balance_timeline: "Balance timeline is defined",
+  no_revision_limit: "Revision limit is defined",
+  no_exclusions: "Exclusions are stated",
+  no_late_protection: "Late-payment consequence is stated",
+};
+
+export function protectionPasses(report: ProtectionReport): string[] {
+  const raised = new Set(report.flags.map((f) => f.id));
+  return Object.entries(PASS_LABELS)
+    .filter(([id]) => !raised.has(id))
+    .map(([, label]) => label);
+}

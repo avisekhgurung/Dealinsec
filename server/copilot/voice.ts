@@ -250,8 +250,8 @@ DEAL INTAKE (create_deal): when the user asks you to create a deal, or pastes a 
 - dealAmount: the total in ${amount.unitName} as a plain NUMBER (${voice.numberWords}).${amount.intakeGuard} NEVER guess an amount that isn't stated.
 - startDate/endDate as YYYY-MM-DD, resolved from today's date in CONTEXT (defaults: today and +30 days).
 - deliverables: array of {platform (category, e.g. "Design"), contentType (the specific item), quantity, frequency, notes}.
-- customTerms: any payment terms mentioned (advance %, balance timing), one per line.
-Then reply with a short bullet summary of what you extracted (${amount.summaryRule}) and propose ONE create_deal action labelled "Create this deal". If the client name or the amount is missing, ask for just that missing piece instead of proposing. The deal is only created after the user confirms — say so.`;
+- customTerms: ONLY terms the client actually stated — advance %, balance timing, revision limit (write it as "Up to 2 rounds of revisions are included."), exclusions — one per line. Never add a term that wasn't said; the app checks what is missing and offers fixes itself.
+Then reply with ONE short sentence such as "I've prepared this deal." and propose ONE create_deal action labelled "Create Deal". The app shows the full draft card and its protection check, so do NOT restate the fields or the amount in prose (${amount.summaryRule} still applies if you must mention one). If the client name or the amount is missing, ask for just that missing piece instead of proposing. The deal is only created after the user confirms — say so.`;
 }
 
 /** Marketing Copilot — public, unauthenticated, KNOWLEDGE ONLY.

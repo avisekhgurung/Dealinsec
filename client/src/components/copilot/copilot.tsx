@@ -20,6 +20,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMoney } from "@/hooks/use-locale";
 import { useToast } from "@/hooks/use-toast";
 import { COPILOT_EVENT, takePendingCopilot } from "@/lib/copilot-bus";
+import { DealDraftCard, type DealDraft } from "./deal-draft-card";
 
 /* ── types mirrored from server/copilot/insights.ts ── */
 interface Briefing {
@@ -35,11 +36,14 @@ interface Briefing {
 }
 
 interface CopilotAction {
-  type: "navigate" | "confirm";
+  type: "navigate" | "confirm" | "deal_draft";
   label: string;
   to?: string;
   tool?: string;
   args?: Record<string, unknown>;
+  /** deal_draft: a server-issued, single-use proposal and the card to show. */
+  proposalId?: string;
+  draft?: DealDraft;
 }
 
 interface Msg {
@@ -187,11 +191,49 @@ export function Copilot() {
     }
   };
 
+  // Edit hands the validated draft to the ordinary deal form, prefilled.
+  const editDraft = (draft: DealDraft) => {
+    try {
+      sessionStorage.setItem("dis_deal_prefill", JSON.stringify(draft.prefill));
+    } catch { /* private mode: the form just opens empty */ }
+    go("/deals/new");
+  };
+
+  // Add a server-suggested term to the draft (changes the draft only).
+  const [fixingId, setFixingId] = useState<string | null>(null);
+  const addTerm = async (msgIndex: number, actionIndex: number, proposalId: string, flagId: string) => {
+    if (fixingId) return;
+    setFixingId(flagId);
+    try {
+      const res = await apiRequest("POST", `/api/copilot/proposal/${proposalId}/add-term`, { flagId });
+      const data = await res.json();
+      if (data.ok && data.draft) {
+        setMessages((cur) => cur.map((m, i) => i !== msgIndex ? m : {
+          ...m,
+          actions: m.actions?.map((a, j) => j === actionIndex ? { ...a, draft: data.draft } : a),
+        }));
+      } else {
+        toast({ title: data.message ?? "Couldn't add that term." });
+      }
+    } catch {
+      toast({ title: "That draft has expired. Ask me again and I'll prepare it." });
+    } finally {
+      setFixingId(null);
+    }
+  };
+
+  // A synchronous lock: two clicks in the same tick both see busy=false.
+  const confirmLock = useRef(false);
   const runConfirm = async (msgIndex: number, action: CopilotAction) => {
-    if (busy) return;
+    if (busy || confirmLock.current) return;
+    confirmLock.current = true;
     setBusy(true);
     try {
-      const res = await apiRequest("POST", "/api/copilot/execute", { tool: action.tool, args: action.args });
+      const res = await apiRequest(
+        "POST",
+        "/api/copilot/execute",
+        action.proposalId ? { proposalId: action.proposalId } : { tool: action.tool, args: action.args },
+      );
       const data = await res.json();
       // A confirmed mutation changed real data — refresh the app's views.
       if (data.ok) {
@@ -210,6 +252,7 @@ export function Copilot() {
     } catch {
       setMessages((cur) => [...cur, { role: "assistant", content: "That didn't work — your role may not allow it." }]);
     } finally {
+      confirmLock.current = false;
       setBusy(false);
     }
   };
@@ -390,7 +433,19 @@ export function Copilot() {
                 <Bubble msg={m} onCopy={() => {
                   navigator.clipboard?.writeText(m.content).then(() => toast({ title: "Copied — paste it into WhatsApp or email" }), () => {});
                 }} onRetone={(tone) => m.chaser && draftChaser(m.chaser.invoiceId, tone)} />
-                {m.role === "assistant" && !!m.actions?.length && (
+                {m.role === "assistant" && m.actions?.map((a, j) => a.type === "deal_draft" && a.draft && a.proposalId ? (
+                  <DealDraftCard
+                    key={`draft-${j}`}
+                    draft={a.draft}
+                    done={!!m.done}
+                    busy={busy}
+                    fixingId={fixingId}
+                    onCreate={() => runConfirm(i, a)}
+                    onEdit={() => editDraft(a.draft!)}
+                    onAddTerm={(flagId) => addTerm(i, j, a.proposalId!, flagId)}
+                  />
+                ) : null)}
+                {m.role === "assistant" && !!m.actions?.some((a) => a.type !== "deal_draft") && (
                   <div className="flex flex-wrap gap-1.5 mt-1.5 pl-9">
                     {m.actions.map((a, j) =>
                       a.type === "navigate" && a.to ? (

@@ -18,7 +18,8 @@ import type { Express } from "express";
 import { isAuthenticated } from "../auth";
 import { aiProvider, copilotConfigured, type ChatMessage } from "./provider";
 import { retrieveKnowledge, AI_KNOWLEDGE_VERSION } from "./knowledge";
-import { toolDefs, runTool, executeCreateQuotation, executeCreateDeal } from "./tools";
+import { toolDefs, runTool, executeCreateQuotation, executeCreateDeal, buildDealCandidate } from "./tools";
+import { appendTerm, buildDealDraft, confirmProposal, openProposal, registerProposal } from "./proposals";
 import { copilotSettings, getDealJourney } from "./workflow";
 import { computeBriefing, computeDealIntel } from "./insights";
 import {
@@ -234,7 +235,7 @@ export function registerCopilotRoutes(app: Express) {
       const history: ChatMessage[] = rawHistory
         .filter((m: any) => (m?.role === "user" || m?.role === "assistant") && typeof m?.content === "string")
         .slice(-16)
-        .map((m: any) => ({ role: m.role, content: String(m.content).slice(0, 2000) }));
+        .map((m: any) => ({ role: m.role, content: String(m.content).slice(0, 4000) }));
       if (!history.length || history[history.length - 1].role !== "user") {
         return res.status(400).json({ error: "No message" });
       }
@@ -304,25 +305,40 @@ export function registerCopilotRoutes(app: Express) {
       // Parse the trailing ACTIONS line into typed buttons.
       let reply = content;
       const actions: any[] = [];
-      const m =
-        content.match(/\nACTIONS:\s*(\[[\s\S]*\])\s*$/) ??
-        content.match(/^ACTIONS:\s*(\[[\s\S]*\])\s*$/);
+      // The model is told to end with ONE `ACTIONS: [...]` line, but it sometimes
+      // adds a sentence after it. Take the last such line wherever it sits and
+      // remove just that line, so the JSON never reaches the user.
+      const lines = content.split("\n");
+      let actionsAt = -1;
+      for (let i = lines.length - 1; i >= 0; i--) {
+        if (/^\s*ACTIONS:\s*\[.*\]\s*$/.test(lines[i])) { actionsAt = i; break; }
+      }
+      const m = actionsAt >= 0 ? [lines[actionsAt], lines[actionsAt].replace(/^\s*ACTIONS:\s*/, "").trim()] : null;
       if (m) {
-        reply = content.slice(0, content.length - m[0].length).trim();
+        reply = lines.filter((_, i) => i !== actionsAt).join("\n").trim();
+        const userText = history.filter((h) => h.role === "user").map((h) => h.content).join("\n");
         try {
           for (const a of JSON.parse(m[1]).slice(0, 3)) {
             if (a && typeof a.label === "string" && typeof a.to === "string" && a.to.startsWith("/")) {
               actions.push({ type: "navigate", label: a.label.slice(0, 40), to: a.to.slice(0, 120) });
             } else if (a && typeof a.label === "string" && a.tool === "create_quotation" && Number.isFinite(Number(a.args?.dealId))) {
               actions.push({ type: "confirm", label: a.label.slice(0, 40), tool: "create_quotation", args: { dealId: Number(a.args.dealId) } });
-            } else if (
-              a && typeof a.label === "string" && a.tool === "create_deal" &&
-              a.args && typeof a.args === "object" &&
-              JSON.stringify(a.args).length <= 4000
-            ) {
-              // Structural gate only — executeCreateDeal clamps and
-              // re-validates every field against the session user.
-              actions.push({ type: "confirm", label: a.label.slice(0, 40), tool: "create_deal", args: a.args });
+            } else if (a && typeof a.label === "string" && a.tool === "create_deal" && a.args && typeof a.args === "object" && JSON.stringify(a.args).length <= 4000) {
+              // The model only proposes. The server validates the fields the
+              // same way the executor will, runs the Protection Check on the
+              // result and issues a single-use proposal id; the button below
+              // carries that id and nothing else. A draft that fails
+              // validation (no client, no amount) simply gets no button.
+              const built = await buildDealCandidate(a.args, req.user);
+              if (built.ok) {
+                const proposalId = registerProposal(req.user, "create_deal", a.args, userText);
+                actions.push({
+                  type: "deal_draft",
+                  label: "Create Deal",
+                  proposalId,
+                  draft: buildDealDraft(built.data as any, built.amountMajor, built.settings, userText),
+                });
+              }
             }
           }
         } catch {
@@ -342,14 +358,49 @@ export function registerCopilotRoutes(app: Express) {
     }
   });
 
+  // Add a suggested protection term to a draft. Changes only the draft the
+  // user is looking at (nothing is saved), and the wording always comes from
+  // the server's own Protection Check, never from the request.
+  app.post("/api/copilot/proposal/:id/add-term", isAuthenticated, async (req: any, res) => {
+    try {
+      const p = openProposal(req.params.id, req.user);
+      if (!p) return res.status(404).json({ ok: false, message: "That draft has expired. Ask me again and I'll prepare it." });
+      const before = await buildDealCandidate(p.args, req.user);
+      if (!before.ok) return res.status(400).json({ ok: false, message: before.message });
+      const flag = buildDealDraft(before.data as any, before.amountMajor, before.settings, p.userText)
+        .protection.flags.find((f) => f.id === String(req.body?.flagId ?? ""));
+      if (!flag?.suggestedTerm) return res.status(400).json({ ok: false, message: "There's no suggested fix for that." });
+      appendTerm(p, flag.suggestedTerm);
+      const after = await buildDealCandidate(p.args, req.user);
+      if (!after.ok) return res.status(400).json({ ok: false, message: after.message });
+      res.json({ ok: true, draft: buildDealDraft(after.data as any, after.amountMajor, after.settings, p.userText) });
+    } catch (err) {
+      console.error("[copilot] add-term error:", err);
+      res.status(500).json({ ok: false, message: "Couldn't update the draft. Please try again." });
+    }
+  });
+
   app.post("/api/copilot/execute", isAuthenticated, async (req: any, res) => {
     try {
-      const { tool, args } = req.body ?? {};
+      const { tool, args, proposalId } = req.body ?? {};
+
+      // Deals: only a server-issued proposal can be confirmed. Raw create_deal
+      // arguments are refused, so a stale tab or a hand-made request can't
+      // create a deal the server never drafted, and a repeat can't duplicate.
+      if (proposalId !== undefined) {
+        const { status, body } = await confirmProposal(proposalId, req.user, (t, a) =>
+          t === "create_deal" ? executeCreateDeal(a, req.user) : Promise.resolve({ ok: false, message: "Unknown action" }),
+        );
+        console.log(`[copilot] execute org=${req.user.organizationId} user=${req.user.id} tool=create_deal ok=${body.ok} replay=${!!body.replay}`);
+        return res.status(status).json(body);
+      }
+
       let result: { ok: boolean; message: string; route?: string };
       if (tool === "create_quotation") {
+        // Naturally idempotent: a current draft quotation is returned, not duplicated.
         result = await executeCreateQuotation(Number(args?.dealId), req.user);
       } else if (tool === "create_deal") {
-        result = await executeCreateDeal(args, req.user);
+        return res.status(400).json({ ok: false, message: "This draft is out of date. Reload the page and ask again." });
       } else {
         return res.status(400).json({ error: "Unknown action" });
       }

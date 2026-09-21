@@ -321,7 +321,10 @@ export async function runTool(name: string, args: any, user: User, settings?: Lo
  *  permission gate, same schema validation, same credit spend with the
  *  same compensation path. The model's args are UNTRUSTED — everything is
  *  clamped and re-validated here. */
-export async function executeCreateDeal(rawArgs: any, user: User) {
+/** Clamp and validate model-proposed deal fields WITHOUT writing anything. The
+ *  executor below and the proposal card both use this, so what the user is
+ *  shown is exactly what would be saved. */
+export async function buildDealCandidate(rawArgs: any, user: User) {
   if (!memberCan(user, "deals.create")) {
     return { ok: false as const, message: "Your role doesn't allow creating deals. Ask your organization owner." };
   }
@@ -400,6 +403,15 @@ export async function executeCreateDeal(rawArgs: any, user: User) {
   if (!parsed.success) {
     return { ok: false as const, message: "Those details don't form a valid deal — try creating it from the Deals page." };
   }
+
+  return { ok: true as const, data: parsed.data, amountMajor, settings };
+}
+
+export async function executeCreateDeal(rawArgs: any, user: User) {
+  const built = await buildDealCandidate(rawArgs, user);
+  if (!built.ok) return built;
+  const parsed = { data: built.data };
+  const { currency, locale } = built.settings;
 
   // Same credit gate as POST /api/deals: spend AFTER validation; compensate
   // if the insert fails so a crash never eats a credit.

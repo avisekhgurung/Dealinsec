@@ -111,6 +111,25 @@ function rememberedDealType(): DealType | null {
   }
 }
 
+/** A draft handed over by the Copilot's Edit button (one read, then gone). The
+ *  server validated these fields; the form still validates them again. */
+interface DealPrefill {
+  brandName?: string; dealTitle?: string; dealType?: string; dealAmount?: number;
+  startDate?: string; endDate?: string; customTerms?: string;
+  deliverables?: { platform: string; contentType: string; quantity: number; frequency: string; notes: string }[];
+}
+function takeDealPrefill(): DealPrefill | null {
+  try {
+    const raw = sessionStorage.getItem("dis_deal_prefill");
+    if (!raw) return null;
+    sessionStorage.removeItem("dis_deal_prefill");
+    const p = JSON.parse(raw);
+    return p && typeof p === "object" ? p : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function CreateDealPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -120,7 +139,9 @@ export default function CreateDealPage() {
   // Two-step wizard: an app-like full-screen type picker, then the form.
   // Skip the picker when the type is already known: ?type= param (deep links)
   // wins, else the remembered last-used type. First-ever deal sees the picker.
-  const [urlType] = useState<DealType | null>(initialTypeFromUrl);
+  const [prefill] = useState<DealPrefill | null>(takeDealPrefill);
+  const prefillType = (dealTypeOptions as readonly string[]).includes(prefill?.dealType ?? "") ? (prefill!.dealType as DealType) : null;
+  const [urlType] = useState<DealType | null>(() => prefillType ?? initialTypeFromUrl());
   const [memoryType] = useState<DealType | null>(() => (urlType ? null : rememberedDealType()));
   const initialType = urlType ?? memoryType;
   const [step, setStep] = useState<"type" | "form">(initialType ? "form" : "type");
@@ -134,25 +155,27 @@ export default function CreateDealPage() {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      brandName: "",
-      dealTitle: "",
+      brandName: prefill?.brandName ?? "",
+      dealTitle: prefill?.dealTitle ?? "",
       dealType: initialType ?? dealTypeOptions[0],
-      dealAmount: 0,
-      startDate: "",
-      endDate: "",
+      dealAmount: prefill?.dealAmount ?? 0,
+      startDate: prefill?.startDate ?? "",
+      endDate: prefill?.endDate ?? "",
       deliverableMode: "all" as const,
-      deliverables: [
-        {
-          id: crypto.randomUUID(),
-          platform: "",
-          contentType: "",
-          quantity: 1,
-          frequency: "One-time",
-          notes: "",
-        },
-      ],
+      deliverables: prefill?.deliverables?.length
+        ? prefill.deliverables.map((d) => ({ id: crypto.randomUUID(), ...d }))
+        : [
+            {
+              id: crypto.randomUUID(),
+              platform: "",
+              contentType: "",
+              quantity: 1,
+              frequency: "One-time",
+              notes: "",
+            },
+          ],
       standardTermIds: STANDARD_TERMS.map((t) => t.id),
-      customTerms: "",
+      customTerms: prefill?.customTerms ?? "",
     },
   });
 
@@ -161,7 +184,10 @@ export default function CreateDealPage() {
 
   // Itemizable custom terms — stored as newline-joined string in form for
   // backward compat with the existing customTerms text field.
-  const [customTermsList, setCustomTermsList] = useState<string[]>([""]);
+  const [customTermsList, setCustomTermsList] = useState<string[]>(() => {
+    const lines = (prefill?.customTerms ?? "").split("\n").map((t) => t.trim()).filter(Boolean);
+    return lines.length ? lines : [""];
+  });
   const syncCustomTerms = (next: string[]) => {
     setCustomTermsList(next);
     form.setValue("customTerms", next.map(t => t.trim()).filter(Boolean).join("\n"));
