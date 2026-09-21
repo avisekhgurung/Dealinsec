@@ -54,7 +54,7 @@ export function landingSeoBody(): string {
 <ol>
 <li><strong>Create a deal</strong> with the client, scope, timeline and fee.</li>
 <li><strong>Send a quote</strong> generated from the deal, with standard or custom terms.</li>
-<li><strong>Get the agreement signed</strong> online, with a dated record of who accepted.</li>
+<li><strong>Get the agreement signed</strong>: you sign with your saved signature, send the PDF and upload the client's signed copy as proof.</li>
 <li><strong>Send the invoice</strong> as an advance, milestone or final invoice drawn from the agreement.</li>
 <li><strong>Track payment</strong> and see what is paid, pending or overdue.</li>
 </ol>
@@ -77,7 +77,7 @@ export function landingSeoBody(): string {
 <h2>Everything you need to manage the client deal</h2>
 <ul>
 <li><strong>Win the deal</strong>: deals, quotes and your own terms.</li>
-<li><strong>Protect the work</strong>: agreements, scope and deliverables, online signatures.</li>
+<li><strong>Protect the work</strong>: agreements, scope and deliverables, signatures and signed-copy proof.</li>
 <li><strong>Get paid</strong>: invoices, payment tracking and payment reminders.</li>
 <li><strong>Stay organized</strong>: a dashboard, and every document as a PDF.</li>
 </ul>
@@ -93,7 +93,7 @@ export function landingSeoBody(): string {
 <p>From the <a href="/blog">DealInSec blog</a>: <a href="/blog/what-is-deal-management-software">what deal management software is</a>, the <a href="/blog/quotation-format">quotation format guide with a free sample</a>, <a href="/blog/how-to-make-a-quotation-online">how to make a quotation online</a>, <a href="/blog/quotation-software-vs-excel">quotation software vs Excel</a>, <a href="/blog/quotation-vs-proposal">quotation vs proposal</a>, <a href="/blog/how-to-manage-a-deal-from-quotation-to-invoice">managing a deal from quotation to invoice</a>, and <a href="/blog/fake-quotation">when a sample quotation is fine and when it's fraud</a>. For getting paid: <a href="/blog/client-not-paying">what to do when a client isn't paying</a>, <a href="/blog/payment-reminder-message-to-client">payment reminder messages that work</a>, and <a href="/blog/advance-payment-terms">advance payment terms</a>. Written for India: <a href="/blog/best-quotation-software-india">choosing quotation software in India</a> and <a href="/blog/msme-payment-rule-45-days-samadhaan">the MSME 45-day payment rule</a>.</p>
 
 <h2>Start simple. Grow when you need to.</h2>
-<p>The free plan is permanent and covers 4 deals a month, each with its quotation. Every new account also starts with a 7-day Pro trial with no card, in every country. Pro adds unlimited deals, e-signed agreements, invoices and payment tracking. In India, Pro is ₹99 per month or ₹999 per year. Outside India, Pro is listed at $99, £79 or €89 a year, annual only, and international checkout is opening soon. No platform fee on your deal value.</p>
+<p>The free plan is permanent and covers 4 deals a month, each with its quotation. Every new account also starts with a 7-day Pro trial with no card, in every country. Pro adds unlimited deals, agreements with signature, invoices and payment tracking. In India, Pro is ₹99 per month or ₹999 per year. Outside India, Pro is listed at $99, £79 or €89 a year, annual only, and international checkout is opening soon. No platform fee on your deal value.</p>
 
 <h2>Frequently asked questions</h2>
 ${faqs}

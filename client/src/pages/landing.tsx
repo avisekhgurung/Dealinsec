@@ -1031,7 +1031,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
   ];
   const proMonthlyPerks = [
     "Unlimited deals & quotations",
-    "Unlimited signed agreements with e-signature",
+    "Unlimited agreements with your signature and signed-copy tracking",
     "Unlimited professional invoices",
     "Payment tracking: paid, pending and overdue",
     "Priority email support",

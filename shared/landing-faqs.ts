@@ -12,7 +12,7 @@ export interface LandingFaq {
 export const LANDING_FAQS: LandingFaq[] = [
   {
     q: "What is DealInSec?",
-    a: "DealInSec is a workspace for freelancers to manage a client deal from first quote to final payment. You create the deal, send a quotation, get an agreement signed online, send the invoice and track whether it has been paid. Each document is generated from the same deal, so the scope and the numbers always match.",
+    a: "DealInSec is a workspace for freelancers to manage a client deal from first quote to final payment. You create the deal, send a quotation, get the agreement signed, send the invoice and track whether it has been paid. Each document is generated from the same deal, so the scope and the numbers always match.",
   },
   {
     q: "Who is DealInSec for?",
@@ -20,15 +20,15 @@ export const LANDING_FAQS: LandingFaq[] = [
   },
   {
     q: "Can I use DealInSec with international clients?",
-    a: "Yes. You choose your country and billing currency when you sign up, from a list of 50 currencies, and your quotes, agreements and invoices use it. Your client can receive the documents and accept the agreement online from anywhere. The tax field, bank labels, invoice numbering and agreement wording follow the country you work from.",
+    a: "Yes. You choose your country and billing currency when you sign up, from a list of 50 currencies, and your quotes, agreements and invoices use it. Your client can receive the documents from anywhere and sign the agreement however they prefer; you upload the signed copy. The tax field, bank labels, invoice numbering and agreement wording follow the country you work from.",
   },
   {
     q: "Can I create quotes and agreements?",
-    a: "Yes. Create a deal with the client, deliverables, timeline and fee, then generate a quotation from it with standard or custom terms. When the client accepts, the agreement is generated from the same deal. Before you send the terms, Protection Check flags risky wording such as unlimited revisions or a missing advance, and suggests lines to add. Nothing is added unless you approve it.",
+    a: "Yes. Create a deal with the client, deliverables, timeline and fee, then generate a quotation from it with standard or custom terms. Once the client agrees, create the agreement from the same deal. Before you send the terms, Protection Check flags risky wording such as unlimited revisions or a missing advance, and suggests lines to add. Nothing is added unless you approve it.",
   },
   {
     q: "Can clients sign agreements online?",
-    a: "Yes. Your client accepts the agreement electronically and DealInSec records who accepted, when, and which signature was used, with a PDF both sides can keep. It is electronic acceptance with an audit record, not a qualified or certified digital signature, and DealInSec is not a law firm, so have a lawyer review anything high-value or unusual.",
+    a: "Not through a signing link yet. You create the agreement with your saved signature applied, download the PDF and send it. Your client signs it however they prefer, and you upload the signed copy as proof, which marks the agreement Signed with the date. It is a record of what was agreed, not a Digital Signature Certificate or a certified e-signature, and DealInSec is not a law firm, so have a lawyer review anything high-value or unusual.",
   },
   {
     q: "Can I create invoices?",

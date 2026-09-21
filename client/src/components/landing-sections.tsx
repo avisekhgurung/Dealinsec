@@ -153,7 +153,7 @@ const STEP_PREVIEWS = [
   <div key="agr" className="space-y-1.5">
     <p className="text-[11px] font-semibold">Service agreement</p>
     <p className="flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold"><Check className="w-3 h-3" /> You signed</p>
-    <p className="flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold"><Check className="w-3 h-3" /> Client signed</p>
+    <p className="flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold"><Check className="w-3 h-3" /> Signed copy on file</p>
   </div>,
   // 04 invoice
   <div key="inv" className="space-y-1.5">
@@ -172,7 +172,7 @@ const STEP_PREVIEWS = [
 const STEPS = [
   { icon: Briefcase, title: "Create a deal", desc: "Client, scope, timeline and fee in one record." },
   { icon: FileText, title: "Send a quote", desc: "A clean quotation with your terms, generated from the deal." },
-  { icon: FileSignature, title: "Get the agreement signed", desc: "Your client accepts online, with a dated record." },
+  { icon: FileSignature, title: "Get the agreement signed", desc: "Sign with your saved signature, send the PDF, and upload the signed copy." },
   { icon: Receipt, title: "Send the invoice", desc: "Advance, milestone or final, drawn from the agreement." },
   { icon: Wallet, title: "Track payment", desc: "See what's paid, pending or overdue at a glance." },
 ];
@@ -263,7 +263,7 @@ export function ScopeSection() {
                   <p className="text-2xl font-bold text-emerald-600">$3,200</p>
                 </div>
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                  <Check className="w-3.5 h-3.5" /> Awaiting client signature
+                  <Clock className="w-3.5 h-3.5" /> Awaiting signed copy
                 </span>
               </div>
             </div>
@@ -273,7 +273,7 @@ export function ScopeSection() {
             <ShieldCheck className="w-4 h-4" /> Clear scope. Fewer misunderstandings.
           </div>
           <ul className="mt-6 space-y-3 text-[15px] text-neutral-700 dark:text-neutral-300">
-            <li className="flex gap-2.5"><Check className="w-4 h-4 text-emerald-600 mt-1 shrink-0" /> Your client accepts online; the record shows who signed and when.</li>
+            <li className="flex gap-2.5"><Check className="w-4 h-4 text-emerald-600 mt-1 shrink-0" /> You sign with your saved signature and send the PDF. Upload the client\u2019s signed copy and the agreement is marked Signed, with the date.</li>
             <li className="flex gap-2.5"><Check className="w-4 h-4 text-emerald-600 mt-1 shrink-0" /> Protection Check flags vague wording like &ldquo;unlimited revisions&rdquo; or a missing advance before you send.</li>
           </ul>
           <p className="text-xs text-neutral-500 mt-5 max-w-md">
@@ -436,7 +436,7 @@ export function ProfessionalSection() {
                 <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 p-2.5">
                   <p className="text-[9px] uppercase tracking-widest text-neutral-500 mb-1">Client</p>
                   <div className="h-4 rounded bg-neutral-100 dark:bg-neutral-800" />
-                  <p className="flex items-center gap-1 mt-1 text-[9px] font-semibold text-amber-700 dark:text-amber-400"><Clock className="w-3 h-3" /> Awaiting</p>
+                  <p className="flex items-center gap-1 mt-1 text-[9px] font-semibold text-amber-700 dark:text-amber-400"><Clock className="w-3 h-3" /> Awaiting copy</p>
                 </div>
               </div>
             </DocShell>
@@ -628,7 +628,7 @@ const FEATURE_GROUPS = [
     items: [
       { t: "Agreements", d: "Generated from the accepted quote." },
       { t: "Scope & deliverables", d: "Revisions and exclusions spelled out." },
-      { t: "Signatures", d: "Online acceptance with a dated record." },
+      { t: "Signatures", d: "Your signature applied; signed copy kept as proof." },
     ],
   },
   {
