@@ -320,6 +320,7 @@ export function registerCopilotRoutes(app: Express) {
       if (m) {
         reply = lines.filter((_, i) => i !== actionsAt).join("\n").trim();
         const userText = history.filter((h) => h.role === "user").map((h) => h.content).join("\n");
+        const dropped: string[] = [];
         try {
           for (const a of JSON.parse(m[1]).slice(0, 3)) {
             if (a && typeof a.label === "string" && typeof a.to === "string" && a.to.startsWith("/")) {
@@ -352,8 +353,12 @@ export function registerCopilotRoutes(app: Express) {
                   proposalId,
                   draft: buildAgreementDraft(built.data, built.settings),
                 });
-              } else if (built.route) {
-                actions.push({ type: "navigate", label: "Open Agreement", to: built.route });
+              } else {
+                // The model wrote its reply BEFORE this validation ran, so it
+                // may claim a draft that doesn't exist — replace its claim
+                // with the real reason, and still offer wherever it points.
+                dropped.push(built.message);
+                if (built.route) actions.push({ type: "navigate", label: "Open Agreement", to: built.route });
               }
             } else if (a && typeof a.label === "string" && a.tool === "create_invoice" && a.args && typeof a.args === "object") {
               const built = await buildInvoiceCandidate(a.args, req.user);
@@ -365,12 +370,17 @@ export function registerCopilotRoutes(app: Express) {
                   proposalId,
                   draft: buildInvoiceDraft(built.data, built.settings),
                 });
+              } else {
+                dropped.push(built.message);
               }
             }
           }
         } catch {
           /* malformed actions line → text only */
         }
+        // A dropped proposal means the reply above may be describing something
+        // that didn't happen — say so plainly rather than leave it uncorrected.
+        if (dropped.length) reply += (reply ? "\n\n" : "") + dropped.join(" ");
       }
 
       // Observability: no message content, just shape.

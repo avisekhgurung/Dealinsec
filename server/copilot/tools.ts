@@ -268,7 +268,7 @@ export async function runTool(name: string, args: any, user: User, settings?: Lo
       );
       if (!rows.length) return "No matching agreements.";
       return cap(rows)
-        .map((c) => `Agreement #${c.id} "${c.contractName}" · ${formatMoney(c.contractValueMinor, currency, locale)} · ${c.status} · route:/contracts/${c.id}`)
+        .map((c) => `Agreement #${c.id} "${c.contractName}" · ${formatMoney(c.contractValueMinor, currency, locale)} · ${c.status} · dealId:${c.dealId} · route:/contracts/${c.id}`)
         .join("\n");
     }
 

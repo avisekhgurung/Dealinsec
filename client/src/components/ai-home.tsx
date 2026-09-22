@@ -35,7 +35,7 @@ interface Chip {
 const CHIPS: Chip[] = [
   { label: "New Deal", icon: Plus, perm: "deals.create", href: "/deals/new" },
   { label: "Create Quotation", icon: FileText, perm: "quotations.create", ask: "Create a quotation for my most recent deal" },
-  { label: "Create Invoice", icon: Receipt, perm: "invoices.create", href: "/contracts" },
+  { label: "Create Invoice", icon: Receipt, perm: "invoices.create", ask: "Create an invoice for my most recent signed agreement" },
   { label: "Overdue Payments", icon: AlertTriangle, ask: "Which invoices are overdue?" },
   { label: "What should I do today?", icon: ListChecks, ask: "What should I do today?" },
   { label: "Daily Briefing", icon: Sun, ask: null },
