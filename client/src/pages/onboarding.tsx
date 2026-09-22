@@ -15,6 +15,7 @@ import { getLocaleSettings, type LocaleFields, type LocaleSettings } from "@shar
 import { sameRegion } from "@shared/region";
 import { useLocation } from "wouter";
 import { postAuthDestination, hasPendingDealPrefill } from "@/lib/deal-prefill";
+import { trackEvent } from "@/lib/analytics";
 
 /**
  * What the chosen country changes on this screen. Data, not a branch: a country
@@ -136,7 +137,7 @@ export default function OnboardingPage() {
       const firstName = nameParts[0];
       const lastName = nameParts.slice(1).join(" ") || null;
 
-      await apiRequest("PATCH", "/api/profile", {
+      const profileRes = await apiRequest("PATCH", "/api/profile", {
         firstName,
         lastName,
         phone: rules.normalizePhone(phone, dialCode),
@@ -150,6 +151,12 @@ export default function OnboardingPage() {
         timezone: region.timezone,
         onboardingComplete: true,
       });
+      // Onboarding is the trial's one-shot grant point (server/trial.ts) —
+      // this is the only place that can ever observe the moment it starts.
+      if (!user?.trialStartedAt) {
+        const updated = await profileRes.json().catch(() => null);
+        if (updated?.trialStartedAt) trackEvent("pro_trial_started");
+      }
 
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       const restoring = hasPendingDealPrefill();

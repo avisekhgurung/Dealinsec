@@ -504,10 +504,13 @@ export default function ContractConfirmationPage() {
                 <div className="flex gap-3">
                   <Crown className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                   <div className="space-y-2">
-                    <p className="font-semibold text-emerald-900 dark:text-emerald-200">Agreements are a Pro feature</p>
-                    <p className="text-sm text-emerald-800 dark:text-emerald-300 leading-relaxed">
-                      Upgrade to DealInSec Pro to create unlimited signed agreements, invoices and payment tracking.
-                    </p>
+                    <p className="font-semibold text-emerald-900 dark:text-emerald-200">Take this deal to a signed agreement</p>
+                    <ul className="text-sm text-emerald-800 dark:text-emerald-300 space-y-1">
+                      <li>✓ Professional agreement</li>
+                      <li>✓ Online client signing</li>
+                      <li>✓ Signed audit record</li>
+                      <li>✓ Continue into invoicing</li>
+                    </ul>
                     <Button
                       size="sm"
                       className="mt-1 text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"

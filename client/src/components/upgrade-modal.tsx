@@ -45,9 +45,9 @@ export function useUpgradeModal(): UpgradeModalContextValue {
 
 const FEATURE_COPY: Record<UpgradeFeature, string> = {
   deals: "Your free plan covers 4 deals a month — you've used them all.",
-  agreements: "Creating signed agreements is a Pro feature.",
-  invoices: "Generating invoices is a Pro feature.",
-  payment_tracking: "Payment tracking — recording payments and marking invoices Paid — is a Pro feature.",
+  agreements: "Your quotation is ready to become a signed agreement — that's where Pro comes in.",
+  invoices: "Your agreement is signed — create the invoice and track payment with Pro.",
+  payment_tracking: "Track who's paid and who still owes you — part of Pro.",
 };
 
 // Only what ships today — reminders and custom branding are still "coming
@@ -79,9 +79,14 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
   const checkoutAvailable = usePlanCheckoutAvailable();
 
   const openUpgradeModal = useCallback((options: UpgradeModalOptions = {}) => {
-    setFeature(options.feature ?? "deals");
+    const feature = options.feature ?? "deals";
+    setFeature(feature);
     setOpen(true);
-    trackEvent("upgrade_modal_shown", { feature: options.feature ?? "deals" });
+    trackEvent("upgrade_modal_shown", { feature });
+    // Named separately from the generic event above so the two highest-value
+    // workflow moments (Step 5 B/C) are queryable on their own.
+    if (feature === "agreements") trackEvent("agreement_upgrade_clicked");
+    if (feature === "invoices") trackEvent("invoice_upgrade_clicked");
   }, []);
 
   return (

@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { BottomNav } from "@/components/bottom-nav";
 import { ArrowLeft, Download, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
 import type { Deal, Quote } from "@shared/schema";
-import { STANDARD_TERMS, termsForPhase, recordNo } from "@shared/schema";
+import { STANDARD_TERMS, termsForPhase, recordNo, hasProAccess } from "@shared/schema";
 import { getDeliverableLabels } from "@shared/dealTypeTaxonomy";
 import { PagedDocument, type DocBlock } from "@/components/document/paged";
 import {
@@ -389,8 +389,16 @@ export default function QuotePreviewPage() {
           <QuoteSharePanel dealId={deal.id} />
         </div>
 
+        {/* Only for a user who'd actually hit the Pro gate one tap later — a
+            Pro/trial user proceeds straight through, no reason to mention it. */}
+        {!hasProAccess(user) && (
+          <p className="text-xs text-muted-foreground px-1 pt-4 print:hidden">
+            Your quotation is ready. Create the signed agreement, get it e-signed, and invoice — with Pro.
+          </p>
+        )}
+
         {/* Stacked on narrow phones: side by side, the two labels need ~420px. */}
-        <div className="flex flex-col min-[440px]:flex-row gap-3 pt-4 pb-2 print:hidden">
+        <div className={`flex flex-col min-[440px]:flex-row gap-3 pb-2 print:hidden ${hasProAccess(user) ? "pt-4" : "pt-2"}`}>
           <Button variant="outline" className="flex-1 h-12 rounded-xl font-semibold" onClick={() => window.print()}>
             <Download className="w-4 h-4 mr-2" /> Download PDF
           </Button>

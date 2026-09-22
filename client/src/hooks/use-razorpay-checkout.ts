@@ -127,15 +127,20 @@ export function useRazorpayCheckout() {
 
       rzp.on("payment.failed", (resp: any) => {
         setIsLoading(false);
+        trackEvent("payment_failed", { plan, stage: "gateway" });
         cbs.onError?.(
           resp?.error?.description ||
             "Your payment couldn't be processed. No money was deducted — please try again.",
         );
       });
 
+      trackEvent("checkout_started", { plan });
       rzp.open();
     } catch (error: any) {
       setIsLoading(false);
+      // Failed before the gateway ever opened (order creation, script load) —
+      // distinct stage from a gateway-reported decline above.
+      trackEvent("payment_failed", { plan, stage: "init" });
       cbs.onError?.(error.message || "Could not start the payment. Please try again.");
     }
   }, []);

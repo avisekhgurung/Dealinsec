@@ -23,7 +23,7 @@ import {
   Search, Plus, ArrowRight, FileText, FileCheck, Receipt, Crown,
   AlertTriangle, Scissors,
 } from "lucide-react";
-import { hasProAccess } from "@shared/schema";
+import { hasProAccess, hasLapsedTrial } from "@shared/schema";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
 import { useAuth } from "@/hooks/useAuth";
 import { useMoney } from "@/hooks/use-locale";
@@ -223,8 +223,11 @@ export function PickParentDialog({
                 </p>
                 <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
                   {/* "GST-ready" is India's promise and Indian accounts keep reading
-                      it; elsewhere GST is not the tax, so it is not named. */}
-                  Your 7-day trial unlocks the full workflow — agreements,{" "}
+                      it; elsewhere GST is not the tax, so it is not named. A user who
+                      already used their one-per-account trial isn't offered another —
+                      "unlocks" only applies while a trial is still available. */}
+                  {hasLapsedTrial(user) ? "Your 7-day trial has ended. Upgrade" : "Upgrade"} to Pro for the
+                  full workflow — agreements,{" "}
                   {moneySettings.country === "IN" ? "GST-ready invoices" : "invoices"} and payment tracking.
                 </p>
                 <Button
