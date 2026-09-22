@@ -21,6 +21,7 @@ import NotFound from "@/pages/not-found";
 
 // Lazy-loaded — only fetched when the user navigates to that route
 const PublicQuotePage         = lazy(() => import("@/pages/public-quote"));
+const PublicSignPage          = lazy(() => import("@/pages/public-sign"));
 const OnboardingPage          = lazy(() => import("@/pages/onboarding"));
 const DashboardPage           = lazy(() => import("@/pages/dashboard"));
 const DealsPage               = lazy(() => import("@/pages/deals"));
@@ -111,6 +112,13 @@ function Router() {
     return (
       <Suspense fallback={<RouteLoader />}>
         <PublicQuotePage />
+      </Suspense>
+    );
+  }
+  if (location.startsWith("/s/")) {
+    return (
+      <Suspense fallback={<RouteLoader />}>
+        <PublicSignPage />
       </Suspense>
     );
   }

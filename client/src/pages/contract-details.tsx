@@ -38,6 +38,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Landmark } from "lucide-react";
 import type { Contract, Deal, BrandInvoice, Quote } from "@shared/schema";
 import { WorkflowStepper } from "@/components/workflow-stepper";
+import { AgreementSignPanel } from "@/components/agreement-sign-panel";
 import { recordNo } from "@shared/schema";
 
 export default function ContractDetailsPage() {
@@ -861,6 +862,10 @@ export default function ContractDetailsPage() {
               </dl>
             </CardContent>
           </Card>
+
+          <section className="space-y-3">
+            <AgreementSignPanel contractId={contract.id} />
+          </section>
 
           <section className="space-y-3">
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">

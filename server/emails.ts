@@ -334,6 +334,33 @@ export function quoteAcceptedEmail(args: {
   return { subject, html };
 }
 
+export function agreementSignedByClientEmail(args: {
+  firstName?: string;
+  clientName: string;
+  contractName: string;
+  amountMinor: number;
+  contractId: number;
+  signerName: string;
+  locale?: LocaleFields | null;
+}): { subject: string; html: string } {
+  const subject = `${args.clientName} signed your agreement`;
+  const html = layout({
+    preview: `${args.signerName} signed ${args.contractName} online.`,
+    bodyHtml: `
+      ${heading("Agreement signed ✍️")}
+      ${para(`<strong>${args.signerName}</strong>, on behalf of <strong>${args.clientName}</strong>, signed your agreement online.`)}
+      ${infoCard(
+        infoRow("Agreement", args.contractName) +
+        infoRow("Signed by", args.signerName) +
+        infoRow("Value", money(args.amountMinor, args.locale)),
+      )}
+      ${button("View agreement", `${appUrl()}/contracts/${args.contractId}`)}
+      ${para("This is electronic acceptance with an audit record — who signed, when, and which signature was used — not a Digital Signature Certificate. You can generate the invoice next.")}
+    `,
+  });
+  return { subject, html };
+}
+
 export function contractSignedEmail(args: {
   firstName?: string;
   brandName: string;

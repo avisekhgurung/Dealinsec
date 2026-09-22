@@ -13,6 +13,7 @@ import { requirePro, requireOrgPermission, withOrg, getBillingUser, logOrgActivi
 import { maybeStartTrial } from "./trial";
 import { registerCopilotRoutes } from "./copilot/routes";
 import { registerQuoteShareRoutes } from "./quoteShare";
+import { registerAgreementSignRoutes } from "./agreementSign";
 import { getSeatLimit, INVITABLE_ROLES, hasPermission as hasOrgPermission, orgRoleOptions, CUSTOM_ROLE, ASSIGNABLE_PERMISSIONS , canReadModule} from "@shared/permissions";
 import { aiEnabled, reserve, refund, extractInvoice } from "./ai";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
@@ -583,6 +584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
   registerCopilotRoutes(app);
   registerQuoteShareRoutes(app);
+  registerAgreementSignRoutes(app);
 
   // Org-scoped access check: a resource is visible to every active member of
   // its organization. Rows created before the org migration (or by an old

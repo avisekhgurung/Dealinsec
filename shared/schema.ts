@@ -713,6 +713,31 @@ export const contracts = pgTable("contracts", {
    *  predates this column was issued by an INR org, which the minor-units
    *  migration's guard proves before it runs. */
   currency: varchar("currency", { length: 3 }).notNull().default(DEFAULT_LOCALE_SETTINGS.currency),
+
+  // ── Client-facing e-signature (additive — see script/migrate-contract-esign.ts) ──
+  // A parallel path to "signedByBrand" alongside the existing manual proof
+  // upload, not a replacement for it: whichever happens first sets
+  // signedByBrand/status the same way, so every downstream reader (Money
+  // Radar, Deal Health, the workflow stepper) needs no change. These columns
+  // ARE the audit record for the online path — who signed, with which
+  // signature, when, from where.
+  clientShareToken: varchar("client_share_token").unique(),
+  clientSharedAt: timestamp("client_shared_at"),
+  clientShareRevokedAt: timestamp("client_share_revoked_at"),
+  clientShareViewCount: integer("client_share_view_count").notNull().default(0),
+  /** The frozen, redacted content shown on the sign page — see
+   *  shared/contractSign.ts. Never contains a tax id, bank field or the
+   *  freelancer's own signature image. */
+  clientSignShareSnapshot: jsonb("client_sign_share_snapshot"),
+  clientSignedAt: timestamp("client_signed_at"),
+  clientSignerName: varchar("client_signer_name"),
+  clientSignerEmail: varchar("client_signer_email"),
+  /** A drawn signature, captured as a PNG data URL at the moment of signing —
+   *  never the freelancer's own signatureUrl, and never editable afterwards. */
+  clientSignatureDataUrl: text("client_signature_data_url"),
+  /** Best-effort provenance for the audit record, from the same
+   *  Cloudflare-aware header read as the public quote endpoint. */
+  clientSignerIp: varchar("client_signer_ip"),
 });
 
 export const invoices = pgTable("invoices", {
