@@ -517,10 +517,27 @@ export default function ContractPdfPage() {
             />
             <SignatureCell
               heading={`Party B — ${copy.clientRole}`}
-              name={c.brandName}
-              date={c.signedByBrand && c.signedDate ? docDate(c.signedDate, loc) : null}
-              signatureUrl={null}
-              note={c.signedByBrand ? "Accepted electronically — signed copy on record" : undefined}
+              // Signed online: the client's own drawn signature and the name
+              // they typed, captured at that moment (server/agreementSign.ts)
+              // — never the generic placeholder. Signed the old way (a
+              // proof file uploaded separately): no image exists for this
+              // party, so the note explains what's on file instead.
+              name={c.clientSignedAt ? c.clientSignerName || c.brandName : c.brandName}
+              date={
+                c.clientSignedAt
+                  ? docDate(c.clientSignedAt, loc)
+                  : c.signedByBrand && c.signedDate
+                  ? docDate(c.signedDate, loc)
+                  : null
+              }
+              signatureUrl={c.clientSignedAt ? c.clientSignatureDataUrl : null}
+              note={
+                c.clientSignedAt
+                  ? undefined
+                  : c.signedByBrand
+                  ? "Accepted electronically — signed copy on record"
+                  : undefined
+              }
             />
           </div>
         </div>

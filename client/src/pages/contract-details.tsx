@@ -509,7 +509,9 @@ export default function ContractDetailsPage() {
               <div className="flex-1 min-w-0">
                 <h3 className="text-white font-bold text-base">Agreement PDF</h3>
                 <p className="text-white/75 text-xs leading-snug">
-                  Download &amp; send to {contract.brandName} for signing
+                  {contract.signedByBrand
+                    ? "Signed — download the record for your files"
+                    : `Download & send to ${contract.brandName} for signing`}
                 </p>
               </div>
             </div>
