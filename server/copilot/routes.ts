@@ -18,8 +18,11 @@ import type { Express } from "express";
 import { isAuthenticated } from "../auth";
 import { aiProvider, copilotConfigured, type ChatMessage } from "./provider";
 import { retrieveKnowledge, AI_KNOWLEDGE_VERSION } from "./knowledge";
-import { toolDefs, runTool, executeCreateQuotation, executeCreateDeal, buildDealCandidate } from "./tools";
-import { appendTerm, buildDealDraft, confirmProposal, openProposal, registerProposal } from "./proposals";
+import {
+  toolDefs, runTool, executeCreateQuotation, executeCreateDeal, buildDealCandidate,
+  buildAgreementCandidate, executeCreateAgreement, buildInvoiceCandidate, executeCreateInvoice,
+} from "./tools";
+import { appendTerm, buildAgreementDraft, buildDealDraft, buildInvoiceDraft, confirmProposal, openProposal, registerProposal } from "./proposals";
 import { copilotSettings, getDealJourney } from "./workflow";
 import { computeBriefing, computeDealIntel } from "./insights";
 import {
@@ -339,6 +342,30 @@ export function registerCopilotRoutes(app: Express) {
                   draft: buildDealDraft(built.data as any, built.amountMajor, built.settings, userText),
                 });
               }
+            } else if (a && typeof a.label === "string" && a.tool === "create_agreement" && a.args && typeof a.args === "object") {
+              const built = await buildAgreementCandidate(a.args, req.user);
+              if (built.ok) {
+                const proposalId = registerProposal(req.user, "create_agreement", a.args);
+                actions.push({
+                  type: "agreement_draft",
+                  label: "Create Agreement",
+                  proposalId,
+                  draft: buildAgreementDraft(built.data, built.settings),
+                });
+              } else if (built.route) {
+                actions.push({ type: "navigate", label: "Open Agreement", to: built.route });
+              }
+            } else if (a && typeof a.label === "string" && a.tool === "create_invoice" && a.args && typeof a.args === "object") {
+              const built = await buildInvoiceCandidate(a.args, req.user);
+              if (built.ok) {
+                const proposalId = registerProposal(req.user, "create_invoice", a.args);
+                actions.push({
+                  type: "invoice_draft",
+                  label: "Create Invoice",
+                  proposalId,
+                  draft: buildInvoiceDraft(built.data, built.settings),
+                });
+              }
             }
           }
         } catch {
@@ -388,10 +415,13 @@ export function registerCopilotRoutes(app: Express) {
       // arguments are refused, so a stale tab or a hand-made request can't
       // create a deal the server never drafted, and a repeat can't duplicate.
       if (proposalId !== undefined) {
-        const { status, body } = await confirmProposal(proposalId, req.user, (t, a) =>
-          t === "create_deal" ? executeCreateDeal(a, req.user) : Promise.resolve({ ok: false, message: "Unknown action" }),
-        );
-        console.log(`[copilot] execute org=${req.user.organizationId} user=${req.user.id} tool=create_deal ok=${body.ok} replay=${!!body.replay}`);
+        const { status, body } = await confirmProposal(proposalId, req.user, (t, a) => {
+          if (t === "create_deal") return executeCreateDeal(a, req.user);
+          if (t === "create_agreement") return executeCreateAgreement(a, req.user);
+          if (t === "create_invoice") return executeCreateInvoice(a, req.user);
+          return Promise.resolve({ ok: false, message: "Unknown action" });
+        });
+        console.log(`[copilot] execute org=${req.user.organizationId} user=${req.user.id} proposal=${proposalId} ok=${body.ok} replay=${!!body.replay}`);
         return res.status(status).json(body);
       }
 

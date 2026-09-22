@@ -21,6 +21,7 @@ import { useMoney } from "@/hooks/use-locale";
 import { useToast } from "@/hooks/use-toast";
 import { COPILOT_EVENT, takePendingCopilot } from "@/lib/copilot-bus";
 import { DealDraftCard, type DealDraft } from "./deal-draft-card";
+import { AgreementDraftCard, InvoiceDraftCard, type AgreementDraft, type InvoiceDraft } from "./proposal-cards";
 
 /* ── types mirrored from server/copilot/insights.ts ── */
 interface Briefing {
@@ -36,14 +37,14 @@ interface Briefing {
 }
 
 interface CopilotAction {
-  type: "navigate" | "confirm" | "deal_draft";
+  type: "navigate" | "confirm" | "deal_draft" | "agreement_draft" | "invoice_draft";
   label: string;
   to?: string;
   tool?: string;
   args?: Record<string, unknown>;
-  /** deal_draft: a server-issued, single-use proposal and the card to show. */
+  /** *_draft: a server-issued, single-use proposal and the card to show. */
   proposalId?: string;
-  draft?: DealDraft;
+  draft?: DealDraft | AgreementDraft | InvoiceDraft;
 }
 
 interface Msg {
@@ -433,19 +434,30 @@ export function Copilot() {
                 <Bubble msg={m} onCopy={() => {
                   navigator.clipboard?.writeText(m.content).then(() => toast({ title: "Copied — paste it into WhatsApp or email" }), () => {});
                 }} onRetone={(tone) => m.chaser && draftChaser(m.chaser.invoiceId, tone)} />
-                {m.role === "assistant" && m.actions?.map((a, j) => a.type === "deal_draft" && a.draft && a.proposalId ? (
-                  <DealDraftCard
-                    key={`draft-${j}`}
-                    draft={a.draft}
-                    done={!!m.done}
-                    busy={busy}
-                    fixingId={fixingId}
-                    onCreate={() => runConfirm(i, a)}
-                    onEdit={() => editDraft(a.draft!)}
-                    onAddTerm={(flagId) => addTerm(i, j, a.proposalId!, flagId)}
-                  />
-                ) : null)}
-                {m.role === "assistant" && !!m.actions?.some((a) => a.type !== "deal_draft") && (
+                {m.role === "assistant" && m.actions?.map((a, j) => {
+                  if (a.type === "deal_draft" && a.draft && a.proposalId) {
+                    return (
+                      <DealDraftCard
+                        key={`draft-${j}`}
+                        draft={a.draft as DealDraft}
+                        done={!!m.done}
+                        busy={busy}
+                        fixingId={fixingId}
+                        onCreate={() => runConfirm(i, a)}
+                        onEdit={() => editDraft(a.draft as DealDraft)}
+                        onAddTerm={(flagId) => addTerm(i, j, a.proposalId!, flagId)}
+                      />
+                    );
+                  }
+                  if (a.type === "agreement_draft" && a.draft && a.proposalId) {
+                    return <AgreementDraftCard key={`draft-${j}`} draft={a.draft as AgreementDraft} done={!!m.done} busy={busy} onCreate={() => runConfirm(i, a)} />;
+                  }
+                  if (a.type === "invoice_draft" && a.draft && a.proposalId) {
+                    return <InvoiceDraftCard key={`draft-${j}`} draft={a.draft as InvoiceDraft} done={!!m.done} busy={busy} onCreate={() => runConfirm(i, a)} />;
+                  }
+                  return null;
+                })}
+                {m.role === "assistant" && !!m.actions?.some((a) => !a.type.endsWith("_draft")) && (
                   <div className="flex flex-wrap gap-1.5 mt-1.5 pl-9">
                     {m.actions.map((a, j) =>
                       a.type === "navigate" && a.to ? (

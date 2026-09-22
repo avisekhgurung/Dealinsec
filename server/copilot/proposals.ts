@@ -26,6 +26,23 @@ import {
 const TTL_MS = 30 * 60 * 1000;
 const MAX_OPEN = 2000;
 
+export type ProposalTool = "create_deal" | "create_agreement" | "create_invoice";
+
+export interface AgreementDraft {
+  client: string;
+  project: string;
+  amount: string;
+  timeline: string;
+}
+
+export interface InvoiceDraft {
+  client: string;
+  invoiceType: "full" | "advance" | "final";
+  amount: string;
+  dueDate: string | null;
+  linkedAgreement: boolean;
+}
+
 export interface DealDraft {
   client: string;
   project: string;
@@ -59,7 +76,7 @@ export interface DealDraft {
 interface Proposal {
   userId: string;
   organizationId: string | null;
-  tool: "create_deal";
+  tool: ProposalTool;
   args: Record<string, unknown>;
   /** The user's own words, kept to check the amount against on every rebuild. */
   userText: string;
@@ -78,9 +95,9 @@ const sweep = () => {
 
 export function registerProposal(
   user: { id: string; organizationId?: string | null },
-  tool: "create_deal",
+  tool: ProposalTool,
   args: Record<string, unknown>,
-  userText: string,
+  userText = "",
 ): string {
   sweep();
   const id = crypto.randomBytes(16).toString("hex");
@@ -125,7 +142,7 @@ export type RunOutcome = { ok: boolean; message: string; route?: string; replay?
 export async function confirmProposal(
   id: unknown,
   user: { id: string; organizationId?: string | null },
-  run: (tool: "create_deal", args: Record<string, unknown>) => Promise<{ ok: boolean; message: string; route?: string }>,
+  run: (tool: ProposalTool, args: Record<string, unknown>) => Promise<{ ok: boolean; message: string; route?: string }>,
 ): Promise<{ status: number; body: RunOutcome }> {
   sweep();
   const p = typeof id === "string" ? store.get(id) : undefined;
@@ -150,6 +167,31 @@ export async function confirmProposal(
     p.state = "open";
     throw err;
   }
+}
+
+export function buildAgreementDraft(
+  candidate: { contractName: string; brandName: string; contractValueMinor: number; startDate: string; endDate: string },
+  settings: LocaleSettings,
+): AgreementDraft {
+  return {
+    client: candidate.brandName,
+    project: candidate.contractName,
+    amount: formatMoney(candidate.contractValueMinor, settings.currency, settings.locale),
+    timeline: `${candidate.startDate} to ${candidate.endDate}`,
+  };
+}
+
+export function buildInvoiceDraft(
+  candidate: { brandName: string; dealAmountMinor: number; invoiceType: string; dueDate: string | null; contractId: number | null },
+  settings: LocaleSettings,
+): InvoiceDraft {
+  return {
+    client: candidate.brandName,
+    invoiceType: (candidate.invoiceType as InvoiceDraft["invoiceType"]) ?? "full",
+    amount: formatMoney(candidate.dealAmountMinor, settings.currency, settings.locale),
+    dueDate: candidate.dueDate,
+    linkedAgreement: candidate.contractId !== null,
+  };
 }
 
 /* ── Grounding: an amount must come from the user's words ─────────────── */

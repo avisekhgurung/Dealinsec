@@ -20,14 +20,22 @@
 import { storage } from "../storage";
 import { memberCan } from "@shared/permissions";
 import {
-  hasProAccess, hasActiveDealBoost, insertDealSchema, dealTypeOptions,
+  hasProAccess, hasActiveDealBoost, insertDealSchema, insertContractSchema, insertBrandInvoiceSchema,
+  brandInvoiceTypeOptions, dealTypeOptions, amountMinorSchema,
   resolveLocaleSettings, toMinor, MAX_AMOUNT_MINOR,
-  type User, type Deliverable, type LocaleSettings,
+  type User, type Deliverable, type LocaleSettings, type Contract,
 } from "@shared/schema";
 import { formatMoney, formatDate } from "@shared/money";
 import { getBillingUser, logOrgActivity } from "../entitlements";
 import { copilotSettings, getDealJourney } from "./workflow";
 import { computeBriefing, computeDealIntel } from "./insights";
+// The four money/issuer helpers below are also used by POST /api/contracts and
+// POST /api/brand-invoices — exported from routes.ts, not duplicated, so an
+// agreement or invoice made from chat is stamped exactly like one made from
+// the form. Only called inside async functions (never at module load), so
+// the require cycle back to routes.ts (which registers these copilot routes)
+// resolves before either side is ever invoked.
+import { documentLocaleFor, issuedCurrency, issuingContext, invoiceableRemainingMinor } from "../routes";
 import { analyzeDealProtections } from "./riskcheck";
 import { amountVoice, speaksNativeMoney, voiceFor } from "./voice";
 
@@ -550,4 +558,182 @@ export async function executeCreateQuotation(dealId: number, user: User) {
   });
   logOrgActivity(user, "generated", "quotation", quote.id, `Quotation for: ${deal.dealTitle || deal.brandName} (via Copilot)`);
   return { ok: true as const, message: `Quotation v${quote.version} created for "${deal.dealTitle}".`, route: `/deals/${dealId}/quote` };
+}
+
+/** Clamp and validate a proposed agreement WITHOUT writing anything.
+ *  Mirrors POST /api/contracts (server/routes.ts) exactly: same permission,
+ *  same Pro gate, same one-per-deal rule, same issuer/currency freeze. */
+export async function buildAgreementCandidate(rawArgs: any, user: User) {
+  if (!memberCan(user, "agreements.create")) {
+    return { ok: false as const, message: "Your role doesn't allow creating agreements. Ask your organization owner." };
+  }
+  const billing = await getBillingUser(user);
+  if (!hasProAccess(billing)) {
+    return { ok: false as const, message: "Agreements are a Pro feature — upgrade to generate one." };
+  }
+  const dealId = Number(rawArgs?.dealId);
+  if (!Number.isFinite(dealId)) return { ok: false as const, message: "I need a deal to create the agreement for." };
+  const deal = await storage.getDeal(dealId);
+  if (!deal || !inOrg(deal, user)) return { ok: false as const, message: "That deal isn't in your organization." };
+  const existing = await storage.getContractByDealId(dealId);
+  if (existing) return { ok: false as const, message: `An agreement already exists for "${deal.dealTitle}".`, route: `/contracts/${existing.id}` };
+
+  const { settings } = await issuingContext(user);
+  return {
+    ok: true as const,
+    dealId,
+    data: {
+      dealId,
+      contractName: `${deal.brandName} - ${deal.dealTitle}`,
+      brandName: deal.brandName,
+      startDate: deal.startDate,
+      endDate: deal.endDate,
+      contractValueMinor: deal.dealAmountMinor,
+      exclusive: true,
+    },
+    settings,
+  };
+}
+
+export async function executeCreateAgreement(rawArgs: any, user: User) {
+  const built = await buildAgreementCandidate(rawArgs, user);
+  if (!built.ok) return built;
+
+  const signerName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || null;
+  const parsed = insertContractSchema.safeParse({
+    ...built.data,
+    signerUserId: user.id,
+    signerName,
+    signatureUrl: user.digitalSignature ?? null,
+    sealUrl: user.companySeal ?? null,
+    userId: user.id,
+    organizationId: user.organizationId,
+  });
+  if (!parsed.success) return { ok: false as const, message: "Those details don't form a valid agreement — try creating it from the deal page." };
+
+  // Re-check just before writing: two confirms racing on the same deal must
+  // not both pass the one-per-deal rule (registerProposal doesn't lock across
+  // proposal ids the way it locks a single id's own repeat).
+  const stillNone = !(await storage.getContractByDealId(built.dealId));
+  if (!stillNone) return { ok: false as const, message: "An agreement already exists for this deal now." };
+
+  const { settings, issued } = await issuingContext(user);
+  const contract = await storage.createContract({
+    ...parsed.data,
+    ...issued,
+    signedByInfluencer: true,
+    signedByInfluencerDate: new Date().toISOString(),
+  } as any);
+  logOrgActivity(user, "created", "agreement", contract.id, `Agreement: ${contract.brandName} (via Copilot)`);
+  await storage.updateDeal(contract.dealId, { status: "Active" });
+
+  return {
+    ok: true as const,
+    message: `Agreement created for "${contract.brandName}" — ${formatMoney(contract.contractValueMinor, settings.currency, settings.locale)}. Next step: generate the invoice.`,
+    route: `/contracts/${contract.id}`,
+  };
+}
+
+/** Clamp and validate a proposed invoice WITHOUT writing anything. Mirrors
+ *  POST /api/brand-invoices: the parent deal/agreement must be in the caller's
+ *  org, and the amount can never exceed what the agreement is still owed. The
+ *  amount itself is NEVER taken as a bare number from the model — only as a
+ *  percentage of a real agreement/deal value, or "full"/"final" (the whole
+ *  remaining amount), so a hallucinated figure cannot reach an invoice. */
+export async function buildInvoiceCandidate(rawArgs: any, user: User) {
+  if (!memberCan(user, "invoices.create")) {
+    return { ok: false as const, message: "Your role doesn't allow creating invoices. Ask your organization owner." };
+  }
+  const billing = await getBillingUser(user);
+  if (!hasProAccess(billing)) {
+    return { ok: false as const, message: "Invoices are a Pro feature — upgrade to create one." };
+  }
+  const dealId = Number(rawArgs?.dealId);
+  if (!Number.isFinite(dealId)) return { ok: false as const, message: "I need a deal to invoice." };
+  const deal = await storage.getDeal(dealId);
+  if (!deal || !inOrg(deal, user)) return { ok: false as const, message: "That deal isn't in your organization." };
+
+  const contract = await storage.getContractByDealId(dealId);
+  if (rawArgs?.contractId && (!contract || contract.id !== Number(rawArgs.contractId))) {
+    return { ok: false as const, message: "That agreement isn't linked to this deal." };
+  }
+
+  const invoiceType = brandInvoiceTypeOptions.includes(rawArgs?.invoiceType) ? rawArgs.invoiceType : "full";
+  const { settings } = await issuingContext(user);
+
+  // The ceiling: what's left on the agreement, or the deal's own value if
+  // there's no agreement yet (the invoice will simply have no contractId).
+  const ceilingMinor = contract
+    ? await invoiceableRemainingMinor(contract, user)
+    : Number(deal.dealAmountMinor);
+  if (contract) {
+    const agreementCurrency = issuedCurrency(contract);
+    if (agreementCurrency && agreementCurrency !== settings.currency) {
+      return { ok: false as const, message: `This agreement was issued in ${agreementCurrency}, but your organization now uses ${settings.currency}.` };
+    }
+  }
+  if (ceilingMinor <= 0) {
+    return { ok: false as const, message: contract ? "This agreement is already fully invoiced." : "This deal has nothing left to invoice." };
+  }
+
+  // amountPercent (grounded: "the 50% advance") wins over a bare amount claim.
+  const percent = Number(rawArgs?.amountPercent);
+  let amountMinor: number;
+  if (Number.isFinite(percent) && percent > 0 && percent <= 100) {
+    amountMinor = Math.round(ceilingMinor * (percent / 100));
+  } else {
+    amountMinor = ceilingMinor;
+  }
+  const parsedAmount = amountMinorSchema.safeParse(amountMinor);
+  if (!parsedAmount.success || parsedAmount.data <= 0 || parsedAmount.data > ceilingMinor) {
+    return { ok: false as const, message: "That invoice amount isn't valid for this agreement." };
+  }
+
+  return {
+    ok: true as const,
+    dealId,
+    contractId: contract?.id ?? null,
+    data: {
+      dealId,
+      contractId: contract ? contract.id : null,
+      brandName: deal.brandName,
+      dealAmountMinor: parsedAmount.data,
+      invoiceType,
+      dueDate: typeof rawArgs?.dueDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(rawArgs.dueDate) ? rawArgs.dueDate : null,
+    },
+    settings,
+  };
+}
+
+export async function executeCreateInvoice(rawArgs: any, user: User) {
+  const built = await buildInvoiceCandidate(rawArgs, user);
+  if (!built.ok) return built;
+
+  const { owner: issuer, settings, issued } = await issuingContext(user);
+  const influencerName = [issuer.firstName, issuer.lastName].filter(Boolean).join(" ") || issuer.email || "Freelancer";
+  const invoiceNumber = await storage.generateOrgInvoiceNumber(user.organizationId);
+
+  const parsed = insertBrandInvoiceSchema.safeParse({
+    ...built.data,
+    ...issued,
+    splitPercentage: null,
+    notes: null,
+    lineItems: null,
+    userId: user.id,
+    organizationId: user.organizationId,
+    invoiceNumber,
+    invoiceDate: new Date().toISOString().slice(0, 10),
+    influencerName,
+    influencerEmail: issuer.email || null,
+    status: "Unpaid",
+  });
+  if (!parsed.success) return { ok: false as const, message: "Those details don't form a valid invoice — try creating it from the agreement page." };
+
+  const invoice = await storage.createBrandInvoice(parsed.data);
+  logOrgActivity(user, "created", "invoice", invoice.id, `Invoice ${invoice.invoiceNumber}: ${invoice.brandName} (via Copilot)`);
+  return {
+    ok: true as const,
+    message: `Invoice ${invoice.invoiceNumber} created for "${invoice.brandName}" — ${formatMoney(invoice.dealAmountMinor, settings.currency, settings.locale)}.`,
+    route: `/brand-invoices/${invoice.id}`,
+  };
 }

@@ -172,7 +172,7 @@ function rejectCurrencyMismatch(body: unknown, expected: string, res: any): bool
  *  quotes a figure exactly as the screen beside it shows it. Pass the contract
  *  or invoice being talked about as `issuedRow`: an amount already issued is
  *  quoted in the currency it was issued in, not the org's current one. */
-async function documentLocaleFor(reqUser: User, issuedRow?: object | null): Promise<LocaleSettings> {
+export async function documentLocaleFor(reqUser: User, issuedRow?: object | null): Promise<LocaleSettings> {
   const org = reqUser.organizationId ? await storage.getOrganization(reqUser.organizationId) : undefined;
   const currency = issuedCurrency(issuedRow);
   return documentLocaleSettings(org, reqUser, currency ? { currency } : null);
@@ -183,7 +183,7 @@ async function documentLocaleFor(reqUser: User, issuedRow?: object | null): Prom
  *  was backfilled 'INR', which is what its org was. Null only for a row that
  *  is not a contract or invoice (or a caller passing nothing), which
  *  documentLocaleSettings reads as "the org's". */
-function issuedCurrency(row: object | null | undefined): CurrencyCode | null {
+export function issuedCurrency(row: object | null | undefined): CurrencyCode | null {
   const code = (row as { currency?: unknown } | null | undefined)?.currency;
   return typeof code === "string" && code ? (getCurrency(code).code as CurrencyCode) : null;
 }
@@ -470,7 +470,7 @@ function buildIssuerSnapshot(owner: User, settings: LocaleSettings): IssuerSnaps
  * issuer keeps rendering live, and the moment it lands every newly issued
  * document is snapshotted with no change here.
  */
-async function issuingContext(reqUser: User) {
+export async function issuingContext(reqUser: User) {
   const [owner, settings] = await Promise.all([getBillingUser(reqUser), documentLocaleFor(reqUser)]);
   return {
     owner,
@@ -491,7 +491,7 @@ async function issuingContext(reqUser: User) {
  * invoice being edited, so raising an invoice from ₹30,000 to ₹32,500 is
  * measured against the other invoices only.
  */
-async function invoiceableRemainingMinor(
+export async function invoiceableRemainingMinor(
   contract: Contract,
   reqUser: User,
   excludeInvoiceId?: number,
