@@ -11,6 +11,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Check, FileSignature, Loader2, ShieldCheck } from "lucide-react";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { SignaturePad } from "@/components/signature-pad";
+import { PublicDocFooter } from "@/components/public-doc-footer";
 
 interface Snapshot {
   issuerName: string;
@@ -83,6 +84,7 @@ export default function PublicSignPage() {
         <p className="text-sm text-neutral-500 max-w-sm">
           It may have been revoked, or the agreement may already be signed another way. Ask the sender for a fresh link.
         </p>
+        <PublicDocFooter />
       </div>
     );
   }
@@ -179,7 +181,7 @@ export default function PublicSignPage() {
           </div>
         </div>
 
-        <p className="flex items-center justify-center gap-1.5 text-xs text-neutral-400 mt-6">Sent with DealInSec</p>
+        <PublicDocFooter />
       </div>
     </div>
   );

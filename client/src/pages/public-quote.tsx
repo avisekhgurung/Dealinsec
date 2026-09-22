@@ -7,7 +7,8 @@
  */
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Check, FileText, Loader2, ShieldCheck } from "lucide-react";
+import { Check, Loader2, ShieldCheck } from "lucide-react";
+import { PublicDocFooter } from "@/components/public-doc-footer";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 
 interface Snapshot {
@@ -78,6 +79,7 @@ export default function PublicQuotePage() {
         <p className="text-sm text-neutral-500 max-w-sm">
           It may have been revoked, or replaced by a newer version. Ask the sender for a fresh link.
         </p>
+        <PublicDocFooter />
       </div>
     );
   }
@@ -154,9 +156,7 @@ export default function PublicQuotePage() {
           </div>
         </div>
 
-        <p className="flex items-center justify-center gap-1.5 text-xs text-neutral-400 mt-6">
-          <FileText className="w-3.5 h-3.5" /> Sent with DealInSec
-        </p>
+<PublicDocFooter />
       </div>
     </div>
   );
