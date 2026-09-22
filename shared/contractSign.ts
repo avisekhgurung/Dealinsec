@@ -8,7 +8,7 @@
  * `termsForPhase(ids, "agreement")` filter the authenticated contract PDF
  * uses, not a re-derived approximation of it.
  */
-import { STANDARD_TERMS, termsForPhase, type Contract, type LocaleSettings } from "./schema";
+import { STANDARD_TERMS, termsForPhase, type Contract, type Deliverable, type LocaleSettings } from "./schema";
 import { formatMoney } from "./money";
 
 export interface AgreementShareSnapshot {
@@ -22,17 +22,47 @@ export interface AgreementShareSnapshot {
   currency: string;
   amountLabel: string;
   terms: string[];
+  /** Full LocaleSettings so the client's own official document renders in
+   *  the same locale/date-format/currency conventions the freelancer's does
+   *  — country and currency alone aren't enough to pick a date format. */
+  country: string;
+  locale: string;
+  timezone: string;
+  /** Which numbered-clause template applies (governing-law wording, the
+   *  provider/client nouns) — a taxonomy key, not private data. */
+  dealType: string | null;
+  exclusive: boolean;
+  /** Redacted the same way a quotation's deliverables are: category,
+   *  output and quantity — never the free-text `notes` field, which is
+   *  arbitrary internal shorthand, not something written for a client to read. */
+  deliverables: { category: string; output: string; quantity: number; frequency: string }[];
+  /** Whether `terms` already covers payment, so Clause 3's schedule sentence
+   *  matches the freelancer's own copy instead of always printing the
+   *  generic default. */
+  hasOwnPaymentTerms: boolean;
 }
+
+// Same regex as client/src/components/document/checks.ts's
+// termsMentionPayment() — duplicated rather than imported because that file
+// lives outside shared/ (it has a couple of client-only siblings) and this
+// one-line check isn't worth restructuring that module for. Keep both in
+// sync if either changes.
+const mentionsPayment = (text: string | null | undefined): boolean =>
+  /advance|payment|payab|\bdue\b|instalment|installment|milestone|%/i.test(text ?? "");
 
 export function buildAgreementShareSnapshot(args: {
   issuerName: string;
   contract: Pick<Contract, "brandName" | "contractName" | "startDate" | "endDate" | "contractValueMinor">;
+  dealType: string | null | undefined;
+  exclusive: boolean;
+  deliverables: readonly Pick<Deliverable, "contentType" | "platform" | "quantity" | "frequency">[] | null | undefined;
   dealStandardTermIds: readonly string[] | null | undefined;
   dealCustomTerms: string | null | undefined;
   settings: LocaleSettings;
 }): AgreementShareSnapshot {
   const { issuerName, contract, settings } = args;
-  const standardLabels = termsForPhase(args.dealStandardTermIds ?? [], "agreement").map((t) => t.label);
+  const selectedTerms = termsForPhase(args.dealStandardTermIds ?? [], "agreement");
+  const standardLabels = selectedTerms.map((t) => t.label);
   const customLines = (args.dealCustomTerms ?? "").split("\n").map((t) => t.trim()).filter(Boolean);
 
   return {
@@ -46,6 +76,13 @@ export function buildAgreementShareSnapshot(args: {
     currency: settings.currency,
     amountLabel: formatMoney(contract.contractValueMinor, settings.currency, settings.locale),
     terms: [...standardLabels, ...customLines],
+    country: settings.country,
+    locale: settings.locale,
+    timezone: settings.timezone,
+    dealType: args.dealType ?? null,
+    exclusive: args.exclusive,
+    deliverables: (args.deliverables ?? []).map((d) => ({ category: d.platform, output: d.contentType, quantity: d.quantity ?? 1, frequency: d.frequency })),
+    hasOwnPaymentTerms: mentionsPayment(args.dealCustomTerms) || selectedTerms.some((t) => t.payment),
   };
 }
 

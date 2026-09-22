@@ -13,15 +13,13 @@ import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { trackEvent } from "@/lib/analytics";
 import { SignatureInput } from "@/components/signature-input";
 import { PublicDocFooter } from "@/components/public-doc-footer";
+import { PublicAgreementDoc, type PublicAgreementSnapshot } from "@/components/document/public-agreement-doc";
 
-interface Snapshot {
-  issuerName: string;
-  clientName: string;
-  contractName: string;
-  startDate: string;
-  endDate: string;
+/** Everything the compact summary cards read, plus everything
+ *  PublicAgreementDoc needs to render the full official document — one
+ *  response, one type, so the two views can never see different data. */
+interface Snapshot extends PublicAgreementSnapshot {
   amountLabel: string;
-  terms: string[];
 }
 
 const BRAND_GRADIENT = "linear-gradient(135deg, #059669 0%, #0D9488 100%)";
@@ -49,6 +47,10 @@ export default function PublicSignPage() {
     signedAt: string | null;
     signerName: string | null;
     signerEmail: string | null;
+    /** Only ever present once this agreement is signed — the client's own
+     *  signature, returned so their document still renders correctly after a
+     *  page reload, when the locally-drawn `signatureDataUrl` state is gone. */
+    signatureDataUrl: string | null;
     documentIntegrity: "verified" | "unavailable" | "mismatch" | null;
   }>({
     queryKey: ["/api/public/agreements", token],
@@ -104,15 +106,24 @@ export default function PublicSignPage() {
   const s = data.snapshot;
   const signed = justSigned || data.signed;
   const canSubmit = signerName.trim().length >= 2 && !!signatureDataUrl && agree;
+  // Prefer the signature just drawn this session (freshest, and covers the
+  // instant after signing before a refetch lands); fall back to the server's
+  // copy for a reload of an already-signed link.
+  const effectiveSignatureDataUrl = signatureDataUrl || data.signatureDataUrl;
+  const effectiveSignerName = data.signerName || signerName;
+  const effectiveSignerEmail = data.signerEmail || signerEmail || null;
+  const effectiveSignedAt = data.signedAt || new Date().toISOString();
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 px-4 py-8 sm:py-14">
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+      {/* Narrow for the compact review/signing card; widened to fit the full
+          official document once one exists to show. */}
+      <div className={signed ? "max-w-4xl mx-auto" : "max-w-2xl mx-auto"}>
+        <div className="flex items-center justify-between mb-6 print:hidden">
           <DealinsecLogo size="md" withText />
         </div>
 
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xl shadow-emerald-900/5 overflow-hidden">
+        <div className="max-w-2xl mx-auto rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xl shadow-emerald-900/5 overflow-hidden print:hidden">
           <div className="h-1.5" style={{ background: BRAND_GRADIENT }} />
           <div className="p-6 sm:p-8">
             <div className="flex items-center justify-between gap-2 mb-1">
@@ -248,6 +259,19 @@ export default function PublicSignPage() {
             </div>
           </div>
         </div>
+
+        {signed && (
+          <div className="max-w-4xl mx-auto mt-8 print:mt-0">
+            <p className="text-xs font-semibold text-neutral-500 mb-3 print:hidden">Your copy of the signed agreement</p>
+            <PublicAgreementDoc
+              snapshot={s}
+              signerName={effectiveSignerName}
+              signerEmail={effectiveSignerEmail}
+              signatureDataUrl={effectiveSignatureDataUrl}
+              signedAt={effectiveSignedAt}
+            />
+          </div>
+        )}
 
         <PublicDocFooter />
       </div>

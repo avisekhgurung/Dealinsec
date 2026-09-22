@@ -31,15 +31,15 @@ import { getAgreementCopy, getDeliverableLabels } from "@shared/dealTypeTaxonomy
 import { PagedDocument, type DocBlock } from "@/components/document/paged";
 import {
   DocHeader, docFooter, SectionTitle, TwoParties, Party, KV, tableBlocks,
-  SignatureCell, DocWarnings, docMoney, docDate,
+  SignatureCell, DocWarnings, docMoney, docDate, Clause, renderClauseBody,
 } from "@/components/document/primitives";
 import { currencyProseName, documentLocaleSettings, formatAmount } from "@/lib/format";
 import { useMoney } from "@/hooks/use-locale";
 import { DocLocalePending } from "@/components/document/locale-pending";
-import { countryName } from "@shared/region";
 import {
   detectPaymentConflicts, termsMentionPayment, validateDocData,
 } from "@/components/document/checks";
+import { buildAgreementClauses } from "@shared/agreementClauses";
 
 function slugify(s: string): string {
   return (s || "").normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
@@ -92,79 +92,7 @@ const taxIdLabel = (country: string): string => TAX_ID_LABELS[country] ?? "Tax r
  * a signed agreement must not change with the reader's browser. Every other
  * country's CLDR name already is its plain English name.
  */
-const LEGAL_COUNTRY_NAMES: Readonly<Record<string, string>> = {
-  AE: "the United Arab Emirates",
-  AG: "Antigua and Barbuda",
-  AX: "the Åland Islands",
-  BA: "Bosnia and Herzegovina",
-  BL: "Saint Barthélemy",
-  BQ: "the Caribbean Netherlands",
-  BS: "the Bahamas",
-  CC: "the Cocos (Keeling) Islands",
-  CD: "the Democratic Republic of the Congo",
-  CF: "the Central African Republic",
-  CG: "the Republic of the Congo",
-  CI: "Côte d’Ivoire",
-  CK: "the Cook Islands",
-  CV: "Cabo Verde",
-  CZ: "the Czech Republic",
-  DO: "the Dominican Republic",
-  FK: "the Falkland Islands",
-  FM: "the Federated States of Micronesia",
-  FO: "the Faroe Islands",
-  // England & Wales, Scotland and Northern Ireland are separate legal systems;
-  // "the laws of the United Kingdom" names no jurisdiction at all.
-  GB: "England and Wales",
-  GM: "the Gambia",
-  HK: "Hong Kong",
-  IM: "the Isle of Man",
-  KM: "the Comoros",
-  KN: "Saint Kitts and Nevis",
-  KP: "North Korea",
-  KR: "the Republic of Korea",
-  KY: "the Cayman Islands",
-  LC: "Saint Lucia",
-  MF: "Saint Martin",
-  MH: "the Marshall Islands",
-  MK: "North Macedonia",
-  MM: "Myanmar",
-  MO: "Macao",
-  MP: "the Northern Mariana Islands",
-  MV: "the Maldives",
-  NL: "the Netherlands",
-  PH: "the Philippines",
-  PM: "Saint Pierre and Miquelon",
-  PN: "the Pitcairn Islands",
-  PS: "the Palestinian Territories",
-  SB: "Solomon Islands",
-  SH: "Saint Helena",
-  SJ: "Svalbard and Jan Mayen",
-  ST: "São Tomé and Príncipe",
-  SZ: "Eswatini",
-  TC: "the Turks and Caicos Islands",
-  TL: "Timor-Leste",
-  TR: "Türkiye",
-  TT: "Trinidad and Tobago",
-  US: "the United States",
-  VA: "Vatican City",
-  VC: "Saint Vincent and the Grenadines",
-  VG: "the British Virgin Islands",
-  VI: "the United States Virgin Islands",
-  WF: "Wallis and Futuna",
-};
-const legalCountryName = (code: string): string => LEGAL_COUNTRY_NAMES[code] ?? countryName(code);
 
-function Clause({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", gap: "2.5mm", marginBottom: "1.5mm" }}>
-        <span className="doc-clause-no">{n}</span>
-        <span className="doc-h3">{title}</span>
-      </div>
-      <div className="doc-body doc-muted-t" style={{ paddingLeft: "8mm" }}>{children}</div>
-    </div>
-  );
-}
 
 export default function ContractPdfPage() {
   const { id } = useParams<{ id: string }>();
@@ -366,81 +294,26 @@ export default function ContractPdfPage() {
       keepWithNext: true,
       node: <SectionTitle>Terms &amp; conditions</SectionTitle>,
     });
-    out.push({
-      key: "c1",
-      node: (
-        <Clause n={1} title="Scope of Work">
-          The {copy.providerNoun} agrees to provide {copy.serviceDescription} for the {copy.clientNoun}
-          {" "}as described in the Deliverables section above, in connection with the engagement titled
-          {" "}"{deal?.dealTitle || c.contractName}". {copy.complianceNote}
-        </Clause>
-      ),
+    // Built from the SAME shared function the client's own signed-copy view
+    // uses (shared/agreementClauses.ts) — the two documents cannot drift
+    // apart on wording, because there is only one place the wording lives.
+    const clauses = buildAgreementClauses({
+      dealType: deal?.dealType,
+      country,
+      exclusive: c.exclusive,
+      dealTitle: deal?.dealTitle || c.contractName,
+      amountLabel: docMoney(c.contractValueMinor, loc),
+      amountWordsLabel: `${currencyProseName(loc.currency)} ${formatAmount(c.contractValueMinor, loc.currency, loc.locale)}`,
+      startDateLabel: docDate(c.startDate, loc),
+      endDateLabel: docDate(c.endDate, loc),
+      hasOwnPaymentTerms,
     });
-    out.push({
-      key: "c2",
-      node: (
-        <Clause n={2} title="Deliverables & Timeline">
-          All deliverables shall be submitted for {copy.clientNoun} approval at least 48 hours before the
-          scheduled delivery or publication date. The {copy.clientNoun} shall provide approval or revision
-          requests within 24 hours of receipt. The {copy.providerNoun} shall incorporate up to two (2) rounds
-          of revisions at no additional charge. This Agreement is effective from{" "}
-          <strong>{docDate(c.startDate, loc)}</strong> through <strong>{docDate(c.endDate, loc)}</strong>.
-        </Clause>
-      ),
-    });
-    out.push({
-      key: "c3",
-      node: (
-        <Clause n={3} title={`Compensation (${docMoney(c.contractValueMinor, loc)})`}>
-          In consideration for the services rendered, the {copy.clientNoun} shall pay the {copy.providerNoun} a
-          total fee of <strong>{docMoney(c.contractValueMinor, loc)}</strong> ({currencyProseName(loc.currency)}{" "}
-          {formatAmount(c.contractValueMinor, loc.currency, loc.locale)} only).{" "}
-          {hasOwnPaymentTerms ? (
-            <>Payment shall follow the schedule agreed between the parties as set out in the Deal-Specific
-            Terms (Section 7) of this Agreement.</>
-          ) : (
-            <>Payment shall be structured as: 50% advance upon execution and 50% within 30 days of final
-            deliverable approval.</>
-          )}{" "}
-          Late payments attract interest at 1.5% per month.
-        </Clause>
-      ),
-    });
-    out.push({
-      key: "c4",
-      node: <Clause n={4} title={copy.rightsHeading}>{copy.rightsText}</Clause>,
-    });
-    out.push({
-      key: "c5",
-      node: (
-        <Clause n={5} title="Exclusivity Terms">
-          {c.exclusive ? copy.exclusiveText : copy.nonExclusiveText}
-        </Clause>
-      ),
-    });
-    out.push({
-      key: "c6",
-      node: isIndia ? (
-        <Clause n={6} title="Governing Law (Indian Contract Act 1872)">
-          This Agreement shall be governed by and construed in accordance with the laws of India,
-          including the Indian Contract Act, 1872. Any disputes shall first be attempted to be resolved
-          through good-faith negotiation for 30 days, failing which disputes shall be submitted to
-          binding arbitration under the Arbitration and Conciliation Act, 1996. The courts of India
-          shall have exclusive jurisdiction for any legal proceedings.
-        </Clause>
-      ) : (
-        // Deliberately names no statute and no arbitration scheme: we have not
-        // verified which apply in each country, and a wrong citation in a
-        // contract is worse than none. The creation screen tells the user this
-        // wording is a general template (contract-confirmation.tsx).
-        <Clause n={6} title="Governing Law">
-          This Agreement shall be governed by and construed in accordance with the laws of{" "}
-          {legalCountryName(country)}. Any disputes shall first be attempted to be resolved through
-          good-faith negotiation for 30 days, failing which the courts of {legalCountryName(country)}
-          {" "}shall have exclusive jurisdiction for any legal proceedings.
-        </Clause>
-      ),
-    });
+    for (const clause of clauses) {
+      out.push({
+        key: `c${clause.n}`,
+        node: <Clause n={clause.n} title={clause.title}>{renderClauseBody(clause.body)}</Clause>,
+      });
+    }
 
     if (selectedTerms.length || customLines.length) {
       const items = [

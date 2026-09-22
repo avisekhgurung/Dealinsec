@@ -106,6 +106,9 @@ export function registerAgreementSignRoutes(app: Express) {
       const snapshot = buildAgreementShareSnapshot({
         issuerName,
         contract,
+        dealType: deal?.dealType,
+        exclusive: contract.exclusive,
+        deliverables: deal?.deliverables,
         dealStandardTermIds: (deal?.standardTermIds as string[] | null) ?? [],
         dealCustomTerms: deal?.customTerms ?? null,
         settings,
@@ -159,6 +162,12 @@ export function registerAgreementSignRoutes(app: Express) {
         signedAt: contract.clientSignedAt,
         signerName: contract.clientSignerName,
         signerEmail: contract.clientSignerEmail,
+        // Only ever returned to whoever holds this exact token — which is the
+        // person who drew it. Letting them see (and print) their own
+        // signature again on a later visit is the point of a "download your
+        // signed agreement" page; it is not exposed anywhere the token's
+        // holder didn't already have access to.
+        signatureDataUrl: contract.signedByBrand ? contract.clientSignatureDataUrl : null,
         documentIntegrity: contract.clientSignedAt ? verifyDocumentHash(contract, contract.documentHash) : null,
       });
     } catch (err) {

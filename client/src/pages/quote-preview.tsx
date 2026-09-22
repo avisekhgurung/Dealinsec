@@ -254,12 +254,19 @@ export default function QuotePreviewPage() {
             Accept this quotation online to confirm your approval of the proposed project, before {docDate(validUntil, loc)}.
             An agreement will be provided separately for review and electronic signing.
           </p>
-          <SignatureCell
-            heading="Prepared by"
-            name={fullName}
-            date={docDate(issuedOn, loc)}
-            signatureUrl={issuer.digitalSignature || null}
-          />
+          {/* Constrained to one column's width, not the full page: this used
+              to sit beside a second cell in a 2-column grid, and the pen
+              line (.doc-sig-box's bottom border) stretches to fill whatever
+              contains it — full width reads as one enormous, empty
+              underline once the client cell it used to sit beside is gone. */}
+          <div style={{ maxWidth: "70mm" }}>
+            <SignatureCell
+              heading="Prepared by"
+              name={fullName}
+              date={docDate(issuedOn, loc)}
+              signatureUrl={issuer.digitalSignature || null}
+            />
+          </div>
         </div>
       ),
     });

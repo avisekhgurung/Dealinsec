@@ -16,6 +16,9 @@ describe("buildAgreementShareSnapshot — the public sign-page contract", () => 
   const snap = buildAgreementShareSnapshot({
     issuerName: "Lena Ortiz",
     contract,
+    dealType: "Development",
+    exclusive: true,
+    deliverables: [{ contentType: "Landing page design", platform: "Design", quantity: 1, frequency: "One-time" }],
     dealStandardTermIds: ["validity_30", "advance_50"],
     dealCustomTerms: "Up to 2 rounds of revisions are included.",
     settings,
@@ -37,6 +40,14 @@ describe("buildAgreementShareSnapshot — the public sign-page contract", () => 
   it("prints the real agreement money, formatted", () => {
     expect(snap.amountMinor).toBe(150000);
     expect(snap.amountLabel).toContain("1,500");
+  });
+
+  it("carries the fields the client's own official document needs to render", () => {
+    expect(snap.country).toBe("IN");
+    expect(snap.dealType).toBe("Development");
+    expect(snap.exclusive).toBe(true);
+    expect(snap.deliverables).toEqual([{ category: "Design", output: "Landing page design", quantity: 1, frequency: "One-time" }]);
+    expect(snap.hasOwnPaymentTerms).toBe(true); // "advance_50" is a payment term
   });
 });
 

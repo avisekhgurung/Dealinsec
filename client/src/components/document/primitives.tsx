@@ -266,6 +266,28 @@ export function TotalBlock({
   );
 }
 
+/* ── Numbered clauses ─────────────────────────────────────────────────── */
+
+export function Clause({ n, title, children }: { n: number; title: string; children: ReactNode }) {
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: "2.5mm", marginBottom: "1.5mm" }}>
+        <span className="doc-clause-no">{n}</span>
+        <span className="doc-h3">{title}</span>
+      </div>
+      <div className="doc-body doc-muted-t" style={{ paddingLeft: "8mm" }}>{children}</div>
+    </div>
+  );
+}
+
+/** Renders a clause body from shared/agreementClauses.ts, whose `**text**`
+ *  spans are the only formatting it can carry (it's plain data, read by two
+ *  different pages — see that file's header for why). */
+export function renderClauseBody(body: string): ReactNode {
+  const parts = body.split(/\*\*(.+?)\*\*/g);
+  return parts.map((p, i) => (i % 2 === 1 ? <strong key={i}>{p}</strong> : p));
+}
+
 /* ── Signatures ────────────────────────────────────────────────────────── */
 
 export function SignatureCell({
