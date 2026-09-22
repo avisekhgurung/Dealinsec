@@ -394,6 +394,10 @@ export function ProfessionalSection() {
           subtitle="Give every client a clear, consistent experience with professional documents and a simple workflow."
         />
 
+        <p className="text-center text-sm sm:text-base font-semibold text-emerald-700 dark:text-emerald-400 mt-4">
+          Your client doesn&apos;t need an account to view a quote, accept it, or sign an agreement.
+        </p>
+
         <motion.div
           variants={stagger}
           initial="hidden"

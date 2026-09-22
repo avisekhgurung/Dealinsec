@@ -6,10 +6,11 @@
  * consent checkbox; the server sets contracts.status="Signed" the same way
  * the existing manual proof-upload path already does.
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Check, FileSignature, Loader2, ShieldCheck } from "lucide-react";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
+import { trackEvent } from "@/lib/analytics";
 import { SignaturePad } from "@/components/signature-pad";
 import { PublicDocFooter } from "@/components/public-doc-footer";
 
@@ -51,6 +52,9 @@ export default function PublicSignPage() {
     },
     retry: false,
   });
+  useEffect(() => {
+    if (data) trackEvent("public_agreement_view");
+  }, [!!data]);
 
   const sign = useMutation({
     mutationFn: async () => {
@@ -64,6 +68,7 @@ export default function PublicSignPage() {
     },
     onSuccess: () => {
       setJustSigned(true);
+      trackEvent("public_agreement_sign");
       refetch();
     },
   });

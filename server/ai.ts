@@ -256,3 +256,64 @@ async function completeJson(systemPrompt: string, text: string): Promise<any> {
 }
 
 export const AI_MAX_INPUT = MAX_INPUT;
+
+/* ── Public "try it" demo: client message → structured deal draft ──
+ * Same completeJson() plumbing as the invoice extractor above, same
+ * reserve()/refund() rate limiter (one shared public-AI budget). NEVER
+ * writes anything — the route calling this has no database access to a
+ * deal, and the caller has no session. */
+
+export interface AnonDealDraft {
+  client: string;
+  project: string;
+  /** MAJOR units, as the text stated them — never converted. */
+  amount: number;
+  /** ISO 4217 if the text named one; "" if not stated (the demo shows no $/₹
+   *  symbol in that case rather than guess). */
+  currency: string;
+  timeline: string;
+  deliverables: string[];
+  revisions: number | null;
+  advancePercent: number | null;
+  /** One line per payment/scope condition actually stated — this is what
+   *  Protection Check reads, so it must be text, not a summary of the text. */
+  terms: string[];
+}
+
+const DEMO_DEAL_PROMPT = `You convert a short freelancer/client conversation into a structured JSON deal draft. Output ONLY a JSON object with exactly this shape and nothing else:
+{"client": string, "project": string, "amount": number, "currency": string, "timeline": string, "deliverables": string[], "revisions": number | null, "advancePercent": number | null, "terms": string[]}
+Rules:
+- "client": the client's name if stated, else "".
+- "project": a short 2-6 word title for the work.
+- "amount": the total budget/fee as a plain number, expanding shorthand ("1.5k"->1500, "2 lakh"->200000). 0 if no amount is stated. NEVER invent a number that is not in the text.
+- "currency": the ISO 4217 code the amount is actually in ($ -> USD, £ -> GBP, € -> EUR, ₹ -> INR) if a symbol or code is given; "" if the text gives no currency signal at all.
+- "timeline": the stated duration or deadline in the text's own words (e.g. "2 weeks", "by Friday"); "" if not stated.
+- "deliverables": short phrases for each concrete thing being delivered, max 6.
+- "revisions": the stated revision/round limit as a number, else null. Never invent one.
+- "advancePercent": the stated advance/upfront percentage, else null. Never invent one.
+- "terms": one short line per payment or scope condition ACTUALLY STATED in the text (e.g. "50% advance", "2 revisions included", "payment after launch") — this is quoted for a risk check, so never add a condition that was not said, and never restate the whole message as one term.
+No commentary, no markdown, JSON only.`;
+
+function normalizeAnonDeal(p: any): AnonDealDraft {
+  const currency = String(p?.currency ?? "").trim().toUpperCase();
+  return {
+    client: String(p?.client ?? "").slice(0, 120),
+    project: String(p?.project ?? "").slice(0, 160) || "Untitled project",
+    amount: clampNum(p?.amount, 0),
+    currency: /^[A-Z]{3}$/.test(currency) ? currency : "",
+    timeline: String(p?.timeline ?? "").slice(0, 80),
+    deliverables: Array.isArray(p?.deliverables) ? p.deliverables.slice(0, 6).map((d: any) => String(d).slice(0, 120)) : [],
+    // A model quirk: it returns 0 for "not stated" despite the prompt saying
+    // null — accepting 0 here would show a false "Revisions: 0" on the card, so
+    // only a POSITIVE count counts as a real, stated limit.
+    revisions: Number.isFinite(Number(p?.revisions)) && Number(p?.revisions) > 0 ? Number(p.revisions) : null,
+    advancePercent: Number.isFinite(Number(p?.advancePercent)) && Number(p?.advancePercent) > 0 && Number(p?.advancePercent) <= 100 ? Number(p.advancePercent) : null,
+    terms: Array.isArray(p?.terms) ? p.terms.slice(0, 8).map((t: any) => String(t).slice(0, 200)) : [],
+  };
+}
+
+export async function extractDealDraft(text: string): Promise<AnonDealDraft> {
+  const parsed = await completeJson(DEMO_DEAL_PROMPT, text);
+  return normalizeAnonDeal(parsed);
+}
+

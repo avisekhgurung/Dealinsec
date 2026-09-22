@@ -10,6 +10,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { trackEvent } from "@/lib/analytics";
 import { Check, Copy, FileSignature, Loader2, ShieldCheck, XCircle } from "lucide-react";
 
 interface SignShareStatus {
@@ -36,7 +37,10 @@ export function AgreementSignPanel({ contractId }: { contractId: number }) {
 
   const create = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/contracts/${contractId}/sign-share`, {})).json(),
-    onSuccess: (d) => qc.setQueryData(key, { ...d, signed: false }),
+    onSuccess: (d) => {
+      qc.setQueryData(key, { ...d, signed: false });
+      trackEvent("agreement_shared");
+    },
     onError: (e: any) => toast({ title: e?.message || "Couldn't create the signing link.", variant: "destructive" }),
   });
 

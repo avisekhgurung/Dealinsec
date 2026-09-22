@@ -8,21 +8,23 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { Sparkles, ArrowUp, Plus, FileText, Receipt, AlertTriangle, Sun, ListChecks } from "lucide-react";
+import { Sparkles, ArrowUp, Plus, FileText, Receipt, AlertTriangle, Sun, ListChecks, Wand2 } from "lucide-react";
 import { askCopilot } from "@/lib/copilot-bus";
 import { useAuth } from "@/hooks/useAuth";
 import { memberCan } from "@shared/permissions";
 
 const PLACEHOLDERS = [
-  "Create a deal from a client message…",
-  "Create a quotation for Rahul…",
-  "Which invoices are overdue?",
+  "Paste a client message…",
+  "Create a deal from my client conversation…",
+  "Which payments are overdue?",
+  "Create an invoice for my latest deal…",
   "What should I do today?",
-  "Check my active deals for risks…",
 ];
 
 // The Copilot truncates each message at 4,000 characters (server/copilot/routes.ts).
 const MAX_LEN = 4000;
+
+const FIRST_RUN_EXAMPLE = "Client wants a $2,000 website in 4 weeks with 2 revisions.";
 
 interface Chip {
   label: string;
@@ -41,7 +43,7 @@ const CHIPS: Chip[] = [
   { label: "Daily Briefing", icon: Sun, ask: null },
 ];
 
-export function AiHome() {
+export function AiHome({ firstRun = false }: { firstRun?: boolean }) {
   const { user } = useAuth();
   const [text, setText] = useState("");
   const [phIndex, setPhIndex] = useState(0);
@@ -77,6 +79,11 @@ export function AiHome() {
     setText("");
   };
 
+  const fillExample = () => {
+    setText(FIRST_RUN_EXAMPLE);
+    areaRef.current?.focus();
+  };
+
   const chips = CHIPS.filter((c) => !c.perm || memberCan(user as any, c.perm as any));
 
   return (
@@ -88,7 +95,9 @@ export function AiHome() {
       <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
         <Sparkles className="w-3.5 h-3.5" /> DealInSec AI
       </p>
-      <h2 className="text-xl lg:text-2xl font-bold tracking-tight mt-1">What do you want to do?</h2>
+      <h2 className="text-xl lg:text-2xl font-bold tracking-tight mt-1">
+        {firstRun ? "Let's turn your first client message into a deal." : "What do you want to do?"}
+      </h2>
 
       <form
         onSubmit={(e) => {
@@ -152,10 +161,20 @@ export function AiHome() {
             </button>
           );
         })}
+        {firstRun && (
+          <button
+            type="button"
+            onClick={fillExample}
+            data-testid="ai-chip-try-example"
+            className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:border-emerald-400 transition-colors"
+          >
+            <Wand2 className="w-3.5 h-3.5" /> Try an example
+          </button>
+        )}
       </div>
 
       <p className="mt-3 text-[11px] text-muted-foreground">
-        Paste a client message and I&apos;ll draft the deal. Nothing is created until you confirm.
+        Paste a client message and I&apos;ll turn it into a deal. Nothing is created until you confirm.
       </p>
     </section>
   );

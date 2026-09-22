@@ -6,6 +6,7 @@
  * so it never navigates the client away from the document they're reading.
  */
 import { Sparkles } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 
 export function PublicDocFooter() {
   return (
@@ -17,6 +18,7 @@ export function PublicDocFooter() {
         target="_blank"
         rel="noopener noreferrer"
         data-testid="link-public-doc-cta"
+        onClick={() => trackEvent("plg_footer_click")}
         className="font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 underline underline-offset-2"
       >
         Create yours →

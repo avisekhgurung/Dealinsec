@@ -14,6 +14,7 @@ import { dialCodeForCountry } from "@shared/region";
 import { getLocaleSettings, type LocaleFields, type LocaleSettings } from "@shared/schema";
 import { sameRegion } from "@shared/region";
 import { useLocation } from "wouter";
+import { postAuthDestination, hasPendingDealPrefill } from "@/lib/deal-prefill";
 
 /**
  * What the chosen country changes on this screen. Data, not a branch: a country
@@ -151,8 +152,14 @@ export default function OnboardingPage() {
       });
 
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      toast({ title: "You're in!", description: `We'll ask for ${rules.taxIdLabel}, bank & signature only when you need them.` });
-      setLocation("/dashboard");
+      const restoring = hasPendingDealPrefill();
+      toast({
+        title: "You're in!",
+        description: restoring
+          ? "Picking up right where you left off."
+          : `We'll ask for ${rules.taxIdLabel}, bank & signature only when you need them.`,
+      });
+      setLocation(postAuthDestination());
     } catch (error: any) {
       toast({
         title: "Failed to save profile",

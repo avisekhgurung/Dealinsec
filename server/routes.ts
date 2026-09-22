@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertFeedbackSchema, feedback, insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, organizations as organizationsTable, newsletterSubscribers, invoiceDocumentCategories, invoiceLineItemSchema, brandInvoiceTypeOptions, hasActivePro, hasActiveDealBoost, hasProAccess, hasActiveTrial, getTrialDaysLeft, getDealCredits, amountMinorSchema, getCurrency, fromMinor, CURRENCIES, type User, type Contract, type LocaleSettings, type CurrencyCode, type InvoiceLineItem } from "@shared/schema";
+import { insertFeedbackSchema, feedback, insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, organizations as organizationsTable, newsletterSubscribers, invoiceDocumentCategories, invoiceLineItemSchema, brandInvoiceTypeOptions, hasActivePro, hasActiveDealBoost, hasProAccess, hasActiveTrial, getTrialDaysLeft, getDealCredits, amountMinorSchema, getCurrency, fromMinor, toMinor, resolveLocaleSettings, CURRENCIES, type User, type Contract, type LocaleSettings, type CurrencyCode, type InvoiceLineItem } from "@shared/schema";
 import { documentLocaleSettings, formatMoney, splitMinor } from "@shared/money";
 import { isCountryCode, normalizeTimeZone } from "@shared/region";
 import { isoDateInZone, wouldRenumberIssuedInvoice, withoutInvoiceNumber } from "@shared/invoice-numbering";
@@ -15,7 +15,9 @@ import { registerCopilotRoutes } from "./copilot/routes";
 import { registerQuoteShareRoutes } from "./quoteShare";
 import { registerAgreementSignRoutes } from "./agreementSign";
 import { getSeatLimit, INVITABLE_ROLES, hasPermission as hasOrgPermission, orgRoleOptions, CUSTOM_ROLE, ASSIGNABLE_PERMISSIONS , canReadModule} from "@shared/permissions";
-import { aiEnabled, reserve, refund, extractInvoice } from "./ai";
+import { aiEnabled, reserve, refund, extractInvoice, extractDealDraft } from "./ai";
+import { analyzeDealProtections, flagPriority, protectionPasses } from "./copilot/riskcheck";
+import { amountAppearsIn } from "./copilot/proposals";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import multer from "multer";
 import { z } from "zod";
@@ -3190,6 +3192,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (reservedIp && !error?.billed) refund(reservedIp);
       console.error("AI invoice error:", error?.message || error);
       res.status(502).json({ error: "Couldn't generate that — please try again, or fill it in manually." });
+    }
+  });
+
+  // ── Public "try it" demo: client message → deal draft + Protection Check ──
+  // Same shape as /api/ai/invoice above: no login, same reserve()/refund()
+  // budget (one shared public-AI cap), the DeepSeek key never leaves the
+  // server. NEVER touches the database — there is no dealId, no orgId, no
+  // proposal id, nothing a client could replay into a mutation. The
+  // Protection Check itself is the REAL one (analyzeDealProtections), the
+  // exact function the authenticated chat-to-deal flow uses, so what a
+  // visitor sees here is not a mockup of the feature — it is the feature.
+  app.post("/api/ai/demo-deal", async (req: any, res) => {
+    let reservedIp: string | null = null;
+    try {
+      if (!aiEnabled()) return res.status(503).json({ error: "AI is unavailable right now." });
+      const text = String(req.body?.text || "").trim();
+      if (text.length < 8) return res.status(400).json({ error: "Paste a bit more of the conversation." });
+      if (text.length > 600) return res.status(400).json({ error: "That's a bit long — keep it to a paragraph." });
+      const cf = req.headers["cf-connecting-ip"];
+      const xff = String(req.headers["x-forwarded-for"] || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+      const ip = (cf ? String(cf) : xff.length ? xff[xff.length - 1] : req.ip || "unknown").trim() || "unknown";
+      const rl = reserve(ip);
+      if (!rl.ok) {
+        return res.status(429).json({
+          error:
+            rl.reason === "ip"
+              ? "You've used your free tries for today. Create a free account to keep going."
+              : "AI is busy right now — please try again in a bit.",
+          reason: rl.reason,
+        });
+      }
+      reservedIp = ip;
+      const draft = await extractDealDraft(text);
+
+      const settings = resolveLocaleSettings(null, draft.currency ? ({ currency: draft.currency } as any) : null);
+      const customTerms = draft.terms.join("\n");
+      const report = analyzeDealProtections({ customTerms, standardTermIds: [] } as any, settings);
+      const grounded = draft.amount > 0 ? amountAppearsIn(text, draft.amount) : true;
+
+      res.json({
+        draft,
+        amountLabel: draft.amount > 0 ? formatMoney(toMinor(draft.amount, settings.currency || "USD"), settings.currency || "USD", settings.locale) : null,
+        protection: {
+          flags: report.flags.map((f) => ({ id: f.id, priority: flagPriority(f), title: f.title, detail: f.detail, suggestedTerm: f.suggestedTerm })),
+          passes: protectionPasses(report),
+        },
+        warning: !grounded ? "That amount doesn't appear in what you pasted — check it before creating the deal." : null,
+      });
+    } catch (error: any) {
+      if (reservedIp && !error?.billed) refund(reservedIp);
+      console.error("AI demo-deal error:", error?.message || error);
+      res.status(502).json({ error: "Couldn't read that — please try again, or try a different message." });
     }
   });
 

@@ -55,6 +55,7 @@ import { trackEvent } from "@/lib/analytics";
 import { LandingCopilot, LandingCopilotSection } from "@/components/landing-copilot";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { BRAND_GRADIENT, GradientText, SectionHeader, fadeUp, stagger } from "@/components/landing-shared";
+import { LandingTryDemo } from "@/components/landing-try-demo";
 import {
   ProblemSection,
   HowItWorksSection,
@@ -276,6 +277,7 @@ export default function LandingPage() {
           isAuthenticated={isAuthenticated}
           onPrimaryClick={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
         />
+        {!isAuthenticated && <LandingTryDemo />}
         <ProblemSection />
         <HowItWorksSection />
         <ScopeSection />
@@ -695,7 +697,7 @@ function Hero({
               variants={heroFadeUp}
               className="text-[2.6rem] sm:text-6xl lg:text-[4.75rem] font-bold tracking-tight leading-[1.03] text-balance"
             >
-              Freelance work,
+              Turn client conversations
               <br />
               <span
                 className="relative inline-block"
@@ -706,7 +708,7 @@ function Hero({
                   backgroundClip: "text",
                 }}
               >
-                from deal to paid.
+                into professional deals.
                 <motion.span
                   className="absolute -bottom-1 left-0 right-0 h-[6px] rounded-full opacity-40"
                   style={{ background: "linear-gradient(90deg, transparent, #10B981, transparent)" }}
@@ -721,21 +723,35 @@ function Hero({
               variants={heroFadeUp}
               className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed text-pretty"
             >
-              Create professional quotes, agreements and invoices &mdash; then track every client deal from one simple workspace.
+              Paste what your client wants. DealInSec turns it into a structured deal, checks for risky terms, and helps you go from quotation to agreement to invoice.
             </motion.p>
 
             <motion.div variants={heroFadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-              <Button
-                onClick={onPrimaryClick}
-                className="h-12 px-7 text-[15px] font-semibold text-white border-0 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all w-full sm:w-auto"
-                style={{ background: BRAND_GRADIENT }}
-                data-testid="button-hero-cta"
-              >
-                {isAuthenticated ? "Go to Dashboard" : "Start for free"}
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
+              {isAuthenticated ? (
+                <Button
+                  onClick={onPrimaryClick}
+                  className="h-12 px-7 text-[15px] font-semibold text-white border-0 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all w-full sm:w-auto"
+                  style={{ background: BRAND_GRADIENT }}
+                  data-testid="button-hero-cta"
+                >
+                  Go to Dashboard
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              ) : (
+                <a
+                  href="#try"
+                  onClick={() => trackEvent("hero_cta_click", { label: "try_it_free" })}
+                  className="h-12 px-7 inline-flex items-center justify-center text-[15px] font-semibold rounded-md text-white border-0 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all w-full sm:w-auto"
+                  style={{ background: BRAND_GRADIENT }}
+                  data-testid="button-hero-cta"
+                >
+                  Try it free
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </a>
+              )}
               <a
                 href="#how"
+                onClick={() => trackEvent("hero_cta_click", { label: "see_how_it_works" })}
                 className="h-12 px-7 inline-flex items-center justify-center text-[15px] font-semibold rounded-md border border-neutral-300 dark:border-neutral-700 bg-white/60 dark:bg-neutral-900/60 backdrop-blur-sm hover:bg-white dark:hover:bg-neutral-900 w-full sm:w-auto transition-colors"
                 data-testid="link-hero-how"
               >
@@ -1091,7 +1107,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
               <span className="text-4xl font-bold tracking-tight">₹0</span>
               <span className="text-sm text-neutral-500">/ forever</span>
             </div>
-            <p className="text-xs text-neutral-500 mt-1">Run your pipeline professionally — deals and quotations included.</p>
+            <p className="text-xs text-neutral-500 mt-1">Try DealInSec with your first real client work.</p>
             <ul className="mt-5 space-y-2.5">
               {freePerks.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">
@@ -1151,7 +1167,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                 </span>
                 <span className="text-sm text-neutral-500">/ month</span>
               </div>
-              <p className="text-xs text-neutral-500 mt-1">The complete workflow: quote, agreement, invoice and payment tracking.</p>
+              <p className="text-xs text-neutral-500 mt-1">Take the deal all the way to signed agreement, invoice and payment tracking.</p>
 
               <ul className="mt-5 space-y-2.5">
                 {proMonthlyPerks.map((f) => (

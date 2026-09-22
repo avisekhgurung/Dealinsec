@@ -789,7 +789,7 @@ export default function DashboardPage() {
       <main className="px-4 py-5 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-6 lg:space-y-5 xl:px-10">
 
         {/* ── AI home: the first thing you see is what you can ask for ── */}
-        <AiHome />
+        <AiHome firstRun={!dealsLoading && deals.length === 0} />
 
         {/* ── Profile completion nudge — top priority before any action ── */}
         {showProfileNudge && (

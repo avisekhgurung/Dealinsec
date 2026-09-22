@@ -26,6 +26,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { trackEvent } from "@/lib/analytics";
+import { postAuthDestination } from "@/lib/deal-prefill";
 
 const PIPELINE = [
   { icon: Briefcase, label: "Deal" },
@@ -80,7 +81,7 @@ export default function AuthPage() {
   const [lastName, setLastName] = useState("");
 
   useEffect(() => {
-    if (isAuthenticated) setLocation("/dashboard");
+    if (isAuthenticated) setLocation(postAuthDestination());
   }, [isAuthenticated, setLocation]);
 
   const submit = async (e: React.FormEvent) => {
@@ -90,11 +91,12 @@ export default function AuthPage() {
       if (mode === "signup") {
         await apiRequest("POST", "/api/auth/signup", { email, password, firstName, lastName });
         trackEvent("sign_up", { method: "email" });
+        trackEvent("signup_completed", { method: "email" });
       } else {
         await apiRequest("POST", "/api/auth/login", { email, password });
       }
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      setLocation("/dashboard");
+      setLocation(postAuthDestination());
     } catch (error: any) {
       toast({
         title: mode === "signup" ? "Signup failed" : "Sign in failed",

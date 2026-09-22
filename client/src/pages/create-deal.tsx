@@ -2,7 +2,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { z } from "zod";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +38,7 @@ import {
   type DealType,
 } from "@shared/dealTypeTaxonomy";
 import { trackEvent } from "@/lib/analytics";
+import { DEAL_PREFILL_KEY } from "@/lib/deal-prefill";
 import { MoneyCurrencyPendingError, useMoney } from "@/hooks/use-locale";
 
 // The form collects MAJOR units from a human — `dealAmount`, what they type —
@@ -120,9 +121,9 @@ interface DealPrefill {
 }
 function takeDealPrefill(): DealPrefill | null {
   try {
-    const raw = sessionStorage.getItem("dis_deal_prefill");
+    const raw = sessionStorage.getItem(DEAL_PREFILL_KEY);
     if (!raw) return null;
-    sessionStorage.removeItem("dis_deal_prefill");
+    sessionStorage.removeItem(DEAL_PREFILL_KEY);
     const p = JSON.parse(raw);
     return p && typeof p === "object" ? p : null;
   } catch {
@@ -140,6 +141,11 @@ export default function CreateDealPage() {
   // Skip the picker when the type is already known: ?type= param (deep links)
   // wins, else the remembered last-used type. First-ever deal sees the picker.
   const [prefill] = useState<DealPrefill | null>(takeDealPrefill);
+  // Fired once, only when a prefill was actually restored — never on an
+  // ordinary "start from scratch" visit to this page.
+  useEffect(() => {
+    if (prefill) trackEvent("draft_restored_after_signup");
+  }, []);
   const prefillType = (dealTypeOptions as readonly string[]).includes(prefill?.dealType ?? "") ? (prefill!.dealType as DealType) : null;
   const [urlType] = useState<DealType | null>(() => prefillType ?? initialTypeFromUrl());
   const [memoryType] = useState<DealType | null>(() => (urlType ? null : rememberedDealType()));

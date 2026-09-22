@@ -271,7 +271,12 @@ export function Copilot() {
 
   return (
     <>
-      {!open && (
+      {/* The dashboard already has the big AI composer as its entry point —
+          a second floating "Ask" pill next to it competes for the same
+          attention, so it's hidden there specifically. Every other page
+          (deal details, invoices, etc.) keeps it, since those have no
+          composer of their own. */}
+      {!open && location !== "/dashboard" && (
         <button
           type="button"
           onClick={() => setOpen(true)}

@@ -5,11 +5,12 @@
  * snapshot (shared/quoteShare.ts). There is no live deal data here and no way
  * to reach one — this page never calls an authenticated endpoint.
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Check, Loader2, ShieldCheck } from "lucide-react";
 import { PublicDocFooter } from "@/components/public-doc-footer";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
+import { trackEvent } from "@/lib/analytics";
 
 interface Snapshot {
   issuerName: string;
@@ -53,6 +54,9 @@ export default function PublicQuotePage() {
     },
     retry: false,
   });
+  useEffect(() => {
+    if (data) trackEvent("public_document_view", { type: "quote" });
+  }, [!!data]);
 
   const accept = useMutation({
     mutationFn: async () => {
@@ -60,7 +64,10 @@ export default function PublicQuotePage() {
       if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || "Couldn't accept");
       return res.json();
     },
-    onSuccess: () => setAcceptedNow(true),
+    onSuccess: () => {
+      setAcceptedNow(true);
+      trackEvent("public_quote_accept");
+    },
   });
 
   if (isLoading) {

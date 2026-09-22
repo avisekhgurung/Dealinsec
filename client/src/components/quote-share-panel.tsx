@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { trackEvent } from "@/lib/analytics";
 import { Check, Copy, Link2, Loader2, ShieldCheck, XCircle } from "lucide-react";
 
 interface ShareStatus {
@@ -32,7 +33,10 @@ export function QuoteSharePanel({ dealId }: { dealId: number }) {
 
   const create = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/deals/${dealId}/quote/share`, {})).json(),
-    onSuccess: (d) => qc.setQueryData(key, d),
+    onSuccess: (d) => {
+      qc.setQueryData(key, d);
+      trackEvent("quotation_shared");
+    },
     onError: (e: any) => toast({ title: e?.message || "Couldn't create the share link.", variant: "destructive" }),
   });
 
