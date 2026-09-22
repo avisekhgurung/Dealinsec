@@ -20,6 +20,7 @@ import LandingPage from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 
 // Lazy-loaded — only fetched when the user navigates to that route
+const PublicQuotePage         = lazy(() => import("@/pages/public-quote"));
 const OnboardingPage          = lazy(() => import("@/pages/onboarding"));
 const DashboardPage           = lazy(() => import("@/pages/dashboard"));
 const DealsPage               = lazy(() => import("@/pages/deals"));
@@ -102,6 +103,17 @@ function Router() {
     setAppShell(inAppShell);
   }, [inAppShell]);
 
+
+  // A shared quotation link needs no account and no auth check — a client
+  // (or the freelancer, previewing it) sees exactly this page regardless of
+  // whether they're signed in, before anything else in this function runs.
+  if (location.startsWith("/d/")) {
+    return (
+      <Suspense fallback={<RouteLoader />}>
+        <PublicQuotePage />
+      </Suspense>
+    );
+  }
 
   // Initial app load (auth check) → full branded splash, shown once per session
   if (isLoading) {

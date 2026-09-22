@@ -83,6 +83,7 @@ export interface IStorage {
 
   createQuote(data: InsertQuote): Promise<Quote>;
   getQuoteByDealId(dealId: number): Promise<Quote | undefined>;
+  getQuoteByShareToken(token: string): Promise<Quote | undefined>;
   getQuotesByDealId(dealId: number): Promise<Quote[]>;
   updateQuote(id: number, updates: Partial<Quote>): Promise<Quote | undefined>;
 
@@ -561,6 +562,14 @@ export class DatabaseStorage implements IStorage {
 
   async getQuoteByDealId(dealId: number): Promise<Quote | undefined> {
     const [quote] = await db.select().from(quotes).where(eq(quotes.dealId, dealId)).orderBy(desc(quotes.createdAt)).limit(1);
+    return quote;
+  }
+
+  /** The ONLY lookup the public quotation page is allowed: by the opaque
+   *  token, never by a guessable id. Exact match only — 192 bits of
+   *  randomness makes a LIKE/prefix search unnecessary and risky. */
+  async getQuoteByShareToken(token: string): Promise<Quote | undefined> {
+    const [quote] = await db.select().from(quotes).where(eq(quotes.shareToken, token)).limit(1);
     return quote;
   }
 

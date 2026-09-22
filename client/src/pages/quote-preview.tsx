@@ -34,6 +34,7 @@ import {
   detectPaymentConflicts, deriveSchedule, validateDocData,
 } from "@/components/document/checks";
 import { DocLocalePending } from "@/components/document/locale-pending";
+import { QuoteSharePanel } from "@/components/quote-share-panel";
 import { formatTaxRegistration, invoiceTaxProfile, taxRegistrations } from "@shared/invoice-tax";
 
 function slugify(s: string): string {
@@ -375,6 +376,10 @@ export default function QuotePreviewPage() {
           locale={loc}
           footer={docFooter(quoteNumber, `Deal ${recordNo("deal", deal.id)}`)}
         />
+
+        <div className="mt-4 print:hidden">
+          <QuoteSharePanel dealId={deal.id} />
+        </div>
 
         {/* Stacked on narrow phones: side by side, the two labels need ~420px. */}
         <div className="flex flex-col min-[440px]:flex-row gap-3 pt-4 pb-2 print:hidden">

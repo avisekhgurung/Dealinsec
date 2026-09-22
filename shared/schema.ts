@@ -906,6 +906,26 @@ export const quotes = pgTable("quotes", {
   status: varchar("status").notNull().default("draft"),
   version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow(),
+
+  // ── Client-facing sharing (additive — see script/migrate-quote-share.ts) ──
+  // A share link is a capability URL, not a password: it must be showable to
+  // its owner again on reload (a real "copy link" button, like any other
+  // product's share link), so the token itself is stored, not a hash of it —
+  // unlike the password-reset token, which is a proof of mailbox control and
+  // is looked up by email first. Its security is 192 bits of randomness plus
+  // `shareRevokedAt`, not secrecy of the database.
+  shareToken: varchar("share_token").unique(),
+  /** The REDACTED content frozen at share time — see shared/quoteShare.ts.
+   *  A client who opened the link keeps seeing the price they were quoted
+   *  even if the deal is edited afterwards; PAN/GSTIN/bank fields are never
+   *  in this object, because it is served with NO authentication. */
+  shareSnapshot: jsonb("share_snapshot"),
+  sharedAt: timestamp("shared_at"),
+  shareRevokedAt: timestamp("share_revoked_at"),
+  shareViewCount: integer("share_view_count").notNull().default(0),
+  /** Soft signal only — "the client clicked Accept", never a signature. See
+   *  agreement acceptance (Phase 6) for anything that needs to be relied on. */
+  acceptedAt: timestamp("accepted_at"),
 });
 
 export const insertQuoteSchema = createInsertSchema(quotes).omit({ id: true, createdAt: true });

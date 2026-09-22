@@ -308,6 +308,32 @@ export function proPlanReceiptEmail(args: {
 // the agreement and the invoice were printed in. Pass
 // resolveLocaleSettings(org, user); omitting it means India.
 
+export function quoteAcceptedEmail(args: {
+  firstName?: string;
+  clientName: string;
+  dealTitle: string;
+  amountMinor: number;
+  dealId: number;
+  locale?: LocaleFields | null;
+}): { subject: string; html: string } {
+  const subject = `${args.clientName} accepted your quotation`;
+  const html = layout({
+    preview: `${args.clientName} accepted the quotation for ${args.dealTitle}.`,
+    bodyHtml: `
+      ${heading("Quotation accepted ✅")}
+      ${para(`<strong>${args.clientName}</strong> accepted your quotation for <strong>${args.dealTitle}</strong>.`)}
+      ${infoCard(
+        infoRow("Client", args.clientName) +
+        infoRow("Project", args.dealTitle) +
+        infoRow("Amount", money(args.amountMinor, args.locale)),
+      )}
+      ${button("Open deal", `${appUrl()}/deals/${args.dealId}`)}
+      ${para("This confirms interest, not a signed agreement — create the agreement next when you're ready to start.")}
+    `,
+  });
+  return { subject, html };
+}
+
 export function contractSignedEmail(args: {
   firstName?: string;
   brandName: string;
