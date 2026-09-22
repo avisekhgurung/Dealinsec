@@ -27,6 +27,8 @@ import {
 import { formatMoney, formatDate } from "@shared/money";
 import { getBillingUser, logOrgActivity } from "../entitlements";
 import { copilotSettings, getDealJourney } from "./workflow";
+import { computeBriefing, computeDealIntel } from "./insights";
+import { analyzeDealProtections } from "./riskcheck";
 import { amountVoice, speaksNativeMoney, voiceFor } from "./voice";
 
 const inOrg = (
@@ -140,6 +142,40 @@ export const toolDefs = (settings: LocaleSettings) => [
       description:
         "The caller's plan/entitlements (free / trial with days left / Pro), role, organization name and seat usage. Use for plan, billing-status or 'can I…' questions.",
       parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_money_radar",
+      description:
+        "The org's collectible money right now: overdue invoices, invoices due this week, and signed agreements not yet invoiced — each with a total and count. Use for 'how much money is expected', 'what's overdue', 'what can I invoice'.",
+      parameters: { type: "object", properties: {} },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_deal_health",
+      description:
+        "One deal's explainable health score (0-100) with the signals behind it (amount/deliverables/revisions defined, payment terms, overdue status) and its recommended next action. Use for 'is this deal healthy', 'what's next on this deal'.",
+      parameters: {
+        type: "object",
+        properties: { dealId: { type: "number", description: "Deal id" } },
+        required: ["dealId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "run_protection_check",
+      description:
+        "Check one deal's terms (or all active deals if dealId is omitted) for risky wording (unlimited revisions, vague scope, pay-when-paid) and missing protections (advance, balance timeline, revision limit, exclusions, late-payment terms). Use for 'check my terms', 'which deals are missing a revision limit', 'is this deal protected'.",
+      parameters: {
+        type: "object",
+        properties: { dealId: { type: "number", description: "Deal id — omit to check every active deal" } },
+      },
     },
   },
   {
@@ -303,6 +339,57 @@ export async function runTool(name: string, args: any, user: User, settings?: Lo
       return rows
         .map((a) => `${a.userName ?? "Someone"} ${a.action} ${a.entityType}${a.detail ? ` — ${a.detail}` : ""}`)
         .join("\n");
+    }
+
+    case "get_money_radar": {
+      const { currency, locale } = await turnSettings();
+      const b = await computeBriefing(user);
+      const r = b.radar;
+      const line = (label: string, t: { totalMinor: number; count: number }) =>
+        `${label}: ${formatMoney(t.totalMinor, currency, locale)} (${t.count})`;
+      if (!r.overdue.count && !r.dueThisWeek.count && !r.readyToInvoice.count) {
+        return "Nothing collectible right now — no overdue invoices, nothing due this week, nothing signed and waiting to be invoiced.";
+      }
+      return [
+        line("Overdue", r.overdue),
+        line("Due this week", r.dueThisWeek),
+        line("Signed, not yet invoiced", r.readyToInvoice),
+        `Total collectible: ${formatMoney(r.collectibleMinor, currency, locale)}`,
+      ].join("\n") + "\nroute:/invoices";
+    }
+
+    case "get_deal_health": {
+      const dealId = Number(args?.dealId);
+      if (!Number.isFinite(dealId)) return "I need a deal id to check its health.";
+      const intel = await computeDealIntel(dealId, user);
+      if (!intel) return "Deal not found in your organization.";
+      const signals = intel.health.signals.map((s) => `${s.state === "good" ? "✓" : s.state === "warn" ? "⚠" : "✗"} ${s.label}: ${s.detail}`).join("\n");
+      const next = intel.nextAction ? `\nNext: ${intel.nextAction.action} — route:${intel.nextAction.route}` : "";
+      return `Deal Health: ${intel.health.score}/100 (${intel.health.grade})\n${signals}${next}\nroute:/deals/${dealId}`;
+    }
+
+    case "run_protection_check": {
+      const dealId = Number(args?.dealId);
+      const settings = await turnSettings();
+      if (Number.isFinite(dealId)) {
+        const deal = await storage.getDeal(dealId);
+        if (!deal || !inOrg(deal, user)) return "Deal not found in your organization.";
+        const report = analyzeDealProtections(deal, settings);
+        if (!report.flags.length) return `"${deal.dealTitle}" — no risky wording or missing protections found. route:/deals/${dealId}`;
+        return report.flags
+          .map((f) => `${f.severity === "risk" ? "Risk" : "Gap"}: ${f.title} — ${f.detail}`)
+          .join("\n") + `\nroute:/deals/${dealId}`;
+      }
+      // No dealId: sweep every Pending/Active deal, summary only (no per-flag detail — that's what asking about one deal is for).
+      const all = await storage.getDealsByOrg(orgId, user.id);
+      const active = all.filter((d) => d.status !== "Completed");
+      if (!active.length) return "No active deals to check.";
+      const flagged = active
+        .map((d) => ({ d, report: analyzeDealProtections(d, settings) }))
+        .filter(({ report }) => report.flags.length > 0);
+      if (!flagged.length) return `Checked ${active.length} active deal${active.length === 1 ? "" : "s"} — no risky wording or missing protections found.`;
+      return `${flagged.length} of ${active.length} active deals have something to fix:\n` +
+        cap(flagged, 6).map(({ d, report }) => `#${d.id} "${d.dealTitle}" · ${d.brandName} · ${report.risks} risk${report.risks === 1 ? "" : "s"}, ${report.gaps} gap${report.gaps === 1 ? "" : "s"} · route:/deals/${d.id}`).join("\n");
     }
 
     default:
