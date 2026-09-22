@@ -27,11 +27,14 @@
  * other currency. International checkout is pending Razorpay International
  * approval.
  *
- * GLOBAL_PLANS below is the agreed price list for when it opens: India keeps
- * monthly + annual in ₹, everywhere else is ANNUAL ONLY in a local currency.
- * Nothing reads it yet. Annual-only abroad is deliberate: a card charge carries
- * a fixed per-transaction cost, which is trivial once a year and punitive
- * twelve times a year on a small ticket.
+ * GLOBAL_PLANS (now in shared/globalPlans.ts) is the agreed price list for
+ * when it opens: India keeps monthly + annual in ₹, everywhere else is
+ * ANNUAL ONLY in a local currency. The pricing page reads it to show an
+ * international visitor their real future price instead of a rupee figure
+ * they can't pay — checkout itself still refuses every non-₹ order below.
+ * Annual-only abroad is deliberate: a card charge carries a fixed
+ * per-transaction cost, which is trivial once a year and punitive twelve
+ * times a year on a small ticket.
  *
  * To be confirmed on activation, not assumed: how international payments settle
  * to us and what export paperwork they produce. Razorpay's pricing page
@@ -83,41 +86,13 @@ export function getExtraSeatPrice(): number {
   return parseInt(process.env.EXTRA_SEAT_PRICE ?? "99", 10);
 }
 
-export interface PlanPrice {
-  /** Amount in MAJOR units of the currency (99 = ₹99 / $99). */
-  amount: number;
-  currency: string;
-  /** Term length in days, mirroring PRO_*_DAYS. */
-  days: number;
-}
-
-/**
- * NOT WIRED — the agreed price list for international checkout, which is
- * pending Razorpay International approval (see the header). No route, order or
- * screen reads this. Do not quote or charge from it until checkout is live
- * end to end: order creation, the pricing page and the grant path together.
- *
- * Local round numbers beat a live FX conversion: "£79" reads as a price,
- * "£78.43" reads as a glitch — and a price that moves with the exchange rate
- * can silently contradict the marketing page.
- *
- * India is the only market with a monthly plan. Everywhere else is annual only.
- * The INR row records the list price; live ₹ orders read the env-driven
- * getters above instead, so a ₹1 test-mode run keeps working.
- */
-export const GLOBAL_PLANS: Readonly<Record<string, { monthly?: PlanPrice; yearly: PlanPrice }>> = {
-  INR: {
-    monthly: { amount: 99, currency: "INR", days: PRO_MONTHLY_DAYS },
-    yearly: { amount: 999, currency: "INR", days: PRO_YEARLY_DAYS },
-  },
-  USD: { yearly: { amount: 99, currency: "USD", days: PRO_YEARLY_DAYS } },
-  GBP: { yearly: { amount: 79, currency: "GBP", days: PRO_YEARLY_DAYS } },
-  EUR: { yearly: { amount: 89, currency: "EUR", days: PRO_YEARLY_DAYS } },
-  AUD: { yearly: { amount: 149, currency: "AUD", days: PRO_YEARLY_DAYS } },
-  CAD: { yearly: { amount: 139, currency: "CAD", days: PRO_YEARLY_DAYS } },
-  SGD: { yearly: { amount: 129, currency: "SGD", days: PRO_YEARLY_DAYS } },
-  AED: { yearly: { amount: 369, currency: "AED", days: PRO_YEARLY_DAYS } },
-};
+// GLOBAL_PLANS (the agreed international price list) now lives in
+// shared/globalPlans.ts, so the CLIENT can read prices for display without
+// importing this whole module (the Razorpay SDK, server env vars). Still not
+// wired to checkout: no order, charge or grant here reads it — see that
+// file's header for what "safe to display, not safe to charge" means.
+export type { PlanPrice } from "@shared/globalPlans";
+export { GLOBAL_PLANS } from "@shared/globalPlans";
 
 function getClient(): Razorpay {
   if (_client) return _client;

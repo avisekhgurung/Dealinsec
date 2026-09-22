@@ -31,7 +31,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { queryClient } from "@/lib/queryClient";
 import { PaymentResult } from "@/components/payment-result";
 import { useRazorpayCheckout, type CheckoutPlan } from "@/hooks/use-razorpay-checkout";
-import { PLAN_PRICE_DEFAULTS, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
+import { PLAN_PRICE_DEFAULTS, formatRupees, usePlanCheckoutAvailable, useInternationalPlanPrice } from "@/hooks/use-plan-prices";
 import { useLocale } from "@/hooks/use-locale";
 
 const REDIRECT_KEY = "postPaymentRedirect";
@@ -88,6 +88,7 @@ export default function PricingPage() {
   // Indian account, so every `checkoutAvailable ? … : …` below renders exactly
   // what India saw before.
   const checkoutAvailable = usePlanCheckoutAvailable();
+  const intlPrice = useInternationalPlanPrice();
 
   const proActive = hasActivePro(user);
   const boostActive = hasActiveDealBoost(user);
@@ -301,6 +302,11 @@ export default function PricingPage() {
                   : trialActive
                   ? " Your Pro trial keeps everything unlocked until it ends."
                   : " The Free plan keeps working in the meantime."}
+              </p>
+              <p className="text-xs font-semibold mt-1.5">
+                {intlPrice.isExact
+                  ? <>Once it opens, Pro will be <span className="tabular-nums">{intlPrice.label}</span> a year.</>
+                  : <>Once it opens, Pro will start from around <span className="tabular-nums">{intlPrice.label}</span> a year — the exact price for your currency is still being confirmed.</>}
               </p>
               <p className="text-[11px] text-muted-foreground mt-1.5">
                 Based in India and seeing this?{" "}

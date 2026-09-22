@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { formatMoney } from "@/lib/format";
 import { useLocale, useMoney } from "@/hooks/use-locale";
 import { toMinor } from "@shared/schema";
+import { globalYearlyPriceFor } from "@shared/globalPlans";
 
 export const PLAN_PRICE_DEFAULTS = {
   proMonthlyPrice: 99,
@@ -66,6 +67,24 @@ export function usePlanCheckoutAvailable(): boolean {
   const { country: personCountry } = useLocale();
   const { settings: { country: workspaceCountry } } = useMoney();
   return personCountry === PLAN_CHECKOUT_COUNTRY && workspaceCountry === PLAN_CHECKOUT_COUNTRY;
+}
+
+/**
+ * What an international visitor will eventually pay, once checkout opens for
+ * their country — read from shared/globalPlans.ts, NEVER from a live order
+ * (checkout still refuses every non-₹ order; see usePlanCheckoutAvailable).
+ * `isExact` is false when their own currency has no agreed row yet (43 of the
+ * 50 the app supports don't) and this is the USD anchor instead — the caller
+ * should say "from $99/year", not imply that figure is their own price.
+ */
+export function useInternationalPlanPrice(): { label: string; isExact: boolean; currency: string } {
+  const { settings } = useMoney();
+  const { price, isExact } = globalYearlyPriceFor(settings.currency);
+  return {
+    label: formatMoney(toMinor(price.amount, price.currency), price.currency, settings.locale),
+    isExact,
+    currency: price.currency,
+  };
 }
 
 export function usePlanPrices({ enabled = true }: { enabled?: boolean } = {}) {
