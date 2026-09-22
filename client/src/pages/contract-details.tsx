@@ -691,7 +691,7 @@ export default function ContractDetailsPage() {
             {/* Generate new — while the contract is signed AND the
                 member's role includes invoice creation. */}
             {canInvoice && (
-            <Card className="glass-card border-0">
+            <Card id="generate-invoice" className="glass-card border-0 scroll-mt-20">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30">

@@ -8,10 +8,10 @@
  */
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Check, FileSignature, Loader2, ShieldCheck } from "lucide-react";
+import { Check, Download, FileSignature, Loader2, ShieldCheck } from "lucide-react";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { trackEvent } from "@/lib/analytics";
-import { SignaturePad } from "@/components/signature-pad";
+import { SignatureInput } from "@/components/signature-input";
 import { PublicDocFooter } from "@/components/public-doc-footer";
 
 interface Snapshot {
@@ -43,7 +43,14 @@ export default function PublicSignPage() {
   const [agree, setAgree] = useState(false);
   const [justSigned, setJustSigned] = useState(false);
 
-  const { data, isLoading, isError, refetch } = useQuery<{ snapshot: Snapshot; signed: boolean; signedAt: string | null; signerName: string | null }>({
+  const { data, isLoading, isError, refetch } = useQuery<{
+    snapshot: Snapshot;
+    signed: boolean;
+    signedAt: string | null;
+    signerName: string | null;
+    signerEmail: string | null;
+    documentIntegrity: "verified" | "unavailable" | "mismatch" | null;
+  }>({
     queryKey: ["/api/public/agreements", token],
     queryFn: async () => {
       const res = await fetch(`/api/public/agreements/${token}`);
@@ -108,20 +115,25 @@ export default function PublicSignPage() {
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xl shadow-emerald-900/5 overflow-hidden">
           <div className="h-1.5" style={{ background: BRAND_GRADIENT }} />
           <div className="p-6 sm:p-8">
-            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-1">Agreement</p>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">Agreement</p>
+              <span className="text-[11px] font-semibold text-neutral-400">Version 1</span>
+            </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-balance">{s.contractName}</h1>
-            <p className="text-sm text-neutral-500 mt-1">Between {s.issuerName} and {s.clientName}</p>
+            <p className="text-sm text-neutral-500 mt-1">Between <span className="font-semibold text-neutral-700 dark:text-neutral-300">{s.issuerName}</span> and <span className="font-semibold text-neutral-700 dark:text-neutral-300">{s.clientName}</span></p>
 
             <div className="grid sm:grid-cols-2 gap-4 mt-6">
+              <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1">Project value</p>
+                <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{s.amountLabel}</p>
+              </div>
               <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1">Period</p>
                 <p className="text-sm">{fmtDate(s.startDate)} – {fmtDate(s.endDate)}</p>
               </div>
-              <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-1">Value</p>
-                <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{s.amountLabel}</p>
-              </div>
             </div>
+
+            <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mt-6 mb-2">Review agreement</p>
 
             {s.terms.length > 0 && (
               <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4 mt-4">
@@ -134,12 +146,60 @@ export default function PublicSignPage() {
 
             <div className="mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-800">
               {signed ? (
-                <div className="flex items-center gap-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40 p-4" data-testid="agreement-signed-badge">
-                  <ShieldCheck className="w-6 h-6 text-emerald-600 shrink-0" />
-                  <div>
-                    <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">Signed{data.signerName || signerName ? ` by ${data.signerName || signerName}` : ""}</p>
-                    <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80">Electronic acceptance recorded, not a Digital Signature Certificate.</p>
+                <div className="space-y-4" data-testid="agreement-signed-badge">
+                  <div className="flex items-center gap-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40 p-4">
+                    <ShieldCheck className="w-6 h-6 text-emerald-600 shrink-0" />
+                    <div>
+                      <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">Agreement signed</p>
+                      <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80">Your electronic signature has been recorded.</p>
+                    </div>
                   </div>
+
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-sm rounded-xl border border-neutral-200 dark:border-neutral-800 p-4">
+                    <div>
+                      <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Signed by</dt>
+                      <dd className="font-semibold">{data.signerName || signerName}</dd>
+                    </div>
+                    {(data.signerEmail || signerEmail) && (
+                      <div>
+                        <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Email</dt>
+                        <dd className="font-semibold truncate">{data.signerEmail || signerEmail}</dd>
+                      </div>
+                    )}
+                    <div>
+                      <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Signed</dt>
+                      <dd className="font-semibold">
+                        {data.signedAt
+                          ? new Date(data.signedAt).toLocaleString(undefined, { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" })
+                          : "Just now"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">Status</dt>
+                      <dd className="font-bold text-emerald-600 dark:text-emerald-400">SIGNED</dd>
+                    </div>
+                    {data.documentIntegrity === "verified" && (
+                      <div className="col-span-2 pt-1">
+                        <dt className="sr-only">Document integrity</dt>
+                        <dd className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                          <ShieldCheck className="w-3.5 h-3.5" /> Document integrity — recorded and matches the signed record
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+
+                  <p className="text-xs text-neutral-500">
+                    Electronic acceptance with an audit record — this is not a Digital Signature Certificate or Aadhaar eSign.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    data-testid="button-download-signed-agreement"
+                    className="w-full h-11 rounded-md border border-neutral-300 dark:border-neutral-700 text-sm font-bold inline-flex items-center justify-center gap-2 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors"
+                  >
+                    <Download className="w-4 h-4" /> Download Signed Agreement
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -163,11 +223,14 @@ export default function PublicSignPage() {
                       className="h-10 rounded-md border border-neutral-300 dark:border-neutral-700 bg-transparent px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
                     />
                   </div>
-                  <SignaturePad onChange={setSignatureDataUrl} />
+                  <SignatureInput signerName={signerName} onChange={setSignatureDataUrl} />
                   <label className="flex items-start gap-2 text-xs text-neutral-600 dark:text-neutral-400">
                     <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5" data-testid="checkbox-agree" />
-                    I agree to sign this agreement electronically. This is electronic acceptance with an audit record, not a Digital Signature Certificate or Aadhaar eSign.
+                    I agree to use electronic records and electronic signatures for this agreement. I understand that my electronic signature indicates my intent to sign this agreement. This is electronic acceptance with an audit record, not a Digital Signature Certificate or Aadhaar eSign.
                   </label>
+                  <p className="text-[11px] text-neutral-500">
+                    By selecting Sign Agreement, you confirm that you have reviewed this agreement and intend to sign it electronically.
+                  </p>
                   <button
                     type="button"
                     disabled={!canSubmit || sign.isPending}

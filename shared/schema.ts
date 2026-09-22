@@ -738,6 +738,13 @@ export const contracts = pgTable("contracts", {
   /** Best-effort provenance for the audit record, from the same
    *  Cloudflare-aware header read as the public quote endpoint. */
   clientSignerIp: varchar("client_signer_ip"),
+  /** SHA-256 over the exact signed record — see shared/contractSign.ts
+   *  computeDocumentHash(). Computed once, at the moment of signing, from
+   *  fields that are never edited afterwards (the whole point of "signed
+   *  means immutable"). A later mismatch would mean the stored row itself
+   *  was altered outside the app — this is a tamper DETECTOR against that,
+   *  not a cryptographic seal on the rendered PDF bytes; never claim more. */
+  documentHash: varchar("document_hash"),
 });
 
 export const invoices = pgTable("invoices", {

@@ -7,7 +7,7 @@
  */
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Check, Loader2, ShieldCheck } from "lucide-react";
+import { ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
 import { PublicDocFooter } from "@/components/public-doc-footer";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { trackEvent } from "@/lib/analytics";
@@ -139,27 +139,42 @@ export default function PublicQuotePage() {
 
             <div className="flex items-end justify-between mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-800">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Investment</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Total project fee</p>
                 <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{s.amountLabel}</p>
               </div>
-              {accepted ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 px-4 py-2 text-sm font-bold" data-testid="quote-accepted-badge">
-                  <ShieldCheck className="w-4 h-4" /> Accepted
-                </span>
-              ) : (
+              {!accepted && (
                 <button
                   type="button"
                   disabled={accept.isPending}
                   onClick={() => accept.mutate()}
                   data-testid="button-accept-quotation"
-                  className="h-11 px-6 rounded-md text-white text-sm font-bold shadow-md shadow-emerald-500/25 disabled:opacity-60"
+                  className="h-11 px-6 rounded-md text-white text-sm font-bold shadow-md shadow-emerald-500/25 disabled:opacity-60 inline-flex items-center gap-2"
                   style={{ background: BRAND_GRADIENT }}
                 >
-                  {accept.isPending ? "Accepting…" : "Accept Quotation"}
+                  {accept.isPending ? "Accepting…" : "Accept Quotation"} {!accept.isPending && <ArrowRight className="w-4 h-4" />}
                 </button>
               )}
             </div>
             {accept.isError && <p className="text-xs text-rose-600 mt-2">{(accept.error as Error).message}</p>}
+
+            {accepted ? (
+              <div className="mt-5 rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 p-4" data-testid="quote-accepted-badge">
+                <p className="flex items-center gap-1.5 text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                  <ShieldCheck className="w-4 h-4" /> Quotation accepted
+                </p>
+                <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80 mt-1">
+                  Your approval has been recorded and the freelancer has been notified.
+                </p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mt-3">Next step</p>
+                <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5">
+                  The freelancer can now prepare the agreement for your review and electronic signature.
+                </p>
+              </div>
+            ) : (
+              <p className="text-[11px] text-neutral-500 mt-3 text-center sm:text-left">
+                Accepting confirms your approval of this quotation. The agreement will be provided separately for review and electronic signing.
+              </p>
+            )}
           </div>
         </div>
 

@@ -11,7 +11,7 @@ import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { trackEvent } from "@/lib/analytics";
-import { Check, Copy, FileSignature, Loader2, ShieldCheck, XCircle } from "lucide-react";
+import { ArrowRight, Check, Copy, FileSignature, Loader2, Receipt, ShieldCheck, XCircle } from "lucide-react";
 
 interface SignShareStatus {
   active: boolean;
@@ -22,6 +22,7 @@ interface SignShareStatus {
   signerName?: string | null;
   signerEmail?: string | null;
   signedAt?: string | null;
+  documentIntegrity?: "verified" | "unavailable" | "mismatch" | null;
 }
 
 export function AgreementSignPanel({ contractId }: { contractId: number }) {
@@ -62,16 +63,26 @@ export function AgreementSignPanel({ contractId }: { contractId: number }) {
   // Signed (whichever path got there first) — a summary, not a share control.
   if (data?.signed) {
     return (
-      <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 p-4" data-testid="agreement-sign-summary">
-        <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-          <ShieldCheck className="w-4 h-4" /> Signed online
-        </p>
-        {data.signerName && (
-          <p className="text-xs text-muted-foreground mt-1">
-            {data.signerName}{data.signerEmail ? ` (${data.signerEmail})` : ""}
-            {data.signedAt ? ` · ${new Date(data.signedAt).toLocaleString()}` : ""}
+      <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 p-4 space-y-3" data-testid="agreement-sign-summary">
+        <div>
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+            <ShieldCheck className="w-4 h-4" /> Signed online
           </p>
-        )}
+          {data.signerName && (
+            <p className="text-xs text-muted-foreground mt-1">
+              {data.signerName}{data.signerEmail ? ` (${data.signerEmail})` : ""}
+              {data.signedAt ? ` · ${new Date(data.signedAt).toLocaleString()}` : ""}
+            </p>
+          )}
+          {data.documentIntegrity === "verified" && (
+            <p className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mt-1.5">
+              <ShieldCheck className="w-3 h-3" /> Document integrity — recorded
+            </p>
+          )}
+        </div>
+        <a href="#generate-invoice" className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:underline">
+          <Receipt className="w-3.5 h-3.5" /> Next: Create Invoice <ArrowRight className="w-3 h-3" />
+        </a>
       </div>
     );
   }

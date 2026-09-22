@@ -239,26 +239,27 @@ export default function QuotePreviewPage() {
       }
     }
 
-    // Sign-off. A quotation that stopped at its terms left the client no
-    // obvious way to say yes; this is the acceptance section a printed
-    // quotation is expected to end with. Both pen lines print empty.
+    // Next step. A QUOTATION is accepted, never signed — the AGREEMENT is the
+    // document that carries a signature (see contract-pdf.tsx). No client
+    // pen-line here on purpose: printing one implied the client had to sign
+    // THIS document, which is exactly the confusion this section used to
+    // cause. "Prepared by" is the freelancer's own record, not a counter-
+    // party signature, so it stays.
     out.push({
       key: "acceptance",
       node: (
         <div>
-          <SectionTitle>Acceptance</SectionTitle>
-          <p className="doc-small doc-muted-t" style={{ margin: "0 0 3mm" }}>
-            To accept this quotation, sign below and return a copy, or confirm in writing before {docDate(validUntil, loc)}.
+          <SectionTitle>Next step</SectionTitle>
+          <p className="doc-small doc-muted-t" style={{ margin: "0 0 4mm" }}>
+            Accept this quotation online to confirm your approval of the proposed project, before {docDate(validUntil, loc)}.
+            An agreement will be provided separately for review and electronic signing.
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14mm", alignItems: "start" }}>
-            <SignatureCell
-              heading="Prepared by"
-              name={fullName}
-              date={docDate(issuedOn, loc)}
-              signatureUrl={issuer.digitalSignature || null}
-            />
-            <SignatureCell heading={`Accepted for ${deal.brandName}`} />
-          </div>
+          <SignatureCell
+            heading="Prepared by"
+            name={fullName}
+            date={docDate(issuedOn, loc)}
+            signatureUrl={issuer.digitalSignature || null}
+          />
         </div>
       ),
     });

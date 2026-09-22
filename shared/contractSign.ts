@@ -48,3 +48,45 @@ export function buildAgreementShareSnapshot(args: {
     terms: [...standardLabels, ...customLines],
   };
 }
+
+/* ── Document integrity ──────────────────────────────────────────────────
+ * A detector, not a cryptographic seal on rendered PDF bytes: it proves the
+ * signed FIELDS in the database haven't changed since the moment of signing
+ * (they never should — signing is meant to be immutable), not that any PDF
+ * generated from them is byte-identical to one generated earlier. Say
+ * "recorded" / "matches the signed record", never "tamper-proof".
+ */
+import crypto from "crypto";
+
+export interface SignedRecordForHash {
+  clientSignShareSnapshot: unknown;
+  clientSignerName: string | null;
+  clientSignerEmail: string | null;
+  clientSignatureDataUrl: string | null;
+  clientSignedAt: string | Date | null;
+}
+
+/** Deterministic: same signed fields always hash the same way, so this can
+ *  be recomputed on every read and compared to the stored value. */
+export function computeDocumentHash(record: SignedRecordForHash): string {
+  const canonical = JSON.stringify({
+    snapshot: record.clientSignShareSnapshot ?? null,
+    signerName: record.clientSignerName ?? null,
+    signerEmail: record.clientSignerEmail ?? null,
+    signatureDataUrl: record.clientSignatureDataUrl ?? null,
+    signedAt: record.clientSignedAt ? new Date(record.clientSignedAt).toISOString() : null,
+  });
+  return crypto.createHash("sha256").update(canonical).digest("hex");
+}
+
+/** "verified" only when a hash was stored AND it still matches the record's
+ *  current fields; "unavailable" for a pre-hash row (nothing to check
+ *  against — not a failure); "mismatch" if the stored fields somehow moved,
+ *  which should never happen given the immutability rule elsewhere. */
+export function verifyDocumentHash(
+  record: SignedRecordForHash,
+  storedHash: string | null,
+): "verified" | "unavailable" | "mismatch" {
+  if (!storedHash) return "unavailable";
+  return computeDocumentHash(record) === storedHash ? "verified" : "mismatch";
+}

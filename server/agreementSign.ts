@@ -21,7 +21,7 @@ import { isAuthenticated } from "./auth";
 import { memberCan } from "@shared/permissions";
 import { hasProAccess } from "@shared/schema";
 import { documentLocaleSettings } from "@shared/money";
-import { buildAgreementShareSnapshot } from "@shared/contractSign";
+import { buildAgreementShareSnapshot, computeDocumentHash, verifyDocumentHash } from "@shared/contractSign";
 import { sendEmail, agreementSignedByClientEmail } from "./emails";
 import { documentLocaleFor, issuedCurrency } from "./routes";
 import { getBillingUser, logOrgActivity } from "./entitlements";
@@ -80,6 +80,7 @@ export function registerAgreementSignRoutes(app: Express) {
         signerName: contract.clientSignerName,
         signerEmail: contract.clientSignerEmail,
         signedAt: contract.clientSignedAt,
+        documentIntegrity: contract.clientSignedAt ? verifyDocumentHash(contract, contract.documentHash) : null,
       });
     } catch (err) {
       console.error("[agreement-sign] status error:", err);
@@ -157,6 +158,8 @@ export function registerAgreementSignRoutes(app: Express) {
         signed: contract.signedByBrand,
         signedAt: contract.clientSignedAt,
         signerName: contract.clientSignerName,
+        signerEmail: contract.clientSignerEmail,
+        documentIntegrity: contract.clientSignedAt ? verifyDocumentHash(contract, contract.documentHash) : null,
       });
     } catch (err) {
       console.error("[agreement-sign] public view error:", err);
@@ -191,6 +194,16 @@ export function registerAgreementSignRoutes(app: Express) {
       }
 
       const now = new Date();
+      // The hash covers exactly the fields being written here — computed from
+      // the SAME values before they're stored, not re-read afterwards, so it
+      // can never drift from what verifyDocumentHash later recomputes.
+      const documentHash = computeDocumentHash({
+        clientSignShareSnapshot: contract.clientSignShareSnapshot,
+        clientSignerName: signerName,
+        clientSignerEmail: signerEmail,
+        clientSignatureDataUrl: req.body.signatureDataUrl,
+        clientSignedAt: now,
+      });
       const updated = await storage.updateContract(contract.id, {
         status: "Signed",
         signedByBrand: true,
@@ -200,6 +213,7 @@ export function registerAgreementSignRoutes(app: Express) {
         clientSignerEmail: signerEmail,
         clientSignatureDataUrl: req.body.signatureDataUrl,
         clientSignerIp: clientIp(req),
+        documentHash,
       });
       if (!updated) return res.status(500).json({ error: "Couldn't record the signature." });
 

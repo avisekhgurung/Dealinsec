@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAgreementShareSnapshot } from "./contractSign";
+import { buildAgreementShareSnapshot, computeDocumentHash, verifyDocumentHash } from "./contractSign";
 import { resolveLocaleSettings } from "./schema";
 
 const settings = resolveLocaleSettings({ country: "IN" } as any);
@@ -37,5 +37,32 @@ describe("buildAgreementShareSnapshot — the public sign-page contract", () => 
   it("prints the real agreement money, formatted", () => {
     expect(snap.amountMinor).toBe(150000);
     expect(snap.amountLabel).toContain("1,500");
+  });
+});
+
+describe("document integrity hash", () => {
+  const record = {
+    clientSignShareSnapshot: { v: 1, clientName: "Acme" },
+    clientSignerName: "Jordan Lee",
+    clientSignerEmail: "jordan@acme.example",
+    clientSignatureDataUrl: "data:image/png;base64,AAAA",
+    clientSignedAt: "2026-09-22T19:36:19.853Z",
+  };
+
+  it("is deterministic for identical fields", () => {
+    expect(computeDocumentHash(record)).toBe(computeDocumentHash({ ...record }));
+  });
+
+  it("changes if any signed field changes", () => {
+    const h = computeDocumentHash(record);
+    expect(computeDocumentHash({ ...record, clientSignerName: "Someone Else" })).not.toBe(h);
+    expect(computeDocumentHash({ ...record, clientSignerEmail: null })).not.toBe(h);
+    expect(computeDocumentHash({ ...record, clientSignatureDataUrl: "data:image/png;base64,BBBB" })).not.toBe(h);
+  });
+
+  it("verifyDocumentHash: unavailable, verified, mismatch", () => {
+    expect(verifyDocumentHash(record, null)).toBe("unavailable");
+    expect(verifyDocumentHash(record, computeDocumentHash(record))).toBe("verified");
+    expect(verifyDocumentHash(record, "not-a-real-hash")).toBe("mismatch");
   });
 });
