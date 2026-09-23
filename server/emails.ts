@@ -169,15 +169,20 @@ export function inviteEmail(args: {
   inviterName: string;
   roleLabel: string;
   token: string;
+  /** The inviting org's own country — known at the call site (req.org),
+   *  unlike welcomeEmail's pre-onboarding moment. "GST invoices" only means
+   *  anything to an Indian org; everywhere else it's just "invoices". */
+  country?: string | null;
 }): { subject: string; html: string } {
   const acceptUrl = `${appUrl()}/invite/${args.token}`;
   const subject = `You've been invited to join ${args.orgName} on DealInSec`;
+  const invoiceWord = args.country === "IN" ? "GST invoices" : "invoices";
   const html = layout({
     preview: `${args.inviterName} invited you to join ${args.orgName} as ${args.roleLabel}.`,
     bodyHtml: `
       ${heading(`Join ${args.orgName} on DealInSec`)}
       ${para(`<strong>${args.inviterName}</strong> has invited you to join <strong>${args.orgName}</strong> as <strong>${args.roleLabel}</strong>.`)}
-      ${para("DealInSec is where the team runs its deals — quotations, e-signed agreements, GST invoices and payment tracking in one workflow.")}
+      ${para(`DealInSec is where the team runs its deals — quotations, e-signed agreements, ${invoiceWord} and payment tracking in one workflow.`)}
       ${button("Accept Invitation", acceptUrl)}
       ${para("You'll set a password and land right inside the organization. This invitation expires in 7 days.")}
       ${para("Didn't expect this? You can safely ignore this email.")}
@@ -199,7 +204,7 @@ export function welcomeEmail(args: { firstName?: string }): { subject: string; h
     bodyHtml: `
       ${heading(`Welcome aboard${name}!`)}
       ${para("DealInSec helps you track deals, send quotations, sign agreements, and bill clients — all in one workflow.")}
-      ${para("Finish setting up your account and you'll get a <strong>7-day Pro trial</strong> — agreements, GST invoices and payment tracking, all unlocked. Here's your first move:")}
+      ${para("Finish setting up your account and you'll get a <strong>7-day Pro trial</strong> — agreements, invoices and payment tracking, all unlocked. Here's your first move:")}
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">
         <tr><td style="padding:6px 0;color:#334155;font-size:14px;">1️⃣ &nbsp;Create your first deal</td></tr>
         <tr><td style="padding:6px 0;color:#334155;font-size:14px;">2️⃣ &nbsp;Send a professional quotation</td></tr>
@@ -355,7 +360,9 @@ export function agreementSignedByClientEmail(args: {
         infoRow("Value", money(args.amountMinor, args.locale)),
       )}
       ${button("View agreement", `${appUrl()}/contracts/${args.contractId}`)}
-      ${para("This is electronic acceptance with an audit record — who signed, when, and which signature was used — not a Digital Signature Certificate. You can generate the invoice next.")}
+      ${para(`This is electronic acceptance with an audit record — who signed, when, and which signature was used — not ${
+        args.locale?.country === "IN" ? "a Digital Signature Certificate" : "a certificate-based digital signature"
+      }. You can generate the invoice next.`)}
     `,
   });
   return { subject, html };

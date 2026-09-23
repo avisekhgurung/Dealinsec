@@ -180,13 +180,21 @@ export function registerAgreementSignRoutes(app: Express) {
     try {
       if (!takeQuota(clientIp(req))) return res.status(429).json({ error: "Too many requests. Try again shortly." });
       const token = String(req.params.token || "");
+      // Same exact-length gate as the GET route — newToken() always produces
+      // this length, so anything else cannot be a real token and is rejected
+      // before it ever reaches the database.
+      if (token.length < 30 || token.length > 40) return res.status(404).json({ error: "This signing link is no longer available." });
       const contract = await storage.getContractByShareToken(token);
       if (!contract || contract.clientShareRevokedAt || !contract.clientSignShareSnapshot) {
         return res.status(404).json({ error: "This signing link is no longer available." });
       }
-      // Terminal check FIRST, before touching anything the model/client sent:
-      // whichever path signs first wins, and a second attempt (online after a
-      // manual proof upload, or a resubmit) is refused, never overwritten.
+      // Early check FIRST, before touching anything the model/client sent —
+      // fails fast for the common case (an already-signed link reloaded) and
+      // avoids validating a body that can't lead anywhere. This alone is
+      // NOT the concurrency guard: two requests can both pass it before
+      // either writes. The real guard is the atomic claim in
+      // claimContractSignatureOnce below, whose WHERE clause is what
+      // actually decides which of two simultaneous signers wins.
       if (contract.signedByBrand) {
         return res.status(409).json({ error: "This agreement has already been signed.", signedAt: contract.clientSignedAt });
       }
@@ -213,9 +221,8 @@ export function registerAgreementSignRoutes(app: Express) {
         clientSignatureDataUrl: req.body.signatureDataUrl,
         clientSignedAt: now,
       });
-      const updated = await storage.updateContract(contract.id, {
+      const updated = await storage.claimContractSignatureOnce(contract.id, {
         status: "Signed",
-        signedByBrand: true,
         signedDate: now.toISOString().slice(0, 10),
         clientSignedAt: now,
         clientSignerName: signerName,
@@ -224,7 +231,12 @@ export function registerAgreementSignRoutes(app: Express) {
         clientSignerIp: clientIp(req),
         documentHash,
       });
-      if (!updated) return res.status(500).json({ error: "Couldn't record the signature." });
+      if (!updated) {
+        // Someone else's request won the atomic claim between our read above
+        // and this write — the same outcome as the early check, just caught
+        // at the point that actually matters.
+        return res.status(409).json({ error: "This agreement has already been signed." });
+      }
 
       // Best-effort notification — never blocks the client's confirmation.
       const deal = await storage.getDeal(contract.dealId);

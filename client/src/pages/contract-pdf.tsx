@@ -39,7 +39,8 @@ import { DocLocalePending } from "@/components/document/locale-pending";
 import {
   detectPaymentConflicts, termsMentionPayment, validateDocData,
 } from "@/components/document/checks";
-import { buildAgreementClauses } from "@shared/agreementClauses";
+import { buildAgreementClauses, executionRecordDisclosure } from "@shared/agreementClauses";
+import { taxIdLabel } from "@shared/invoice-tax";
 
 function slugify(s: string): string {
   return (s || "").normalize("NFKD").replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
@@ -60,27 +61,6 @@ function issuedCountry(contract: object | undefined, fallback: string): string {
   return typeof raw === "string" && /^[A-Za-z]{2}$/.test(raw.trim()) ? raw.trim().toUpperCase() : fallback;
 }
 
-/** EU member states (ISO-3166 alpha-2), for the "VAT number" label. Same list
- *  as shared/invoice-tax.ts, so an agreement and an invoice from one freelancer
- *  name the same registration the same way. */
-const EU_COUNTRIES = "AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE".split(" ");
-
-/**
- * What a non-Indian freelancer's tax registration is called on the agreement.
- * It is the one number stored in the profile's `gstNumber` slot outside India
- * — the slot shared/invoice-tax.ts already prints a UK VAT number from — and it
- * is optional, because most freelancers outside India have no registration to
- * show. Kept in step with contract-confirmation.tsx and profile.tsx, which ask
- * for the same field under the same label.
- */
-const TAX_ID_LABELS: Readonly<Record<string, string>> = {
-  GB: "VAT number",
-  ...Object.fromEntries(EU_COUNTRIES.map((c) => [c, "VAT number"])),
-  US: "EIN / Tax ID",
-  AU: "ABN",
-  CA: "GST/HST number",
-};
-const taxIdLabel = (country: string): string => TAX_ID_LABELS[country] ?? "Tax registration number";
 
 /**
  * A country as English legal prose names it, for "the laws of …".
@@ -429,29 +409,10 @@ export default function ContractPdfPage() {
             <KV label="Effective from" strong>{docDate(c.startDate, loc)}</KV>
             <KV label="Status" strong>{c.status}{c.signedDate ? ` · ${docDate(c.signedDate, loc)}` : ""}</KV>
           </div>
-          {isIndia ? (
-            <p className="doc-small doc-muted-t">
-              This agreement was prepared and accepted electronically. The signature shown for Party A is the
-              image on file for the named signatory, captured when this document was created. This is an
-              electronic acceptance with an audit record — it is not a Digital Signature Certificate issued
-              under the Information Technology Act, 2000, and no certifying-authority verification is claimed.
-              Parties may additionally execute a physically signed counterpart. Stamp duty and registration,
-              where applicable, are the responsibility of the parties — DealInSec does not pay, issue or
-              verify them.
-            </p>
-          ) : (
-            // The same disclosure without India's IT Act: it says what this
-            // acceptance is not, in terms that hold in any country.
-            <p className="doc-small doc-muted-t">
-              This agreement was prepared and accepted electronically. The signature shown for Party A is the
-              image on file for the named signatory, captured when this document was created. This is an
-              electronic acceptance with an audit record — it is not a certificate-based digital signature,
-              and no certifying-authority verification is claimed.
-              Parties may additionally execute a physically signed counterpart. Stamp duty and registration,
-              where applicable, are the responsibility of the parties — DealInSec does not pay, issue or
-              verify them.
-            </p>
-          )}
+          <p className="doc-small doc-muted-t">
+            This agreement was prepared and accepted electronically. The signature shown for Party A is the
+            image on file for the named signatory, captured when this document was created. {executionRecordDisclosure(country)}
+          </p>
         </div>
       ),
     });

@@ -14,6 +14,7 @@ import { trackEvent } from "@/lib/analytics";
 import { SignatureInput } from "@/components/signature-input";
 import { PublicDocFooter } from "@/components/public-doc-footer";
 import { PublicAgreementDoc, type PublicAgreementSnapshot } from "@/components/document/public-agreement-doc";
+import { notADscPhrase } from "@shared/agreementClauses";
 
 /** Everything the compact summary cards read, plus everything
  *  PublicAgreementDoc needs to render the full official document — one
@@ -200,7 +201,7 @@ export default function PublicSignPage() {
                   </dl>
 
                   <p className="text-xs text-neutral-500">
-                    Electronic acceptance with an audit record — this is not a Digital Signature Certificate or Aadhaar eSign.
+                    Electronic acceptance with an audit record — this is not {notADscPhrase(s.country)}.
                   </p>
 
                   <button
@@ -237,7 +238,7 @@ export default function PublicSignPage() {
                   <SignatureInput signerName={signerName} onChange={setSignatureDataUrl} />
                   <label className="flex items-start gap-2 text-xs text-neutral-600 dark:text-neutral-400">
                     <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5" data-testid="checkbox-agree" />
-                    I agree to use electronic records and electronic signatures for this agreement. I understand that my electronic signature indicates my intent to sign this agreement. This is electronic acceptance with an audit record, not a Digital Signature Certificate or Aadhaar eSign.
+                    I agree to use electronic records and electronic signatures for this agreement. I understand that my electronic signature indicates my intent to sign this agreement. This is electronic acceptance with an audit record, not {notADscPhrase(s.country)}.
                   </label>
                   <p className="text-[11px] text-neutral-500">
                     By selecting Sign Agreement, you confirm that you have reviewed this agreement and intend to sign it electronically.

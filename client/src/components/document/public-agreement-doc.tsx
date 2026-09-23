@@ -12,7 +12,7 @@
 import { useMemo } from "react";
 import { DEFAULT_LOCALE_SETTINGS, type LocaleSettings } from "@shared/schema";
 import { getAgreementCopy, getDeliverableLabels } from "@shared/dealTypeTaxonomy";
-import { buildAgreementClauses } from "@shared/agreementClauses";
+import { buildAgreementClauses, executionRecordDisclosure } from "@shared/agreementClauses";
 import { PagedDocument, type DocBlock } from "./paged";
 import {
   DocHeader, docFooter, SectionTitle, TwoParties, Party, KV, tableBlocks,
@@ -231,11 +231,7 @@ export function PublicAgreementDoc({
           <p className="doc-small doc-muted-t" style={{ marginTop: "2.5mm" }}>
             This agreement was accepted electronically. Party B&apos;s signature above is the image or
             typed mark captured at the moment of signing, with an audit record of who signed, when and
-            from where. This is electronic acceptance with an audit record — it is not a Digital
-            Signature Certificate issued under the Information Technology Act, 2000, and no
-            certifying-authority verification is claimed. Parties may also execute a signed paper
-            counterpart. Stamp duty and registration, where applicable, are the responsibility of the
-            parties — DealInSec does not pay, issue or verify them.
+            from where. {executionRecordDisclosure(s.country)}
           </p>
         </div>
       ),

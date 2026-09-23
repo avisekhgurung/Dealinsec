@@ -18,25 +18,9 @@ import { STANDARD_TERMS, hasActivePro, hasProAccess, hasActiveTrial } from "@sha
 import type { Deal, Contract } from "@shared/schema";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { parseApiError, isUpgradeError, currencyChangedToast } from "@/lib/api-error";
+import { taxIdLabel } from "@shared/invoice-tax";
 
 type Phase = "reserving" | "creating" | "done";
-
-/** EU member states (ISO-3166 alpha-2), for the "VAT number" label. */
-const EU_COUNTRIES = "AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE".split(" ");
-
-/**
- * What the tax registration is called outside India. The agreement prints the
- * number under this same label, so the table is kept in step with
- * contract-pdf.tsx (and profile.tsx, which edits the same field).
- */
-const TAX_ID_LABELS: Readonly<Record<string, string>> = {
-  GB: "VAT number",
-  ...Object.fromEntries(EU_COUNTRIES.map((c) => [c, "VAT number"])),
-  US: "EIN / Tax ID",
-  AU: "ABN",
-  CA: "GST/HST number",
-};
-const taxIdLabel = (country: string): string => TAX_ID_LABELS[country] ?? "Tax registration number";
 
 export default function ContractConfirmationPage() {
   const params = useParams<{ id: string }>();

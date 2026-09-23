@@ -40,6 +40,7 @@ import type { Contract, Deal, BrandInvoice, Quote } from "@shared/schema";
 import { WorkflowStepper } from "@/components/workflow-stepper";
 import { AgreementSignPanel } from "@/components/agreement-sign-panel";
 import { recordNo } from "@shared/schema";
+import { executionRecordDisclosure } from "@shared/agreementClauses";
 
 export default function ContractDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -490,10 +491,7 @@ export default function ContractDetailsPage() {
                 </div>
               </dl>
               <p className="text-[11px] leading-relaxed text-muted-foreground">
-                Accepted electronically with an audit record. This is not a Digital Signature
-                Certificate issued under the Information Technology Act, 2000, and no
-                certifying-authority verification is claimed. Parties may also execute a signed
-                paper counterpart.
+                {executionRecordDisclosure(fmt.settings.country)}
               </p>
             </div>
           </CardContent>

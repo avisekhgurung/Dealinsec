@@ -57,7 +57,7 @@ export default function PitchPage() {
           <section className="text-center py-8 print:py-4">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-4">
               <Zap className="w-4 h-4" />
-              <span className="text-sm font-medium">For India's freelancers</span>
+              <span className="text-sm font-medium">For freelancers worldwide</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4 print:text-3xl">
               DealInSec
@@ -731,11 +731,11 @@ export default function PitchPage() {
                       </div>
                       <div className="flex items-center gap-2 p-2 border rounded-lg">
                         <Phone className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">+91 98765 43210</span>
+                        <span className="text-sm">+1 555 0182</span>
                       </div>
                       <div className="flex items-center gap-2 p-2 border rounded-lg">
                         <MapPin className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Mumbai, India</span>
+                        <span className="text-sm">Remote</span>
                       </div>
                     </div>
                     <Button size="sm" variant="outline" className="w-full text-xs" data-testid="button-mockup-edit-profile">
@@ -856,7 +856,7 @@ export default function PitchPage() {
           </section>
 
           <footer className="text-center py-6 text-sm text-muted-foreground border-t print:py-2">
-            <p>DealInSec - deal management for India's freelancers</p>
+            <p>DealInSec - deal management for freelancers worldwide</p>
             <p className="mt-1">Quote it. Sign it. Invoice it. Get paid.</p>
           </footer>
 

@@ -117,6 +117,28 @@ const PROFILES: Readonly<Record<string, InvoiceTaxProfile>> = {
   US: { ...GENERIC, registrations: [], taxLabelHint: "Sales tax" },
 };
 
+/**
+ * What to CALL the tax-ID field on the profile form and on an issued
+ * agreement — a UI label, independent of InvoiceTaxProfile.registrations
+ * above (which governs what actually prints on an INVOICE face, and
+ * deliberately omits some identifiers per country, e.g. a US TIN belongs on
+ * a W-9, never the invoice). Used to be three byte-identical copies of this
+ * table (profile.tsx, contract-confirmation.tsx, contract-pdf.tsx) that could
+ * silently drift — an Australian's agreement said "ABN" while their invoice
+ * said something else. One table now; both surfaces read it.
+ */
+const TAX_ID_LABELS: Readonly<Record<string, string>> = {
+  GB: "VAT number",
+  ...Object.fromEntries(EU.map((c) => [c, "VAT number"])),
+  US: "EIN / Tax ID",
+  AU: "ABN",
+  CA: "GST/HST number",
+};
+
+export function taxIdLabel(country: string): string {
+  return TAX_ID_LABELS[getLocaleSettings({ country }).country] ?? "Tax registration number";
+}
+
 /** How an invoice issued from `country` presents tax. Unknown → generic. */
 export function invoiceTaxProfile(country?: string | null): InvoiceTaxProfile {
   return PROFILES[getLocaleSettings({ country }).country] ?? GENERIC;
@@ -155,6 +177,12 @@ const BANK_ROUTING_LABELS: Readonly<Record<string, string>> = {
   AU: "BSB",
   CA: "Transit / institution number",
   ...Object.fromEntries(EU.map((c) => [c, "IBAN / BIC"])),
+  // UAE banks route by IBAN, domestically and internationally — the generic
+  // "Bank code" fallback undersold what freelancers there actually need to
+  // give a client. Japan is left on that generic fallback deliberately: "bank
+  // code" (plus a branch code, which this one field can't split out without a
+  // new column) is already the correct Japanese term, not a placeholder.
+  AE: "IBAN",
 };
 
 export function bankRoutingLabel(country?: string | null): string {

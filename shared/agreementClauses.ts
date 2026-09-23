@@ -82,6 +82,40 @@ export const LEGAL_COUNTRY_NAMES: Readonly<Record<string, string>> = {
 
 export const legalCountryName = (code: string): string => LEGAL_COUNTRY_NAMES[code] ?? countryName(code);
 
+/**
+ * The "not a certificate-based signature" fragment shared by every place
+ * that says it — the public sign page's checkbox and confirmation line, the
+ * agreement's own execution record, and the owner-facing signing-status
+ * card. One source so a non-India signer is never asked to consent to text
+ * naming an Indian identity scheme (Aadhaar) or an Indian statute (IT Act,
+ * 2000) — that used to be hardcoded in three separate files and reached
+ * every country unconditionally.
+ */
+export const notADscPhrase = (country: string): string =>
+  country === "IN"
+    ? "a Digital Signature Certificate or Aadhaar eSign"
+    : "a certificate-based digital signature";
+
+/**
+ * The execution-record disclosure paragraph — what an "electronic
+ * acceptance with an audit record" is and is not, plus (India only) the
+ * stamp-duty disclaimer. Shared between the freelancer's own agreement PDF
+ * (contract-pdf.tsx) and the client's public copy (public-agreement-doc.tsx)
+ * so the two can't say different things to different readers of the same
+ * signed document. Non-India gets no stamp-duty sentence: that is an Indian
+ * instrument, not a universal one, and asserting it elsewhere was a bug.
+ */
+export function executionRecordDisclosure(country: string): string {
+  const isIndia = country === "IN";
+  const notCert = isIndia
+    ? "it is not a Digital Signature Certificate issued under the Information Technology Act, 2000, and no certifying-authority verification is claimed"
+    : "it is not a certificate-based digital signature, and no certifying-authority verification is claimed";
+  const stampDuty = isIndia
+    ? " Stamp duty and registration, where applicable, are the responsibility of the parties — DealInSec does not pay, issue or verify them."
+    : "";
+  return `This is an electronic acceptance with an audit record — ${notCert}. Parties may additionally execute a physically signed counterpart.${stampDuty}`;
+}
+
 export interface AgreementClause {
   n: number;
   title: string;

@@ -35,8 +35,6 @@ const ContractsPage           = lazy(() => import("@/pages/contracts"));
 const ContractDetailsPage     = lazy(() => import("@/pages/contract-details"));
 const ContractPdfPage         = lazy(() => import("@/pages/contract-pdf"));
 const BillingPage             = lazy(() => import("@/pages/billing"));
-const InvoiceDetailsPage      = lazy(() => import("@/pages/invoice-details"));
-const PaymentSuccessPage      = lazy(() => import("@/pages/payment-success"));
 const BrandInvoiceDetailsPage = lazy(() => import("@/pages/brand-invoice-details"));
 const BrandInvoiceNewPage     = lazy(() => import("@/pages/brand-invoice-new"));
 const ProfilePage             = lazy(() => import("@/pages/profile"));
@@ -208,8 +206,6 @@ function Router() {
             <Route path="/contracts" component={ContractsPage} />
             <Route path="/contracts/:id/export" component={ContractPdfPage} />
             <Route path="/contracts/:id" component={ContractDetailsPage} />
-            <Route path="/invoices/success" component={PaymentSuccessPage} />
-            <Route path="/invoices/:id" component={InvoiceDetailsPage} />
             <Route path="/invoices" component={BillingPage} />
             <Route path="/brand-invoices/new" component={BrandInvoiceNewPage} />
             <Route path="/brand-invoices/:id" component={BrandInvoiceDetailsPage} />

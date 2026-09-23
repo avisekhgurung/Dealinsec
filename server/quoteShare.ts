@@ -161,6 +161,10 @@ export function registerQuoteShareRoutes(app: Express) {
     try {
       if (!takeQuota(clientIp(req))) return res.status(429).json({ error: "Too many requests. Try again shortly." });
       const token = String(req.params.token || "");
+      // Same exact-length gate as the GET route — newToken() always produces
+      // this length, so anything else cannot be a real token and is rejected
+      // before it ever reaches the database.
+      if (token.length < 30 || token.length > 40) return res.status(404).json({ error: "This quotation link is no longer available." });
       const quote = await storage.getQuoteByShareToken(token);
       if (!quote || quote.shareRevokedAt || !quote.shareSnapshot) {
         return res.status(404).json({ error: "This quotation link is no longer available." });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAgreementClauses, legalCountryName } from "./agreementClauses";
+import { buildAgreementClauses, executionRecordDisclosure, legalCountryName, notADscPhrase } from "./agreementClauses";
 
 const base = {
   dealType: "Development",
@@ -54,5 +54,39 @@ describe("buildAgreementClauses", () => {
     expect(legalCountryName("GB")).toBe("England and Wales");
     expect(legalCountryName("US")).toBe("the United States");
     expect(legalCountryName("FR")).toBe("France");
+  });
+});
+
+describe("notADscPhrase — the public signing page's consent wording", () => {
+  it("names Aadhaar and the IT Act only for India", () => {
+    expect(notADscPhrase("IN")).toContain("Aadhaar");
+  });
+
+  it("never mentions Aadhaar or any India-specific term for a non-India signer", () => {
+    for (const country of ["US", "GB", "DE", "AE", "SG", "JP", "FR", "CA", "AU"]) {
+      const phrase = notADscPhrase(country);
+      expect(phrase).not.toMatch(/aadhaar|information technology act|it act|india/i);
+    }
+  });
+});
+
+describe("executionRecordDisclosure — the agreement's own signing disclosure", () => {
+  it("cites the IT Act and stamp duty for India", () => {
+    const text = executionRecordDisclosure("IN");
+    expect(text).toContain("Information Technology Act, 2000");
+    expect(text).toContain("Stamp duty");
+  });
+
+  it("mentions neither the IT Act nor stamp duty for any non-India country", () => {
+    for (const country of ["US", "GB", "DE", "AE", "SG", "JP", "FR", "CA", "AU"]) {
+      const text = executionRecordDisclosure(country);
+      expect(text).not.toMatch(/information technology act|stamp duty|aadhaar|gstin?|pan\b/i);
+    }
+  });
+
+  it("still says what the acceptance is not, for every country", () => {
+    for (const country of ["IN", "US", "DE"]) {
+      expect(executionRecordDisclosure(country)).toMatch(/electronic acceptance with an audit record/i);
+    }
   });
 });

@@ -214,6 +214,19 @@ const COUNTRIES_BY_CURRENCY: Partial<Record<CurrencyCode, string>> = {
 export const FALLBACK_CURRENCY: CurrencyCode = "USD";
 
 /**
+ * Where guessCountry() has NO real signal at all (see its own comment — a
+ * privacy browser reporting UTC + en-US is the common case), the guess used
+ * to fall through to DEFAULT_LOCALE_SETTINGS.country, which is India. That
+ * meant a detection failure for a German or American visitor silently
+ * pre-filled the onboarding picker with India / INR — a plausible-looking
+ * wrong answer nobody had reason to double-check. There is no country this
+ * fallback can be "right" for; it exists only so the picker has something to
+ * show. It matches FALLBACK_CURRENCY's own reasoning: neutral, not India,
+ * always visible and always changeable before anything is stored.
+ */
+const UNKNOWN_REGION_FALLBACK = "US";
+
+/**
  * Countries CLDR has an English locale for ("en-IN", "en-GB", "en-DE").
  *
  * Every document and every screen is written in English, so the locale is an
@@ -339,7 +352,7 @@ export function guessCountry(hints: {
     const cc = countryOfLanguageTag(tag);
     if (cc && !UNINFORMATIVE_LANGUAGE_COUNTRIES.has(cc)) return cc;
   }
-  return DEFAULT_LOCALE_SETTINGS.country;
+  return UNKNOWN_REGION_FALLBACK;
 }
 
 /** The currency a country defaults to, and whether it is that country's own. */

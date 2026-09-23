@@ -42,6 +42,7 @@ export interface IStorage {
   getContractByShareToken(token: string): Promise<Contract | undefined>;
   createContract(contract: InsertContract): Promise<Contract>;
   updateContract(id: number, updates: Partial<Contract>): Promise<Contract | undefined>;
+  claimContractSignatureOnce(id: number, updates: Partial<Contract>): Promise<Contract | undefined>;
   getContractsForBrand(brandUserId: string): Promise<Contract[]>;
 
   getInvoices(userId: string): Promise<Invoice[]>;
@@ -217,6 +218,19 @@ export class DatabaseStorage implements IStorage {
 
   async updateContract(id: number, updates: Partial<Contract>): Promise<Contract | undefined> {
     const [updated] = await db.update(contracts).set(updates).where(eq(contracts.id, id)).returning();
+    return updated;
+  }
+
+  async claimContractSignatureOnce(id: number, updates: Partial<Contract>): Promise<Contract | undefined> {
+    // Atomic claim, same pattern as completePayuOrderOnce: the "not already
+    // signed" guard lives in the WHERE clause, not in a read-then-write in
+    // the route. Of two concurrent sign requests for the same contract,
+    // exactly one row is returned; the loser gets undefined and the route
+    // reports 409, never a stomped or duplicated signature.
+    const [updated] = await db.update(contracts)
+      .set({ ...updates, signedByBrand: true })
+      .where(sql`${contracts.id} = ${id} AND ${contracts.signedByBrand} = false`)
+      .returning();
     return updated;
   }
 

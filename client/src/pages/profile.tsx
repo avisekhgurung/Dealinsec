@@ -13,7 +13,7 @@ import { useLocale, useMoney } from "@/hooks/use-locale";
 import { useLocation, Link } from "wouter";
 import { BottomNav } from "@/components/bottom-nav";
 import { hasActivePro, hasActiveTrial, hasLapsedTrial, getTrialDaysLeft } from "@shared/schema";
-import { bankRoutingLabel } from "@shared/invoice-tax";
+import { bankRoutingLabel, taxIdLabel } from "@shared/invoice-tax";
 
 // ─── Country-specific field labels ───────────────────────────────────────────
 // India keeps PAN, GSTIN and IFSC exactly as before. Elsewhere a PAN has no
@@ -22,19 +22,6 @@ import { bankRoutingLabel } from "@shared/invoice-tax";
 // its bank routing code, under the names that country uses. Data, not a
 // branch: a country is a row, and an unlisted one gets the generic names.
 
-/** EU member states (ISO-3166 alpha-2). */
-const EU_COUNTRIES = "AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE".split(" ");
-
-/** Kept in step with contract-confirmation.tsx and contract-pdf.tsx: the
- *  agreement prints this number under exactly this label. */
-const TAX_ID_LABELS: Readonly<Record<string, string>> = {
-  GB: "VAT number",
-  ...Object.fromEntries(EU_COUNTRIES.map((c) => [c, "VAT number"])),
-  US: "EIN / Tax ID",
-  AU: "ABN",
-  CA: "GST/HST number",
-};
-const taxIdLabel = (country: string): string => TAX_ID_LABELS[country] ?? "Tax registration number";
 
 /** Shared with the invoice, which prints this field under the same label. */
 const routingLabel = bankRoutingLabel;
@@ -738,6 +725,11 @@ export default function ProfilePage() {
                     onChange={(e) => setIfscCode(e.target.value.toUpperCase())}
                     data-testid="input-ifsc"
                   />
+                  {/* One stored field covers both — this only clarifies how to
+                      use it, never adds a second field or a banking engine. */}
+                  {routingLabel(docCountry) === "IBAN / BIC" && (
+                    <p className="text-xs text-muted-foreground">Enter your IBAN — add BIC/SWIFT after it if your bank needs both.</p>
+                  )}
                 </div>
                 )}
                 <div className="space-y-2">

@@ -18,7 +18,6 @@ import { getSeatLimit, INVITABLE_ROLES, hasPermission as hasOrgPermission, orgRo
 import { aiEnabled, reserve, refund, extractInvoice, extractDealDraft } from "./ai";
 import { analyzeDealProtections, flagPriority, protectionPasses } from "./copilot/riskcheck";
 import { amountAppearsIn } from "./copilot/proposals";
-import { getUncachableStripeClient, getStripePublishableKey } from "./stripeClient";
 import multer from "multer";
 import { z } from "zod";
 import path from "path";
@@ -1115,110 +1114,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(invoice);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch invoice" });
-    }
-  });
-
-  app.post("/api/invoices/:id/pay", isAuthenticated, async (req: any, res) => {
-    try {
-      const invoice = await storage.getInvoice(parseInt(req.params.id));
-      if (!invoice) {
-        return res.status(404).json({ error: "Invoice not found" });
-      }
-      if (!inOrg(invoice, req.user)) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      if (invoice.status === "Paid") {
-        return res.status(400).json({ error: "Invoice already paid" });
-      }
-
-      const stripe = await getUncachableStripeClient();
-      const baseUrl = process.env.APP_URL || `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
-
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        line_items: [
-          {
-            price_data: {
-              currency: 'inr',
-              product_data: {
-                name: `DealInSec Platform Fee - ${invoice.invoiceNumber}`,
-                description: `Contract creation and platform service fee for ${invoice.brandName} deal`,
-              },
-              unit_amount: invoice.totalAmount * 100,
-            },
-            quantity: 1,
-          },
-        ],
-        mode: 'payment',
-        success_url: `${baseUrl}/billing/success?invoice_id=${invoice.id}&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${baseUrl}/billing/invoice/${invoice.id}`,
-        metadata: {
-          invoiceId: invoice.id.toString(),
-          contractId: invoice.contractId.toString(),
-          userId: invoice.userId,
-        },
-      });
-
-      res.json({ url: session.url });
-    } catch (error) {
-      console.error("Stripe checkout error:", error);
-      res.status(500).json({ error: "Failed to create payment session" });
-    }
-  });
-
-  app.post("/api/invoices/:id/confirm-payment", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.id;
-      const invoice = await storage.getInvoice(parseInt(req.params.id));
-      if (!invoice) {
-        return res.status(404).json({ error: "Invoice not found" });
-      }
-      if (invoice.userId !== userId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      if (invoice.status === "Paid") {
-        return res.json(invoice);
-      }
-
-      const { session_id } = req.body;
-      if (!session_id) {
-        return res.status(400).json({ error: "Session ID required" });
-      }
-
-      const stripe = await getUncachableStripeClient();
-      const session = await stripe.checkout.sessions.retrieve(session_id);
-
-      if (session.payment_status !== 'paid') {
-        return res.status(400).json({ error: "Payment not completed" });
-      }
-
-      if (session.metadata?.invoiceId !== invoice.id.toString()) {
-        return res.status(400).json({ error: "Session does not match invoice" });
-      }
-
-      if (session.metadata?.userId !== userId) {
-        return res.status(403).json({ error: "Session does not belong to you" });
-      }
-
-      const expectedAmount = invoice.totalAmount * 100;
-      if (session.amount_total !== expectedAmount) {
-        return res.status(400).json({ error: "Amount mismatch" });
-      }
-
-      const updatedInvoice = await storage.updateInvoice(parseInt(req.params.id), {
-        status: "Paid",
-      });
-
-      await storage.updateContract(invoice.contractId, {
-        status: "Active",
-      });
-
-      res.json(updatedInvoice);
-    } catch (error) {
-      console.error("Payment confirmation error:", error);
-      res.status(500).json({ error: "Failed to confirm payment" });
     }
   });
 
@@ -2500,6 +2395,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? roleLabel
           : orgRole.charAt(0) + orgRole.slice(1).toLowerCase(),
         token,
+        country: req.org.country,
       });
       void sendEmail({ to: email, subject, html });
 
@@ -2524,6 +2420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         inviterName,
         roleLabel: inv.orgRole.charAt(0) + inv.orgRole.slice(1).toLowerCase(),
         token: inv.token,
+        country: req.org.country,
       });
       void sendEmail({ to: inv.email, subject, html });
       res.json({ success: true });

@@ -6,9 +6,6 @@ import { serveStatic } from "./static";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { createServer } from "http";
-import { runMigrations } from 'stripe-replit-sync';
-import { getStripeSync } from './stripeClient';
-import { WebhookHandlers } from './webhookHandlers';
 import { setupGoogleAuth } from './googleAuth';
 import { getSession } from './auth';
 import { storage } from './storage';
@@ -37,51 +34,6 @@ export function log(message: string, source = "express") {
   });
 
   console.log(`${formattedTime} [${source}] ${message}`);
-}
-
-async function initStripe() {
-  const databaseUrl = process.env.DATABASE_URL;
-
-  if (!databaseUrl) {
-    console.log('DATABASE_URL not found, skipping Stripe initialization');
-    return;
-  }
-
-  // Skip Stripe in local development (requires Replit-specific tokens)
-  if (!process.env.REPL_IDENTITY && !process.env.WEB_REPL_RENEWAL) {
-    console.log('Replit tokens not found, skipping Stripe initialization (local dev mode)');
-    return;
-  }
-
-  try {
-    console.log('Initializing Stripe schema...');
-    await runMigrations({ databaseUrl });
-    console.log('Stripe schema ready');
-
-    const stripeSync = await getStripeSync();
-
-    console.log('Setting up managed webhook...');
-    const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
-    const { webhook, uuid } = await stripeSync.findOrCreateManagedWebhook(
-      `${webhookBaseUrl}/api/stripe/webhook`,
-      {
-        enabled_events: ['*'],
-        description: 'Managed webhook for DealInSec Stripe sync',
-      }
-    );
-    console.log(`Webhook configured: ${webhook.url} (UUID: ${uuid})`);
-
-    console.log('Syncing Stripe data...');
-    stripeSync.syncBackfill()
-      .then(() => {
-        console.log('Stripe data synced');
-      })
-      .catch((err: any) => {
-        console.error('Error syncing Stripe data:', err);
-      });
-  } catch (error) {
-    console.error('Failed to initialize Stripe:', error);
-  }
 }
 
 // Canonical host + scheme. Google indexed three variants of this site
@@ -113,8 +65,6 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
 }
 
 (async () => {
-  await initStripe();
-
   app.use(canonicalRedirect);
 
   // Liveness probe. Deliberately dependency-free (no DB, session or auth) and
@@ -146,35 +96,6 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
       .type("application/xml")
       .send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`);
   });
-
-  app.post(
-    '/api/stripe/webhook/:uuid',
-    express.raw({ type: 'application/json' }),
-    async (req, res) => {
-      const signature = req.headers['stripe-signature'];
-
-      if (!signature) {
-        return res.status(400).json({ error: 'Missing stripe-signature' });
-      }
-
-      try {
-        const sig = Array.isArray(signature) ? signature[0] : signature;
-
-        if (!Buffer.isBuffer(req.body)) {
-          console.error('STRIPE WEBHOOK ERROR: req.body is not a Buffer');
-          return res.status(500).json({ error: 'Webhook processing error' });
-        }
-
-        const { uuid } = req.params;
-        await WebhookHandlers.processWebhook(req.body as Buffer, sig, uuid);
-
-        res.status(200).json({ received: true });
-      } catch (error: any) {
-        console.error('Webhook error:', error.message);
-        res.status(400).json({ error: 'Webhook processing error' });
-      }
-    }
-  );
 
   app.use(
     express.json({
