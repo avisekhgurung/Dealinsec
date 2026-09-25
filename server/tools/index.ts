@@ -18,6 +18,7 @@ import { gstCalculatorPage, gstCalculatorMeta } from "./gst-calculator";
 import { proformaInvoicePage, proformaInvoiceMeta } from "./proforma-invoice";
 import { purchaseOrderPage, purchaseOrderMeta } from "./purchase-order";
 import { ukLatePaymentPage, ukLatePaymentMeta } from "./uk-late-payment";
+import { paymentReminderPage, paymentReminderMeta } from "./payment-reminder-email";
 import { registerProgrammaticPages, programmaticSitemapPaths } from "./programmatic";
 
 // html-to-image UMD bundle (for PNG export), read once and served self-hosted
@@ -46,6 +47,7 @@ interface ToolDef {
 export const TOOLS: ToolDef[] = [
   { ...quotationMakerMeta, render: quotationMakerPage },
   { ...billGeneratorMeta, render: billGeneratorPage },
+  { ...paymentReminderMeta, render: paymentReminderPage },
   { ...serviceAgreementMeta, render: serviceAgreementPage },
   { ...proformaInvoiceMeta, render: proformaInvoicePage },
   { ...purchaseOrderMeta, render: purchaseOrderPage },
@@ -67,6 +69,7 @@ export function toolSitemapPaths(): string[] {
 
 // Distinct line icons per tool (lucide-style), rendered inside the card badge.
 const ICONS: Record<string, string> = {
+  "payment-reminder-email-generator": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>`,
   "uk-late-payment-calculator": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M5 3 2.5 5.5M19 3l2.5 2.5"/></svg>`,
   "gst-invoice-generator": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg>`,
   "bill-generator": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8"/><path d="M8 11h8"/><path d="M8 15h5"/></svg>`,
@@ -80,9 +83,9 @@ const ICONS: Record<string, string> = {
 
 const INDEX_FAQ: { q: string; a: string }[] = [
   { q: "Are these tools really free?", a: "Yes — every tool is free to use with no sign-up. You can create and download unlimited invoices, quotations and agreements as PDFs." },
-  { q: "Do the tools work outside India?", a: "Yes. The quotation maker, invoice and bill generator, service agreement, proforma invoice and purchase order work in any country: pick your country and currency, and the document follows it — the currency, the date format, the name of your tax (GST, VAT or sales tax) and the tax number your clients expect. A few tools are built on one country's rules and say so: the GST invoice generator and GST calculator for India, and the late-payment calculator for the UK." },
+  { q: "Do the tools work outside India?", a: "Yes. The quotation maker, invoice and bill generator, payment reminder email generator, service agreement, proforma invoice and purchase order work in any country: pick your country and currency, and the document follows it — the currency, the date format, the name of your tax (GST, VAT or sales tax) and the tax number your clients expect. A few tools are built on one country's rules and say so: the GST invoice generator and GST calculator for India, and the late-payment calculator for the UK." },
   { q: "Is my data safe?", a: "Everything runs in your browser. What you type is saved only on your own device and is never sent to or stored on our servers." },
-  { q: "What do I get if I create an account?", a: "Every client project lives on one thread — quotation, agreement, invoice and payment tracking — instead of scattered across WhatsApp, email and your downloads folder. The free plan covers 4 deals a month, each with its quotation, and every new account starts with a 7-day Pro trial (no card) that unlocks e-signed agreements, invoices and payment tracking. In India, Pro is ₹99 a month or ₹999 a year. Outside India the free plan and the trial are open today, and paid plans are opening soon at $99, £79 or €89 a year." },
+  { q: "What do I get if I create an account?", a: "Every client project lives on one thread — quotation, agreement, invoice and payment tracking — instead of scattered across WhatsApp, email and your downloads folder. The free plan covers 4 deals a month, each with its quotation, and every new account starts with a 7-day Pro trial (no card) that unlocks e-signed agreements, invoices and payment tracking. In India, Pro is ₹99 a month or ₹999 a year. Outside India the free plan and the trial are open today; paid plans can't be bought from other countries yet." },
 ];
 
 function toolCard(t: ToolDef): string {
@@ -140,7 +143,7 @@ function toolsIndexPage(): string {
   return renderToolPage({
     title: "Free Invoice, Quotation & Agreement Tools for Freelancers | DealInSec",
     description:
-      "Free, no-sign-up tools for freelancers in any country — quotation maker, invoice generator, service agreement, proforma invoice and purchase order in your own currency, plus GST tools for India and a UK late-payment calculator.",
+      "Free, no-sign-up tools for freelancers in any country — quotation maker, invoice generator, payment reminder email generator, service agreement, proforma invoice and purchase order in your own currency, plus GST tools for India and a UK late-payment calculator.",
     canonicalPath: "/tools",
     bodyHtml: body,
     jsonLd: [

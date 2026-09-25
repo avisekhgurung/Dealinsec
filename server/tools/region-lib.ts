@@ -132,7 +132,10 @@ export const REGION_JS = `
       // "en-US" is the default of privacy browsers and of laptops sold in India; it proves nothing.
       if(cc && cc!=='US' && RG_DATA[cc]) return cc;
     }
-    return 'IN';
+    // No real signal (a privacy browser: UTC + en-US). Not India: that silently
+    // gave a German or American visitor rupee amounts. Same neutral default as
+    // shared/region.ts guessCountry(); the picker is visible and editable.
+    return 'US';
   }
   function initRegion(onChange){
     var sel=$('country'), cur=$('currency');

@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { VitePWA } from "vite-plugin-pwa";
+import { SSR_PATH_PATTERN, swNavigationMatcher } from "./shared/ssr-paths";
 
 export default defineConfig({
   plugins: [
@@ -18,7 +19,7 @@ export default defineConfig({
         name: "DealInSec — Deal Management OS",
         short_name: "DealInSec",
         description:
-          "Track, sign, and bill every client or brand deal — in one workflow. Built for India.",
+          "Track, sign, and bill every client deal — quotation, agreement, invoice and payment tracking in one workflow. Built for freelancers worldwide.",
         theme_color: "#FFFFFF",
         background_color: "#0F172A",
         display: "standalone",
@@ -44,10 +45,9 @@ export default defineConfig({
         // serves the SPA shell and /tools etc. render the landing page.
         navigateFallbackDenylist: [
           /^\/api\//,
-          /^\/tools(\/|$)/,
-          /^\/blog(\/|$)/,
-          /^\/(quotation-software|contract-management|proposal-management|invoice-management|e-signature|interior-design-software|freelancer-invoice-software|refrens-alternative|vyapar-alternative)(\/|$)/,
-          /^\/templates\//,
+          // Every top-level path Express renders itself — one list, shared
+          // with the server and its tests (shared/ssr-paths.ts).
+          SSR_PATH_PATTERN,
           /^\/sitemap\.xml$/,
           /^\/robots\.txt$/,
         ],
@@ -56,11 +56,9 @@ export default defineConfig({
             // App shell — network first so users get fresh deploys. Exclude the
             // server-rendered pages (/tools, /blog, category pages) so the SW
             // never caches/handles them.
-            urlPattern: ({ request, url }) =>
-              request.mode === "navigate" &&
-              !/^\/(tools|blog|quotation-software|contract-management|proposal-management|invoice-management|e-signature|interior-design-software|freelancer-invoice-software|refrens-alternative|vyapar-alternative)(\/|$)/.test(
-                url.pathname,
-              ),
+            // Self-contained on purpose: this function is serialised into sw.js,
+            // so it must not reference anything imported here.
+            urlPattern: swNavigationMatcher,
             handler: "NetworkFirst",
             options: { cacheName: "pages", networkTimeoutSeconds: 3 },
           },

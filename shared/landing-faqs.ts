@@ -28,7 +28,7 @@ export const LANDING_FAQS: LandingFaq[] = [
   },
   {
     q: "Can clients sign agreements online?",
-    a: "Not through a signing link yet. You create the agreement with your saved signature applied, download the PDF and send it. Your client signs it however they prefer, and you upload the signed copy as proof, which marks the agreement Signed with the date. It is a record of what was agreed, not a Digital Signature Certificate or a certified e-signature, and DealInSec is not a law firm, so have a lawyer review anything high-value or unusual.",
+    a: "Yes. Send your client a signing link: they open it without an account, review the agreement and sign online by drawing or typing a signature. The agreement then records who signed, when and with which signature. You can still download the PDF and upload a signed copy as proof if your client prefers to sign on paper. It is electronic acceptance with an audit record, not a Digital Signature Certificate or a certified e-signature, and DealInSec is not a law firm, so have a lawyer review anything high-value or unusual.",
   },
   {
     q: "Can I create invoices?",
@@ -44,7 +44,7 @@ export const LANDING_FAQS: LandingFaq[] = [
   },
   {
     q: "Is there a free plan?",
-    a: "Yes. The free plan is permanent and covers 4 deals a month, each with a professional quotation. Every new account also starts with a 7-day Pro trial with everything unlocked and no card needed. Signed agreements, invoices and payment tracking are part of Pro. In India, Pro is ₹99 a month or ₹999 a year. Outside India, paid checkout is opening soon at $99, £79 or €89 a year, annual only; the free plan and the trial are open everywhere in the meantime. There are no platform fees on your deal value.",
+    a: "Yes. The free plan is permanent and covers 4 deals a month, each with a professional quotation. Every new account also starts with a 7-day Pro trial with everything unlocked and no card needed. Signed agreements, invoices and payment tracking are part of Pro. In India, Pro is ₹99 a month or ₹999 a year. Outside India, paid plans can't be bought yet; the free plan and the trial are open everywhere. There are no platform fees on your deal value.",
   },
   {
     q: "Can I cancel anytime?",

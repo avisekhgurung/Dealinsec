@@ -11,14 +11,18 @@ import { COMMON_JS, MEDIA_JS, EXPORT_JS } from "./client-lib";
 import { REGION_JS, regionFieldsHtml } from "./region-lib";
 
 const PATH = "/tools/service-agreement-template";
-const TITLE = "Free Service Agreement Template — Download PDF | DealInSec";
+const TITLE = "Free Freelance Contract & Service Agreement Template — PDF | DealInSec";
 const DESC =
-  "Create a free service agreement between a freelancer and their client, in any country and currency — scope, deliverables, fees, revisions, cancellation, governing law and signatures. Download as PDF, no sign-up.";
+  "Create a free freelance contract (service agreement) between a freelancer and their client, in any country and currency — scope, deliverables, fees, revisions, cancellation, governing law and signatures. Download as PDF, no sign-up.";
 
 const FAQ: { q: string; a: string }[] = [
   {
     q: "Is this service agreement template free?",
     a: "Yes. Fill in the details and download a professional service agreement as a PDF for free, with no sign-up. It is generated entirely in your browser.",
+  },
+  {
+    q: "Can I use this as a freelance contract template?",
+    a: "Yes. It is written for a freelancer and a client: it sets out the scope, deliverables, fees and payment schedule, revisions, cancellation, late payment, confidentiality, ownership of the work and governing law, with signature blocks for both parties. Edit any clause before you download it. It is a starting point, not legal advice, so have a lawyer review anything high-value or unusual.",
   },
   {
     q: "What should a service agreement include?",
@@ -30,7 +34,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "How do I get it signed?",
-    a: "You can print and sign it, or send it from DealInSec: your client accepts it online and the agreement keeps an execution record — who accepted it, when, and with which signature — attached to the deal. Agreements are part of Pro (₹99/month in India; plans for the rest of the world are opening soon), and every new account starts with a 7-day Pro trial, no card.",
+    a: "You can print and sign it, or send it from DealInSec: your client accepts it online and the agreement keeps an execution record — who accepted it, when, and with which signature — attached to the deal. Agreements are part of Pro (₹99/month in India; paid plans can't be bought from other countries yet), and every new account starts with a 7-day Pro trial, no card.",
   },
 ];
 
@@ -63,7 +67,7 @@ function jsonLd(): object[] {
 
 const BODY = `
 <div class="hero"><div class="wrap">
-  <h1>Free Service Agreement Template</h1>
+  <h1>Free Freelance Contract &amp; Service Agreement Template</h1>
   <p class="sub">Generate a clear, professional contract between you and your client — scope, deliverables, fees, revisions, cancellation and signatures. Fill it in and download a PDF, free.</p>
   <div class="chips">
     <span class="chip">100% free</span>
@@ -435,6 +439,6 @@ export function serviceAgreementPage(): string {
 export const serviceAgreementMeta = {
   slug: "service-agreement-template",
   path: PATH,
-  title: "Free Service Agreement Template",
-  blurb: "Generate a professional service contract — scope, fees, revisions, cancellation and signatures — and download it as a PDF, free.",
+  title: "Freelance Contract & Service Agreement",
+  blurb: "Generate a freelance contract (service agreement) — scope, fees, revisions, cancellation and signatures — and download it as a PDF, free.",
 };

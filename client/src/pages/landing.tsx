@@ -1079,9 +1079,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
             <Globe className="w-3.5 h-3.5" /> Pricing around the world
           </p>
           <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            New accounts start with a 7-day Pro trial, and the free plan stays free after it. Both are open everywhere, with no card. The prices below are in rupees and can be paid from India today. International plans will be
-            <span className="font-semibold text-neutral-900 dark:text-white"> $99, £79 or €89 a year</span>, annual
-            only. Checkout for them is opening soon, and we won&apos;t take a foreign card until it can be charged in your own currency.
+            New accounts start with a 7-day Pro trial, and the free plan stays free after it. Both are open everywhere, with no card. The prices below are in rupees and can be paid from India today. Paid plans can&apos;t be bought from other countries yet, and we won&apos;t take a foreign card until they can.
           </p>
         </motion.div>
 

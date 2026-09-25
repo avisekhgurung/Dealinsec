@@ -14,7 +14,7 @@
 import { renderToolPage, esc, SITE_ORIGIN } from "./layout";
 
 const PATH = "/tools/quotation-templates";
-const TITLE = "Free Quotation Templates — Word & Excel Download | DealInSec";
+const TITLE = "Free Quotation Templates for Freelancers — Word & Excel | DealInSec";
 const DESC =
   "Download free quotation templates for freelancers: a simple service quotation, a GST quotation (India) and a freelancer one-pager in Word, plus an Excel format with auto-totals. No sign-up — or edit online in any currency and export a PDF.";
 
@@ -178,7 +178,7 @@ function cards(): string {
 
 const BODY = `
 <div class="hero"><div class="wrap">
-  <h1>Free Quotation Templates</h1>
+  <h1>Free Quotation Templates for Freelancers</h1>
   <p class="sub">Download a professional quotation format in Word or Excel — or edit it online in your own currency and export a PDF. Brand-neutral, made for freelancers, no sign-up.</p>
   <div class="chips">
     <span class="chip">100% free</span>
@@ -258,6 +258,6 @@ export function quotationTemplatesPage(): string {
 export const quotationTemplatesMeta = {
   slug: "quotation-templates",
   path: PATH,
-  title: "Quotation Templates",
+  title: "Quotation Templates for Freelancers",
   blurb: "Download free quotation formats in Word & Excel — or edit them online in any currency and export a PDF. Brand-neutral, with a GST option for India.",
 };

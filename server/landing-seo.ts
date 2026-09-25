@@ -18,6 +18,7 @@
  */
 
 import { LANDING_FAQS } from "@shared/landing-faqs";
+import { guidesHtml } from "./blog";
 
 const FAQS = LANDING_FAQS;
 
@@ -54,7 +55,7 @@ export function landingSeoBody(): string {
 <ol>
 <li><strong>Create a deal</strong> with the client, scope, timeline and fee.</li>
 <li><strong>Send a quote</strong> generated from the deal, with standard or custom terms.</li>
-<li><strong>Get the agreement signed</strong>: you sign with your saved signature, send the PDF and upload the client's signed copy as proof.</li>
+<li><strong>Get the agreement signed</strong>: send your client a signing link and they sign online without an account, or download the PDF and upload a signed copy as proof.</li>
 <li><strong>Send the invoice</strong> as an advance, milestone or final invoice drawn from the agreement.</li>
 <li><strong>Track payment</strong> and see what is paid, pending or overdue.</li>
 </ol>
@@ -83,17 +84,18 @@ export function landingSeoBody(): string {
 </ul>
 
 <h2>Free tools, no sign-up</h2>
-<p>Create a <a href="/tools/quotation-maker">quotation</a>, a <a href="/tools/bill-generator">bill</a>, a <a href="/tools/purchase-order-generator">purchase order</a>, a <a href="/tools/service-agreement-template">service agreement</a> or a
+<p>Create a <a href="/tools/quotation-maker">quotation</a>, a <a href="/tools/bill-generator">bill</a>, a <a href="/tools/payment-reminder-email-generator">payment reminder email</a>, a <a href="/tools/purchase-order-generator">purchase order</a>, a <a href="/tools/service-agreement-template">service agreement</a> or a
 <a href="/tools/proforma-invoice-generator">proforma invoice</a> — free in your browser, no account needed. There is also an <a href="/tools/invoice-format/for-freelancers">invoice format for freelancers</a>. Country tools: a <a href="/tools/gst-invoice-generator">GST invoice</a> with CGST, SGST and IGST computed and a <a href="/tools/gst-calculator">GST calculator</a> for India, and a <a href="/tools/uk-late-payment-calculator">UK late payment calculator</a> that works out the statutory interest and compensation you can claim when a UK client pays late.</p>
 
 <h2>What DealInSec covers</h2>
-<p><a href="/freelancer-invoice-software">Freelancer invoice software</a> · <a href="/quotation-software">quotation software</a> · <a href="/proposal-management">proposal management</a> · <a href="/contract-management">contract management</a> · <a href="/e-signature">e-signature</a> · <a href="/invoice-management">invoice management</a> · <a href="/refrens-alternative">Refrens alternative</a> · <a href="/vyapar-alternative">Vyapar alternative</a> — one thread per deal, from first quote to final payment.</p>
+<p><a href="/freelancer-invoice-software">Freelancer invoice software</a> · <a href="/quotation-software">quotation software</a> · <a href="/proposal-management">proposal management</a> · <a href="/contract-management">contract management</a> · <a href="/e-signature">e-signature</a> · <a href="/invoice-management">invoice management</a> · <a href="/freelance-business-management-software">freelance business management software</a> · <a href="/bonsai-alternatives">Bonsai alternatives</a> · <a href="/bonsai-vs-dealinsec">Bonsai vs DealInSec</a> · <a href="/refrens-alternative">Refrens alternative</a> · <a href="/vyapar-alternative">Vyapar alternative</a> — one thread per deal, from first quote to final payment.</p>
 
 <h2>Guides</h2>
-<p>From the <a href="/blog">DealInSec blog</a>: <a href="/blog/what-is-deal-management-software">what deal management software is</a>, the <a href="/blog/quotation-format">quotation format guide with a free sample</a>, <a href="/blog/how-to-make-a-quotation-online">how to make a quotation online</a>, <a href="/blog/quotation-software-vs-excel">quotation software vs Excel</a>, <a href="/blog/quotation-vs-proposal">quotation vs proposal</a>, <a href="/blog/how-to-manage-a-deal-from-quotation-to-invoice">managing a deal from quotation to invoice</a>, and <a href="/blog/fake-quotation">when a sample quotation is fine and when it's fraud</a>. For getting paid: <a href="/blog/client-not-paying">what to do when a client isn't paying</a>, <a href="/blog/payment-reminder-message-to-client">payment reminder messages that work</a>, and <a href="/blog/advance-payment-terms">advance payment terms</a>. Written for India: <a href="/blog/best-quotation-software-india">choosing quotation software in India</a> and <a href="/blog/msme-payment-rule-45-days-samadhaan">the MSME 45-day payment rule</a>.</p>
+<p>From the <a href="/blog">DealInSec blog</a>:</p>
+${guidesHtml()}
 
 <h2>Start simple. Grow when you need to.</h2>
-<p>The free plan is permanent and covers 4 deals a month, each with its quotation. Every new account also starts with a 7-day Pro trial with no card, in every country. Pro adds unlimited deals, agreements with signature, invoices and payment tracking. In India, Pro is ₹99 per month or ₹999 per year. Outside India, Pro is listed at $99, £79 or €89 a year, annual only, and international checkout is opening soon. No platform fee on your deal value.</p>
+<p>The free plan is permanent and covers 4 deals a month, each with its quotation. Every new account also starts with a 7-day Pro trial with no card, in every country. Pro adds unlimited deals, agreements with signature, invoices and payment tracking. In India, Pro is ₹99 per month or ₹999 per year. Outside India the free plan and the trial are fully open; paid plans can't be bought from other countries yet. No platform fee on your deal value.</p>
 
 <h2>Frequently asked questions</h2>
 ${faqs}

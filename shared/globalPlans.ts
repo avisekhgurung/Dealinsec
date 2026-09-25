@@ -7,9 +7,9 @@
  * (Razorpay SDK, server env vars) just to read a price table.
  *
  * STILL NOT WIRED TO CHECKOUT: no order, no charge and no grant reads this.
- * It is safe to DISPLAY (the landing page already quotes three of these
- * seven figures as "opening soon" — this extends the same honest framing to
- * the rest, never as a price that can be paid today).
+ * No public page quotes these figures any more (the Razorpay International
+ * application was rejected, 2026-09-23, and marketing copy must not imply a
+ * date). Kept only as the agreed list prices for when a rail exists.
  *
  * Local round numbers beat a live FX conversion: "£79" reads as a price,
  * "£78.43" reads as a glitch — and a price that moves with the exchange rate

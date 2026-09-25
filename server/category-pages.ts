@@ -19,9 +19,10 @@
  *
  * Same architecture as /tools and /blog: complete server-rendered HTML,
  * registered BEFORE the SPA catch-all. Every path here must ALSO be in
- * vite.config.ts navigateFallbackDenylist (and the NetworkFirst exclusion),
- * and in the landing page's plain-anchor checks — otherwise the PWA service
- * worker / wouter swallow the navigation.
+ * shared/ssr-paths.ts (which feeds vite.config.ts's service-worker exclusions;
+ * server/seo.test.ts fails if one is missing) and in the landing page's
+ * plain-anchor checks — otherwise the PWA service worker / wouter swallow the
+ * navigation.
  *
  * Copy rules (standing): no invented customers, counts or testimonials; no
  * claims that agreements are "binding" — electronic acceptance with an audit
@@ -31,17 +32,26 @@
  * non-payment disorganisation causes and leaves a record, nothing more.
  */
 import type { Express } from "express";
-import { esc, SITE_ORIGIN, LOGO_SVG } from "./tools/layout";
+import { esc, SITE_ORIGIN, LOGO_SVG, gaSnippet } from "./tools/layout";
 
-const SIGNUP = "/auth?mode=signup&utm_source=category&utm_medium=page";
+// ?ref=, not utm_*: an internal UTM would overwrite the organic session source in GA4.
+const SIGNUP = "/auth?mode=signup&ref=category";
 
 interface Faq {
   q: string;
   a: string;
 }
 
-interface CategoryPage {
+export interface CategoryPage {
   path: string;
+  /** "IN" pages are written for India (₹ pricing, GST, PAN). "global" pages
+   *  must contain no India-only framing and advertise only what can actually
+   *  be bought from anywhere (the free plan). */
+  region: "IN" | "global";
+  /** ISO date of the last substantive edit → sitemap <lastmod>. */
+  updated?: string;
+  /** Social/preview image for pages that have one. */
+  ogImage?: { src: string; alt: string; w: number; h: number };
   /** <title> (site name appended). */
   metaTitle: string;
   description: string;
@@ -152,30 +162,44 @@ function header(): string {
   </div></header>`;
 }
 
-function footer(): string {
+function footer(region: "IN" | "global"): string {
+  const tagline =
+    region === "IN"
+      ? "for India's freelancers: quotation, e-signed agreement, invoice and payment tracking on one thread per client."
+      : "for freelancers worldwide: quotation, e-signed agreement, invoice and payment tracking on one thread per client.";
   return `<footer class="site"><div class="wrap">
     <div class="links">
       <a href="/">Product</a>
+      <a href="/freelance-business-management-software">Freelance Business Management</a>
       <a href="/freelancer-invoice-software">For Freelancers</a>
       <a href="/quotation-software">Quotation Software</a>
       <a href="/contract-management">Contract Management</a>
       <a href="/invoice-management">Invoice Management</a>
       <a href="/e-signature">E-Signature</a>
+      <a href="/bonsai-alternatives">Bonsai Alternatives</a>
       <a href="/tools">Free Tools</a>
       <a href="/blog">Blog</a>
       <a href="/terms">Terms</a>
       <a href="/privacy">Privacy</a>
     </div>
-    <div class="muted">© 2026 DealInSec — for India's freelancers: quotation, e-signed agreement, invoice and payment tracking on one thread per client.</div>
+    <div class="muted">© 2026 DealInSec — ${tagline}</div>
   </div></footer>`;
 }
 
-function ctaBand(): string {
+function ctaBand(region: "IN" | "global"): string {
+  const sub =
+    region === "IN"
+      ? "Quotation, e-signed scope, invoices and payment follow-up that always agree with each other — built for India's freelancers."
+      : "Quotation, e-signed scope, invoices and payment follow-up that always agree with each other — built for freelancers, wherever you bill from.";
+  const note =
+    region === "IN"
+      ? "No card required · Free plan after the trial · Pro ₹99/month or ₹999/year"
+      : "No card required · Free plan and 7-day Pro trial in every country · Paid plans currently available in India";
   return `<div class="cta-band"><div class="wrap">
     <h2>One client. One thread. Zero retyping.</h2>
-    <p>Quotation, e-signed scope, invoices and payment follow-up that always agree with each other — built for India's freelancers.</p>
-    <a class="btn" href="${SIGNUP}">Start your 7-day free trial →</a>
-    <span class="sub-note">No card required · Free plan after the trial · Pro ₹99/month or ₹999/year</span>
+    <p>${sub}</p>
+    <a class="btn" href="${SIGNUP}" data-cta>Start your 7-day free trial →</a>
+    <span class="sub-note">${note}</span>
   </div></div>`;
 }
 
@@ -197,8 +221,26 @@ function threadSection(highlight: "quote" | "contract" | "invoice" | "track" | "
   </div></section>`;
 }
 
-function relatedSection(currentPath: string): string {
-  const cards = PAGES.filter((p) => p.path !== currentPath)
+/** The commercial pillar every category/comparison page links to. Kept as data
+ *  here (not imported) so server/comparison-pages.ts can depend on this file
+ *  without a cycle. */
+export const PILLAR_LINK = {
+  path: "/freelance-business-management-software",
+  shortLabel: "Freelance Business Management Software",
+  h1: "Everything a freelancer needs to run client work, from deal to paid",
+};
+
+interface RelatedLink {
+  path: string;
+  shortLabel: string;
+  h1: string;
+}
+
+function relatedSection(currentPath: string, siblings: RelatedLink[]): string {
+  const all = [...siblings, PILLAR_LINK];
+  const seen = new Set<string>();
+  const cards = all
+    .filter((p) => p.path !== currentPath && !seen.has(p.path) && seen.add(p.path))
     .map((p) => `<a class="rel-card" href="${esc(p.path)}">${esc(p.shortLabel)}<span>${esc(p.h1)}</span></a>`)
     .join("");
   return `<section><div class="wrap">
@@ -209,10 +251,11 @@ function relatedSection(currentPath: string): string {
 
 /* ── Pages ─────────────────────────────────────────────────────────────── */
 
-const PAGES: CategoryPage[] = [
+export const PAGES: CategoryPage[] = [
   /* ── /freelancer-invoice-software — the flagship: the whole audience ─── */
   {
     path: "/freelancer-invoice-software",
+    region: "IN",
     metaTitle: "Freelancer Invoice Software for India — Quote, Sign, Get Paid",
     description:
       "For India's freelancers: quotation, e-signed scope, advance & milestone invoices with your PAN/GSTIN, and payment reminders drafted in English or Hinglish — on one thread per client. Free plan; Pro ₹99/month.",
@@ -309,6 +352,7 @@ const PAGES: CategoryPage[] = [
   /* ── /refrens-alternative — buying-intent comparison ─────────────────── */
   {
     path: "/refrens-alternative",
+    region: "IN",
     metaTitle: "Refrens Alternative for Freelancers in India",
     description:
       "A Refrens alternative for Indian freelancers who want the whole client deal on one thread: quotation → e-signed scope → advance & milestone invoices → payment follow-up. Honest comparison. Pro ₹99/month; free 7-day trial, no card.",
@@ -360,6 +404,7 @@ const PAGES: CategoryPage[] = [
   /* ── /vyapar-alternative — buying-intent comparison ──────────────────── */
   {
     path: "/vyapar-alternative",
+    region: "IN",
     metaTitle: "Vyapar Alternative for Freelancers (India)",
     description:
       "A Vyapar alternative for freelancers, not shops: DealInSec runs client deals — quotation, e-signed scope, milestone invoices and payment follow-up — instead of inventory-based GST billing. Honest comparison. Pro ₹99/month; free trial, no card.",
@@ -410,6 +455,7 @@ const PAGES: CategoryPage[] = [
   /* ── /quotation-software ─────────────────────────────────────────────── */
   {
     path: "/quotation-software",
+    region: "IN",
     metaTitle: "Quotation Software for Freelancers in India",
     description:
       "Online quotation software for Indian freelancers: itemised quotes with GST, revision rounds and advance terms, numbered PDFs in your name — and each accepted quote converts into an agreement and invoice. Free plan; Pro ₹99/month.",
@@ -467,6 +513,7 @@ const PAGES: CategoryPage[] = [
   /* ── /contract-management ────────────────────────────────────────────── */
   {
     path: "/contract-management",
+    region: "IN",
     metaTitle: "Contract Management Software for Freelancers in India",
     description:
       "Contract management for Indian freelancers: agreements generated from accepted quotations, electronic acceptance with an audit record, statuses, and linked invoices. Pro ₹99/month; free 7-day trial, no card.",
@@ -513,6 +560,7 @@ const PAGES: CategoryPage[] = [
   /* ── /proposal-management ────────────────────────────────────────────── */
   {
     path: "/proposal-management",
+    region: "IN",
     metaTitle: "Proposal Management Software for Freelancers",
     description:
       "Proposal management for Indian freelancers: itemised, priced proposals (quotations) with revision rounds and advance terms, tracked to acceptance and converted into e-signed agreements and invoices. Free 7-day trial.",
@@ -555,6 +603,7 @@ const PAGES: CategoryPage[] = [
   /* ── /invoice-management ─────────────────────────────────────────────── */
   {
     path: "/invoice-management",
+    region: "IN",
     metaTitle: "Invoice Management Software for Freelancers in India",
     description:
       "Invoice management for Indian freelancers: invoices generated from agreements, consecutive numbering per financial year, paid/unpaid tracking with dates, and a dashboard of what to bill and chase. Pro ₹99/month; free 7-day trial.",
@@ -601,6 +650,7 @@ const PAGES: CategoryPage[] = [
   /* ── /e-signature ────────────────────────────────────────────────────── */
   {
     path: "/e-signature",
+    region: "IN",
     metaTitle: "E-Signature for Freelancers in India",
     description:
       "E-signature for Indian freelancers: your client accepts the agreement electronically with an audit record — who signed, when, with which signature — built into the quotation-to-invoice workflow. Honest about what it is. Pro ₹99/month; free 7-day trial.",
@@ -651,8 +701,18 @@ const THREAD_HIGHLIGHT: Record<string, "quote" | "contract" | "invoice" | "track
   "/e-signature": "contract",
 };
 
-function categoryPage(p: CategoryPage): string {
+/** Renders any category/comparison page. `siblings` are the pages to show under
+ *  "The rest of the thread" (the pillar is always added). */
+export function renderCategoryPage(p: CategoryPage, siblings: RelatedLink[]): string {
   const url = SITE_ORIGIN + p.path;
+  const offers =
+    p.region === "IN"
+      ? [
+          { "@type": "Offer", name: "Pro Monthly", price: "99", priceCurrency: "INR", description: "Pro plan ₹99/month; free plan and 7-day trial available" },
+          { "@type": "Offer", name: "Pro Annual", price: "999", priceCurrency: "INR", description: "Pro plan ₹999/year (about ₹83/month)" },
+        ]
+      : // Never advertise a price that cannot be bought from where the reader is.
+        [{ "@type": "Offer", name: "Free plan", price: "0", priceCurrency: "USD", description: "4 deals a month with quotations; 7-day Pro trial, in every country" }];
   const jsonLd: object[] = [
     {
       "@context": "https://schema.org",
@@ -662,10 +722,7 @@ function categoryPage(p: CategoryPage): string {
       operatingSystem: "Web",
       description: p.description,
       url,
-      offers: [
-        { "@type": "Offer", name: "Pro Monthly", price: "99", priceCurrency: "INR", description: "Pro plan ₹99/month; free plan and 7-day trial available" },
-        { "@type": "Offer", name: "Pro Annual", price: "999", priceCurrency: "INR", description: "Pro plan ₹999/year (about ₹83/month)" },
-      ],
+      offers,
     },
     {
       "@context": "https://schema.org",
@@ -686,6 +743,13 @@ function categoryPage(p: CategoryPage): string {
     },
   ];
 
+  const ogImg = p.ogImage
+    ? `<meta property="og:image" content="${SITE_ORIGIN}${esc(p.ogImage.src)}" />
+<meta property="og:image:width" content="${p.ogImage.w}" />
+<meta property="og:image:height" content="${p.ogImage.h}" />
+<meta property="og:image:alt" content="${esc(p.ogImage.alt)}" />
+<meta name="twitter:image" content="${SITE_ORIGIN}${esc(p.ogImage.src)}" />`
+    : "";
   const chips = p.chips.map((c) => `<span class="chip">${esc(c)}</span>`).join("");
   const faqHtml = p.faq.map((f) => `<h3>${esc(f.q)}</h3><p>${esc(f.a)}</p>`).join("");
 
@@ -694,7 +758,7 @@ function categoryPage(p: CategoryPage): string {
   <h1>${esc(p.h1)}</h1>
   <p class="sub">${esc(p.sub)}</p>
   <div class="hero-ctas">
-    <a class="btn" href="${SIGNUP}">Start free trial →</a>
+    <a class="btn" href="${SIGNUP}" data-cta>Start free trial →</a>
     <a class="btn ghost" href="/tools">Try the free tools</a>
   </div>
   <div class="chips">${chips}</div>
@@ -705,7 +769,7 @@ ${p.sections}
   <h2>Frequently asked questions</h2>
   ${faqHtml}
 </div></section>
-${relatedSection(p.path)}`;
+${relatedSection(p.path, siblings)}`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -715,35 +779,37 @@ ${relatedSection(p.path)}`;
 <title>${esc(p.metaTitle)} | DealInSec</title>
 <meta name="description" content="${esc(p.description)}" />
 <link rel="canonical" href="${url}" />
-<meta name="robots" content="index,follow" />
+<meta name="robots" content="index,follow,max-image-preview:large" />
 <meta property="og:type" content="website" />
 <meta property="og:title" content="${esc(p.metaTitle)} | DealInSec" />
 <meta property="og:description" content="${esc(p.description)}" />
 <meta property="og:url" content="${url}" />
 <meta property="og:site_name" content="DealInSec" />
-<meta name="twitter:card" content="summary" />
+<meta name="twitter:card" content="${p.ogImage ? "summary_large_image" : "summary"}" />
 <meta name="twitter:title" content="${esc(p.metaTitle)} | DealInSec" />
 <meta name="twitter:description" content="${esc(p.description)}" />
+${ogImg}
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="icon" href="/favicon.ico" sizes="any" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+${gaSnippet()}
 ${STYLES}
 ${jsonLd.map((b) => `<script type="application/ld+json">${JSON.stringify(b).replace(/</g, "\\u003c")}</script>`).join("\n")}
 </head>
 <body>
 ${header()}
 <main>${body}</main>
-${ctaBand()}
-${footer()}
+${ctaBand(p.region)}
+${footer(p.region)}
 </body>
 </html>`;
 }
 
 /* ── Public wiring ─────────────────────────────────────────────────────── */
 
-/** Paths for the sitemap AND for the SW/router exclusion lists. */
+/** Paths for the sitemap (the SW/router exclusion list lives in shared/ssr-paths.ts). */
 export const CATEGORY_PATHS = PAGES.map((p) => p.path);
 
 export function categorySitemapPaths(): string[] {
@@ -751,7 +817,8 @@ export function categorySitemapPaths(): string[] {
 }
 
 export function registerCategoryPages(app: Express) {
+  const siblings = PAGES;
   for (const p of PAGES) {
-    app.get(p.path, (_req, res) => res.type("html").send(categoryPage(p)));
+    app.get(p.path, (_req, res) => res.type("html").send(renderCategoryPage(p, siblings)));
   }
 }

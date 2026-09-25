@@ -956,7 +956,7 @@ export default function SettingsPage() {
                       Free plan includes 1 user. Pro — and your free trial — includes 5 team members.{" "}
                       {checkoutAvailable
                         ? <>Need more? Extra seats are {formatRupees(extraSeatPrice)}/seat per month.</>
-                        : <>Need more? Extra seats — international checkout coming soon.</>}
+                        : <>Need more? Extra seats aren't available in your country yet.</>}
                     </p>
                   )}
                   {canBilling ? (
@@ -1182,7 +1182,7 @@ export default function SettingsPage() {
                   <Button variant="outline" className="w-full">
                     {checkoutAvailable
                       ? <>Buy Additional Seats — {formatRupees(extraSeatPrice)}/seat</>
-                      : <>Additional seats — international checkout coming soon</>}
+                      : <>Additional seats — not available in your country yet</>}
                   </Button>
                 </Link>
               </>

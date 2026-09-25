@@ -143,7 +143,7 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
               </p>
             ) : (
               <p className="text-[11px] text-center text-muted-foreground flex items-center justify-center gap-1.5" data-testid="upgrade-modal-intl-soon">
-                <Globe className="w-3 h-3" /> International checkout coming soon
+                <Globe className="w-3 h-3" /> Paid plans aren't available in your country yet
               </p>
             )}
           </div>

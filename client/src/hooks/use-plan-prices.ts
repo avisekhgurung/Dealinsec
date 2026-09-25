@@ -47,7 +47,7 @@ const PLAN_CHECKOUT_COUNTRY = "IN";
 
 /**
  * Whether this person may be shown a buy button for a plan today. False means
- * show the plans with an "international checkout is coming soon" note instead
+ * show the plans with a "not available in your country yet" note instead
  * — a buy button there would either fail at Razorpay or charge rupees to
  * someone who was never told that is what they are paying.
  *

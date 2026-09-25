@@ -21,11 +21,11 @@
  *
  * GLOBAL PRICING — NOT LIVE (Sep 2026). Every order this file creates is in ₹ on
  * the domestic Razorpay account, so today only a customer in India can buy. The
- * pricing page shows everyone else an "international checkout is coming soon"
- * note in place of a buy button (usePlanCheckoutAvailable in
+ * pricing page shows everyone else a "paid plans aren't available in your
+ * country yet" note in place of a buy button (usePlanCheckoutAvailable in
  * client/src/hooks/use-plan-prices.ts), and createRazorpayOrder refuses any
- * other currency. International checkout is pending Razorpay International
- * approval.
+ * other currency. The Razorpay International application was rejected (2026-09-23), so there
+ * is no international payment rail yet.
  *
  * GLOBAL_PLANS (now in shared/globalPlans.ts) is the agreed price list for
  * when it opens: India keeps monthly + annual in ₹, everywhere else is

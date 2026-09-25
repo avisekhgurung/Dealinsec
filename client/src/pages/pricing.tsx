@@ -31,7 +31,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { queryClient } from "@/lib/queryClient";
 import { PaymentResult } from "@/components/payment-result";
 import { useRazorpayCheckout, type CheckoutPlan } from "@/hooks/use-razorpay-checkout";
-import { PLAN_PRICE_DEFAULTS, formatRupees, usePlanCheckoutAvailable, useInternationalPlanPrice } from "@/hooks/use-plan-prices";
+import { PLAN_PRICE_DEFAULTS, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
 import { useLocale } from "@/hooks/use-locale";
 
 const REDIRECT_KEY = "postPaymentRedirect";
@@ -46,7 +46,7 @@ function CheckoutComingSoon({ testId }: { testId: string }) {
       data-testid={testId}
     >
       <Globe className="h-4 w-4 flex-shrink-0" />
-      International checkout coming soon
+      Paid plans aren't available in your country yet
     </div>
   );
 }
@@ -82,13 +82,12 @@ export default function PricingPage() {
   // price is our price.
   const fmt = formatRupees;
   const { locale } = useLocale();
-  // International checkout is not live. Outside India the plans still show,
-  // with a "coming soon" note where every buy control would be — never a
+  // Paid checkout is India-only. Outside India the plans still show, with a
+  // plain "not available yet" note where every buy control would be — never a
   // button that fails at Razorpay or quietly charges rupees. Always true for an
   // Indian account, so every `checkoutAvailable ? … : …` below renders exactly
   // what India saw before.
   const checkoutAvailable = usePlanCheckoutAvailable();
-  const intlPrice = useInternationalPlanPrice();
 
   const proActive = hasActivePro(user);
   const boostActive = hasActiveDealBoost(user);
@@ -291,7 +290,7 @@ export default function PricingPage() {
               <Globe className="w-5 h-5 text-primary" />
             </div>
             <div className="flex-1">
-              <p className="font-bold text-sm">International checkout is coming soon</p>
+              <p className="font-bold text-sm">Paid plans aren't available in your country yet</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Plans can only be bought from India for now, so the prices below are in rupees and are
                 what customers in India pay. Checkout for your country isn't open yet, so there is
@@ -302,11 +301,6 @@ export default function PricingPage() {
                   : trialActive
                   ? " Your Pro trial keeps everything unlocked until it ends."
                   : " The Free plan keeps working in the meantime."}
-              </p>
-              <p className="text-xs font-semibold mt-1.5">
-                {intlPrice.isExact
-                  ? <>Once it opens, Pro will be <span className="tabular-nums">{intlPrice.label}</span> a year.</>
-                  : <>Once it opens, Pro will start from around <span className="tabular-nums">{intlPrice.label}</span> a year — the exact price for your currency is still being confirmed.</>}
               </p>
               <p className="text-[11px] text-muted-foreground mt-1.5">
                 Based in India and seeing this?{" "}

@@ -38,7 +38,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Can I turn a quotation into a signed deal?",
-    a: "Yes. In DealInSec the quotation becomes an agreement your client accepts online, and then the invoice — all on one thread for that client, with the figures carried across. The free plan covers 4 deals a month with their quotations; e-signed agreements, invoices and payment tracking are part of Pro (₹99/month in India; plans for the rest of the world are opening soon), and every new account starts with a 7-day Pro trial, no card.",
+    a: "Yes. In DealInSec the quotation becomes an agreement your client accepts online, and then the invoice — all on one thread for that client, with the figures carried across. The free plan covers 4 deals a month with their quotations; e-signed agreements, invoices and payment tracking are part of Pro (₹99/month in India; paid plans can't be bought from other countries yet), and every new account starts with a 7-day Pro trial, no card.",
   },
 ];
 

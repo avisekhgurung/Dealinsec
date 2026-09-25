@@ -12,6 +12,7 @@ import { storage } from './storage';
 import { registerToolPages, toolSitemapPaths } from './tools';
 import { registerBlogPages, blogSitemapPaths } from './blog';
 import { registerCategoryPages, categorySitemapPaths } from './category-pages';
+import { registerComparisonPages, comparisonSitemapPaths } from './comparison-pages';
 import { registerLegacyRedirects } from './legacy-redirects';
 // The ledger key only, from a module with no side effects. NEVER import
 // script/migrate-money-minor-units.ts here: that bundles its CLI into the server.
@@ -88,9 +89,19 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
   // auth and intentionally excluded).
   app.get("/sitemap.xml", (_req, res) => {
     const base = `https://${CANONICAL_HOST}`;
-    const paths = ["/", "/pitch", "/terms", "/privacy", "/cookies", "/refund", ...categorySitemapPaths(), ...toolSitemapPaths(), ...blogSitemapPaths()];
-    const urls = paths
-      .map((p) => `  <url>\n    <loc>${base}${p}</loc>\n    <changefreq>weekly</changefreq>\n  </url>`)
+    // Entries are either a bare path or { loc, lastmod } — blog posts carry a
+    // real last-modified date; a date that is invented (e.g. "today") would
+    // teach Google to distrust the field, so tools/category pages omit it.
+    const entries: (string | { loc: string; lastmod?: string })[] = [
+      "/", "/pitch", "/terms", "/privacy", "/cookies", "/refund",
+      ...categorySitemapPaths(), ...comparisonSitemapPaths(), ...toolSitemapPaths(), ...blogSitemapPaths(),
+    ];
+    const urls = entries
+      .map((e) => (typeof e === "string" ? { loc: e } : e))
+      .map(
+        ({ loc, lastmod }) =>
+          `  <url>\n    <loc>${base}${loc}</loc>${lastmod ? `\n    <lastmod>${lastmod}</lastmod>` : ""}\n    <changefreq>weekly</changefreq>\n  </url>`,
+      )
       .join("\n");
     res
       .type("application/xml")
@@ -306,6 +317,7 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
   registerToolPages(app);
   registerBlogPages(app);
   registerCategoryPages(app);
+  registerComparisonPages(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

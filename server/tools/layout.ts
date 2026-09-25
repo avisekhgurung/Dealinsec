@@ -27,8 +27,32 @@ export interface ToolPageOptions {
 }
 
 export const SITE_ORIGIN = "https://www.dealinsec.com";
-const APP_LINK = "/?utm_source=tools&utm_medium=seo_page";
-const APP_SIGNUP = "/?utm_source=tools&utm_medium=remove_brand";
+// Internal links use ?ref= (nothing reads it; the SPA already uses it for the
+// public-document footer). NOT utm_*: in GA4 an internal UTM starts a new
+// session attributed to that source, erasing the organic/search origin of the
+// very visit we are trying to measure.
+const APP_LINK = "/?ref=tools";
+const APP_SIGNUP = "/?ref=tools_remove_brand";
+
+/** Same property as client/index.html; server/seo.test.ts asserts they match. */
+export const GA_MEASUREMENT_ID = "G-W3VTLRH79B";
+
+/**
+ * GA4 for the server-rendered pages (tools, blog, category, comparison).
+ *
+ * The SPA loads GA from client/index.html with send_page_view:false and sends
+ * page views itself; these pages have no React, so they must send their own —
+ * otherwise an organic landing on a blog post is invisible and the funnel
+ * "organic landing → CTA click → sign_up" has no first step. Same host gate as
+ * the SPA snippet, so localhost dev/test traffic never reaches GA.
+ *
+ * `seo_cta_click` fires for anchors marked data-cta and for links into the
+ * product (/auth, /pricing, /?…). Tool-to-tool navigation is deliberately NOT
+ * counted: it is browsing, not conversion intent.
+ */
+export function gaSnippet(): string {
+  return `<script>(function(){var h=location.hostname;if(h==='localhost'||h==='127.0.0.1'||h.endsWith('.local'))return;var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}';document.head.appendChild(s);window.dataLayer=window.dataLayer||[];window.gtag=function(){dataLayer.push(arguments)};gtag('js',new Date());gtag('config','${GA_MEASUREMENT_ID}');document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(!a)return;var u=a.getAttribute('href')||'';if(a.hasAttribute('data-cta')||/^\\/auth|^\\/pricing|^\\/\\?/.test(u)){gtag('event','seo_cta_click',{page:location.pathname,target:u,transport_type:'beacon'})}})})();</script>`;
+}
 
 /** HTML-escape untrusted/dynamic text before it goes into markup. */
 export function esc(s: unknown): string {
@@ -510,6 +534,7 @@ const TOOL_LINKS: [string, string][] = [
   ["/tools", "All tools"],
   ["/tools/quotation-maker", "Quotation"],
   ["/tools/bill-generator", "Invoice"],
+  ["/tools/payment-reminder-email-generator", "Payment Reminder"],
   ["/tools/service-agreement-template", "Agreement"],
   ["/tools/proforma-invoice-generator", "Proforma"],
   ["/tools/purchase-order-generator", "Purchase Order"],
@@ -552,7 +577,7 @@ function header(): string {
       <a href="/tools#faq">FAQs</a>
       <a href="mailto:support@dealinsec.com">Contact</a>
     </nav>
-    <a class="btn" href="${APP_LINK}">Open App ${EXT_ICON}</a>
+    <a class="btn" href="${APP_LINK}" data-cta>Open App ${EXT_ICON}</a>
   </div></header>`;
 }
 
@@ -562,9 +587,9 @@ function ctaBand(): string {
     <div class="cta-ico">${clock}</div>
     <div class="cta-copy">
       <h2>Get every deal in writing — and get paid on time</h2>
-      <p>Built for freelancers, wherever you bill from: quotation, e-signed agreement, invoice and payment tracking on one thread per client, in your own currency. Free to start, with a 7-day Pro trial and no card. Pro is ₹99/month in India; plans for the rest of the world are opening soon.</p>
+      <p>Built for freelancers, wherever you bill from: quotation, e-signed agreement, invoice and payment tracking on one thread per client, in your own currency. Free to start, with a 7-day Pro trial and no card in every country. Paid plans can currently be bought in India (₹99/month or ₹999/year).</p>
     </div>
-    <a class="btn" href="${APP_LINK}">Start free →</a>
+    <a class="btn" href="${APP_LINK}" data-cta>Start free →</a>
   </div></div>`;
 }
 
@@ -635,10 +660,10 @@ function brandModal(): string {
         <ul class="bm-list">
           <li>Remove the &ldquo;Made with DealInSec&rdquo; footer</li>
           <li><b>4 free Deal Credits every month</b> &mdash; run real deals with quotations</li>
-          <li>E-signed agreements, invoices and payment tracking with Pro &mdash; ₹99/month in India, world plans opening soon</li>
+          <li>E-signed agreements, invoices and payment tracking with Pro &mdash; the 7-day trial is open everywhere; paid plans can currently be bought in India (₹99/month)</li>
         </ul>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
-          <a class="btn" href="${APP_SIGNUP}" style="flex:1;min-width:150px;justify-content:center">Sign up free →</a>
+          <a class="btn" href="${APP_SIGNUP}" data-cta style="flex:1;min-width:150px;justify-content:center">Sign up free →</a>
           <button type="button" class="btn ghost" data-close>Maybe later</button>
         </div>
       </div>
@@ -661,7 +686,7 @@ export function renderToolPage(o: ToolPageOptions): string {
 <title>${esc(o.title)}</title>
 <meta name="description" content="${esc(o.description)}" />
 <link rel="canonical" href="${canonical}" />
-<meta name="robots" content="index,follow" />
+<meta name="robots" content="index,follow,max-image-preview:large" />
 <meta property="og:type" content="website" />
 <meta property="og:title" content="${esc(o.title)}" />
 <meta property="og:description" content="${esc(o.description)}" />
@@ -676,6 +701,7 @@ export function renderToolPage(o: ToolPageOptions): string {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <script defer src="/tools/lib/html-to-image.js"></script>
+${gaSnippet()}
 ${STYLES}
 ${o.headExtra || ""}
 ${ld}
