@@ -1460,7 +1460,7 @@ ${ctaInline("Skip the blank page", "Choose friendly, firm or final and the free 
     metaTitle: "How to Follow Up on an Unpaid Invoice (Step by Step)",
     description:
       "A step-by-step process for following up on an unpaid invoice: what to send and when, how to keep the client, when to stop work, and when to stop emailing.",
-    date: "2026-09-27",
+    date: "2026-09-26",
     readMins: 7,
     excerpt: "The process behind the templates: a day-by-day follow-up sequence, when to change channel, when to pause work and how to keep the relationship intact.",
     hero: { src: "/blog/deal-thread-meeting.webp", alt: "A tense discussion about a project around a laptop", w: 1600, h: 1067 },
@@ -1517,7 +1517,7 @@ ${ctaInline("Don't rely on remembering", "DealInSec tracks each invoice from sen
     metaTitle: "Freelance Invoicing Guide: How to Invoice a Client",
     description:
       "How to invoice a client as a freelancer: what to include, when to send, payment terms and due dates, deposits and milestones, and how to get paid on time.",
-    date: "2026-09-27",
+    date: "2026-09-26",
     readMins: 8,
     excerpt: "What a freelance invoice must include, when to send it, how to set due dates and deposits, and the habits that get invoices paid on time.",
     hero: { src: "/blog/quotation-format-review.webp", alt: "Two people reviewing documents at a desk with laptops", w: 1600, h: 1068 },
@@ -1583,7 +1583,7 @@ ${ctaInline("Invoices drawn from the agreement", "In DealInSec the invoice comes
     metaTitle: "Freelance Payment Terms: What to Put in Your Agreement",
     description:
       "Freelance payment terms explained: deposits, milestones, due dates, late fees, currency and payment methods — with sample clauses you can adapt. Not legal advice.",
-    date: "2026-09-27",
+    date: "2026-09-26",
     readMins: 8,
     excerpt: "Deposits, milestones, due dates, late fees and currency: what to put in your freelance payment terms, with sample clauses to adapt.",
     hero: { src: "/blog/deal-management-handshake.webp", alt: "Two people agreeing on deal terms with a handshake", w: 1600, h: 1068 },
@@ -1645,7 +1645,7 @@ ${ctaInline("Terms that match at every step", "DealInSec carries the terms from 
     metaTitle: "Scope Creep for Freelancers: Prevent It & Respond",
     description:
       "What scope creep is, how to prevent it with a written scope and change process, and copy-ready emails for when a client asks for more than was agreed.",
-    date: "2026-09-27",
+    date: "2026-09-26",
     readMins: 7,
     excerpt: "Prevent scope creep with a written scope and a change process, and use these emails when a client asks for something that wasn't agreed.",
     hero: { src: "/blog/deal-thread-meeting.webp", alt: "A tense discussion about a project around a laptop", w: 1600, h: 1067 },
@@ -1697,7 +1697,7 @@ ${ctaInline("Put the scope in writing first", "Generate a freelance agreement wi
     metaTitle: "Freelance Revision Limits: Policy & Sample Wording",
     description:
       "How to set a freelance revision policy: how many rounds to include, what counts as a revision, what to charge beyond the limit, and sample wording for your agreement.",
-    date: "2026-09-27",
+    date: "2026-09-26",
     readMins: 6,
     excerpt: "How many revision rounds to include, what counts as a round, what to charge for extras, and sample clauses for your agreement and quotation.",
     hero: { src: "/blog/make-quotation-online-desk.webp", alt: "A laptop, notepad and coffee on a desk, ready to write a follow-up email", w: 1600, h: 1067 },
@@ -1744,7 +1744,7 @@ ${ctaInline("Catch it before you send", "DealInSec's Protection Check reads your
     metaTitle: "Freelance Contract Terms: 10 Clauses That Protect You",
     description:
       "The freelance contract terms that matter most — scope, payment, revisions, cancellation, ownership, confidentiality and more — explained plainly. Not legal advice.",
-    date: "2026-09-27",
+    date: "2026-09-26",
     readMins: 8,
     excerpt: "Ten clauses every freelance contract should cover, in plain English, with what each one protects and where to get a template.",
     hero: { src: "/blog/deal-management-handshake.webp", alt: "Two people agreeing on deal terms with a handshake", w: 1600, h: 1068 },
