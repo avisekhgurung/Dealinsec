@@ -180,7 +180,7 @@ const AVAILABILITY = `<div class="callout honest"><b>Where DealInSec's paid plan
 
 const METHODOLOGY = (vs: Vendor[]) => `<section><div class="wrap">
   <h2>How this comparison was made</h2>
-  <p class="sec-sub">Each competitor's prices and features were read from that vendor's own pricing page on <time datetime="${REVIEWED_ON}">26 September 2026</time> (${vs.map((v) => esc(v.name)).join(", ")}). Aggregator and review sites were not used as sources, because they disagree with each other and with the vendors. Feature cells contain only what the vendor's pricing page lists. DealInSec's column describes what the product does today, including what it does not do. We make DealInSec, so read this with that in mind and verify anything that matters to you on the vendors' own sites.</p>
+  <p class="sec-sub">Each competitor's prices and features were read from that vendor's own pricing page on <time datetime="${REVIEWED_ON}">26 September 2026</time> (${vs.map((v) => esc(v.name)).join(", ")}). Aggregator and review sites were not used as sources, because they disagree with each other and with the vendors. Feature cells contain only what the vendor's pricing page lists. DealInSec's column describes what the product does today, including what it does not do. We make DealInSec, so read this with that in mind and verify anything that matters to you on the vendors' own sites. More on <a href="/about">how we write our guides</a>.</p>
 </div></section>`;
 
 /* ── Pages ─────────────────────────────────────────────────────────────── */
@@ -242,6 +242,16 @@ export const COMPARISON_PAGES: CategoryPage[] = [
     <div class="ft"><b>Who should look elsewhere</b><p>Anyone who needs hourly time tracking, a full client portal or built-in accounting. The <a href="/bonsai-alternatives">alternatives page</a> compares five options with prices read from their own sites.</p></div>
   </div>
   ${AVAILABILITY}
+</div></section>
+<section><div class="wrap">
+  <h2>Guides by stage</h2>
+  <p class="sec-sub">Free guides for each step of a client deal. None of them needs an account.</p>
+  <div class="feat">
+    <div class="ft"><b>Before the work: the deal and the quote</b><p>Decide between a <a href="/blog/quotation-vs-proposal">quotation and a proposal</a>, then follow <a href="/blog/how-to-manage-a-deal-from-quotation-to-invoice">one deal from quotation to invoice</a> so nothing gets dropped. For the category itself, see <a href="/blog/what-is-deal-management-software">what deal management software is</a>.</p></div>
+    <div class="ft"><b>Protecting the scope</b><p>Put the <a href="/blog/freelance-contract-terms">contract clauses that protect you</a> in writing, set <a href="/blog/revision-limits">revision limits</a>, and know what to say when <a href="/blog/scope-creep">scope creep</a> starts.</p></div>
+    <div class="ft"><b>Invoicing and terms</b><p>Agree <a href="/blog/freelance-payment-terms">payment terms</a>, including what Net 30 means, before you start, then <a href="/blog/freelance-invoice-guide">invoice each stage</a> against the agreement.</p></div>
+    <div class="ft"><b>Getting paid</b><p>Start with a polite <a href="/blog/payment-reminder-email">payment reminder email</a>, then an <a href="/blog/overdue-invoice-email">overdue invoice email</a>, then the <a href="/blog/how-to-follow-up-on-unpaid-invoice">unpaid-invoice follow-up sequence</a>. More wording is in the <a href="/blog/reminder-email-templates">reminder email templates</a>.</p></div>
+  </div>
 </div></section>
 <section><div class="wrap">
   <h2>Go deeper</h2>
@@ -441,6 +451,94 @@ ${METHODOLOGY([vendor("bonsai")])}`,
       },
     ],
   },
+  /* ── About — the entity page ──────────────────────────────────────────── */
+  {
+    path: "/about",
+    region: "global",
+    updated: REVIEWED_ON,
+    metaTitle: "About DealInSec: Who Makes It and How We Write",
+    description:
+      "About DealInSec: software for freelancers to run each client deal from quotation to payment. Who makes it, what it does and doesn't do, where paid plans are available, and how our guides are written.",
+    h1: "About DealInSec",
+    sub: "DealInSec is software for freelancers and solo service providers to run each client deal from quotation to payment — built and run by an independent founder.",
+    chips: ["Independent founder", "Freelancers in any country", "50 currencies", "Free plan · 7-day trial"],
+    shortLabel: "About DealInSec",
+    extraJsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "AboutPage",
+        name: "About DealInSec",
+        url: "https://www.dealinsec.com/about",
+        about: { "@id": "https://www.dealinsec.com/#organization" },
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "@id": "https://www.dealinsec.com/#organization",
+        name: "DealInSec",
+        url: "https://www.dealinsec.com/",
+        logo: "https://www.dealinsec.com/apple-touch-icon.png",
+        email: "support@dealinsec.com",
+        description:
+          "Software for freelancers to run each client deal from quotation to payment: quotations, online agreement signing, invoices and payment tracking.",
+        founder: { "@type": "Person", name: "Avisekh Gurung" },
+        address: { "@type": "PostalAddress", addressLocality: "Darjeeling", addressRegion: "West Bengal", addressCountry: "IN" },
+      },
+    ],
+    sections: `
+<section><div class="wrap">
+  <h2>What DealInSec is</h2>
+  <p class="sec-sub">DealInSec is web software for freelancers and solo service providers — designers, developers, writers, video editors and photographers, marketers and consultants. It keeps each client deal on one record: a quotation the client can accept online, an agreement the client can sign online, invoices drawn from that agreement, and a clear view of what is paid, pending and overdue. It works in 50 currencies, with the tax field, invoice numbering and date format of the country you work from.</p>
+</div></section>
+<section><div class="wrap">
+  <h2>Who makes it</h2>
+  <p class="sec-sub">DealInSec is a sole proprietorship of Avisekh Gurung, an independent founder based in Darjeeling, India. It is not backed by investors or run by a large team; the same person who builds the product answers support email. The legal details are in the <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</p>
+</div></section>
+<section><div class="wrap">
+  <h2>What it does — and what it doesn't</h2>
+  <div class="feat">
+    <div class="ft"><b>What it does</b><p>Deals and quotations with a client acceptance link; agreements with a public signing link, recording who signed, when and with which signature; invoices drawn from the agreement; payment tracking; a Protection Check that flags risky or missing terms before you send; and AI-drafted payment reminders that you review and send yourself.</p></div>
+    <div class="ft"><b>What it doesn't</b><p>It does not track time, run a client portal, do accounting or expenses, schedule meetings, send reminders automatically or collect payments. Your client pays you directly and you mark the invoice paid. Online signing is electronic acceptance with an audit record, not a certified digital signature.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>Where it is available</h2>
+  <p class="sec-sub">The free plan (4 deals a month, each with its quotation) and the 7-day Pro trial are open in every country, with no card. The paid Pro plan — ₹99 a month or ₹999 a year — can currently be bought in India only. We can't yet take payments from other countries, and we will say so on this page when that changes. The <a href="/tools">free tools</a> need no account and don't store what you type on our servers.</p>
+</div></section>
+<section><div class="wrap">
+  <h2>How we write our guides</h2>
+  <ul>
+    <li><b>No invented numbers.</b> We do not publish statistics, customer counts or testimonials we cannot show. When we cite a figure, we say where it comes from.</li>
+    <li><b>Competitor facts from the source.</b> Prices and features on our <a href="/bonsai-alternatives">comparison pages</a> are read from each vendor's own pricing page, and the review date is printed next to every table.</li>
+    <li><b>Law and tax, hedged.</b> Rules on contracts, interest and tax differ by country. Our guides say when something depends on your country or contract, and they are general information, not legal or tax advice.</li>
+    <li><b>We make DealInSec.</b> Where a guide mentions our product, read it with that in mind; we state what DealInSec doesn't do as plainly as what it does.</li>
+    <li><b>Dated and updated.</b> Each guide shows when it was published and, after a substantive change, when it was updated.</li>
+  </ul>
+</div></section>
+<section><div class="wrap">
+  <h2>Contact</h2>
+  <p class="sec-sub">Email <a href="mailto:support@dealinsec.com">support@dealinsec.com</a> for support, corrections to a guide or comparison, or anything else.</p>
+</div></section>`,
+    faq: [
+      {
+        q: "Who owns DealInSec?",
+        a: "DealInSec is a sole proprietorship of Avisekh Gurung, an independent founder based in Darjeeling, India.",
+      },
+      {
+        q: "Can I use DealInSec outside India?",
+        a: "Yes. The free plan and the 7-day Pro trial are open in every country, and documents follow your currency and country. The paid Pro plan can currently be bought in India only.",
+      },
+      {
+        q: "Does DealInSec handle my clients' payments?",
+        a: "No. It tracks payment status. Your client pays you directly, and you mark the invoice paid.",
+      },
+      {
+        q: "How do I report a mistake in a guide or comparison?",
+        a: "Email support@dealinsec.com with the page and the correction. Comparison prices are re-read from vendors' own pages and the review date is updated when they change.",
+      },
+    ],
+  },
+
 ];
 
 /** Paths for the sitemap, each with the date the page was last reviewed. */
@@ -449,7 +547,9 @@ export function comparisonSitemapPaths(): { loc: string; lastmod?: string }[] {
 }
 
 export function registerComparisonPages(app: Express) {
+  // /about is not part of "the rest of the thread" on comparison pages.
+  const siblings = COMPARISON_PAGES.filter((p) => p.path !== "/about");
   for (const p of COMPARISON_PAGES) {
-    app.get(p.path, (_req, res) => res.type("html").send(renderCategoryPage(p, COMPARISON_PAGES)));
+    app.get(p.path, (_req, res) => res.type("html").send(renderCategoryPage(p, siblings)));
   }
 }

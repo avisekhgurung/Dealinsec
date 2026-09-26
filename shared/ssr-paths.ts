@@ -33,6 +33,7 @@ export const SSR_PATH_PREFIXES: readonly string[] = [
   "freelance-business-management-software",
   "bonsai-alternatives",
   "bonsai-vs-dealinsec",
+  "about",
 ];
 
 /** Matches "/tools", "/tools/anything", "/blog/x" … but not "/toolsx". */

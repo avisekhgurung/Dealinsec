@@ -16,6 +16,7 @@ import { PAGES, registerCategoryPages } from "./category-pages";
 import { COMPARISON_PAGES, VENDORS, registerComparisonPages, comparisonSitemapPaths } from "./comparison-pages";
 import { registerToolPages } from "./tools";
 import { landingSeoBody } from "./landing-seo";
+import { llmsTxt } from "./llms";
 
 type Handler = (req: unknown, res: any) => void;
 
@@ -309,5 +310,66 @@ describe("comparison pages", () => {
         .replace(/What is the best alternative to Bonsai\?/g, "");
       expect(text, p.path).not.toMatch(/\bthe best\b|#1\b|number one/i);
     }
+  });
+});
+
+describe("entity and AEO surface", () => {
+  const ORIGIN = "https://www.dealinsec.com";
+
+  it("every URL listed in /llms.txt is a real page", () => {
+    const known = new Set([...pages.keys(), ...STATIC_PATHS]);
+    const txt = llmsTxt(ORIGIN);
+    const urls = [...txt.matchAll(/\]\((https?:\/\/[^)]+)\)/g)].map((m) => m[1]);
+    expect(urls.length).toBeGreaterThan(30);
+    const bad = urls.filter((u) => !u.startsWith(ORIGIN) || !known.has(u.slice(ORIGIN.length)));
+    expect(bad).toEqual([]);
+    // Every post, tool and comparison page is listed.
+    for (const p of POSTS) expect(txt, p.slug).toContain(`${ORIGIN}/blog/${p.slug})`);
+  });
+
+  it("/about names the founder as an Organization entity, with no invented profiles", () => {
+    const html = pages.get("/about")!;
+    expect(html).toBeTruthy();
+    const org = jsonLdBlocks(html).find((b) => b["@type"] === "Organization");
+    expect(org.founder.name).toBe("Avisekh Gurung");
+    expect(org.sameAs).toBeUndefined();
+    expect(jsonLdBlocks(html).some((b) => b["@type"] === "AboutPage")).toBe(true);
+  });
+
+  it("no page links to a placeholder social profile", () => {
+    const hits = htmlPages
+      .filter(([, h]) => /href="https:\/\/(twitter\.com|x\.com|www\.linkedin\.com|www\.facebook\.com|www\.instagram\.com)\/?"/.test(h))
+      .map(([p]) => p);
+    expect(hits).toEqual([]);
+  });
+
+  it("a post shows an Updated date only when it was substantively edited after publishing", () => {
+    for (const p of POSTS) {
+      const html = pages.get(`/blog/${p.slug}`)!;
+      const shows = /· Updated <time/.test(html);
+      expect(shows, p.slug).toBe(Boolean(p.updated && p.updated !== p.date));
+    }
+  });
+
+  it("every global post links, in its own body, to a free tool, a commercial page and another guide", () => {
+    // Global posts point at global commercial pages (the India category pages are
+    // written for Indian readers), and /about is not a commercial page.
+    const commercial = new Set(
+      [...PAGES, ...COMPARISON_PAGES].filter((p) => p.region === "global" && p.path !== "/about").map((p) => p.path),
+    );
+    const problems: string[] = [];
+    for (const p of POSTS.filter((x) => !x.region)) {
+      const hrefs = [...p.body.matchAll(/href="(\/[^"#?]*)/g)].map((m) => m[1]);
+      if (!hrefs.some((h) => h.startsWith("/tools/"))) problems.push(`${p.slug}: no free tool`);
+      if (!hrefs.some((h) => commercial.has(h))) problems.push(`${p.slug}: no commercial page`);
+      if (!hrefs.some((h) => h.startsWith("/blog/") && h !== `/blog/${p.slug}`)) problems.push(`${p.slug}: no other guide`);
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it("the pillar links down to every global guide", () => {
+    const html = pages.get("/freelance-business-management-software")!;
+    const missing = POSTS.filter((p) => !p.region && !html.includes(`href="/blog/${p.slug}"`)).map((p) => p.slug);
+    expect(missing).toEqual([]);
   });
 });

@@ -593,9 +593,9 @@ function ctaBand(): string {
   </div></div>`;
 }
 
+// Only real channels. Social icons were placeholders (bare twitter.com /
+// linkedin.com) — add profiles here only once real DealInSec accounts exist.
 const SOCIALS = `<div class="socials">
-  <a href="https://twitter.com/" aria-label="Twitter"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-7.2 8.2L23 22h-6.6l-5.2-6.8L5.3 22H2l7.7-8.8L1.5 2h6.8l4.7 6.2L18.9 2Zm-2.3 18h1.8L7.2 3.9H5.3L16.6 20Z"/></svg></a>
-  <a href="https://www.linkedin.com/" aria-label="LinkedIn"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6.94 5a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM3.2 8.5h3.5V21H3.2V8.5Zm5.6 0h3.35v1.7h.05c.47-.85 1.6-1.75 3.3-1.75 3.53 0 4.18 2.2 4.18 5.05V21h-3.5v-5.6c0-1.33-.02-3.05-1.86-3.05-1.86 0-2.15 1.45-2.15 2.95V21H8.8V8.5Z"/></svg></a>
   <a href="mailto:support@dealinsec.com" aria-label="Email"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="m3 6 9 6.5L21 6"/></svg></a>
 </div>`;
 
@@ -634,6 +634,7 @@ function footer(): string {
         <a href="/tools/quotation-maker">Quotation Maker</a>
         <a href="/tools/bill-generator">Invoice Generator</a>
         <a href="/">Product</a>
+        <a href="/about">About</a>
         <a href="/terms">Terms</a>
         <a href="/privacy">Privacy</a>
         <a href="/refund">Refund</a>

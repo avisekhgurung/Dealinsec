@@ -13,6 +13,7 @@ import { registerToolPages, toolSitemapPaths } from './tools';
 import { registerBlogPages, blogSitemapPaths } from './blog';
 import { registerCategoryPages, categorySitemapPaths } from './category-pages';
 import { registerComparisonPages, comparisonSitemapPaths } from './comparison-pages';
+import { llmsTxt } from './llms';
 import { registerLegacyRedirects } from './legacy-redirects';
 // The ledger key only, from a module with no side effects. NEVER import
 // script/migrate-money-minor-units.ts here: that bundles its CLI into the server.
@@ -83,6 +84,12 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
     res.type("text/plain").send(
       `User-agent: *\nAllow: /\n\nSitemap: https://${CANONICAL_HOST}/sitemap.xml\n`,
     );
+  });
+
+  // llms.txt — a factual brief for AI answer engines, generated from the page
+  // registries (server/llms.ts) so it never lists a page that doesn't exist.
+  app.get("/llms.txt", (_req, res) => {
+    res.type("text/plain").send(llmsTxt(`https://${CANONICAL_HOST}`));
   });
 
   // sitemap.xml — the public, indexable pages only (the app itself is behind

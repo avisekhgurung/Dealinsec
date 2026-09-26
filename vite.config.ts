@@ -50,6 +50,7 @@ export default defineConfig({
           SSR_PATH_PATTERN,
           /^\/sitemap\.xml$/,
           /^\/robots\.txt$/,
+          /^\/llms\.txt$/,
         ],
         runtimeCaching: [
           {

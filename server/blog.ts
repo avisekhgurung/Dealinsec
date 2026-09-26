@@ -222,6 +222,7 @@ function footer(): string {
       <a href="/tools/quotation-maker">Quotation Maker</a>
       <a href="/tools/gst-invoice-generator">GST Invoice Generator</a>
       <a href="/">Product</a>
+      <a href="/about">About</a>
       <a href="/terms">Terms</a>
       <a href="/privacy">Privacy</a>
     </div>
@@ -715,7 +716,7 @@ ${ctaInline("Need the real thing?", "Make a genuine, professional quotation in f
 ${ctaInline("See it on one real deal", "Create a deal, generate the quotation, convert it to an agreement, raise the invoice — 7-day free trial, no card.", SIGNUP, "Try DealInSec free →")}
 
 <h2>Who actually needs it</h2>
-<p>Freelancers — designers, developers, writers, video editors and photographers, marketers and consultants — anyone who quotes, signs and bills their own clients, so the work follows the quote → agree → deliver → bill arc. If you sell products off a shelf, you need billing/inventory software instead; if your problem is finding clients rather than papering them, you need a CRM first. DealInSec's stack covers the deal side: <a href="/quotation-software">quotation software</a>, <a href="/contract-management">contract management</a>, <a href="/invoice-management">invoice management</a> and <a href="/e-signature">e-signature</a> on one thread.</p>
+<p>Freelancers — designers, developers, writers, video editors and photographers, marketers and consultants — anyone who quotes, signs and bills their own clients, so the work follows the quote → agree → deliver → bill arc. If you sell products off a shelf, you need billing/inventory software instead; if your problem is finding clients rather than papering them, you need a CRM first. DealInSec's stack covers the deal side: <a href="/quotation-software">quotation software</a>, <a href="/contract-management">contract management</a>, <a href="/invoice-management">invoice management</a> and <a href="/e-signature">e-signature</a> on one thread. To see how that differs from all-in-one tools with time tracking and accounting, read <a href="/freelance-business-management-software">what freelance business management software covers</a>; to try the first step without an account, use the free <a href="/tools/quotation-maker">quotation maker</a>.</p>
 `,
   },
 
@@ -932,7 +933,7 @@ ${ctaInline("Test the whole thread in an afternoon", "Free 7-day trial, no card:
 <p>India note: "quotation" is by far the dominant word in Indian client work — designers, developers and consultants are asked for quotations daily, proposals mostly in competitive consulting pitches. When in doubt, say quotation and nobody blinks.</p>
 
 <h2>One document, both jobs</h2>
-<p>The practical move is to stop choosing. Build your <a href="/blog/quotation-format">quotation properly</a> — itemised deliverables, notes that explain approach where it matters, terms and validity — and it functions as a compact proposal. In <a href="/proposal-management">DealInSec</a>, deliverable rows carry notes precisely so the "why this scope" narrative lives inside the priced document rather than in a separate deck the client skims once and loses.</p>
+<p>The practical move is to stop choosing. Build your <a href="/blog/quotation-format">quotation properly</a> — itemised deliverables, notes that explain approach where it matters, terms and validity — and it functions as a compact proposal. In <a href="/proposal-management">DealInSec</a>, deliverable rows carry notes precisely so the "why this scope" narrative lives inside the priced document rather than in a separate deck the client skims once and loses. For where quotations sit in the wider freelance toolkit, see <a href="/freelance-business-management-software">freelance business management software</a>.</p>
 
 <h2>The difference stops mattering after acceptance</h2>
 <p>Whichever word was on the document, acceptance is the moment it must become precise: agreed scope, agreed amount, agreed terms, in writing. That's the real chain — offer (quotation or proposal) → <a href="/contract-management">agreement</a> → <a href="/invoice-management">invoices</a> — and it's why the document you send should be built for conversion, not just persuasion. A beautiful proposal that ends in vague pricing produces a vague agreement and a disputed invoice.</p>
@@ -1003,7 +1004,7 @@ ${ctaInline("Send one document that does both", "Itemised scope with notes, term
 ${ctaInline("Run the thread automatically", "DealInSec generates each document from the deal record and shows you what needs action — quotation to collected payment.", SIGNUP, "Start free — no card →")}
 
 <h2>Manual vs software, honestly</h2>
-<p>The manual version of this system works: a folder per deal, a numbering convention, calendar reminders, a weekly review. Its cost isn't money — it's that every step depends on your discipline on a busy week, and the documents still can't check each other for drift. <a href="/blog/what-is-deal-management-software">Deal management software</a> exists to make the thread structural instead of virtuous: documents generated from one record can't disagree, and the dashboard remembers the follow-ups you'd otherwise carry in your head. Start manual; switch the day a dropped deal costs you more than a month of the software.</p>
+<p>The manual version of this system works: a folder per deal, a numbering convention, calendar reminders, a weekly review. Its cost isn't money — it's that every step depends on your discipline on a busy week, and the documents still can't check each other for drift. <a href="/blog/what-is-deal-management-software">Deal management software</a> exists to make the thread structural instead of virtuous: documents generated from one record can't disagree, and the dashboard remembers the follow-ups you'd otherwise carry in your head. Start manual — the free <a href="/tools/quotation-maker">quotation maker</a> and <a href="/tools/service-agreement-template">freelance contract template</a> need no account — and switch the day a dropped deal costs you more than a month of the software. <a href="/freelance-business-management-software">What freelance business management software covers</a> explains where a deal tool fits beside time tracking and accounting.</p>
 `,
   },
 
@@ -1549,7 +1550,7 @@ ${ctaInline("Don't rely on remembering", "DealInSec tracks each invoice from sen
 <p>Invoice the moment the event in your agreement occurs — the deposit date, an approved milestone, delivery — not at the end of the month. If your agreement doesn't say, agree it before starting; see <a href="/blog/freelance-payment-terms">freelance payment terms</a>.</p>
 
 <h2>Deposits, milestones and final invoices</h2>
-<p>Splitting a project into invoices reduces risk for both sides. A common structure is a deposit before work starts and the balance on delivery; longer projects add a milestone in the middle. Whatever you choose, invoice each stage against the agreement so the total never exceeds what was agreed — DealInSec enforces that ceiling by drawing invoices from the agreement.</p>
+<p>Splitting a project into invoices reduces risk for both sides. A common structure is a deposit before work starts and the balance on delivery; longer projects add a milestone in the middle. Whatever you choose, invoice each stage against the agreement so the total never exceeds what was agreed — DealInSec enforces that ceiling by drawing invoices from the agreement. <a href="/freelance-business-management-software">What freelance business management software covers</a> compares that approach with all-in-one tools.</p>
 
 <h2>Due dates and payment terms</h2>
 <p>Put a date on the invoice, not only "net 30". A specific due date is easier to act on and to follow up. Small jobs are often due on receipt, projects in 7 to 14 days, and larger organisations may require 30 days or longer; choose what your agreement supports and be consistent. Mention late fees only if your terms provide for them.</p>
@@ -1584,10 +1585,11 @@ ${ctaInline("Invoices drawn from the agreement", "In DealInSec the invoice comes
     description:
       "Freelance payment terms explained: deposits, milestones, due dates, late fees, currency and payment methods — with sample clauses you can adapt. Not legal advice.",
     date: "2026-09-26",
-    readMins: 8,
+    readMins: 9,
     excerpt: "Deposits, milestones, due dates, late fees and currency: what to put in your freelance payment terms, with sample clauses to adapt.",
     hero: { src: "/blog/deal-management-handshake.webp", alt: "Two people agreeing on deal terms with a handshake", w: 1600, h: 1068 },
     faq: [
+      { q: "What does Net 30 mean on an invoice?", a: "Net 30 means the full amount is due 30 calendar days after the invoice date, weekends included. Net 15 and Net 60 work the same way with 15 or 60 days. Write the actual due date on the invoice as well, so there is no doubt about which day the count starts from." },
       { q: "What are freelance payment terms?", a: "The written rules for how and when you are paid: the total fee, any deposit, the schedule of instalments, when each invoice is due, accepted payment methods, currency, and what happens if payment is late. They belong in the agreement and on the quotation." },
       { q: "How much deposit should a freelancer ask for?", a: "Many freelancers ask for a deposit before starting, commonly somewhere between 25% and 50% of the fee for a project. It is a convention, not a rule; what matters is that you are never owed much more than one instalment at any point." },
       { q: "Can I charge a late fee on a freelance invoice?", a: "Only if your signed agreement provides for it or the law in your country gives you a right to it, and rules differ by country. State the fee clearly in the agreement before work starts. This is general information, not legal advice." },
@@ -1609,6 +1611,18 @@ ${ctaInline("Invoices drawn from the agreement", "In DealInSec the invoice comes
 <li><b>Cancellation.</b> What is owed if the client stops the project.</li>
 </ol>
 
+<h2>What Net 30, Net 15 and "due on receipt" mean</h2>
+<p>These short labels describe when an invoice must be paid. "Net" means the full amount; the number is how many calendar days the client has, counted from the invoice date unless your agreement says otherwise.</p>
+<div class="seq-wrap"><table class="seq">
+<tr><th>Term</th><th>What it means</th><th>Often used for</th></tr>
+<tr><td>Due on receipt</td><td>Payable as soon as the invoice arrives</td><td>Deposits and small jobs</td></tr>
+<tr><td>Net 7 / Net 14</td><td>Due 7 or 14 calendar days after the invoice date</td><td>Freelance project instalments</td></tr>
+<tr><td>Net 15</td><td>Due 15 calendar days after the invoice date</td><td>Smaller clients and projects</td></tr>
+<tr><td>Net 30</td><td>Due 30 calendar days after the invoice date</td><td>Larger companies with monthly payment runs</td></tr>
+<tr><td>Net 60 / Net 90</td><td>Due 60 or 90 calendar days after the invoice date</td><td>Some large organisations; long waits for a freelancer</td></tr>
+</table></div>
+<p>Two habits avoid most confusion: write the actual due date on the invoice, not only the label, and agree the term in writing before work starts. Longer terms mean you finance the client's project for longer, which is one reason deposits exist. In some countries the law also limits or sets payment periods for business customers, so check local rules.</p>
+
 <h2>Deposits, milestones and final payment</h2>
 <p>The principle is simple: you should never be owed much more than one instalment. A deposit before you start, a payment at a milestone on longer projects, and the balance on delivery achieves that. For monthly retainers, bill in advance for the month. The exact percentages are a convention; choose ones your client accepts and your risk can bear.</p>
 
@@ -1621,7 +1635,7 @@ ${tpl(4, "Late payment (only if you will use it)", "If an invoice is not paid by
 <p>Where you charge interest or fees, the rules differ by country: UK business customers can have statutory rights, see the <a href="/tools/uk-late-payment-calculator">UK late payment calculator</a>; India has separate rules for registered MSMEs, covered in <a href="/blog/client-not-paying">this playbook</a>. Elsewhere, check local rules.</p>
 
 <h2>Where to put them</h2>
-<p>State the terms on the quotation so the client sees them before saying yes, repeat them in the signed agreement, and restate the due date on every invoice. You can generate the agreement with the free <a href="/tools/service-agreement-template">freelance contract template</a>. For a closer look at deposits, including India examples, see <a href="/blog/advance-payment-terms">advance payment terms</a>.</p>
+<p>State the terms on the quotation so the client sees them before saying yes, repeat them in the signed agreement, and restate the due date on every invoice. You can generate the agreement with the free <a href="/tools/service-agreement-template">freelance contract template</a>. For a closer look at deposits, including India examples, see <a href="/blog/advance-payment-terms">advance payment terms</a>. To keep the same terms consistent from quotation to invoice, see <a href="/freelance-business-management-software">what freelance business management software covers</a>.</p>
 
 ${ctaInline("Terms that match at every step", "DealInSec carries the terms from the quotation into the agreement and the invoice, and its Protection Check flags a missing advance or payment deadline before you send.", SIGNUP, "Try it free →")}
 
@@ -1676,7 +1690,7 @@ ${ctaInline("Terms that match at every step", "DealInSec carries the terms from 
 <li><b>Tie payment to stages,</b> so a stage is not "done" until it is approved and paid.</li>
 <li><b>Refer back to the document</b> whenever a request arrives, calmly and quickly.</li>
 </ol>
-<p>A signed <a href="/tools/service-agreement-template">agreement</a> makes all of this easier to hold to; see <a href="/blog/freelance-contract-terms">the clauses that matter</a>. Before you send, DealInSec's Protection Check reads your terms and flags risky or missing wording — unlimited revisions, no advance, no payment deadline — and suggests lines to add. Nothing is added unless you approve it.</p>
+<p>A signed <a href="/tools/service-agreement-template">agreement</a> makes all of this easier to hold to; see <a href="/blog/freelance-contract-terms">the clauses that matter</a>. Before you send, DealInSec's Protection Check reads your terms and flags risky or missing wording — unlimited revisions, no advance, no payment deadline — and suggests lines to add. Nothing is added unless you approve it. For how this fits into running a whole deal, see <a href="/freelance-business-management-software">freelance business management software</a>.</p>
 
 <h2>What to say when it happens</h2>
 ${tpl(1, "A request outside the agreed scope", "Subject: Adding {Request} to {Project}\n\nHi {Client name},\n\nThanks for the idea. Our agreement covers {agreed deliverables}; {request} is outside that scope. I can add it for {Amount} and about {X} extra days. If you would like to go ahead, reply \"approved\" and I will schedule it. If not, I will continue with the current scope on the agreed timeline.\n\nBest,\n{Your name}", "Use when a client asks for something the agreement doesn't cover.")}
@@ -1728,7 +1742,7 @@ ${ctaInline("Put the scope in writing first", "Generate a freelance agreement wi
 <h2>Sample wording</h2>
 ${tpl(1, "For the quotation", "This quotation includes up to {Number} rounds of revisions. Additional rounds are charged at {Rate or price}.")}
 ${tpl(2, "For the agreement", "The fee includes up to {Number} rounds of revisions. A round is a single consolidated set of written feedback on a delivered draft. Corrections of the Provider's errors are not counted. Requests for changes to the agreed scope, or further rounds, are quoted separately and begin only when approved in writing.")}
-<p>You can add this clause with the free <a href="/tools/service-agreement-template">freelance contract template</a> and the <a href="/tools/quotation-maker">quotation maker</a>. DealInSec's Protection Check flags a missing revision limit before you send the deal.</p>
+<p>You can add this clause with the free <a href="/tools/service-agreement-template">freelance contract template</a> and the <a href="/tools/quotation-maker">quotation maker</a>. DealInSec's Protection Check flags a missing revision limit before you send the deal; <a href="/freelance-business-management-software">what freelance business management software covers</a> explains the rest of the workflow.</p>
 
 <h2>When a client goes past the limit</h2>
 <p>Use a short, friendly message that restates the agreement and gives a choice — there is a ready-made template for it in <a href="/blog/scope-creep">the scope creep guide</a>. Keep the tone the same as the rest of the project; the goal is to enforce the rule without making it personal.</p>
@@ -1773,7 +1787,7 @@ ${ctaInline("Catch it before you send", "DealInSec's Protection Check reads your
 </ol>
 
 <h2>Get it signed before you start</h2>
-<p>A contract only protects you if it exists before the work does. Send it with the quotation, get it signed, and start on the deposit. Working on a verbal yes leaves you with a memory of what was agreed instead of a document. The free <a href="/tools/service-agreement-template">freelance contract template</a> covers these clauses in your country's format and downloads as a PDF. In DealInSec, the accepted quotation becomes the agreement, and your client signs online through a link without creating an account.</p>
+<p>A contract only protects you if it exists before the work does. Send it with the quotation, get it signed, and start on the deposit. Working on a verbal yes leaves you with a memory of what was agreed instead of a document. The free <a href="/tools/service-agreement-template">freelance contract template</a> covers these clauses in your country's format and downloads as a PDF. In DealInSec, the accepted quotation becomes the agreement, and your client signs online through a link without creating an account — see <a href="/freelance-business-management-software">what freelance business management software covers</a> for the full quotation-to-payment workflow.</p>
 
 <h2>What an electronic signature is and isn't</h2>
 <p>Electronic signatures are recognised in many countries, but the legal effect depends on the country and the document. In DealInSec the agreement records electronic acceptance with an audit record — who signed, when and with which signature. It is not a certified digital signature, and it is not legal advice; for high-value or unusual work, have a lawyer review the terms.</p>
@@ -1891,7 +1905,7 @@ function postPage(p: BlogPost): string {
 <div class="wrap"><nav class="crumbs" aria-label="Breadcrumb"><a href="/">Home</a> › <a href="/blog">Blog</a> › ${esc(p.title)}</nav></div>
 <article>
   <h1>${esc(p.title)}</h1>
-  <div class="post-meta">By the DealInSec team · ${fmtDate(p.date)} · ${p.readMins} min read</div>
+  <div class="post-meta">By the <a href="/about">DealInSec team</a> · Published <time datetime="${p.date}">${fmtDate(p.date)}</time>${p.updated && p.updated !== p.date ? ` · Updated <time datetime="${p.updated}">${fmtDate(p.updated)}</time>` : ""} · ${p.readMins} min read</div>
   <figure class="hero-img"><img src="${esc(p.hero.src)}" alt="${esc(p.hero.alt)}" width="${p.hero.w}" height="${p.hero.h}" fetchpriority="high" /></figure>
   ${p.body}
   ${faqHtml}

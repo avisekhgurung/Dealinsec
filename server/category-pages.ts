@@ -50,6 +50,8 @@ export interface CategoryPage {
   region: "IN" | "global";
   /** ISO date of the last substantive edit → sitemap <lastmod>. */
   updated?: string;
+  /** Extra structured data for this page (e.g. Organization on /about). */
+  extraJsonLd?: object[];
   /** Social/preview image for pages that have one. */
   ogImage?: { src: string; alt: string; w: number; h: number };
   /** <title> (site name appended). */
@@ -179,6 +181,7 @@ function footer(region: "IN" | "global"): string {
       <a href="/bonsai-alternatives">Bonsai Alternatives</a>
       <a href="/tools">Free Tools</a>
       <a href="/blog">Blog</a>
+      <a href="/about">About</a>
       <a href="/terms">Terms</a>
       <a href="/privacy">Privacy</a>
     </div>
@@ -741,6 +744,7 @@ export function renderCategoryPage(p: CategoryPage, siblings: RelatedLink[]): st
         acceptedAnswer: { "@type": "Answer", text: f.a },
       })),
     },
+    ...(p.extraJsonLd ?? []),
   ];
 
   const ogImg = p.ogImage
