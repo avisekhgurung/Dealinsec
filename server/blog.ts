@@ -1373,7 +1373,7 @@ ${ctaInline("Generate one from your invoice details", "Enter the invoice number,
   {
     slug: "overdue-invoice-email",
     cluster: "getting-paid",
-    related: ["payment-reminder-email", "reminder-email-templates", "client-not-paying", "msme-payment-rule-45-days-samadhaan"],
+    related: ["payment-reminder-email", "how-to-follow-up-on-unpaid-invoice", "reminder-email-templates", "client-not-paying", "msme-payment-rule-45-days-samadhaan"],
     title: "Overdue Invoice Email Templates: Polite Follow-Up Examples",
     metaTitle: "Overdue Invoice Email Templates: Polite Follow-Ups",
     description:
@@ -1448,6 +1448,346 @@ ${ctaInline("Skip the blank page", "Choose friendly, firm or final and the free 
 
 <h2>Make the next invoice easier to collect</h2>
 <p>Most overdue invoices trace back to something missing at the start: no written scope, no deposit, no due date the client accepted. Put payment terms in writing before you begin — a <a href="/tools/service-agreement-template">service agreement</a> with clear due dates does that, and the <a href="/tools/quotation-maker">quotation maker</a> puts the terms on the quote. If you want the whole trail — quotation, e-signed agreement, invoice and the overdue status — on one record, that is what <a href="/freelance-business-management-software">DealInSec</a> is for. For the reminders that come earlier in the process, see <a href="/blog/payment-reminder-email">payment reminder email templates</a> and <a href="/blog/reminder-email-templates">reminder email templates</a>.</p>`,
+  },
+
+  /* ══ Getting paid — follow-up, invoicing, payment terms ═════════════════ */
+
+  {
+    slug: "how-to-follow-up-on-unpaid-invoice",
+    cluster: "getting-paid",
+    related: ["overdue-invoice-email", "payment-reminder-email", "freelance-payment-terms", "client-not-paying"],
+    title: "How to Follow Up on an Unpaid Invoice Without Losing the Client",
+    metaTitle: "How to Follow Up on an Unpaid Invoice (Step by Step)",
+    description:
+      "A step-by-step process for following up on an unpaid invoice: what to send and when, how to keep the client, when to stop work, and when to stop emailing.",
+    date: "2026-09-27",
+    readMins: 7,
+    excerpt: "The process behind the templates: a day-by-day follow-up sequence, when to change channel, when to pause work and how to keep the relationship intact.",
+    hero: { src: "/blog/deal-thread-meeting.webp", alt: "A tense discussion about a project around a laptop", w: 1600, h: 1067 },
+    faq: [
+      { q: "How soon should I follow up on an unpaid invoice?", a: "The working day after the due date is common, with a heads-up a day or two before for new clients or large invoices. The exact timing matters less than doing it consistently: an invoice that sits for weeks quietly drops down someone's list." },
+      { q: "How do I follow up without damaging the relationship?", a: "Be specific and calm: name the invoice, the amount and the due date, ask for a payment date, and assume good faith at first. Firmness comes from clarity and consistency, not from tone. Most late payers are disorganised rather than unwilling." },
+      { q: "Should I follow up by phone or email?", a: "Email first, because it is dated and complete. Call when two emails have gone unanswered or the amount is large, and confirm the outcome by email straight afterwards so the record is in writing." },
+      { q: "When should I stop work for non-payment?", a: "When your agreement or payment terms allow it, you have told the client in writing, and you are prepared to do it. Pausing without that basis can create a dispute of its own, so check your terms first." },
+    ],
+    body: `<p class="lead">The invoice is late and you are weighing two fears: that chasing will annoy the client, and that not chasing will cost you the money. The way through is a process you can run without emotion — the same steps, on the same schedule, every time.</p>
+
+<div class="answer"><p><b>Quick answer:</b> Follow up on the working day after the due date with a short email naming the invoice, the amount and the date, and ask for a payment date. Send a firmer email about a week later, call if it goes quiet, and send a final notice at two to three weeks that says what you will do next. Confirm every call in writing, and only pause work if your agreement allows it.</p></div>
+
+<h2>Step 0: make sure the invoice is collectable</h2>
+<p>Before chasing, check the basics: the invoice went to the right person, the amount and currency are right, the due date is on it, the payment details are correct, and it matches the quotation or agreement. Many "late" invoices are stuck on a wrong email address or a purchase-order number the client's accounts team needed.</p>
+
+<h2>The follow-up sequence</h2>
+<div class="seq-wrap"><table class="seq">
+<tr><th>When</th><th>Action</th><th>Goal</th></tr>
+<tr><td>1–3 days before due</td><td>Short heads-up (optional)</td><td>Confirm it arrived; prevent a slip</td></tr>
+<tr><td>Day after due</td><td>Friendly email, invoice re-attached</td><td>Get a payment date</td></tr>
+<tr><td>~7 days overdue</td><td>Firmer email with a reply-by date</td><td>Commitment or the reason for delay</td></tr>
+<tr><td>~10–14 days overdue</td><td>Phone call, then confirm in writing</td><td>A spoken promise, made written</td></tr>
+<tr><td>~14–21 days overdue</td><td>Final notice stating next steps</td><td>Payment, or a documented decision to escalate</td></tr>
+</table></div>
+<p>These are common rhythms, not rules. Copy-ready wording for each stage is in <a href="/blog/payment-reminder-email">payment reminder email templates</a> and <a href="/blog/overdue-invoice-email">overdue invoice email templates</a>, or generate one with the <a href="/tools/payment-reminder-email-generator">payment reminder email generator</a>.</p>
+
+<h2>Keep the client while you chase</h2>
+<ul>
+<li><b>Separate the person from the invoice.</b> Stay friendly in tone and exact about the money.</li>
+<li><b>Make paying easy.</b> Re-attach the invoice, restate the payment details, and offer to reissue it in a different name or format.</li>
+<li><b>Offer a way out.</b> A part-payment or a short payment plan, in writing, often recovers more than an argument would.</li>
+<li><b>Keep delivering only as far as your terms allow.</b> Continuing to work for free tells the client the invoice is optional.</li>
+<li><b>Write down every promise.</b> "I will pay on Friday" is only useful if you can point to it.</li>
+</ul>
+
+<h2>When to pause work</h2>
+<p>Pausing work is the strongest lever most freelancers have, and the easiest to misuse. It works best when your agreement says work stops if an invoice is unpaid past a date, the client has been told in writing, and you will really do it. If your agreement is silent, a calm message explaining the delivery date will move is safer than an ultimatum. Check your payment terms, and see <a href="/blog/freelance-payment-terms">what to include in freelance payment terms</a> so the next agreement covers it.</p>
+
+<h2>When to stop emailing</h2>
+<p>Three emails and a call without a real answer means the channel is exhausted. What comes next depends on your country, your contract and the amount: a formal demand letter, a collections service, or a small-claims process. Weigh the cost and time against the sum, and speak to a professional before you take formal steps. If your client is a UK business, the <a href="/tools/uk-late-payment-calculator">UK late payment calculator</a> shows the statutory interest and compensation that may apply; if you work in India, see <a href="/blog/client-not-paying">the client-not-paying playbook</a>. This is general information, not legal advice.</p>
+
+${ctaInline("Don't rely on remembering", "DealInSec tracks each invoice from sent to paid and shows what is overdue. Copilot drafts the reminder from the real invoice; you review and send it.", SIGNUP, "Try it free →")}
+
+<h2>Fewer follow-ups next time</h2>
+<p>Most chasing traces back to something missing at the start: no written scope, no deposit, no due date the client accepted. Fix those upstream with a signed <a href="/tools/service-agreement-template">agreement</a>, a <a href="/tools/quotation-maker">quotation</a> that states the payment terms, and one record that keeps quote, agreement and invoice consistent — that is what <a href="/freelance-business-management-software">DealInSec</a> is built for.</p>`,
+  },
+
+  {
+    slug: "freelance-invoice-guide",
+    cluster: "getting-paid",
+    related: ["freelance-payment-terms", "payment-reminder-email", "overdue-invoice-email", "how-to-follow-up-on-unpaid-invoice"],
+    title: "Freelance Invoicing Guide: How to Invoice Clients and Get Paid",
+    metaTitle: "Freelance Invoicing Guide: How to Invoice a Client",
+    description:
+      "How to invoice a client as a freelancer: what to include, when to send, payment terms and due dates, deposits and milestones, and how to get paid on time.",
+    date: "2026-09-27",
+    readMins: 8,
+    excerpt: "What a freelance invoice must include, when to send it, how to set due dates and deposits, and the habits that get invoices paid on time.",
+    hero: { src: "/blog/quotation-format-review.webp", alt: "Two people reviewing documents at a desk with laptops", w: 1600, h: 1068 },
+    faq: [
+      { q: "What should a freelance invoice include?", a: "Your name or business and contact details, the client's details, a unique invoice number, the issue date and due date, a description of the work with quantities and rates, the total in the agreed currency, payment instructions, and any tax information your country requires. Reference the quotation or agreement it belongs to." },
+      { q: "When should I send an invoice?", a: "As soon as the invoiceable event happens: on the deposit date, when a milestone is approved, or on delivery — whichever your agreement says. Sending late delays payment by exactly as long." },
+      { q: "What payment terms should I put on a freelance invoice?", a: "State a due date, not just 'net 30'. Common choices are payment on receipt for small jobs, 7 to 14 days for projects, and 30 days for larger companies that insist on it. Match what your agreement says." },
+      { q: "Do I need to charge tax on a freelance invoice?", a: "It depends on your country, your registration status and where your client is. This guide does not give tax advice: check your local rules or ask an accountant. Only add tax to an invoice if you know it applies." },
+    ],
+    body: `<p class="lead">An invoice is the last document in a deal and the one that turns work into money. A clear one gets paid faster; a vague one gets questions. Here is what to put on it, when to send it, and how to set it up so you rarely have to chase.</p>
+
+<div class="answer"><p><b>Quick answer:</b> Send an invoice with a unique number, both parties' details, a clear description of the work, the total in the agreed currency, an explicit due date and payment instructions — as soon as the invoiceable event happens. Tie it to the agreement so the amount is never a surprise, and follow up on the day after it falls due.</p></div>
+
+<h2>What a freelance invoice should include</h2>
+<ul>
+<li><b>Your details:</b> name or business name and contact information, plus any registration number your country requires.</li>
+<li><b>Client details:</b> the legal name to bill and where to send it, plus a purchase-order number if they use one.</li>
+<li><b>A unique invoice number.</b> Sequential numbers make invoices easy to find and prove.</li>
+<li><b>Dates:</b> the issue date and an explicit due date.</li>
+<li><b>Description of the work:</b> line items with quantity and rate, matching the quotation.</li>
+<li><b>The total,</b> in the currency you agreed, and any deposit already paid.</li>
+<li><b>Payment instructions:</b> bank details or your accepted methods, and a reference to quote.</li>
+<li><b>Tax information</b> only where it applies to you. Rules differ by country; this is a question for local rules or an accountant.</li>
+<li><b>A reference to the agreement or quotation</b> the invoice belongs to.</li>
+</ul>
+<p>You can build one in minutes with the free <a href="/tools/bill-generator">invoice generator</a>, in your own currency and with your country's date format.</p>
+
+<h2>When to send it</h2>
+<p>Invoice the moment the event in your agreement occurs — the deposit date, an approved milestone, delivery — not at the end of the month. If your agreement doesn't say, agree it before starting; see <a href="/blog/freelance-payment-terms">freelance payment terms</a>.</p>
+
+<h2>Deposits, milestones and final invoices</h2>
+<p>Splitting a project into invoices reduces risk for both sides. A common structure is a deposit before work starts and the balance on delivery; longer projects add a milestone in the middle. Whatever you choose, invoice each stage against the agreement so the total never exceeds what was agreed — DealInSec enforces that ceiling by drawing invoices from the agreement.</p>
+
+<h2>Due dates and payment terms</h2>
+<p>Put a date on the invoice, not only "net 30". A specific due date is easier to act on and to follow up. Small jobs are often due on receipt, projects in 7 to 14 days, and larger organisations may require 30 days or longer; choose what your agreement supports and be consistent. Mention late fees only if your terms provide for them.</p>
+
+<h2>How to get invoices paid on time</h2>
+<ul>
+<li>Send it to the person who approves payment, not just the person who hired you.</li>
+<li>Make it easy: attach the PDF, restate the payment details, quote a reference.</li>
+<li>Agree terms in writing before you start.</li>
+<li>Send a friendly heads-up before the due date for new clients or large invoices.</li>
+<li>Follow up the working day after it falls due, every time. See <a href="/blog/how-to-follow-up-on-unpaid-invoice">how to follow up on an unpaid invoice</a>.</li>
+</ul>
+
+${ctaInline("Invoices drawn from the agreement", "In DealInSec the invoice comes from the signed agreement, so the amounts match and you can see what is paid, pending and overdue.", SIGNUP, "Start free →")}
+
+<h2>Common invoicing mistakes</h2>
+<ul>
+<li>No due date, or a due date that differs from the agreement.</li>
+<li>Invoices that don't match the quotation, inviting a dispute.</li>
+<li>Missing payment instructions, so the client has to ask.</li>
+<li>Waiting weeks to send it after the work is done.</li>
+<li>Skipping the follow-up because it feels awkward. Reminders are routine: see <a href="/blog/payment-reminder-email">payment reminder email templates</a>.</li>
+</ul>`,
+  },
+
+  {
+    slug: "freelance-payment-terms",
+    cluster: "getting-paid",
+    related: ["freelance-invoice-guide", "advance-payment-terms", "freelance-contract-terms", "how-to-follow-up-on-unpaid-invoice"],
+    title: "Freelance Payment Terms: What to Include in Your Client Agreement",
+    metaTitle: "Freelance Payment Terms: What to Put in Your Agreement",
+    description:
+      "Freelance payment terms explained: deposits, milestones, due dates, late fees, currency and payment methods — with sample clauses you can adapt. Not legal advice.",
+    date: "2026-09-27",
+    readMins: 8,
+    excerpt: "Deposits, milestones, due dates, late fees and currency: what to put in your freelance payment terms, with sample clauses to adapt.",
+    hero: { src: "/blog/deal-management-handshake.webp", alt: "Two people agreeing on deal terms with a handshake", w: 1600, h: 1068 },
+    faq: [
+      { q: "What are freelance payment terms?", a: "The written rules for how and when you are paid: the total fee, any deposit, the schedule of instalments, when each invoice is due, accepted payment methods, currency, and what happens if payment is late. They belong in the agreement and on the quotation." },
+      { q: "How much deposit should a freelancer ask for?", a: "Many freelancers ask for a deposit before starting, commonly somewhere between 25% and 50% of the fee for a project. It is a convention, not a rule; what matters is that you are never owed much more than one instalment at any point." },
+      { q: "Can I charge a late fee on a freelance invoice?", a: "Only if your signed agreement provides for it or the law in your country gives you a right to it, and rules differ by country. State the fee clearly in the agreement before work starts. This is general information, not legal advice." },
+      { q: "Should payment terms be in the contract or on the invoice?", a: "Both, and they must match. The agreement is where both sides accept the terms; the invoice restates the due date and payment details so nobody has to search for them." },
+    ],
+    body: `<p class="lead">Almost every payment problem is a payment-terms problem in disguise: nothing written, or something written vaguely. Clear terms turn "when will I be paid?" into a date on a document both sides signed.</p>
+
+<div class="answer"><p><b>Quick answer:</b> Put five things in writing before work starts: the total fee and currency, the deposit and schedule of instalments, the due date for each invoice, how you accept payment, and what happens if payment is late. Repeat them on the quotation, the agreement and each invoice so they never disagree.</p></div>
+
+<h2>What freelance payment terms should cover</h2>
+<ol>
+<li><b>The fee and currency.</b> A total or rate, and the currency it is in — especially with international clients.</li>
+<li><b>Deposit.</b> Whether one is required, how much, and that work starts on receipt.</li>
+<li><b>Schedule.</b> Instalments tied to events (deposit, milestone, delivery) rather than vague dates.</li>
+<li><b>Due date.</b> How many days after each invoice, or on receipt.</li>
+<li><b>Payment methods and who pays fees.</b> Bank transfer, card or a platform, and who covers transfer charges.</li>
+<li><b>Late payment.</b> A reminder process and, if you use one, a late fee or a right to pause work.</li>
+<li><b>Expenses and extras.</b> Whether expenses are reimbursed and how out-of-scope work is priced.</li>
+<li><b>Cancellation.</b> What is owed if the client stops the project.</li>
+</ol>
+
+<h2>Deposits, milestones and final payment</h2>
+<p>The principle is simple: you should never be owed much more than one instalment. A deposit before you start, a payment at a milestone on longer projects, and the balance on delivery achieves that. For monthly retainers, bill in advance for the month. The exact percentages are a convention; choose ones your client accepts and your risk can bear.</p>
+
+<h2>Sample clauses to adapt</h2>
+<p>These are starting points, not legal advice. Adjust them to your situation and have a lawyer review anything high-value.</p>
+${tpl(1, "Fee and deposit", "The total fee for the Services is {Amount} ({Currency}). A deposit of {Percentage}% ({Deposit amount}) is due before work begins, and work starts on receipt of the deposit. The balance is invoiced on delivery.")}
+${tpl(2, "Milestone schedule", "Payment is made in {Number} instalments: {X}% on signature, {Y}% on approval of {Milestone}, and {Z}% on final delivery. Each instalment is invoiced when its milestone is reached and is due within {Days} days of the invoice date.")}
+${tpl(3, "Due date and methods", "Invoices are due within {Days} days of the invoice date. Payment may be made by {Methods}. The Client is responsible for any bank or platform charges on their side, so the amount received equals the invoiced amount.")}
+${tpl(4, "Late payment (only if you will use it)", "If an invoice is not paid by its due date, the Provider may charge {Fee or interest} as permitted by applicable law and may pause work until the overdue amount is paid, after giving written notice.")}
+<p>Where you charge interest or fees, the rules differ by country: UK business customers can have statutory rights, see the <a href="/tools/uk-late-payment-calculator">UK late payment calculator</a>; India has separate rules for registered MSMEs, covered in <a href="/blog/client-not-paying">this playbook</a>. Elsewhere, check local rules.</p>
+
+<h2>Where to put them</h2>
+<p>State the terms on the quotation so the client sees them before saying yes, repeat them in the signed agreement, and restate the due date on every invoice. You can generate the agreement with the free <a href="/tools/service-agreement-template">freelance contract template</a>. For a closer look at deposits, including India examples, see <a href="/blog/advance-payment-terms">advance payment terms</a>.</p>
+
+${ctaInline("Terms that match at every step", "DealInSec carries the terms from the quotation into the agreement and the invoice, and its Protection Check flags a missing advance or payment deadline before you send.", SIGNUP, "Try it free →")}
+
+<h2>Common mistakes</h2>
+<ul>
+<li>Agreeing payment on a call and never writing it down.</li>
+<li>Starting work with no deposit and no written schedule.</li>
+<li>Terms that differ between the quote, the agreement and the invoice.</li>
+<li>Late fees that appear for the first time in a reminder.</li>
+<li>Ignoring currency and transfer fees on international projects.</li>
+</ul>`,
+  },
+
+  /* ══ Protection cluster ═════════════════════════════════════════════════ */
+
+  {
+    slug: "scope-creep",
+    cluster: "protection",
+    related: ["revision-limits", "freelance-contract-terms", "freelance-payment-terms", "quotation-vs-proposal"],
+    title: "Scope Creep for Freelancers: How to Prevent It and What to Say When It Happens",
+    metaTitle: "Scope Creep for Freelancers: Prevent It & Respond",
+    description:
+      "What scope creep is, how to prevent it with a written scope and change process, and copy-ready emails for when a client asks for more than was agreed.",
+    date: "2026-09-27",
+    readMins: 7,
+    excerpt: "Prevent scope creep with a written scope and a change process, and use these emails when a client asks for something that wasn't agreed.",
+    hero: { src: "/blog/deal-thread-meeting.webp", alt: "A tense discussion about a project around a laptop", w: 1600, h: 1067 },
+    faq: [
+      { q: "What is scope creep?", a: "Scope creep is work that grows beyond what was originally agreed — extra pages, extra revisions, extra deliverables — without a matching change in price or time. It is usually a series of small requests rather than one big one." },
+      { q: "How do I prevent scope creep as a freelancer?", a: "Write the scope down before starting: deliverables, exclusions, revision limits and timeline. Agree a change process so extra requests are quoted and approved in writing, and refer back to the agreement when a request arrives." },
+      { q: "How do I tell a client something is out of scope without upsetting them?", a: "Be matter-of-fact and offer a path: confirm what the agreement covers, say the new request is outside it, and give a price and timeline for doing it. Clients usually respond to clarity better than to silence followed by resentment." },
+      { q: "Should I charge for small extras?", a: "That is a judgement call. A one-off goodwill gesture can be fine if you say it is one; a pattern of unpaid extras teaches the client that the scope has no edge. Whatever you choose, say it in writing." },
+    ],
+    body: `<p class="lead">Scope creep rarely arrives as a big demand. It arrives as "one more thing" — a small extra page, a quick tweak, a slightly different version — until the project you priced is not the project you are doing. Prevention is mostly writing, and the rest is a habit.</p>
+
+<div class="answer"><p><b>Quick answer:</b> Prevent scope creep by putting the deliverables, exclusions, revision limit and timeline in writing before you start, and by agreeing that extra requests are quoted and approved in writing. When a request arrives, restate what was agreed, say the new item is outside it, and give a price and timeline.</p></div>
+
+<h2>Where scope creep comes from</h2>
+<ul>
+<li><b>A vague scope.</b> "A website" or "some designs" means different things to each side.</li>
+<li><b>Unlimited revisions.</b> Without a limit, feedback never ends. See <a href="/blog/revision-limits">revision limits</a>.</li>
+<li><b>No exclusions.</b> If the agreement says what is included but not what is not, everything unlisted feels negotiable.</li>
+<li><b>Verbal additions.</b> "Sure, quick change" on a call, with nothing written.</li>
+<li><b>New stakeholders.</b> Someone joins mid-project with a different idea of the goal.</li>
+</ul>
+
+<h2>How to prevent it</h2>
+<ol>
+<li><b>Write the scope.</b> List the deliverables specifically and say what is excluded.</li>
+<li><b>Set a revision limit</b> and define what counts as a round.</li>
+<li><b>Agree a change process:</b> requests outside the scope are quoted for cost and time, and start only when approved in writing.</li>
+<li><b>Tie payment to stages,</b> so a stage is not "done" until it is approved and paid.</li>
+<li><b>Refer back to the document</b> whenever a request arrives, calmly and quickly.</li>
+</ol>
+<p>A signed <a href="/tools/service-agreement-template">agreement</a> makes all of this easier to hold to; see <a href="/blog/freelance-contract-terms">the clauses that matter</a>. Before you send, DealInSec's Protection Check reads your terms and flags risky or missing wording — unlimited revisions, no advance, no payment deadline — and suggests lines to add. Nothing is added unless you approve it.</p>
+
+<h2>What to say when it happens</h2>
+${tpl(1, "A request outside the agreed scope", "Subject: Adding {Request} to {Project}\n\nHi {Client name},\n\nThanks for the idea. Our agreement covers {agreed deliverables}; {request} is outside that scope. I can add it for {Amount} and about {X} extra days. If you would like to go ahead, reply \"approved\" and I will schedule it. If not, I will continue with the current scope on the agreed timeline.\n\nBest,\n{Your name}", "Use when a client asks for something the agreement doesn't cover.")}
+${tpl(2, "A small extra you are happy to include once", "Subject: Re: {Request}\n\nHi {Client name},\n\nHappy to include {request} this time as a courtesy. Going forward, extras beyond the agreed scope will be quoted separately so we both stay clear on time and cost.\n\nBest,\n{Your name}", "Only if you mean it — it sets a precedent, so say it is a one-off.")}
+${tpl(3, "Revision limit reached", "Subject: Revisions on {Deliverable}\n\nHi {Client name},\n\nWe have completed the {X} rounds of revisions included in the agreement. Further changes can be done at {rate or amount} per round, or I can wrap up the current version. Which would you prefer?\n\nBest,\n{Your name}", "Use when feedback keeps coming after the included rounds.")}
+
+<h2>Handling it without souring the relationship</h2>
+<p>Most scope creep is not bad faith — clients don't know where the edges are. Stay friendly, be specific about what is covered, and offer a way to get the extra. If you handle the first instance well, the rest usually follow the pattern.</p>
+
+${ctaInline("Put the scope in writing first", "Generate a freelance agreement with scope, revisions and cancellation — free, no sign-up — or run the whole deal in DealInSec.", "/tools/service-agreement-template", "Open the template →")}`,
+  },
+
+  {
+    slug: "revision-limits",
+    cluster: "protection",
+    related: ["scope-creep", "freelance-contract-terms", "freelance-payment-terms"],
+    title: "Freelance Revision Limits: How Many Rounds to Include and How to Word It",
+    metaTitle: "Freelance Revision Limits: Policy & Sample Wording",
+    description:
+      "How to set a freelance revision policy: how many rounds to include, what counts as a revision, what to charge beyond the limit, and sample wording for your agreement.",
+    date: "2026-09-27",
+    readMins: 6,
+    excerpt: "How many revision rounds to include, what counts as a round, what to charge for extras, and sample clauses for your agreement and quotation.",
+    hero: { src: "/blog/make-quotation-online-desk.webp", alt: "A laptop, notepad and coffee on a desk, ready to write a follow-up email", w: 1600, h: 1067 },
+    faq: [
+      { q: "How many revisions should a freelancer include?", a: "Two rounds is a common convention for design and writing work, and some projects justify one or three. What matters is that the number is written down and the client knows what counts as a round." },
+      { q: "What counts as a revision?", a: "Define it: typically one consolidated set of feedback from the client on a delivered draft. Sending feedback in pieces, or asking for a different direction, are different things and should be stated as such." },
+      { q: "What should I charge for extra revisions?", a: "Either an hourly rate or a fixed price per additional round, stated in the agreement so it is not a negotiation when it happens. Whatever you choose, tell the client before starting the extra round." },
+      { q: "Should the revision limit be on the quote or the contract?", a: "Both. The quote sets the expectation before the client says yes; the agreement makes it a term. Keep the wording identical." },
+    ],
+    body: `<p class="lead">Unlimited revisions are the quietest way to lose money on a project. A written revision limit turns "just one more change" into a clear choice: pay for another round, or accept the work as it stands.</p>
+
+<div class="answer"><p><b>Quick answer:</b> State the number of included revision rounds (two is common), define a round as one consolidated set of feedback, say what extra rounds cost, and put the same wording on the quotation and in the agreement. When the limit is reached, offer a paid round or wrap up.</p></div>
+
+<h2>How many rounds to include</h2>
+<p>There is no correct number, only a documented one. Two rounds is a widely used convention for creative work: enough for the client to react and refine, not enough to drift. Complex or subjective work may justify three; small fixed-scope work may need only one. Price the project knowing how many rounds you are including.</p>
+
+<h2>Define what counts as a round</h2>
+<ul>
+<li><b>One round = one consolidated set of feedback</b> on a delivered draft, from a single point of contact.</li>
+<li><b>Fixes to your mistakes</b> (typos, missing items) are not counted as rounds.</li>
+<li><b>A change of direction</b> is a new scope item, not a revision.</li>
+<li><b>Feedback arriving in pieces</b> counts as one round only when consolidated.</li>
+</ul>
+
+<h2>What to charge beyond the limit</h2>
+<p>Choose a rate or a fixed price per extra round, and write it down. It removes the awkward negotiation later, and it is easier for the client to accept a rule they agreed to than a surprise.</p>
+
+<h2>Sample wording</h2>
+${tpl(1, "For the quotation", "This quotation includes up to {Number} rounds of revisions. Additional rounds are charged at {Rate or price}.")}
+${tpl(2, "For the agreement", "The fee includes up to {Number} rounds of revisions. A round is a single consolidated set of written feedback on a delivered draft. Corrections of the Provider's errors are not counted. Requests for changes to the agreed scope, or further rounds, are quoted separately and begin only when approved in writing.")}
+<p>You can add this clause with the free <a href="/tools/service-agreement-template">freelance contract template</a> and the <a href="/tools/quotation-maker">quotation maker</a>. DealInSec's Protection Check flags a missing revision limit before you send the deal.</p>
+
+<h2>When a client goes past the limit</h2>
+<p>Use a short, friendly message that restates the agreement and gives a choice — there is a ready-made template for it in <a href="/blog/scope-creep">the scope creep guide</a>. Keep the tone the same as the rest of the project; the goal is to enforce the rule without making it personal.</p>
+
+${ctaInline("Catch it before you send", "DealInSec's Protection Check reads your terms and flags unlimited revisions or a missing limit — nothing is changed unless you approve it.", SIGNUP, "Try it free →")}`,
+  },
+
+  {
+    slug: "freelance-contract-terms",
+    cluster: "protection",
+    related: ["freelance-payment-terms", "scope-creep", "revision-limits", "advance-payment-terms"],
+    title: "Freelance Contract Terms: 10 Clauses That Protect You",
+    metaTitle: "Freelance Contract Terms: 10 Clauses That Protect You",
+    description:
+      "The freelance contract terms that matter most — scope, payment, revisions, cancellation, ownership, confidentiality and more — explained plainly. Not legal advice.",
+    date: "2026-09-27",
+    readMins: 8,
+    excerpt: "Ten clauses every freelance contract should cover, in plain English, with what each one protects and where to get a template.",
+    hero: { src: "/blog/deal-management-handshake.webp", alt: "Two people agreeing on deal terms with a handshake", w: 1600, h: 1068 },
+    faq: [
+      { q: "What should a freelance contract include?", a: "The parties, the scope and deliverables, the timeline, fees and payment terms, revisions, cancellation, ownership of the work, confidentiality, liability limits and governing law, plus signatures. Each protects a specific risk." },
+      { q: "Do I need a lawyer for a freelance contract?", a: "A clear template covers most routine projects, but for high-value or unusual work a lawyer's review is worthwhile. Legal requirements differ by country. This page is general information, not legal advice." },
+      { q: "Is an electronically signed contract valid?", a: "Electronic signatures are recognised in many countries, but the rules and their effect vary. DealInSec records electronic acceptance with an audit record — who signed, when and with which signature — and is not a certified digital signature. Check what your situation requires." },
+      { q: "When does ownership of the work transfer?", a: "Commonly on full payment. Many freelancers state that ownership of the final deliverables passes to the client on payment in full, and that they keep the right to show the work in a portfolio unless agreed otherwise." },
+    ],
+    body: `<p class="lead">A freelance contract is not paperwork for its own sake. Each clause answers a question that otherwise gets answered in the middle of a disagreement: what exactly am I delivering, when do I get paid, what happens if we stop, and who owns the result?</p>
+
+<div class="answer"><p><b>Quick answer:</b> A solid freelance contract names the parties, defines the scope and deliverables, sets the timeline and payment terms, limits revisions, says what happens on cancellation, addresses ownership and confidentiality, and states governing law, with signatures from both sides. This page explains each in plain English; it is general information, not legal advice.</p></div>
+
+<h2>The ten clauses</h2>
+<ol>
+<li><b>Parties and services.</b> Who is contracting with whom, and a specific description of the work and deliverables. The scope is your first defence against <a href="/blog/scope-creep">scope creep</a>.</li>
+<li><b>Timeline.</b> Start date, milestones and delivery date, and what happens if the client delays feedback or materials.</li>
+<li><b>Fees and payment terms.</b> Total or rate, deposit, schedule, due dates and currency. See <a href="/blog/freelance-payment-terms">freelance payment terms</a>.</li>
+<li><b>Revisions.</b> The number of included rounds and what counts as one. See <a href="/blog/revision-limits">revision limits</a>.</li>
+<li><b>Change requests.</b> Work outside the scope is quoted and approved in writing before it starts.</li>
+<li><b>Cancellation.</b> What is owed if either side ends the project — commonly the deposit is non-refundable and work already delivered remains payable.</li>
+<li><b>Ownership and portfolio rights.</b> Often: ownership of the final work passes on full payment, and the freelancer may show it in a portfolio unless agreed otherwise.</li>
+<li><b>Confidentiality.</b> Each side keeps the other's non-public information private.</li>
+<li><b>Liability.</b> A reasonable limit on what you can be liable for. This is a clause where a lawyer's review is especially useful.</li>
+<li><b>Governing law and disputes.</b> Which country's law applies and how disagreements are handled. It matters more with international clients.</li>
+</ol>
+
+<h2>Get it signed before you start</h2>
+<p>A contract only protects you if it exists before the work does. Send it with the quotation, get it signed, and start on the deposit. Working on a verbal yes leaves you with a memory of what was agreed instead of a document. The free <a href="/tools/service-agreement-template">freelance contract template</a> covers these clauses in your country's format and downloads as a PDF. In DealInSec, the accepted quotation becomes the agreement, and your client signs online through a link without creating an account.</p>
+
+<h2>What an electronic signature is and isn't</h2>
+<p>Electronic signatures are recognised in many countries, but the legal effect depends on the country and the document. In DealInSec the agreement records electronic acceptance with an audit record — who signed, when and with which signature. It is not a certified digital signature, and it is not legal advice; for high-value or unusual work, have a lawyer review the terms.</p>
+
+${ctaInline("Run the deal, not just the document", "Quotation, e-signed agreement, invoice and payment status on one record — with a Protection Check on your terms before you send.", SIGNUP, "Try it free →")}
+
+<h2>Before you send: a quick check</h2>
+<ul>
+<li>Is every deliverable listed, and is there something excluded?</li>
+<li>Is there a revision limit and a change process?</li>
+<li>Are the deposit, schedule and due dates written down?</li>
+<li>Does the cancellation clause say what is owed?</li>
+<li>Do the quotation, agreement and invoice agree with each other?</li>
+</ul>`,
   },
 
 ];
