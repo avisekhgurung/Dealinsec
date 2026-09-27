@@ -14,9 +14,9 @@ import { GA_MEASUREMENT_ID, esc, gaSnippet } from "./tools/layout";
 import { COPY_SCRIPT, POSTS, blogSitemapPaths, guidesHtml, registerBlogPages, relatedSlugs, tpl } from "./blog";
 import { PAGES, registerCategoryPages } from "./category-pages";
 import { COMPARISON_PAGES, VENDORS, registerComparisonPages, comparisonSitemapPaths } from "./comparison-pages";
-import { registerToolPages } from "./tools";
+import { TOOLS, registerToolPages } from "./tools";
 import { landingSeoBody } from "./landing-seo";
-import { llmsTxt } from "./llms";
+import { COMPARISON_DESCRIPTIONS, TOOL_DESCRIPTIONS, llmsTxt } from "./llms";
 
 type Handler = (req: unknown, res: any) => void;
 
@@ -325,6 +325,18 @@ describe("entity and AEO surface", () => {
     expect(bad).toEqual([]);
     // Every post, tool and comparison page is listed.
     for (const p of POSTS) expect(txt, p.slug).toContain(`${ORIGIN}/blog/${p.slug})`);
+  });
+
+  it("every tool and comparison page in /llms.txt has its own factual description", () => {
+    const tools = TOOLS.map((t) => t.slug);
+    const comparisons = COMPARISON_PAGES.map((p) => p.path).filter(
+      (p) => p !== "/about" && p !== "/freelance-business-management-software",
+    );
+    expect(tools.filter((s) => !TOOL_DESCRIPTIONS[s])).toEqual([]);
+    expect(comparisons.filter((p) => !COMPARISON_DESCRIPTIONS[p])).toEqual([]);
+    // No stale entries for tools or pages that no longer exist.
+    expect(Object.keys(TOOL_DESCRIPTIONS).filter((s) => !tools.includes(s))).toEqual([]);
+    expect(Object.keys(COMPARISON_DESCRIPTIONS).filter((p) => !comparisons.includes(p))).toEqual([]);
   });
 
   it("/about names the founder as an Organization entity, with no invented profiles", () => {
