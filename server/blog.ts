@@ -1317,7 +1317,7 @@ ${tpl(16, "Confirming a scope change in writing", "Subject: Confirming scope for
 
 <h2>Before you send: check three things</h2>
 <ul>
-<li><b>The invoice is right.</b> Number, amount, currency, due date and payment details — a wrong detail is the easiest excuse to delay.</li>
+<li><b>The invoice is right.</b> Number, amount, currency, due date and payment details — a wrong detail is the easiest excuse to delay. If the invoice only states a term, the <a href="/tools/invoice-due-date-calculator">invoice due date calculator</a> gives the date.</li>
 <li><b>The client actually received it.</b> A spam-filtered invoice looks exactly like an ignored one. Ask if you are unsure.</li>
 <li><b>Your terms say what you are about to say.</b> A late fee, a work pause or a deadline is only fair game if your agreement or invoice terms include it.</li>
 </ul>
@@ -1411,7 +1411,7 @@ ${ctaInline("Generate one from your invoice details", "Enter the invoice number,
 <div class="answer"><p><b>Quick answer:</b> An overdue invoice email should name the invoice number, the amount and the original due date, attach the invoice, and ask for a specific payment date. Keep the first ones warm, get firmer as the invoice ages, and only mention late fees, a work pause or next steps if your agreement supports them. Six templates by age, with Copy buttons, follow.</p></div>
 
 <h2>Overdue, late, unpaid: are they the same?</h2>
-<p>In everyday use, yes — but the words differ slightly. <b>Overdue</b> means the due date has passed. <b>Unpaid</b> means no payment has arrived, which can also be true before the due date. <b>Late payment</b> is usually the phrase used when interest or compensation is discussed. In an email, use the plainest one: name the invoice and the due date and let the facts speak.</p>
+<p>In everyday use, yes — but the words differ slightly. <b>Overdue</b> means the due date has passed. <b>Unpaid</b> means no payment has arrived, which can also be true before the due date. <b>Late payment</b> is usually the phrase used when interest or compensation is discussed. In an email, use the plainest one: name the invoice and the due date and let the facts speak. If the invoice gives only a term such as Net 30, the <a href="/tools/invoice-due-date-calculator">invoice due date calculator</a> shows the exact due date.</p>
 
 <h2>Overdue invoice email templates, by age</h2>
 ${tpl(1, "1–7 days overdue: light touch", "Subject: Invoice {Invoice #} — payment reminder\n\nHi {Client name},\n\nInvoice {Invoice #} for {Amount} was due on {Due date} and I do not see the payment yet. It may already be on its way — I have attached a copy in case it helps. Could you confirm when it will be paid?\n\nThank you,\n{Your name}", "Assume good faith: an approval is often stuck, not refused.")}
@@ -1553,7 +1553,7 @@ ${ctaInline("Don't rely on remembering", "DealInSec tracks each invoice from sen
 <p>Splitting a project into invoices reduces risk for both sides. A common structure is a deposit before work starts and the balance on delivery; longer projects add a milestone in the middle. Whatever you choose, invoice each stage against the agreement so the total never exceeds what was agreed — DealInSec enforces that ceiling by drawing invoices from the agreement. <a href="/freelance-business-management-software">What freelance business management software covers</a> compares that approach with all-in-one tools.</p>
 
 <h2>Due dates and payment terms</h2>
-<p>Put a date on the invoice, not only "net 30". A specific due date is easier to act on and to follow up. Small jobs are often due on receipt, projects in 7 to 14 days, and larger organisations may require 30 days or longer; choose what your agreement supports and be consistent. Mention late fees only if your terms provide for them.</p>
+<p>Put a date on the invoice, not only "net 30". A specific due date is easier to act on and to follow up; the <a href="/tools/invoice-due-date-calculator">invoice due date calculator</a> works it out from the invoice date and the term. Small jobs are often due on receipt, projects in 7 to 14 days, and larger organisations may require 30 days or longer; choose what your agreement supports and be consistent. Mention late fees only if your terms provide for them.</p>
 
 <h2>How to get invoices paid on time</h2>
 <ul>
@@ -1621,7 +1621,7 @@ ${ctaInline("Invoices drawn from the agreement", "In DealInSec the invoice comes
 <tr><td>Net 30</td><td>Due 30 calendar days after the invoice date</td><td>Larger companies with monthly payment runs</td></tr>
 <tr><td>Net 60 / Net 90</td><td>Due 60 or 90 calendar days after the invoice date</td><td>Some large organisations; long waits for a freelancer</td></tr>
 </table></div>
-<p>Two habits avoid most confusion: write the actual due date on the invoice, not only the label, and agree the term in writing before work starts. Longer terms mean you finance the client's project for longer, which is one reason deposits exist. In some countries the law also limits or sets payment periods for business customers, so check local rules.</p>
+<p>Two habits avoid most confusion: write the actual due date on the invoice, not only the label, and agree the term in writing before work starts. The <a href="/tools/invoice-due-date-calculator">invoice due date calculator</a> turns a term such as Net 30 into that date. Longer terms mean you finance the client's project for longer, which is one reason deposits exist. In some countries the law also limits or sets payment periods for business customers, so check local rules.</p>
 
 <h2>Deposits, milestones and final payment</h2>
 <p>The principle is simple: you should never be owed much more than one instalment. A deposit before you start, a payment at a milestone on longer projects, and the balance on delivery achieves that. For monthly retainers, bill in advance for the month. The exact percentages are a convention; choose ones your client accepts and your risk can bear.</p>

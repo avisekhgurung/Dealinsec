@@ -176,7 +176,7 @@ const BODY = `
     <li><b>Never apologise for asking.</b> It is a routine business email, not a favour.</li>
     <li><b>Confirm calls in writing.</b> If the client promises payment by phone, email the date back to them.</li>
   </ol>
-  <p>More templates and timing guidance: <a href="/blog/payment-reminder-email">payment reminder email templates</a>, <a href="/blog/overdue-invoice-email">overdue invoice email templates</a> and <a href="/blog/reminder-email-templates">reminder email templates for any follow-up</a>. Chasing a UK business client? The <a href="/tools/uk-late-payment-calculator">UK late payment calculator</a> shows the statutory interest and compensation that may apply.</p>
+  <p>More templates and timing guidance: <a href="/blog/payment-reminder-email">payment reminder email templates</a>, <a href="/blog/overdue-invoice-email">overdue invoice email templates</a> and <a href="/blog/reminder-email-templates">reminder email templates for any follow-up</a>. Only have the payment terms, not the date? The <a href="/tools/invoice-due-date-calculator">invoice due date calculator</a> turns Net 15, 30, 45 or 60 into a due date. Chasing a UK business client? The <a href="/tools/uk-late-payment-calculator">UK late payment calculator</a> shows the statutory interest and compensation that may apply.</p>
 </div></section>
 
 <section><div class="wrap">

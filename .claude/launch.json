@@ -28,6 +28,15 @@
         "DATABASE_URL=postgresql://dealtest@localhost:5544/dealinsec_pdftest PORT=3000 npm run dev"
       ],
       "port": 3000
+    },
+    {
+      "name": "dealinsec-prod-local",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "DATABASE_URL=postgresql://dealtest@localhost:5544/dealinsec_pdftest NODE_ENV=production PORT=5099 SESSION_SECRET=local-only-not-a-secret node dist/index.cjs"
+      ],
+      "port": 5099
     }
   ]
 }

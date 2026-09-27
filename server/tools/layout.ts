@@ -535,6 +535,7 @@ const TOOL_LINKS: [string, string][] = [
   ["/tools/quotation-maker", "Quotation"],
   ["/tools/bill-generator", "Invoice"],
   ["/tools/payment-reminder-email-generator", "Payment Reminder"],
+  ["/tools/invoice-due-date-calculator", "Due Date"],
   ["/tools/service-agreement-template", "Agreement"],
   ["/tools/proforma-invoice-generator", "Proforma"],
   ["/tools/purchase-order-generator", "Purchase Order"],

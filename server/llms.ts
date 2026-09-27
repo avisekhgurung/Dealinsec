@@ -25,6 +25,8 @@ export const TOOL_DESCRIPTIONS: Record<string, string> = {
     "builds an item-wise bill or invoice with a total, optional tax, a logo, a signature and an optional PAID stamp, and downloads it as a PDF or PNG",
   "payment-reminder-email-generator":
     "turns an invoice's number, amount and due date into a reminder email in a friendly, firm or final tone, to copy or open in the user's email app; it sends nothing itself",
+  "invoice-due-date-calculator":
+    "works out an invoice due date from the invoice date and payment terms (due on receipt, Net 7, 15, 30, 45 or 60), with an option to move a weekend due date to the next Monday; public holidays are not considered",
   "service-agreement-template":
     "generates a freelancer–client service agreement (scope, deliverables, fees, revisions, cancellation, governing law and signature blocks) and downloads it as a PDF",
   "proforma-invoice-generator":

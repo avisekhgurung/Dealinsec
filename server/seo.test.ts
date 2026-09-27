@@ -14,7 +14,8 @@ import { GA_MEASUREMENT_ID, esc, gaSnippet } from "./tools/layout";
 import { COPY_SCRIPT, POSTS, blogSitemapPaths, guidesHtml, registerBlogPages, relatedSlugs, tpl } from "./blog";
 import { PAGES, registerCategoryPages } from "./category-pages";
 import { COMPARISON_PAGES, VENDORS, registerComparisonPages, comparisonSitemapPaths } from "./comparison-pages";
-import { TOOLS, registerToolPages } from "./tools";
+import { TOOLS, registerToolPages, toolSitemapPaths } from "./tools";
+import { CORE_JS as DUE_DATE_CORE_JS, EXAMPLE_INVOICE_DATE, FAQ as DUE_DATE_FAQ } from "./tools/invoice-due-date";
 import { landingSeoBody } from "./landing-seo";
 import { COMPARISON_DESCRIPTIONS, TOOL_DESCRIPTIONS, llmsTxt } from "./llms";
 
@@ -383,5 +384,88 @@ describe("entity and AEO surface", () => {
     const html = pages.get("/freelance-business-management-software")!;
     const missing = POSTS.filter((p) => !p.region && !html.includes(`href="/blog/${p.slug}"`)).map((p) => p.slug);
     expect(missing).toEqual([]);
+  });
+});
+
+describe("invoice due date calculator page", () => {
+  const PATH = "/tools/invoice-due-date-calculator";
+  const html = pages.get(PATH) ?? "";
+  const visible = stripJsonLd(html);
+
+  it("is registered, in the sitemap, and not served by the SPA shell", () => {
+    expect(html.length).toBeGreaterThan(1000);
+    expect(toolSitemapPaths()).toContain(PATH);
+    expect(SSR_PATH_PATTERN.test(PATH)).toBe(true);
+  });
+
+  it("has one H1, its own canonical, title and meta description, and the calculator markup", () => {
+    expect(html.match(/<h1[\s>]/g)?.length).toBe(1);
+    expect(html).toContain(`<link rel="canonical" href="https://www.dealinsec.com${PATH}" />`);
+    expect(html).toMatch(/<title>Invoice Due Date Calculator — Net 15, Net 30, Net 45 &amp; Net 60 \| DealInSec<\/title>/);
+    expect(html).toMatch(/<meta name="description" content="Calculate an invoice due date from the invoice date and payment terms/);
+    for (const id of ["dd-date", "dd-due", "dd-reset", "dd-explain"]) expect(html, id).toContain(`id="${id}"`);
+    for (const v of ["0", "7", "15", "30", "45", "60"]) expect(html).toContain(`name="terms" value="${v}"`);
+    expect(html).toContain('value="next-business-day"');
+  });
+
+  it("marks up only what is visible: FAQ questions and answers match exactly", () => {
+    const ld = jsonLdBlocks(html);
+    expect(ld.map((b) => b["@type"]).sort()).toEqual(["BreadcrumbList", "FAQPage", "SoftwareApplication"]);
+    const faq = ld.find((b) => b["@type"] === "FAQPage");
+    expect(faq.mainEntity.map((q: any) => q.name)).toEqual(DUE_DATE_FAQ.map((f) => f.q));
+    expect(faq.mainEntity.map((q: any) => q.acceptedAnswer.text)).toEqual(DUE_DATE_FAQ.map((f) => f.a));
+    for (const f of DUE_DATE_FAQ) {
+      expect(visible).toContain(`<summary>${esc(f.q)}</summary>`);
+      expect(visible).toContain(`<p>${esc(f.a)}</p>`);
+    }
+  });
+
+  it("the dates written in the prose agree with the calculator", () => {
+    const { ddCalc } = new Function(`${DUE_DATE_CORE_JS}; return { ddCalc: ddCalc };`)();
+    const due = (days: number) => ddCalc(EXAMPLE_INVOICE_DATE, days, "keep").due;
+    expect(EXAMPLE_INVOICE_DATE).toBe("2026-10-01");
+    expect(due(15)).toBe("2026-10-16");
+    expect(visible).toContain("on Net 15 terms is due on 16 October 2026");
+    expect(due(30)).toBe("2026-10-31");
+    expect(visible).toContain("on Net 30 terms is due on 31 October 2026");
+    expect(visible).toContain("the due date is 31 October 2026"); // FAQ
+    expect(due(45)).toBe("2026-11-15");
+    expect(visible).toContain("on Net 45 terms is due on 15 November 2026");
+  });
+
+  it("never presents a weekend or payment rule as law", () => {
+    const text = visible.replace(/<[^>]+>/g, " ");
+    expect(text).not.toMatch(/legally (required|mandatory|binding)|required by law|by law/i);
+  });
+
+  it("links to the payment-terms and reminder resources", () => {
+    for (const href of [
+      "/blog/freelance-payment-terms",
+      "/blog/payment-reminder-email",
+      "/blog/overdue-invoice-email",
+      "/tools/payment-reminder-email-generator",
+    ]) {
+      expect(visible, href).toContain(`href="${href}"`);
+    }
+  });
+
+  it("is linked in context from the pages about due dates and reminders", () => {
+    for (const from of [
+      "/blog/freelance-payment-terms",
+      "/blog/freelance-invoice-guide",
+      "/blog/payment-reminder-email",
+      "/blog/overdue-invoice-email",
+      "/tools/payment-reminder-email-generator",
+    ]) {
+      // Outside the shared tool navigation, which links every tool anyway.
+      const main = (pages.get(from) ?? "").match(/<main>([\s\S]*?)<\/main>|<article[\s\S]*?<\/article>/)?.[0] ?? "";
+      expect(main, from).toContain(`href="${PATH}"`);
+    }
+  });
+
+  it("has one product CTA, tracked by the existing seo_cta_click rule, that says reminders are drafted not sent", () => {
+    expect(visible).not.toContain('class="cta-band"');
+    expect(visible).toContain('href="/auth?mode=signup&ref=tool_due_date" data-cta');
+    expect(visible).toMatch(/It only drafts: you review the reminder and send it yourself/);
   });
 });
