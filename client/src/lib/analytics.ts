@@ -6,7 +6,23 @@
  * instead, so SPA route changes are tracked accurately (one event per route).
  */
 
+import { sanitizeEventParams } from "@shared/analyticsParams";
+import type { Audience } from "@shared/audience";
+
 export const GA_MEASUREMENT_ID = "G-W3VTLRH79B";
+
+// The signed-in account's work type, attached to every event so results can be
+// read per audience. Set by useAudience(); events from pages with no account
+// (public quote and signing pages, the homepage) pass `audience` themselves.
+let currentAudience: Audience | undefined;
+
+export function setAnalyticsAudience(audience: Audience | undefined): void {
+  currentAudience = audience;
+  if (typeof window !== "undefined" && typeof window.gtag === "function" && audience) {
+    // A user property, so GA4 can segment reports by audience as well.
+    window.gtag("set", "user_properties", { audience });
+  }
+}
 
 declare global {
   interface Window {
@@ -66,5 +82,8 @@ export function trackPageView(path: string): void {
 /** Fire a custom GA4 event (e.g. trackEvent("create_deal", { dealType: "Creator" })). */
 export function trackEvent(name: string, params?: Record<string, unknown>): void {
   if (typeof window === "undefined" || typeof window.gtag !== "function") return;
-  window.gtag("event", name, params);
+  // Sanitised first: nothing a person typed or pasted may reach analytics (see
+  // shared/analyticsParams.ts). Then the audience, unless the caller gave one.
+  const safe = sanitizeEventParams(params) ?? {};
+  window.gtag("event", name, currentAudience && safe.audience === undefined ? { ...safe, audience: currentAudience } : safe);
 }

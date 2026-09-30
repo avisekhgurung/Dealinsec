@@ -38,6 +38,7 @@ export function QuoteSharePanel({ dealId, party = "client" }: { dealId: number; 
     onSuccess: (d) => {
       qc.setQueryData(key, d);
       trackEvent("quotation_shared");
+      trackEvent("quotation_sent", { channel: "link" });
     },
     onError: (e: any) => toast({ title: e?.message || "Couldn't create the share link.", variant: "destructive" }),
   });

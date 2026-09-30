@@ -23,6 +23,7 @@ import { COPILOT_EVENT, takePendingCopilot } from "@/lib/copilot-bus";
 import { DealDraftCard, type DealDraft } from "./deal-draft-card";
 import { AgreementDraftCard, InvoiceDraftCard, type AgreementDraft, type InvoiceDraft } from "./proposal-cards";
 import { useAudience } from "@/hooks/use-audience";
+import { trackEvent } from "@/lib/analytics";
 
 /* ── types mirrored from server/copilot/insights.ts ── */
 interface Briefing {
@@ -163,6 +164,11 @@ export function Copilot() {
       });
       const data = await res.json();
       setMessages((cur) => [...cur, { role: "assistant", content: data.reply, actions: data.actions }]);
+      // A drafted deal is the completed reading of a pasted message. Only the fact
+      // that it happened is sent, never what was pasted.
+      if (Array.isArray(data.actions) && data.actions.some((a: { type?: string }) => a?.type === "deal_draft")) {
+        trackEvent("ai_deal_analysis_completed", { source: "copilot" });
+      }
     } catch {
       setMessages((cur) => [...cur, { role: "assistant", content: "I couldn't complete that right now. Please try again." }]);
     } finally {
@@ -187,6 +193,7 @@ export function Copilot() {
       const tones: string[] = Array.isArray(data.tones) ? data.tones : UNIVERSAL_TONES;
       const drafted = typeof data.tone === "string" ? data.tone : tone;
       setMessages((cur) => [...cur, { role: "assistant", content: data.message, chaser: { invoiceId, tone: drafted, tones } }]);
+      trackEvent("payment_followup_created", { tone: drafted });
     } catch {
       setMessages((cur) => [...cur, { role: "assistant", content: "Couldn't draft that message right now — try again in a moment." }]);
     } finally {
@@ -207,6 +214,8 @@ export function Copilot() {
   const addTerm = async (msgIndex: number, actionIndex: number, proposalId: string, flagId: string) => {
     if (fixingId) return;
     setFixingId(flagId);
+    // Acting on a finding; the finding's id is a fixed label, not user text.
+    trackEvent("protection_issue_opened", { finding: flagId, surface: "draft_card" });
     try {
       const res = await apiRequest("POST", `/api/copilot/proposal/${proposalId}/add-term`, { flagId });
       const data = await res.json();

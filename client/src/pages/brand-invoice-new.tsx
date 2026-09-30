@@ -43,6 +43,7 @@ import {
   taxLineLabel, taxRegistrations, type TaxRate,
 } from "@shared/invoice-tax";
 import { addDaysToIsoDate, isoDateInZone } from "@shared/invoice-numbering";
+import { trackEvent } from "@/lib/analytics";
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 
@@ -299,6 +300,7 @@ export default function BrandInvoiceNewPage() {
       return { split: false, data: await res.json() };
     },
     onSuccess: (result) => {
+      trackEvent("invoice_created", { split: !!result.split });
       queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/deals", contract?.dealId, "brand-invoices"] });
       if (result.split) {

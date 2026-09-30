@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useParams, Link } from "wouter";
 import { ProtectionFindings, type Finding } from "@/components/protection-findings";
@@ -92,6 +92,7 @@ export default function DealDetailsPage() {
     },
     onSuccess: () => {
       trackEvent("generate_quote");
+      trackEvent("quotation_created");
       queryClient.invalidateQueries({ queryKey: ["/api/deals", params.id, "quote"] });
       setLocation(`/deals/${params.id}/quote`);
     },
@@ -860,6 +861,19 @@ function DealIntelCards({ dealId, existingTerms }: { dealId: number; existingTer
     onError: () => toast({ title: "Couldn't update the terms", description: "Only pending deals can be edited.", variant: "destructive" }),
   });
 
+  // Viewed once per deal when the check has loaded: how many findings, never which text.
+  const viewedFor = useRef<number | null>(null);
+  useEffect(() => {
+    const p = data?.protection;
+    if (!p || viewedFor.current === dealId) return;
+    viewedFor.current = dealId;
+    trackEvent("protection_check_viewed", {
+      flags: p.flags.length,
+      important: p.flags.filter((f) => f.level === "important").length,
+      surface: "deal_page",
+    });
+  }, [data?.protection, dealId]);
+
   if (!data) return null;
   const { health, nextAction, protection } = data;
   const canEdit = data.dealStatus === "Pending";
@@ -921,7 +935,7 @@ function DealIntelCards({ dealId, existingTerms }: { dealId: number; existingTer
                 passes={protection.passes}
                 // "Fix these" opens the existing suggest → review → add flow, so
                 // nothing is written to the deal without being read first.
-                onFix={suggested === null && protection.gaps > 0 ? () => suggest.mutate() : undefined}
+                onFix={suggested === null && protection.gaps > 0 ? () => { trackEvent("protection_issue_opened", { action: "fix", surface: "deal_page" }); suggest.mutate(); } : undefined}
                 fixing={suggest.isPending}
                 onContinue={nextAction ? () => setLocation(nextAction.route) : undefined}
               />

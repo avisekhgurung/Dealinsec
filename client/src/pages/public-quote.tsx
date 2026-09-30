@@ -58,7 +58,7 @@ export default function PublicQuotePage() {
     retry: false,
   });
   useEffect(() => {
-    if (data) trackEvent("public_document_view", { type: "quote" });
+    if (data) trackEvent("public_document_view", { type: "quote", audience: audienceForDealType(data.snapshot?.dealType) });
   }, [!!data]);
 
   const accept = useMutation({
@@ -69,7 +69,7 @@ export default function PublicQuotePage() {
     },
     onSuccess: () => {
       setAcceptedNow(true);
-      trackEvent("public_quote_accept");
+      trackEvent("public_quote_accept", { audience: audienceForDealType(data?.snapshot?.dealType) });
     },
   });
 

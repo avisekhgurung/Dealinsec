@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { audienceLabels, normalizeAudience, type Audience, type AudienceLabels } from "@shared/audience";
+import { setAnalyticsAudience } from "@/lib/analytics";
 
 export interface AudienceState extends AudienceLabels {
   /** The account's work type. Client work until the org says otherwise. */
@@ -29,10 +31,15 @@ export function useAudience(): AudienceState {
     staleTime: 5 * 60 * 1000,
   });
   const audience = normalizeAudience(org?.audience);
+  const ready = !hasOrg || org != null;
+  // Every analytics event from here on carries this account's work type.
+  useEffect(() => {
+    if (ready) setAnalyticsAudience(audience);
+  }, [audience, ready]);
   return {
     ...audienceLabels(audience),
     audience,
     isBrand: audience === "brand_collaboration",
-    ready: !hasOrg || org != null,
+    ready,
   };
 }

@@ -41,6 +41,7 @@ export function AgreementSignPanel({ contractId, party = "client" }: { contractI
     onSuccess: (d) => {
       qc.setQueryData(key, { ...d, signed: false });
       trackEvent("agreement_shared");
+      trackEvent("agreement_sent", { channel: "link" });
     },
     onError: (e: any) => toast({ title: e?.message || "Couldn't create the signing link.", variant: "destructive" }),
   });

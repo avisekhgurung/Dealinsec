@@ -158,6 +158,7 @@ export default function CreateDealPage() {
   // ordinary "start from scratch" visit to this page.
   useEffect(() => {
     if (prefill) trackEvent("draft_restored_after_signup");
+    trackEvent("deal_started", { source: prefill ? "draft" : "form" });
   }, []);
   const prefillType = isPickable(prefill?.dealType) ? prefill.dealType : null;
   const [urlType] = useState<PickerType | null>(() => prefillType ?? initialTypeFromUrl());
@@ -240,7 +241,11 @@ export default function CreateDealPage() {
       return res.json();
     },
     onSuccess: (deal) => {
-      trackEvent("create_deal", { deal_type: deal?.dealType });
+      // create_deal is the long-standing name (GA key event); deal_created is
+      // the same moment under the name the audience reports use.
+      const dealAudience = audienceForDealType(deal?.dealType);
+      trackEvent("create_deal", { deal_type: deal?.dealType, audience: dealAudience });
+      trackEvent("deal_created", { deal_type: deal?.dealType, audience: dealAudience });
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
       toast({
         title: "Deal created",

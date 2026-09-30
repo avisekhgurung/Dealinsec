@@ -13,6 +13,7 @@ import { UpgradeModalProvider } from "@/components/upgrade-modal";
 const Copilot = lazy(() => import("@/components/copilot/copilot").then((m) => ({ default: m.Copilot })));
 import { trackPageView, trackEvent } from "@/lib/analytics";
 import { setAppShell } from "@/lib/theme";
+import { useAudience } from "@/hooks/use-audience";
 import { useLocation } from "wouter";
 
 // Eagerly loaded — always needed for first render
@@ -62,6 +63,12 @@ const FULL_BLEED_ROUTES = new Set([
   "/refund",
   "/onboarding",
 ]);
+
+/** Sets the audience every analytics event from a signed-in page carries. */
+function AudienceAnalytics() {
+  useAudience();
+  return null;
+}
 
 function isFullBleedRoute(pathname: string) {
   if (FULL_BLEED_ROUTES.has(pathname)) return true;
@@ -174,6 +181,7 @@ function Router() {
 
   return (
     <>
+      <AudienceAnalytics />
       {showShell && <DesktopTopNav />}
       {/* Copilot floats on every authed workspace page (not on print/full-bleed views) */}
       {showShell && (

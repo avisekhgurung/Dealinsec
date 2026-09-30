@@ -95,6 +95,11 @@ export default function AuthPage() {
     if (isAuthenticated) setLocation(postAuthDestination());
   }, [isAuthenticated, setLocation]);
 
+  // The signup form was shown (once per visit to it, not per keystroke).
+  useEffect(() => {
+    if (mode === "signup") trackEvent("signup_started");
+  }, [mode]);
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);

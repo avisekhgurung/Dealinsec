@@ -29,7 +29,8 @@ import {
   taxRegistrations,
 } from "@shared/invoice-tax";
 import { parseApiError, isUpgradeError } from "@/lib/api-error";
-import { audienceForDealType } from "@shared/audience";
+import { audienceForDealType, dealAudienceLabels } from "@shared/audience";
+import { trackEvent } from "@/lib/analytics";
 
 function slugify(s: string): string {
   return (s || "")
@@ -104,6 +105,7 @@ export default function BrandInvoiceDetailsPage() {
       return res.json();
     },
     onSuccess: () => {
+      trackEvent("payment_marked_paid", { audience: audienceForDealType(deal?.dealType) });
       queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices", id] });
       toast({ title: "Invoice marked as paid" });
@@ -458,7 +460,7 @@ export default function BrandInvoiceDetailsPage() {
             <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30">
               <div className="flex items-center justify-center gap-2 py-3">
                 <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                <span className="font-semibold text-emerald-700 dark:text-emerald-300">Payment Received</span>
+                <span className="font-semibold text-emerald-700 dark:text-emerald-300">{dealAudienceLabels(deal?.dealType).payment} received</span>
               </div>
               {canRecordPayment && (
                 <div className="px-3 pb-3 text-center">

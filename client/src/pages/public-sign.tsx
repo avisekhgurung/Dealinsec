@@ -15,6 +15,7 @@ import { SignatureInput } from "@/components/signature-input";
 import { PublicDocFooter } from "@/components/public-doc-footer";
 import { PublicAgreementDoc, type PublicAgreementSnapshot } from "@/components/document/public-agreement-doc";
 import { notADscPhrase } from "@shared/agreementClauses";
+import { audienceForDealType } from "@shared/audience";
 
 /** Everything the compact summary cards read, plus everything
  *  PublicAgreementDoc needs to render the full official document — one
@@ -63,7 +64,7 @@ export default function PublicSignPage() {
     retry: false,
   });
   useEffect(() => {
-    if (data) trackEvent("public_agreement_view");
+    if (data) trackEvent("public_agreement_view", { audience: audienceForDealType((data as any)?.snapshot?.dealType) });
   }, [!!data]);
 
   const sign = useMutation({
@@ -78,7 +79,8 @@ export default function PublicSignPage() {
     },
     onSuccess: () => {
       setJustSigned(true);
-      trackEvent("public_agreement_sign");
+      trackEvent("public_agreement_sign", { audience: audienceForDealType((data as any)?.snapshot?.dealType) });
+      trackEvent("agreement_signed", { audience: audienceForDealType((data as any)?.snapshot?.dealType) });
       refetch();
     },
   });

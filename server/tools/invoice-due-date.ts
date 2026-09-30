@@ -345,10 +345,14 @@ const PAGE_JS = `
     $('dd-explain').innerHTML = ddExplain(r, fmtDay).map(function (s) {
       return '<p>' + s.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</p>';
     }).join('');
-    // One analytics event per page view, on the first real use.
+    // One analytics event per page view, on the first real use. tool_use is the
+    // long-standing name; tool_completed is the same moment under the shared name.
     if (fromUser && !used) {
       used = true;
-      if (typeof window.gtag === 'function') window.gtag('event', 'tool_use', { tool: 'invoice-due-date-calculator' });
+      if (typeof window.gtag === 'function') {
+        window.gtag('event', 'tool_use', { tool: 'invoice-due-date-calculator' });
+        window.gtag('event', 'tool_completed', { tool: 'invoice-due-date-calculator' });
+      }
     }
   }
   function reset() {
@@ -357,7 +361,11 @@ const PAGE_JS = `
     document.querySelector('input[name="weekend"][value="keep"]').checked = true;
     calc(false);
   }
-  $('dd-form').addEventListener('input', function () { calc(true); });
+  var started = false;
+  $('dd-form').addEventListener('input', function () {
+    if (!started) { started = true; if (typeof window.gtag === 'function') window.gtag('event', 'tool_started', { tool: 'invoice-due-date-calculator' }); }
+    calc(true);
+  });
   $('dd-form').addEventListener('change', function () { calc(true); });
   $('dd-form').addEventListener('submit', function (e) { e.preventDefault(); });
   $('dd-reset').addEventListener('click', reset);

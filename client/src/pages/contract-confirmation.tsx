@@ -16,7 +16,7 @@ import { CreditAnimationOverlay } from "@/components/credit-animation-overlay";
 import { trackEvent } from "@/lib/analytics";
 import { STANDARD_TERMS, hasActivePro, hasProAccess, hasActiveTrial } from "@shared/schema";
 import type { Deal, Contract } from "@shared/schema";
-import { defaultExclusive } from "@shared/audience";
+import { audienceForDealType, defaultExclusive } from "@shared/audience";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { parseApiError, isUpgradeError, currencyChangedToast } from "@/lib/api-error";
 import { taxIdLabel } from "@shared/invoice-tax";
@@ -189,6 +189,7 @@ export default function ContractConfirmationPage() {
     },
     onSuccess: (contract) => {
       // Key conversion event: an agreement was signed (a core Pro action).
+      trackEvent("agreement_created", { audience: audienceForDealType(deal?.dealType) });
       trackEvent("sign_agreement", {
         // Major units plus the currency, the way analytics tools expect a
         // monetary value — reporting paise as `value` would show 100x revenue.

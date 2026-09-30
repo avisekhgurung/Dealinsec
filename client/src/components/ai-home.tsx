@@ -13,6 +13,7 @@ import { askCopilot } from "@/lib/copilot-bus";
 import { useAuth } from "@/hooks/useAuth";
 import { useAudience } from "@/hooks/use-audience";
 import { memberCan } from "@shared/permissions";
+import { trackEvent } from "@/lib/analytics";
 
 // Client-work wording is exactly what shipped; a brand account swaps the two
 // lines that name the other party.
@@ -81,6 +82,9 @@ export function AiHome({ firstRun = false }: { firstRun?: boolean }) {
   const submit = () => {
     const t = text.trim();
     if (!t) return;
+    // A pasted message is long; a short question is not an analysis. Only the
+    // fact that a message was sent is recorded, never its text.
+    if (t.length >= 40) trackEvent("ai_deal_analysis_started", { source: "dashboard" });
     askCopilot(t);
     setText("");
   };

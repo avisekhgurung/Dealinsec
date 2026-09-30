@@ -33,6 +33,7 @@ import { PaymentResult } from "@/components/payment-result";
 import { useRazorpayCheckout, type CheckoutPlan } from "@/hooks/use-razorpay-checkout";
 import { PLAN_PRICE_DEFAULTS, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
 import { useLocale } from "@/hooks/use-locale";
+import { trackEvent } from "@/lib/analytics";
 
 const REDIRECT_KEY = "postPaymentRedirect";
 
@@ -52,6 +53,9 @@ function CheckoutComingSoon({ testId }: { testId: string }) {
 }
 
 export default function PricingPage() {
+  useEffect(() => {
+    trackEvent("pricing_viewed");
+  }, []);
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -322,7 +326,7 @@ export default function PricingPage() {
               <span className="text-4xl font-black text-foreground leading-none">{fmt(0)}</span>
               <span className="text-sm text-muted-foreground font-medium">/ forever</span>
             </div>
-            <p className="text-xs text-muted-foreground mb-4">Quote every new client properly, free</p>
+            <p className="text-xs text-muted-foreground mb-4">Quote every new client or brand properly, free</p>
             <ul className="space-y-2.5 mb-6 flex-1">
               {[
                 "4 deals every month",
@@ -362,7 +366,7 @@ export default function PricingPage() {
                 <span className="text-sm text-muted-foreground font-medium">/ month</span>
               </div>
               <p className="text-xs text-muted-foreground mb-4">
-                Quote, e-sign, invoice and track payment for every client
+                Quote, e-sign, invoice and track payment for every client or brand
               </p>
               <ul className="space-y-2.5 mb-6 flex-1">
                 {PRO_FEATURES.map((f) => (
@@ -518,7 +522,7 @@ export default function PricingPage() {
             {[
               { step: "1", title: "Create a Deal", desc: "Free plan covers 4 deals every month" },
               { step: "2", title: "Generate its Quotation", desc: "Included with the deal — no extra cost" },
-              { step: "3", title: "Sign the Agreement", desc: "Pro — scope & terms your client accepts with an e-signature" },
+              { step: "3", title: "Sign the Agreement", desc: "Pro — scope & terms your client or brand accepts with an e-signature" },
               {
                 step: "4",
                 title: "Invoice & track payment",

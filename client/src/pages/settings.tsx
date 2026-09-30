@@ -47,6 +47,7 @@ import { AudiencePicker } from "@/components/audience-picker";
 import { normalizeAudience, type Audience } from "@shared/audience";
 import { getLocaleSettings, type LocaleFields, type LocaleSettings } from "@shared/schema";
 import { sameRegion } from "@shared/region";
+import { trackEvent } from "@/lib/analytics";
 
 /** Entity tints for the activity table — money events read green, documents
  *  blue/teal, people violet; everything else stays neutral. */
@@ -202,7 +203,8 @@ export default function SettingsPage() {
   // existing that it can affect.
   const saveAudience = useMutation({
     mutationFn: async (next: Audience) => (await apiRequest("PATCH", "/api/org", { audience: next })).json(),
-    onSuccess: () => {
+    onSuccess: (_data, next) => {
+      trackEvent("audience_selected", { audience: next, source: "settings" });
       queryClient.invalidateQueries({ queryKey: ["/api/org"] });
       toast({ title: "Work type updated" });
     },

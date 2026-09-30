@@ -102,6 +102,7 @@ export function useRazorpayCheckout() {
             // it (rather than assuming INR and /100) keeps the event right if
             // the order currency ever changes. Today it is always INR.
             const orderCurrency = order.currency || "INR";
+            trackEvent("subscription_started", { plan });
             trackEvent("purchase", {
               currency: orderCurrency,
               value: fromMinor(order.amount, orderCurrency),
