@@ -111,6 +111,7 @@ export function registerAgreementSignRoutes(app: Express) {
         deliverables: deal?.deliverables,
         dealStandardTermIds: (deal?.standardTermIds as string[] | null) ?? [],
         dealCustomTerms: deal?.customTerms ?? null,
+        dealBrandTerms: deal?.brandTerms,
         settings,
       });
 

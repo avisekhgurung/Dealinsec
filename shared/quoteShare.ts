@@ -11,6 +11,7 @@
  */
 import { STANDARD_TERMS, type Deal, type Deliverable, type LocaleSettings } from "./schema";
 import { formatMoney, formatDate } from "./money";
+import { brandTermsForDeal, type BrandTerms } from "./audience";
 
 export interface QuoteShareSnapshot {
   v: 1;
@@ -30,6 +31,9 @@ export interface QuoteShareSnapshot {
   /** The date printed as "valid until" — computed once, at share time, so it
    *  never silently moves as real time passes on an old link. */
   validUntil: string;
+  /** Brand collaborations only, and only when the deal states any. ABSENT
+   *  otherwise, so an existing quotation's snapshot is unchanged. */
+  brandTerms?: BrandTerms;
 }
 
 const deliverableLabel = (d: Deliverable) => `${d.contentType || d.platform}${d.notes ? ` — ${d.notes}` : ""}`;
@@ -39,7 +43,7 @@ const deliverableLabel = (d: Deliverable) => `${d.contentType || d.platform}${d.
  *  this module never needs a User row. */
 export function buildQuoteShareSnapshot(args: {
   issuerName: string;
-  deal: Pick<Deal, "brandName" | "dealTitle" | "dealType" | "deliverables" | "startDate" | "endDate" | "dealAmountMinor" | "standardTermIds" | "customTerms">;
+  deal: Pick<Deal, "brandName" | "dealTitle" | "dealType" | "deliverables" | "startDate" | "endDate" | "dealAmountMinor" | "standardTermIds" | "customTerms"> & { brandTerms?: unknown };
   quoteId: number;
   version: number;
   settings: LocaleSettings;
@@ -51,6 +55,7 @@ export function buildQuoteShareSnapshot(args: {
 
   const standardLabels = STANDARD_TERMS.filter((t) => (deal.standardTermIds as string[] | null)?.includes(t.id) && t.phases.includes("quotation")).map((t) => t.label);
   const customLines = (deal.customTerms ?? "").split("\n").map((t) => t.trim()).filter(Boolean);
+  const brandTerms = deal.dealType === "Brand Collaboration" ? brandTermsForDeal(deal.dealType, deal.brandTerms) : null;
 
   return {
     v: 1,
@@ -68,5 +73,6 @@ export function buildQuoteShareSnapshot(args: {
     quoteNumber: `QUO-${String(quoteId).padStart(4, "0")}`,
     version,
     validUntil: formatDate(validUntil, settings.locale, { day: "numeric", month: "long", year: "numeric" }),
+    ...(brandTerms ? { brandTerms } : {}),
   };
 }

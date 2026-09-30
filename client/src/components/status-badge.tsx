@@ -8,7 +8,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 
-type StatusType = "Pending" | "Active" | "Completed" | "Signed" | "Paid" | "Unpaid" | "Draft" | "Sent";
+type StatusType = "Pending" | "Active" | "Completed" | "Signed" | "Paid" | "Unpaid" | "Draft" | "Sent" | "Due soon" | "Overdue";
 
 const statusConfig: Record<StatusType, { style: string; icon: React.ElementType; dot: string }> = {
   Pending: {
@@ -40,6 +40,18 @@ const statusConfig: Record<StatusType, { style: string; icon: React.ElementType;
     style: "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-900/20 dark:text-rose-400 dark:border-rose-800/50",
     icon: AlertCircle,
     dot: "bg-rose-400",
+  },
+  // Derived payment states (see shared/paymentState.ts). Pending reuses the
+  // amber "Pending" style above.
+  "Due soon": {
+    style: "bg-amber-50 text-amber-800 border border-amber-300 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-700/50",
+    icon: Clock,
+    dot: "bg-amber-500",
+  },
+  Overdue: {
+    style: "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-900/20 dark:text-rose-400 dark:border-rose-800/50",
+    icon: AlertCircle,
+    dot: "bg-rose-500",
   },
   Draft: {
     style: "bg-slate-50 text-slate-600 border border-slate-200 dark:bg-slate-900/20 dark:text-slate-400 dark:border-slate-700/50",

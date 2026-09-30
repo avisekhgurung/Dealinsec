@@ -29,6 +29,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMoney } from "@/hooks/use-locale";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { moneyIcon } from "@/components/money-icon";
+import { useAudience } from "@/hooks/use-audience";
 
 export type PickKind = "quotation" | "agreement" | "invoice";
 
@@ -68,6 +69,7 @@ export function PickParentDialog({
 }: { kind: PickKind; open: boolean; onOpenChange: (v: boolean) => void }) {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const audience = useAudience();
   const { money, settings: moneySettings } = useMoney();
   const { openUpgradeModal } = useUpgradeModal();
   const [search, setSearch] = useState("");
@@ -250,7 +252,7 @@ export function PickParentDialog({
                       autoFocus
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Search by client or title…"
+                      placeholder={`Search by ${audience.partyLower} or title…`}
                       className="pl-9 h-9"
                       data-testid="pick-search"
                     />

@@ -54,3 +54,26 @@ describe("buildQuoteShareSnapshot — the public-page contract", () => {
     expect(again).toEqual(snap);
   });
 });
+
+
+describe("brand terms in the quotation snapshot", () => {
+  const brandDeal = { ...deal, dealType: "Brand Collaboration", brandName: "Glow" };
+  const snapOf = (d: object) =>
+    buildQuoteShareSnapshot({ issuerName: "Lena Ortiz", deal: d as any, quoteId: 1, version: 1, settings, now: new Date("2026-09-22T00:00:00Z") });
+
+  it("adds no key for a client deal, even one that somehow holds brand terms", () => {
+    expect(snapOf({ ...deal, brandTerms: { usageRights: "x" } })).not.toHaveProperty("brandTerms");
+  });
+
+  it("adds no key for a brand collaboration that states nothing", () => {
+    expect(snapOf(brandDeal)).not.toHaveProperty("brandTerms");
+    expect(snapOf({ ...brandDeal, brandTerms: { campaign: "  " } })).not.toHaveProperty("brandTerms");
+  });
+
+  it("carries the stated terms of a brand collaboration", () => {
+    expect(snapOf({ ...brandDeal, brandTerms: { campaign: "Autumn", usageRights: "Organic posts" } }).brandTerms).toEqual({
+      campaign: "Autumn",
+      usageRights: "Organic posts",
+    });
+  });
+});

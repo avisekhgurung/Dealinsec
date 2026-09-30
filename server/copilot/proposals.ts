@@ -16,10 +16,12 @@
 import crypto from "crypto";
 import type { LocaleSettings } from "@shared/schema";
 import { formatMoney } from "@shared/money";
+import { audienceForDealType, type Audience, type BrandTerms } from "@shared/audience";
 import {
   analyzeDealProtections,
   flagPriority,
   protectionPasses,
+  type FindingLevel,
   type FlagPriority,
 } from "./riskcheck";
 
@@ -47,6 +49,10 @@ export interface DealDraft {
   client: string;
   project: string;
   dealType: string;
+  /** Which kind of deal this is, from its type — decides the card's wording. */
+  audience: Audience;
+  /** Usage / exclusivity / approval terms, for a brand deal; null otherwise. */
+  brandTerms: BrandTerms | null;
   amount: string;
   timeline: string;
   deliverables: string[];
@@ -55,7 +61,17 @@ export interface DealDraft {
   advancePercent: number | null;
   revisions: number | null;
   protection: {
-    flags: { id: string; priority: FlagPriority; title: string; detail: string; suggestedTerm?: string }[];
+    flags: {
+      id: string;
+      /** Kept for older surfaces; `level` is the one scale going forward. */
+      priority: FlagPriority;
+      level: FindingLevel;
+      title: string;
+      detail: string;
+      why: string;
+      ask: string;
+      suggestedTerm?: string;
+    }[];
     passes: string[];
   };
   /** Things the user should look at before confirming. */
@@ -70,6 +86,7 @@ export interface DealDraft {
     endDate: string;
     deliverables: { platform: string; contentType: string; quantity: number; frequency: string; notes: string }[];
     customTerms: string;
+    brandTerms?: BrandTerms | null;
   };
 }
 
@@ -256,6 +273,7 @@ export function buildDealDraft(
     endDate: string;
     deliverables: { platform: string; contentType: string; quantity: number; frequency: string; notes?: string | null }[];
     customTerms?: string | null;
+    brandTerms?: BrandTerms | null;
   },
   amountMajor: number,
   settings: LocaleSettings,
@@ -264,8 +282,14 @@ export function buildDealDraft(
   const terms = (candidate.customTerms ?? "").split("\n").map((t) => t.trim()).filter(Boolean);
   const termsText = terms.join("\n");
 
-  // The check only reads terms, so a draft is checked exactly like a saved deal.
-  const report = analyzeDealProtections({ customTerms: termsText, standardTermIds: [] } as any, settings);
+  // The check reads the terms, the deal type and any brand terms. Dates and
+  // deliverables are deliberately not passed: a draft's dates are defaults the
+  // server filled in, and checking them would report a deadline that nobody set.
+  const brandTerms = candidate.brandTerms ?? null;
+  const report = analyzeDealProtections(
+    { dealType: candidate.dealType, customTerms: termsText, standardTermIds: [], brandTerms } as any,
+    settings,
+  );
 
   const warnings: string[] = [];
   if (!amountAppearsIn(userText, amountMajor)) {
@@ -276,6 +300,8 @@ export function buildDealDraft(
     client: candidate.brandName,
     project: candidate.dealTitle,
     dealType: candidate.dealType,
+    audience: audienceForDealType(candidate.dealType),
+    brandTerms,
     amount: formatMoney(candidate.dealAmountMinor, settings.currency, settings.locale),
     timeline: timelineLabel(candidate.startDate, candidate.endDate),
     deliverables: candidate.deliverables.map((d) => (d.quantity > 1 ? `${d.quantity} × ${d.contentType}` : d.contentType)),
@@ -286,8 +312,11 @@ export function buildDealDraft(
       flags: report.flags.map((f) => ({
         id: f.id,
         priority: flagPriority(f),
+        level: f.level,
         title: f.title,
         detail: f.detail,
+        why: f.why,
+        ask: f.ask,
         suggestedTerm: f.suggestedTerm,
       })),
       passes: protectionPasses(report),
@@ -308,6 +337,7 @@ export function buildDealDraft(
         notes: d.notes ?? "",
       })),
       customTerms: termsText,
+      brandTerms,
     },
   };
 }

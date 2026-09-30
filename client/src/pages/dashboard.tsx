@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/useAuth";
+import { useAudience } from "@/hooks/use-audience";
 import { useQuery } from "@tanstack/react-query";
 import { AiHome } from "@/components/ai-home";
 import { Link } from "wouter";
@@ -14,7 +15,7 @@ import {
   TrendingUp, IndianRupee, Banknote, Clock, CheckCircle2,
   UserCircle, MapPin, FileText, PenTool, Landmark, X as XIcon, Sparkles,
   Crown, Rocket, Users2, UserPlus2, Settings as SettingsIcon,
-  Zap, FileSignature, ArrowUpRight
+  Zap, FileSignature, ArrowUpRight, ShieldAlert
 } from "lucide-react";
 import {
   BarChart, Bar, Cell, PieChart, Pie, AreaChart, Area,
@@ -568,6 +569,57 @@ function MoneyTile({ label, amountMinor, icon: Icon, tint, fmt }: {
   );
 }
 
+// ─── Protection issues ───────────────────────────────────────────────────────
+// A count of REAL pending deals whose terms have something worth clarifying,
+// from the same Protection Check the deal page shows. Shown only when there is
+// something to show: a clean account gets no card rather than a made-up "all
+// clear". Mirrors ProtectionSummary in server/copilot/riskcheck.ts.
+function ProtectionIssuesCard({ isBrand }: { isBrand: boolean }) {
+  const { data } = useQuery<{
+    protection?: { checked: number; withIssues: number; important: number; usageRights: number; exclusivity: number };
+  }>({ queryKey: ["/api/copilot/briefing"], staleTime: 60_000 });
+  const p = data?.protection;
+  if (!p || p.withIssues === 0) return null;
+  const stats = [
+    { label: "Important", n: p.important, dot: "bg-rose-500" },
+    ...(isBrand
+      ? [
+          { label: "Usage rights", n: p.usageRights, dot: "bg-amber-500" },
+          { label: "Exclusivity", n: p.exclusivity, dot: "bg-amber-500" },
+        ]
+      : []),
+  ].filter((x) => x.n > 0);
+  return (
+    <Card className="glass-card border-amber-300/40 dark:border-amber-800/40" data-testid="protection-issues">
+      <CardContent className="p-4 lg:p-5">
+        <div className="flex items-start gap-3">
+          <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Protection issues</p>
+            <p className="text-sm font-semibold mt-0.5">
+              {p.withIssues} pending deal{p.withIssues === 1 ? " has" : "s have"} terms worth clarifying before you send.
+            </p>
+            {stats.length > 0 && (
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {stats.map((x) => (
+                  <li key={x.label} className="inline-flex items-center gap-1.5 rounded-full border border-border/70 px-2.5 py-1 text-xs font-semibold">
+                    <span className={`w-2 h-2 rounded-full ${x.dot}`} aria-hidden /> {x.n} {x.label.toLowerCase()}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <Link href="/deals" className="shrink-0">
+            <Button size="sm" variant="outline" className="h-8 text-xs font-semibold">
+              Review <ChevronRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Money Radar ─────────────────────────────────────────────────────────────
 // "How much money am I leaving on the table?" — three deterministic buckets
 // from the insights engine; every number clickable, none invented.
@@ -635,6 +687,7 @@ function MoneyRadarCard() {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const audience = useAudience();
   const fmt = useMoney();
   const canCreateDeal = memberCan(user as any, "deals.create");
   const displayName = user?.firstName && user?.lastName
@@ -761,7 +814,7 @@ export default function DashboardPage() {
               <Link href="/deals/new" className="hidden lg:block">
                 <Button size="sm" className="gradient-btn text-white font-semibold" data-testid="header-new-deal">
                   <Plus className="w-4 h-4 mr-1.5" />
-                  New Deal
+                  {audience.newDealCta}
                 </Button>
               </Link>
             )}
@@ -897,6 +950,7 @@ export default function DashboardPage() {
         <TeamSeatsCard />
 
         <MoneyRadarCard />
+        <ProtectionIssuesCard isBrand={audience.isBrand} />
 
         {/* ── Stat cards — the funnel, in order: deal → quote → agreement →
             invoice → money ── */}
@@ -1356,13 +1410,13 @@ export default function DashboardPage() {
               </div>
               <h3 className="font-semibold mb-1">No deals yet</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Create your first client deal to get started
+                {audience.emptyState}
               </p>
               {canCreateDeal && (
                 <Link href="/deals/new">
                   <Button className="gradient-btn" data-testid="button-create-first-deal">
                     <Plus className="w-4 h-4 mr-2" />
-                    Create Deal
+                    {audience.newDealCta}
                   </Button>
                 </Link>
               )}

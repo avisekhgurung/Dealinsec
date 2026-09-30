@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertFeedbackSchema, feedback, insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, organizations as organizationsTable, newsletterSubscribers, invoiceDocumentCategories, invoiceLineItemSchema, brandInvoiceTypeOptions, hasActivePro, hasActiveDealBoost, hasProAccess, hasActiveTrial, getTrialDaysLeft, getDealCredits, amountMinorSchema, getCurrency, fromMinor, toMinor, resolveLocaleSettings, CURRENCIES, type User, type Contract, type LocaleSettings, type CurrencyCode, type InvoiceLineItem } from "@shared/schema";
 import { documentLocaleSettings, formatMoney, splitMinor } from "@shared/money";
 import { isCountryCode, normalizeTimeZone } from "@shared/region";
+import { brandTermsForDeal, isAudience, normalizeAudience } from "@shared/audience";
 import { isoDateInZone, wouldRenumberIssuedInvoice, withoutInvoiceNumber } from "@shared/invoice-numbering";
 import { bankRoutingLabel, invoiceTaxProfile } from "@shared/invoice-tax";
 import { eq, sql } from "drizzle-orm";
@@ -720,7 +721,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       try {
-        const deal = await storage.createDeal(parsed.data);
+        const deal = await storage.createDeal({
+          ...parsed.data,
+          brandTerms: brandTermsForDeal(parsed.data.dealType, parsed.data.brandTerms),
+        });
         logOrgActivity(req.user, "created", "deal", deal.id, `Deal: ${deal.dealTitle || deal.brandName}`);
         res.status(201).json(deal);
       } catch (insertError) {
@@ -749,7 +753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // column became dealAmountMinor, reading `dealAmount` here kept compiling
       // and silently dropped every amount edit. Refuse the old key outright.
       if (rejectStaleMoneyBody(req.body, res)) return;
-      const { brandName, dealTitle, dealAmountMinor, startDate, endDate, deliverables, brandUserId, deliverableMode, standardTermIds, customTerms } = req.body;
+      const { brandName, dealTitle, dealAmountMinor, startDate, endDate, deliverables, brandUserId, deliverableMode, standardTermIds, customTerms, brandTerms } = req.body;
       const updates: any = {};
       if (brandName !== undefined) updates.brandName = brandName;
       if (dealTitle !== undefined) updates.dealTitle = dealTitle;
@@ -773,6 +777,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (deliverableMode !== undefined) updates.deliverableMode = deliverableMode;
       if (standardTermIds !== undefined) updates.standardTermIds = standardTermIds;
       if (customTerms !== undefined) updates.customTerms = customTerms;
+      // Bounded and blank-stripped; null clears it. Judged by the deal's own
+      // type, which this route does not change.
+      if (brandTerms !== undefined) updates.brandTerms = brandTermsForDeal(deal.dealType, brandTerms);
 
       const updated = await storage.updateDeal(dealId, updates);
 
@@ -2104,8 +2111,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/org", isAuthenticated, requireOrgPermission("org.settings"), withOrg, async (req: any, res) => {
     try {
-      const { name, industry, logo } = req.body || {};
+      const { name, industry, logo, audience } = req.body || {};
       const updates: any = {};
+      // The account's work type. Free to change at any time: it only changes
+      // wording and what the new-deal picker offers first, never existing data.
+      if (audience !== undefined) {
+        if (!isAudience(audience)) return res.status(400).json({ field: "audience", error: "Choose client work or brand collaborations" });
+        updates.audience = audience;
+      }
       if (typeof name === "string" && name.trim()) updates.name = name.trim().slice(0, 80);
       if (typeof industry === "string") updates.industry = industry.trim().slice(0, 60) || null;
       if (typeof logo === "string") updates.logo = logo.trim().slice(0, 500) || null;
@@ -3121,20 +3134,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       reservedIp = ip;
-      const draft = await extractDealDraft(text);
+      // Which kind of message this is: the visitor's own choice, never inferred.
+      // Anything but "brand_collaboration" is client work, as before.
+      const audience = normalizeAudience(req.body?.audience);
+      const draft = await extractDealDraft(text, audience);
 
       const settings = resolveLocaleSettings(null, draft.currency ? ({ currency: draft.currency } as any) : null);
       const customTerms = draft.terms.join("\n");
-      const report = analyzeDealProtections({ customTerms, standardTermIds: [] } as any, settings);
+      const report = analyzeDealProtections(
+        {
+          dealType: audience === "brand_collaboration" ? "Brand Collaboration" : undefined,
+          brandTerms: draft.brandTerms ?? null,
+          customTerms,
+          standardTermIds: [],
+        } as any,
+        settings,
+      );
       const grounded = draft.amount > 0 ? amountAppearsIn(text, draft.amount) : true;
 
       res.json({
         draft,
         amountLabel: draft.amount > 0 ? formatMoney(toMinor(draft.amount, settings.currency || "USD"), settings.currency || "USD", settings.locale) : null,
         protection: {
-          flags: report.flags.map((f) => ({ id: f.id, priority: flagPriority(f), title: f.title, detail: f.detail, suggestedTerm: f.suggestedTerm })),
+          flags: report.flags.map((f) => ({ id: f.id, priority: flagPriority(f), level: f.level, title: f.title, detail: f.detail, why: f.why, ask: f.ask, suggestedTerm: f.suggestedTerm })),
           passes: protectionPasses(report),
         },
+        audience,
         warning: !grounded ? "That amount doesn't appear in what you pasted — check it before creating the deal." : null,
       });
     } catch (error: any) {

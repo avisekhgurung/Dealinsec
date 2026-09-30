@@ -1,8 +1,20 @@
 # What DealInSec is
 
 DealInSec is deal-management software for India's freelancers — designers,
-developers, writers, video editors & photographers, marketers and consultants.
-Solo independent professionals who quote, sign and bill their own clients.
+developers, writers, video editors & photographers, marketers and consultants —
+and for creators who do paid brand collaborations (content creators, UGC
+creators, influencers). Solo independent professionals who quote, sign and bill
+their own clients or brands.
+
+Two kinds of work, one product: at signup you choose "I work with clients"
+(freelancers, consultants, service professionals) or "I work with brands"
+(creators, UGC creators, influencers); it can be changed any time in Settings →
+Work type. The workflow, documents and pricing are the same for both. A brand
+account sees "brand deal" wording and is offered the Brand Collaboration deal
+type first, which adds optional campaign, usage rights, usage duration,
+exclusivity and approval-process fields. Whatever a deal states is written into
+its quotation and agreement; anything it does not state is left out, never
+invented, and Protection Check asks about it.
 
 One workflow: **Deal → Quotation → Agreement → Invoice → Payment tracking.**
 The problem: you do the work, and the client pays late, pays less, or never

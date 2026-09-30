@@ -9,6 +9,7 @@
  */
 import { storage } from "../storage";
 import { resolveLocaleSettings, type LocaleSettings, type User } from "@shared/schema";
+import { normalizeAudience, type Audience } from "@shared/audience";
 import { contextAmountForModel, type ModelAmount } from "./voice";
 
 /** The locale the Copilot works in: the ORG's, falling back to the member's —
@@ -19,6 +20,13 @@ import { contextAmountForModel, type ModelAmount } from "./voice";
 export async function copilotSettings(user: User): Promise<LocaleSettings> {
   const org = user.organizationId ? await storage.getOrganization(user.organizationId) : undefined;
   return resolveLocaleSettings(org, user);
+}
+
+/** The account's work type: what the prompt is told about who the user works
+ *  with. Client work unless the org says otherwise. */
+export async function copilotAudience(user: User): Promise<Audience> {
+  const org = user.organizationId ? await storage.getOrganization(user.organizationId) : undefined;
+  return normalizeAudience(org?.audience);
 }
 
 export const WORKFLOW_STAGES = [

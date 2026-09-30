@@ -41,6 +41,7 @@ import { WorkflowStepper } from "@/components/workflow-stepper";
 import { AgreementSignPanel } from "@/components/agreement-sign-panel";
 import { recordNo } from "@shared/schema";
 import { executionRecordDisclosure } from "@shared/agreementClauses";
+import { dealAudienceLabels } from "@shared/audience";
 
 export default function ContractDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -70,6 +71,10 @@ export default function ContractDetailsPage() {
     queryKey: ["/api/deals", contract?.dealId],
     enabled: !!contract?.dealId,
   });
+
+  // The other party's name follows the deal's own type: "Brand" for a brand
+  // collaboration, "Client" for everything else.
+  const party = dealAudienceLabels(deal?.dealType).party;
 
   const { data: dealBrandInvoices = [] } = useQuery<BrandInvoice[]>({
     queryKey: ["/api/deals", contract?.dealId, "brand-invoices"],
@@ -450,7 +455,7 @@ export default function ContractDetailsPage() {
                       ? "text-emerald-700 dark:text-emerald-300"
                       : "text-amber-700 dark:text-amber-300"
                   }`}>
-                    Brand Authorization
+                    {party} Authorization
                   </p>
                   <p className={`text-xs ${
                     contract.signedByBrand
@@ -459,7 +464,7 @@ export default function ContractDetailsPage() {
                   }`}>
                     {contract.signedByBrand && contract.signedDate
                       ? `Signed on ${formatDate(contract.signedDate)}`
-                      : "Awaiting brand signature"}
+                      : `Awaiting ${party.toLowerCase()} signature`}
                   </p>
                 </div>
               </div>
@@ -540,7 +545,7 @@ export default function ContractDetailsPage() {
 
         <section className="space-y-3">
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Invoice for Brand
+              Invoice for {party}
             </h3>
 
             {/* Existing invoices — always visible when present */}
@@ -696,7 +701,7 @@ export default function ContractDetailsPage() {
                     <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-sm">{hasInvoice ? "Generate another invoice" : "Generate Invoice for Brand"}</p>
+                    <p className="font-medium text-sm">{hasInvoice ? "Generate another invoice" : `Generate Invoice for ${party}`}</p>
                     <p className="text-xs text-muted-foreground">
                       {contract.status !== "Signed"
                         ? "Upload signed contract proof to enable billing"
@@ -864,7 +869,7 @@ export default function ContractDetailsPage() {
           </Card>
 
           <section className="space-y-3">
-            <AgreementSignPanel contractId={contract.id} />
+            <AgreementSignPanel contractId={contract.id} party={party.toLowerCase()} />
           </section>
 
           <section className="space-y-3">

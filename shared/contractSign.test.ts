@@ -77,3 +77,50 @@ describe("document integrity hash", () => {
     expect(verifyDocumentHash(record, "not-a-real-hash")).toBe("mismatch");
   });
 });
+
+
+describe("brand terms in the agreement snapshot", () => {
+  const build = (dealType: string, dealBrandTerms?: unknown) =>
+    buildAgreementShareSnapshot({
+      issuerName: "Lena Ortiz",
+      contract,
+      dealType,
+      exclusive: true,
+      deliverables: [{ contentType: "Reel", platform: "Instagram", quantity: 2, frequency: "One-time" }],
+      dealStandardTermIds: ["advance_50"],
+      dealCustomTerms: "",
+      dealBrandTerms,
+      settings,
+    });
+  const KEYS_BEFORE = [
+    "v", "issuerName", "clientName", "contractName", "startDate", "endDate", "amountMinor", "currency",
+    "amountLabel", "terms", "country", "locale", "timezone", "dealType", "exclusive", "deliverables", "hasOwnPaymentTerms",
+  ];
+
+  it("leaves every existing snapshot exactly as it was: same keys, same order, so its hash is unchanged", () => {
+    expect(Object.keys(build("Development"))).toEqual(KEYS_BEFORE);
+    expect(Object.keys(build("Development", { usageRights: "x" }))).toEqual(KEYS_BEFORE);
+    expect(Object.keys(build("Creator", { usageRights: "x" }))).toEqual(KEYS_BEFORE);
+    expect(Object.keys(build("Brand Collaboration"))).toEqual(KEYS_BEFORE);
+    expect(Object.keys(build("Brand Collaboration", { usageRights: "  " }))).toEqual(KEYS_BEFORE);
+  });
+
+  it("carries the terms of a brand collaboration when the deal states any", () => {
+    const snap = build("Brand Collaboration", { usageRights: "Organic posts", usageDuration: "3 months", junk: "x" });
+    expect(snap.brandTerms).toEqual({ usageRights: "Organic posts", usageDuration: "3 months" });
+    expect(Object.keys(snap)).toEqual([...KEYS_BEFORE, "brandTerms"]);
+  });
+
+  it("changes the document hash only for a snapshot that carries brand terms", () => {
+    const hashOf = (snapshot: unknown) =>
+      computeDocumentHash({
+        clientSignShareSnapshot: snapshot,
+        clientSignerName: "Jordan Lee",
+        clientSignerEmail: null,
+        clientSignatureDataUrl: null,
+        clientSignedAt: "2026-09-22T19:36:19.853Z",
+      });
+    expect(hashOf(build("Development"))).toBe(hashOf(build("Development", { usageRights: "x" })));
+    expect(hashOf(build("Brand Collaboration", { usageRights: "Organic" }))).not.toBe(hashOf(build("Brand Collaboration")));
+  });
+});

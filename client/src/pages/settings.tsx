@@ -43,6 +43,8 @@ import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components
 import { pageNumbers } from "@/components/data-table/data-table";
 import { FeedbackCard } from "@/components/feedback-card";
 import { RegionFields } from "@/components/region-fields";
+import { AudiencePicker } from "@/components/audience-picker";
+import { normalizeAudience, type Audience } from "@shared/audience";
 import { getLocaleSettings, type LocaleFields, type LocaleSettings } from "@shared/schema";
 import { sameRegion } from "@shared/region";
 
@@ -68,6 +70,7 @@ type Tab = "organization" | "team" | "activity" | "subscription" | "preferences"
 
 interface OrgSummary extends LocaleFields {
   id: string; name: string; slug: string | null; industry: string | null;
+  audience?: string | null;
   seatLimit: number; seatsUsed: number; pendingInvites: number;
   ownerPlan: string; ownerPlanExpiresAt: string | null;
   ownerOnTrial?: boolean; ownerTrialEndsAt?: string | null;
@@ -191,6 +194,19 @@ export default function SettingsPage() {
       toast({ title: "Organization updated" });
     },
     onError: () => toast({ title: "Could not update organization", variant: "destructive" }),
+  });
+
+  // ── Work type ──
+  // Saved the moment it is chosen: it only changes wording and what the
+  // new-deal picker offers first, so there is nothing to confirm and nothing
+  // existing that it can affect.
+  const saveAudience = useMutation({
+    mutationFn: async (next: Audience) => (await apiRequest("PATCH", "/api/org", { audience: next })).json(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/org"] });
+      toast({ title: "Work type updated" });
+    },
+    onError: (err) => toast({ title: "Could not update work type", description: parseApiError(err).error, variant: "destructive" }),
   });
 
   // ── Country & currency ──
@@ -455,6 +471,34 @@ export default function SettingsPage() {
                         <p className="text-xs text-muted-foreground">Only the Owner or an Admin can edit the business profile.</p>
                       )}
                     </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="glass-card">
+                <CardContent className="p-5 lg:p-6 space-y-4">
+                  <div>
+                    <h2 className="font-bold text-lg">Work type</h2>
+                    <p className="text-sm text-muted-foreground">
+                      What kind of work you do. It changes the wording and which deal type is offered first. Your
+                      existing deals, quotations, agreements and invoices are not affected.
+                    </p>
+                  </div>
+                  {orgLoading ? (
+                    <Skeleton className="h-20 w-full rounded-xl" />
+                  ) : (
+                    <>
+                      <AudiencePicker
+                        layout="row"
+                        idPrefix="settings-audience"
+                        value={normalizeAudience(org?.audience)}
+                        onChange={(next) => saveAudience.mutate(next)}
+                        disabled={!canEditOrg || saveAudience.isPending}
+                      />
+                      {!canEditOrg && (
+                        <p className="text-xs text-muted-foreground">Only the Owner or an Admin can change the work type.</p>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>

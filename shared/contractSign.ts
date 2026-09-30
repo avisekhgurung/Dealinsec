@@ -10,6 +10,7 @@
  */
 import { STANDARD_TERMS, termsForPhase, type Contract, type Deliverable, type LocaleSettings } from "./schema";
 import { formatMoney } from "./money";
+import { brandTermsForDeal, type BrandTerms } from "./audience";
 
 export interface AgreementShareSnapshot {
   v: 1;
@@ -40,6 +41,10 @@ export interface AgreementShareSnapshot {
    *  matches the freelancer's own copy instead of always printing the
    *  generic default. */
   hasOwnPaymentTerms: boolean;
+  /** Brand collaborations only, and only when the deal states any. ABSENT (not
+   *  null) otherwise, so every other snapshot — and the document hash computed
+   *  over it — is exactly what it was before this field existed. */
+  brandTerms?: BrandTerms;
 }
 
 // Same regex as client/src/components/document/checks.ts's
@@ -58,12 +63,16 @@ export function buildAgreementShareSnapshot(args: {
   deliverables: readonly Pick<Deliverable, "contentType" | "platform" | "quantity" | "frequency">[] | null | undefined;
   dealStandardTermIds: readonly string[] | null | undefined;
   dealCustomTerms: string | null | undefined;
+  dealBrandTerms?: unknown;
   settings: LocaleSettings;
 }): AgreementShareSnapshot {
   const { issuerName, contract, settings } = args;
   const selectedTerms = termsForPhase(args.dealStandardTermIds ?? [], "agreement");
   const standardLabels = selectedTerms.map((t) => t.label);
   const customLines = (args.dealCustomTerms ?? "").split("\n").map((t) => t.trim()).filter(Boolean);
+  // Only the new Brand Collaboration type reads them (the legacy Creator wording
+  // is frozen), and only when something is stated.
+  const brandTerms = args.dealType === "Brand Collaboration" ? brandTermsForDeal(args.dealType, args.dealBrandTerms) : null;
 
   return {
     v: 1,
@@ -83,6 +92,7 @@ export function buildAgreementShareSnapshot(args: {
     exclusive: args.exclusive,
     deliverables: (args.deliverables ?? []).map((d) => ({ category: d.platform, output: d.contentType, quantity: d.quantity ?? 1, frequency: d.frequency })),
     hasOwnPaymentTerms: mentionsPayment(args.dealCustomTerms) || selectedTerms.some((t) => t.payment),
+    ...(brandTerms ? { brandTerms } : {}),
   };
 }
 

@@ -20,6 +20,8 @@ import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table/data-table";
 import { Receipt, Calendar, ChevronRight, Briefcase, Search, X, Plus } from "lucide-react";
 import type { Deal, BrandInvoice } from "@shared/schema";
+import { PAYMENT_STATE_LABEL, paymentState } from "@shared/paymentState";
+import { useAudience } from "@/hooks/use-audience";
 
 type FilterType = "all" | "paid" | "unpaid";
 
@@ -29,7 +31,7 @@ const fmtDate = (s: string | null | undefined, locale: string) =>
 const typeLabel = (t: string) => (t === "advance" ? "Advance" : t === "final" ? "Final" : "Full");
 
 // A factory, because money and dates need the org's currency and locale.
-const makeColumns = (fmt: MoneyFormat): ColumnDef<BrandInvoice>[] => [
+const makeColumns = (fmt: MoneyFormat, party = "Client"): ColumnDef<BrandInvoice>[] => [
   {
     accessorKey: "invoiceNumber",
     header: "Invoice No.",
@@ -38,8 +40,8 @@ const makeColumns = (fmt: MoneyFormat): ColumnDef<BrandInvoice>[] => [
   },
   {
     accessorKey: "brandName",
-    header: "Client",
-    meta: { label: "Client", filter: "text" },
+    header: party,
+    meta: { label: party, filter: "text" },
     cell: ({ row }) => <span className="text-muted-foreground">{row.original.brandName}</span>,
   },
   {
@@ -88,7 +90,7 @@ const makeColumns = (fmt: MoneyFormat): ColumnDef<BrandInvoice>[] => [
     accessorKey: "status",
     header: "Status",
     meta: { label: "Status", filter: "select" },
-    cell: ({ row }) => <StatusBadge status={row.original.status} size="compact" />,
+    cell: ({ row }) => <StatusBadge status={PAYMENT_STATE_LABEL[paymentState(row.original)]} size="compact" />,
     filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
   },
   { id: "actions", header: "Actions", meta: { label: "Actions", align: "right" }, enableSorting: false, enableHiding: false,
@@ -102,7 +104,8 @@ export default function BillingPage() {
   const [pickOpen, setPickOpen] = useState(false);
   const { user } = useAuth();
   const fmt = useMoney();
-  const columns = useMemo(() => makeColumns(fmt), [fmt]);
+  const audience = useAudience();
+  const columns = useMemo(() => makeColumns(fmt, audience.party), [fmt, audience.party]);
   const canCreate = memberCan(user as any, "invoices.create");
   const [, setLocation] = useLocation();
 
@@ -284,7 +287,7 @@ export default function BillingPage() {
                                   </div>
                                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
                                     <span className="text-sm font-bold text-primary">{fmt.money(invoice.dealAmountMinor)}</span>
-                                    <StatusBadge status={invoice.status} />
+                                    <StatusBadge status={PAYMENT_STATE_LABEL[paymentState(invoice)]} />
                                   </div>
                                   <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                                 </div>

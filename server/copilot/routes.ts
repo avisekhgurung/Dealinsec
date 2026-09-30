@@ -23,7 +23,7 @@ import {
   buildAgreementCandidate, executeCreateAgreement, buildInvoiceCandidate, executeCreateInvoice,
 } from "./tools";
 import { appendTerm, buildAgreementDraft, buildDealDraft, buildInvoiceDraft, confirmProposal, openProposal, registerProposal } from "./proposals";
-import { copilotSettings, getDealJourney } from "./workflow";
+import { copilotAudience, copilotSettings, getDealJourney } from "./workflow";
 import { computeBriefing, computeDealIntel } from "./insights";
 import {
   chatSystemPrompt, publicSystemPrompt, voiceFor, chaserTones, chaserToneFor,
@@ -248,6 +248,7 @@ export function registerCopilotRoutes(app: Express) {
       // Read once per turn and handed to the prompt, the journey and every
       // tool call, so nothing in one turn can describe two currencies.
       const settings = await copilotSettings(req.user);
+      const audience = await copilotAudience(req.user);
 
       // Page context: advisory. If it names a deal, attach its REAL journey
       // (org-checked server-side) so "what do I do here?" uses live state.
@@ -263,7 +264,7 @@ export function registerCopilotRoutes(app: Express) {
 
       const tools = toolDefs(settings);
       const messages: ChatMessage[] = [
-        { role: "system", content: chatSystemPrompt(settings) },
+        { role: "system", content: chatSystemPrompt(settings, audience) },
         { role: "system", content: `PRODUCT KNOWLEDGE (authoritative):\n${retrieveKnowledge(lastUserMsg)}` },
         { role: "system", content: `CONTEXT: ${contextBlock}` },
         ...history,

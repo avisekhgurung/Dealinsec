@@ -25,10 +25,11 @@ import { ArrowLeft, Download, ArrowRight, CheckCircle2, AlertTriangle } from "lu
 import type { Deal, Quote } from "@shared/schema";
 import { STANDARD_TERMS, termsForPhase, recordNo, hasProAccess } from "@shared/schema";
 import { getDeliverableLabels } from "@shared/dealTypeTaxonomy";
+import { audienceForDealType, brandTermRows, dealAudienceLabels } from "@shared/audience";
 import { PagedDocument, type DocBlock } from "@/components/document/paged";
 import {
   DocHeader, docFooter, SectionTitle, TwoParties, Party, tableBlocks, TotalBlock,
-  SignatureCell, DocWarnings, docMoney, docDate,
+  SignatureCell, DocWarnings, docMoney, docDate, KV,
 } from "@/components/document/primitives";
 import {
   detectPaymentConflicts, deriveSchedule, validateDocData,
@@ -92,6 +93,11 @@ export default function QuotePreviewPage() {
   const blocks = useMemo<DocBlock[]>(() => {
     if (!deal) return [];
     const out: DocBlock[] = [];
+    const brandDeal = audienceForDealType(deal.dealType) === "brand_collaboration";
+    const partyWord = dealAudienceLabels(deal.dealType).partyLower;
+    // Only the terms the deal states; the creator sees what is missing in
+    // Protection Check, and a document sent to a brand does not print blanks.
+    const brandRows = brandTermRows((deal as any).brandTerms, { withCampaign: true });
 
     out.push({
       key: "head",
@@ -99,7 +105,7 @@ export default function QuotePreviewPage() {
       node: (
         <DocHeader
           brand={fullName !== "—" ? fullName : undefined}
-          docType="Quotation"
+          docType={brandDeal ? "Brand Collaboration Quote" : "Quotation"}
           docNo={quoteNumber}
           status={quote?.status === "revised" ? "Revised" : undefined}
           meta={[
@@ -143,10 +149,10 @@ export default function QuotePreviewPage() {
       node: (
         <div>
           <SectionTitle>
-            {deal.deliverableMode === "any_one" ? "Deliverable options — client selects one" : "Deliverables & services"}
+            {deal.deliverableMode === "any_one" ? `Deliverable options — ${partyWord} selects one` : "Deliverables & services"}
           </SectionTitle>
           {deal.deliverableMode === "any_one" && (
-            <p className="doc-small doc-muted-t">The client may choose one of the following options.</p>
+            <p className="doc-small doc-muted-t">The {partyWord} may choose one of the following options.</p>
           )}
         </div>
       ),
@@ -173,6 +179,22 @@ export default function QuotePreviewPage() {
           : <span className="doc-small doc-muted-t">{d.notes || "—"}</span>,
       }),
     );
+
+    if (brandRows.length) {
+      out.push({
+        key: "brand-terms",
+        node: (
+          <div>
+            <SectionTitle>Campaign, usage &amp; exclusivity</SectionTitle>
+            <div style={{ display: "grid", gap: "2.5mm" }}>
+              {brandRows.map((r) => (
+                <KV key={r.key} label={r.label}>{r.value}</KV>
+              ))}
+            </div>
+          </div>
+        ),
+      });
+    }
 
     // The currency decides the split's rounding factor (1 for JPY, 100 for
     // INR), so it must be the document's — the one the server's split uses.
@@ -386,7 +408,7 @@ export default function QuotePreviewPage() {
         />
 
         <div className="mt-4 print:hidden">
-          <QuoteSharePanel dealId={deal.id} />
+          <QuoteSharePanel dealId={deal.id} party={dealAudienceLabels(deal.dealType).partyLower} />
         </div>
 
         {/* Only for a user who'd actually hit the Pro gate one tap later — a

@@ -20,6 +20,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table/data-table";
 import { FileText, Calendar, Shield, ChevronRight, FileCheck, Search, X, Plus } from "lucide-react";
 import type { Contract, Deal } from "@shared/schema";
+import { useAudience } from "@/hooks/use-audience";
 
 type FilterType = "all" | "active" | "completed";
 
@@ -28,7 +29,7 @@ const fmtDate = (s: string, locale: string) =>
 
 // A factory, not a constant: money and dates now need the org's currency and
 // locale, which only a hook can supply.
-const makeColumns = (fmt: MoneyFormat): ColumnDef<Contract>[] => [
+const makeColumns = (fmt: MoneyFormat, party = "Client"): ColumnDef<Contract>[] => [
   {
     id: "agreementNo",
     header: "Agreement No.",
@@ -46,8 +47,8 @@ const makeColumns = (fmt: MoneyFormat): ColumnDef<Contract>[] => [
   },
   {
     accessorKey: "brandName",
-    header: "Client",
-    meta: { label: "Client", filter: "text" },
+    header: party,
+    meta: { label: party, filter: "text" },
     cell: ({ row }) => <span className="text-muted-foreground">{row.original.brandName}</span>,
   },
   {
@@ -108,7 +109,8 @@ export default function ContractsPage() {
   const [pickOpen, setPickOpen] = useState(false);
   const { user } = useAuth();
   const fmt = useMoney();
-  const columns = useMemo(() => makeColumns(fmt), [fmt]);
+  const audience = useAudience();
+  const columns = useMemo(() => makeColumns(fmt, audience.party), [fmt, audience.party]);
   const canCreate = memberCan(user as any, "agreements.create");
   const [, setLocation] = useLocation();
 

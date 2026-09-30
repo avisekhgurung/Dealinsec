@@ -67,6 +67,48 @@ describe("buildDealDraft", () => {
   });
 });
 
+describe("buildDealDraft for a brand collaboration", () => {
+  const brand = (customTerms?: string, brandTerms: object | null = null) => ({
+    ...candidate(customTerms),
+    brandName: "Glow Skincare",
+    dealTitle: "Autumn launch",
+    dealType: "Brand Collaboration",
+    brandTerms,
+    deliverables: [{ platform: "Instagram", contentType: "Reel", quantity: 2, frequency: "One-time", notes: "" }],
+  });
+
+  it("runs the creator checks and keeps them out of a client draft", () => {
+    const d = buildDealDraft(brand("50% advance. Balance within 7 days."), 800, settings, "$800 for 2 Reels");
+    expect(d.audience).toBe("brand_collaboration");
+    const ids = d.protection.flags.map((f) => f.id);
+    expect(ids).toEqual(expect.arrayContaining(["no_usage_rights", "no_exclusivity_terms", "no_approval_process"]));
+    const client = buildDealDraft(candidate("50% advance. Balance within 7 days."), 800, settings, "$800");
+    expect(client.audience).toBe("client_work");
+    expect(client.protection.flags.map((f) => f.id)).not.toContain("no_usage_rights");
+  });
+
+  it("marks usage rights important and carries the question to ask", () => {
+    const d = buildDealDraft(brand(), 800, settings, "$800");
+    const usage = d.protection.flags.find((f) => f.id === "no_usage_rights")!;
+    expect(usage.level).toBe("important");
+    expect(usage.ask).toMatch(/whether paid advertising is included/);
+  });
+
+  it("does not report a deadline the server defaulted", () => {
+    const d = buildDealDraft(brand(), 800, settings, "$800");
+    expect(d.protection.flags.map((f) => f.id)).not.toContain("no_deadline");
+  });
+
+  it("carries the brand terms to the card and to the edit form", () => {
+    const terms = { usageRights: "Organic posts", usageDuration: "3 months" };
+    const d = buildDealDraft(brand("", terms), 800, settings, "$800");
+    expect(d.brandTerms).toEqual(terms);
+    expect(d.prefill.brandTerms).toEqual(terms);
+    expect(d.protection.flags.map((f) => f.id)).not.toContain("no_usage_rights");
+    expect(d.protection.flags.map((f) => f.id)).not.toContain("no_usage_duration");
+  });
+});
+
 describe("proposals run at most once", () => {
   it("replays the first result on a repeat, without running again", async () => {
     const id = registerProposal(me, "create_deal", { brandName: "Acme" }, "x");

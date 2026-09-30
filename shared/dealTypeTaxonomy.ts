@@ -46,9 +46,19 @@ export const legacyDealTypeOptions = [
   "Service Vendor",
 ] as const;
 
+// The deal type for paid brand collaborations (creators, UGC creators,
+// influencers). Kept OUT of dealTypeOptions on purpose: that list is the
+// client-work picker and is also read by the AI intake prompt and the CSV
+// import, whose text and validation must not change for existing accounts.
+// The picker shows this type first for accounts whose work type is
+// "brand_collaboration" (see shared/audience.ts). The retired "Creator" type
+// above stays untouched — signed agreements re-render from its wording.
+export const brandDealTypeOptions = ["Brand Collaboration"] as const;
+
 export type DealType = (typeof dealTypeOptions)[number];
 export type LegacyDealType = (typeof legacyDealTypeOptions)[number];
-export type AnyDealType = DealType | LegacyDealType;
+export type BrandDealType = (typeof brandDealTypeOptions)[number];
+export type AnyDealType = DealType | LegacyDealType | BrandDealType;
 
 export const dealTypeMeta: Record<AnyDealType, { label: string; description: string; emoji: string; tint: string }> = {
   // Tints are spread so neighbouring cards differ in both the 2-column
@@ -94,6 +104,12 @@ export const dealTypeMeta: Record<AnyDealType, { label: string; description: str
     description: "Any other freelance work — describe it your own way.",
     emoji: "⚙️",
     tint: "slate",
+  },
+  "Brand Collaboration": {
+    label: "Brand Collaboration",
+    description: "Paid brand deals — Reels, UGC, YouTube integrations, posts and stories.",
+    emoji: "🤝",
+    tint: "teal",
   },
   // ── Legacy types (existing deals only, not selectable) ──
   "Real Estate": {
@@ -1029,6 +1045,7 @@ export const TAXONOMY: Record<AnyDealType, TaxonomyEntry> = {
   "Video & Photo": videoPhotoTaxonomy,
   Consulting: consultingTaxonomy,
   Custom: customTaxonomy,
+  "Brand Collaboration": creatorTaxonomy,
   // Legacy (existing deals only)
   "Real Estate": realEstateTaxonomy,
   "Interior Design": interiorDesignTaxonomy,
@@ -1122,6 +1139,25 @@ const AGREEMENT_COPY: Record<AnyDealType, AgreementCopy> = {
   Writing: FREELANCE_AGREEMENT_COPY,
   Marketing: FREELANCE_AGREEMENT_COPY,
   "Video & Photo": FREELANCE_AGREEMENT_COPY,
+  "Brand Collaboration": {
+    title: "Brand Collaboration Agreement",
+    providerRole: "Creator",
+    providerNoun: "Creator",
+    clientRole: "Brand",
+    clientNoun: "Brand",
+    clientFieldLabel: "Brand Name",
+    serviceDescription: "content creation and promotion services",
+    complianceNote: "All content shall be original and produced in line with the applicable advertising rules and platform policies, including any disclosure of the paid partnership that they require.",
+    rightsHeading: "Content Rights & Usage",
+    // The default text for a deal that states no usage terms. When the deal
+    // carries brandTerms, buildAgreementClauses writes this clause from them.
+    rightsText:
+      "The Creator retains ownership of the content. Upon full payment, the Brand may use the approved content only as set out in the usage terms agreed between the parties. Any use beyond those terms, such as paid advertising, use on other channels or use for a longer period, requires the Creator's prior written agreement and may be charged separately.",
+    exclusiveText:
+      "This Agreement is EXCLUSIVE to the extent agreed between the parties. During the exclusivity period stated in this Agreement, the Creator shall not publish paid content for a direct competitor of the Brand in the agreed category without the Brand's prior written consent.",
+    nonExclusiveText:
+      "This Agreement is NON-EXCLUSIVE. The Creator may work with other brands during the Agreement period, provided such work does not breach the terms agreed herein.",
+  },
   "Real Estate": {
     title: "Real Estate Services Agreement",
     providerRole: "Broker / Real Estate Consultant",
@@ -1322,6 +1358,7 @@ const DELIVERABLE_LABELS: Record<AnyDealType, DeliverableLabels> = {
   "Video & Photo": FREELANCE_LABELS,
   Consulting: { category: "Practice Area", type: "Format", who: "Client Name" },
   Custom: { category: "Category", type: "Output", who: "Client / Brand" },
+  "Brand Collaboration": { category: "Platform", type: "Content Type", who: "Brand Name" },
   // Legacy (existing deals only)
   "Real Estate": { category: "Service", type: "Billing Basis", who: "Client Name" },
   "Interior Design": { category: "Scope / Area", type: "Billing Basis", who: "Client Name" },

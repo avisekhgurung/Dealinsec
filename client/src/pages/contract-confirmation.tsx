@@ -16,6 +16,7 @@ import { CreditAnimationOverlay } from "@/components/credit-animation-overlay";
 import { trackEvent } from "@/lib/analytics";
 import { STANDARD_TERMS, hasActivePro, hasProAccess, hasActiveTrial } from "@shared/schema";
 import type { Deal, Contract } from "@shared/schema";
+import { defaultExclusive } from "@shared/audience";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { parseApiError, isUpgradeError, currencyChangedToast } from "@/lib/api-error";
 import { taxIdLabel } from "@shared/invoice-tax";
@@ -178,7 +179,9 @@ export default function ContractConfirmationPage() {
         contractValueMinor: deal.dealAmountMinor,
         currency: fmt.currency,
         status: "Signed" as const,
-        exclusive: true,
+        // Exclusive for every deal type as it always was; a brand collaboration
+        // is exclusive only if the deal states an exclusivity term.
+        exclusive: defaultExclusive(deal.dealType, deal.brandTerms),
       };
 
       const res = await apiRequest("POST", "/api/contracts", contractData);
@@ -240,6 +243,9 @@ export default function ContractConfirmationPage() {
       return () => clearTimeout(t);
     }
   }, [overlayPhase, contractId]);
+
+  // The consent line names exclusivity only when this agreement has it.
+  const exclusiveDeal = deal ? defaultExclusive(deal.dealType, deal.brandTerms) : true;
 
   const canSubmit =
     agreed &&
@@ -778,7 +784,9 @@ export default function ContractConfirmationPage() {
               data-testid="checkbox-agree"
             />
             <label htmlFor="agree" className="text-sm leading-relaxed cursor-pointer select-none">
-              I understand and agree to the exclusivity terms in this agreement.
+              {exclusiveDeal
+                ? "I understand and agree to the exclusivity terms in this agreement."
+                : "I have reviewed the terms of this agreement."}
             </label>
           </div>
 

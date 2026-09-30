@@ -25,7 +25,7 @@ interface SignShareStatus {
   documentIntegrity?: "verified" | "unavailable" | "mismatch" | null;
 }
 
-export function AgreementSignPanel({ contractId }: { contractId: number }) {
+export function AgreementSignPanel({ contractId, party = "client" }: { contractId: number; party?: string }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [copied, setCopied] = useState(false);
@@ -93,7 +93,7 @@ export function AgreementSignPanel({ contractId }: { contractId: number }) {
         <FileSignature className="w-4 h-4 text-emerald-600" /> Send for e-signature
       </p>
       <p className="text-xs text-muted-foreground mb-3">
-        A link your client can open and sign without an account — no PAN, GSTIN or bank details shown.
+        A link your {party} can open and sign without an account — no PAN, GSTIN or bank details shown.
       </p>
 
       {data?.active ? (

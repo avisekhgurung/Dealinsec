@@ -314,6 +314,38 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
     process.exit(1);
   }
 
+  // Audience schema GATE — same fail-closed rule as above, for the two additive
+  // columns this build reads (organizations.audience, deals.brand_terms).
+  // Drizzle selects every declared column, so a database without them would
+  // fail every organization and deal read. Refusing to boot instead means the
+  // previous instance keeps serving until the operator has run the script.
+  // Read-only — information_schema, never DDL.
+  try {
+    const audienceColumns = await db.execute(sql`
+      SELECT table_name, column_name FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND ((table_name = 'organizations' AND column_name = 'audience')
+          OR (table_name = 'deals' AND column_name = 'brand_terms'))`);
+    const havePair = new Set(
+      (audienceColumns.rows ?? []).map((r: any) => `${r.table_name}.${r.column_name}`),
+    );
+    const missingAudience = ["organizations.audience", "deals.brand_terms"].filter((n) => !havePair.has(n));
+    if (missingAudience.length) {
+      console.error(
+        `REFUSING TO SERVE: this database is missing ${missingAudience.join(", ")}, which this build ` +
+          "reads on every request. Run once (additive, safe to repeat):\n" +
+          "    npx tsx --env-file=.env script/migrate-audience.ts\n" +
+          "(If you are a developer seeing this locally, you are probably pointed at the " +
+          "shared production database — set DATABASE_URL to your local test DB.)",
+      );
+      process.exit(1);
+    }
+    log("schema gate: audience columns present");
+  } catch (err) {
+    console.error("REFUSING TO SERVE: could not verify the audience schema:", err);
+    process.exit(1);
+  }
+
   const httpServer = await registerRoutes(app);
 
   // Public server-rendered SEO/tool pages — MUST be registered before the SPA

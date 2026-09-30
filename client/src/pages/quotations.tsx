@@ -26,6 +26,7 @@ import { useMoney, type MoneyFormat } from "@/hooks/use-locale";
 import { dealTypeMeta } from "@shared/dealTypeTaxonomy";
 import type { Quote, Deal } from "@shared/schema";
 import { FileText, Search, X, ChevronRight, Plus } from "lucide-react";
+import { useAudience } from "@/hooks/use-audience";
 
 type QuoteRow = Quote & { deal: Deal | null };
 // Flat search fields for the table's global filter (it reads top-level keys).
@@ -37,7 +38,7 @@ const fmtDate = (s: string | Date | null | undefined, locale: string) =>
 // Desktop table columns — same register conventions as Deals: mono record
 // number, bold client, tinted type chip, tabular amount, compact badges.
 // A factory, because money and dates need the org's currency and locale.
-const makeColumns = (fmt: MoneyFormat): ColumnDef<QuoteTableRow>[] => [
+const makeColumns = (fmt: MoneyFormat, party = "Client"): ColumnDef<QuoteTableRow>[] => [
   {
     id: "quoteNo",
     header: "Quotation No.",
@@ -49,8 +50,8 @@ const makeColumns = (fmt: MoneyFormat): ColumnDef<QuoteTableRow>[] => [
   },
   {
     id: "client",
-    header: "Client",
-    meta: { label: "Client", filter: "text" },
+    header: party,
+    meta: { label: party, filter: "text" },
     accessorFn: (r) => r.deal?.brandName ?? "",
     cell: ({ row }) => <span className="font-semibold text-foreground">{row.original.deal?.brandName || "—"}</span>,
   },
@@ -108,7 +109,8 @@ export default function QuotationsPage() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const fmt = useMoney();
-  const columns = useMemo(() => makeColumns(fmt), [fmt]);
+  const audience = useAudience();
+  const columns = useMemo(() => makeColumns(fmt, audience.party), [fmt, audience.party]);
   const canCreate = memberCan(user as any, "quotations.create");
   const { data: quotes = [], isLoading } = useQuery<QuoteRow[]>({ queryKey: ["/api/quotes"] });
 
@@ -168,7 +170,7 @@ export default function QuotationsPage() {
         <div className="relative flex-1 lg:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <Input
-            placeholder="Search by client, deal or quotation number…"
+            placeholder={`Search by ${audience.partyLower}, deal or quotation number…`}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 pr-9"
@@ -222,7 +224,7 @@ export default function QuotationsPage() {
                 </p>
                 <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
                   {search
-                    ? "Try a different client or deal name."
+                    ? `Try a different ${audience.partyLower} or deal name.`
                     : "Open a deal and generate its quotation — it'll appear here for the whole team."}
                 </p>
                 {!search && canCreate && (
@@ -235,7 +237,7 @@ export default function QuotationsPage() {
               <>
                 {/* Desktop column headers */}
                 <div className="hidden lg:grid grid-cols-[0.8fr_1.3fr_1.5fr_0.9fr_0.6fr_0.9fr_auto] gap-4 px-5 py-2.5 border-b border-border/60 bg-muted/30">
-                  {["Quotation No.", "Client", "Deal", "Value", "Version", "Issued", ""].map((h, i) => (
+                  {["Quotation No.", audience.party, "Deal", "Value", "Version", "Issued", ""].map((h, i) => (
                     <span key={i} className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       {h}
                     </span>

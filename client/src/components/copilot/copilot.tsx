@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { COPILOT_EVENT, takePendingCopilot } from "@/lib/copilot-bus";
 import { DealDraftCard, type DealDraft } from "./deal-draft-card";
 import { AgreementDraftCard, InvoiceDraftCard, type AgreementDraft, type InvoiceDraft } from "./proposal-cards";
+import { useAudience } from "@/hooks/use-audience";
 
 /* ── types mirrored from server/copilot/insights.ts ── */
 interface Briefing {
@@ -101,6 +102,7 @@ function StagedLoading() {
 
 export function Copilot() {
   const { isAuthenticated, user } = useAuth();
+  const account = useAudience();
   const { money } = useMoney();
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
@@ -263,7 +265,7 @@ export function Copilot() {
       ? ["What should I do next on this deal?", "Is this deal healthy?", "Summarise this deal"]
       : ctx.entityType === "invoice"
         ? ["Is this invoice overdue?", "Prepare a payment reminder"]
-        : ["Create a deal — I'll paste the client chat", "Which clients owe me money?", "What can I invoice today?", "Show my pending work"];
+        : [`Create a deal — I'll paste the ${account.partyLower} chat`, `Which ${account.partyLower}s owe me money?`, "What can I invoice today?", "Show my pending work"];
 
   const radar = briefing?.radar;
   const allClear = briefing && briefing.attentionCount === 0;

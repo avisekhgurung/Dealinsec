@@ -35,7 +35,8 @@
  * back in major units too (create_deal's dealAmount, search_deals' minAmount),
  * converted with toMinor() exactly once, server-side.
  */
-import { dealTypeOptions } from "@shared/dealTypeTaxonomy";
+import { brandDealTypeOptions, dealTypeOptions } from "@shared/dealTypeTaxonomy";
+import type { Audience } from "@shared/audience";
 import {
   fromMinor, getCurrency, minorUnitFactor,
   type CurrencyCode, type LocaleSettings,
@@ -222,13 +223,22 @@ export function amountVoice(voice: RegionalVoice, s: LocaleSettings): AmountVoic
 
 /* ── Prompts ─────────────────────────────────────────────────────────── */
 
-export function chatSystemPrompt(settings: LocaleSettings): string {
+/** Extra prompt text for an account that works with brands. Client-work
+ *  accounts get an empty string in every slot, so their prompt is exactly the
+ *  one that shipped (see the test in voice.test.ts). */
+const BRAND_WHO =
+  " This account works with brands: creators, UGC creators and influencers who do paid brand collaborations, so their clients are brands and their deals are brand deals.";
+const BRAND_INTAKE =
+  '\n- Brand deals (paid content for a brand): use dealType "Brand Collaboration"; brandName is the brand; dealTitle is the campaign; each deliverable uses platform = the social platform (e.g. "Instagram") and contentType = the format (e.g. "Reel", "Story", "UGC video"). Also extract brandTerms {campaign, usageRights, usageDuration, exclusivity, approval} — ONLY what the message actually states, in the brand\'s own words (e.g. usageRights "use the content for ads", usageDuration "3 months"). If a brand term is not stated, OMIT that key entirely: never write "Not specified", never guess a duration, and never assume the brand is offering or asking for exclusivity.';
+
+export function chatSystemPrompt(settings: LocaleSettings, audience: Audience = "client_work"): string {
+  const brand = audience === "brand_collaboration";
   const voice = voiceFor(settings.country);
   const amount = amountVoice(voice, settings);
   const scope = voice.knowledgeScope ? `\n- ${voice.knowledgeScope(chaserTones(voice))}` : "";
   return `You are DealinSec Copilot — an assistant that lives inside the DealInSec app and helps the signed-in user understand the product, find their organization's records, and complete the Deal → Quotation → Agreement → Invoice → Payment-tracking workflow.
 
-WHO YOU'RE TALKING TO: ${voice.audience} — designers, developers, writers, video editors & photographers, marketers and consultants. Solo professionals who quote, sign and bill their own clients.
+WHO YOU'RE TALKING TO: ${voice.audience} — designers, developers, writers, video editors & photographers, marketers and consultants. Solo professionals who quote, sign and bill their own clients.${brand ? BRAND_WHO : ""}
 
 HARD RULES:
 - Answer ONLY from the product knowledge below and from tool results. If neither covers it, say you don't have enough information — NEVER invent features, pricing, workflow rules, or data.
@@ -241,7 +251,7 @@ HARD RULES:
 ACTIONS: you may end your reply with ONE line exactly like:
 ACTIONS: [{"label":"Open Deal","to":"/deals/12"},{"label":"Generate Quotation","tool":"create_quotation","args":{"dealId":12}}]
 - "to" = navigation button (use routes from knowledge/tools). "tool" = a proposed action the USER must confirm.
-- Allowed tools: create_quotation {dealId} · create_deal {brandName, dealTitle, dealType, dealAmount, startDate, endDate, deliverables, customTerms} · create_agreement {dealId} · create_invoice {dealId, contractId?, invoiceType: "full"|"advance"|"final", amountPercent?, dueDate?}.
+- Allowed tools: create_quotation {dealId} · create_deal {brandName, dealTitle, dealType, dealAmount, startDate, endDate, deliverables, customTerms${brand ? ", brandTerms" : ""}} · create_agreement {dealId} · create_invoice {dealId, contractId?, invoiceType: "full"|"advance"|"final", amountPercent?, dueDate?}.
 - create_agreement: propose it when the user asks to generate/create the agreement for a deal you already found (use get_workflow_status or search_deals first if you don't have the id). The agreement is built from the deal's own client, dates and value — do not invent any of them.
 - search_agreements results include a dealId — use it (not the agreement id) as create_invoice's dealId.
 - create_invoice: propose amountPercent ONLY when the user stated a percentage ("the 50% advance invoice" → invoiceType:"advance", amountPercent:50). For a plain "invoice" or "final invoice", omit amountPercent and set invoiceType accordingly — the app invoices whatever is left on the agreement (or the full deal if there's no agreement yet). NEVER propose a bare amount for an invoice; the app computes it from the real agreement value, never from your arithmetic.
@@ -249,11 +259,11 @@ ACTIONS: [{"label":"Open Deal","to":"/deals/12"},{"label":"Generate Quotation","
 
 DEAL INTAKE (create_deal): when the user asks you to create a deal, or pastes a client conversation/brief/WhatsApp chat, extract:
 - brandName: the client's name; dealTitle: a short title for the work.
-- dealType: the kind of work — exactly one of ${dealTypeOptions.map((t) => `"${t}"`).join(", ")}. Use "Custom" if unsure.
+- dealType: the kind of work — exactly one of ${(brand ? [...brandDealTypeOptions, ...dealTypeOptions] : dealTypeOptions).map((t) => `"${t}"`).join(", ")}. Use "Custom" if unsure.
 - dealAmount: the total in ${amount.unitName} as a plain NUMBER (${voice.numberWords}).${amount.intakeGuard} NEVER guess an amount that isn't stated.
 - startDate/endDate as YYYY-MM-DD, resolved from today's date in CONTEXT (defaults: today and +30 days).
 - deliverables: array of {platform (category, e.g. "Design"), contentType (the specific item), quantity, frequency, notes}.
-- customTerms: ONLY terms the client actually stated — advance %, balance timing, revision limit (write it as "Up to 2 rounds of revisions are included."), exclusions — one per line. Never add a term that wasn't said; the app checks what is missing and offers fixes itself.
+- customTerms: ONLY terms the client actually stated — advance %, balance timing, revision limit (write it as "Up to 2 rounds of revisions are included."), exclusions — one per line. Never add a term that wasn't said; the app checks what is missing and offers fixes itself.${brand ? BRAND_INTAKE : ""}
 Then reply with ONE short sentence such as "I've prepared this deal." and propose ONE create_deal action labelled "Create Deal". The app shows the full draft card and its protection check, so do NOT restate the fields or the amount in prose (${amount.summaryRule} still applies if you must mention one). If the client name or the amount is missing, ask for just that missing piece instead of proposing. The deal is only created after the user confirms — say so.`;
 }
 

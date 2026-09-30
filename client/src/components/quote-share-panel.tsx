@@ -1,5 +1,5 @@
 /**
- * "Share with client" — creates/shows/revokes the public quotation link for
+ * "Share with {party}" — creates/shows/revokes the public quotation link for
  * one deal. Talks only to /api/deals/:id/quote/share*, never touches the
  * public endpoints (those are for the client's browser, unauthenticated).
  */
@@ -21,7 +21,8 @@ interface ShareStatus {
   acceptedAt?: string | null;
 }
 
-export function QuoteSharePanel({ dealId }: { dealId: number }) {
+export function QuoteSharePanel({ dealId, party = "client" }: { dealId: number; party?: string }) {
+  const Party = party.charAt(0).toUpperCase() + party.slice(1);
   const { toast } = useToast();
   const qc = useQueryClient();
   const [copied, setCopied] = useState(false);
@@ -63,7 +64,7 @@ export function QuoteSharePanel({ dealId }: { dealId: number }) {
         <Link2 className="w-4 h-4 text-emerald-600" /> Share with client
       </p>
       <p className="text-xs text-muted-foreground mb-3">
-        A link your client can open without an account — no PAN, GSTIN or bank details shown.
+        A link your {party} can open without an account — no PAN, GSTIN or bank details shown.
       </p>
 
       {data?.active ? (
@@ -78,7 +79,7 @@ export function QuoteSharePanel({ dealId }: { dealId: number }) {
             />
             <Button size="sm" variant="outline" className="h-9 shrink-0" onClick={copyLink} data-testid="button-copy-share-link">
               {copied ? <Check className="w-3.5 h-3.5 mr-1.5" /> : <Copy className="w-3.5 h-3.5 mr-1.5" />}
-              {copied ? "Copied" : "Copy Client Link"}
+              {copied ? "Copied" : `Copy ${Party} Link`}
             </Button>
           </div>
           <div className="flex items-center justify-between">
@@ -129,7 +130,7 @@ export function QuoteSharePanel({ dealId }: { dealId: number }) {
       ) : (
         <Button size="sm" onClick={() => create.mutate()} disabled={create.isPending} className="gradient-btn text-white" data-testid="button-create-share-link">
           {create.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Link2 className="w-3.5 h-3.5 mr-1.5" />}
-          {create.isPending ? "Creating…" : "Create client link"}
+          {create.isPending ? "Creating…" : `Create ${party} link`}
         </Button>
       )}
     </div>

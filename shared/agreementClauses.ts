@@ -14,6 +14,7 @@
  */
 import { getAgreementCopy } from "./dealTypeTaxonomy";
 import { countryName } from "./region";
+import { normalizeBrandTerms, type BrandTerms } from "./audience";
 
 /**
  * A country as English legal prose names it, for "the laws of …". Moved
@@ -138,23 +139,47 @@ export interface AgreementClauseInputs {
   startDateLabel: string;
   endDateLabel: string;
   hasOwnPaymentTerms: boolean;
+  /** Usage, exclusivity and approval terms of a brand collaboration. Read only
+   *  for the "Brand Collaboration" deal type; every other type ignores it, so
+   *  an existing agreement's wording cannot change. */
+  brandTerms?: BrandTerms | null;
 }
+
+/** A stated term written into a sentence: trimmed, one closing full stop. */
+const sentence = (text: string): string => `${text.trim().replace(/[.\s]+$/, "")}.`;
 
 export function buildAgreementClauses(args: AgreementClauseInputs): AgreementClause[] {
   const copy = getAgreementCopy(args.dealType);
   const isIndia = args.country === "IN";
   const country = legalCountryName(args.country);
+  const brand = args.dealType === "Brand Collaboration" ? normalizeBrandTerms(args.brandTerms) : null;
+
+  // Brand collaboration only, and only for what the deal states.
+  const campaignPart = brand?.campaign ? `, for the campaign "${brand.campaign}"` : "";
+  const usageParts = [
+    brand?.usageRights ? `Usage: ${sentence(brand.usageRights)}` : "",
+    brand?.usageDuration ? `Usage period: ${sentence(brand.usageDuration)}` : "",
+  ].filter(Boolean);
+  const rightsBody = usageParts.length ? `${copy.rightsText} Agreed usage terms — ${usageParts.join(" ")}` : copy.rightsText;
+  const exclusivityBody =
+    args.exclusive && brand?.exclusivity
+      ? `${copy.exclusiveText} Exclusivity terms: ${sentence(brand.exclusivity)}`
+      : args.exclusive ? copy.exclusiveText : copy.nonExclusiveText;
 
   return [
     {
       n: 1,
       title: "Scope of Work",
-      body: `The ${copy.providerNoun} agrees to provide ${copy.serviceDescription} for the ${copy.clientNoun} as described in the Deliverables section above, in connection with the engagement titled "${args.dealTitle}". ${copy.complianceNote}`,
+      body: `The ${copy.providerNoun} agrees to provide ${copy.serviceDescription} for the ${copy.clientNoun} as described in the Deliverables section above, in connection with the engagement titled "${args.dealTitle}"${campaignPart}. ${copy.complianceNote}`,
     },
     {
       n: 2,
       title: "Deliverables & Timeline",
-      body: `All deliverables shall be submitted for ${copy.clientNoun} approval at least 48 hours before the scheduled delivery or publication date. The ${copy.clientNoun} shall provide approval or revision requests within 24 hours of receipt. The ${copy.providerNoun} shall incorporate up to two (2) rounds of revisions at no additional charge. This Agreement is effective from **${args.startDateLabel}** through **${args.endDateLabel}**.`,
+      body: brand?.approval
+        ? // The deal states its own approval step, so the generic 48-hour / 24-hour
+          // sentences are not printed beside it (they could contradict it).
+          `All deliverables shall be submitted to the ${copy.clientNoun} for approval before publication. Content approval: ${sentence(brand.approval)} The ${copy.providerNoun} shall incorporate up to two (2) rounds of revisions at no additional charge unless the Deal-Specific Terms state otherwise. This Agreement is effective from **${args.startDateLabel}** through **${args.endDateLabel}**.`
+        : `All deliverables shall be submitted for ${copy.clientNoun} approval at least 48 hours before the scheduled delivery or publication date. The ${copy.clientNoun} shall provide approval or revision requests within 24 hours of receipt. The ${copy.providerNoun} shall incorporate up to two (2) rounds of revisions at no additional charge. This Agreement is effective from **${args.startDateLabel}** through **${args.endDateLabel}**.`,
     },
     {
       n: 3,
@@ -168,12 +193,12 @@ export function buildAgreementClauses(args: AgreementClauseInputs): AgreementCla
     {
       n: 4,
       title: copy.rightsHeading,
-      body: copy.rightsText,
+      body: rightsBody,
     },
     {
       n: 5,
       title: "Exclusivity Terms",
-      body: args.exclusive ? copy.exclusiveText : copy.nonExclusiveText,
+      body: exclusivityBody,
     },
     isIndia
       ? {

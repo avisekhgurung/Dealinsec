@@ -5,6 +5,7 @@
  */
 import { Button } from "@/components/ui/button";
 import { Check, FileSignature, Receipt } from "lucide-react";
+import { useAudience } from "@/hooks/use-audience";
 
 export interface AgreementDraft {
   client: string;
@@ -49,10 +50,11 @@ const Shell = ({
 );
 
 export function AgreementDraftCard({ draft, done, busy, onCreate }: { draft: AgreementDraft; done: boolean; busy: boolean; onCreate: () => void }) {
+  const { party, project } = useAudience();
   return (
     <Shell icon={FileSignature} kicker="Draft agreement" done={done} busy={busy} onCreate={onCreate} label="Create Agreement" testId="agreement-draft-card">
-      <Field label="Client">{draft.client}</Field>
-      <Field label="Project">{draft.project}</Field>
+      <Field label={party}>{draft.client}</Field>
+      <Field label={project}>{draft.project}</Field>
       <Field label="Value"><span className="tabular-nums">{draft.amount}</span></Field>
       <Field label="Timeline">{draft.timeline}</Field>
     </Shell>
@@ -62,9 +64,10 @@ export function AgreementDraftCard({ draft, done, busy, onCreate }: { draft: Agr
 const TYPE_LABEL: Record<InvoiceDraft["invoiceType"], string> = { full: "Full", advance: "Advance", final: "Final" };
 
 export function InvoiceDraftCard({ draft, done, busy, onCreate }: { draft: InvoiceDraft; done: boolean; busy: boolean; onCreate: () => void }) {
+  const { party } = useAudience();
   return (
     <Shell icon={Receipt} kicker="Draft invoice" done={done} busy={busy} onCreate={onCreate} label="Create Invoice" testId="invoice-draft-card">
-      <Field label="Client">{draft.client}</Field>
+      <Field label={party}>{draft.client}</Field>
       <Field label="Type">{TYPE_LABEL[draft.invoiceType]}</Field>
       <Field label="Amount"><span className="tabular-nums">{draft.amount}</span></Field>
       <Field label="Due">{draft.dueDate ?? "Not set"}</Field>

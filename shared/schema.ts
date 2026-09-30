@@ -3,6 +3,7 @@ import { pgTable, text, integer, bigint, boolean, json, serial, varchar, timesta
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { dealTypeOptions as TAXONOMY_DEAL_TYPES } from "./dealTypeTaxonomy";
+import { AUDIENCES, brandTermsSchema, type BrandTerms } from "./audience";
 
 // Legacy enum options — kept for backward compat with existing UI helpers.
 // New deals can store any string here (validated client-side against taxonomy).
@@ -376,6 +377,10 @@ export const organizations = pgTable("organizations", {
   slug: varchar("slug").unique(),
   logo: varchar("logo"),
   industry: varchar("industry"),
+  // The kind of work this account does — see shared/audience.ts. Nullable on
+  // purpose: every organization that predates the column reads as
+  // "client_work", so nothing existing changes and nobody is re-onboarded.
+  audience: varchar("audience", { length: 20 }).$type<(typeof AUDIENCES)[number]>(),
   // Extra seats purchased beyond the plan's included seats (₹99/seat/month).
   // One shared expiry: rebuying resets the pack. Included seats are derived
   // from the owner's plan (free = 1, Pro = 5) via getSeatLimit().
@@ -627,6 +632,9 @@ export const deals = pgTable("deals", {
   deliverableMode: varchar("deliverable_mode").notNull().default("all"),
   standardTermIds: json("standard_term_ids").$type<string[]>().default(sql`'[]'::json`),
   customTerms: text("custom_terms"),
+  // Optional usage-rights / exclusivity / approval terms for brand
+  // collaborations. Null for every deal that does not state any.
+  brandTerms: jsonb("brand_terms").$type<BrandTerms>(),
   status: text("status").notNull().default("Pending"),
 });
 
@@ -771,7 +779,12 @@ export const invoices = pgTable("invoices", {
 
 export const insertDealSchema = createInsertSchema(deals)
   .omit({ id: true, status: true })
-  .extend({ dealAmountMinor: amountMinorSchema });
+  .extend({
+    dealAmountMinor: amountMinorSchema,
+    // Re-stated so the bounds are enforced: drizzle-zod infers an open json
+    // schema from a jsonb column.
+    brandTerms: brandTermsSchema.nullable().optional(),
+  });
 export type InsertDeal = z.infer<typeof insertDealSchema>;
 export type Deal = typeof deals.$inferSelect;
 

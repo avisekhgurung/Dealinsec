@@ -4,7 +4,8 @@
   Invoices→Pipeline value), deal status split, Earned/Pending, deliverables
   chart, recent deals, trial countdown.
 - Deal types match freelance work (Design, Development, Writing, Marketing,
-  Video & Photo, Consulting, Custom), with picklists for the kind of work and
+  Video & Photo, Consulting, Custom) plus Brand Collaboration for paid brand
+  deals (Reels, UGC, YouTube integrations, posts, stories), with picklists for the kind of work and
   how you bill it (per project, milestone, hourly, monthly retainer, per
   word/article/design) plus an "Other (specify)" free-text option.
 - Quotations: versioned, professional documents; print/PDF from the browser.
@@ -34,9 +35,14 @@
 - Protection Check on every deal: flags risky wording (e.g. unlimited
   revisions, "pay when our client pays", "to be decided later", contradicting
   payment figures) and missing protections (no advance, no balance timeline,
-  no revision limit, no exclusions, no late-payment consequence). One tap
-  suggests the missing term lines and can add them to a Pending deal. It does
-  not give legal advice.
+  no revision limit, no exclusions, no late-payment consequence, no
+  cancellation terms, no ownership statement, no acceptance step). For brand
+  collaborations it also checks usage rights, usage duration, open-ended usage
+  ("in perpetuity", "all media"), exclusivity and the approval process. Each
+  finding is Important, Attention or Good to know, says why it matters and what
+  to ask, and never blocks anything. One tap suggests the missing term lines and
+  can add them to a Pending deal. It checks the wording of the terms only; it
+  does not give legal advice.
 - Payment Chaser: drafts follow-up messages for unpaid invoices in five tones
   including Hinglish, using only the real invoice facts. The user copies and
   sends it themselves — DealInSec never messages a client directly.

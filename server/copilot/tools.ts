@@ -25,6 +25,8 @@ import {
   resolveLocaleSettings, toMinor, MAX_AMOUNT_MINOR,
   type User, type Deliverable, type LocaleSettings, type Contract,
 } from "@shared/schema";
+import { brandDealTypeOptions } from "@shared/dealTypeTaxonomy";
+import { brandTermsForDeal, defaultExclusive } from "@shared/audience";
 import { formatMoney, formatDate } from "@shared/money";
 import { getBillingUser, logOrgActivity } from "../entitlements";
 import { copilotSettings, getDealJourney } from "./workflow";
@@ -459,7 +461,12 @@ export async function buildDealCandidate(rawArgs: any, user: User) {
   // schema, so this clamp is the only thing standing between model output and
   // the column.
   const wantType = str(rawArgs?.dealType, 40).toLowerCase();
-  const dealType = dealTypeOptions.find((t) => t.toLowerCase() === wantType) ?? "Custom";
+  // "Brand Collaboration" is accepted for any account; the account's work type
+  // only decides which types the prompt offers and the picker shows first.
+  const dealType = [...dealTypeOptions, ...brandDealTypeOptions].find((t) => t.toLowerCase() === wantType) ?? "Custom";
+  // Bounded and placeholder-stripped, and stored only on a brand deal. The
+  // model is told to leave out what the message doesn't say.
+  const brandTerms = brandTermsForDeal(dealType, rawArgs?.brandTerms);
   const startDate = dateRe.test(str(rawArgs?.startDate, 10)) ? str(rawArgs.startDate, 10) : iso(today);
   const endDate = dateRe.test(str(rawArgs?.endDate, 10))
     ? str(rawArgs.endDate, 10)
@@ -494,6 +501,7 @@ export async function buildDealCandidate(rawArgs: any, user: User) {
     deliverables,
     deliverableMode: "all",
     customTerms,
+    brandTerms,
   });
   if (!parsed.success) {
     return { ok: false as const, message: "Those details don't form a valid deal — try creating it from the Deals page." };
@@ -589,7 +597,9 @@ export async function buildAgreementCandidate(rawArgs: any, user: User) {
       startDate: deal.startDate,
       endDate: deal.endDate,
       contractValueMinor: deal.dealAmountMinor,
-      exclusive: true,
+      // True for every existing deal type; a brand collaboration is exclusive
+      // only when the deal states an exclusivity term.
+      exclusive: defaultExclusive(deal.dealType, deal.brandTerms),
     },
     settings,
   };

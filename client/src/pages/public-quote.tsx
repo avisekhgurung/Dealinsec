@@ -11,6 +11,7 @@ import { ArrowRight, Check, Loader2, ShieldCheck } from "lucide-react";
 import { PublicDocFooter } from "@/components/public-doc-footer";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { trackEvent } from "@/lib/analytics";
+import { audienceForDealType, brandTermRows, type BrandTerms } from "@shared/audience";
 
 interface Snapshot {
   issuerName: string;
@@ -25,6 +26,8 @@ interface Snapshot {
   quoteNumber: string;
   version: number;
   validUntil: string;
+  /** Brand collaborations that state any; absent on every other snapshot. */
+  brandTerms?: BrandTerms;
 }
 
 const BRAND_GRADIENT = "linear-gradient(135deg, #059669 0%, #0D9488 100%)";
@@ -93,6 +96,8 @@ export default function PublicQuotePage() {
 
   const s = data.snapshot;
   const accepted = acceptedNow || !!data.acceptedAt;
+  const isBrand = audienceForDealType(s.dealType) === "brand_collaboration";
+  const termRows = brandTermRows(s.brandTerms);
 
   return (
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 px-4 py-8 sm:py-14">
@@ -105,9 +110,12 @@ export default function PublicQuotePage() {
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xl shadow-emerald-900/5 overflow-hidden">
           <div className="h-1.5" style={{ background: BRAND_GRADIENT }} />
           <div className="p-6 sm:p-8">
-            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-1">Quotation</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-1">{isBrand ? "Brand Collaboration Quote" : "Quotation"}</p>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-balance">{s.dealTitle}</h1>
             <p className="text-sm text-neutral-500 mt-1">Prepared for {s.clientName} · by {s.issuerName}</p>
+            {s.brandTerms?.campaign && (
+              <p className="text-sm text-neutral-500 mt-0.5">Campaign: {s.brandTerms.campaign}</p>
+            )}
 
             <div className="grid sm:grid-cols-2 gap-4 mt-6">
               <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4">
@@ -128,6 +136,20 @@ export default function PublicQuotePage() {
               </div>
             </div>
 
+            {termRows.length > 0 && (
+              <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4 mt-4" data-testid="quote-brand-terms">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-2">Usage, exclusivity &amp; approval</p>
+                <dl className="space-y-2 text-sm">
+                  {termRows.map((r) => (
+                    <div key={r.key}>
+                      <dt className="text-[11px] font-semibold text-neutral-500">{r.label}</dt>
+                      <dd className="text-neutral-700 dark:text-neutral-300">{r.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+
             {s.terms.length > 0 && (
               <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4 mt-4">
                 <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-2">Payment terms</p>
@@ -139,7 +161,7 @@ export default function PublicQuotePage() {
 
             <div className="flex items-end justify-between mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-800">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">Total project fee</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">{isBrand ? "Total fee" : "Total project fee"}</p>
                 <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{s.amountLabel}</p>
               </div>
               {!accepted && (
@@ -163,11 +185,11 @@ export default function PublicQuotePage() {
                   <ShieldCheck className="w-4 h-4" /> Quotation accepted
                 </p>
                 <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80 mt-1">
-                  Your approval has been recorded and the freelancer has been notified.
+                  Your approval has been recorded and {s.issuerName} has been notified.
                 </p>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mt-3">Next step</p>
                 <p className="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5">
-                  The freelancer can now prepare the agreement for your review and electronic signature.
+                  {s.issuerName} can now prepare the agreement for your review and electronic signature.
                 </p>
               </div>
             ) : (

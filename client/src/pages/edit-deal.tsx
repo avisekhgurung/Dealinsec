@@ -29,6 +29,7 @@ import {
 import type { Deal, Deliverable } from "@shared/schema";
 import {
   dealTypeOptions,
+  brandDealTypeOptions,
   legacyDealTypeOptions,
   dealTypeMeta,
   TAXONOMY,
@@ -37,6 +38,8 @@ import {
   type AnyDealType,
 } from "@shared/dealTypeTaxonomy";
 import { TaxonomyCombobox } from "@/components/taxonomy-combobox";
+import { audienceForDealType, normalizeBrandTerms } from "@shared/audience";
+import { BrandTermsFields, emptyBrandTermsDraft, type BrandTermsDraft } from "@/components/brand-terms-fields";
 import { MoneyCurrencyPendingError, useMoney } from "@/hooks/use-locale";
 
 const formSchema = z.object({
@@ -44,7 +47,7 @@ const formSchema = z.object({
   dealTitle: z.string().min(1, "Deal title is required"),
   // Accept legacy types so pre-pivot deals can still be edited; the type
   // selector grid only offers the Phase-1 sectors.
-  dealType: z.enum([...dealTypeOptions, ...legacyDealTypeOptions] as [string, ...string[]]).default("Custom"),
+  dealType: z.enum([...dealTypeOptions, ...brandDealTypeOptions, ...legacyDealTypeOptions] as [string, ...string[]]).default("Custom"),
   // MAJOR units, as a human types them. The column is `dealAmountMinor`; the
   // conversion happens once on seed and once on save, nowhere else.
   dealAmount: z.coerce.number().positive("Deal amount must be positive"),
@@ -124,6 +127,13 @@ export default function EditDealPage() {
   // deal_type is a plain varchar, so an off-list value must not crash the page.
   const taxonomy = TAXONOMY[dealType] ?? TAXONOMY.Custom;
   const L = getDeliverableLabels(dealType);
+  // Decided by the deal's STORED type, never by the card highlighted above: the
+  // update route does not change a deal's type, so a card click must not make
+  // the brand terms appear for a deal that is not a brand collaboration.
+  const storedType = (deal as any)?.dealType as string | undefined;
+  const isBrandDeal = storedType === "Brand Collaboration";
+  const brandWording = audienceForDealType(dealType) === "brand_collaboration";
+  const [brandTermsDraft, setBrandTermsDraft] = useState<BrandTermsDraft>(() => emptyBrandTermsDraft());
 
   const handleDealTypeChange = (next: DealType) => {
     form.setValue("dealType", next);
@@ -175,6 +185,7 @@ export default function EditDealPage() {
       // entry if blank so the user sees at least one input row.
       const parts = String(rawCustomTerms).split(/\n+/).map(s => s.trim()).filter(Boolean);
       setCustomTermsList(parts.length > 0 ? parts : [""]);
+      setBrandTermsDraft(emptyBrandTermsDraft((deal as any).brandTerms));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deal, fmt.ready, seededDealId]);
@@ -192,6 +203,8 @@ export default function EditDealPage() {
         ...rest,
         dealAmountMinor: fmt.minor(dealAmount),
         currency: fmt.currency,
+        // Sent only for a brand collaboration; null clears every term.
+        ...(isBrandDeal ? { brandTerms: normalizeBrandTerms(brandTermsDraft) } : {}),
       });
       return res.json();
     },
@@ -291,8 +304,10 @@ export default function EditDealPage() {
               below will be selected and picking one rewrites the deal. */}
           {!(dealTypeOptions as readonly string[]).includes(dealType) && (
             <p className="text-xs text-muted-foreground">
-              Current type: {dealTypeMeta[dealType]?.emoji} {dealTypeMeta[dealType]?.label ?? dealType} — no
-              longer offered for new deals. Picking one below will reset your deliverables.
+              Current type: {dealTypeMeta[dealType]?.emoji} {dealTypeMeta[dealType]?.label ?? dealType}
+              {(brandDealTypeOptions as readonly string[]).includes(dealType)
+                ? ". Picking another type below will reset your deliverables."
+                : " — no longer offered for new deals. Picking one below will reset your deliverables."}
             </p>
           )}
 
@@ -340,7 +355,7 @@ export default function EditDealPage() {
 
         <section className="glass-card rounded-xl p-5 space-y-4">
           <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            {dealType === "Creator" ? "Brand Details" : "Client Details"}
+            {brandWording ? "Brand Details" : "Client Details"}
           </h2>
 
           <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-x-5 lg:gap-y-4 lg:space-y-0">
@@ -349,7 +364,7 @@ export default function EditDealPage() {
               <Input
                 id="brandName"
                 placeholder={
-                  dealType === "Creator"
+                  brandWording
                     ? "e.g., Nike, Adidas, Mamaearth"
                     : "Client / company name"
                 }
@@ -591,6 +606,12 @@ export default function EditDealPage() {
             </p>
           )}
         </section>
+
+        {/* Keyed on the seeded deal so it remounts once the saved terms are in,
+            and opens itself when there are any. */}
+        {isBrandDeal && (
+          <BrandTermsFields key={seededDealId ?? "loading"} value={brandTermsDraft} onChange={setBrandTermsDraft} />
+        )}
 
         <section className="glass-card rounded-xl p-5 space-y-4">
           <div className="flex items-center gap-2">

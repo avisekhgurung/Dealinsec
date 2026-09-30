@@ -13,6 +13,7 @@ import { useMemo } from "react";
 import { DEFAULT_LOCALE_SETTINGS, type LocaleSettings } from "@shared/schema";
 import { getAgreementCopy, getDeliverableLabels } from "@shared/dealTypeTaxonomy";
 import { buildAgreementClauses, executionRecordDisclosure } from "@shared/agreementClauses";
+import type { BrandTerms } from "@shared/audience";
 import { PagedDocument, type DocBlock } from "./paged";
 import {
   DocHeader, docFooter, SectionTitle, TwoParties, Party, KV, tableBlocks,
@@ -35,6 +36,9 @@ export interface PublicAgreementSnapshot {
   exclusive: boolean;
   deliverables: { category: string; output: string; quantity: number; frequency: string }[];
   hasOwnPaymentTerms: boolean;
+  /** Brand collaborations that state usage, exclusivity or approval terms.
+   *  Absent on every older or non-brand snapshot. */
+  brandTerms?: BrandTerms;
 }
 
 export function PublicAgreementDoc({
@@ -155,6 +159,7 @@ export function PublicAgreementDoc({
       startDateLabel: docDate(s.startDate, loc),
       endDateLabel: docDate(s.endDate, loc),
       hasOwnPaymentTerms: s.hasOwnPaymentTerms,
+      brandTerms: s.brandTerms,
     });
     for (const clause of clauses) {
       out.push({ key: `c${clause.n}`, node: <Clause n={clause.n} title={clause.title}>{renderClauseBody(clause.body)}</Clause> });

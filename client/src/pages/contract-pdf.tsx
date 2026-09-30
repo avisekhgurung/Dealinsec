@@ -287,6 +287,7 @@ export default function ContractPdfPage() {
       startDateLabel: docDate(c.startDate, loc),
       endDateLabel: docDate(c.endDate, loc),
       hasOwnPaymentTerms,
+      brandTerms: deal?.brandTerms,
     });
     for (const clause of clauses) {
       out.push({

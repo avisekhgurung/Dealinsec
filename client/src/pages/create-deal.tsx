@@ -32,14 +32,26 @@ import {
 } from "@shared/schema";
 import {
   dealTypeOptions,
+  brandDealTypeOptions,
   dealTypeMeta,
   TAXONOMY,
   getDeliverableLabels,
   type DealType,
+  type BrandDealType,
 } from "@shared/dealTypeTaxonomy";
+import { audienceForDealType, dealAudienceLabels, normalizeBrandTerms, pickerDealTypes, type BrandTerms } from "@shared/audience";
+import { useAudience } from "@/hooks/use-audience";
+import { BrandTermsFields, emptyBrandTermsDraft, type BrandTermsDraft } from "@/components/brand-terms-fields";
 import { trackEvent } from "@/lib/analytics";
 import { DEAL_PREFILL_KEY } from "@/lib/deal-prefill";
 import { MoneyCurrencyPendingError, useMoney } from "@/hooks/use-locale";
+
+// Every type the form can hold. The client-work list is the picker's default;
+// Brand Collaboration is offered first to brand accounts (see pickerDealTypes).
+type PickerType = DealType | BrandDealType;
+const PICKABLE = [...brandDealTypeOptions, ...dealTypeOptions] as const;
+const isPickable = (t: string | null | undefined): t is PickerType =>
+  !!t && (PICKABLE as readonly string[]).includes(t);
 
 // The form collects MAJOR units from a human — `dealAmount`, what they type —
 // and the stored column is `dealAmountMinor`. Omitting the minor field and
@@ -48,7 +60,7 @@ import { MoneyCurrencyPendingError, useMoney } from "@/hooks/use-locale";
 const formSchema = insertDealSchema.omit({ userId: true, dealAmountMinor: true }).extend({
   brandName: z.string().min(1, "Client / brand name is required"),
   dealTitle: z.string().min(1, "Deal title is required"),
-  dealType: z.enum(dealTypeOptions).default(dealTypeOptions[0]),
+  dealType: z.enum(PICKABLE).default(dealTypeOptions[0]),
   dealAmount: z.coerce.number().positive("Deal amount must be positive"),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
@@ -88,10 +100,10 @@ const TINT_HOVER: Record<string, string> = {
 
 // ?type=Development deep-links straight to the form with the type chosen —
 // used by vertical landing pages and the Copilot.
-function initialTypeFromUrl(): DealType | null {
+function initialTypeFromUrl(): PickerType | null {
   try {
     const t = new URLSearchParams(window.location.search).get("type");
-    return t && (dealTypeOptions as readonly string[]).includes(t) ? (t as DealType) : null;
+    return isPickable(t) ? t : null;
   } catch {
     return null;
   }
@@ -103,10 +115,10 @@ function initialTypeFromUrl(): DealType | null {
 // always-one-tap-away escape, so this never locks anyone in.
 const DEAL_TYPE_MEMORY_KEY = "dis_last_deal_type";
 
-function rememberedDealType(): DealType | null {
+function rememberedDealType(): PickerType | null {
   try {
     const t = localStorage.getItem(DEAL_TYPE_MEMORY_KEY);
-    return t && (dealTypeOptions as readonly string[]).includes(t) ? (t as DealType) : null;
+    return isPickable(t) ? t : null;
   } catch {
     return null;
   }
@@ -117,6 +129,7 @@ function rememberedDealType(): DealType | null {
 interface DealPrefill {
   brandName?: string; dealTitle?: string; dealType?: string; dealAmount?: number;
   startDate?: string; endDate?: string; customTerms?: string;
+  brandTerms?: BrandTerms | null;
   deliverables?: { platform: string; contentType: string; quantity: number; frequency: string; notes: string }[];
 }
 function takeDealPrefill(): DealPrefill | null {
@@ -146,9 +159,10 @@ export default function CreateDealPage() {
   useEffect(() => {
     if (prefill) trackEvent("draft_restored_after_signup");
   }, []);
-  const prefillType = (dealTypeOptions as readonly string[]).includes(prefill?.dealType ?? "") ? (prefill!.dealType as DealType) : null;
-  const [urlType] = useState<DealType | null>(() => prefillType ?? initialTypeFromUrl());
-  const [memoryType] = useState<DealType | null>(() => (urlType ? null : rememberedDealType()));
+  const prefillType = isPickable(prefill?.dealType) ? prefill.dealType : null;
+  const [urlType] = useState<PickerType | null>(() => prefillType ?? initialTypeFromUrl());
+  const [memoryType] = useState<PickerType | null>(() => (urlType ? null : rememberedDealType()));
+  const account = useAudience();
   const initialType = urlType ?? memoryType;
   const [step, setStep] = useState<"type" | "form">(initialType ? "form" : "type");
   // True while the form shows a type the user didn't pick this visit.
@@ -185,8 +199,12 @@ export default function CreateDealPage() {
     },
   });
 
-  const dealType = (form.watch("dealType") as DealType) || dealTypeOptions[0];
+  const dealType = (form.watch("dealType") as PickerType) || dealTypeOptions[0];
   const taxonomy = TAXONOMY[dealType];
+  // A deal's own type decides its wording and whether the brand terms apply.
+  const isBrandDeal = audienceForDealType(dealType) === "brand_collaboration";
+  const party = dealAudienceLabels(dealType);
+  const [brandTermsDraft, setBrandTermsDraft] = useState<BrandTermsDraft>(() => emptyBrandTermsDraft(prefill?.brandTerms));
 
   // Itemizable custom terms — stored as newline-joined string in form for
   // backward compat with the existing customTerms text field.
@@ -211,6 +229,9 @@ export default function CreateDealPage() {
       const res = await apiRequest("POST", "/api/deals", {
         ...rest,
         dealAmountMinor: fmt.minor(dealAmount),
+        // Only a brand collaboration carries these; the server stores nothing
+        // for any other type and drops blank fields either way.
+        brandTerms: isBrandDeal ? normalizeBrandTerms(brandTermsDraft) : null,
         // The currency those minor units are IN. The server refuses the write
         // if the workspace has since moved to another one (CURRENCY_CHANGED),
         // rather than storing ₹65,000 as $65,000.
@@ -286,7 +307,7 @@ export default function CreateDealPage() {
   // When dealType changes, reset all deliverable category/type fields so the
   // user picks from the new taxonomy (prevents stale Design values lingering
   // on a Writing deal, etc.)
-  const handleDealTypeChange = (next: DealType) => {
+  const handleDealTypeChange = (next: PickerType) => {
     form.setValue("dealType", next);
     const current = form.getValues("deliverables");
     form.setValue(
@@ -298,7 +319,7 @@ export default function CreateDealPage() {
   // Picker → form. Only reset taxonomy fields when the type actually changed
   // (returning via "Change" and re-picking the same type keeps filled rows).
   // Every explicit pick is remembered so the NEXT deal skips the picker.
-  const pickType = (next: DealType) => {
+  const pickType = (next: PickerType) => {
     if (next !== form.getValues("dealType")) handleDealTypeChange(next);
     try { localStorage.setItem(DEAL_TYPE_MEMORY_KEY, next); } catch {}
     setFromMemory(false);
@@ -369,11 +390,12 @@ export default function CreateDealPage() {
             variants={{ hidden: {}, show: { transition: { staggerChildren: 0.045 } } }}
             className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4"
           >
-            {dealTypeOptions.map((dt) => {
+            {(pickerDealTypes(account.audience) as readonly PickerType[]).map((dt, _i, all) => {
               const meta = dealTypeMeta[dt];
               // 7 types: Custom (last) spans two columns so both the 2-col and
-              // 4-col grids end on a full row instead of a lone gap.
-              const span = dt === "Custom" ? "col-span-2" : "";
+              // 4-col grids end on a full row instead of a lone gap. With the
+              // brand type there are 8, which already fill the rows.
+              const span = dt === "Custom" && all.length % 2 === 1 ? "col-span-2" : "";
               return (
                 <motion.button
                   key={dt}
@@ -450,7 +472,7 @@ export default function CreateDealPage() {
 
         <section className="glass-card rounded-xl p-5 space-y-4">
           <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            Client Details
+            {party.party} Details
           </h2>
 
           <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-x-5 lg:gap-y-4 lg:space-y-0">
@@ -458,7 +480,7 @@ export default function CreateDealPage() {
               <Label htmlFor="brandName">{L.who}</Label>
               <Input
                 id="brandName"
-                placeholder="Client / company name"
+                placeholder={isBrandDeal ? "Brand name" : "Client / company name"}
                 className="h-12"
                 data-testid="input-brand-name"
                 {...form.register("brandName")}
@@ -499,7 +521,7 @@ export default function CreateDealPage() {
               <Label htmlFor="dealTitle">Deal Title</Label>
               <Input
                 id="dealTitle"
-                placeholder="e.g., Website redesign — 5 pages"
+                placeholder={isBrandDeal ? "e.g., Autumn skincare launch — 2 Reels" : "e.g., Website redesign — 5 pages"}
                 className="h-12"
                 data-testid="input-deal-title"
                 {...form.register("dealTitle")}
@@ -691,6 +713,8 @@ export default function CreateDealPage() {
             </p>
           )}
         </section>
+
+        {isBrandDeal && <BrandTermsFields value={brandTermsDraft} onChange={setBrandTermsDraft} />}
 
         <section className="glass-card rounded-xl p-5 space-y-4">
           <div className="flex items-center gap-2">

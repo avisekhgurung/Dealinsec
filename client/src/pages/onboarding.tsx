@@ -5,6 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Sparkles } from "lucide-react";
+import { AudiencePicker, DESCRIBES_YOU } from "@/components/audience-picker";
+import type { Audience } from "@shared/audience";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -75,6 +78,10 @@ export default function OnboardingPage() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
+  // Nothing is preselected: the work type shapes the wording of the whole app,
+  // so it is an answer, not a default. "What best describes you" is optional.
+  const [audience, setAudience] = useState<Audience | null>(null);
+  const [describes, setDescribes] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [billingAddress, setBillingAddress] = useState("");
@@ -88,6 +95,10 @@ export default function OnboardingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!audience) {
+      toast({ title: "Choose the kind of work you do", variant: "destructive" });
+      return;
+    }
     if (!fullName.trim()) {
       toast({ title: "Full name is required", variant: "destructive" });
       return;
@@ -118,19 +129,24 @@ export default function OnboardingPage() {
         const org = await queryClient
           .ensureQueryData<LocaleFields>({ queryKey: ["/api/org"] })
           .catch(() => undefined);
-        if (!sameRegion(getLocaleSettings(org), region)) {
-          try {
-            await apiRequest("PATCH", "/api/org", region);
-          } catch (error) {
-            toast({
-              title: "Couldn't save your country and currency",
-              description: parseApiError(error).error || "Please try again.",
-              variant: "destructive",
-            });
-            return;
-          }
-          await queryClient.invalidateQueries({ queryKey: ["/api/org"] });
+        // One write for everything the workspace records at signup. The region
+        // is included only when it differs (an Indian signup sends none), but the
+        // work type is always saved: it is what the person just chose.
+        const orgUpdates: Record<string, unknown> = { audience };
+        if (describes) orgUpdates.industry = describes;
+        if (!sameRegion(getLocaleSettings(org), region)) Object.assign(orgUpdates, region);
+        try {
+          await apiRequest("PATCH", "/api/org", orgUpdates);
+        } catch (error) {
+          toast({
+            title: "Couldn't save your details",
+            description: parseApiError(error).error || "Please try again.",
+            variant: "destructive",
+          });
+          return;
         }
+        await queryClient.invalidateQueries({ queryKey: ["/api/org"] });
+        trackEvent("audience_selected", { audience });
       }
 
       const nameParts = fullName.trim().split(" ");
@@ -195,6 +211,43 @@ export default function OnboardingPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <Label id="audience-label">What kind of work do you do? *</Label>
+              <AudiencePicker value={audience} onChange={setAudience} idPrefix="onboarding-audience" />
+              <p className="text-xs text-muted-foreground">
+                This sets the wording and starting point. You can change it any time in Settings.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-baseline justify-between">
+                <Label>What best describes you?</Label>
+                <span className="text-[11px] text-muted-foreground font-medium">Optional</span>
+              </div>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="What best describes you?">
+                {DESCRIBES_YOU.map((label) => {
+                  const on = describes === label;
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setDescribes(on ? null : label)}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500",
+                        on
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+                          : "border-border bg-background text-muted-foreground hover:border-emerald-300",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="fullName">Full Name *</Label>
               <Input

@@ -1,6 +1,10 @@
 # Terminology
 
-- Deal: one client engagement (client name, title, amount, dates, deliverables).
+- Deal: one client or brand engagement (name, title, amount, dates, deliverables).
+- Brand deal: a Brand Collaboration deal — a creator's paid work for a brand.
+- Work type: the account setting (Settings → Work type) that chooses client or
+  brand wording; it does not change existing deals or documents.
+- Usage rights: what the brand may do with the content, where and for how long.
 - Quotation/Quote: the priced proposal document generated from a deal.
 - Agreement (also "contract" in URLs): the electronic agreement created from a
   deal; one per deal; Signed once proof is uploaded.

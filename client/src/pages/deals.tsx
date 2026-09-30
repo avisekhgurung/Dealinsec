@@ -25,6 +25,7 @@ import { parseApiError, isUpgradeError } from "@/lib/api-error";
 import { Plus, Briefcase, ChevronRight, Calendar, Search, X } from "lucide-react";
 import { dealTypeMeta } from "@shared/dealTypeTaxonomy";
 import type { Deal } from "@shared/schema";
+import { useAudience } from "@/hooks/use-audience";
 
 type FilterType = "all" | "pending" | "active" | "completed";
 
@@ -43,7 +44,7 @@ type DealRow = Deal & { amountMajor: string };
 
 // Desktop table columns. A factory rather than a constant because money and
 // dates now need the org's currency and locale, which only a hook can supply.
-const makeColumns = (fmt: MoneyFormat): ColumnDef<DealRow>[] => [
+const makeColumns = (fmt: MoneyFormat, party = "Client"): ColumnDef<DealRow>[] => [
   {
     id: "dealNo",
     header: "Deal No.",
@@ -55,8 +56,8 @@ const makeColumns = (fmt: MoneyFormat): ColumnDef<DealRow>[] => [
   },
   {
     accessorKey: "brandName",
-    header: "Client",
-    meta: { label: "Client", filter: "text" },
+    header: party,
+    meta: { label: party, filter: "text" },
     cell: ({ row }) => <span className="font-semibold text-foreground">{row.original.brandName}</span>,
   },
   {
@@ -129,7 +130,8 @@ export default function DealsPage() {
   const [dateRange, setDateRange] = useState<DateRange>(ALL_TIME);
   const { user } = useAuth();
   const fmt = useMoney();
-  const columns = useMemo(() => makeColumns(fmt), [fmt]);
+  const audience = useAudience();
+  const columns = useMemo(() => makeColumns(fmt, audience.party), [fmt, audience.party]);
   const canCreateDeal = memberCan(user as any, "deals.create");
   // ?pick=agreement — arrived from the invoice picker's "create an agreement".
   const [pickAgreement, setPickAgreement] = useState(
@@ -258,7 +260,7 @@ export default function DealsPage() {
             <CardContent className="py-12 text-center">
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted mx-auto mb-4"><Briefcase className="w-8 h-8 text-muted-foreground" /></div>
               <h3 className="font-semibold mb-1">No deals yet</h3>
-              <p className="text-sm text-muted-foreground mb-4">Create your first client deal to get started</p>
+              <p className="text-sm text-muted-foreground mb-4">{audience.emptyState}</p>
               {canCreateDeal && (
                 <Link href="/deals/new">
                   <Button className="gradient-btn text-white" data-testid="button-create-deal-empty"><Plus className="w-4 h-4 mr-2" />Create Deal</Button>

@@ -11,11 +11,14 @@ import { Link } from "wouter";
 import { Sparkles, ArrowUp, Plus, FileText, Receipt, AlertTriangle, Sun, ListChecks, Wand2 } from "lucide-react";
 import { askCopilot } from "@/lib/copilot-bus";
 import { useAuth } from "@/hooks/useAuth";
+import { useAudience } from "@/hooks/use-audience";
 import { memberCan } from "@shared/permissions";
 
-const PLACEHOLDERS = [
-  "Paste a client message…",
-  "Create a deal from my client conversation…",
+// Client-work wording is exactly what shipped; a brand account swaps the two
+// lines that name the other party.
+const placeholdersFor = (party: "client" | "brand") => [
+  `Paste a ${party} message…`,
+  `Create a deal from my ${party} conversation…`,
   "Which payments are overdue?",
   "Create an invoice for my latest deal…",
   "What should I do today?",
@@ -25,6 +28,7 @@ const PLACEHOLDERS = [
 const MAX_LEN = 4000;
 
 const FIRST_RUN_EXAMPLE = "Client wants a $2,000 website in 4 weeks with 2 revisions.";
+const FIRST_RUN_EXAMPLE_BRAND = "A brand offers $800 for 2 Instagram Reels and 3 stories, and wants to use the content for ads.";
 
 interface Chip {
   label: string;
@@ -45,6 +49,8 @@ const CHIPS: Chip[] = [
 
 export function AiHome({ firstRun = false }: { firstRun?: boolean }) {
   const { user } = useAuth();
+  const { isBrand, partyLower, composerPrompt } = useAudience();
+  const PLACEHOLDERS = placeholdersFor(isBrand ? "brand" : "client");
   const [text, setText] = useState("");
   const [phIndex, setPhIndex] = useState(0);
   const areaRef = useRef<HTMLTextAreaElement>(null);
@@ -80,7 +86,7 @@ export function AiHome({ firstRun = false }: { firstRun?: boolean }) {
   };
 
   const fillExample = () => {
-    setText(FIRST_RUN_EXAMPLE);
+    setText(isBrand ? FIRST_RUN_EXAMPLE_BRAND : FIRST_RUN_EXAMPLE);
     areaRef.current?.focus();
   };
 
@@ -96,7 +102,7 @@ export function AiHome({ firstRun = false }: { firstRun?: boolean }) {
         <Sparkles className="w-3.5 h-3.5" /> DealInSec AI
       </p>
       <h2 className="text-xl lg:text-2xl font-bold tracking-tight mt-1">
-        {firstRun ? "Let's turn your first client message into a deal." : "What do you want to do?"}
+        {firstRun ? `Let's turn your first ${partyLower} message into a deal.` : "What do you want to do?"}
       </h2>
 
       <form
@@ -174,7 +180,7 @@ export function AiHome({ firstRun = false }: { firstRun?: boolean }) {
       </div>
 
       <p className="mt-3 text-[11px] text-muted-foreground">
-        Paste a client message and I&apos;ll turn it into a deal. Nothing is created until you confirm.
+        {composerPrompt} and I&apos;ll turn it into a deal. Nothing is created until you confirm.
       </p>
     </section>
   );

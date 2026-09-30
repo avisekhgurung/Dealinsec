@@ -29,6 +29,7 @@ import {
   taxRegistrations,
 } from "@shared/invoice-tax";
 import { parseApiError, isUpgradeError } from "@/lib/api-error";
+import { audienceForDealType } from "@shared/audience";
 
 function slugify(s: string): string {
   return (s || "")
@@ -234,7 +235,7 @@ export default function BrandInvoiceDetailsPage() {
       node: (
         <DocHeader
           brand={influencerName !== "—" ? influencerName : undefined}
-          docType="Invoice"
+          docType={audienceForDealType(deal?.dealType) === "brand_collaboration" ? "Brand Collaboration Invoice" : "Invoice"}
           docNo={invoice.invoiceNumber}
           status={invoice.status}
           meta={[
@@ -271,6 +272,10 @@ export default function BrandInvoiceDetailsPage() {
               name={invoice.brandName}
               lines={[
                 deal?.dealTitle && `Re: ${deal.dealTitle}`,
+                // Brand deals name the campaign when the deal states one.
+                audienceForDealType(deal?.dealType) === "brand_collaboration" && (deal as any)?.brandTerms?.campaign
+                  ? `Campaign: ${(deal as any).brandTerms.campaign}`
+                  : null,
                 invoice.contractId ? `Agreement: ${recordNo("agreement", invoice.contractId)}` : null,
                 invoice.dealId ? `Deal: ${recordNo("deal", invoice.dealId)}` : null,
               ]}

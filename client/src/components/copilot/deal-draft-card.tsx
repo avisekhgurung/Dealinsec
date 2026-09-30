@@ -6,12 +6,16 @@
  * by the model. Nothing here creates anything until Create Deal is pressed.
  */
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Check, Loader2, Pencil, ShieldCheck, Plus } from "lucide-react";
+import { AlertTriangle, Check, Loader2, Pencil } from "lucide-react";
+import { ProtectionFindings, type Finding } from "@/components/protection-findings";
+import { BRAND_TERM_LABELS, NOT_SPECIFIED, type Audience, type BrandTerms } from "@shared/audience";
 
 export interface DealDraft {
   client: string;
   project: string;
   dealType: string;
+  audience: Audience;
+  brandTerms: BrandTerms | null;
   amount: string;
   timeline: string;
   deliverables: string[];
@@ -19,7 +23,7 @@ export interface DealDraft {
   advancePercent: number | null;
   revisions: number | null;
   protection: {
-    flags: { id: string; priority: "high" | "attention"; title: string; detail: string; suggestedTerm?: string }[];
+    flags: { id: string; priority: "high" | "attention"; level: Finding["level"]; title: string; detail: string; why: string; ask: string; suggestedTerm?: string }[];
     passes: string[];
   };
   warnings: string[];
@@ -50,8 +54,10 @@ export function DealDraftCard({
   onEdit: () => void;
   onAddTerm: (flagId: string) => void;
 }) {
-  const high = draft.protection.flags.filter((f) => f.priority === "high");
-  const attention = draft.protection.flags.filter((f) => f.priority === "attention");
+  const brand = draft.audience === "brand_collaboration";
+  const findings: Finding[] = draft.protection.flags.map((f) => ({
+    id: f.id, level: f.level, title: f.title, why: f.why, ask: f.ask, suggestedTerm: f.suggestedTerm,
+  }));
 
   return (
     <div className="ml-9 mt-2 rounded-2xl border border-emerald-300/50 dark:border-emerald-800/50 overflow-hidden bg-background" data-testid="deal-draft-card">
@@ -60,8 +66,8 @@ export function DealDraftCard({
       </div>
 
       <div className="p-3.5 grid grid-cols-2 gap-x-3 gap-y-2.5">
-        <Field label="Client">{draft.client}</Field>
-        <Field label="Project">{draft.project}</Field>
+        <Field label={brand ? "Brand" : "Client"}>{draft.client}</Field>
+        <Field label={brand ? "Campaign" : "Project"}>{draft.project}</Field>
         <Field label="Amount"><span className="tabular-nums">{draft.amount}</span></Field>
         <Field label="Timeline">{draft.timeline}</Field>
         {draft.advancePercent != null && <Field label="Advance">{draft.advancePercent}%</Field>}
@@ -69,6 +75,20 @@ export function DealDraftCard({
         <div className="col-span-2">
           <Field label="Deliverables">{draft.deliverables.join(" · ")}</Field>
         </div>
+        {brand && (
+          // Read from the brand's message: anything it did not say is shown as
+          // "Not specified", never filled in.
+          <div className="col-span-2 grid grid-cols-2 gap-x-3 gap-y-2.5" data-testid="draft-brand-terms">
+            {(["usageRights", "usageDuration", "exclusivity", "approval"] as const).map((k) => {
+              const value = draft.brandTerms?.[k];
+              return (
+                <Field key={k} label={BRAND_TERM_LABELS[k]}>
+                  {value ? value : <span className="font-normal text-muted-foreground">{NOT_SPECIFIED}</span>}
+                </Field>
+              );
+            })}
+          </div>
+        )}
         {draft.terms.length > 0 && (
           <div className="col-span-2">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Terms</p>
@@ -85,43 +105,16 @@ export function DealDraftCard({
         </p>
       ))}
 
-      {/* Protection Check — computed from the terms above */}
-      <div className="border-t border-border/70 px-3.5 py-3 space-y-2" data-testid="draft-protection">
-        <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          <ShieldCheck className="w-3.5 h-3.5" /> Protection check
-        </p>
-        {[...high.map((f) => ({ f, tone: "high" as const })), ...attention.map((f) => ({ f, tone: "attention" as const }))].map(({ f, tone }) => (
-          <div key={f.id} className="flex items-start gap-2">
-            <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${tone === "high" ? "bg-rose-500" : "bg-amber-500"}`} aria-hidden />
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold">
-                <span className={tone === "high" ? "text-rose-600 dark:text-rose-400" : "text-amber-700 dark:text-amber-400"}>
-                  {tone === "high" ? "High priority" : "Needs attention"}
-                </span>{" "}
-                · {f.title}
-              </p>
-              <p className="text-[11px] text-muted-foreground leading-snug">{f.detail}</p>
-              {f.suggestedTerm && !done && (
-                <button
-                  type="button"
-                  disabled={busy || fixingId !== null}
-                  onClick={() => onAddTerm(f.id)}
-                  data-testid={`draft-fix-${f.id}`}
-                  className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline disabled:opacity-50"
-                >
-                  {fixingId === f.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                  Add: &ldquo;{f.suggestedTerm}&rdquo;
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-        {draft.protection.passes.map((p) => (
-          <p key={p} className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" aria-hidden /> {p}
-          </p>
-        ))}
-        <p className="text-[10px] text-muted-foreground">A check on the words in your terms, not legal advice.</p>
+      {/* Protection Check — computed from the terms above. The card keeps its
+          own Create / Edit buttons below, so the findings show no action pair. */}
+      <div className="border-t border-border/70 px-3.5 py-3" data-testid="draft-protection">
+        <ProtectionFindings
+          findings={findings}
+          passes={draft.protection.passes}
+          onAddTerm={done ? undefined : (f) => onAddTerm(f.id)}
+          addingId={fixingId}
+          disableAdd={busy}
+        />
       </div>
 
       <div className="border-t border-border/70 px-3.5 py-2.5 flex flex-wrap items-center gap-2">

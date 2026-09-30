@@ -73,7 +73,7 @@ async function loadOrg(user: User): Promise<OrgData> {
   return { deals, contracts, invoices, settings: resolveLocaleSettings(org, user) };
 }
 
-import { analyzeDealProtections, type ProtectionReport } from "./riskcheck";
+import { analyzeDealProtections, protectionPasses, summarizeProtection, type ProtectionReport, type ProtectionSummary } from "./riskcheck";
 
 const signed = (c: Contract) => c.status === "Signed" || !!c.signedByBrand;
 const invAmountMinor = (i: BrandInvoice) => i.dealAmountMinor || 0;
@@ -242,6 +242,9 @@ export interface Briefing {
   attentionCount: number;
   radar: MoneyRadar;
   nextActions: NextBestAction[];
+  /** Protection Check across the deals still awaiting a yes (status Pending),
+   *  where the terms can still be changed. */
+  protection: ProtectionSummary;
   generatedAt: string;
 }
 
@@ -255,23 +258,30 @@ export async function computeBriefing(user: User): Promise<Briefing> {
     .slice(0, 5);
   const attentionCount =
     (radar.overdue.count ? 1 : 0) + (radar.readyToInvoice.count ? 1 : 0) + (radar.dueThisWeek.count ? 1 : 0);
+  const protection = summarizeProtection(
+    data.deals.filter((d) => d.status === "Pending").map((d) => analyzeDealProtections(d, data.settings)),
+  );
   return {
     greetingName: user.firstName || "there",
     attentionCount,
     radar,
     nextActions,
+    protection,
     generatedAt: new Date().toISOString(),
   };
 }
 
-export async function computeDealIntel(dealId: number, user: User): Promise<{ health: DealHealth; nextAction: NextBestAction | null; protection: ProtectionReport; dealStatus: string } | null> {
+export async function computeDealIntel(dealId: number, user: User): Promise<{ health: DealHealth; nextAction: NextBestAction | null; protection: ProtectionReport & { passes: string[] }; dealStatus: string } | null> {
   const data = await loadOrg(user);
   const deal = data.deals.find((d) => d.id === dealId);
   if (!deal) return null;
+  const report = analyzeDealProtections(deal, data.settings);
   return {
     health: computeDealHealth(deal, data),
     nextAction: computeNextBestAction(deal, data),
-    protection: analyzeDealProtections(deal, data.settings),
+    // `passes` are the checks that ran and found the terms in order — shown
+    // beside the findings so a clean check reads as one, not as silence.
+    protection: { ...report, passes: protectionPasses(report) },
     dealStatus: deal.status,
   };
 }
