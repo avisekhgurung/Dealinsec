@@ -25,7 +25,7 @@ import { ArrowLeft, Download, ArrowRight, CheckCircle2, AlertTriangle } from "lu
 import type { Deal, Quote } from "@shared/schema";
 import { STANDARD_TERMS, termsForPhase, recordNo, hasProAccess } from "@shared/schema";
 import { getDeliverableLabels } from "@shared/dealTypeTaxonomy";
-import { audienceForDealType, brandTermRows, dealAudienceLabels } from "@shared/audience";
+import { brandTermRows, dealAudienceLabels } from "@shared/audience";
 import { PagedDocument, type DocBlock } from "@/components/document/paged";
 import {
   DocHeader, docFooter, SectionTitle, TwoParties, Party, tableBlocks, TotalBlock,
@@ -93,7 +93,6 @@ export default function QuotePreviewPage() {
   const blocks = useMemo<DocBlock[]>(() => {
     if (!deal) return [];
     const out: DocBlock[] = [];
-    const brandDeal = audienceForDealType(deal.dealType) === "brand_collaboration";
     const partyWord = dealAudienceLabels(deal.dealType).partyLower;
     // Only the terms the deal states; the creator sees what is missing in
     // Protection Check, and a document sent to a brand does not print blanks.
@@ -105,7 +104,7 @@ export default function QuotePreviewPage() {
       node: (
         <DocHeader
           brand={fullName !== "—" ? fullName : undefined}
-          docType={brandDeal ? "Brand Collaboration Quote" : "Quotation"}
+          docType="Quotation"
           docNo={quoteNumber}
           status={quote?.status === "revised" ? "Revised" : undefined}
           meta={[

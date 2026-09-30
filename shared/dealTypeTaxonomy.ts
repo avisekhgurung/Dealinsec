@@ -1140,7 +1140,7 @@ const AGREEMENT_COPY: Record<AnyDealType, AgreementCopy> = {
   Marketing: FREELANCE_AGREEMENT_COPY,
   "Video & Photo": FREELANCE_AGREEMENT_COPY,
   "Brand Collaboration": {
-    title: "Brand Collaboration Agreement",
+    title: "Agreement",
     providerRole: "Creator",
     providerNoun: "Creator",
     clientRole: "Brand",

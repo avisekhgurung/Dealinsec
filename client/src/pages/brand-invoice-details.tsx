@@ -237,7 +237,7 @@ export default function BrandInvoiceDetailsPage() {
       node: (
         <DocHeader
           brand={influencerName !== "—" ? influencerName : undefined}
-          docType={audienceForDealType(deal?.dealType) === "brand_collaboration" ? "Brand Collaboration Invoice" : "Invoice"}
+          docType="Invoice"
           docNo={invoice.invoiceNumber}
           status={invoice.status}
           meta={[

@@ -862,11 +862,11 @@ export const PAGES: CategoryPage[] = [
   <p class="muted" style="font-size:14px">What you leave blank stays blank: nothing is filled in for you, and an agreement only states the terms the deal actually carries.</p>
 </div></section>
 <section><div class="wrap">
-  <h2>A brand collaboration quote, agreement, invoice and payment record</h2>
+  <h2>Quotation, agreement, invoice and payment record for a brand deal</h2>
   <div class="feat">
-    <div class="ft"><b>Brand collaboration quote</b><p>Brand, campaign, deliverables, platforms, usage, exclusivity, fee and payment terms in one document the brand can open from a link and accept, with no account.</p></div>
+    <div class="ft"><b>Quotation</b><p>Brand, campaign, deliverables, platforms, usage, exclusivity, fee and payment terms in one document the brand can open from a link and accept, with no account.</p></div>
     <div class="ft"><b>Agreement</b><p>Written from the deal's own terms, so the usage, exclusivity and approval you agreed are what the document says. The brand signs online, and the record shows who signed, when and with which signature.</p></div>
-    <div class="ft"><b>Invoice</b><p>A brand collaboration invoice raised from the agreement: deposit, balance or the full amount, in your currency, and never more than the agreement is worth.</p></div>
+    <div class="ft"><b>Invoice</b><p>An invoice raised from the agreement: deposit, balance or the full amount, in your currency, and never more than the agreement is worth.</p></div>
     <div class="ft"><b>Payment tracking</b><p>See which brand payments are pending, due soon, overdue or paid. When one is late, DealInSec drafts a follow-up for you to review and send.</p></div>
   </div>
 </div></section>

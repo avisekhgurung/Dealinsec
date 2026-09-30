@@ -164,7 +164,7 @@ export default function ContractPdfPage() {
         <DocHeader
           formal
           brand={signerLabel !== "—" ? signerLabel : undefined}
-          docType={copy.title}
+          docType="Agreement"
           docNo={agreementNo}
           status={c.status === "Signed" ? "Signed" : "Pending"}
           meta={[

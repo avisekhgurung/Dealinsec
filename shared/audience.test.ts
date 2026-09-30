@@ -116,7 +116,7 @@ describe("the Brand Collaboration deal type", () => {
 
   it("has its own agreement wording without the legacy platform-registration line", () => {
     const c = getAgreementCopy("Brand Collaboration");
-    expect(c.title).toBe("Brand Collaboration Agreement");
+    expect(c.title).toBe("Agreement");
     expect(c.providerNoun).toBe("Creator");
     expect(c.clientNoun).toBe("Brand");
     expect(c.exclusiveText).not.toMatch(/Dealinsec platform/i);

@@ -84,7 +84,7 @@ export function PublicAgreementDoc({
       key: "header",
       node: (
         <DocHeader
-          docType={copy.title}
+          docType="Agreement"
           docNo=""
           status="Signed"
           formal

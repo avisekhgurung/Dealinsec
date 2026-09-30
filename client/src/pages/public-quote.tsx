@@ -110,7 +110,7 @@ export default function PublicQuotePage() {
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-xl shadow-emerald-900/5 overflow-hidden">
           <div className="h-1.5" style={{ background: BRAND_GRADIENT }} />
           <div className="p-6 sm:p-8">
-            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-1">{isBrand ? "Brand Collaboration Quote" : "Quotation"}</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-1">Quotation</p>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-balance">{s.dealTitle}</h1>
             <p className="text-sm text-neutral-500 mt-1">Prepared for {s.clientName} · by {s.issuerName}</p>
             {s.brandTerms?.campaign && (
