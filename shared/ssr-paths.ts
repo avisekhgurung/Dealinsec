@@ -27,6 +27,9 @@ export const SSR_PATH_PREFIXES: readonly string[] = [
   "freelancer-invoice-software",
   "refrens-alternative",
   "vyapar-alternative",
+  // audience pages (server/category-pages.ts)
+  "for-freelancers",
+  "for-creators",
   // retired page kept for its 301 (server/legacy-redirects.ts)
   "interior-design-software",
   // comparison pages (server/comparison-pages.ts)

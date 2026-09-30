@@ -45,15 +45,21 @@ export function landingSeoBody(): string {
   ).join("");
 
   return `<div id="seo-fallback">
-<h1>Freelance work, from deal to paid</h1>
-<p>DealInSec helps freelancers, independent consultants, creators and solo service professionals manage the whole client deal in one place: create the deal, send a professional quote, get the agreement signed, send the invoice and track every payment. It is freelance deal management built around what happens between getting a client and getting paid, for freelancers worldwide, in 50 currencies.</p>
+<h1>Turn client and brand deals into clear, professional agreements — and get paid</h1>
+<p>Create the deal, spot missing terms, send a professional quote, get the agreement signed, invoice your client or brand, and track payment, all in one workflow. DealInSec is for freelancers, independent consultants and solo service professionals, and for creators, UGC creators and influencers doing paid brand collaborations, worldwide, in 50 currencies.</p>
+<p>The workflow: Deal, Protection Check, Quotation, Agreement, Invoice, Payment.</p>
 
-<h2>Your freelance business shouldn't live across 7 different apps</h2>
-<p>Client messages in WhatsApp, scope in Google Docs, quotes in PDFs, invoices in another tool and payment tracking in a spreadsheet. DealInSec replaces the scatter with one connected workflow: quote, agreement, invoice, payment. One client, one deal, one source of truth.</p>
+<h2>Two ways in, one product</h2>
+<p><strong>For client work: freelancers and independent professionals.</strong> Turn project requests into clear scope, professional quotes, agreements and invoices. <a href="/for-freelancers">DealInSec for freelancers</a>.</p>
+<p><strong>For brand collaborations: creators and UGC professionals.</strong> Turn brand offers into clear deliverables, usage terms, agreements and invoices. <a href="/for-creators">DealInSec for creators</a>.</p>
+<p>Not sure what a message leaves out? The free <a href="/tools/deal-risk-checker">Deal Risk Checker</a> reads a pasted client request or brand offer and lists what is missing, with no account.</p>
 
-<h2>From client conversation to paid</h2>
+<h2>Your deals shouldn't live across 7 different apps</h2>
+<p>Client and brand messages in WhatsApp and DMs, scope in Google Docs, quotes in PDFs, invoices in another tool and payment tracking in a spreadsheet. DealInSec replaces the scatter with one connected workflow: quote, agreement, invoice, payment. One client or brand, one deal, one source of truth.</p>
+
+<h2>From client or brand conversation to paid</h2>
 <ol>
-<li><strong>Create a deal</strong> with the client, scope, timeline and fee.</li>
+<li><strong>Create a deal</strong> with the client or brand, scope, timeline and fee.</li>
 <li><strong>Send a quote</strong> generated from the deal, with standard or custom terms.</li>
 <li><strong>Get the agreement signed</strong>: send your client a signing link and they sign online without an account, or download the PDF and upload a signed copy as proof.</li>
 <li><strong>Send the invoice</strong> as an advance, milestone or final invoice drawn from the agreement.</li>
@@ -61,7 +67,7 @@ export function landingSeoBody(): string {
 </ol>
 
 <h2>Get the scope clear before the work begins</h2>
-<p>Define deliverables, timelines, revisions and payment terms before you start, so everyone is on the same page. Protection Check reads your terms and flags risky wording such as unlimited revisions or a missing advance. It is a written record of what was agreed, not legal advice, and it cannot force a client to pay.</p>
+<p>Define deliverables, timelines, revisions and payment terms before you start, and for a brand deal the usage rights, exclusivity and approval process, so everyone is on the same page. Protection Check reads your terms and flags risky or missing wording such as unlimited revisions, a missing advance or unclear usage rights. It is a written record of what was agreed, not legal advice, and it cannot force a client to pay.</p>
 
 <h2>Know exactly what you're owed</h2>
 <p>Track every invoice from sent to paid, so nothing gets lost in your inbox: total invoiced, paid, pending and overdue at a glance. DealInSec tracks payments but does not process them; your client pays you directly and you mark the invoice paid. When something is late, Copilot drafts the follow-up and you review and send it.</p>
@@ -69,11 +75,11 @@ export function landingSeoBody(): string {
 <h2>Look professional from the first quote to the final invoice</h2>
 <p>Give every client a clear, consistent experience with a professional quotation, agreement and invoice, all generated from the same deal.</p>
 
-<h2>Built for freelancers, wherever you work</h2>
-<p>Work with clients across borders while keeping your deals, documents and invoices organized in one place. Choose from 50 currencies, including USD, EUR, GBP, CAD, AUD, INR and AED. The tax field, bank labels, invoice numbering and agreement wording follow the country you work from.</p>
+<h2>Built for freelancers and creators, wherever you work</h2>
+<p>Work with clients and brands across borders while keeping your deals, documents and invoices organized in one place. Choose from 50 currencies, including USD, EUR, GBP, CAD, AUD, INR and AED. The tax field, bank labels, invoice numbering and agreement wording follow the country you work from.</p>
 
 <h2>Spend less time turning conversations into paperwork</h2>
-<p>Paste a client's message into Copilot and it drafts the deal: client, budget, timeline, deliverables and terms. It is AI-assisted, so you review and edit the draft, and nothing is created until you confirm.</p>
+<p>Paste a client's or brand's message into Copilot and it drafts the deal: the client or brand, budget, timeline, deliverables and terms. Anything the message doesn't say is left as Not specified. It is AI-assisted, so you review and edit the draft, and nothing is created until you confirm.</p>
 
 <h2>Everything you need to manage the client deal</h2>
 <ul>
@@ -84,11 +90,11 @@ export function landingSeoBody(): string {
 </ul>
 
 <h2>Free tools, no sign-up</h2>
-<p>Create a <a href="/tools/quotation-maker">quotation</a>, a <a href="/tools/bill-generator">bill</a>, a <a href="/tools/payment-reminder-email-generator">payment reminder email</a>, a <a href="/tools/purchase-order-generator">purchase order</a>, a <a href="/tools/service-agreement-template">service agreement</a> or a
+<p>Check a client request or brand offer with the <a href="/tools/deal-risk-checker">Deal Risk Checker</a>, or create a <a href="/tools/quotation-maker">quotation</a>, a <a href="/tools/bill-generator">bill</a>, a <a href="/tools/payment-reminder-email-generator">payment reminder email</a>, a <a href="/tools/purchase-order-generator">purchase order</a>, a <a href="/tools/service-agreement-template">service agreement</a> or a
 <a href="/tools/proforma-invoice-generator">proforma invoice</a> — free in your browser, no account needed. There is also an <a href="/tools/invoice-format/for-freelancers">invoice format for freelancers</a>. Country tools: a <a href="/tools/gst-invoice-generator">GST invoice</a> with CGST, SGST and IGST computed and a <a href="/tools/gst-calculator">GST calculator</a> for India, and a <a href="/tools/uk-late-payment-calculator">UK late payment calculator</a> that works out the statutory interest and compensation you can claim when a UK client pays late.</p>
 
 <h2>What DealInSec covers</h2>
-<p><a href="/freelancer-invoice-software">Freelancer invoice software</a> · <a href="/quotation-software">quotation software</a> · <a href="/proposal-management">proposal management</a> · <a href="/contract-management">contract management</a> · <a href="/e-signature">e-signature</a> · <a href="/invoice-management">invoice management</a> · <a href="/freelance-business-management-software">freelance business management software</a> · <a href="/bonsai-alternatives">Bonsai alternatives</a> · <a href="/bonsai-vs-dealinsec">Bonsai vs DealInSec</a> · <a href="/refrens-alternative">Refrens alternative</a> · <a href="/vyapar-alternative">Vyapar alternative</a> — one thread per deal, from first quote to final payment.</p>
+<p><a href="/for-freelancers">For freelancers</a> · <a href="/for-creators">For creators</a> · <a href="/freelancer-invoice-software">Freelancer invoice software</a> · <a href="/quotation-software">quotation software</a> · <a href="/proposal-management">proposal management</a> · <a href="/contract-management">contract management</a> · <a href="/e-signature">e-signature</a> · <a href="/invoice-management">invoice management</a> · <a href="/freelance-business-management-software">freelance business management software</a> · <a href="/bonsai-alternatives">Bonsai alternatives</a> · <a href="/bonsai-vs-dealinsec">Bonsai vs DealInSec</a> · <a href="/refrens-alternative">Refrens alternative</a> · <a href="/vyapar-alternative">Vyapar alternative</a> — one thread per deal, from first quote to final payment.</p>
 
 <h2>Guides</h2>
 <p>From the <a href="/blog">DealInSec blog</a>:</p>

@@ -10,6 +10,7 @@
  */
 import { POSTS } from "./blog";
 import { COMPARISON_PAGES } from "./comparison-pages";
+import { PAGES } from "./category-pages";
 import { TOOLS } from "./tools";
 
 /**
@@ -19,6 +20,8 @@ import { TOOLS } from "./tools";
  * a registered tool has no entry here.
  */
 export const TOOL_DESCRIPTIONS: Record<string, string> = {
+  "deal-risk-checker":
+    "reads a pasted client request or brand offer in the browser and lists what it says, what it leaves out (such as payment timing, usage rights and exclusivity), the points worth clarifying and the questions to ask; an optional AI reading extracts the fee, deliverables and terms",
   "quotation-maker":
     "builds a quotation with line items, optional GST, VAT or sales tax and standard terms in a chosen country's currency, and downloads it as a PDF",
   "bill-generator":
@@ -51,7 +54,16 @@ export const COMPARISON_DESCRIPTIONS: Record<string, string> = {
     "compares Bonsai and DealInSec side by side: Bonsai's current pricing, what each product includes, what DealInSec does not do, and who each suits",
 };
 
+/** One factual line per audience page, keyed by path. */
+export const AUDIENCE_DESCRIPTIONS: Record<string, string> = {
+  "/for-freelancers":
+    "how a client deal runs from request to payment for freelancers and independent professionals: scope, quotation, agreement, invoice and payment tracking, with a Protection Check of the terms",
+  "/for-creators":
+    "how a brand deal runs from offer to payment for creators, UGC creators and influencers: deliverables, usage rights, exclusivity, quotation, agreement, invoice and payment tracking, with a Protection Check of the terms",
+};
+
 export function llmsTxt(origin: string): string {
+  const audiencePages = PAGES.filter((p) => p.path in AUDIENCE_DESCRIPTIONS);
   const link = (title: string, path: string, note?: string) =>
     `- [${title}](${origin}${path})${note ? `: ${note}` : ""}`;
 
@@ -62,14 +74,14 @@ export function llmsTxt(origin: string): string {
 
   return `# DealInSec
 
-> DealInSec is web software for freelancers and solo service providers to run each client deal from quotation to payment: a quotation the client can accept online, an agreement the client can sign online, invoices drawn from that agreement, and tracking of what is paid, pending and overdue. It works in 50 currencies and is used by freelancers in any country.
+> DealInSec is web software for freelancers, solo service providers and creators doing paid brand collaborations to run each client or brand deal from quotation to payment: a quotation the client or brand can accept online, an agreement they can sign online, invoices drawn from that agreement, and tracking of what is paid, pending and overdue. It works in 50 currencies and is used in any country.
 
 ## Key facts
 
 - Maker: DealInSec is a sole proprietorship of Avisekh Gurung, based in Darjeeling, India.
 - Contact: support@dealinsec.com
-- What it does: deals; quotations with a client acceptance link; agreements with a public signing link (electronic acceptance with an audit record of who signed, when and with which signature — not a certified digital signature); invoices drawn from the agreement; payment status tracking; Protection Check, which flags risky or missing terms (such as unlimited revisions or no advance) before a deal is sent; AI-drafted payment reminders that the user reviews and sends themselves.
-- What it does not do: time tracking, a client portal, accounting or expense tracking, meeting scheduling, sending reminders automatically, or collecting payments. Clients pay the freelancer directly; DealInSec records the status.
+- What it does: deals; quotations with a client acceptance link; agreements with a public signing link (electronic acceptance with an audit record of who signed, when and with which signature — not a certified digital signature); invoices drawn from the agreement; payment status tracking; Protection Check, which flags risky or missing terms (such as unlimited revisions, no advance, unclear usage rights or exclusivity) before a deal is sent; AI-drafted payment reminders that the user reviews and sends themselves.
+- What it does not do: time tracking, a client portal, accounting or expense tracking, meeting scheduling, sending reminders automatically, or collecting payments. Clients and brands pay the user directly; DealInSec records the status. It is not a marketplace and does not find deals.
 - Pricing: a free plan (4 deals a month, each with its quotation) and a 7-day Pro trial with no card are open in every country. The paid Pro plan (₹99 a month or ₹999 a year) can currently be bought in India only; payments from other countries are not available yet.
 - Free tools: browser-based document tools that need no account and do not store what is typed on DealInSec's servers.
 
@@ -77,6 +89,10 @@ export function llmsTxt(origin: string): string {
 
 ${link("About DealInSec", "/about", "who makes it, what it does and does not do, and how its guides are written")}
 ${link(pillar.shortLabel, pillar.path, "what freelance business management software is, and where DealInSec fits")}
+
+## Who it is for
+
+${audiencePages.map((p) => link(p.shortLabel, p.path, AUDIENCE_DESCRIPTIONS[p.path])).join("\n")}
 
 ## Free tools
 

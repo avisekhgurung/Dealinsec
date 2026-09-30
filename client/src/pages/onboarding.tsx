@@ -8,6 +8,7 @@ import { Loader2, Sparkles } from "lucide-react";
 import { AudiencePicker, DESCRIBES_YOU } from "@/components/audience-picker";
 import type { Audience } from "@shared/audience";
 import { cn } from "@/lib/utils";
+import { readAudienceIntent } from "@/lib/audience-intent";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -78,9 +79,11 @@ export default function OnboardingPage() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
-  // Nothing is preselected: the work type shapes the wording of the whole app,
-  // so it is an answer, not a default. "What best describes you" is optional.
-  const [audience, setAudience] = useState<Audience | null>(null);
+  // Nothing is preselected by default: the work type shapes the wording of the
+  // whole app, so it is an answer, not a default. The one exception is a choice
+  // the person already made on the way in (a homepage card, the demo's selector
+  // or the Deal Risk Checker), which they can still change here.
+  const [audience, setAudience] = useState<Audience | null>(readAudienceIntent);
   const [describes, setDescribes] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");

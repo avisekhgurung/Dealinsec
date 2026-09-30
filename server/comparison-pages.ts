@@ -458,10 +458,10 @@ ${METHODOLOGY([vendor("bonsai")])}`,
     updated: REVIEWED_ON,
     metaTitle: "About DealInSec: Who Makes It and How We Write",
     description:
-      "About DealInSec: software for freelancers to run each client deal from quotation to payment. Who makes it, what it does and doesn't do, where paid plans are available, and how our guides are written.",
+      "About DealInSec: software for freelancers and creators to run each client or brand deal from quotation to payment. Who makes it, what it does and doesn't do, where paid plans are available, and how our guides are written.",
     h1: "About DealInSec",
-    sub: "DealInSec is software for freelancers and solo service providers to run each client deal from quotation to payment — built and run by an independent founder.",
-    chips: ["Independent founder", "Freelancers in any country", "50 currencies", "Free plan · 7-day trial"],
+    sub: "DealInSec is software for freelancers, solo service providers and creators doing paid brand collaborations to run each client or brand deal from quotation to payment — built and run by an independent founder.",
+    chips: ["Independent founder", "Freelancers and creators in any country", "50 currencies", "Free plan · 7-day trial"],
     shortLabel: "About DealInSec",
     extraJsonLd: [
       {
@@ -480,7 +480,7 @@ ${METHODOLOGY([vendor("bonsai")])}`,
         logo: "https://www.dealinsec.com/apple-touch-icon.png",
         email: "support@dealinsec.com",
         description:
-          "Software for freelancers to run each client deal from quotation to payment: quotations, online agreement signing, invoices and payment tracking.",
+          "Software for freelancers and creators to run each client or brand deal from quotation to payment: quotations, online agreement signing, invoices and payment tracking.",
         founder: { "@type": "Person", name: "Avisekh Gurung" },
         address: { "@type": "PostalAddress", addressLocality: "Darjeeling", addressRegion: "West Bengal", addressCountry: "IN" },
       },
@@ -488,7 +488,7 @@ ${METHODOLOGY([vendor("bonsai")])}`,
     sections: `
 <section><div class="wrap">
   <h2>What DealInSec is</h2>
-  <p class="sec-sub">DealInSec is web software for freelancers and solo service providers — designers, developers, writers, video editors and photographers, marketers and consultants. It keeps each client deal on one record: a quotation the client can accept online, an agreement the client can sign online, invoices drawn from that agreement, and a clear view of what is paid, pending and overdue. It works in 50 currencies, with the tax field, invoice numbering and date format of the country you work from.</p>
+  <p class="sec-sub">DealInSec is web software for freelancers and solo service providers — designers, developers, writers, video editors and photographers, marketers and consultants — and for creators, UGC creators and influencers who do paid brand collaborations. It keeps each client or brand deal on one record: a quotation the client or brand can accept online, an agreement they can sign online, invoices drawn from that agreement, and a clear view of what is paid, pending and overdue. It is one product with two ways in: at signup you choose whether you work with clients or with brands, and the wording and the deal fields follow. It works in 50 currencies, with the tax field, invoice numbering and date format of the country you work from.</p>
 </div></section>
 <section><div class="wrap">
   <h2>Who makes it</h2>
@@ -497,8 +497,8 @@ ${METHODOLOGY([vendor("bonsai")])}`,
 <section><div class="wrap">
   <h2>What it does — and what it doesn't</h2>
   <div class="feat">
-    <div class="ft"><b>What it does</b><p>Deals and quotations with a client acceptance link; agreements with a public signing link, recording who signed, when and with which signature; invoices drawn from the agreement; payment tracking; a Protection Check that flags risky or missing terms before you send; and AI-drafted payment reminders that you review and send yourself.</p></div>
-    <div class="ft"><b>What it doesn't</b><p>It does not track time, run a client portal, do accounting or expenses, schedule meetings, send reminders automatically or collect payments. Your client pays you directly and you mark the invoice paid. Online signing is electronic acceptance with an audit record, not a certified digital signature.</p></div>
+    <div class="ft"><b>What it does</b><p>Deals and quotations with a client or brand acceptance link; agreements with a public signing link, recording who signed, when and with which signature; invoices drawn from the agreement; payment tracking; a Protection Check that flags risky or missing terms before you send, including usage rights and exclusivity for brand deals; and AI-drafted payment reminders that you review and send yourself.</p></div>
+    <div class="ft"><b>What it doesn't</b><p>It is not a marketplace and does not find you clients or brand deals. It does not track time, run a client portal, do accounting or expenses, schedule meetings, send reminders automatically or collect payments. Your client or brand pays you directly and you mark the invoice paid. Online signing is electronic acceptance with an audit record, not a certified digital signature, and nothing it produces is legal advice.</p></div>
   </div>
 </div></section>
 <section><div class="wrap">
@@ -530,7 +530,11 @@ ${METHODOLOGY([vendor("bonsai")])}`,
       },
       {
         q: "Does DealInSec handle my clients' payments?",
-        a: "No. It tracks payment status. Your client pays you directly, and you mark the invoice paid.",
+        a: "No. It tracks payment status. Your client or brand pays you directly, and you mark the invoice paid.",
+      },
+      {
+        q: "Is DealInSec a marketplace for brand deals?",
+        a: "No. It does not find deals or connect creators with brands. It helps you turn a deal you already have, a client's request or a brand's offer, into clear terms, a quotation, an agreement and an invoice.",
       },
       {
         q: "How do I report a mistake in a guide or comparison?",

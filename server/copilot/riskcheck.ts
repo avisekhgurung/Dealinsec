@@ -16,6 +16,7 @@
 import { STANDARD_TERMS, type Deal, type LocaleSettings } from "@shared/schema";
 import { formatMoney } from "@shared/money";
 import { audienceForDealType, normalizeBrandTerms, type Audience } from "@shared/audience";
+import { findingText } from "@shared/findingCopy";
 
 /** One scale for every place a finding is shown. */
 export type FindingLevel = "important" | "attention" | "informational";
@@ -136,6 +137,17 @@ export function analyzeDealProtections(deal: Deal, settings: LocaleSettings): Pr
     checked.push(id);
     if (missing) add(id, "gap", title, why, ask, suggestedTerm);
   };
+  // Findings the free Deal Risk Checker can raise too take their wording from
+  // one shared source (shared/findingCopy.ts), so the two cannot drift apart.
+  const partyKey = brand ? "brand" : "client";
+  const addShared = (id: string, severity: "risk" | "gap") => {
+    const t = findingText(id, partyKey);
+    add(id, severity, t.title, t.why, t.ask);
+  };
+  const gapShared = (id: string, missing: boolean, suggestedTerm?: string) => {
+    const t = findingText(id, partyKey);
+    gap(id, missing, t.title, t.why, t.ask, suggestedTerm);
+  };
 
   /* ── Dangerous phrases (disputes waiting for a trigger) ── */
   if (has(/as per (the )?(site|project|client)? ?(requirement|condition)/i)) {
@@ -146,11 +158,7 @@ export function analyzeDealProtections(deal: Deal, settings: LocaleSettings): Pr
     );
   }
   if (has(/unlimited (revision|change|iteration|modification)/i)) {
-    add(
-      "unlimited_revisions", "risk", "Unlimited revisions promised",
-      `Unlimited changes means the project ends when the ${party} feels like it. Cap revisions and price the rest.`,
-      "Cap revisions at a fixed number of rounds and price any extra round.",
-    );
+    addShared("unlimited_revisions", "risk");
   }
   if (has(/back[\s-]?to[\s-]?back/i) || has(/pa(y|id|yment)[^.\n]{0,40}(when|after|once)[^.\n]{0,40}(client|receiv|realis|clear)/i)) {
     add(
@@ -188,18 +196,12 @@ export function analyzeDealProtections(deal: Deal, settings: LocaleSettings): Pr
 
   /* ── Brand-deal risks ── */
   if (brand && has(OPEN_USAGE_RE)) {
-    add(
-      "open_ended_usage", "risk", "Open-ended usage",
-      'Wording like "in perpetuity" or "all media" lets the brand use your content forever and everywhere for the same fee.',
-      "Limit usage to named channels and a set period, and price longer or wider use separately.",
-    );
+    addShared("open_ended_usage", "risk");
   }
 
   /* ── Missing protections ── */
-  gap(
-    "no_advance", !has(/advance|upfront|up-front|token|booking amount/i), "No advance",
-    "Starting without an advance means you carry all the risk — and the awkward conversation happens after the work.",
-    "Ask for an advance before work starts, for example 50%.",
+  gapShared(
+    "no_advance", !has(/advance|upfront|up-front|token|booking amount/i),
     "50% advance payment is required to confirm the project; work begins on receipt.",
   );
   gap(
@@ -208,10 +210,8 @@ export function analyzeDealProtections(deal: Deal, settings: LocaleSettings): Pr
     "Confirm when the balance is due, for example within 7 days of final delivery.",
     "The remaining balance is due within 7 days of final delivery.",
   );
-  gap(
-    "no_revision_limit", !has(/revision|rework|iteration|round of change/i), "No revision limit",
-    '"Just one more small change" is the most expensive sentence in service work. Cap it in writing.',
-    "Agree how many rounds of revisions are included.",
+  gapShared(
+    "no_revision_limit", !has(/revision|rework|iteration|round of change/i),
     // The org's own glyph, never a hardcoded ₹: this string is pasted into the
     // user's own contract, and a ₹ in a British freelancer's terms is wrong.
     `Two rounds of revisions are included; further revisions are billed at ${pricePlaceholder(settings)} per round.`,
@@ -228,30 +228,19 @@ export function analyzeDealProtections(deal: Deal, settings: LocaleSettings): Pr
     "State what happens if a payment is late, such as pausing work.",
     "If a due payment is delayed beyond 7 days, work may be paused until the account is settled.",
   );
-  gap(
-    "no_cancellation", !has(/cancel|terminat|kill fee|call off/i), "Cancellation isn't covered",
-    `If the ${party} cancels halfway, nothing says what you are still owed for the work already done.`,
-    `Agree what happens to the advance and to work already delivered if the ${party} cancels.`,
+  gapShared(
+    "no_cancellation", !has(/cancel|terminat|kill fee|call off/i),
     "If the project is cancelled after work has started, the advance is non-refundable and any work already delivered is paid for.",
   );
-  gap(
+  gapShared(
     "no_ownership", !has(/ownership|intellectual property|\bIP\b|copyright|rights (to|in)|licen[sc]e|assign/i),
-    "Ownership isn't stated",
-    brand
-      ? "If it doesn't say who owns the content, the brand may assume it owns it outright."
-      : "If it doesn't say who owns the finished work, both sides may assume it is theirs — usually only found out at the final payment.",
-    brand
-      ? "Confirm that you keep ownership of the content and the brand only gets the use that is agreed."
-      : "Confirm when ownership of the final work passes to the client, for example on full payment.",
     brand
       ? "The creator keeps ownership of the content; the brand's right to use it is limited to what is agreed in writing."
       : "Ownership of the final deliverables passes to the client on full payment; until then the work remains the freelancer's.",
   );
   if (!brand) {
-    gap(
-      "no_acceptance", !has(/accept|approv|sign[- ]?off|deemed/i), "No acceptance step",
-      "Without a point where the client accepts the work, the project has no end and the final payment has no trigger.",
-      "Agree how the client confirms the work is accepted and how long they have to respond.",
+    gapShared(
+      "no_acceptance", !has(/accept|approv|sign[- ]?off|deemed/i),
       "Deliverables are treated as accepted if no changes are requested within 5 working days of delivery.",
     );
   }
@@ -259,30 +248,22 @@ export function analyzeDealProtections(deal: Deal, settings: LocaleSettings): Pr
   /* ── Brand-deal protections ── */
   if (brand) {
     const usageStated = !!terms.usageRights || has(USAGE_RE);
-    gap(
-      "no_usage_rights", !usageStated, "Usage rights aren't specified",
-      "Without stated usage rights, the brand may assume it can use your content anywhere, including in paid ads.",
-      "Ask the brand how long they can use the content and whether paid advertising is included.",
+    gapShared(
+      "no_usage_rights", !usageStated,
       "The brand may use the approved content on its own social channels only. Paid advertising or any other use needs the creator's written agreement and may be charged separately.",
     );
     if (usageStated) {
-      gap(
-        "no_usage_duration", !terms.usageDuration && !has(USAGE_DURATION_RE), "Usage duration isn't specified",
-        "Usage with no end date can turn a one-off fee into a permanent licence.",
-        "Agree how long the brand may use the content, for example 3 or 6 months, and what renewing it costs.",
+      gapShared(
+        "no_usage_duration", !terms.usageDuration && !has(USAGE_DURATION_RE),
         "Usage of the content is limited to [number] months from the first publication date.",
       );
     }
-    gap(
-      "no_exclusivity_terms", !terms.exclusivity && !has(/exclusiv|non[- ]?compete|competitor|competing/i), "Exclusivity isn't specified",
-      "If exclusivity isn't stated, it's unclear whether you can work with competing brands during or after the campaign.",
-      "Ask whether the brand expects exclusivity, in which category and for how long, and whether that changes the fee.",
+    gapShared(
+      "no_exclusivity_terms", !terms.exclusivity && !has(/exclusiv|non[- ]?compete|competitor|competing/i),
       "No exclusivity applies unless agreed in writing. If exclusivity is agreed, it covers [category] for [period] and is priced separately.",
     );
-    gap(
-      "no_approval_process", !terms.approval && !has(/approv|sign[- ]?off|review (before|of)/i), "Approval process isn't specified",
-      "Without an agreed approval step, content can be sent back for changes with no limit on rounds or timing.",
-      "Confirm who approves the content, how quickly they respond, and how many rounds of changes are included.",
+    gapShared(
+      "no_approval_process", !terms.approval && !has(/approv|sign[- ]?off|review (before|of)/i),
       "The brand approves the content once in advance and responds within 2 working days; up to 2 rounds of changes are included.",
     );
   }
@@ -298,13 +279,7 @@ export function analyzeDealProtections(deal: Deal, settings: LocaleSettings): Pr
     );
   }
   if (typeof deal.endDate === "string") {
-    gap(
-      "no_deadline", !deal.endDate.trim(), brand ? "Campaign deadline isn't specified" : "No deadline is set",
-      brand
-        ? "Without a campaign deadline, the posting dates and the final payment have nothing to hang from."
-        : "Without a deadline, the project can drift and the final payment has nothing to hang from.",
-      brand ? "Confirm the posting dates or the campaign deadline." : "Confirm the delivery date.",
-    );
+    gapShared("no_deadline", !deal.endDate.trim());
   }
 
   // Most important first; the sort is stable, so the order within a level is

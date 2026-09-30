@@ -45,6 +45,7 @@ import {
   Radar,
   Navigation,
   MessageSquare,
+  ChevronDown,
 } from "lucide-react";
 import { SiGoogle, SiInstagram, SiYoutube, SiX, SiFacebook, SiLinkedin } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
@@ -67,6 +68,8 @@ import {
   FeatureGroupsSection,
 } from "@/components/landing-sections";
 import { LANDING_FAQS } from "@shared/landing-faqs";
+import { rememberAudienceIntent } from "@/lib/audience-intent";
+import type { Audience } from "@shared/audience";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -87,6 +90,14 @@ const SERVER_ROUTE_PREFIXES = [
   "/freelancer-invoice-software",
   "/refrens-alternative",
   "/vyapar-alternative",
+  "/for-freelancers",
+  "/for-creators",
+  // Pages the landing page did not link to before, listed so a future link is
+  // a plain navigation rather than a click wouter silently swallows.
+  "/about",
+  "/freelance-business-management-software",
+  "/bonsai-alternatives",
+  "/bonsai-vs-dealinsec",
 ];
 const isServerRoute = (href: string) => SERVER_ROUTE_PREFIXES.some((p) => href.startsWith(p));
 
@@ -277,6 +288,7 @@ export default function LandingPage() {
           isAuthenticated={isAuthenticated}
           onPrimaryClick={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
         />
+        {!isAuthenticated && <AudienceSection onStart={() => openAuth("signup")} />}
         {!isAuthenticated && <LandingTryDemo />}
         <ProblemSection />
         <HowItWorksSection />
@@ -669,6 +681,121 @@ function NavItem({ href, label }: { href: string; label: string }) {
   );
 }
 
+/** Deal → Protection Check → Quotation → Agreement → Invoice → Payment. Stacked on
+ *  a phone, one row from the sm breakpoint. The same six steps for both audiences. */
+const WORKFLOW_STEPS: { label: string; Icon: typeof Briefcase }[] = [
+  { label: "Deal", Icon: Briefcase },
+  { label: "Protection Check", Icon: ShieldCheck },
+  { label: "Quotation", Icon: FileText },
+  { label: "Agreement", Icon: FileSignature },
+  { label: "Invoice", Icon: Receipt },
+  { label: "Payment", Icon: CreditCard },
+];
+
+function WorkflowStrip() {
+  return (
+    <ol
+      aria-label="The DealInSec workflow"
+      className="mx-auto flex max-w-4xl flex-col items-center gap-1.5 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-2"
+      data-testid="workflow-strip"
+    >
+      {WORKFLOW_STEPS.map(({ label, Icon }, i) => (
+        <li key={label} className="flex flex-col items-center gap-1.5 sm:flex-row sm:gap-2">
+          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200/80 dark:border-emerald-800/50 bg-white/80 dark:bg-neutral-900/70 px-3.5 py-2 text-sm font-semibold shadow-sm">
+            <Icon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
+            {label}
+          </span>
+          {i < WORKFLOW_STEPS.length - 1 && (
+            <>
+              <ChevronDown className="h-4 w-4 text-neutral-400 sm:hidden" aria-hidden />
+              <ChevronRight className="hidden h-4 w-4 text-neutral-400 sm:block" aria-hidden />
+            </>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+const AUDIENCE_CARDS: {
+  audience: Audience;
+  eyebrow: string;
+  title: string;
+  body: string;
+  cta: string;
+  href: string;
+  learn: string;
+  Icon: typeof Briefcase;
+}[] = [
+  {
+    audience: "client_work",
+    eyebrow: "For client work",
+    title: "Freelancers & independent professionals",
+    body: "Turn project requests into clear scope, professional quotes, agreements and invoices.",
+    cta: "Start a client deal",
+    href: "/for-freelancers",
+    learn: "See how it works for freelancers",
+    Icon: Briefcase,
+  },
+  {
+    audience: "brand_collaboration",
+    eyebrow: "For brand collaborations",
+    title: "Creators & UGC professionals",
+    body: "Turn brand offers into clear deliverables, usage terms, agreements and invoices.",
+    cta: "Start a brand deal",
+    href: "/for-creators",
+    learn: "See how it works for creators",
+    Icon: Clapperboard,
+  },
+];
+
+/** Two ways in to the one product. The button remembers the choice so onboarding
+ *  can preselect it; the link goes to that audience's own page. */
+function AudienceSection({ onStart }: { onStart: () => void }) {
+  return (
+    <section id="audiences" className="pb-4 sm:pb-8" aria-label="Who it is for">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid gap-4 sm:grid-cols-2 lg:gap-6">
+          {AUDIENCE_CARDS.map(({ audience, eyebrow, title, body, cta, href, learn, Icon }) => (
+            <div
+              key={audience}
+              className="flex flex-col rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 p-6 shadow-sm"
+              data-testid={`audience-card-${audience}`}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/50">
+                  <Icon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                </span>
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">{eyebrow}</p>
+              </div>
+              <h3 className="mt-3 text-xl font-bold tracking-tight">{title}</h3>
+              <p className="mt-1.5 flex-1 text-neutral-600 dark:text-neutral-400 leading-relaxed">{body}</p>
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    rememberAudienceIntent(audience);
+                    trackEvent("audience_card_click", { audience });
+                    onStart();
+                  }}
+                  className="h-11 px-5 inline-flex items-center justify-center gap-2 rounded-md text-sm font-semibold text-white shadow-md shadow-emerald-500/20"
+                  style={{ background: BRAND_GRADIENT }}
+                  data-testid={`audience-cta-${audience}`}
+                >
+                  {cta} <ArrowRight className="h-4 w-4" aria-hidden />
+                </button>
+                <a href={href} className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">
+                  {learn} →
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Hero({
   isAuthenticated,
   onPrimaryClick,
@@ -690,14 +817,14 @@ function Hero({
               className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm border border-emerald-200/70 dark:border-emerald-800/40 shadow-sm text-[11px] font-bold tracking-[0.14em] text-emerald-700 dark:text-emerald-300"
             >
               <Globe className="w-3.5 h-3.5" />
-              BUILT FOR FREELANCERS WORLDWIDE
+              FOR FREELANCERS &amp; CREATORS WORLDWIDE
             </motion.p>
 
             <motion.h1
               variants={heroFadeUp}
-              className="text-[2.6rem] sm:text-6xl lg:text-[4.75rem] font-bold tracking-tight leading-[1.03] text-balance"
+              className="text-[2.35rem] sm:text-5xl lg:text-[3.75rem] font-bold tracking-tight leading-[1.06] text-balance"
             >
-              Turn client conversations
+              Turn client and brand deals into
               <br />
               <span
                 className="relative inline-block"
@@ -708,7 +835,7 @@ function Hero({
                   backgroundClip: "text",
                 }}
               >
-                into professional deals.
+                clear, professional agreements — and get paid.
                 <motion.span
                   className="absolute -bottom-1 left-0 right-0 h-[6px] rounded-full opacity-40"
                   style={{ background: "linear-gradient(90deg, transparent, #10B981, transparent)" }}
@@ -723,7 +850,7 @@ function Hero({
               variants={heroFadeUp}
               className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed text-pretty"
             >
-              Paste what your client wants. DealInSec turns it into a structured deal, checks for risky terms, and helps you go from quotation to agreement to invoice.
+              Create the deal, spot missing terms, send a professional quote, get the agreement signed, invoice your client or brand, and track payment — all in one workflow.
             </motion.p>
 
             <motion.div variants={heroFadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
@@ -738,24 +865,27 @@ function Hero({
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               ) : (
-                <a
-                  href="#try"
-                  onClick={() => trackEvent("hero_cta_click", { label: "try_it_free" })}
+                <button
+                  type="button"
+                  onClick={() => {
+                    trackEvent("hero_cta_click", { label: "create_first_deal" });
+                    onPrimaryClick();
+                  }}
                   className="h-12 px-7 inline-flex items-center justify-center text-[15px] font-semibold rounded-md text-white border-0 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all w-full sm:w-auto"
                   style={{ background: BRAND_GRADIENT }}
                   data-testid="button-hero-cta"
                 >
-                  Try it free
+                  Create your first deal
                   <ArrowRight className="w-4 h-4 ml-2" />
-                </a>
+                </button>
               )}
               <a
-                href="#how"
-                onClick={() => trackEvent("hero_cta_click", { label: "see_how_it_works" })}
+                href="#try"
+                onClick={() => trackEvent("hero_cta_click", { label: "check_deal_free" })}
                 className="h-12 px-7 inline-flex items-center justify-center text-[15px] font-semibold rounded-md border border-neutral-300 dark:border-neutral-700 bg-white/60 dark:bg-neutral-900/60 backdrop-blur-sm hover:bg-white dark:hover:bg-neutral-900 w-full sm:w-auto transition-colors"
-                data-testid="link-hero-how"
+                data-testid="link-hero-check"
               >
-                See how it works
+                Check a deal for free
                 <ChevronRight className="w-4 h-4 ml-1" />
               </a>
             </motion.div>
@@ -763,6 +893,10 @@ function Hero({
             <motion.p variants={heroFadeUp} className="text-xs sm:text-sm text-neutral-500">
               No credit card required · Professional documents · Multiple currencies
             </motion.p>
+
+            <motion.div variants={heroFadeUp} className="pt-4">
+              <WorkflowStrip />
+            </motion.div>
           </motion.div>
         </div>
 
@@ -901,10 +1035,10 @@ function WhoWeServeSection() {
           eyebrow="Who it's for"
           title={
             <>
-              Built for <GradientText>independent professionals</GradientText>
+              Built for <GradientText>independent professionals &amp; creators</GradientText>
             </>
           }
-          subtitle="If you quote, agree terms with and bill your own clients, the workflow fits. Pick the kind of work you do; it works the same way."
+          subtitle="If you quote, agree terms with and bill your own clients or brands, the workflow fits. Pick the kind of work you do; it works the same way."
         />
 
         <motion.div
@@ -1282,7 +1416,7 @@ function FAQSection() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
           eyebrow="FAQ"
-          title="Questions freelancers ask"
+          title="Questions freelancers and creators ask"
           subtitle="Straight answers about what DealInSec does, and what it doesn't."
         />
 
@@ -1352,7 +1486,7 @@ function FinalCTA({ isAuthenticated, onCTA }: { isAuthenticated: boolean; onCTA:
                 See how it works
               </a>
             </div>
-            <p className="text-xs text-emerald-100/70 mt-6">Built for freelancers worldwide.</p>
+            <p className="text-xs text-emerald-100/70 mt-6">Built for freelancers and creators worldwide.</p>
           </div>
         </motion.div>
       </div>
@@ -1371,7 +1505,7 @@ function Footer() {
           <div className="col-span-2 md:col-span-1">
             <DealinsecLogo size="md" withText />
             <p className="text-xs text-neutral-500 mt-4 leading-relaxed max-w-[240px]">
-              Quotes, agreements, invoices and payment tracking for freelancers worldwide, in 50 currencies.
+              Quotes, agreements, invoices and payment tracking for freelancers and creators worldwide, in 50 currencies.
             </p>
             <div className="flex items-center gap-3 mt-5">
               {[
@@ -1396,6 +1530,9 @@ function Footer() {
           <FooterColumn
             title="Product"
             links={[
+              { label: "For Freelancers", href: "/for-freelancers" },
+              { label: "For Creators", href: "/for-creators" },
+              { label: "Deal Risk Checker", href: "/tools/deal-risk-checker" },
               { label: "Freelancer Invoice Software", href: "/freelancer-invoice-software" },
               { label: "Quotation Software", href: "/quotation-software" },
               { label: "Contract Management", href: "/contract-management" },

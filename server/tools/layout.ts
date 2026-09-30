@@ -532,6 +532,7 @@ const AMBIENT = `<div class="ambient" aria-hidden="true"><span class="blob b1"><
 // Tools that work in any country first, then the country-specific ones.
 const TOOL_LINKS: [string, string][] = [
   ["/tools", "All tools"],
+  ["/tools/deal-risk-checker", "Deal Risk"],
   ["/tools/quotation-maker", "Quotation"],
   ["/tools/bill-generator", "Invoice"],
   ["/tools/payment-reminder-email-generator", "Payment Reminder"],
@@ -588,7 +589,7 @@ function ctaBand(): string {
     <div class="cta-ico">${clock}</div>
     <div class="cta-copy">
       <h2>Get every deal in writing — and get paid on time</h2>
-      <p>Built for freelancers, wherever you bill from: quotation, e-signed agreement, invoice and payment tracking on one thread per client, in your own currency. Free to start, with a 7-day Pro trial and no card in every country. Paid plans can currently be bought in India (₹99/month or ₹999/year).</p>
+      <p>Built for freelancers and creators, wherever you bill from: quotation, e-signed agreement, invoice and payment tracking on one thread per client or brand, in your own currency. Free to start, with a 7-day Pro trial and no card in every country. Paid plans can currently be bought in India (₹99/month or ₹999/year).</p>
     </div>
     <a class="btn" href="${APP_LINK}" data-cta>Start free →</a>
   </div></div>`;
@@ -642,7 +643,7 @@ function footer(): string {
       </div>
       ${SOCIALS}
     </div>
-    <div class="muted">© ${y} DealInSec — quotation, agreement and invoice software for freelancers. These free tools run in your browser; nothing you enter is stored on our servers.</div>
+    <div class="muted">© ${y} DealInSec — quotation, agreement and invoice software for freelancers and creators. These free tools run in your browser; nothing you enter is stored on our servers.</div>
   </div></footer>`;
 }
 

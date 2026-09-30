@@ -16,8 +16,10 @@ import { PAGES, registerCategoryPages } from "./category-pages";
 import { COMPARISON_PAGES, VENDORS, registerComparisonPages, comparisonSitemapPaths } from "./comparison-pages";
 import { TOOLS, registerToolPages, toolSitemapPaths } from "./tools";
 import { CORE_JS as DUE_DATE_CORE_JS, EXAMPLE_INVOICE_DATE, FAQ as DUE_DATE_FAQ } from "./tools/invoice-due-date";
+import { EXAMPLES as DEAL_RISK_EXAMPLES, FAQ as DEAL_RISK_FAQ } from "./tools/deal-risk";
 import { landingSeoBody } from "./landing-seo";
-import { COMPARISON_DESCRIPTIONS, TOOL_DESCRIPTIONS, llmsTxt } from "./llms";
+import { AUDIENCE_DESCRIPTIONS, COMPARISON_DESCRIPTIONS, TOOL_DESCRIPTIONS, llmsTxt } from "./llms";
+import { categorySitemapPaths } from "./category-pages";
 
 type Handler = (req: unknown, res: any) => void;
 
@@ -467,5 +469,242 @@ describe("invoice due date calculator page", () => {
     expect(visible).not.toContain('class="cta-band"');
     expect(visible).toContain('href="/auth?mode=signup&ref=tool_due_date" data-cta');
     expect(visible).toMatch(/It only drafts: you review the reminder and send it yourself/);
+  });
+});
+
+
+describe("deal risk checker page", () => {
+  const PATH = "/tools/deal-risk-checker";
+  const html = pages.get(PATH) ?? "";
+  const visible = stripJsonLd(html);
+  const text = visible.replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ");
+
+  it("is registered, in the sitemap, and not served by the SPA shell", () => {
+    expect(html.length).toBeGreaterThan(1000);
+    expect(toolSitemapPaths()).toContain(PATH);
+    expect(SSR_PATH_PATTERN.test(PATH)).toBe(true);
+  });
+
+  it("has one H1, its own canonical, title and description, and the tool markup", () => {
+    expect(html.match(/<h1[\s>]/g)?.length).toBe(1);
+    expect(html).toContain(`<link rel="canonical" href="https://www.dealinsec.com${PATH}" />`);
+    expect(html).toMatch(/<title>Deal Risk Checker — Check a Client or Brand Message Before You Say Yes \| DealInSec<\/title>/);
+    expect(html).toMatch(/<meta name="description" content="Paste a client request or a brand offer/);
+    for (const id of ["dr-text", "dr-run", "dr-result", "dr-summary", "dr-missing", "dr-findings", "dr-questions", "dr-copy", "dr-ai-run", "dr-cta"]) {
+      expect(html, id).toContain(`id="${id}"`);
+    }
+    expect(html).toContain('name="kind" value="client"');
+    expect(html).toContain('name="kind" value="brand"');
+  });
+
+  it("marks up only what is visible: FAQ questions and answers match exactly", () => {
+    const ld = jsonLdBlocks(html);
+    expect(ld.map((b) => b["@type"]).sort()).toEqual(["BreadcrumbList", "FAQPage", "SoftwareApplication"]);
+    const faq = ld.find((b) => b["@type"] === "FAQPage");
+    expect(faq.mainEntity.map((q: any) => q.name)).toEqual(DEAL_RISK_FAQ.map((f) => f.q));
+    expect(faq.mainEntity.map((q: any) => q.acceptedAnswer.text)).toEqual(DEAL_RISK_FAQ.map((f) => f.a));
+    for (const f of DEAL_RISK_FAQ) {
+      expect(visible).toContain(`<summary>${esc(f.q)}</summary>`);
+      expect(visible).toContain(`<p>${esc(f.a)}</p>`);
+    }
+  });
+
+  it("offers the two examples from the brief", () => {
+    for (const e of DEAL_RISK_EXAMPLES) expect(html).toContain(`data-text="${esc(e.text)}"`);
+    expect(DEAL_RISK_EXAMPLES.map((e) => e.kind)).toEqual(["client", "brand"]);
+  });
+
+  it("says plainly what it is not and where the message goes", () => {
+    expect(text).toMatch(/not legal advice/i);
+    expect(text).toMatch(/nothing you paste is saved/i);
+    expect(text).toMatch(/sends the message to an AI service/i);
+    // "not a guarantee of anything" is the hedge we want; only a claim is banned.
+    expect(text).toMatch(/not a guarantee/i);
+    expect(text).not.toMatch(/legally (required|mandatory|binding)|(?<!not an? )guarantee[ds]?|\bcompliant\b/i);
+  });
+
+  it("keeps no draft: the page never writes the pasted message to storage", () => {
+    // sessionStorage is used for the sign-up handoff only (the AI draft and the work type),
+    // never for the message text.
+    expect(html).not.toMatch(/localStorage/);
+    const stores = [...html.matchAll(/(?:sessionStorage)\.setItem\('([^']+)'/g)].map((m) => m[1]);
+    expect(stores.sort()).toEqual(["dis_audience_intent", "dis_deal_prefill"]);
+  });
+
+  it("has one product CTA, tracked by the seo_cta_click rule, and no shared CTA band", () => {
+    expect(visible).not.toContain('class="cta-band"');
+    expect(visible).toContain('href="/auth?mode=signup&ref=tool_deal_risk" data-cta');
+  });
+
+  it("links to the documents, terms guides and the audience pages it belongs with", () => {
+    for (const href of [
+      "/tools/quotation-maker",
+      "/tools/service-agreement-template",
+      "/blog/freelance-payment-terms",
+      "/tools/invoice-due-date-calculator",
+      "/blog/scope-creep",
+      "/blog/revision-limits",
+      "/blog/freelance-contract-terms",
+    ]) {
+      expect(visible, href).toContain(`href="${href}"`);
+    }
+  });
+
+  it("is linked in context from the guides about scope, revisions and contracts", () => {
+    for (const from of ["/blog/scope-creep", "/blog/revision-limits", "/blog/freelance-contract-terms", "/for-freelancers", "/for-creators"]) {
+      const main = (pages.get(from) ?? "").match(/<main>([\s\S]*?)<\/main>|<article[\s\S]*?<\/article>/)?.[0] ?? "";
+      expect(main, from).toContain(`href="${PATH}"`);
+    }
+  });
+
+  it("appears in the tool switcher, the tools hub and llms.txt", () => {
+    expect(pages.get("/tools/quotation-maker")).toContain(`href="${PATH}"`);
+    expect(pages.get("/tools")).toContain(`href="${PATH}"`);
+    expect(llmsTxt("https://www.dealinsec.com")).toContain(`https://www.dealinsec.com${PATH}`);
+    expect(TOOL_DESCRIPTIONS["deal-risk-checker"]).toMatch(/pasted client request or brand offer/);
+  });
+});
+
+describe("audience pages: /for-freelancers and /for-creators", () => {
+  const PATHS = ["/for-freelancers", "/for-creators"];
+  const mainOf = (p: string) => (pages.get(p) ?? "").match(/<main>([\s\S]*?)<\/main>/)?.[1] ?? "";
+  const textOf = (p: string) => stripJsonLd(mainOf(p)).replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/g, " ").replace(/\s+/g, " ").toLowerCase();
+
+  it("are registered, global, in the sitemap and matched by the SSR pattern", () => {
+    for (const p of PATHS) {
+      expect(pages.get(p)?.length, p).toBeGreaterThan(1000);
+      expect(categorySitemapPaths(), p).toContain(p);
+      expect(SSR_PATH_PATTERN.test(p), p).toBe(true);
+      expect(PAGES.find((x) => x.path === p)?.region, p).toBe("global");
+    }
+  });
+
+  it("have one H1, their own canonical, title, description and a FAQ that matches its markup", () => {
+    for (const p of PATHS) {
+      const html = pages.get(p) ?? "";
+      const page = PAGES.find((x) => x.path === p)!;
+      expect(html.match(/<h1[\s>]/g)?.length, p).toBe(1);
+      expect(html, p).toContain(`<link rel="canonical" href="https://www.dealinsec.com${p}" />`);
+      expect(html, p).toContain(`<title>${esc(page.metaTitle)} | DealInSec</title>`);
+      expect(page.description.length, `${p} description`).toBeLessThan(200);
+      const faq = jsonLdBlocks(html).find((b) => b["@type"] === "FAQPage");
+      expect(faq.mainEntity.map((q: any) => q.name), p).toEqual(page.faq.map((f) => f.q));
+    }
+  });
+
+  it("are not near-duplicates: genuinely different content for each audience", () => {
+    const shingles = (t: string) => {
+      const w = t.split(" ");
+      const set = new Set<string>();
+      for (let i = 0; i + 4 <= w.length; i++) set.add(w.slice(i, i + 4).join(" "));
+      return set;
+    };
+    const a = shingles(textOf("/for-freelancers"));
+    const b = shingles(textOf("/for-creators"));
+    const shared = [...a].filter((x) => b.has(x)).length;
+    const jaccard = shared / (a.size + b.size - shared);
+    // The shared thread section and the site chrome account for the overlap.
+    expect(jaccard).toBeLessThan(0.3);
+  });
+
+  it("each speaks to its own audience and to what the other one lacks", () => {
+    const creators = textOf("/for-creators");
+    const freelancers = textOf("/for-freelancers");
+    for (const term of ["usage rights", "exclusivity", "brand", "ugc", "reels"]) expect(creators, term).toContain(term);
+    for (const term of ["scope", "deposit", "revision", "milestone"]) expect(freelancers, term).toContain(term);
+    expect(freelancers).not.toContain("usage rights");
+  });
+
+  it("say what DealInSec does not do, that it is not legal advice, and that unknowns stay unspecified", () => {
+    for (const p of PATHS) {
+      const t = textOf(p);
+      expect(t, p).toContain("not legal advice");
+      expect(t, p).toMatch(/doesn.t collect payment|does not collect payments?|doesn.t do/);
+      expect(t, p).toContain("not specified");
+      expect(t, p).toMatch(/free plan/);
+    }
+    expect(textOf("/for-creators")).toMatch(/isn.t a marketplace|not a marketplace/);
+  });
+
+  it("make no legal, guarantee or payment promise and quote no price", () => {
+    for (const p of PATHS) {
+      const t = textOf(p);
+      expect(t, p).not.toMatch(/legally binding|(?<!not an? )guarantee[ds]?|will pay you|you will get paid|100% safe|fully protected/);
+    }
+    // Example figures in the illustrative deals are allowed; a plan price is not.
+    for (const p of PATHS) {
+      expect(mainOf(p), p).not.toMatch(/per month|\/month|\/year|a month or/i);
+    }
+  });
+
+  it("link to the checker, each other, the pillar and real tools, and never to an India page", () => {
+    expect(mainOf("/for-freelancers")).toContain('href="/for-creators"');
+    expect(mainOf("/for-creators")).toContain('href="/for-freelancers"');
+    for (const p of PATHS) {
+      const m = mainOf(p);
+      expect(m, p).toContain('href="/tools/deal-risk-checker"');
+      expect(m, p).toContain('href="/tools/quotation-maker"');
+      for (const india of ["/freelancer-invoice-software", "/refrens-alternative", "/vyapar-alternative", "/tools/gst-"]) {
+        expect(m, `${p} -> ${india}`).not.toContain(`href="${india}`);
+      }
+    }
+  });
+
+  it("are listed in llms.txt with a factual description, and linked from the footer and header", () => {
+    const llms = llmsTxt("https://www.dealinsec.com");
+    for (const p of PATHS) {
+      expect(llms).toContain(`https://www.dealinsec.com${p}`);
+      expect(AUDIENCE_DESCRIPTIONS[p]).toBeTruthy();
+      expect(pages.get("/quotation-software"), p).toContain(`href="${p}"`);
+    }
+  });
+
+  it("relate only to global pages, so an India-framed page never appears on them", () => {
+    for (const p of PATHS) {
+      // Only the related-pages grid: the shared footer legitimately links every category page.
+      const grid = (pages.get(p) ?? "").match(/The rest of the thread<\/h2>\s*<div class="rel-grid">([\s\S]*?)<\/div>\s*<\/div><\/section>/)?.[1] ?? "";
+      expect(grid, p).toContain('class="rel-card"');
+      for (const india of ["/refrens-alternative", "/vyapar-alternative", "/quotation-software", "/e-signature", "/freelancer-invoice-software"]) {
+        expect(grid, `${p} -> ${india}`).not.toContain(`href="${india}"`);
+      }
+    }
+  });
+});
+
+describe("homepage crawler fallback speaks to both audiences", () => {
+  const body = landingSeoBody();
+
+  it("leads with the two-audience headline and the workflow", () => {
+    expect(body).toContain("<h1>Turn client and brand deals into clear, professional agreements — and get paid</h1>");
+    expect(body).toContain("Deal, Protection Check, Quotation, Agreement, Invoice, Payment");
+  });
+
+  it("introduces both audiences and links to their pages and the checker", () => {
+    for (const href of ["/for-freelancers", "/for-creators", "/tools/deal-risk-checker"]) expect(body, href).toContain(`href="${href}"`);
+    expect(body).toContain("For client work: freelancers and independent professionals.");
+    expect(body).toContain("For brand collaborations: creators and UGC professionals.");
+  });
+
+  it("answers the creator question in its FAQ, without claiming a marketplace", () => {
+    expect(body).toContain("Can I use DealInSec for brand deals as a creator?");
+    expect(body).toMatch(/not a marketplace and it does not find brand deals/);
+  });
+});
+
+describe("the tools hub", () => {
+  const html = pages.get("/tools") ?? "";
+
+  it("groups the tools: protection first, then documents, then country tools", () => {
+    const i = (needle: string) => html.indexOf(needle);
+    expect(i("Deal &amp; protection")).toBeGreaterThan(-1);
+    expect(i("Deal &amp; protection")).toBeLessThan(i("Quotes, agreements &amp; invoices"));
+    expect(i("Built on one country's rules")).toBeGreaterThan(-1);
+    expect(i("Quotes, agreements &amp; invoices")).toBeLessThan(i("Built on one country's rules"));
+    expect(html.indexOf("/tools/deal-risk-checker")).toBeLessThan(html.indexOf("/tools/quotation-maker"));
+  });
+
+  it("is addressed to freelancers and creators", () => {
+    expect(html).toMatch(/Free tools for<br \/><span class="accent">freelancers &amp; creators<\/span>/);
+    expect(html).toContain("Who are the tools for?");
   });
 });

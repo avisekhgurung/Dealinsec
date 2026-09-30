@@ -19,7 +19,7 @@ export default defineConfig({
         name: "DealInSec — Deal Management OS",
         short_name: "DealInSec",
         description:
-          "Track, sign, and bill every client deal — quotation, agreement, invoice and payment tracking in one workflow. Built for freelancers worldwide.",
+          "Track, sign, and bill every client or brand deal — quotation, agreement, invoice and payment tracking in one workflow. Built for freelancers and creators worldwide.",
         theme_color: "#FFFFFF",
         background_color: "#0F172A",
         display: "standalone",

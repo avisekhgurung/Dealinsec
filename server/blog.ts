@@ -226,7 +226,7 @@ function footer(): string {
       <a href="/terms">Terms</a>
       <a href="/privacy">Privacy</a>
     </div>
-    <div class="muted">© 2026 DealInSec — quotations, e-signed agreements and invoices for freelancers worldwide. Articles are general information, not legal or tax advice.</div>
+    <div class="muted">© 2026 DealInSec — quotations, e-signed agreements and invoices for freelancers and creators worldwide. Articles are general information, not legal or tax advice.</div>
   </div></footer>`;
 }
 
@@ -1690,7 +1690,7 @@ ${ctaInline("Terms that match at every step", "DealInSec carries the terms from 
 <li><b>Tie payment to stages,</b> so a stage is not "done" until it is approved and paid.</li>
 <li><b>Refer back to the document</b> whenever a request arrives, calmly and quickly.</li>
 </ol>
-<p>A signed <a href="/tools/service-agreement-template">agreement</a> makes all of this easier to hold to; see <a href="/blog/freelance-contract-terms">the clauses that matter</a>. Before you send, DealInSec's Protection Check reads your terms and flags risky or missing wording — unlimited revisions, no advance, no payment deadline — and suggests lines to add. Nothing is added unless you approve it. For how this fits into running a whole deal, see <a href="/freelance-business-management-software">freelance business management software</a>.</p>
+<p>A signed <a href="/tools/service-agreement-template">agreement</a> makes all of this easier to hold to; see <a href="/blog/freelance-contract-terms">the clauses that matter</a>. Before you send, DealInSec's Protection Check reads your terms and flags risky or missing wording — unlimited revisions, no advance, no payment deadline — and suggests lines to add. Nothing is added unless you approve it. To see what a client's request leaves out before you agree to it, paste it into the free <a href="/tools/deal-risk-checker">deal risk checker</a>. For how this fits into running a whole deal, see <a href="/freelance-business-management-software">freelance business management software</a>.</p>
 
 <h2>What to say when it happens</h2>
 ${tpl(1, "A request outside the agreed scope", "Subject: Adding {Request} to {Project}\n\nHi {Client name},\n\nThanks for the idea. Our agreement covers {agreed deliverables}; {request} is outside that scope. I can add it for {Amount} and about {X} extra days. If you would like to go ahead, reply \"approved\" and I will schedule it. If not, I will continue with the current scope on the agreed timeline.\n\nBest,\n{Your name}", "Use when a client asks for something the agreement doesn't cover.")}
@@ -1742,7 +1742,7 @@ ${ctaInline("Put the scope in writing first", "Generate a freelance agreement wi
 <h2>Sample wording</h2>
 ${tpl(1, "For the quotation", "This quotation includes up to {Number} rounds of revisions. Additional rounds are charged at {Rate or price}.")}
 ${tpl(2, "For the agreement", "The fee includes up to {Number} rounds of revisions. A round is a single consolidated set of written feedback on a delivered draft. Corrections of the Provider's errors are not counted. Requests for changes to the agreed scope, or further rounds, are quoted separately and begin only when approved in writing.")}
-<p>You can add this clause with the free <a href="/tools/service-agreement-template">freelance contract template</a> and the <a href="/tools/quotation-maker">quotation maker</a>. DealInSec's Protection Check flags a missing revision limit before you send the deal; <a href="/freelance-business-management-software">what freelance business management software covers</a> explains the rest of the workflow.</p>
+<p>You can add this clause with the free <a href="/tools/service-agreement-template">freelance contract template</a> and the <a href="/tools/quotation-maker">quotation maker</a>. DealInSec's Protection Check flags a missing revision limit before you send the deal, and the free <a href="/tools/deal-risk-checker">deal risk checker</a> shows whether a client's message mentions revisions at all; <a href="/freelance-business-management-software">what freelance business management software covers</a> explains the rest of the workflow.</p>
 
 <h2>When a client goes past the limit</h2>
 <p>Use a short, friendly message that restates the agreement and gives a choice — there is a ready-made template for it in <a href="/blog/scope-creep">the scope creep guide</a>. Keep the tone the same as the rest of the project; the goal is to enforce the rule without making it personal.</p>
@@ -1795,6 +1795,7 @@ ${ctaInline("Catch it before you send", "DealInSec's Protection Check reads your
 ${ctaInline("Run the deal, not just the document", "Quotation, e-signed agreement, invoice and payment status on one record — with a Protection Check on your terms before you send.", SIGNUP, "Try it free →")}
 
 <h2>Before you send: a quick check</h2>
+<p>If you are still deciding whether to accept the work, the free <a href="/tools/deal-risk-checker">deal risk checker</a> reads the client's message and lists which of these points it leaves open.</p>
 <ul>
 <li>Is every deliverable listed, and is there something excluded?</li>
 <li>Is there a revision limit and a change process?</li>

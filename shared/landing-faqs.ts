@@ -12,11 +12,15 @@ export interface LandingFaq {
 export const LANDING_FAQS: LandingFaq[] = [
   {
     q: "What is DealInSec?",
-    a: "DealInSec is a workspace for freelancers to manage a client deal from first quote to final payment. You create the deal, send a quotation, get the agreement signed, send the invoice and track whether it has been paid. Each document is generated from the same deal, so the scope and the numbers always match.",
+    a: "DealInSec is a workspace for freelancers and for creators doing paid brand collaborations to manage a client or brand deal from first quote to final payment. You create the deal, check its terms, send a quotation, get the agreement signed, send the invoice and track whether it has been paid. Each document is generated from the same deal, so the scope and the numbers always match.",
   },
   {
     q: "Who is DealInSec for?",
-    a: "Freelancers, independent consultants, creators and other solo service professionals who quote, agree terms with and bill their own clients: designers, developers, writers, video editors, photographers, marketers and consultants. It is built for one person running client work, not for large teams.",
+    a: "Freelancers, independent consultants and other solo service professionals who quote, agree terms with and bill their own clients (designers, developers, writers, video editors, photographers, marketers and consultants), and creators, UGC creators and influencers who do paid brand collaborations. It is built for one person running client or brand work, not for large teams.",
+  },
+  {
+    q: "Can I use DealInSec for brand deals as a creator?",
+    a: "Yes. Choose “I work with brands” when you sign up and the app uses brand wording and offers the Brand Collaboration deal type, with optional fields for campaign, usage rights, usage duration, exclusivity and approval. Protection Check asks about anything the brand's offer leaves out, and the quotation, agreement and invoice state the terms you enter. It is the same workflow and pricing as for client work, it is not a marketplace and it does not find brand deals.",
   },
   {
     q: "Can I use DealInSec with international clients?",
@@ -51,7 +55,7 @@ export const LANDING_FAQS: LandingFaq[] = [
     a: "Yes. Pro is paid for a fixed period, a month or a year, with no auto-debit, so nothing renews behind your back. If you don't renew, your account returns to the free plan. See the refund policy for what applies to a purchase.",
   },
   {
-    q: "Can DealInSec create a deal from a client's message?",
-    a: "Yes. Paste the client's conversation into DealInSec Copilot and it drafts the deal from what was said: client, scope, amount, dates and terms. It is AI-assisted, so check the draft. Nothing is created until you confirm it, and it never invents an amount that wasn't stated.",
+    q: "Can DealInSec create a deal from a client's or brand's message?",
+    a: "Yes. Paste the client's or brand's conversation into DealInSec Copilot and it drafts the deal from what was said: the client or brand, scope, amount, dates and terms, and for a brand deal any usage, exclusivity and approval terms. It is AI-assisted, so check the draft. Anything the message doesn't say is left as Not specified, nothing is created until you confirm it, and it never invents an amount that wasn't stated.",
   },
 ];

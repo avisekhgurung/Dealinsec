@@ -20,6 +20,7 @@ import { purchaseOrderPage, purchaseOrderMeta } from "./purchase-order";
 import { ukLatePaymentPage, ukLatePaymentMeta } from "./uk-late-payment";
 import { paymentReminderPage, paymentReminderMeta } from "./payment-reminder-email";
 import { invoiceDueDatePage, invoiceDueDateMeta } from "./invoice-due-date";
+import { dealRiskPage, dealRiskMeta } from "./deal-risk";
 import { registerProgrammaticPages, programmaticSitemapPaths } from "./programmatic";
 
 // html-to-image UMD bundle (for PNG export), read once and served self-hosted
@@ -42,14 +43,18 @@ interface ToolDef {
   render: () => string;
   /** Set for a tool built on one country's rules; absent means any country. */
   country?: "IN" | "GB";
+  /** Where a country-neutral tool sits on /tools. Absent means "documents". */
+  group?: "protection";
 }
 
-// Order is display order on /tools: the tools that work anywhere first.
+// Order is display order on /tools: the tools that work anywhere first, with the
+// deal-and-protection tools leading.
 export const TOOLS: ToolDef[] = [
+  { ...dealRiskMeta, render: dealRiskPage, group: "protection" },
+  { ...paymentReminderMeta, render: paymentReminderPage, group: "protection" },
+  { ...invoiceDueDateMeta, render: invoiceDueDatePage, group: "protection" },
   { ...quotationMakerMeta, render: quotationMakerPage },
   { ...billGeneratorMeta, render: billGeneratorPage },
-  { ...paymentReminderMeta, render: paymentReminderPage },
-  { ...invoiceDueDateMeta, render: invoiceDueDatePage },
   { ...serviceAgreementMeta, render: serviceAgreementPage },
   { ...proformaInvoiceMeta, render: proformaInvoicePage },
   { ...purchaseOrderMeta, render: purchaseOrderPage },
@@ -71,6 +76,7 @@ export function toolSitemapPaths(): string[] {
 
 // Distinct line icons per tool (lucide-style), rendered inside the card badge.
 const ICONS: Record<string, string> = {
+  "deal-risk-checker": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 9.3 8 11 4.6-1.7 8-6 8-11V5Z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>`,
   "invoice-due-date-calculator": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/></svg>`,
   "payment-reminder-email-generator": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>`,
   "uk-late-payment-calculator": `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M5 3 2.5 5.5M19 3l2.5 2.5"/></svg>`,
@@ -85,8 +91,9 @@ const ICONS: Record<string, string> = {
 };
 
 const INDEX_FAQ: { q: string; a: string }[] = [
-  { q: "Are these tools really free?", a: "Yes — every tool is free to use with no sign-up. You can create and download unlimited invoices, quotations and agreements as PDFs." },
-  { q: "Do the tools work outside India?", a: "Yes. The quotation maker, invoice and bill generator, payment reminder email generator, invoice due date calculator, service agreement, proforma invoice and purchase order work in any country: pick your country and currency, and the document follows it — the currency, the date format, the name of your tax (GST, VAT or sales tax) and the tax number your clients expect. A few tools are built on one country's rules and say so: the GST invoice generator and GST calculator for India, and the late-payment calculator for the UK." },
+  { q: "Are these tools really free?", a: "Yes — every tool is free to use with no sign-up. You can check a client or brand message, and create and download unlimited invoices, quotations and agreements as PDFs." },
+  { q: "Who are the tools for?", a: "Freelancers and other people who do client work, and creators, UGC creators and influencers who do paid brand collaborations. The deal risk checker and the documents work for both; the deal risk checker asks which kind of deal you are looking at." },
+  { q: "Do the tools work outside India?", a: "Yes. The deal risk checker, quotation maker, invoice and bill generator, payment reminder email generator, invoice due date calculator, service agreement, proforma invoice and purchase order work in any country: pick your country and currency, and the document follows it — the currency, the date format, the name of your tax (GST, VAT or sales tax) and the tax number your clients expect. A few tools are built on one country's rules and say so: the GST invoice generator and GST calculator for India, and the late-payment calculator for the UK." },
   { q: "Is my data safe?", a: "Everything runs in your browser. What you type is saved only on your own device and is never sent to or stored on our servers." },
   { q: "What do I get if I create an account?", a: "Every client project lives on one thread — quotation, agreement, invoice and payment tracking — instead of scattered across WhatsApp, email and your downloads folder. The free plan covers 4 deals a month, each with its quotation, and every new account starts with a 7-day Pro trial (no card) that unlocks e-signed agreements, invoices and payment tracking. In India, Pro is ₹99 a month or ₹999 a year. Outside India the free plan and the trial are open today; paid plans can't be bought from other countries yet." },
 ];
@@ -105,7 +112,8 @@ function toolCard(t: ToolDef): string {
 }
 
 function toolsIndexPage(): string {
-  const anywhere = TOOLS.filter((t) => !t.country).map(toolCard).join("\n");
+  const protection = TOOLS.filter((t) => !t.country && t.group === "protection").map(toolCard).join("\n");
+  const documents = TOOLS.filter((t) => !t.country && t.group !== "protection").map(toolCard).join("\n");
   const local = TOOLS.filter((t) => t.country).map(toolCard).join("\n");
 
   const faqHtml = INDEX_FAQ.map((f) => `<h3>${f.q}</h3><p>${f.a}</p>`).join("\n");
@@ -113,14 +121,20 @@ function toolsIndexPage(): string {
   const body = `
   <div class="hero"><div class="wrap">
     <span class="badge">🎁 100% Free · No sign-up · Instant download</span>
-    <h1>Free tools for<br /><span class="accent">freelancers</span></h1>
-    <p class="sub">Quotations, invoices and agreements for designers, developers, writers, video editors, photographers, marketers and consultants — in your own currency, done in your browser, no sign-up.</p>
+    <h1>Free tools for<br /><span class="accent">freelancers &amp; creators</span></h1>
+    <p class="sub">Check a client or brand message before you say yes, then create the quotation, agreement and invoice — for freelancers, consultants, creators and influencers, in your own currency, done in your browser, no sign-up.</p>
   </div></div>
 
   <section><div class="wrap">
-    <h2>Works in any country</h2>
+    <h2>Deal &amp; protection</h2>
+    <p class="muted" style="margin-top:-6px">Check what a client or brand is asking for, get paid on time and follow up. Works in any country.</p>
+    <div class="tool-grid">${protection}</div>
+  </div></section>
+
+  <section><div class="wrap">
+    <h2>Quotes, agreements &amp; invoices</h2>
     <p class="muted" style="margin-top:-6px">Pick your country and currency; the document follows its money, dates and tax.</p>
-    <div class="tool-grid">${anywhere}</div>
+    <div class="tool-grid">${documents}</div>
   </div></section>
 
   <section><div class="wrap">
@@ -144,9 +158,9 @@ function toolsIndexPage(): string {
   </div></section>`;
 
   return renderToolPage({
-    title: "Free Invoice, Quotation & Agreement Tools for Freelancers | DealInSec",
+    title: "Free Deal, Invoice, Quotation & Agreement Tools for Freelancers and Creators | DealInSec",
     description:
-      "Free, no-sign-up tools for freelancers in any country — quotation maker, invoice generator, payment reminder email generator, service agreement, proforma invoice and purchase order in your own currency, plus GST tools for India and a UK late-payment calculator.",
+      "Free, no-sign-up tools for freelancers and creators in any country — a deal risk checker for client and brand messages, quotation maker, invoice generator, payment reminder email generator, service agreement, proforma invoice and purchase order in your own currency, plus GST tools for India and a UK late-payment calculator.",
     canonicalPath: "/tools",
     bodyHtml: body,
     jsonLd: [

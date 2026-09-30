@@ -156,6 +156,8 @@ function header(): string {
     <a class="brand" href="/" aria-label="DealInSec home">${LOGO_SVG}<span class="brand-text">Deal<span class="brand-accent">insec</span></span></a>
     <nav class="nav">
       <a href="/">Product</a>
+      <a href="/for-freelancers">Freelancers</a>
+      <a href="/for-creators">Creators</a>
       <a href="/tools">Free Tools</a>
       <a href="/blog">Blog</a>
       <a href="/#pricing">Pricing</a>
@@ -168,12 +170,15 @@ function footer(region: "IN" | "global"): string {
   const tagline =
     region === "IN"
       ? "for India's freelancers: quotation, e-signed agreement, invoice and payment tracking on one thread per client."
-      : "for freelancers worldwide: quotation, e-signed agreement, invoice and payment tracking on one thread per client.";
+      : "for freelancers and creators worldwide: quotation, e-signed agreement, invoice and payment tracking on one thread per client or brand.";
   return `<footer class="site"><div class="wrap">
     <div class="links">
       <a href="/">Product</a>
       <a href="/freelance-business-management-software">Freelance Business Management</a>
-      <a href="/freelancer-invoice-software">For Freelancers</a>
+      <a href="/for-freelancers">For Freelancers</a>
+      <a href="/for-creators">For Creators</a>
+      <a href="/tools/deal-risk-checker">Deal Risk Checker</a>
+      <a href="/freelancer-invoice-software">Freelancer Invoice Software</a>
       <a href="/quotation-software">Quotation Software</a>
       <a href="/contract-management">Contract Management</a>
       <a href="/invoice-management">Invoice Management</a>
@@ -193,7 +198,7 @@ function ctaBand(region: "IN" | "global"): string {
   const sub =
     region === "IN"
       ? "Quotation, e-signed scope, invoices and payment follow-up that always agree with each other — built for India's freelancers."
-      : "Quotation, e-signed scope, invoices and payment follow-up that always agree with each other — built for freelancers, wherever you bill from.";
+      : "Quotation, e-signed scope, invoices and payment follow-up that always agree with each other — built for freelancers and creators, wherever you bill from.";
   const note =
     region === "IN"
       ? "No card required · Free plan after the trial · Pro ₹99/month or ₹999/year"
@@ -265,7 +270,7 @@ export const PAGES: CategoryPage[] = [
     h1: "Invoice software for Indian freelancers who are tired of chasing payments",
     sub: "For India's freelancers — designers, developers, writers, video editors & photographers, marketers and consultants. Quote the work, get the scope accepted in writing, bill the advance and milestones, and follow up on late payments — one thread per client, ₹99/month.",
     chips: ["Advance + milestone billing", "Signed, timestamped scope", "Reminders in English or Hinglish", "Pro ₹99/month · free plan", "7-day trial · no card"],
-    shortLabel: "For Freelancers",
+    shortLabel: "Freelancer Invoice Software",
     sections: `
 <section><div class="wrap">
   <h2>Built for people who quote, sign and bill their own clients</h2>
@@ -692,6 +697,234 @@ export const PAGES: CategoryPage[] = [
       },
     ],
   },
+  /* ── /for-freelancers — client work, any country ─────────────────────── */
+  {
+    path: "/for-freelancers",
+    region: "global",
+    updated: "2026-09-30",
+    metaTitle: "Client Deals for Freelancers: Scope, Quote, Agreement, Invoice",
+    description:
+      "Turn a client's request into a clear scope, a professional quote, a signed agreement and an invoice, then track payment. For freelancers and independent professionals.",
+    h1: "Turn client requests into clear scope, signed agreements and paid invoices",
+    sub: "Paste what the client asked for, see which terms are missing, send a professional quote, get the agreement signed, invoice the client and track payment — one workflow, for freelancers and independent professionals in any country.",
+    chips: ["Scope, revisions and deposits", "Protection Check before you send", "Quote → agreement → invoice", "Free plan in every country", "Not legal advice"],
+    shortLabel: "For Freelancers",
+    sections: `
+<section><div class="wrap">
+  <h2>Where client work goes wrong</h2>
+  <p class="sec-sub">Most client projects start as a message: “Can you build our website for $1,500? We need it by October 20.” That one sentence doesn't say what the website includes, whether there is a deposit, when the balance is due, how many rounds of changes are included, who owns the finished work or what happens if the client cancels. Each is easy to agree before you start and hard to settle afterwards.</p>
+  <div class="feat">
+    <div class="ft"><b>The scope is a sentence</b><p>“A website” can mean five pages or fifty. Without a written list of deliverables, whatever the client asks for next can be argued to be part of the price.</p></div>
+    <div class="ft"><b>The changes have no limit</b><p>“Just one more small change” is the most expensive sentence in service work. A revision limit written down early turns the extra rounds into a quote instead of a favour.</p></div>
+    <div class="ft"><b>The payment has no date</b><p>“We'll pay after launch” can quietly become “whenever”. A deposit and a due date for the balance are what keep a finished project from waiting on someone else's cash flow.</p></div>
+    <div class="ft"><b>The record is a chat</b><p>When the terms live in a message thread, the invoice, the quote and the agreement can each say something slightly different, and nobody can point to the version everyone accepted.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>How a client deal runs in DealInSec</h2>
+  <p class="sec-sub">The same deal carries through every step, so the quote, the agreement and the invoice never disagree.</p>
+  <div class="feat">
+    <div class="ft"><b>1. Deal</b><p>Paste the client's message or fill in the form: client, project, deliverables, deadline, fee, deposit and revisions. The AI reading shows anything the message doesn't say as “Not specified” and never invents it. Nothing is created until you confirm.</p></div>
+    <div class="ft"><b>2. Protection Check</b><p>The terms are checked for what is missing or risky — a deposit, a balance due date, a revision limit, cancellation, ownership, acceptance — with the question to ask for each. It never blocks you from continuing.</p></div>
+    <div class="ft"><b>3. Quotation</b><p>A professional project quote from the deal, with deliverables, timeline, fee and payment terms. The client can open a link, review it and accept it, with no account.</p></div>
+    <div class="ft"><b>4. Agreement</b><p>The accepted quote becomes an agreement with the same figures. The client signs online through a link, and the record shows who signed, when and with which signature.</p></div>
+    <div class="ft"><b>5. Invoice</b><p>Invoices are raised from the agreement — deposit, milestone, balance, or the full amount — and can't add up to more than the agreement is worth.</p></div>
+    <div class="ft"><b>6. Payment tracking</b><p>See what is pending, due soon, overdue or paid. When one is late, DealInSec drafts a follow-up for you to review and send yourself.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>What the Protection Check looks at for client work</h2>
+  <p class="sec-sub">It checks the wording of your terms and tells you what is worth clarifying. It is not legal advice, and a deal with no findings is not a guarantee of anything.</p>
+  <div class="tbl-scroll"><table class="cmp">
+    <tr><th>Check</th><th>What it asks</th></tr>
+    <tr><td><b>Scope and deliverables</b></td><td>Is there a list of what you'll deliver, and does the wording leave the scope open (“as per requirement”)?</td></tr>
+    <tr><td><b>Deposit</b></td><td>Is an advance or deposit due before work starts?</td></tr>
+    <tr><td><b>Balance timing</b></td><td>Is there a due window for the rest, or does “on completion” quietly become “whenever”?</td></tr>
+    <tr><td><b>Revisions</b></td><td>Is there a limit on rounds of changes, and is anything excluded?</td></tr>
+    <tr><td><b>Cancellation</b></td><td>What is owed for work already done if the client cancels?</td></tr>
+    <tr><td><b>Ownership</b></td><td>When does the finished work become the client's?</td></tr>
+    <tr><td><b>Acceptance</b></td><td>How does the client confirm the work is accepted, and how long do they have?</td></tr>
+    <tr><td><b>Late payment</b></td><td>Is there any stated consequence if a payment is late?</td></tr>
+  </table></div>
+  <p class="muted" style="font-size:14px;margin-top:12px">Try it on a real message without an account: the free <a href="/tools/deal-risk-checker">Deal Risk Checker</a> reads a pasted client request and lists what it says and what it leaves out.</p>
+</div></section>
+<section><div class="wrap">
+  <h2>Example: from a message to a paid invoice</h2>
+  <p class="sec-sub">An illustrative project, not a real client, showing how the pieces connect. The figures are examples.</p>
+  <div class="tbl-scroll"><table class="cmp">
+    <tr><th>Step</th><th>What happens</th></tr>
+    <tr><td><b>The message</b></td><td>“Can you build our website for $1,500? We need it by October 20.”</td></tr>
+    <tr><td><b>What it states</b></td><td>A fee and a deadline.</td></tr>
+    <tr><td><b>What it doesn't say</b></td><td>What the website includes, a deposit, when the balance is due, how many revisions are included, ownership and cancellation.</td></tr>
+    <tr><td><b>Protection Check</b></td><td>Raises each of those as a question to put to the client, most important first.</td></tr>
+    <tr><td><b>Quotation</b></td><td>Lists the pages, two revision rounds, a 50% deposit and the balance due within seven days of launch. The client accepts it from a link.</td></tr>
+    <tr><td><b>Agreement</b></td><td>Carries the same figures. The client signs online.</td></tr>
+    <tr><td><b>Invoices</b></td><td>A deposit invoice, then a balance invoice on launch. Together they can't exceed the agreement.</td></tr>
+    <tr><td><b>A late payment</b></td><td>Shows as overdue. DealInSec drafts a reminder with the real invoice number, amount and due date; you send it.</td></tr>
+  </table></div>
+  <div class="callout honest"><b>What DealInSec doesn't do</b><p>It can't make a client pay, and it doesn't collect payments: clients pay you directly and DealInSec records the status. It has no time tracking, client portal, accounting or expense tracking, and it doesn't send reminders by itself. It gives you clear terms in writing before you start, documents that agree with each other and a dated record of what was accepted.</p></div>
+</div></section>
+<section><div class="wrap">
+  <h2>Free tools and guides for client work</h2>
+  <div class="rel-grid">
+    <a class="rel-card" href="/tools/deal-risk-checker">Deal Risk Checker<span>Paste a client message and see what's missing before you say yes.</span></a>
+    <a class="rel-card" href="/tools/quotation-maker">Quotation maker<span>A professional quote as a PDF, in your currency.</span></a>
+    <a class="rel-card" href="/tools/service-agreement-template">Freelance contract template<span>Scope, fees, revisions, cancellation and signatures.</span></a>
+    <a class="rel-card" href="/blog/scope-creep">Scope creep<span>How to respond when the work grows.</span></a>
+    <a class="rel-card" href="/blog/revision-limits">Revision limits<span>Setting a number and pricing the rest.</span></a>
+    <a class="rel-card" href="/blog/freelance-payment-terms">Payment terms<span>Deposits, milestones and due dates.</span></a>
+  </div>
+  <p class="muted" style="font-size:14px;margin-top:12px">Working with brands instead? See <a href="/for-creators">DealInSec for creators</a>. Comparing tools? See the <a href="/freelance-business-management-software">freelance business management software guide</a> and <a href="/bonsai-alternatives">Bonsai alternatives</a>.</p>
+</div></section>`,
+    faq: [
+      {
+        q: "What does DealInSec do for a freelancer?",
+        a: "It runs one client deal from request to payment: it turns a client's message into a structured deal, checks the terms for what is missing, generates a quotation the client can accept online, creates an agreement the client can sign online, raises invoices from that agreement and tracks what is paid, pending and overdue.",
+      },
+      {
+        q: "Can I paste a client's message instead of filling in a form?",
+        a: "Yes. Paste the message and the AI reading extracts the client, project, deliverables, fee, deadline and any terms it states. Anything the message doesn't say is shown as “Not specified” rather than guessed, and nothing is created until you confirm.",
+      },
+      {
+        q: "What is the difference between a quotation and an agreement?",
+        a: "A quotation is the priced offer: what you will deliver, when and for how much. An agreement is what both sides accept as the terms of the work. In DealInSec the accepted quotation becomes the agreement with the same figures, so the two cannot disagree.",
+      },
+      {
+        q: "How does the Protection Check help?",
+        a: "It reads the terms of the deal and lists what is missing or risky, such as no deposit, no balance due date, no revision limit, unclear cancellation or ownership, each with the question to ask or a line you can add. It checks the wording only and is not legal advice.",
+      },
+      {
+        q: "Does DealInSec collect payments from my clients?",
+        a: "No. Clients pay you directly, by whatever method you agree, and DealInSec records the status. It can draft a payment reminder for you to review and send yourself; it never sends one on its own.",
+      },
+      {
+        q: "Can I use DealInSec outside India?",
+        a: "Yes. The free plan, which covers 4 deals a month with their quotations, and a 7-day Pro trial with no card are open in every country, in 50 currencies. Paid plans can currently be bought in India only.",
+      },
+      {
+        q: "Is the client's signature legally valid?",
+        a: "The client accepts the agreement electronically and DealInSec records who accepted it, when and with which signature. It is not a certificate-based digital signature. Whether an agreement is enforceable depends on its terms and the law that applies, and this is not legal advice, so have a lawyer review anything high-value or unusual.",
+      },
+    ],
+  },
+
+  /* ── /for-creators — brand collaborations, any country ───────────────── */
+  {
+    path: "/for-creators",
+    region: "global",
+    updated: "2026-09-30",
+    metaTitle: "Brand Deal Agreements, Quotes and Invoices for Creators",
+    description:
+      "Turn a brand's offer into clear deliverables, usage rights and exclusivity terms, then send a quote, get it signed, invoice the brand and track payment. For creators and UGC creators.",
+    h1: "Turn brand offers into clear terms, signed agreements and paid invoices",
+    sub: "Paste the brand's message, see which terms are missing — usage rights, exclusivity, approval, payment timing — then send a quote, get the agreement signed, invoice the brand and track payment. For creators, UGC creators and influencers.",
+    chips: ["Usage rights and exclusivity", "Protection Check before you say yes", "Brand quote → agreement → invoice", "Free plan in every country", "Not legal advice"],
+    shortLabel: "For Creators",
+    sections: `
+<section><div class="wrap">
+  <h2>The problem with a brand offer in a DM</h2>
+  <p class="sec-sub">Brand deals usually start as a short message: “We'd love 2 Instagram Reels and 3 stories for $800. We'd also like to use the content for ads.” That is a real offer, and it leaves most of the deal open: how long the brand can use your content, whether ad use is included in the fee, whether you can work with competing brands, how many rounds of changes you owe and when you are paid.</p>
+  <div class="feat">
+    <div class="ft"><b>The deliverables are loose</b><p>“A few posts” or “some stories” can grow. A count, a format and a platform for each piece keep the brief from expanding after you agree.</p></div>
+    <div class="ft"><b>The usage is open</b><p>Posting content yourself is different from a brand running it as an ad. Without a stated channel and period, “use the content” has no end date.</p></div>
+    <div class="ft"><b>The exclusivity is assumed</b><p>Whether you can work with a competitor during or after the campaign should be a stated term, with a category and a length, not something both sides assume differently.</p></div>
+    <div class="ft"><b>The payment has no date</b><p>“We'll pay after posting” can become weeks. A deposit and a due date written down before you start are what make the fee arrive on a schedule.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>Deal analysis: paste the message</h2>
+  <p class="sec-sub">Paste the brand's email or DM and DealInSec reads it into a brand deal: the brand, campaign, deliverables, platform, fee, deadline, revisions and any usage, exclusivity or approval terms it states. Anything the message doesn't say is shown as “Not specified”, never guessed, and nothing is created until you confirm.</p>
+  <div class="callout honest"><b>Try it without an account</b><p>The free <a href="/tools/deal-risk-checker">Deal Risk Checker</a> reads a pasted brand offer in your browser and lists what it says, what it leaves out and the questions to ask. The optional AI reading is the only step that sends the message anywhere, and only when you press it.</p></div>
+</div></section>
+<section><div class="wrap">
+  <h2>What the Protection Check looks at for a brand deal</h2>
+  <p class="sec-sub">It checks the wording of the terms and tells you what is worth clarifying before you say yes. Each finding says why it matters and what to ask. It is not legal advice, and a deal with no findings is not a guarantee of anything.</p>
+  <div class="tbl-scroll"><table class="cmp">
+    <tr><th>Check</th><th>What it asks</th></tr>
+    <tr><td><b>Usage rights</b></td><td>Where can the brand use the content, and does that include paid advertising?</td></tr>
+    <tr><td><b>Usage duration</b></td><td>For how long? Usage with no end date can turn a one-off fee into a permanent licence.</td></tr>
+    <tr><td><b>Open-ended wording</b></td><td>Does it say “in perpetuity” or “all media”?</td></tr>
+    <tr><td><b>Exclusivity</b></td><td>Is a competitor category ruled out, and for how long?</td></tr>
+    <tr><td><b>Approval</b></td><td>Who approves the content, how quickly, and how many rounds of changes are included?</td></tr>
+    <tr><td><b>Deliverables and platform</b></td><td>How many pieces, in what format, on which platform?</td></tr>
+    <tr><td><b>Payment timing</b></td><td>Is there a deposit, and when is the rest due?</td></tr>
+    <tr><td><b>Cancellation and ownership</b></td><td>What is owed if the campaign is cancelled, and who owns the content?</td></tr>
+  </table></div>
+</div></section>
+<section><div class="wrap">
+  <h2>Deliverables, usage rights and exclusivity, in plain terms</h2>
+  <h3>Deliverables</h3>
+  <p>A deliverable is one piece of content the brand is paying for: for example a Reel, a set of stories, a TikTok or a YouTube integration. Listing each with its platform and quantity is the cleanest way to say what the fee covers.</p>
+  <h3>Usage rights</h3>
+  <p>Usage rights describe what the brand may do with your content after it is made: post it on its own channels, run it as a paid ad, put it on its website, and for how long. Practice varies between brands and countries, so the useful habit is to ask and write the answer down. The Brand Collaboration deal type has fields for the usage rights and the usage duration, and whatever you enter is written into the quotation and the agreement.</p>
+  <h3>Exclusivity</h3>
+  <p>Exclusivity limits who else you can work with, usually a competing category for a set period. It matters because it can turn away other paid work. If a brand wants it, the category and the length are worth stating, and whether it changes the fee is worth asking.</p>
+  <p class="muted" style="font-size:14px">What you leave blank stays blank: nothing is filled in for you, and an agreement only states the terms the deal actually carries.</p>
+</div></section>
+<section><div class="wrap">
+  <h2>A brand collaboration quote, agreement, invoice and payment record</h2>
+  <div class="feat">
+    <div class="ft"><b>Brand collaboration quote</b><p>Brand, campaign, deliverables, platforms, usage, exclusivity, fee and payment terms in one document the brand can open from a link and accept, with no account.</p></div>
+    <div class="ft"><b>Agreement</b><p>Written from the deal's own terms, so the usage, exclusivity and approval you agreed are what the document says. The brand signs online, and the record shows who signed, when and with which signature.</p></div>
+    <div class="ft"><b>Invoice</b><p>A brand collaboration invoice raised from the agreement: deposit, balance or the full amount, in your currency, and never more than the agreement is worth.</p></div>
+    <div class="ft"><b>Payment tracking</b><p>See which brand payments are pending, due soon, overdue or paid. When one is late, DealInSec drafts a follow-up for you to review and send.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>Example: one brand offer, before and after</h2>
+  <p class="sec-sub">An illustrative offer, not a real brand or customer.</p>
+  <div class="tbl-scroll"><table class="cmp">
+    <tr><th>The offer says</th><th>It doesn't say</th><th>What Protection Check would ask</th></tr>
+    <tr><td>2 Instagram Reels and 3 stories for $800</td><td>The deadline, or when payment is due</td><td>Confirm the posting dates and when the fee is paid.</td></tr>
+    <tr><td>“We'd also like to use the content for ads”</td><td>Which ad channels, for how long, and whether ads are in the fee</td><td>Ask which channels, how long, and whether ad use is included or charged separately.</td></tr>
+    <tr><td>—</td><td>Exclusivity, approval and revisions</td><td>Ask whether competitors are ruled out and for how long, who approves the content and how many rounds of changes are included.</td></tr>
+  </table></div>
+  <div class="callout honest"><b>What DealInSec doesn't do</b><p>It isn't a marketplace: it doesn't find you brand deals or connect you with brands. It doesn't collect payment; brands pay you directly and DealInSec records the status. It can't make a brand pay, has no time tracking, client portal or accounting, and doesn't send reminders by itself. It gives you clear terms in writing before you agree, documents that agree with each other and a dated record of what was accepted.</p></div>
+</div></section>
+<section><div class="wrap">
+  <h2>Free tools and guides for brand deals</h2>
+  <div class="rel-grid">
+    <a class="rel-card" href="/tools/deal-risk-checker">Deal Risk Checker<span>Paste a brand's message and see what's missing.</span></a>
+    <a class="rel-card" href="/tools/quotation-maker">Quotation maker<span>A professional quote as a PDF, in your currency.</span></a>
+    <a class="rel-card" href="/tools/bill-generator">Invoice generator<span>An invoice with your logo and details.</span></a>
+    <a class="rel-card" href="/tools/payment-reminder-email-generator">Payment reminder generator<span>A polite follow-up for a late payment.</span></a>
+    <a class="rel-card" href="/blog/freelance-payment-terms">Payment terms<span>Deposits, milestones and due dates.</span></a>
+    <a class="rel-card" href="/blog/freelance-contract-terms">Contract terms<span>What a contract should say.</span></a>
+  </div>
+  <p class="muted" style="font-size:14px;margin-top:12px">Doing client projects as well? See <a href="/for-freelancers">DealInSec for freelancers</a>.</p>
+</div></section>`,
+    faq: [
+      {
+        q: "Is DealInSec for creators and influencers?",
+        a: "Yes. When you sign up, choose “I work with brands” and the app uses brand wording, offers the Brand Collaboration deal type first and adds optional fields for campaign, usage rights, usage duration, exclusivity and approval. It is the same workflow and the same pricing as for client work, and you can change the setting any time.",
+      },
+      {
+        q: "What are usage rights in a brand deal?",
+        a: "Usage rights describe what the brand may do with your content after it is made, such as posting it on its own channels, running it as a paid ad or using it on its website, and for how long. Practice varies, so it is worth asking and writing the answer into the agreement.",
+      },
+      {
+        q: "What is exclusivity in an influencer agreement?",
+        a: "Exclusivity limits who else you can work with, usually a competing category for a set period. If a brand asks for it, the category and the length are worth stating, and whether it changes the fee is worth asking.",
+      },
+      {
+        q: "Do I need a written agreement for a brand collaboration?",
+        a: "Writing the terms down makes clear to both sides what was agreed: the deliverables, the fee and when it is paid, how the content may be used and for how long. Whether a particular document is enforceable depends on its terms and where you are, so this is not legal advice; for a high-value or unusual deal, have a lawyer review it.",
+      },
+      {
+        q: "Does DealInSec find brand deals or collect payment from brands?",
+        a: "No. It is not a marketplace and does not find deals. Brands pay you directly, and DealInSec records the status of each invoice. It can draft a payment reminder for you to review and send yourself.",
+      },
+      {
+        q: "Can I use DealInSec outside India?",
+        a: "Yes. The free plan, which covers 4 deals a month with their quotations, and a 7-day Pro trial with no card are open in every country, in 50 currencies. Paid plans can currently be bought in India only.",
+      },
+      {
+        q: "Is the brand's signature legally valid?",
+        a: "The brand accepts the agreement electronically and DealInSec records who accepted it, when and with which signature. It is not a certificate-based digital signature. Whether an agreement is enforceable depends on its terms and the law that applies, and this is not legal advice.",
+      },
+    ],
+  },
+
 ];
 
 /* ── Rendering ─────────────────────────────────────────────────────────── */
@@ -821,8 +1054,11 @@ export function categorySitemapPaths(): string[] {
 }
 
 export function registerCategoryPages(app: Express) {
-  const siblings = PAGES;
   for (const p of PAGES) {
+    // A global page is related only to other global pages (the pillar is always
+    // added): the India pages are written for India and must not appear on a page
+    // that carries no India framing. India pages may link to everything.
+    const siblings = p.region === "global" ? PAGES.filter((x) => x.region === "global") : PAGES;
     app.get(p.path, (_req, res) => res.type("html").send(renderCategoryPage(p, siblings)));
   }
 }

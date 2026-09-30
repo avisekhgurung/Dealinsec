@@ -57,7 +57,7 @@ export default function PitchPage() {
           <section className="text-center py-8 print:py-4">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-4">
               <Zap className="w-4 h-4" />
-              <span className="text-sm font-medium">For freelancers worldwide</span>
+              <span className="text-sm font-medium">For freelancers and creators worldwide</span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4 print:text-3xl">
               DealInSec
@@ -797,7 +797,7 @@ export default function PitchPage() {
 
           <section className="py-8 print:py-4">
             <h2 className="text-2xl font-bold text-center mb-6 print:text-xl">
-              Why freelancers choose DealInSec
+              Why freelancers and creators choose DealInSec
             </h2>
             <div className="grid md:grid-cols-3 gap-6 print:gap-3">
               <div className="flex items-start gap-3">
@@ -856,7 +856,7 @@ export default function PitchPage() {
           </section>
 
           <footer className="text-center py-6 text-sm text-muted-foreground border-t print:py-2">
-            <p>DealInSec - deal management for freelancers worldwide</p>
+            <p>DealInSec - deal management for freelancers and creators worldwide</p>
             <p className="mt-1">Quote it. Sign it. Invoice it. Get paid.</p>
           </footer>
 

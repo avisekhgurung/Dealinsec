@@ -55,10 +55,10 @@ export function ProblemSection() {
           eyebrow="The everyday mess"
           title={
             <>
-              Your freelance business shouldn&apos;t live across <GradientText>7 different apps.</GradientText>
+              Your deals shouldn&apos;t live across <GradientText>7 different apps.</GradientText>
             </>
           }
-          subtitle="Client messages in WhatsApp. Scope in Google Docs. Quotes in PDFs. Invoices somewhere else. Payment tracking in a spreadsheet."
+          subtitle="Client and brand messages in WhatsApp and DMs. Scope in Google Docs. Quotes in PDFs. Invoices somewhere else. Payment tracking in a spreadsheet."
         />
 
         <div className="mt-14 grid md:grid-cols-[1fr_auto_1fr] gap-5 md:gap-6 items-stretch">
@@ -492,8 +492,8 @@ export function GlobalSection() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
           eyebrow="Global by design"
-          title="Built for freelancers, wherever you work."
-          subtitle="Work with clients across borders while keeping your deals, documents and invoices organized in one place."
+          title="Built for freelancers and creators, wherever you work."
+          subtitle="Work with clients and brands across borders while keeping your deals, documents and invoices organized in one place."
         />
 
         <motion.div

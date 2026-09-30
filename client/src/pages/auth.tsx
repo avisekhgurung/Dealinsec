@@ -39,7 +39,7 @@ const PIPELINE = [
 const PROOF_POINTS = [
   "Agreements carry a signed execution record",
   "No credit card required",
-  "Built for freelancers worldwide",
+  "Built for freelancers and creators worldwide",
   "7-day Pro trial — everything unlocked",
 ];
 
@@ -385,9 +385,10 @@ export default function AuthPage() {
             <span className="text-emerald-300">And get paid on time.</span>
           </h2>
           <p className="text-emerald-100/70 mt-4 text-sm leading-relaxed">
-            One workflow for freelancers worldwide — designers, developers, writers,
-            video editors &amp; photographers, marketers and consultants. Quotation,
-            e-signed agreement, invoice and payment tracking, on one thread per client.
+            One workflow for freelancers and creators worldwide — designers, developers,
+            writers, video editors &amp; photographers, marketers, consultants, UGC creators
+            and influencers. Quotation, e-signed agreement, invoice and payment tracking,
+            on one thread per client or brand.
           </p>
 
           <div className="flex items-center gap-2 mt-9">
