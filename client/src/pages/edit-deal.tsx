@@ -365,7 +365,7 @@ export default function EditDealPage() {
                 id="brandName"
                 placeholder={
                   brandWording
-                    ? "e.g., Nike, Adidas, Mamaearth"
+                    ? "e.g., Nike, Adidas, Glossier"
                     : "Client / company name"
                 }
                 className="h-12"

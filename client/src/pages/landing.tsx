@@ -332,7 +332,7 @@ export default function LandingPage() {
                 {authTab === "signup" ? "Create your account" : "Welcome back"}
               </h2>
               <p className="text-sm text-neutral-500 mt-1">
-                {authTab === "signup" ? "No credit card. Every Pro feature free for 7 days." : "Sign in to continue"}
+                {authTab === "signup" ? "Every Pro feature free for 7 days." : "Sign in to continue"}
               </p>
             </div>
 
@@ -891,7 +891,7 @@ function Hero({
             </motion.div>
 
             <motion.p variants={heroFadeUp} className="text-xs sm:text-sm text-neutral-500">
-              No credit card required · Professional documents · Multiple currencies
+              Professional documents · Multiple currencies
             </motion.p>
 
             <motion.div variants={heroFadeUp} className="pt-4">
@@ -1254,7 +1254,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
             >
               Start free
             </Button>
-            <p className="text-[11px] text-neutral-500 text-center mt-3">Starts with a 7-day Pro trial. No credit card needed.</p>
+            <p className="text-[11px] text-neutral-500 text-center mt-3">Starts with a 7-day Pro trial.</p>
           </motion.div>
 
           {/* Pro Monthly — recommended */}

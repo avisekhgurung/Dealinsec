@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 
 const EXAMPLES: Record<Audience, string> = {
   client_work:
-    "Hey Rahul, I need a landing page for my startup. Budget is $1500. Need it in two weeks. We can discuss revisions later. Payment after launch.",
+    "Hey Sam, I need a landing page for my startup. Budget is $1500. Need it in two weeks. We can discuss revisions later. Payment after launch.",
   brand_collaboration:
     "Hey! We'd love 2 Instagram Reels and 3 stories for $800. We'd also like to use the content for ads. Payment after posting.",
 };

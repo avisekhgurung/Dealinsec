@@ -27,7 +27,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { trackEvent } from "@/lib/analytics";
 import { postAuthDestination } from "@/lib/deal-prefill";
-import { browserRegion } from "@/components/region-fields";
 
 const PIPELINE = [
   { icon: Briefcase, label: "Deal" },
@@ -38,7 +37,6 @@ const PIPELINE = [
 
 const PROOF_POINTS = [
   "Agreements carry a signed execution record",
-  "No credit card required",
   "Built for freelancers and creators worldwide",
   "7-day Pro trial — everything unlocked",
 ];
@@ -76,16 +74,6 @@ export default function AuthPage() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  // Best-effort only — the same browser-hint guess the onboarding picker
-  // uses, never authoritative. A visitor this can't confidently place is
-  // shown no country-specific claim at all, rather than India's by default.
-  const [likelyIndia] = useState(() => {
-    try {
-      return browserRegion().country === "IN";
-    } catch {
-      return false;
-    }
-  });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -209,7 +197,7 @@ export default function AuthPage() {
               </h1>
               <p className="text-sm text-muted-foreground mt-1.5 mb-6">
                 {mode === "signup"
-                  ? "No credit card. Every Pro feature free for 7 days."
+                  ? "Every Pro feature free for 7 days."
                   : "Sign in to continue to your workspace."}
               </p>
 
@@ -240,7 +228,7 @@ export default function AuthPage() {
                         className="h-12 rounded-xl"
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
-                        placeholder="Meera"
+                        placeholder="Alex"
                         data-testid="input-first-name"
                       />
                     </div>
@@ -251,7 +239,7 @@ export default function AuthPage() {
                         className="h-12 rounded-xl"
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
-                        placeholder="Nair"
+                        placeholder="Morgan"
                         data-testid="input-last-name"
                       />
                     </div>
@@ -429,22 +417,19 @@ export default function AuthPage() {
           </div>
 
           {/* Honest closing card — what the product does, not borrowed credibility.
-              India-specific, so shown only when the visitor is likely in India;
-              a wrong guess just means the card doesn't show, never a wrong claim. */}
-          {likelyIndia && (
-            <div className="mt-9 rounded-2xl border border-emerald-400/20 bg-white/5 px-5 py-4 flex items-start gap-3">
-              <span className="w-9 h-9 rounded-xl bg-emerald-400/15 flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-4.5 h-4.5 w-[18px] h-[18px] text-emerald-300" strokeWidth={2} />
-              </span>
-              <div>
-                <p className="text-sm font-semibold text-white">Made for the Indian financial year</p>
-                <p className="text-xs text-emerald-100/70 leading-relaxed mt-0.5">
-                  Invoices numbered consecutively per FY, GSTIN on your documents, amounts in ₹,
-                  and every agreement carrying its own execution record.
-                </p>
-              </div>
+              The same for every visitor: nothing here is tied to one country. */}
+          <div className="mt-9 rounded-2xl border border-emerald-400/20 bg-white/5 px-5 py-4 flex items-start gap-3">
+            <span className="w-9 h-9 rounded-xl bg-emerald-400/15 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-4.5 h-4.5 w-[18px] h-[18px] text-emerald-300" strokeWidth={2} />
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-white">Made for your country and currency</p>
+              <p className="text-xs text-emerald-100/70 leading-relaxed mt-0.5">
+                Invoices numbered in order, your tax registration on your documents, amounts in
+                your own currency, and every agreement carrying its own execution record.
+              </p>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
