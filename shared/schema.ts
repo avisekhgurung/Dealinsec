@@ -1041,6 +1041,97 @@ export type InsertToolDocument = z.infer<typeof insertToolDocumentSchema>;
 export type ToolDocument = typeof toolDocuments.$inferSelect;
 
 
+// ── AI Deal Operator (agent) ───────────────────────────────────────────
+// Persisted conversations, runs, tool calls and approvals. Created by
+// script/migrate-agent.ts (additive; the server never creates them on boot).
+// Nothing here is joined into the existing deal/quote/agreement/invoice reads,
+// so a database without these tables only disables the agent.
+export const agentSessions = pgTable("agent_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  channel: varchar("channel", { length: 16 }).notNull().default("web"),
+  title: varchar("title", { length: 120 }),
+  dealId: integer("deal_id"),
+  state: varchar("state", { length: 32 }).notNull().default("UNDERSTANDING"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const agentMessages = pgTable("agent_messages", {
+  id: serial("id").primaryKey(),
+  sessionId: varchar("session_id").notNull(),
+  runId: varchar("run_id"),
+  role: varchar("role", { length: 16 }).notNull(), // user | assistant
+  content: text("content").notNull(),
+  /** Action cards shown with this message (approvals, deal/findings cards). */
+  cards: jsonb("cards").$type<unknown[] | null>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const agentRuns = pgTable("agent_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull(),
+  organizationId: varchar("organization_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  status: varchar("status", { length: 24 }).notNull().default("running"),
+  provider: varchar("provider", { length: 24 }),
+  model: varchar("model", { length: 48 }),
+  steps: integer("steps").notNull().default(0),
+  tokensIn: integer("tokens_in").notNull().default(0),
+  tokensOut: integer("tokens_out").notNull().default(0),
+  latencyMs: integer("latency_ms"),
+  errorCode: varchar("error_code", { length: 40 }),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  finishedAt: timestamp("finished_at"),
+});
+
+export const agentToolCalls = pgTable("agent_tool_calls", {
+  id: serial("id").primaryKey(),
+  runId: varchar("run_id").notNull(),
+  tool: varchar("tool", { length: 48 }).notNull(),
+  risk: varchar("risk", { length: 24 }).notNull(),
+  status: varchar("status", { length: 24 }).notNull(), // ok | error | denied | needs_approval | invalid
+  /** Bounded, redacted argument summary — never the pasted message text. */
+  args: jsonb("args").$type<Record<string, unknown> | null>(),
+  resultSummary: varchar("result_summary", { length: 300 }),
+  errorCode: varchar("error_code", { length: 40 }),
+  durationMs: integer("duration_ms"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const agentApprovals = pgTable("agent_approvals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  runId: varchar("run_id").notNull(),
+  sessionId: varchar("session_id").notNull(),
+  organizationId: varchar("organization_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  tool: varchar("tool", { length: 48 }).notNull(),
+  /** The server-validated arguments. Execution reads THESE, never the request. */
+  args: jsonb("args").$type<Record<string, unknown>>().notNull(),
+  argsHash: varchar("args_hash", { length: 64 }).notNull(),
+  /** What the user was shown when asked (a card), for the audit trail. */
+  preview: jsonb("preview").$type<Record<string, unknown> | null>(),
+  status: varchar("status", { length: 16 }).notNull().default("pending"),
+  result: jsonb("result").$type<Record<string, unknown> | null>(),
+  expiresAt: timestamp("expires_at").notNull(),
+  decidedAt: timestamp("decided_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const agentSettings = pgTable("agent_settings", {
+  organizationId: varchar("organization_id").primaryKey(),
+  autonomyLevel: integer("autonomy_level").notNull().default(0),
+  preferences: jsonb("preferences").$type<Record<string, unknown> | null>(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type AgentSession = typeof agentSessions.$inferSelect;
+export type AgentMessage = typeof agentMessages.$inferSelect;
+export type AgentRun = typeof agentRuns.$inferSelect;
+export type AgentApproval = typeof agentApprovals.$inferSelect;
+
+
 // ── Human-facing record numbers ────────────────────────────────────────
 // Short, unique, sortable identifiers built from each table's own serial id
 // (no migration, no collisions — the id is already unique per record type).

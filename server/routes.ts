@@ -13,6 +13,7 @@ import { setupAuth, isAuthenticated } from "./auth";
 import { requirePro, requireOrgPermission, withOrg, getBillingUser, logOrgActivity , requireModuleRead, requireLinkedRead} from "./entitlements";
 import { maybeStartTrial } from "./trial";
 import { registerCopilotRoutes } from "./copilot/routes";
+import { registerAgentRoutes } from "./agent/routes";
 import { registerQuoteShareRoutes } from "./quoteShare";
 import { registerAgreementSignRoutes } from "./agreementSign";
 import { getSeatLimit, INVITABLE_ROLES, hasPermission as hasOrgPermission, orgRoleOptions, CUSTOM_ROLE, ASSIGNABLE_PERMISSIONS , canReadModule} from "@shared/permissions";
@@ -585,6 +586,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", legacyMoneyReadCompat);
   await setupAuth(app);
   registerCopilotRoutes(app);
+  registerAgentRoutes(app);
   registerQuoteShareRoutes(app);
   registerAgreementSignRoutes(app);
 

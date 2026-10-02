@@ -30,23 +30,10 @@ import {
   chaserSystemPrompt, termTailorSystemPrompt,
 } from "./voice";
 import { storage } from "../storage";
+import { readDenial } from "./readAccess";
+import { takeQuota } from "./quota";
 import { getLocaleSettings } from "@shared/schema";
 import { formatDate, formatMoney } from "@shared/money";
-
-const DAILY_PER_USER = 60;
-const usage = new Map<string, { day: string; n: number }>();
-const takeQuota = (userId: string): boolean => {
-  const day = new Date().toISOString().slice(0, 10);
-  const u = usage.get(userId);
-  if (!u || u.day !== day) {
-    if (usage.size > 5000) usage.clear();
-    usage.set(userId, { day, n: 1 });
-    return true;
-  }
-  if (u.n >= DAILY_PER_USER) return false;
-  u.n++;
-  return true;
-};
 
 /** The visitor's country, for the public guide's idioms only. There is no
  *  account to read one from, so this is Cloudflare's IP geolocation. It picks
@@ -95,6 +82,7 @@ export function registerCopilotRoutes(app: Express) {
 
   app.get("/api/copilot/deal-intel/:dealId", isAuthenticated, async (req: any, res) => {
     try {
+      if (readDenial("get_workflow_status", req.user)) return res.status(403).json({ error: "Your role doesn't allow viewing deals." });
       const intel = await computeDealIntel(parseInt(req.params.dealId), req.user);
       if (!intel) return res.status(404).json({ error: "Deal not found" });
       res.json(intel);
@@ -108,6 +96,7 @@ export function registerCopilotRoutes(app: Express) {
   //    Never sends anything — the user copies the message themselves. ──
   app.post("/api/copilot/chaser", isAuthenticated, async (req: any, res) => {
     try {
+      if (readDenial("search_invoices", req.user)) return res.status(403).json({ error: "Your role doesn't allow viewing invoices." });
       if (!copilotConfigured()) return res.status(503).json({ error: "Copilot isn't available right now." });
       if (!takeQuota(req.user.id)) return res.status(429).json({ error: "Daily Copilot limit reached." });
       const invoice = await storage.getBrandInvoice(Number(req.body?.invoiceId));
@@ -153,6 +142,7 @@ export function registerCopilotRoutes(app: Express) {
   //    depends on AI being up. ──
   app.post("/api/copilot/risk-suggest", isAuthenticated, async (req: any, res) => {
     try {
+      if (readDenial("run_protection_check", req.user)) return res.status(403).json({ error: "Your role doesn't allow viewing deals." });
       const deal = await storage.getDeal(Number(req.body?.dealId));
       const owns = deal && (deal.organizationId
         ? deal.organizationId === req.user.organizationId

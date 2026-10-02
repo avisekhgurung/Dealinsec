@@ -40,8 +40,9 @@ import { computeBriefing, computeDealIntel } from "./insights";
 import { documentLocaleFor, issuedCurrency, issuingContext, invoiceableRemainingMinor } from "../routes";
 import { analyzeDealProtections } from "./riskcheck";
 import { amountVoice, speaksNativeMoney, voiceFor } from "./voice";
+import { readDenial } from "./readAccess";
 
-const inOrg = (
+export const inOrg = (
   resource: { organizationId?: string | null; userId?: string | null } | null | undefined,
   user: User,
 ): boolean => {
@@ -206,6 +207,10 @@ type ToolResult = string;
 export async function runTool(name: string, args: any, user: User, settings?: LocaleSettings): Promise<ToolResult> {
   const orgId = user.organizationId;
   if (!orgId) return "No organization on this account.";
+  // The same module-read rule the REST list routes apply: a custom-role member
+  // who can't open a module's page can't read its records through chat either.
+  const denied = readDenial(name, user);
+  if (denied && !denied.startsWith("unknown tool")) return `PERMISSION_DENIED: ${denied}`;
   const turnSettings = () => (settings ? Promise.resolve(settings) : copilotSettings(user));
 
   switch (name) {
