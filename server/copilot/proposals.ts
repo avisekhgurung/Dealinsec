@@ -235,6 +235,24 @@ export function amountAppearsIn(text: string, major: number): boolean {
   return false;
 }
 
+/** A Protection Check report as the cards show it — one shape for the draft
+ *  card, the agent's findings card and the deal page. */
+export function protectionPayload(report: ReturnType<typeof analyzeDealProtections>) {
+  return {
+    flags: report.flags.map((f) => ({
+      id: f.id,
+      priority: flagPriority(f),
+      level: f.level,
+      title: f.title,
+      detail: f.detail,
+      why: f.why,
+      ask: f.ask,
+      suggestedTerm: f.suggestedTerm,
+    })),
+    passes: protectionPasses(report),
+  };
+}
+
 /* ── Draft ─────────────────────────────────────────────────────────────── */
 
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
@@ -308,19 +326,7 @@ export function buildDealDraft(
     terms,
     advancePercent: readAdvancePercent(termsText),
     revisions: readRevisions(termsText),
-    protection: {
-      flags: report.flags.map((f) => ({
-        id: f.id,
-        priority: flagPriority(f),
-        level: f.level,
-        title: f.title,
-        detail: f.detail,
-        why: f.why,
-        ask: f.ask,
-        suggestedTerm: f.suggestedTerm,
-      })),
-      passes: protectionPasses(report),
-    },
+    protection: protectionPayload(report),
     warnings,
     prefill: {
       brandName: candidate.brandName,

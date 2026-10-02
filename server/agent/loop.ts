@@ -134,15 +134,17 @@ export async function runAgent(
     await setState("UNDERSTANDING");
 
     const history = await store.recentMessages(input.sessionId, 16);
-    const userText = history.filter((m) => m.role === "user").map((m) => m.content).join("\n");
+    const userMessages = history.filter((m) => m.role === "user").map((m) => m.content);
+    const userText = userMessages.join("\n");
     const messages: ChatMessage[] = [
       ...deps.systemMessages.map((content) => ({ role: "system" as const, content })),
       ...history.map((m) => ({ role: m.role, content: m.content })),
     ];
 
     const ctx: ToolContext = {
-      user: input.user, sessionId: input.sessionId, runId, signal: ac.signal, userText,
+      user: input.user, sessionId: input.sessionId, runId, signal: ac.signal, userText, userMessages,
       progress: (message) => emit("agent.tool_progress", { message: String(message).slice(0, 120) }),
+      addUsage: (i, o) => { tokensIn += i; tokensOut += o; },
     };
 
     emit("agent.understanding", {});

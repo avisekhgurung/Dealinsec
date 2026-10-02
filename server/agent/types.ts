@@ -98,7 +98,11 @@ export interface ToolContext {
   /** The user's own messages in this conversation, for checking extracted
    *  values against what was actually said. */
   userText: string;
+  /** The same messages one by one, oldest first. */
+  userMessages: string[];
   progress: (message: string) => void;
+  /** A tool that makes its own model call reports the tokens it used. */
+  addUsage?: (inputTokens: number, outputTokens: number) => void;
 }
 
 export interface AgentTool<I = any> {

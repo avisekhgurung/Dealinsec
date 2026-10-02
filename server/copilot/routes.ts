@@ -32,6 +32,7 @@ import {
 import { storage } from "../storage";
 import { readDenial } from "./readAccess";
 import { takeQuota } from "./quota";
+import { draftChaserMessage } from "./chaser";
 import { getLocaleSettings } from "@shared/schema";
 import { formatDate, formatMoney } from "@shared/money";
 
@@ -104,32 +105,7 @@ export function registerCopilotRoutes(app: Express) {
         ? invoice.organizationId === req.user.organizationId
         : invoice.userId === req.user.id);
       if (!owns) return res.status(404).json({ error: "Invoice not found" });
-      const settings = await copilotSettings(req.user);
-      const voice = voiceFor(settings.country);
-      const tones = chaserTones(voice);
-      const tone = chaserToneFor(voice, req.body?.tone);
-      const now = Date.now();
-      const due = invoice!.dueDate ? new Date(invoice!.dueDate as any) : null;
-      const daysOverdue = due ? Math.floor((now - due.getTime()) / 86_400_000) : null;
-      const facts = [
-        `Recipient (address the message TO this client): ${invoice!.brandName}`,
-        `Invoice number: ${invoice!.invoiceNumber}`,
-        // Formatted here, from the row — the model copies this string, it never
-        // does arithmetic or picks a currency.
-        `Amount: ${formatMoney(invoice!.dealAmountMinor, settings.currency, settings.locale)}`,
-        due
-          ? `Due date: ${formatDate(invoice!.dueDate, settings.locale, { day: "numeric", month: "long", year: false, timezone: settings.timezone })}`
-          : "No due date on record",
-        daysOverdue !== null && daysOverdue > 0 ? `Days overdue: ${daysOverdue}` : "Not yet overdue",
-        `Sender (sign off as this person — never greet them): ${req.user.firstName ?? "the business owner"}`,
-      ].join("\n");
-      const result = await aiProvider.chat([
-        { role: "system", content: chaserSystemPrompt(voice, tone) },
-        { role: "user", content: facts },
-      ], []);
-      // `tones` travels with every draft so the client never keeps its own
-      // country table: whatever the retone row offers, this route accepts.
-      res.json({ message: result.content ?? "", tone, tones, invoiceNumber: invoice!.invoiceNumber });
+      res.json(await draftChaserMessage(req.user, invoice!, req.body?.tone));
     } catch (err) {
       console.error("[copilot] chaser error:", err);
       res.status(502).json({ error: "Couldn't draft the message right now. Please try again." });

@@ -19,12 +19,12 @@ import crypto from "crypto";
 import { storage } from "./storage";
 import { isAuthenticated } from "./auth";
 import { memberCan } from "@shared/permissions";
-import { hasProAccess } from "@shared/schema";
 import { documentLocaleSettings } from "@shared/money";
-import { buildAgreementShareSnapshot, computeDocumentHash, verifyDocumentHash } from "@shared/contractSign";
+import { computeDocumentHash, verifyDocumentHash } from "@shared/contractSign";
 import { sendEmail, agreementSignedByClientEmail } from "./emails";
-import { documentLocaleFor, issuedCurrency } from "./routes";
-import { getBillingUser, logOrgActivity } from "./entitlements";
+import { issuedCurrency } from "./routes";
+import { logOrgActivity } from "./entitlements";
+import { createAgreementSignLink } from "./services/sharing";
 
 const inOrg = (resource: { organizationId?: string | null; userId?: string | null } | null | undefined, user: { id: string; organizationId?: string | null }): boolean => {
   if (!resource) return false;
@@ -90,40 +90,9 @@ export function registerAgreementSignRoutes(app: Express) {
 
   app.post("/api/contracts/:id/sign-share", isAuthenticated, async (req: any, res) => {
     try {
-      if (!memberCan(req.user, "agreements.create")) {
-        return res.status(403).json({ error: "Your role doesn't allow sending this for signature." });
-      }
-      const contract = await storage.getContract(parseInt(req.params.id, 10));
-      if (!contract || !inOrg(contract, req.user)) return res.status(404).json({ error: "Agreement not found" });
-      if (contract.signedByBrand) return res.status(409).json({ error: "This agreement is already signed." });
-
-      const billing = await getBillingUser(req.user);
-      if (!hasProAccess(billing)) return res.status(403).json({ error: "Agreements are a Pro feature." });
-
-      const deal = await storage.getDeal(contract.dealId);
-      const settings = await documentLocaleFor(req.user, contract);
-      const issuerName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.email || "";
-      const snapshot = buildAgreementShareSnapshot({
-        issuerName,
-        contract,
-        dealType: deal?.dealType,
-        exclusive: contract.exclusive,
-        deliverables: deal?.deliverables,
-        dealStandardTermIds: (deal?.standardTermIds as string[] | null) ?? [],
-        dealCustomTerms: deal?.customTerms ?? null,
-        dealBrandTerms: deal?.brandTerms,
-        settings,
-      });
-
-      const token = newToken();
-      const updated = await storage.updateContract(contract.id, {
-        clientShareToken: token,
-        clientSignShareSnapshot: snapshot as any,
-        clientSharedAt: new Date(),
-        clientShareRevokedAt: null,
-      });
-      if (!updated) return res.status(500).json({ error: "Couldn't create the signing link." });
-      res.json({ active: true, url: `/s/${token}`, sharedAt: updated.clientSharedAt });
+      const r = await createAgreementSignLink(req.user, parseInt(req.params.id, 10));
+      if (!r.ok) return res.status(r.status).json({ error: r.error });
+      res.json({ active: true, url: r.url, sharedAt: r.sharedAt });
     } catch (err) {
       console.error("[agreement-sign] create error:", err);
       res.status(500).json({ error: "Couldn't create the signing link." });

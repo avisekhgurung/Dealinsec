@@ -14,6 +14,9 @@ import { requirePro, requireOrgPermission, withOrg, getBillingUser, logOrgActivi
 import { maybeStartTrial } from "./trial";
 import { registerCopilotRoutes } from "./copilot/routes";
 import { registerAgentRoutes } from "./agent/routes";
+import { reviseDraftQuote } from "./services/deals";
+import { notifyAgreementCreated } from "./services/agreements";
+import { afterInvoiceStatusChange, paidAtFor } from "./services/payments";
 import { registerQuoteShareRoutes } from "./quoteShare";
 import { registerAgreementSignRoutes } from "./agreementSign";
 import { getSeatLimit, INVITABLE_ROLES, hasPermission as hasOrgPermission, orgRoleOptions, CUSTOM_ROLE, ASSIGNABLE_PERMISSIONS , canReadModule} from "@shared/permissions";
@@ -45,8 +48,6 @@ import {
   sendEmail,
   paymentReceiptEmail,
   proPlanReceiptEmail,
-  contractSignedEmail,
-  paymentReceivedEmail,
   inviteEmail,
 } from "./emails";
 
@@ -786,10 +787,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await storage.updateDeal(dealId, updates);
 
       // If a quote exists, mark it as revised so user can regenerate
-      const existingQuote = await storage.getQuoteByDealId(dealId);
-      if (existingQuote && existingQuote.status === "draft") {
-        await storage.updateQuote(existingQuote.id, { status: "revised" });
-      }
+      await reviseDraftQuote(dealId);
 
       res.json(updated);
     } catch (error) {
@@ -967,16 +965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateDeal(contract.dealId, { status: "Active" });
 
       // Contract-signed email — best-effort
-      if (user?.email) {
-        const { subject, html } = contractSignedEmail({
-          firstName: user.firstName || undefined,
-          brandName: contract.brandName,
-          contractValueMinor: contract.contractValueMinor,
-          contractId: contract.id,
-          locale: settings,
-        });
-        void sendEmail({ to: user.email, subject, html });
-      }
+      notifyAgreementCreated(user, contract, settings);
 
       res.status(201).json(contract);
     } catch (error) {
@@ -1453,49 +1442,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // paid_at is server-owned: stamp it when the payment is recorded,
       // clear it when the payment is reversed.
-      if (invoice.status !== "Paid" && updates.status === "Paid") {
-        (updates as any).paidAt = new Date();
-      } else if (invoice.status === "Paid" && updates.status === "Unpaid") {
-        (updates as any).paidAt = null;
-      }
+      const paidAt = paidAtFor(invoice.status, updates.status);
+      if (paidAt !== undefined) (updates as any).paidAt = paidAt;
 
       // Belt and braces for the allowlist above: whatever it grows to list, the
       // number and the issued currency never reach the UPDATE.
       const { currency: _issuedCurrency, ...safeUpdates } = withoutInvoiceNumber(updates);
       const updated = await storage.updateBrandInvoice(parseInt(req.params.id), safeUpdates);
-      const recordedPayment = invoice.status !== "Paid" && updates.status === "Paid" && updated;
-      // Resolved only when a payment is recorded: the activity line and the
-      // email are the only places this route prints money. The activity detail
-      // is stored text, so for INR it must stay byte-for-byte the "₹65,000"
-      // the feed has always held — formatMoney guarantees exactly that.
-      const paidLocale = recordedPayment ? await documentLocaleFor(req.user, updated) : null;
-
-      if (recordedPayment && paidLocale) {
-        logOrgActivity(req.user, "recorded payment for", "invoice", invoice.id,
-          `${formatMoney(updated.dealAmountMinor || 0, paidLocale.currency, paidLocale.locale)} from ${invoice.brandName}`);
-      }
-
-      // Reversing a payment is a money event too — it must leave the same trail
-      // as recording one, so "who marked this unpaid and when" is answerable.
-      if (invoice.status === "Paid" && updates.status === "Unpaid" && updated) {
-        logOrgActivity(req.user, "reversed the payment on", "invoice", invoice.id,
-          `${updated.invoiceNumber} — back to Unpaid`);
-      }
-
-      // "Payment received" email — only when transitioning Unpaid -> Paid
-      if (recordedPayment && paidLocale) {
-        const owner = await storage.getUser(req.user.id);
-        if (owner?.email) {
-          const { subject, html } = paymentReceivedEmail({
-            firstName: owner.firstName || undefined,
-            brandName: updated.brandName,
-            amountMinor: updated.dealAmountMinor,
-            invoiceNumber: updated.invoiceNumber,
-            locale: paidLocale,
-          });
-          void sendEmail({ to: owner.email, subject, html });
-        }
-      }
+      // Activity trail and the payment-received email, shared with the agent.
+      await afterInvoiceStatusChange(req.user, invoice, updated, updates.status);
 
       res.json(updated);
     } catch (error) {

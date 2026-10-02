@@ -19,9 +19,8 @@ import { storage } from "./storage";
 import { isAuthenticated } from "./auth";
 import { memberCan } from "@shared/permissions";
 import { documentLocaleSettings } from "@shared/money";
-import { buildQuoteShareSnapshot } from "@shared/quoteShare";
 import { sendEmail, quoteAcceptedEmail } from "./emails";
-import { documentLocaleFor } from "./routes";
+import { createQuoteShareLink } from "./services/sharing";
 
 const inOrg = (resource: { organizationId?: string | null; userId?: string | null } | null | undefined, user: { id: string; organizationId?: string | null }): boolean => {
   if (!resource) return false;
@@ -89,29 +88,9 @@ export function registerQuoteShareRoutes(app: Express) {
 
   app.post("/api/deals/:id/quote/share", isAuthenticated, async (req: any, res) => {
     try {
-      if (!memberCan(req.user, "quotations.create")) {
-        return res.status(403).json({ error: "Your role doesn't allow sharing quotations." });
-      }
-      const deal = await storage.getDeal(parseInt(req.params.id, 10));
-      if (!deal || !inOrg(deal, req.user)) return res.status(404).json({ error: "Deal not found" });
-      const quote = await storage.getQuoteByDealId(deal.id);
-      if (!quote) return res.status(400).json({ error: "Generate the quotation before sharing it." });
-
-      const settings = await documentLocaleFor(req.user);
-      const issuerName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.email || "";
-      const snapshot = buildQuoteShareSnapshot({ issuerName, deal, quoteId: quote.id, version: quote.version, settings });
-
-      const token = newToken();
-      const updated = await storage.updateQuote(quote.id, {
-        shareToken: token,
-        shareSnapshot: snapshot as any,
-        sharedAt: new Date(),
-        shareRevokedAt: null,
-        acceptedAt: null, // a re-share (edited deal) starts the acceptance signal over
-      });
-      if (!updated) return res.status(500).json({ error: "Couldn't create the share link." });
-
-      res.json({ active: true, token, url: `/d/${token}`, sharedAt: updated.sharedAt });
+      const r = await createQuoteShareLink(req.user, parseInt(req.params.id, 10));
+      if (!r.ok) return res.status(r.status).json({ error: r.error });
+      res.json({ active: true, token: r.token, url: r.url, sharedAt: r.sharedAt });
     } catch (err) {
       console.error("[quote-share] create error:", err);
       res.status(500).json({ error: "Couldn't create the share link." });

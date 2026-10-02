@@ -78,7 +78,7 @@ async function run(
   emit("agent.started", { approvalId: approval.id, tool: tool.name });
   emit("agent.executing", { tool: tool.name });
   const ctx: ToolContext = {
-    user, sessionId: approval.sessionId, runId: approval.runId, userText: "",
+    user, sessionId: approval.sessionId, runId: approval.runId, userText: "", userMessages: [],
     progress: (m) => emit("agent.tool_progress", { message: String(m).slice(0, 120) }),
   };
   let result;

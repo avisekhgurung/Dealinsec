@@ -30,7 +30,7 @@ function fromAddress(): string {
   return process.env.EMAIL_FROM || "DealInSec <support@dealinsec.com>";
 }
 
-function appUrl(): string {
+export function appUrl(): string {
   return (process.env.APP_URL || "https://www.dealinsec.com").replace(/\/$/, "");
 }
 

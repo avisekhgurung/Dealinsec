@@ -41,6 +41,8 @@ import { documentLocaleFor, issuedCurrency, issuingContext, invoiceableRemaining
 import { analyzeDealProtections } from "./riskcheck";
 import { amountVoice, speaksNativeMoney, voiceFor } from "./voice";
 import { readDenial } from "./readAccess";
+import { isoDateInZone } from "@shared/invoice-numbering";
+import { notifyAgreementCreated } from "../services/agreements";
 
 export const inOrg = (
   resource: { organizationId?: string | null; userId?: string | null } | null | undefined,
@@ -641,6 +643,8 @@ export async function executeCreateAgreement(rawArgs: any, user: User) {
   } as any);
   logOrgActivity(user, "created", "agreement", contract.id, `Agreement: ${contract.brandName} (via Copilot)`);
   await storage.updateDeal(contract.dealId, { status: "Active" });
+  // The same contract-signed email POST /api/contracts sends the creator.
+  notifyAgreementCreated(user, contract, settings);
 
   return {
     ok: true as const,
@@ -737,7 +741,10 @@ export async function executeCreateInvoice(rawArgs: any, user: User) {
     userId: user.id,
     organizationId: user.organizationId,
     invoiceNumber,
-    invoiceDate: new Date().toISOString().slice(0, 10),
+    // Today in the ORG's zone, as POST /api/brand-invoices does: the invoice
+    // number's period is read on that clock, and UTC once dated an IST
+    // 1-April invoice 31 March.
+    invoiceDate: isoDateInZone(settings.timezone),
     influencerName,
     influencerEmail: issuer.email || null,
     status: "Unpaid",

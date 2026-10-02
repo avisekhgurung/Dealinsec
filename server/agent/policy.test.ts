@@ -73,3 +73,27 @@ describe("fenceUntrusted", () => {
     expect(fenceUntrusted('a"> evil', "x")).toContain('source="a___evil"');
   });
 });
+
+import { validateRegistry } from "./registry";
+import { mutationTool } from "./testing";
+import { z } from "zod";
+
+describe("validateRegistry", () => {
+  const read = (name: string) => readTool({ name, description: "a perfectly good description" }, () => ({ ok: true, summary: "" }));
+  it("accepts a well-formed registry", () => {
+    const tools = [read("get_thing"), mutationTool({ name: "create_thing", description: "a perfectly good description" })];
+    expect(validateRegistry(tools)).toBe(tools);
+  });
+  it("rejects duplicates, bad names and thin descriptions", () => {
+    expect(() => validateRegistry([read("get_thing"), read("get_thing")])).toThrow(/duplicate/);
+    expect(() => validateRegistry([read("GetThing")])).toThrow(/lower_snake_case/);
+    expect(() => validateRegistry([readTool({ name: "get_thing", description: "short" }, () => ({ ok: true, summary: "" }))])).toThrow(/real description/);
+  });
+  it("a read tool can't carry a write path, and a mutation needs both steps", () => {
+    expect(() => validateRegistry([{ ...read("get_thing"), prepare: async () => ({ ok: false as const, code: "x", message: "y" }) }])).toThrow(/can't write/);
+    expect(() => validateRegistry([{ ...mutationTool({ name: "create_thing", description: "a perfectly good description" }), execute: undefined }])).toThrow(/prepare\(\) and execute\(\)/);
+  });
+  it("refuses a schema the model can't be shown", () => {
+    expect(() => validateRegistry([read("get_thing")].map((t) => ({ ...t, input: z.date() })))).toThrow(/unsupported zod type/);
+  });
+});
