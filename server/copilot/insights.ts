@@ -11,6 +11,7 @@
 import { storage } from "../storage";
 import { resolveLocaleSettings, type User, type Deal, type Contract, type BrandInvoice, type LocaleSettings } from "@shared/schema";
 import { formatMoney } from "@shared/money";
+import { narrowToReadable } from "./readAccess";
 
 const DAY = 86_400_000;
 
@@ -70,7 +71,9 @@ async function loadOrg(user: User): Promise<OrgData> {
     storage.getBrandInvoicesByOrg(orgId, user.id),
     storage.getOrganization(orgId),
   ]);
-  return { deals, contracts, invoices, settings: resolveLocaleSettings(org, user) };
+  // Only what this member may read: a custom role without access to a module
+  // gets none of its records in the briefing or the deal intelligence.
+  return { ...narrowToReadable(user, { deals, contracts, invoices }), settings: resolveLocaleSettings(org, user) };
 }
 
 import { analyzeDealProtections, protectionPasses, summarizeProtection, type ProtectionReport, type ProtectionSummary } from "./riskcheck";

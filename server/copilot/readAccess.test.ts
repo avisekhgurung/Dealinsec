@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TOOL_READS, readDenial } from "./readAccess";
+import { TOOL_READS, narrowToReadable, readDenial } from "./readAccess";
 
 const custom = (...perms: string[]) => ({ orgRole: "CUSTOM", customPermissions: perms });
 
@@ -41,5 +41,19 @@ describe("readDenial — the chat tools follow the same module-read rules as the
 
   it("an unknown tool is denied", () => {
     expect(readDenial("drop_tables", { orgRole: "OWNER" })).toMatch(/unknown tool/);
+  });
+});
+
+describe("narrowToReadable — the briefing only aggregates what the member may read", () => {
+  const data = { deals: [1, 2], contracts: ["a"], invoices: [true, false] };
+  it("built-in roles keep everything", () => {
+    expect(narrowToReadable({ orgRole: "SALES" }, data)).toEqual(data);
+    expect(narrowToReadable({ orgRole: "OWNER" }, data)).toEqual(data);
+  });
+  it("an invoices-only custom member sees no deals, but their invoices and agreements", () => {
+    expect(narrowToReadable(custom("invoices.create"), data)).toEqual({ deals: [], contracts: ["a"], invoices: [true, false] });
+  });
+  it("a custom member with no permissions sees nothing", () => {
+    expect(narrowToReadable(custom(), data)).toEqual({ deals: [], contracts: [], invoices: [] });
   });
 });

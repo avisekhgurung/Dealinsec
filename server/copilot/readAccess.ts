@@ -45,3 +45,21 @@ export function readDenial(tool: string, user: Who | null | undefined): string |
   for (const m of need) if (!canReadModule(user, m)) return `this member's role doesn't include viewing ${m}.`;
   return null;
 }
+
+/**
+ * The records a member may read, for anything that aggregates across modules
+ * (the daily briefing, deal intelligence). A custom-role member who can't open
+ * the Deals page gets no deals in the briefing either; their money radar and
+ * next actions are built only from what they could read on their own screens.
+ * Built-in roles and the owner keep everything.
+ */
+export function narrowToReadable<D, C, I>(
+  user: Who | null | undefined,
+  data: { deals: D[]; contracts: C[]; invoices: I[] },
+): { deals: D[]; contracts: C[]; invoices: I[] } {
+  return {
+    deals: canReadModule(user, "deals") ? data.deals : [],
+    contracts: canReadModule(user, "agreements") ? data.contracts : [],
+    invoices: canReadModule(user, "invoices") ? data.invoices : [],
+  };
+}

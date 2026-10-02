@@ -156,7 +156,9 @@ export async function runAgent(
       const record = (status: string, extra: { risk?: AgentTool["risk"]; args?: unknown; summary?: string; code?: string } = {}) =>
         store.recordToolCall({
           runId, tool: call.name.slice(0, 48), risk: extra.risk ?? tool?.risk ?? "READ_ONLY", status,
-          args: summarizeArgs(extra.args ?? call.arguments), resultSummary: extra.summary?.slice(0, 300) ?? null,
+          // What a tool returned is business data (client names, amounts): the audit row
+          // keeps its shape only. The records themselves are the source of truth.
+          args: summarizeArgs(extra.args ?? call.arguments), resultSummary: extra.summary ? `${extra.summary.length} chars` : null,
           errorCode: extra.code ?? null, durationMs: Date.now() - started,
         }).catch(() => {});
       toolsUsed.push(call.name);

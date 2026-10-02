@@ -15,14 +15,13 @@ import { copilotAudience } from "../../copilot/workflow";
 import { readDenial } from "../../copilot/readAccess";
 import { storage } from "../../storage";
 import { reviseDraftQuote } from "../../services/deals";
-import { currencyMentions, extractionSystemPrompt, extractionUserMessage, normalizeExtraction, parseJsonObject, pickSourceMessage, protectionInput, suggestedDeal, type FieldKey } from "../extraction";
+import { buildAnalysis } from "../analysis";
+import { currencyMentions, extractionSystemPrompt, extractionUserMessage, parseJsonObject, pickSourceMessage } from "../extraction";
 import { allOf, needsLinkedRead, needsPermission } from "../policy";
-import type { AgentCard, AgentTool, ToolOutcome } from "../types";
+import type { AgentTool, ToolOutcome } from "../types";
 import { dealFor, fail, money, settingsFor } from "./shared";
 
 // ── analyze_deal_message ───────────────────────────────────────────────────
-
-const STATUS_TAG: Record<string, string> = { explicit: "stated", inferred: "inferred (not stated)", missing: "not specified", conflicting: "CONFLICTING" };
 
 const analyzeDealMessage: AgentTool<Record<string, never>> = {
   name: "analyze_deal_message",
@@ -52,30 +51,8 @@ const analyzeDealMessage: AgentTool<Record<string, never>> = {
     const raw = parseJsonObject(reply.content);
     if (!raw) return fail("extraction_failed", "I couldn't read that message reliably. Paste it again, or tell me the key details.");
 
-    const x = normalizeExtraction(raw, source, audience);
-    const { deal, warnings } = suggestedDeal(x, audience, settings.currency);
-
     ctx.progress("Running Protection Check…");
-    const report = analyzeDealProtections(protectionInput(x, audience) as any, settings);
-    const protection = protectionPayload(report);
-
-    const fieldLines = Object.values(x.fields)
-      .filter((f) => f.status !== "missing" || (["amount", "brand"] as FieldKey[]).includes(f.key))
-      .map((f) => `- ${f.label}: ${f.status === "conflicting" ? f.alternatives.join(" / ") : f.display ?? "—"} [${STATUS_TAG[f.status]}]${f.downgraded ? " (the quote didn't match the message)" : ""}`);
-    const summary = [
-      "What the message says:",
-      ...fieldLines,
-      x.missing.length ? `Not specified: ${x.missing.join(", ")}.` : "",
-      x.conflicts.length ? `Conflicting: ${x.conflicts.join(", ")}.` : "",
-      ...warnings.map((w) => `Warning: ${w}`),
-      protection.flags.length ? `Protection Check on what it states (${protection.flags.length}): ${protection.flags.map((f) => f.title).join("; ")}.` : "Protection Check found nothing to flag in what it states.",
-      `For create_deal use exactly these fields (only what the message states — add nothing): ${JSON.stringify(deal)}`,
-    ].filter(Boolean).join("\n");
-
-    const cards: AgentCard[] = [
-      { kind: "deal", data: { extracted: true, fields: Object.values(x.fields).filter((f) => f.status !== "missing" || x.missing.includes(f.label)).map((f) => ({ key: f.key, label: f.label, value: f.display, status: f.status, evidence: f.evidence, alternatives: f.alternatives })), missing: x.missing, conflicts: x.conflicts, warnings, suggestedDeal: deal } },
-      { kind: "findings", data: { title: "Protection Check", findings: protection.flags, passes: protection.passes } },
-    ];
+    const { summary, cards } = buildAnalysis(raw, source, audience, settings);
     return { ok: true, summary, cards };
   },
 };
@@ -158,7 +135,8 @@ const createDeal: AgentTool<z.infer<typeof createDealInput>> = {
           { label: "Client", value: draft.client },
           { label: "Project", value: draft.project },
           { label: "Amount", value: draft.amount },
-          { label: "Timeline", value: draft.timeline },
+          // Dates the message never gave are a default, not a fact: say so.
+          { label: "Timeline", value: input.startDate && input.endDate ? draft.timeline : "Not specified — defaults to 30 days from today" },
           ...(warnings.length ? [{ label: "Check", value: warnings.join(" ") }] : []),
         ],
         effects: spendsCredit ? ["Uses 1 of your Deal Credits for this month."] : [],

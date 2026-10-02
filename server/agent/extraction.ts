@@ -176,6 +176,9 @@ export function normalizeExtraction(raw: unknown, source: string, audience: Audi
     const f = isObj(rawFields[key]) ? (rawFields[key] as Record<string, unknown>) : {};
     let value = coerceValue(def.kind, f.value);
     let status: FieldStatus = STATUSES.includes(f.status as FieldStatus) ? (f.status as FieldStatus) : value != null ? "inferred" : "missing";
+    // "Missing" means the message doesn't cover it: whatever value came with
+    // that tag is dropped, not kept as a guess.
+    if (status === "missing") value = null;
     const alternatives = (Array.isArray(f.alternatives) ? f.alternatives : []).filter((a): a is string => typeof a === "string").map((a) => clip(a, 80)).filter(Boolean).slice(0, 5);
     let evidence = typeof f.evidence === "string" && f.evidence.trim() ? clip(f.evidence, 300) : null;
     let downgraded = false;
