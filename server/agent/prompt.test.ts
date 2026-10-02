@@ -34,6 +34,21 @@ describe("agent system prompt", () => {
   });
 });
 
+describe("channel style", () => {
+  it("the web prompt carries nothing channel-specific", () => {
+    expect(agentSystemPrompt(settings("IN"), "client_work", "web")).not.toMatch(/CHANNEL:/);
+    expect(agentSystemPrompt(settings("IN"))).toBe(agentSystemPrompt(settings("IN"), "client_work", "web"));
+  });
+  it("voice asks for short spoken replies and says approvals aren't possible by voice", () => {
+    const v = agentSystemPrompt(settings("IN"), "client_work", "voice");
+    expect(v).toMatch(/spoken aloud/);
+    expect(v).toMatch(/approvals can't be given by voice yet/);
+  });
+  it("email asks for a draft the user reviews, never a sent message", () => {
+    expect(agentSystemPrompt(settings("IN"), "client_work", "email")).toMatch(/you never send anything yourself/);
+  });
+});
+
 describe("agent context block", () => {
   it("carries only server-derived facts", () => {
     const c = agentContextBlock({ today: "2026-10-03", firstName: "Asha", role: "OWNER", page: "deal-details", route: "/deals/4", journey: { dealId: 4 } });

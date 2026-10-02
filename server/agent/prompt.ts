@@ -10,8 +10,21 @@ import type { Audience } from "@shared/audience";
 import type { LocaleSettings } from "@shared/schema";
 import { amountVoice, voiceFor } from "../copilot/voice";
 import { UNTRUSTED_RULE } from "./untrusted";
+import type { Channel } from "./types";
 
-export function agentSystemPrompt(settings: LocaleSettings, audience: Audience = "client_work"): string {
+/** How a reply should read on a channel other than the screen. The web gets
+ *  nothing extra (it has cards and links); a spoken or emailed reply can't. */
+export function channelStyle(channel: Channel): string {
+  if (channel === "voice") {
+    return "\n\nCHANNEL: this conversation is spoken aloud. Reply in one or two short sentences of plain speech: no lists, no markdown, nothing that can't be said. The person can't see cards, so say what is waiting for their approval and that they give it in the app; approvals can't be given by voice yet. Say amounts the way a person would.";
+  }
+  if (channel === "email") {
+    return "\n\nCHANNEL: this is an email thread. Write a short, professional reply a person could send. The user reviews it before anything is sent; you never send anything yourself.";
+  }
+  return "";
+}
+
+export function agentSystemPrompt(settings: LocaleSettings, audience: Audience = "client_work", channel: Channel = "web"): string {
   const brand = audience === "brand_collaboration";
   const voice = voiceFor(settings.country);
   const amount = amountVoice(voice, settings);
@@ -49,7 +62,7 @@ CREATING A DEAL (create_deal): when the user asks for a deal or pastes a brief, 
 - startDate/endDate as YYYY-MM-DD from today's date in CONTEXT, only if stated; otherwise omit them.
 - deliverables: [{platform, contentType, quantity, frequency, notes}].
 - customTerms: ONLY terms the message actually states, one per line (advance %, balance timing, revision limit as "Up to 2 rounds of revisions are included.", exclusions). The app runs the Protection Check and shows what is missing.${brand ? '\n- Brand deals: dealType "Brand Collaboration"; brandName is the brand, dealTitle the campaign; platform is the social platform and contentType the format ("Reel", "Story"). brandTerms {campaign, usageRights, usageDuration, exclusivity, approval}: ONLY what is stated, in the brand\'s words; omit a key that isn\'t stated, and never assume exclusivity.' : ""}
-After calling create_deal, do not restate the fields: the approval card shows them with the Protection Check.`;
+After calling create_deal, do not restate the fields: the approval card shows them with the Protection Check.${channelStyle(channel)}`;
 }
 
 /** The per-turn facts block. Everything in it is derived server-side. */

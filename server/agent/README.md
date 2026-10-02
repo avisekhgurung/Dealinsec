@@ -50,9 +50,31 @@ user (web today; voice / email later)
 - `script/agent-eval-live.mts` — opt-in, spends DeepSeek calls, measures what a
   real model chooses. Local database only.
 
-## Voice and email
+## Voice and email: adding a channel
 
-`runAgent` takes `{ channel, text }` and emits events; it does not know where
-text came from. A voice adapter adds speech-to-text before it and text-to-speech
-on `agent.message`; an inbox adapter turns a message into a session. Neither
-needs a change to the loop, the policy or the tools.
+`conversation.ts` is the channel-agnostic layer. `converse(deps, { user, text,
+adapter, sessionId?, context? })` runs one turn; it knows nothing about HTTP, a
+phone call or an inbox. A channel is a `ChannelAdapter`:
+
+```ts
+{ channel: "web" | "voice" | "email",
+  emit(event): void,        // deliver an event the channel's own way
+  signal?: AbortSignal }    // the user has gone (closed tab, hung-up call)
+```
+
+- **web** (`routes.ts`): text from the browser; `emit` writes an SSE frame. A
+  refusal before the agent starts (no such conversation, busy, over quota) comes
+  back from `converse` as a typed failure with no events, so the route answers
+  with JSON; once it has started, everything is an event.
+- **voice** (not built): speech-to-text produces `text`; `emit` speaks the text
+  of each `agent.message` and ignores cards and progress. The prompt already
+  switches to short spoken replies (`channelStyle`). Approvals can't be given by
+  voice yet: the agent says something is waiting in the app.
+- **email** (not built): an inbound message becomes `text` on a session; the
+  reply is queued as a **draft for the user's approval**, never sent. Sending an
+  email will be a new CONSEQUENTIAL tool.
+
+Nothing in `loop.ts`, `policy.ts` or the tools changes for a new channel
+(`conversation.test.ts` runs the same turn through a web and a voice adapter and
+checks the runs are identical). `wiring.ts` supplies the real database, model
+and tools; tests inject fakes.

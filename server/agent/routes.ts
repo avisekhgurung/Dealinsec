@@ -20,24 +20,19 @@
  */
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
-import { normalizeAudience } from "@shared/audience";
 import { isAuthenticated } from "../auth";
-import { aiProvider, copilotConfigured } from "../copilot/provider";
-import { retrieveKnowledge } from "../copilot/knowledge";
-import { takeQuota } from "../copilot/quota";
-import { readDenial } from "../copilot/readAccess";
-import { copilotSettings, getDealJourney } from "../copilot/workflow";
+import { copilotConfigured } from "../copilot/provider";
 import { storage } from "../storage";
 import { executeApproval } from "./approvals";
+import { converse, MAX_TEXT, type ChannelAdapter, type ConverseFailure } from "./conversation";
 import { agentLog } from "./log";
-import { runAgent } from "./loop";
-import { agentContextBlock, agentSystemPrompt } from "./prompt";
 import { agentStore, agentTablesReady } from "./store";
 import { AGENT_TOOLS } from "./tools";
 import type { AgentEvent } from "./types";
+import { conversationDeps } from "./wiring";
 
 const messageBody = z.object({
-  text: z.string().trim().min(1, "Type a message").max(4000, "That message is too long"),
+  text: z.string().trim().min(1, "Type a message").max(MAX_TEXT, "That message is too long"),
   channel: z.literal("web").default("web"),
   context: z.object({
     page: z.string().max(60).optional(),
@@ -48,12 +43,8 @@ const messageBody = z.object({
 
 const sessionBody = z.object({ dealId: z.number().int().positive().optional() });
 
-/** One run at a time per conversation. In memory is enough: it only prevents a
- *  double-submit, and a restart ends every run anyway. */
-const activeSessions = new Set<string>();
-
-/** Open a Server-Sent Events response. The heartbeat keeps proxies from closing
- *  an idle stream; closing the connection aborts the run. */
+/** Open a Server-Sent Events response. The heartbeat keeps proxies from
+ *  closing an idle stream. */
 function openStream(res: Response) {
   res.status(200).set({
     "Content-Type": "text/event-stream; charset=utf-8",
@@ -62,14 +53,9 @@ function openStream(res: Response) {
     "X-Accel-Buffering": "no",
   });
   res.flushHeaders();
-  const ac = new AbortController();
   const heartbeat = setInterval(() => { if (!res.writableEnded) res.write(": keep-alive\n\n"); }, 15_000);
-  res.on("close", () => {
-    clearInterval(heartbeat);
-    if (!res.writableEnded) ac.abort();
-  });
+  res.on("close", () => clearInterval(heartbeat));
   return {
-    signal: ac.signal,
     send(e: AgentEvent) {
       if (!res.writableEnded && !res.destroyed) res.write(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`);
     },
@@ -80,7 +66,10 @@ function openStream(res: Response) {
   };
 }
 
-const titleFrom = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 60);
+/** The HTTP status for a refusal that happened before the agent started. */
+const REFUSAL_STATUS: Record<ConverseFailure["code"], number> = {
+  unavailable: 503, not_found: 404, busy: 409, quota: 429, empty: 400, too_long: 400,
+};
 
 export function registerAgentRoutes(app: Express) {
   /** Auth, an organization, and the agent's tables. Without the tables (the
@@ -149,60 +138,31 @@ export function registerAgentRoutes(app: Express) {
     res.json({ ok: true });
   });
 
+  // The web adapter: the browser's text in, the agent's events out as SSE. All
+  // the real work is in converse() (conversation.ts), which knows nothing about
+  // HTTP — a refusal before the agent starts comes back as JSON, and once it has
+  // started everything is an event.
   app.post("/api/agent/sessions/:id/messages", ...guard, async (req: any, res) => {
     const body = messageBody.safeParse(req.body ?? {});
     if (!body.success) return res.status(400).json({ error: body.error.issues[0]?.message ?? "Invalid message" });
-    if (!copilotConfigured()) return res.status(503).json({ error: "The agent isn't available right now." });
-    const session = await agentStore.getSession(req.user, req.params.id);
-    if (!session) return res.status(404).json({ error: "Conversation not found" });
-    if (activeSessions.has(session.id)) return res.status(409).json({ error: "I'm still working on your last message." });
-    if (!takeQuota(req.user.id)) return res.status(429).json({ error: "Daily AI limit reached — try again tomorrow." });
 
-    activeSessions.add(session.id);
-    const stream = openStream(res);
+    const gone = new AbortController();
+    res.on("close", () => { if (!res.writableEnded) gone.abort(); });
+    let stream: ReturnType<typeof openStream> | null = null;
+    const adapter: ChannelAdapter = {
+      channel: body.data.channel,
+      signal: gone.signal,
+      // The stream opens with the first event, so a refusal can still be JSON.
+      emit: (e) => { (stream ??= openStream(res)).send(e); },
+    };
     try {
-      const { text, context } = body.data;
-      const [settings, org, autonomy] = await Promise.all([
-        copilotSettings(req.user),
-        req.user.organizationId ? storage.getOrganization(req.user.organizationId) : undefined,
-        agentStore.getAutonomy(req.user.organizationId),
-      ]);
-      const audience = normalizeAudience(org?.audience);
-
-      // The conversation's deal, or the page's: advisory, and re-authorised
-      // here (the journey itself is organization-checked, and the member must
-      // be allowed to read deals).
-      const dealId = session.dealId ?? context.dealId;
-      const journey = dealId && !readDenial("get_workflow_status", req.user)
-        ? await getDealJourney(dealId, req.user, settings)
-        : null;
-      if (!session.title) await agentStore.setSessionState(session.id, "UNDERSTANDING", titleFrom(text));
-
-      const systemMessages = [
-        agentSystemPrompt(settings, audience),
-        `PRODUCT KNOWLEDGE (authoritative):\n${retrieveKnowledge(text)}`,
-        agentContextBlock({
-          today: new Date().toISOString().slice(0, 10),
-          firstName: req.user.firstName,
-          role: req.user.orgRole,
-          customRole: !!req.user.customPermissions,
-          page: context.page, route: context.route, journey,
-        }),
-      ];
-
-      await runAgent(
-        { provider: aiProvider, store: agentStore, tools: AGENT_TOOLS, systemMessages, autonomy },
-        { sessionId: session.id, user: req.user, text, channel: body.data.channel },
-        stream.send,
-        stream.signal,
-      );
+      const out = await converse(conversationDeps, { user: req.user, text: body.data.text, adapter, sessionId: req.params.id, context: body.data.context });
+      if (!out.ok && !stream) return res.status(REFUSAL_STATUS[out.code]).json({ error: out.message });
     } catch (err) {
       agentLog("error", { errorType: (err as Error)?.name ?? "Error", where: "messages" });
-      stream.send({ type: "agent.failed", runId: "", seq: 0, at: new Date().toISOString(), data: { code: "internal", message: "Something went wrong on our side. Nothing was changed." } });
-    } finally {
-      activeSessions.delete(session.id);
-      stream.end();
+      if (!stream) return res.status(500).json({ error: "Something went wrong on our side. Nothing was changed." });
     }
+    (stream as ReturnType<typeof openStream> | null)?.end();
   });
 
   app.post("/api/agent/approvals/:id/approve", ...guard, async (req: any, res) => {
