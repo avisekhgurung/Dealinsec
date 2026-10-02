@@ -38,31 +38,12 @@ export interface AgentUser {
   firstName?: string | null;
 }
 
-export const AGENT_EVENT_TYPES = [
-  "agent.started", "agent.understanding", "agent.extracting", "agent.searching",
-  "agent.tool_started", "agent.tool_progress", "agent.tool_completed", "agent.tool_failed",
-  "agent.finding", "agent.needs_confirmation", "agent.executing",
-  "agent.message", "agent.completed", "agent.failed",
-] as const;
-export type AgentEventType = (typeof AGENT_EVENT_TYPES)[number];
-
-/** One streamed event. Every event marks real work that has just started or
- *  finished — nothing is emitted on a timer. */
-export interface AgentEvent {
-  type: AgentEventType;
-  runId: string;
-  seq: number;
-  at: string;
-  data: Record<string, unknown>;
-}
+// The wire format lives in shared/agent.ts so the browser uses the same types.
+export { AGENT_EVENT_TYPES } from "@shared/agent";
+export type { AgentEvent, AgentEventType, ApprovalPreview, AgentCard } from "@shared/agent";
+import type { AgentEvent, AgentEventType, ApprovalPreview, AgentCard } from "@shared/agent";
 
 export type EmitEvent = (type: AgentEventType, data?: Record<string, unknown>) => void;
-
-/** A card the UI renders from structured data (never from model prose). */
-export interface AgentCard {
-  kind: "approval" | "deal" | "findings" | "quotation" | "agreement" | "invoice" | "payment";
-  data: Record<string, unknown>;
-}
 
 export type ToolOutcome =
   | { ok: true; summary: string; data?: unknown; cards?: AgentCard[]; route?: string }
@@ -80,15 +61,6 @@ export type Prepared =
       forceApproval?: boolean;
     }
   | { ok: false; code: string; message: string; route?: string };
-
-export interface ApprovalPreview {
-  title: string;
-  /** Short "label: value" lines the user will read before approving. */
-  lines: { label: string; value: string }[];
-  /** Effects beyond the database, in plain words ("Creates a public link…"). */
-  effects: string[];
-  [k: string]: unknown;
-}
 
 export interface ToolContext {
   user: AgentUser & Record<string, any>;

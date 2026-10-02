@@ -25,6 +25,7 @@ const PublicQuotePage         = lazy(() => import("@/pages/public-quote"));
 const PublicSignPage          = lazy(() => import("@/pages/public-sign"));
 const OnboardingPage          = lazy(() => import("@/pages/onboarding"));
 const DashboardPage           = lazy(() => import("@/pages/dashboard"));
+const AgentPage               = lazy(() => import("@/pages/agent"));
 const DealsPage               = lazy(() => import("@/pages/deals"));
 const CreateDealPage          = lazy(() => import("@/pages/create-deal"));
 const EditDealPage            = lazy(() => import("@/pages/edit-deal"));
@@ -203,6 +204,7 @@ function Router() {
             <Route path="/forgot-password"><Redirect to="/dashboard" /></Route>
             <Route path="/reset-password"><Redirect to="/dashboard" /></Route>
             <Route path="/dashboard" component={DashboardPage} />
+            <Route path="/agent/:id?" component={AgentPage} />
             <Route path="/deals" component={DealsPage} />
             <Route path="/deals/new" component={CreateDealPage} />
             <Route path="/deals/import" component={DealsImportPage} />

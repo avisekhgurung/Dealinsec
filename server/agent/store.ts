@@ -16,20 +16,31 @@ import type { AgentCard, AgentState, AgentStore, AgentUser, ApprovalRecord, Auto
 
 const TABLES = ["agent_sessions", "agent_messages", "agent_runs", "agent_tool_calls", "agent_approvals", "agent_settings"];
 
-/** Are the agent's tables there? Read-only; positive answers are cached, a
- *  negative one is rechecked at most every 30s so running the migration
- *  switches the agent on without a restart. */
+/** Are the agent's tables there? Read-only. A positive answer is cached for
+ *  good; a negative one for 30s, so running the migration switches the agent on
+ *  without a restart. Concurrent callers share one in-flight check — otherwise
+ *  the second of two simultaneous first requests would read "not yet checked"
+ *  as "not ready". */
 let ready = false;
 let lastCheck = 0;
-export async function agentTablesReady(): Promise<boolean> {
-  if (ready) return true;
-  if (Date.now() - lastCheck < 30_000) return false;
-  lastCheck = Date.now();
-  const r = await db.execute(sql`
-    SELECT count(*)::int AS n FROM information_schema.tables
-    WHERE table_schema = current_schema() AND table_name IN (${sql.join(TABLES.map((t) => sql`${t}`), sql`, `)})`);
-  ready = Number((r.rows?.[0] as any)?.n) === TABLES.length;
-  return ready;
+let inflight: Promise<boolean> | null = null;
+export function agentTablesReady(): Promise<boolean> {
+  if (ready) return Promise.resolve(true);
+  if (inflight) return inflight;
+  if (lastCheck && Date.now() - lastCheck < 30_000) return Promise.resolve(false);
+  inflight = (async () => {
+    try {
+      const r = await db.execute(sql`
+        SELECT count(*)::int AS n FROM information_schema.tables
+        WHERE table_schema = current_schema() AND table_name IN (${sql.join(TABLES.map((t) => sql`${t}`), sql`, `)})`);
+      ready = Number((r.rows?.[0] as any)?.n) === TABLES.length;
+      return ready;
+    } finally {
+      lastCheck = Date.now();
+      inflight = null;
+    }
+  })();
+  return inflight;
 }
 
 const scope = (user: AgentUser) => and(

@@ -2,14 +2,15 @@
  * AI home — the top of the dashboard.
  *
  * One question, "What do you want to do?", with a composer that hands the text
- * to the Copilot drawer. It is an entry point, not a second chat: the answers,
- * cards and confirm buttons all live in the drawer, and nothing here creates or
+ * to the Agent workspace. It is an entry point, not a second chat: the answers,
+ * cards and approval buttons all live there, and nothing here creates or
  * changes a record. The dashboard below it is untouched.
  */
 import { useEffect, useRef, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Sparkles, ArrowUp, Plus, FileText, Receipt, AlertTriangle, Sun, ListChecks, Wand2 } from "lucide-react";
 import { askCopilot } from "@/lib/copilot-bus";
+import { setPendingAgentMessage } from "@/lib/agent-bus";
 import { useAuth } from "@/hooks/useAuth";
 import { useAudience } from "@/hooks/use-audience";
 import { memberCan } from "@shared/permissions";
@@ -50,6 +51,7 @@ const CHIPS: Chip[] = [
 
 export function AiHome({ firstRun = false }: { firstRun?: boolean }) {
   const { user } = useAuth();
+  const [, navigate] = useLocation();
   const { isBrand, partyLower, composerPrompt } = useAudience();
   const PLACEHOLDERS = placeholdersFor(isBrand ? "brand" : "client");
   const [text, setText] = useState("");
@@ -85,8 +87,15 @@ export function AiHome({ firstRun = false }: { firstRun?: boolean }) {
     // A pasted message is long; a short question is not an analysis. Only the
     // fact that a message was sent is recorded, never its text.
     if (t.length >= 40) trackEvent("ai_deal_analysis_started", { source: "dashboard" });
-    askCopilot(t);
+    openAgent(t);
     setText("");
+  };
+
+  // The message waits in the bus until the Agent page, which loads on demand,
+  // is there to take it.
+  const openAgent = (message: string) => {
+    setPendingAgentMessage(message);
+    navigate("/agent");
   };
 
   const fillExample = () => {
@@ -165,7 +174,7 @@ export function AiHome({ firstRun = false }: { firstRun?: boolean }) {
               type="button"
               className={cls}
               data-testid={`ai-chip-${label.toLowerCase().replace(/[^a-z]+/g, "-")}`}
-              onClick={() => askCopilot(ask ?? undefined)}
+              onClick={() => (ask ? openAgent(ask) : askCopilot())}
             >
               {inner}
             </button>
@@ -184,7 +193,7 @@ export function AiHome({ firstRun = false }: { firstRun?: boolean }) {
       </div>
 
       <p className="mt-3 text-[11px] text-muted-foreground">
-        {composerPrompt} and I&apos;ll turn it into a deal. Nothing is created until you confirm.
+        {composerPrompt} and I&apos;ll turn it into a deal. I ask before I change anything that matters.
       </p>
     </section>
   );

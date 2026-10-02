@@ -30,6 +30,7 @@ describe("basic extraction (brand collaboration)", () => {
     expect(x.fields.amount).toMatchObject({ value: 30000, status: "explicit" });
     expect(x.fields.currency).toMatchObject({ value: "INR", status: "explicit" });
     expect(x.fields.deliverables.display).toBe("3 × Reel (Instagram)");
+    expect(x.fields.amount.display).toBe("INR 30,000");
   });
 
   it("reports exactly what the message does not state", () => {

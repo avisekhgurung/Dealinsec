@@ -40,6 +40,7 @@ function routeTitle(path: string): string {
   const rules: [RegExp, string][] = [
     [/^\/$/, "Home"],
     [/^\/dashboard/, "Dashboard"],
+    [/^\/agent/, "Agent"],
     [/^\/deals\/new/, "Create Deal"],
     [/^\/deals\/[^/]+\/quote/, "Quotation"],
     [/^\/deals\/[^/]+\/edit/, "Edit Deal"],

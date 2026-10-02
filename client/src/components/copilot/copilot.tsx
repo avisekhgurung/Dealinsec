@@ -1,81 +1,26 @@
 /**
- * DealinSec Copilot — the AI deal manager surface.
+ * DealinSec Copilot — the compact entry to the Agent, on every workspace page.
  *
- * Opens with a DAILY BRIEFING, not "how can I help": deterministic
- * intelligence (Money Radar, next best actions) computed server-side from
- * real rows — the model never invents a number. AI is used only to DRAFT
- * words (Payment Chaser) and to answer conversation, and every draft is
- * copy-only: nothing is ever sent on the user's behalf.
+ * It is the same agent as the /agent page (one backend, one history), in a
+ * drawer: it opens with the DAILY BRIEFING — deterministic intelligence
+ * computed server-side from real rows, never invented — and becomes a
+ * conversation as soon as the user asks for something. Every change the agent
+ * proposes arrives as an approval card; nothing is sent to anyone on the user's
+ * behalf.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import {
-  Sparkles, X, SendHorizonal, Loader2, ArrowRight, Check, Bot,
-  AlertTriangle, Clock, Receipt, Copy as CopyIcon, RefreshCw, ShieldCheck,
-} from "lucide-react";
-import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
+import { Sparkles, X, Bot, Maximize2, RotateCcw } from "lucide-react";
+import { getQueryFn } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { useMoney } from "@/hooks/use-locale";
-import { useToast } from "@/hooks/use-toast";
-import { COPILOT_EVENT, takePendingCopilot } from "@/lib/copilot-bus";
-import { DealDraftCard, type DealDraft } from "./deal-draft-card";
-import { AgreementDraftCard, InvoiceDraftCard, type AgreementDraft, type InvoiceDraft } from "./proposal-cards";
 import { useAudience } from "@/hooks/use-audience";
+import { useAgent } from "@/hooks/use-agent";
+import { COPILOT_EVENT, takePendingCopilot } from "@/lib/copilot-bus";
 import { trackEvent } from "@/lib/analytics";
-
-/* ── types mirrored from server/copilot/insights.ts ── */
-interface Briefing {
-  greetingName: string;
-  attentionCount: number;
-  radar: {
-    overdue: { totalMinor: number; count: number; invoices: { id: number; brandName: string; amountMinor: number; daysOverdue: number; invoiceNumber: string }[] };
-    dueThisWeek: { totalMinor: number; count: number; invoices: { id: number; brandName: string; amountMinor: number; dueDate: string; invoiceNumber: string }[] };
-    readyToInvoice: { totalMinor: number; count: number; contracts: { id: number; dealId: number; brandName: string; remainingMinor: number; contractName: string }[] };
-    collectibleMinor: number;
-  };
-  nextActions: { dealId: number; dealTitle: string; brandName: string; action: string; route: string; urgency: "red" | "yellow" | "green" }[];
-}
-
-interface CopilotAction {
-  type: "navigate" | "confirm" | "deal_draft" | "agreement_draft" | "invoice_draft";
-  label: string;
-  to?: string;
-  tool?: string;
-  args?: Record<string, unknown>;
-  /** *_draft: a server-issued, single-use proposal and the card to show. */
-  proposalId?: string;
-  draft?: DealDraft | AgreementDraft | InvoiceDraft;
-}
-
-interface Msg {
-  role: "user" | "assistant";
-  content: string;
-  actions?: CopilotAction[];
-  done?: boolean;
-  /** chaser draft card. `tones` is the retone row, as the server sent it. */
-  chaser?: { invoiceId: number; tone: string; tones: string[] };
-}
-
-/** Only a fallback for a response that lacks `tones`. The real list comes from
- *  the server with every draft, because which tones exist depends on the org's
- *  country (Hinglish is offered to Indian orgs only) and the server is what
- *  enforces it — a second country table here would drift from that one. The
- *  fallback is the set every country gets, so it can never offer a tone the
- *  server would refuse. */
-const UNIVERSAL_TONES = ["Friendly", "Professional", "Firm", "Final reminder"];
-
-const LOADING_STAGES = [
-  "Reviewing your active deals…",
-  "Checking payment status…",
-  "Totalling what's collectible…",
-];
-
-function greeting(): string {
-  const h = new Date().getHours();
-  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-}
+import { AgentConversation } from "@/components/agent/agent-conversation";
+import { BriefingPanel, type Briefing } from "./briefing-panel";
 
 function pageContext(route: string) {
   const dealMatch = route.match(/^\/deals\/(\d+)/);
@@ -87,198 +32,60 @@ function pageContext(route: string) {
   return { page: route.split("/")[1] || "dashboard", route };
 }
 
-/** Rotating staged loading line — intentional, not a generic spinner. */
-function StagedLoading() {
-  const [i, setI] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setI((x) => (x + 1) % LOADING_STAGES.length), 900);
-    return () => clearInterval(id);
-  }, []);
-  return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground py-6 justify-center">
-      <Loader2 className="w-3.5 h-3.5 animate-spin" /> {LOADING_STAGES[i]}
-    </div>
-  );
-}
-
 export function Copilot() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const account = useAudience();
   const { money } = useMoney();
-  const { toast } = useToast();
   const [location, setLocation] = useLocation();
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Msg[]>([]);
-  const [input, setInput] = useState("");
-  const [busy, setBusy] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const ctx = useMemo(() => pageContext(location), [location]);
+  const agent = useAgent({
+    context: { page: ctx.page, route: ctx.route, dealId: ctx.entityType === "deal" ? ctx.entityId : undefined },
+  });
+  const onAgentPage = location.startsWith("/agent");
 
-  const { data: briefing, isLoading: briefingLoading, refetch: refetchBriefing } = useQuery<Briefing>({
+  const { data: briefing, isLoading: briefingLoading } = useQuery<Briefing>({
     queryKey: ["/api/copilot/briefing"],
     queryFn: getQueryFn({ on401: "returnNull" }) as any,
-    enabled: isAuthenticated && open,
+    enabled: isAuthenticated && open && agent.messages.length === 0,
     staleTime: 60_000,
   });
 
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, busy]);
+  useEffect(() => { if (open) trackEvent("agent_opened", { surface: "drawer" }); }, [open]);
 
-  // The dashboard composer and quick-action chips hand work over through
-  // copilot-bus. This component is code-split, so a request made before it
-  // mounted is waiting there: take it on mount as well as on the event.
-  const sendRef = useRef<(text: string) => void>(() => {});
+  // The dashboard's "Daily Briefing" chip hands over through copilot-bus. This
+  // component is code-split, so a request made before it mounted is waiting
+  // there: take it on mount as well as on the event.
   useEffect(() => {
     const take = () => {
       const req = takePendingCopilot();
       if (!req) return;
       setOpen(true);
-      if (req.message) sendRef.current(req.message);
+      if (req.message) void agent.send(req.message);
     };
     take();
     window.addEventListener(COPILOT_EVENT, take);
     return () => window.removeEventListener(COPILOT_EVENT, take);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!isAuthenticated) return null;
+  // The full page is the same conversation; two live copies would only confuse.
+  useEffect(() => { if (onAgentPage) setOpen(false); }, [onAgentPage]);
+
+  if (!isAuthenticated || onAgentPage) return null;
 
   const go = (to: string) => {
     setOpen(false);
     setLocation(to);
   };
 
-  const send = async (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed || busy) return;
-    const next: Msg[] = [...messages, { role: "user", content: trimmed }];
-    setMessages(next);
-    setInput("");
-    setBusy(true);
-    try {
-      const res = await apiRequest("POST", "/api/copilot/chat", {
-        messages: next.filter((m) => !m.chaser).map(({ role, content }) => ({ role, content })).slice(-16),
-        context: ctx,
-      });
-      const data = await res.json();
-      setMessages((cur) => [...cur, { role: "assistant", content: data.reply, actions: data.actions }]);
-      // A drafted deal is the completed reading of a pasted message. Only the fact
-      // that it happened is sent, never what was pasted.
-      if (Array.isArray(data.actions) && data.actions.some((a: { type?: string }) => a?.type === "deal_draft")) {
-        trackEvent("ai_deal_analysis_completed", { source: "copilot" });
-      }
-    } catch {
-      setMessages((cur) => [...cur, { role: "assistant", content: "I couldn't complete that right now. Please try again." }]);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  sendRef.current = send;
-
-  const draftChaser = async (invoiceId: number, tone: string) => {
-    if (busy) return;
-    setBusy(true);
-    setMessages((cur) => [
-      ...cur.filter((m) => !(m.chaser && m.chaser.invoiceId === invoiceId)),
-      { role: "user", content: `Prepare a ${tone.toLowerCase()} payment follow-up` },
-    ]);
-    try {
-      const res = await apiRequest("POST", "/api/copilot/chaser", { invoiceId, tone });
-      const data = await res.json();
-      // Label the card with the tone the server actually drafted in — it
-      // downgrades a tone this org isn't offered to Professional.
-      const tones: string[] = Array.isArray(data.tones) ? data.tones : UNIVERSAL_TONES;
-      const drafted = typeof data.tone === "string" ? data.tone : tone;
-      setMessages((cur) => [...cur, { role: "assistant", content: data.message, chaser: { invoiceId, tone: drafted, tones } }]);
-      trackEvent("payment_followup_created", { tone: drafted });
-    } catch {
-      setMessages((cur) => [...cur, { role: "assistant", content: "Couldn't draft that message right now — try again in a moment." }]);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // Edit hands the validated draft to the ordinary deal form, prefilled.
-  const editDraft = (draft: DealDraft) => {
-    try {
-      sessionStorage.setItem("dis_deal_prefill", JSON.stringify(draft.prefill));
-    } catch { /* private mode: the form just opens empty */ }
-    go("/deals/new");
-  };
-
-  // Add a server-suggested term to the draft (changes the draft only).
-  const [fixingId, setFixingId] = useState<string | null>(null);
-  const addTerm = async (msgIndex: number, actionIndex: number, proposalId: string, flagId: string) => {
-    if (fixingId) return;
-    setFixingId(flagId);
-    // Acting on a finding; the finding's id is a fixed label, not user text.
-    trackEvent("protection_issue_opened", { finding: flagId, surface: "draft_card" });
-    try {
-      const res = await apiRequest("POST", `/api/copilot/proposal/${proposalId}/add-term`, { flagId });
-      const data = await res.json();
-      if (data.ok && data.draft) {
-        setMessages((cur) => cur.map((m, i) => i !== msgIndex ? m : {
-          ...m,
-          actions: m.actions?.map((a, j) => j === actionIndex ? { ...a, draft: data.draft } : a),
-        }));
-      } else {
-        toast({ title: data.message ?? "Couldn't add that term." });
-      }
-    } catch {
-      toast({ title: "That draft has expired. Ask me again and I'll prepare it." });
-    } finally {
-      setFixingId(null);
-    }
-  };
-
-  // A synchronous lock: two clicks in the same tick both see busy=false.
-  const confirmLock = useRef(false);
-  const runConfirm = async (msgIndex: number, action: CopilotAction) => {
-    if (busy || confirmLock.current) return;
-    confirmLock.current = true;
-    setBusy(true);
-    try {
-      const res = await apiRequest(
-        "POST",
-        "/api/copilot/execute",
-        action.proposalId ? { proposalId: action.proposalId } : { tool: action.tool, args: action.args },
-      );
-      const data = await res.json();
-      // A confirmed mutation changed real data — refresh the app's views.
-      if (data.ok) {
-        queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      }
-      setMessages((cur) => {
-        const copy = [...cur];
-        copy[msgIndex] = { ...copy[msgIndex], done: true };
-        return [...copy, {
-          role: "assistant",
-          content: data.message ?? (data.ok ? "Done!" : "That didn't work."),
-          actions: data.ok && data.route ? [{ type: "navigate", label: "Open it", to: data.route }] : undefined,
-        }];
-      });
-    } catch {
-      setMessages((cur) => [...cur, { role: "assistant", content: "That didn't work — your role may not allow it." }]);
-    } finally {
-      confirmLock.current = false;
-      setBusy(false);
-    }
-  };
-
-  const quickPrompts =
+  const contextPrompts =
     ctx.entityType === "deal"
-      ? ["What should I do next on this deal?", "Is this deal healthy?", "Summarise this deal"]
+      ? ["What should I do next on this deal?", "Run the Protection Check on this deal", "What's the payment status?"]
       : ctx.entityType === "invoice"
         ? ["Is this invoice overdue?", "Prepare a payment reminder"]
-        : [`Create a deal — I'll paste the ${account.partyLower} chat`, `Which ${account.partyLower}s owe me money?`, "What can I invoice today?", "Show my pending work"];
-
-  const radar = briefing?.radar;
-  const allClear = briefing && briefing.attentionCount === 0;
-  const worstOverdue = radar?.overdue.invoices[0];
+        : [];
 
   return (
     <>
@@ -292,7 +99,7 @@ export function Copilot() {
           type="button"
           onClick={() => setOpen(true)}
           data-testid="copilot-button"
-          aria-label="Open DealinSec Copilot"
+          aria-label="Open DealinSec Agent"
           className="fixed z-40 bottom-20 right-4 lg:bottom-6 lg:right-6 flex items-center gap-2 rounded-full pl-3.5 pr-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/30 hover:shadow-emerald-600/45 hover:-translate-y-0.5 transition-all"
           style={{ background: "linear-gradient(135deg, #10B981 0%, #059669 55%, #0D9488 100%)" }}
         >
@@ -309,9 +116,8 @@ export function Copilot() {
           className="fixed z-[60] inset-0 sm:inset-auto sm:bottom-4 sm:right-4 sm:w-[420px] sm:h-[640px] sm:max-h-[calc(100vh-2rem)] flex flex-col sm:rounded-2xl border-0 sm:border sm:border-border bg-background shadow-2xl overflow-hidden animate-fade-in"
           data-testid="copilot-drawer"
           role="dialog"
-          aria-label="DealinSec Copilot"
+          aria-label="DealinSec Agent"
         >
-          {/* Header */}
           <div
             className="flex items-center gap-2.5 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:pt-3 text-white shrink-0"
             style={{ background: "linear-gradient(135deg, hsl(160 84% 22%) 0%, hsl(174 70% 26%) 100%)" }}
@@ -320,13 +126,23 @@ export function Copilot() {
               <Bot className="w-[18px] h-[18px]" />
             </span>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold leading-tight">DealinSec Copilot</p>
-              <p className="text-[11px] text-emerald-100/80 leading-tight">Your deal intelligence</p>
+              <p className="text-sm font-bold leading-tight">DealInSec Agent</p>
+              <p className="text-[11px] text-emerald-100/80 leading-tight">Your deals, handled in one conversation</p>
             </div>
+            {agent.messages.length > 0 && (
+              <button type="button" onClick={agent.reset} aria-label="New conversation" data-testid="copilot-new"
+                className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/15 transition-colors">
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            )}
+            <Link href={agent.sessionId ? `/agent/${agent.sessionId}` : "/agent"} onClick={() => setOpen(false)} aria-label="Open the full Agent page" data-testid="copilot-expand"
+              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/15 transition-colors">
+              <Maximize2 className="w-4 h-4" />
+            </Link>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="Close Copilot"
+              aria-label="Close"
               data-testid="copilot-close"
               className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/15 transition-colors"
             >
@@ -334,239 +150,32 @@ export function Copilot() {
             </button>
           </div>
 
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-3.5 py-4 space-y-3">
-            {/* ── Daily briefing (deterministic) ── */}
-            {briefingLoading && <StagedLoading />}
-
-            {briefing && (
-              <div className="space-y-2.5" data-testid="copilot-briefing">
-                <p className="text-sm font-semibold px-0.5">
-                  {greeting()}, {briefing.greetingName} 👋
-                </p>
-                <p className="text-xs text-muted-foreground px-0.5 -mt-1.5">
-                  {allClear
-                    ? "I've reviewed your deals — everything looks protected."
-                    : `I've reviewed your active deals. ${briefing.attentionCount} thing${briefing.attentionCount !== 1 ? "s" : ""} need${briefing.attentionCount === 1 ? "s" : ""} your attention.`}
-                </p>
-
-                {allClear && (
-                  <div className="rounded-xl border border-emerald-300/50 dark:border-emerald-800/50 bg-emerald-500/[0.05] p-3.5 flex items-center gap-3">
-                    <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0" />
-                    <p className="text-xs text-muted-foreground">
-                      No overdue payments, nothing waiting to be invoiced. Create your next deal and I'll watch it end to end.
-                    </p>
-                  </div>
-                )}
-
-                {radar && radar.overdue.count > 0 && (
-                  <div className="rounded-xl border border-rose-300/50 dark:border-rose-900/50 bg-rose-500/[0.05] p-3.5" data-testid="briefing-overdue">
-                    <div className="flex items-center gap-2 mb-1">
-                      <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
-                      <p className="text-sm font-bold text-rose-600 dark:text-rose-400 tabular-nums">{money(radar.overdue.totalMinor)} overdue</p>
-                    </div>
-                    {worstOverdue && (
-                      <p className="text-xs text-muted-foreground mb-2.5">
-                        {worstOverdue.brandName} · {worstOverdue.invoiceNumber} · {worstOverdue.daysOverdue} day{worstOverdue.daysOverdue !== 1 ? "s" : ""} overdue
-                        {radar.overdue.count > 1 ? ` · +${radar.overdue.count - 1} more` : ""}
-                      </p>
-                    )}
-                    <div className="flex flex-wrap gap-1.5">
-                      {worstOverdue && (
-                        <Button size="sm" className="h-7 text-xs font-bold gradient-btn text-white" onClick={() => draftChaser(worstOverdue.id, "Professional")} data-testid="briefing-chaser">
-                          Prepare Follow-up
-                        </Button>
-                      )}
-                      <Button size="sm" variant="outline" className="h-7 text-xs font-semibold" onClick={() => go("/invoices")}>
-                        View invoices
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {radar && radar.readyToInvoice.count > 0 && (
-                  <div className="rounded-xl border border-emerald-300/50 dark:border-emerald-800/50 bg-emerald-500/[0.05] p-3.5" data-testid="briefing-ready">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Receipt className="w-4 h-4 text-emerald-500 shrink-0" />
-                      <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">{money(radar.readyToInvoice.totalMinor)} ready to invoice</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground mb-2.5">
-                      {radar.readyToInvoice.count} signed agreement{radar.readyToInvoice.count !== 1 ? "s" : ""} with uninvoiced value
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {radar.readyToInvoice.contracts.slice(0, 2).map((c) => (
-                        <Button key={c.id} size="sm" variant="outline" className="h-7 text-xs font-semibold border-emerald-300/60 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300" onClick={() => go(`/contracts/${c.id}`)}>
-                          {c.brandName}: {money(c.remainingMinor)} <ArrowRight className="w-3 h-3 ml-1" />
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {radar && radar.dueThisWeek.count > 0 && (
-                  <div className="rounded-xl border border-amber-300/50 dark:border-amber-900/50 bg-amber-500/[0.05] p-3.5" data-testid="briefing-due">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Clock className="w-4 h-4 text-amber-500 shrink-0" />
-                      <p className="text-sm font-bold text-amber-600 dark:text-amber-400 tabular-nums">{money(radar.dueThisWeek.totalMinor)} due this week</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {radar.dueThisWeek.invoices.slice(0, 2).map((i) => i.brandName).join(", ")}
-                      {radar.dueThisWeek.count > 2 ? ` +${radar.dueThisWeek.count - 2} more` : ""} — watching these for you.
-                    </p>
-                  </div>
-                )}
-
-                {briefing.nextActions.length > 0 && (
-                  <div className="rounded-xl border border-border/60 p-3.5">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Next best actions</p>
-                    <ul className="space-y-1.5">
-                      {briefing.nextActions.slice(0, 3).map((a) => (
-                        <li key={a.dealId}>
-                          <button type="button" onClick={() => go(a.route)} className="w-full text-left flex items-center gap-2 text-xs rounded-lg px-2 py-1.5 -mx-2 hover:bg-muted/60 transition-colors group">
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${a.urgency === "red" ? "bg-rose-500" : a.urgency === "yellow" ? "bg-amber-500" : "bg-emerald-500"}`} />
-                            <span className="flex-1 min-w-0 truncate"><b className="font-semibold">{a.brandName}:</b> {a.action}</span>
-                            <ArrowRight className="w-3 h-3 text-muted-foreground/50 group-hover:text-foreground shrink-0" />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+          <AgentConversation
+            agent={agent}
+            compact
+            extraPrompts={contextPrompts}
+            emptyState={
+              <div className="space-y-3" data-testid="copilot-empty">
+                <BriefingPanel
+                  briefing={briefing}
+                  loading={briefingLoading}
+                  money={money}
+                  go={go}
+                  onFollowUp={(invoiceNumber) => agent.send(`Prepare a professional payment follow-up for invoice ${invoiceNumber}`)}
+                />
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {[...contextPrompts, `Which ${account.partyLower}s owe me money?`, "What can I invoice today?", "Show my pending work"].slice(0, 4).map((q) => (
+                    <button key={q} type="button" onClick={() => agent.send(q)}
+                      className="text-xs font-medium px-2.5 py-1.5 rounded-full border border-emerald-300/60 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 transition-colors">
+                      {q}
+                    </button>
+                  ))}
+                </div>
               </div>
-            )}
-
-            {/* ── Conversation ── */}
-            {messages.length === 0 && briefing && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {quickPrompts.map((q) => (
-                  <button key={q} type="button" onClick={() => send(q)} className="text-xs font-medium px-2.5 py-1.5 rounded-full border border-emerald-300/60 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 transition-colors">
-                    {q}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {messages.map((m, i) => (
-              <div key={i}>
-                <Bubble msg={m} onCopy={() => {
-                  navigator.clipboard?.writeText(m.content).then(() => toast({ title: "Copied — paste it into WhatsApp or email" }), () => {});
-                }} onRetone={(tone) => m.chaser && draftChaser(m.chaser.invoiceId, tone)} />
-                {m.role === "assistant" && m.actions?.map((a, j) => {
-                  if (a.type === "deal_draft" && a.draft && a.proposalId) {
-                    return (
-                      <DealDraftCard
-                        key={`draft-${j}`}
-                        draft={a.draft as DealDraft}
-                        done={!!m.done}
-                        busy={busy}
-                        fixingId={fixingId}
-                        onCreate={() => runConfirm(i, a)}
-                        onEdit={() => editDraft(a.draft as DealDraft)}
-                        onAddTerm={(flagId) => addTerm(i, j, a.proposalId!, flagId)}
-                      />
-                    );
-                  }
-                  if (a.type === "agreement_draft" && a.draft && a.proposalId) {
-                    return <AgreementDraftCard key={`draft-${j}`} draft={a.draft as AgreementDraft} done={!!m.done} busy={busy} onCreate={() => runConfirm(i, a)} />;
-                  }
-                  if (a.type === "invoice_draft" && a.draft && a.proposalId) {
-                    return <InvoiceDraftCard key={`draft-${j}`} draft={a.draft as InvoiceDraft} done={!!m.done} busy={busy} onCreate={() => runConfirm(i, a)} />;
-                  }
-                  return null;
-                })}
-                {m.role === "assistant" && !!m.actions?.some((a) => !a.type.endsWith("_draft")) && (
-                  <div className="flex flex-wrap gap-1.5 mt-1.5 pl-9">
-                    {m.actions.map((a, j) =>
-                      a.type === "navigate" && a.to ? (
-                        <Button key={j} size="sm" variant="outline" className="h-7 text-xs font-semibold border-emerald-300/60 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300" onClick={() => go(a.to!)}>
-                          {a.label} <ArrowRight className="w-3 h-3 ml-1" />
-                        </Button>
-                      ) : a.type === "confirm" ? (
-                        <Button key={j} size="sm" disabled={m.done || busy} className="h-7 text-xs font-bold gradient-btn text-white" onClick={() => runConfirm(i, a)} data-testid="copilot-confirm">
-                          {m.done ? <Check className="w-3 h-3 mr-1" /> : <Sparkles className="w-3 h-3 mr-1 text-amber-300" />}
-                          {m.done ? "Done" : a.label}
-                        </Button>
-                      ) : null,
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-            {busy && <StagedLoading />}
-          </div>
-
-          {/* Composer */}
-          <form
-            className="flex items-center gap-2 border-t border-border px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shrink-0 bg-background"
-            onSubmit={(e) => { e.preventDefault(); send(input); }}
-          >
-            <input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about your deals…"
-              maxLength={1000}
-              data-testid="copilot-input"
-              className="flex-1 h-10 rounded-xl border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-            />
-            <Button type="submit" size="icon" disabled={busy || !input.trim()} aria-label="Send" data-testid="copilot-send" className="h-10 w-10 rounded-xl gradient-btn text-white shrink-0">
-              <SendHorizonal className="w-4 h-4" />
-            </Button>
-          </form>
+            }
+          />
         </div>
       )}
     </>
-  );
-}
-
-function Bubble({ msg, onCopy, onRetone }: {
-  msg: Msg;
-  onCopy: () => void;
-  onRetone: (tone: string) => void;
-}) {
-  if (msg.role === "user") {
-    return (
-      <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-md px-3.5 py-2 text-sm text-white whitespace-pre-wrap" style={{ background: "linear-gradient(135deg, #059669, #0D9488)" }}>
-          {msg.content}
-        </div>
-      </div>
-    );
-  }
-  if (msg.chaser) {
-    return (
-      <div className="flex items-start gap-2">
-        <span className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-          <Sparkles className="w-3.5 h-3.5" />
-        </span>
-        <div className="flex-1 min-w-0 rounded-2xl rounded-tl-md border border-border/70 overflow-hidden">
-          <div className="px-3.5 py-2 bg-muted/50 flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              AI-drafted · {msg.chaser.tone} · review before sending
-            </span>
-          </div>
-          <p className="px-3.5 py-2.5 text-sm whitespace-pre-wrap">{msg.content}</p>
-          <div className="px-3.5 pb-2.5 flex flex-wrap items-center gap-1.5">
-            <Button size="sm" className="h-7 text-xs font-bold gradient-btn text-white" onClick={onCopy} data-testid="chaser-copy">
-              <CopyIcon className="w-3 h-3 mr-1" /> Copy
-            </Button>
-            {msg.chaser.tones.filter((t) => t !== msg.chaser!.tone).map((t) => (
-              <button key={t} type="button" onClick={() => onRetone(t)} className="text-[11px] font-medium px-2 py-1 rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors inline-flex items-center gap-1">
-                <RefreshCw className="w-2.5 h-2.5" /> {t}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="flex items-start gap-2">
-      <span className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-        <Sparkles className="w-3.5 h-3.5" />
-      </span>
-      <div className="max-w-[85%] rounded-2xl rounded-tl-md px-3.5 py-2 text-sm bg-muted/70 text-foreground whitespace-pre-wrap">
-        {msg.content.split(/\*\*([^*]+)\*\*/g).map((part, i) => (i % 2 === 1 ? <b key={i}>{part}</b> : part))}
-      </div>
-    </div>
   );
 }

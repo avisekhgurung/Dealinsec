@@ -206,6 +206,12 @@ export function normalizeExtraction(raw: unknown, source: string, audience: Audi
     fields.currency = { ...fields.currency, value: code, display: code, status: "explicit", evidence: firstMentionSnippet(source) };
   }
 
+  // An amount reads with its currency: "INR 30,000", not a bare "30,000".
+  const code = fields.currency.status === "explicit" ? (fields.currency.value as string) : null;
+  if (code && fields.amount.value != null && typeof fields.amount.value === "number") {
+    fields.amount = { ...fields.amount, display: `${code} ${fields.amount.value.toLocaleString("en-US", { maximumFractionDigits: 2 })}` };
+  }
+
   const important = IMPORTANT_FIELDS[audience];
   return {
     fields,
