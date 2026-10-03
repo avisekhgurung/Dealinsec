@@ -30,6 +30,8 @@ export interface World {
   storage: Record<string, (...a: any[]) => any>;
   /** The lead pipeline's store (same semantics as the database one). */
   leads: FakeLeadsStore;
+  /** orgId -> the ideal-client row. */
+  profiles: Map<string, Row>;
 }
 
 export const ORG1 = "org-1";
@@ -56,6 +58,7 @@ export function createWorld(): World {
     readOnly: false,
     storage: {},
     leads: new FakeLeadsStore(() => w.readOnly),
+    profiles: new Map(),
   };
   let id = 100;
   const nextId = () => ++id;
@@ -116,6 +119,12 @@ export function seedDeal(w: World, over: Row = {}): Row {
 /** A lead in the given organization (default: the first), in any stage. */
 export function seedLead(w: World, over: Record<string, any> = {}, orgId = ORG1) {
   return w.leads.seed(orgId, over);
+}
+/** An ideal-client profile for the given organization (default: the first). */
+export function seedProfile(w: World, over: Record<string, any> = {}, orgId = ORG1) {
+  const row = { organizationId: orgId, about: null, services: [], targetIndustries: [], targetLocations: [], exclusions: [], minDealMinor: null, currency: null, updatedBy: "u1", updatedAt: new Date(), ...over };
+  w.profiles.set(orgId, row);
+  return row;
 }
 export function seedQuote(w: World, dealId: number, over: Row = {}): Row {
   const row = { id: 500 + w.quotes.length, userId: "u1", organizationId: ORG1, dealId, status: "draft", version: 1, shareToken: null, shareRevokedAt: null, acceptedAt: null, sharedAt: null, ...over };

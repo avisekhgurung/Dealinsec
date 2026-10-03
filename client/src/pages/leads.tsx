@@ -6,9 +6,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ChevronRight, FileUp, Plus, Search, Target, X } from "lucide-react";
+import { ChevronRight, Crosshair, FileUp, Plus, Search, Target, X } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
+import { IdealClientDialog } from "@/components/leads/ideal-client-dialog";
 import { LeadFormDialog } from "@/components/leads/lead-form-dialog";
 import { LeadImportDialog } from "@/components/leads/lead-import-dialog";
 import { FollowUpsPanel } from "@/components/leads/follow-ups";
@@ -20,7 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { useMoney } from "@/hooks/use-locale";
 import { cn } from "@/lib/utils";
-import { LEAD_STATUSES, dateLabel, isOverdue, listUrl, stageLabel, type LeadList, type LeadRowView } from "@/lib/leads";
+import { IDEAL_CLIENT_URL, LEAD_STATUSES, dateLabel, hasCriteria, isOverdue, listUrl, profileNotSetUp, stageLabel, type IdealClientResponse, type LeadList, type LeadRowView } from "@/lib/leads";
 import { formatMoney } from "@/lib/format";
 import { memberCan } from "@shared/permissions";
 
@@ -50,6 +51,8 @@ export default function LeadsPage() {
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [idealOpen, setIdealOpen] = useState(false);
+  const ideal = useQuery<IdealClientResponse>({ queryKey: [IDEAL_CLIENT_URL] });
 
   const url = listUrl({ status, q: search });
   const { data, isLoading, error } = useQuery<LeadList>({ queryKey: [url] });
@@ -87,6 +90,18 @@ export default function LeadsPage() {
       </header>
 
       <main className="animate-fade-in space-y-4 px-4 py-5 lg:mx-auto lg:max-w-[1600px] lg:space-y-5 lg:px-8 lg:py-6">
+        {!profileNotSetUp(ideal.error) && ideal.data && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-2xl border border-border bg-background px-4 py-2.5 text-sm" data-testid="ideal-client-line">
+            <Crosshair className="h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-400" />
+            <span className="min-w-0 flex-1 break-words text-muted-foreground">
+              {hasCriteria(ideal.data.profile)
+                ? <>Looking for: <span className="font-medium text-foreground">{[...ideal.data.profile.targetIndustries, ...ideal.data.profile.targetLocations].join(", ") || "any client"}</span>{ideal.data.profile.minDealMinor && ideal.data.profile.currency ? <> · from {formatMoney(ideal.data.profile.minDealMinor, ideal.data.profile.currency, locale)}</> : null}</>
+                : "Tell us who you want to win, and each lead is checked against it."}
+            </span>
+            {canEdit && <Button variant="ghost" size="sm" className="h-8" onClick={() => setIdealOpen(true)} data-testid="button-ideal-client">{hasCriteria(ideal.data.profile) ? "Edit" : "Set ideal client"}</Button>}
+          </div>
+        )}
+
         <FollowUpsPanel />
 
         {/* Stage filter: scrolls sideways inside itself, never the page. */}
@@ -165,6 +180,7 @@ export default function LeadsPage() {
 
       <LeadFormDialog open={addOpen} onOpenChange={setAddOpen} />
       <LeadImportDialog open={importOpen} onOpenChange={setImportOpen} />
+      <IdealClientDialog open={idealOpen} onOpenChange={setIdealOpen} />
       <BottomNav />
     </div>
   );

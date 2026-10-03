@@ -31,6 +31,20 @@ export const leadsStoreMock = () => ({
   leadsTablesReady: async () => true,
 });
 
+/** The ideal-client store: the world's map, behind the module name the service imports. */
+export const profileStoreMock = () => ({
+  profileTableReady: async () => true,
+  profileStore: {
+    get: async (orgId: string) => { const r = world().profiles.get(orgId); return r ? { ...r } : null; },
+    save: async (orgId: string, data: Record<string, any>, userId: string) => {
+      if (world().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL");
+      const row = { organizationId: orgId, ...data, updatedBy: userId, updatedAt: new Date() };
+      world().profiles.set(orgId, row);
+      return { ...row };
+    },
+  },
+});
+
 export const entitlementsMock = () => ({
   getBillingUser: async (u: any) =>
     world().billing.get(u.organizationId) ?? { id: u.id, plan: "pro", planExpiresAt: new Date(Date.now() + 365 * 86_400_000) },

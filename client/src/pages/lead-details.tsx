@@ -9,6 +9,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useRoute } from "wouter";
 import { ArrowLeft, Archive, Check, ExternalLink, Handshake, Pencil } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
+import { FitCard } from "@/components/leads/fit-card";
 import { LeadFormDialog } from "@/components/leads/lead-form-dialog";
 import { StageBadge } from "@/components/leads/stage-badge";
 import { Button } from "@/components/ui/button";
@@ -192,7 +193,8 @@ export default function LeadDetailsPage() {
             <TabsTrigger value="timeline" data-testid="tab-timeline">Timeline</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="mt-4">
+          <TabsContent value="overview" className="mt-4 space-y-3">
+            <FitCard leadId={lead.id} />
             <Card className="glass-card"><CardContent className="grid gap-x-4 gap-y-3 p-4 sm:grid-cols-2">
               <Fact label="Website">{lead.website ? <a className="inline-flex items-center gap-1 text-primary hover:underline" href={safeHref(lead.website) ?? `https://${lead.website}`} target="_blank" rel="noopener noreferrer">{lead.website}<ExternalLink className="h-3 w-3" /></a> : "—"}</Fact>
               <Fact label="Estimated value">{value ?? "—"}</Fact>

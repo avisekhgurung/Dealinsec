@@ -8,32 +8,11 @@ import { db } from "../db";
 import { leadClaims, leadEvents, leads, leadTickets, type Lead, type LeadClaim, type LeadTicket } from "@shared/schema";
 import type { LeadStatus } from "@shared/leads";
 import { OPEN_STATUSES } from "@shared/leads";
+import { tablesReadyCheck } from "./ready";
 import { LeadConflictError, type DueTicket, type LeadDetail, type LeadPatch, type LeadRow, type LeadsStore, type ListOptions, type NewLead } from "./types";
 
-const TABLES = ["leads", "lead_events", "lead_tickets", "lead_claims"];
-
-/** Are the lead tables there? Same shape as agentTablesReady: positive is cached, a negative is rechecked every 30s, concurrent callers share one check. */
-let ready = false;
-let lastCheck = 0;
-let inflight: Promise<boolean> | null = null;
-export function leadsTablesReady(): Promise<boolean> {
-  if (ready) return Promise.resolve(true);
-  if (inflight) return inflight;
-  if (lastCheck && Date.now() - lastCheck < 30_000) return Promise.resolve(false);
-  inflight = (async () => {
-    try {
-      const r = await db.execute(sql`
-        SELECT count(*)::int AS n FROM information_schema.tables
-        WHERE table_schema = current_schema() AND table_name IN (${sql.join(TABLES.map((t) => sql`${t}`), sql`, `)})`);
-      ready = Number((r.rows?.[0] as any)?.n) === TABLES.length;
-      return ready;
-    } finally {
-      lastCheck = Date.now();
-      inflight = null;
-    }
-  })();
-  return inflight;
-}
+/** Are the lead tables there? (see ./ready.ts) */
+export const leadsTablesReady = tablesReadyCheck(["leads", "lead_events", "lead_tickets", "lead_claims"]);
 
 const own = (orgId: string, id: number) => and(eq(leads.organizationId, orgId), eq(leads.id, id));
 const isUniqueViolation = (e: unknown) => (e as { code?: string })?.code === "23505";

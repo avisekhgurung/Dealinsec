@@ -21,6 +21,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../storage", async () => (await import("./world-mocks")).storageMock());
 vi.mock("../../entitlements", async () => (await import("./world-mocks")).entitlementsMock());
 vi.mock("../../emails", async () => (await import("./world-mocks")).emailsMock());
+vi.mock("../../leads/profile-store", async () => (await import("./world-mocks")).profileStoreMock());
 vi.mock("../../leads/store", async () => (await import("./world-mocks")).leadsStoreMock());
 vi.mock("../../routes", async () => (await import("./world-mocks")).routesMock());
 vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")).scriptedProviderMock(orig as () => Promise<any>));
@@ -429,7 +430,7 @@ describe("cross-cutting guarantees", () => {
       get_account_status: {}, get_money_radar: {}, get_deal_health: { dealId: deal.id }, get_recent_activity: {}, get_deal: { dealId: deal.id },
       get_quotation: { dealId: deal.id }, get_agreement: { dealId: deal.id }, get_invoice: { invoiceId: inv.id }, get_payment_status: {},
       draft_payment_followup: { invoiceId: inv.id }, run_protection_check: { dealId: deal.id },
-      list_leads: {}, get_lead: { leadId: lead.id }, get_lead_followups: {},
+      list_leads: {}, get_lead: { leadId: lead.id }, get_lead_followups: {}, get_ideal_client: {}, assess_lead_fit: { leadId: lead.id },
     };
     const reads = AGENT_TOOLS.filter((t) => t.risk === "READ_ONLY" && t.name !== "analyze_deal_message");
     expect(reads.map((t) => t.name).sort()).toEqual(Object.keys(args).sort());

@@ -1240,3 +1240,22 @@ export function recordNo(kind: keyof typeof RECORD_PREFIX, id: number | string):
   const n = Number(id);
   return `${RECORD_PREFIX[kind]}-${Number.isFinite(n) ? String(n).padStart(4, "0") : id}`;
 }
+
+
+// The ideal client: what the organization sells and to whom. One row per
+// organization, all optional, nothing inferred. The fit check that uses it is
+// pure (shared/fit.ts). A missing table switches only this feature off.
+export const clientProfiles = pgTable("client_profiles", {
+  organizationId: varchar("organization_id").primaryKey(),
+  about: text("about"),
+  services: jsonb("services").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  targetIndustries: jsonb("target_industries").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  targetLocations: jsonb("target_locations").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  exclusions: jsonb("exclusions").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  /** MINOR units of `currency`, like every amount in the app. */
+  minDealMinor: bigint("min_deal_minor", { mode: "number" }),
+  currency: varchar("currency", { length: 3 }),
+  updatedBy: varchar("updated_by").notNull(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+export type ClientProfileRow = typeof clientProfiles.$inferSelect;

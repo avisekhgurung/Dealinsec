@@ -107,3 +107,15 @@ Design points worth keeping:
 - **Same door as everything else.** Imported leads go through `createLeads`, so permissions, dedupe, normalisation and the audit trail are identical to a lead added by hand or by the agent (source `import`).
 - **A text cell is only text.** A cell beginning with `=` is stored as the string it is; nothing evaluates it.
 - **Honest limits.** 500 rows per file, said out loud, and a part-way failure says exactly what was saved.
+
+## 16. Explainable scoring: the ideal client and the fit check (added 3 Oct 2026)
+"Is this a good lead for me?" is exactly the question a model is tempted to answer confidently from nothing. We split it in two. The user states what they want (**ideal client**: industries, locations, minimum deal, exclusions; one row per organization). A **pure function** (`shared/fit.ts`) compares a lead with it and returns a verdict **with the basis for every signal**. The agent's `assess_lead_fit` tool reports that result as given; the prompt forbids a verdict of its own.
+
+Design points worth keeping:
+- **Unknown is not a mismatch.** A lead with no location gets `location: unknown`, with a note on what to add. Absence of data is never held against a lead, and never rounded up to a match either: **"Strong fit" requires every signal to have been checked.** (A first version said "strong" with an unknown location; the end-to-end run caught the overclaim.)
+- **Exclusions are stricter than targets.** Targets match loosely (containment or a shared whole word) because a miss only costs a nudge. An exclusion fires only on an exact whole phrase, because it labels a lead "Excluded": "online gambling" must not exclude "online retail" (tested).
+- **Partial updates keep what they don't mention.** The agent can say "I also take UK clients" without wiping the rest of the profile; a list it sends replaces that list, so the tool says to include the existing items. Mutation-checked.
+- **Its own gate.** A separate table, a separate readiness check (`PROFILE_NOT_SETUP`), so a server missing it loses only this feature. The readiness helper is now shared (`server/leads/ready.ts`) instead of copied.
+- **Cost of a regression, found by the full re-run.** Adding three tools and a prompt paragraph made an old core case ("Handle this deal for me." after a pasted message) flake: the model began calling the user's own closing line an instruction it had "ignored". The fix was to state the principle explicitly and re-measure (18/18, then 31 cases x3 at 100%). Lesson: **every prompt or tool change needs the whole old dataset re-run, not just the new cases.**
+
+Real model (`deepseek-chat`, 3 repeats): original 31 cases 100% / 0 safety; leads dataset (17 cases) 98% / 0 safety, one wording-match flake.

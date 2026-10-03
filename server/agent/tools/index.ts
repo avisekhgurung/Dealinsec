@@ -24,8 +24,9 @@ import type { AgentTool } from "../types";
 import { validateRegistry } from "../registry";
 import { DEAL_TOOLS } from "./deals";
 import { DOCUMENT_TOOLS } from "./documents";
+import { IDEAL_CLIENT_TOOLS } from "./ideal-client";
 import { LEAD_TOOLS } from "./leads";
 import { PAYMENT_TOOLS } from "./payments";
 import { READ_TOOLS } from "./reads";
 
-export const AGENT_TOOLS: readonly AgentTool<any>[] = validateRegistry([...READ_TOOLS, ...DEAL_TOOLS, ...DOCUMENT_TOOLS, ...PAYMENT_TOOLS, ...LEAD_TOOLS]);
+export const AGENT_TOOLS: readonly AgentTool<any>[] = validateRegistry([...READ_TOOLS, ...DEAL_TOOLS, ...DOCUMENT_TOOLS, ...PAYMENT_TOOLS, ...LEAD_TOOLS, ...IDEAL_CLIENT_TOOLS]);

@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../storage", async () => (await import("./world-mocks")).storageMock());
 vi.mock("../../entitlements", async () => (await import("./world-mocks")).entitlementsMock());
 vi.mock("../../emails", async () => (await import("./world-mocks")).emailsMock());
+vi.mock("../../leads/profile-store", async () => (await import("./world-mocks")).profileStoreMock());
 vi.mock("../../leads/store", async () => (await import("./world-mocks")).leadsStoreMock());
 vi.mock("../../routes", async () => (await import("./world-mocks")).routesMock());
 vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")).scriptedProviderMock(orig as () => Promise<any>));
@@ -22,7 +23,7 @@ import { FakeProvider, call, collect, say, type Step } from "../testing";
 import type { AutonomyLevel } from "../types";
 import { convertToDeal } from "../../services/leads";
 import { useWorld } from "./world-mocks";
-import { createWorld, seedLead, userRow, ORG2, type World } from "./world";
+import { createWorld, seedLead, seedProfile, userRow, ORG2, type World } from "./world";
 
 const world = () => (globalThis as any).__world as World;
 const OWNER = () => world().users.get("u1")!;
@@ -180,6 +181,62 @@ describe("tickets", () => {
   });
 });
 
+describe("the ideal client and the fit check", () => {
+  it("nothing set: the agent is told to ask, and a fit check says there is nothing to compare", async () => {
+    const lead = seedLead(world(), { companyName: "Northwind", industry: "Logistics" });
+    const a = await run({ steps: [call("get_ideal_client", {}), say("ok")] });
+    expect(toolResult(a.provider)).toMatch(/hasn't set their ideal client/);
+    const b = await run({ steps: [call("assess_lead_fit", { leadId: lead.id }), say("ok")] });
+    expect(toolResult(b.provider)).toMatch(/No ideal client set/);
+  });
+
+  it("saving asks at level 0 and shows the change; nothing is stored until approved; other fields are kept", async () => {
+    seedProfile(world(), { targetLocations: ["India"] });
+    const { store } = await run({ steps: [call("update_ideal_client", { targetIndustries: ["Logistics", "Retail"], minDealMajor: 50000 }), ASKED] });
+    expect(world().profiles.get("org-1")!.targetIndustries).toEqual([]);
+    const preview = [...store.approvals.values()][0].preview as any;
+    expect(preview.lines.map((l: any) => l.label)).toEqual(["Target industries", "Minimum deal"]);
+    expect(preview.lines[1].value).toContain("₹50,000");
+    await approve(store, firstApproval(store));
+    expect(world().profiles.get("org-1")).toMatchObject({ targetIndustries: ["Logistics", "Retail"], targetLocations: ["India"], minDealMinor: 5_000_000, currency: "INR", updatedBy: "u1" });
+  });
+
+  it("an unchanged profile asks for nothing; junk is refused before anyone is asked", async () => {
+    seedProfile(world(), { targetIndustries: ["Logistics"] });
+    const same = await run({ steps: [call("update_ideal_client", { targetIndustries: ["Logistics"] }), say("already")] });
+    expect(same.store.approvals.size).toBe(0);
+    expect(toolResult(same.provider)).toMatch(/already how/);
+    const junk = await run({ steps: [call("update_ideal_client", { minDealMajor: -5 }), say("no")] });
+    expect(junk.store.approvals.size).toBe(0);
+  });
+
+  it("a fit check gives plain reasons from the profile, and unknown is not a mismatch", async () => {
+    seedProfile(world(), { targetIndustries: ["logistics"], targetLocations: ["India"], minDealMinor: 5_000_000, currency: "INR", exclusions: ["gambling"] });
+    const good = seedLead(world(), { companyName: "Northwind", industry: "Freight & Logistics", location: "Pune, India", estValueMinor: 6_000_000, currency: "INR" });
+    const thin = seedLead(world(), { companyName: "Orchid", industry: "Logistics" });
+    const bad = seedLead(world(), { companyName: "Lucky Spin", industry: "Online gambling", location: "India" });
+    const g = await run({ steps: [call("assess_lead_fit", { leadId: good.id }), say("ok")] });
+    expect(toolResult(g.provider)).toMatch(/Strong fit/);
+    expect(toolResult(g.provider)).toMatch(/matches your target "logistics"/);
+    expect(toolResult(g.provider)).toMatch(/Estimated ₹60,000 meets your minimum of ₹50,000/);
+    const t = await run({ steps: [call("assess_lead_fit", { leadId: thin.id }), say("ok")] });
+    expect(toolResult(t.provider)).toMatch(/Location \[unknown\]/);
+    expect(toolResult(t.provider)).not.toMatch(/mismatch/);
+    expect(toolResult(t.provider)).toMatch(/needs a location, an estimated value/);
+    const b = await run({ steps: [call("assess_lead_fit", { leadId: bad.id }), say("ok")] });
+    expect(toolResult(b.provider)).toMatch(/Excluded: .*gambling/);
+  });
+
+  it("another organization's profile and leads are invisible", async () => {
+    seedProfile(world(), { targetIndustries: ["Secret industry"] }, ORG2);
+    const theirs = seedLead(world(), { companyName: "Foreign" }, ORG2);
+    const a = await run({ steps: [call("get_ideal_client", {}), say("ok")] });
+    expect(toolResult(a.provider)).not.toMatch(/Secret industry/);
+    const b = await run({ steps: [call("assess_lead_fit", { leadId: theirs.id }), say("ok")] });
+    expect(toolResult(b.provider)).toMatch(/isn't in your organization/);
+  });
+});
+
 describe("follow-ups: what is due", () => {
   const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
   const ticket = (leadId: number, title: string, dueAt: string | null, status = "open", org = "org-1") =>
@@ -322,8 +379,8 @@ describe("isolation and roles", () => {
 
   it("a role with no permissions can use no lead tool", () => {
     const nobody = userRow({ orgRole: "CUSTOM", customPermissions: [] });
-    const leadTools = AGENT_TOOLS.filter((t) => /lead|ticket/.test(t.name));
-    expect(leadTools.length).toBe(13);
+    const leadTools = AGENT_TOOLS.filter((t) => /lead|ticket|ideal_client/.test(t.name));
+    expect(leadTools.length).toBe(16);
     for (const t of leadTools) expect(authorizeCall(t, nobody, {} as any), t.name).not.toBeNull();
   });
 

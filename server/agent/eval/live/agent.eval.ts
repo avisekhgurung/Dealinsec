@@ -16,6 +16,7 @@ import { afterAll, describe, it, vi } from "vitest";
 vi.mock("../../../storage", async () => (await import("../world-mocks")).storageMock());
 vi.mock("../../../entitlements", async () => (await import("../world-mocks")).entitlementsMock());
 vi.mock("../../../emails", async () => (await import("../world-mocks")).emailsMock());
+vi.mock("../../../leads/profile-store", async () => (await import("../world-mocks")).profileStoreMock());
 vi.mock("../../../leads/store", async () => (await import("../world-mocks")).leadsStoreMock());
 vi.mock("../../../routes", async () => (await import("../world-mocks")).routesMock());
 

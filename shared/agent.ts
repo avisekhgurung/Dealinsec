@@ -87,6 +87,9 @@ const TOOL_LABELS: Record<string, string> = {
   list_leads: "your leads",
   get_lead: "the lead",
   get_lead_followups: "your lead follow-ups",
+  get_ideal_client: "your ideal client",
+  update_ideal_client: "your ideal client",
+  assess_lead_fit: "how well the lead fits",
   create_lead: "the lead",
   create_leads: "the leads",
   update_lead: "the lead changes",
@@ -121,6 +124,7 @@ const APPROVE_LABELS: Record<string, string> = {
   complete_ticket: "Update ticket",
   add_lead_claim: "Record fact",
   archive_lead: "Archive lead",
+  update_ideal_client: "Save",
   convert_lead_to_deal: "Create deal",
 };
 export const approveLabel = (tool: unknown): string => APPROVE_LABELS[String(tool)] ?? "Approve";

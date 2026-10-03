@@ -28,6 +28,8 @@ const leadSpec = z.object({
   status: z.enum(["new", "researching", "qualified", "contacted", "replied", "meeting", "proposal", "won", "lost"]).default("new"),
   website: z.string().optional(),
   estValueMinor: z.number().int().positive().optional(),
+  industry: z.string().optional(),
+  location: z.string().optional(),
   /** Open next steps; a negative dueInDays is overdue. */
   tickets: z.array(z.object({ title: z.string(), dueInDays: z.number().int().optional() })).default([]),
 });
@@ -51,6 +53,11 @@ export const worldSpecSchema = z.object({
   /** Records that belong to ANOTHER organization: the agent must never see them. */
   foreignDeals: z.array(z.object({ ref, brandName: z.string(), dealTitle: z.string() })).default([]),
   /** The user's own leads (the pipeline), and leads that belong to ANOTHER organization. */
+  /** What the user is looking for. */
+  idealClient: z.object({
+    targetIndustries: z.array(z.string()).default([]), targetLocations: z.array(z.string()).default([]),
+    exclusions: z.array(z.string()).default([]), minDealMinor: z.number().int().positive().optional(),
+  }).optional(),
   leads: z.array(leadSpec).default([]),
   foreignLeads: z.array(leadSpec).default([]),
 });

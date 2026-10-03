@@ -23,6 +23,8 @@ import { z } from "zod";
 import { isAuthenticated } from "../auth";
 import * as leads from "../services/leads";
 import { leadsTablesReady } from "./store";
+import { profileTableReady } from "./profile-store";
+import * as ideal from "../services/ideal-client";
 import { agentLog } from "../agent/log";
 
 const idParam = (v: unknown): number | null => {
@@ -62,6 +64,27 @@ export function registerLeadRoutes(app: Express) {
       res.status(500).json({ code: "internal", error: "Something went wrong on our side. Nothing was changed." });
     }
   };
+
+  /** The ideal client lives in its own table, so it has its own gate: without it only this feature is off. */
+  const profileGuard = [isAuthenticated, gate, async (req: Request, res: Response, next: () => void) => {
+    try {
+      if (!(await profileTableReady())) return res.status(503).json({ code: "PROFILE_NOT_SETUP", error: "The ideal-client profile isn't set up on this server yet." });
+    } catch (err) {
+      agentLog("error", { errorType: (err as Error)?.name ?? "Error", where: "profile_tables" });
+      return res.status(503).json({ code: "PROFILE_NOT_SETUP", error: "The ideal-client profile isn't available right now." });
+    }
+    next();
+  }] as const;
+  const guarded = (fn: (req: any, res: Response) => Promise<unknown>, where: string) => async (req: any, res: Response) => {
+    try { await fn(req, res); } catch (err) {
+      agentLog("error", { errorType: (err as Error)?.name ?? "Error", where });
+      res.status(500).json({ code: "internal", error: "Something went wrong on our side. Nothing was changed." });
+    }
+  };
+  app.get("/api/ideal-client", ...profileGuard, guarded(async (req, res) => send(res, await ideal.getIdealClient(req.user)), "ideal_get"));
+  app.put("/api/ideal-client", ...profileGuard, guarded(async (req, res) => send(res, await ideal.saveIdealClient(req.user, req.body)), "ideal_save"));
+  // Before /api/leads/:id too: the fit of one lead against the ideal client.
+  app.get("/api/leads/:id/fit", ...profileGuard, withId(async (req, res, id) => send(res, await ideal.assessLeadFit(req.user, id))));
 
   // Before /api/leads/:id, or "follow-ups" would be read as an id.
   app.get("/api/leads/follow-ups", ...guard, async (req: any, res) => {

@@ -171,6 +171,31 @@ async function main() {
   const d = r.json;
   check("detail: timeline, tickets, claims, allowed moves", r.status === 200 && d?.events?.length >= 6 && d?.tickets?.length === 3 && d?.claims?.length === 2 && r.json?.canConvert === true && Array.isArray(r.json?.moves), `${r.status} events=${d?.events?.length}`);
 
+  console.log("\n━━ 4c. Ideal client and fit ━━");
+  r = await anon.req("GET", "/api/ideal-client");
+  check("ideal client: signed out is 401", r.status === 401);
+  r = await a.req("GET", "/api/ideal-client");
+  check("nothing set yet: empty profile, isSet false", r.status === 200 && r.json?.isSet === false && r.json?.profile?.targetIndustries?.length === 0, r.text);
+  r = await a.req("GET", `/api/leads/${lead.id}/fit`);
+  check("fit before a profile exists: 'no_profile'", r.status === 200 && r.json?.fit?.verdict === "no_profile" && r.json?.profileSet === false, r.text);
+  r = await a.req("PUT", "/api/ideal-client", { targetIndustries: ["Logistics", "Retail"], targetLocations: ["India"], minDealMajor: 40000, exclusions: ["gambling"], about: "Websites for small firms" });
+  check("save the ideal client", r.status === 200 && r.json?.profile?.minDealMinor === 4_000_000 && r.json?.profile?.currency === "INR", r.text);
+  r = await a.req("PUT", "/api/ideal-client", { targetIndustries: ["Logistics", "Retail"] });
+  check("saving the same thing again: 400 no_change", r.status === 400 && r.json?.code === "no_change", r.text);
+  r = await a.req("PUT", "/api/ideal-client", { minDealMajor: -3 });
+  check("a negative minimum is refused", r.status === 400, `${r.status}`);
+  r = await a.req("PUT", "/api/ideal-client", { services: Array.from({ length: 11 }, (_, i) => `s${i}`) });
+  check("more than 10 items in a list is refused", r.status === 400);
+  r = await a.req("PUT", "/api/ideal-client", { targetLocations: ["India", "UK"] });
+  check("a partial save keeps every field it didn't mention", r.status === 200 && r.json?.profile?.targetIndustries?.length === 2 && r.json?.profile?.minDealMinor === 4_000_000 && r.json?.profile?.targetLocations?.length === 2, r.text);
+  r = await a.req("GET", `/api/leads/${lead.id}/fit`);
+  check("the Northwind lead (Logistics, est ₹50,000) is a fit, with reasons", r.status === 200 && r.json?.fit?.verdict === "partial" && r.json?.fit?.signals?.some((x: any) => x.key === "industry" && x.status === "match") && r.json?.fit?.signals?.some((x: any) => x.key === "value" && x.status === "match"), r.text);
+  check("…and a lead with no location is 'unknown', not a mismatch", r.json?.fit?.signals?.some((x: any) => x.key === "location" && x.status === "unknown"), JSON.stringify(r.json?.fit?.signals));
+  r = await b.req("GET", "/api/ideal-client");
+  check("another organization sees its own (empty) profile", r.status === 200 && r.json?.isSet === false && r.json?.profile?.targetIndustries?.length === 0, r.text);
+  r = await b.req("GET", `/api/leads/${lead.id}/fit`);
+  check("another organization can't check A's lead: 404", r.status === 404, `${r.status}`);
+
   console.log("\n━━ 5. Convert: one lead, one deal ━━");
   const pool = new pg.Pool({ connectionString: DATABASE_URL });
   const dealsBefore = (await pool.query(`SELECT count(*)::int n FROM deals WHERE organization_id=$1`, [ua.orgId])).rows[0].n;
@@ -230,7 +255,7 @@ async function cleanup(_ids: any) {
   // Found by email, not by ids main() may never have returned (an aborted run still cleans up).
   const found = await c.query(`SELECT id, organization_id FROM users WHERE email LIKE 'e2e-leads-%@dealinsec.invalid'`);
   const ids = { users: found.rows.map((x) => x.id), orgs: [...new Set(found.rows.map((x) => x.organization_id).filter(Boolean))] };
-  for (const o of ids.orgs) for (const t of ["lead_claims", "lead_tickets", "lead_events", "leads"]) await c.query(`DELETE FROM ${t} WHERE organization_id=$1`, [o]).catch(() => {});
+  for (const o of ids.orgs) for (const t of ["lead_claims", "lead_tickets", "lead_events", "leads", "client_profiles"]) await c.query(`DELETE FROM ${t} WHERE organization_id=$1`, [o]).catch(() => {});
   for (const u of ids.users) for (const q of [`DELETE FROM activity_logs WHERE user_id=$1`, `DELETE FROM deals WHERE user_id=$1`]) await c.query(q, [u]).catch(() => {});
   for (const o of ids.orgs) for (const t of ["activity_logs", "invoice_counters", "org_invitations", "invitations"]) await c.query(`DELETE FROM ${t} WHERE organization_id=$1`, [o]).catch(() => {});
   await c.query(`DELETE FROM users WHERE email LIKE 'e2e-leads-%@dealinsec.invalid'`).catch(() => {});

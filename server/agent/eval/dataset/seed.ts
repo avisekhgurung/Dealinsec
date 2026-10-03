@@ -3,7 +3,7 @@
  * the `{{deal.acme}}` placeholders in turns and expectations to the ids those
  * records received. Pure apart from mutating the world it is handed.
  */
-import { createWorld, seedContract, seedDeal, seedInvoice, seedLead, seedQuote, userRow, ORG1, ORG2, type Row, type World } from "../world";
+import { createWorld, seedContract, seedDeal, seedInvoice, seedLead, seedProfile, seedQuote, userRow, ORG1, ORG2, type Row, type World } from "../world";
 import type { WorldSpec } from "./schema";
 
 export type Refs = { deal: Record<string, number>; invoice: Record<string, number>; contract: Record<string, number>; lead: Record<string, number> };
@@ -13,6 +13,7 @@ const isoIn = (days: number) => new Date(Date.now() + days * DAY).toISOString().
 
 const leadRow = (l: WorldSpec["leads"][number]) => ({
   companyName: l.companyName, status: l.status,
+  ...(l.industry ? { industry: l.industry } : {}), ...(l.location ? { location: l.location } : {}),
   ...(l.website ? { website: l.website, domain: l.website.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "") } : {}),
   ...(l.estValueMinor ? { estValueMinor: l.estValueMinor, currency: "INR" } : {}),
 });
@@ -49,6 +50,7 @@ export function buildWorld(spec: WorldSpec): { world: World; user: Row; refs: Re
     const row = seedDeal(world, { organizationId: ORG2, userId: "u2", brandName: f.brandName, dealTitle: f.dealTitle });
     refs.deal[f.ref] = row.id;
   }
+  if (spec.idealClient) seedProfile(world, { ...spec.idealClient, minDealMinor: spec.idealClient.minDealMinor ?? null, currency: spec.idealClient.minDealMinor ? "INR" : null });
   for (const l of spec.leads) {
     const row = seedLead(world, leadRow(l));
     refs.lead[l.ref] = row.id;
@@ -79,5 +81,5 @@ export function resolveRefs<T>(value: T, refs: Refs): T {
 /** A comparable fingerprint of everything the agent could change. */
 export function snapshotWorld(w: World): string {
   const strip = (rows: Row[]) => rows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== "createdAt")));
-  return JSON.stringify({ deals: strip(w.deals), quotes: strip(w.quotes), contracts: strip(w.contracts), invoices: strip(w.invoices), leads: strip(w.leads.leads as any), tickets: strip(w.leads.tickets as any), claims: strip(w.leads.claims as any), events: w.leads.events.length });
+  return JSON.stringify({ deals: strip(w.deals), quotes: strip(w.quotes), contracts: strip(w.contracts), invoices: strip(w.invoices), leads: strip(w.leads.leads as any), tickets: strip(w.leads.tickets as any), claims: strip(w.leads.claims as any), events: w.leads.events.length, profiles: Array.from(w.profiles.values()).map((p) => ({ ...p, updatedAt: 0 })) });
 }

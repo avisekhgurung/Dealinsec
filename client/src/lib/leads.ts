@@ -75,3 +75,13 @@ export const isOverdue = (due: string | null | undefined) => {
 export interface FollowUpView { id: number; title: string; kind: string; due: string; leadId: number; companyName: string; leadStatus: string }
 export interface FollowUps { today: string; overdue: FollowUpView[]; dueToday: FollowUpView[]; upcoming: FollowUpView[] }
 export const FOLLOWUPS_URL = "/api/leads/follow-ups";
+
+export interface IdealClientView { about: string | null; services: string[]; targetIndustries: string[]; targetLocations: string[]; exclusions: string[]; minDealMinor: number | null; currency: string | null }
+export interface IdealClientResponse { profile: IdealClientView; isSet: boolean }
+export const IDEAL_CLIENT_URL = "/api/ideal-client";
+export const fitUrl = (id: number | string) => `/api/leads/${id}/fit`;
+export const hasCriteria = (p: IdealClientView | undefined) => !!p && (p.targetIndustries.length > 0 || p.targetLocations.length > 0 || p.exclusions.length > 0 || p.minDealMinor !== null);
+/** Anything under /api/ideal-client or a lead's fit changes when the profile does. */
+export const refreshProfile = () =>
+  queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && ((q.queryKey[0] as string).startsWith(IDEAL_CLIENT_URL) || (q.queryKey[0] as string).endsWith("/fit")) });
+export const profileNotSetUp = (err: unknown) => !!err && String((err as Error).message).includes("PROFILE_NOT_SETUP");
