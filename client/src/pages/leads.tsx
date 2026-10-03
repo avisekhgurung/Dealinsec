@@ -6,10 +6,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ChevronRight, Plus, Search, Target, X } from "lucide-react";
+import { ChevronRight, FileUp, Plus, Search, Target, X } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { LeadFormDialog } from "@/components/leads/lead-form-dialog";
+import { LeadImportDialog } from "@/components/leads/lead-import-dialog";
 import { FollowUpsPanel } from "@/components/leads/follow-ups";
 import { StageBadge } from "@/components/leads/stage-badge";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ export default function LeadsPage() {
   const [status, setStatus] = useState<string>("");
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   const url = listUrl({ status, q: search });
   const { data, isLoading, error } = useQuery<LeadList>({ queryKey: [url] });
@@ -69,6 +71,11 @@ export default function LeadsPage() {
             </div>
             <div className="flex items-center gap-2">
               <NotificationBell className="lg:hidden" />
+              {canEdit && (
+                <Button size="sm" variant="outline" onClick={() => setImportOpen(true)} aria-label="Import leads from a CSV" data-testid="button-import-leads">
+                  <FileUp className="h-4 w-4 lg:mr-1.5" /><span className="hidden lg:inline">Import</span>
+                </Button>
+              )}
               {canEdit && (
                 <Button size="sm" className="gradient-btn text-white" onClick={() => setAddOpen(true)} data-testid="button-add-lead">
                   <Plus className="mr-1 h-4 w-4 lg:mr-1.5" />Add<span className="hidden lg:inline">&nbsp;lead</span>
@@ -157,6 +164,7 @@ export default function LeadsPage() {
       </main>
 
       <LeadFormDialog open={addOpen} onOpenChange={setAddOpen} />
+      <LeadImportDialog open={importOpen} onOpenChange={setImportOpen} />
       <BottomNav />
     </div>
   );

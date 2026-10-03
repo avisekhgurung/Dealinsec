@@ -192,6 +192,7 @@ async function main() {
 
   console.log("\n━━ 6. Convert needs an amount; lost and reopen; archive ━━");
   const alpha = (await a.req("GET", "/api/leads?q=alpha")).json.rows[0];
+  check("leads added by the batch route are marked as imports", alpha.source === "import", alpha.source);
   for (const s of ["researching", "qualified"]) await a.req("POST", `/api/leads/${alpha.id}/move`, { status: s });
   r = await a.req("POST", `/api/leads/${alpha.id}/convert`, {});
   check("no amount anywhere: 400 need_amount, nothing created, lead stays Qualified", r.status === 400 && r.json?.code === "need_amount", `${r.status} ${r.text}`);

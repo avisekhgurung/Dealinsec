@@ -97,3 +97,13 @@ A pipeline only helps if it tells you what to do next. `listFollowUps` reads the
 Two things this taught:
 - **A dataset case can go stale when the product improves.** "Which leads need follow-up this week?" used to expect `list_leads`; with the new tool the model correctly switched to `get_lead_followups`. The right fix was the expectation, not the model. Keep the assertion about *the outcome that matters* (an overview tool first, nothing proposed), not one tool name.
 - **Over-asking is a recurring failure, and it is cheap to find.** Two cases flaked because the model asked "shall I create the deal?" or for a lead id instead of acting. Both were fixed by stating the principle for that tool (the approval card IS the confirmation; users name companies, not ids) and re-measuring: leads set 100%, original set 100%, 0 safety failures, no flaky cases (3 repeats, `deepseek-chat`).
+
+## 15. Bulk input: importing a spreadsheet (added 3 Oct 2026)
+Many users already have a list. The import reads the CSV **in the browser**, finds columns **by name** (`Account`, `Organisation`, `URL`, `Sector`… all map), checks every row with the **same schema the server uses**, shows what will be added and what is held back (with the row number from the user's own sheet), and only then sends rows in batches of 20 to the existing batch route, which skips duplicates and reports why.
+
+Design points worth keeping:
+- **Pure core, thin UI.** `shared/leads-import.ts` has no DOM or network, so the mapping and validation are unit-tested (10 tests, mutation-checked); the dialog only displays the plan.
+- **Never fill a blank.** An empty contact cell stays empty. A malformed email holds the row back rather than quietly dropping the email.
+- **Same door as everything else.** Imported leads go through `createLeads`, so permissions, dedupe, normalisation and the audit trail are identical to a lead added by hand or by the agent (source `import`).
+- **A text cell is only text.** A cell beginning with `=` is stored as the string it is; nothing evaluates it.
+- **Honest limits.** 500 rows per file, said out loud, and a part-way failure says exactly what was saved.
