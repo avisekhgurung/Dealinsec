@@ -38,6 +38,11 @@ export const NOT_A_COMPANY_SITE = new Set([
   "yelp.com", "justdial.com", "indiamart.com", "tradeindia.com", "yellowpages.com", "sulekha.com", "mapquest.com",
   "clutch.co", "goodfirms.co", "g2.com", "capterra.com", "trustpilot.com", "sortlist.com", "designrush.com", "upwork.com", "fiverr.com",
   "google.com", "bing.com", "amazon.com", "ebay.com", "alibaba.com", "forbes.com", "bloomberg.com", "reuters.com",
+  // Seen in real search results for "logistics company Pune": news, directories, classifieds, slide decks, lookup tools.
+  "slideserve.com", "slideshare.net", "scribd.com", "whois.com", "beforeitsnews.com", "smergers.com", "indianyellowpages.com", "surfindia.com",
+  "loglink.com", "nexnews.org", "viesearch.com", "mapsofindia.com", "tuffclassified.com", "paperindex.com", "gktoday.in", "kashmirsearch.com",
+  "indianexpress.com", "livemint.com", "hindustantimes.com", "ndtv.com", "timesofindia.com", "thehindu.com", "economictimes.com", "gridinsoft.com",
+  "academia.edu", "researchgate.net", "archive.org", "blogspot.com", "wordpress.com", "wixsite.com", "weebly.com", "tumblr.com",
 ]);
 
 // Second-level public suffixes where the registrable domain has three labels (co.uk, com.au ...).
@@ -62,6 +67,35 @@ export function registrableDomain(host: string): string | null {
   const [sld, tld] = [parts[parts.length - 2], parts[parts.length - 1]];
   const take = SECOND_LEVEL.has(sld) && COUNTRY_TLDS.has(tld) ? 3 : 2;
   return parts.slice(-take).join(".");
+}
+
+/** A host that is government, education or a known aggregator word, rather than a business. */
+const JUNK_HOST = /(^|[.-])(news|times|herald|gazette|yellowpages|directory|classifieds?|listings?|wiki|forum|blogs?|jobs|careers)([.-]|$)/;
+const NON_BUSINESS_LABELS = new Set(["gov", "edu", "ac", "mil", "nic"]);
+/** A path that says "this is an article / listing / search page", not a company's own page. */
+const JUNK_PATH = /\/(news|blogs?|articles?|posts?|category|categories|tags?|search|results|directory|listings?|wiki|forum|questions?|profiles?|biz|business(es)?|companies|jobs|press|events|handle|collections?|question)(\/|\.|$)|\/search\.\w+$|\.(pdf|docx?|pptx?|xlsx?)$/i;
+/** A title that reads like an article, a list or a lookup result rather than a company name. */
+const JUNK_TITLE = /^(top|best|\d+)\s|\bhow to\b|\bwhat is\b|\blist of\b|\bdirectory\b|\byellow pages\b|\bsearch results\b|\bfor sale\b|\bsought\b|\binvestment opportunit|\breviews?\b|\bguide\b|\bways\b|\btips\b|\bwikipedia\b|\bwhois\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b[^|]{0,12}\b(19|20)\d\d\b|^\d{1,2}(st|nd|rd|th)\b/i;
+const GENERIC_TITLES = new Set(["description", "products", "home", "index", "untitled", "browser", "blogs collection", "page not found"]);
+
+/**
+ * Does this result look like a company's OWN page? A guess from the URL and title
+ * alone: it can say no with confidence, never yes. (A directory listing about a
+ * company is the main false positive, which is why the card says these are
+ * guesses and why researching the actual site is a separate, later step.)
+ */
+export function looksLikeCompanyPage(url: string, title: string, domain: string): boolean {
+  let u: URL;
+  try { u = new URL(url); } catch { return false; }
+  const labels = domain.split(".");
+  if (labels.slice(0, -1).some((l) => NON_BUSINESS_LABELS.has(l))) return false;
+  if (JUNK_HOST.test(u.hostname)) return false;
+  if (JUNK_PATH.test(u.pathname)) return false;
+  const t = String(title ?? "").trim();
+  if (JUNK_TITLE.test(t) || GENERIC_TITLES.has(t.toLowerCase())) return false;
+  // A company page is the home page or one level in; deeper than that is almost always a listing or an article.
+  if (u.pathname.split("/").filter(Boolean).length > 2) return false;
+  return true;
 }
 
 export const isBlockedSite = (domain: string) =>
@@ -99,7 +133,7 @@ export function toCandidates(results: SearchResult[], opts: { limit?: number } =
   for (const r of results) {
     const host = hostOf(r.url);
     const domain = host && registrableDomain(host);
-    if (!domain || seen.has(domain) || isBlockedSite(domain)) continue;
+    if (!domain || seen.has(domain) || isBlockedSite(domain) || !looksLikeCompanyPage(r.url, r.title, domain)) continue;
     seen.add(domain);
     out.push({ name: cleanName(r.title, domain), domain, website: `https://${domain}` });
     if (out.length >= (opts.limit ?? MAX_CANDIDATES)) break;

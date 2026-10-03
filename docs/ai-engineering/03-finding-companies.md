@@ -53,3 +53,19 @@ We first built Brave, then learned it needs a card with no spending cap. The fou
 - **Keep the caps even when the service is free.** The allowance and its per-minute limits are not documented, so our 10-a-day and 300-a-month caps now protect a shared free quota instead of a card.
 - **Tolerate what is not documented, but do not trust it.** The client accepts the wrapped (`data.webPages`) and unwrapped shapes, and treats an error code inside a 200 body as an error; anything it cannot read is an empty list or a plain failure, never a crash or a guess. 403 is mapped to "key rejected" and 402/429 to "busy or allowance used up" until a real key shows what the service actually returns.
 - **Test the wire, not only the parse.** The LangSearch client is tested against a real local HTTP server (method, headers, body), and provider selection against the real `discoveryProvider` object, with mutation checks on the header and the country.
+
+## 9. What the real service showed (3 Oct 2026): plumbing is not product
+With a real LangSearch key the client worked first time (1.4 s, 20 results, the response shape matched the docs). The **quality** did not. A general web index is not a company directory: for "logistics company Pune" it returned Wikipedia, news, classifieds, "businesses for sale" listings, slide decks and trade directories, and almost no company home pages.
+
+| After our filter | |
+|---|---|
+| Real queries run | 8 (local B2B, SaaS, agencies, clinics; UK and India) |
+| Raw results | 160 |
+| Survived as "candidates" | 30 |
+| Of those, a company's OWN site | roughly 1 or 2 (my reading; no ground truth) |
+
+What that means and what we did:
+- **A tool that works but misleads is worse than one that fails.** A candidate named "Cars24" with a website of cars24.com is plausible and wrong. The first filter (a blocklist) was whack-a-mole, so we added **structural signals that can say "no" confidently but never "yes"**: government/education hosts, news/blog/directory/search paths, deep paths, listicle and date-like titles, article words. The 20 real junk results are now fixtures in the tests and none becomes a candidate.
+- **Precision is still low and the card says so.** It labels every row a guess, shows the domain, and nothing is added without a click.
+- **The real fix is not more regexes.** Either a provider whose index is better at company sites (compare on the SAME queries before choosing), or a verification step that fetches the candidate's page and checks it is the company's own site (D1b), or both.
+- **Measure yield on real queries before shipping a discovery feature.** Unit tests, a fake service and a clean live eval of the agent's behaviour all passed while the product value was near zero. They test different things, and only the last one tests the product.
