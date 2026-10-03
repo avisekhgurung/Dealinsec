@@ -27,6 +27,8 @@ export interface ChatOptions {
   signal?: AbortSignal;
   /** Output cap; the Copilot's default is 700. */
   maxTokens?: number;
+  /** Use this model for this one call instead of the configured one (a small, fast job that a reasoning model does badly). */
+  model?: string;
 }
 
 export type ProviderErrorCode = "timeout" | "rate_limited" | "upstream" | "invalid_response" | "aborted";
@@ -101,7 +103,7 @@ class DeepSeekProvider implements AIProvider {
               Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}`,
             },
             body: JSON.stringify({
-              model: this.model,
+              model: opts.model || this.model,
               messages,
               tools: tools.length ? tools : undefined,
               temperature: 0.3,

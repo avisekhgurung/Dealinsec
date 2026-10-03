@@ -99,5 +99,6 @@ and tools; tests inject fakes.
 **always asks**, shows the exact words, enforces per-organization and whole-app caps, and refuses queries with personal
 details. Environment: `LANGSEARCH_API_KEY` or `BRAVE_SEARCH_API_KEY` (without either the feature is "not set up"),
 `DISCOVERY_PROVIDER` (optional: `langsearch` | `brave`), `DISCOVERY_DAILY_LIMIT` (default 10 per organization),
-`DISCOVERY_MONTHLY_LIMIT` (default 300 overall), `LANGSEARCH_URL` / `BRAVE_SEARCH_URL` (tests). See
+`DISCOVERY_MONTHLY_LIMIT` (default 300 overall), `DISCOVERY_PICK_MODEL` (the model that reads results; default
+`deepseek-chat`, because a reasoning model returns nothing for this job), `LANGSEARCH_URL` / `BRAVE_SEARCH_URL` (tests). See
 `docs/ai-engineering/03-finding-companies.md`.

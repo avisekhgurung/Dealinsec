@@ -84,12 +84,16 @@ const GENERIC_TITLES = new Set(["description", "products", "home", "index", "unt
  * company is the main false positive, which is why the card says these are
  * guesses and why researching the actual site is a separate, later step.)
  */
+export function looksLikeCompanyHost(hostname: string, domain: string): boolean {
+  const labels = domain.split(".");
+  if (labels.slice(0, -1).some((l) => NON_BUSINESS_LABELS.has(l))) return false;
+  return !JUNK_HOST.test(hostname);
+}
+
 export function looksLikeCompanyPage(url: string, title: string, domain: string): boolean {
   let u: URL;
   try { u = new URL(url); } catch { return false; }
-  const labels = domain.split(".");
-  if (labels.slice(0, -1).some((l) => NON_BUSINESS_LABELS.has(l))) return false;
-  if (JUNK_HOST.test(u.hostname)) return false;
+  if (!looksLikeCompanyHost(u.hostname, domain)) return false;
   if (JUNK_PATH.test(u.pathname)) return false;
   const t = String(title ?? "").trim();
   if (JUNK_TITLE.test(t) || GENERIC_TITLES.has(t.toLowerCase())) return false;
@@ -119,11 +123,24 @@ export function cleanName(title: string, domain: string): string {
   return name;
 }
 
+/**
+ * A business a search turned up.
+ *   site    : the result IS the business's own website (we link its home page).
+ *   listing : the result is a page ABOUT the business on someone else's site (a
+ *             directory profile, a social page); its website is not known yet.
+ */
+export type CandidateKind = "site" | "listing";
 export interface Candidate {
   name: string;
-  domain: string;
-  /** The company's home page, not the deep link the search returned. */
-  website: string;
+  kind: CandidateKind;
+  /** The business's own domain; null for a listing. */
+  domain: string | null;
+  /** The business's own home page; null for a listing. */
+  website: string | null;
+  /** The result page it came from, so a person can see where the name was found. */
+  sourceUrl: string;
+  /** The host of that page, for display. */
+  sourceHost: string;
 }
 
 /** One candidate per company site, in the order the engine ranked them. */
@@ -135,8 +152,90 @@ export function toCandidates(results: SearchResult[], opts: { limit?: number } =
     const domain = host && registrableDomain(host);
     if (!domain || seen.has(domain) || isBlockedSite(domain) || !looksLikeCompanyPage(r.url, r.title, domain)) continue;
     seen.add(domain);
-    out.push({ name: cleanName(r.title, domain), domain, website: `https://${domain}` });
+    out.push({ name: cleanName(r.title, domain), kind: "site", domain, website: `https://${domain}`, sourceUrl: r.url, sourceHost: host ?? domain });
     if (out.length >= (opts.limit ?? MAX_CANDIDATES)) break;
   }
   return out;
+}
+
+
+/* ── verifying what a model says about a set of results ────────────────── */
+
+// Letters in any script count (anything from U+00C0 up is treated as one); everything else is a separator.
+const norm2 = (x: string) => x.toLowerCase().replace(/[^a-z0-9\u00c0-\uffff]+/g, " ").trim();
+const LEGAL_WORDS = new Set(["the", "and", "of", "pvt", "ltd", "llp", "llc", "inc", "co", "company", "corp", "limited", "private", "services", "service", "solutions", "group", "official", "website", "home"]);
+
+/** True when a business name literally appears in the text it was supposedly read from. */
+export function nameAppearsIn(name: string, ...texts: (string | undefined)[]): boolean {
+  const n = norm2(name);
+  if (n.length < 2) return false;
+  return texts.some((t) => !!t && ` ${norm2(t)} `.includes(` ${n} `));
+}
+
+/** Does the domain look like it belongs to a business of this name? ("Godfrey Dadich Partners" ~ godfreydadich.com) */
+export function nameResemblesDomain(name: string, domain: string): boolean {
+  const label = domain.split(".")[0].toLowerCase().replace(/[^a-z0-9]/g, "");
+  const tokens = norm2(name).split(" ").filter((t) => t.length >= 3 && !LEGAL_WORDS.has(t));
+  if (label.length < 4 || !tokens.length) return false;
+  if (tokens.some((t) => t.length >= 4 && label.includes(t))) return true;
+  const joined = tokens.join("");
+  return joined.length >= 4 && (label.includes(joined) || joined.includes(label));
+}
+
+/** The whole name is the domain's name ("Stowe Family Law" = stowefamilylaw.co.uk): the URL is part of the result, so this is checkable. */
+export function nameFromDomain(name: string, domain: string): boolean {
+  const label = domain.split(".")[0].toLowerCase().replace(/[^a-z0-9]/g, "");
+  const n = norm2(name).split(" ").filter((t) => !LEGAL_WORDS.has(t)).join("");
+  return label.length >= 4 && n.length >= 4 && (n === label || n.startsWith(label) || label.startsWith(n));
+}
+
+/** A display name from model output: plain characters only, short. */
+export function plainName(raw: unknown): string {
+  return cleanName(String(raw ?? ""), "x.example").replace(/^X$/, "");
+}
+
+export interface PickedBusiness { index: unknown; name: unknown; kind: unknown }
+
+/**
+ * What the model SAID about the results, checked against the results themselves.
+ * The model can only choose among the results it was given; it cannot add a
+ * business, a website or a name that is not in the text. Anything that fails a
+ * check is dropped, or (for a claimed own site) downgraded to a listing.
+ */
+export function verifyPicks(picks: unknown, results: SearchResult[], opts: { limit?: number } = {}): Candidate[] {
+  const list = (picks as { businesses?: unknown })?.businesses;
+  if (!Array.isArray(list)) return [];
+  const byName = new Map<string, Candidate>();
+  for (const raw of list.slice(0, 30)) {
+    const p = raw as PickedBusiness;
+    const i = typeof p?.index === "number" && Number.isInteger(p.index) ? p.index : -1;
+    const r = results[i];
+    if (!r) continue;
+    const host = hostOf(r.url);
+    const domain = host && registrableDomain(host);
+    if (!host || !domain) continue;
+    let name = plainName(p.name);
+    // A web address is not a name: show the domain's own label ("stowefamilylaw.co.uk" -> "Stowefamilylaw").
+    if (/^(www\.)?[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i.test(name.replace(/\s+/g, ""))) name = cleanName("", name.replace(/^www\./i, "").replace(/\s+/g, ""));
+    // A "name" that reads like an article, ranking or lookup title is not a business, whoever picked it.
+    if (name.length < 2 || JUNK_TITLE.test(name) || GENERIC_TITLES.has(name.toLowerCase())) continue;
+    const inText = nameAppearsIn(name, r.title, r.snippet);
+
+    // An own site is judged on its HOST, not on how deep the page is (a company's service page is deep): the
+    // domain must resemble the name, and the name may be read from the domain itself ("stowefamilylaw.co.uk").
+    const ownOk = p.kind === "own_site" && !isBlockedSite(domain) && looksLikeCompanyHost(host, domain)
+      && nameResemblesDomain(name, domain) && (inText || nameFromDomain(name, domain));
+    let cand: Candidate;
+    if (ownOk) {
+      cand = { name, kind: "site", domain, website: `https://${domain}`, sourceUrl: r.url, sourceHost: host };
+    } else {
+      // A listing's name must be IN the result's own title or snippet: a model cannot invent a business.
+      if (!inText) continue;
+      cand = { name, kind: "listing", domain: null, website: null, sourceUrl: r.url, sourceHost: host };
+    }
+    const key = norm2(name);
+    const prev = byName.get(key);
+    if (!prev || (prev.kind === "listing" && cand.kind === "site")) byName.set(key, cand);
+  }
+  return Array.from(byName.values()).slice(0, opts.limit ?? MAX_CANDIDATES);
 }

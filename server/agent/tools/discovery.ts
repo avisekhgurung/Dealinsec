@@ -40,16 +40,17 @@ export const findCompaniesTool: AgentTool<z.infer<typeof input>> = {
     };
   },
   async execute(ctx, args): Promise<ToolOutcome> {
-    const r = await searchCompanies(ctx.user as any, args, ctx.signal);
+    const r = await searchCompanies(ctx.user as any, args, { signal: ctx.signal, addUsage: ctx.addUsage });
     if (!r.ok) return fail(r.code, r.message);
     if (!r.companies.length) {
-      return { ok: true, route: "/leads", summary: `No company websites came up for "${r.query}". Try describing them differently (the kind of company, the place, what they need).` };
+      return { ok: true, route: "/leads", summary: `No businesses stood out in the results for "${r.query}". Try describing them differently (the kind of business and the place).` };
     }
-    const lines = r.companies.map((c) => `- ${c.name} — ${c.domain}${c.alreadyLead ? ` (already your lead #${c.alreadyLead})` : ""}`);
+    const lines = r.companies.map((c) =>
+      `- ${c.name} — ${c.kind === "site" ? c.domain : `listed on ${c.sourceHost}, website not found yet`}${c.alreadyLead ? ` (already your lead #${c.alreadyLead})` : ""}`);
     return {
       ok: true, route: "/leads",
-      cards: [{ kind: "companies", data: { query: r.query, companies: r.companies, remainingToday: r.remainingToday, provider: r.provider } }],
-      summary: `Found ${r.companies.length} possible ${r.companies.length === 1 ? "company" : "companies"} for "${r.query}" (${r.remainingToday} searches left today). Names are guesses from page titles, so check them before adding:\n${lines.join("\n")}`,
+      cards: [{ kind: "companies", data: { query: r.query, companies: r.companies, remainingToday: r.remainingToday, provider: r.provider, reviewed: r.reviewed } }],
+      summary: `Found ${r.companies.length} possible ${r.companies.length === 1 ? "business" : "businesses"} for "${r.query}" (${r.remainingToday} searches left today). Names come from search results and may be wrong, so check them before adding. A "listed on" business was found on a directory or profile page, so its own website isn't known yet:\n${lines.join("\n")}${r.reviewed ? "" : "\n(These results could not be reviewed automatically, so expect some that aren't real businesses.)"}`,
     };
   },
 };

@@ -6,7 +6,8 @@
  * search text is safe to send out, and the organization and the whole app are
  * under their search caps (a paid service with no spending cap of its own).
  */
-import { sanitizeQuery, toCandidates, type Candidate } from "@shared/discovery";
+import { sanitizeQuery, type Candidate } from "@shared/discovery";
+import { pickBusinesses } from "../discovery/pick";
 import { DiscoveryError } from "../discovery/types";
 import { discoveryConfigured, discoveryProvider } from "../discovery/provider";
 import { searchCount } from "../discovery/usage";
@@ -46,12 +47,14 @@ export async function planSearch(user: Who, raw: { query?: unknown; country?: un
 
 export interface FoundCompany extends Candidate { alreadyLead: number | null }
 
-export async function searchCompanies(user: Who, raw: { query?: unknown; country?: unknown }, signal?: AbortSignal): Promise<Result<{ query: string; companies: FoundCompany[]; remainingToday: number; provider: string }>> {
+export async function searchCompanies(
+  user: Who, raw: { query?: unknown; country?: unknown }, opts: { signal?: AbortSignal; addUsage?: (i: number, o: number) => void } = {},
+): Promise<Result<{ query: string; companies: FoundCompany[]; remainingToday: number; provider: string; reviewed: boolean }>> {
   const plan = await planSearch(user, raw);
   if (!plan.ok) return plan;
   let results;
   try {
-    results = await discoveryProvider.search(plan.query, { country: plan.country ?? undefined, count: 20, signal });
+    results = await discoveryProvider.search(plan.query, { country: plan.country ?? undefined, count: 50, signal: opts.signal });
   } catch (e) {
     if (e instanceof DiscoveryError) {
       agentLog("error", { errorType: "DiscoverySearchFailed", code: e.code });
@@ -59,11 +62,22 @@ export async function searchCompanies(user: Who, raw: { query?: unknown; country
     }
     throw e;
   }
+  // A model reads the results and picks real businesses; code verifies every pick. There is deliberately
+  // no fallback: unreviewed web results are mostly news and directories, and a wrong list is worse than
+  // an honest "try again".
+  const picked = await pickBusinesses(results, plan.query, { signal: opts.signal, addUsage: opts.addUsage });
+  if (picked === null) {
+    agentLog("error", { errorType: "DiscoveryReviewFailed" });
+    return fail(502, "review_failed", "I searched, but couldn't review the results just now, so I won't show unchecked ones. Try again in a minute.");
+  }
+  const reviewed = true;
+  const candidates = picked;
+
   const orgId = user.organizationId!;
   const companies: FoundCompany[] = [];
-  for (const c of toCandidates(results)) {
-    const existing = await leadsStore.findByDomain(orgId, c.domain);
+  for (const c of candidates) {
+    const existing = c.domain ? await leadsStore.findByDomain(orgId, c.domain) : await leadsStore.findByName(orgId, c.name);
     companies.push({ ...c, alreadyLead: existing?.id ?? null });
   }
-  return { ok: true, query: plan.query, companies, remainingToday: Math.max(0, plan.remainingToday - 1), provider: plan.provider.label };
+  return { ok: true, query: plan.query, companies, remainingToday: Math.max(0, plan.remainingToday - 1), provider: plan.provider.label, reviewed };
 }

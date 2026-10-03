@@ -69,3 +69,31 @@ What that means and what we did:
 - **Precision is still low and the card says so.** It labels every row a guess, shows the domain, and nothing is added without a click.
 - **The real fix is not more regexes.** Either a provider whose index is better at company sites (compare on the SAME queries before choosing), or a verification step that fetches the candidate's page and checks it is the company's own site (D1b), or both.
 - **Measure yield on real queries before shipping a discovery feature.** Unit tests, a fake service and a clean live eval of the agent's behaviour all passed while the product value was near zero. They test different things, and only the last one tests the product.
+
+## 10. Making a weak free index useful: a model reads, code verifies (3 Oct 2026)
+The founder chose to stay on LangSearch rather than compare providers. So the question became: how much value can be extracted from an index that mostly returns news, encyclopedias and directories?
+
+**What the API allowed, measured:** 50 results per call works (more raw material for the same allowance). `excludeDomains` works as an array but **fails with HTTP 502 for long lists** (88 domains), and adding words like "official website" changed little, so neither is used.
+
+**The change of approach.** Regexes over URLs and titles cannot tell "Leeds Dental Clinic | Bunity" (a real business, on a directory) from "Top 10 dentists" (an article). A person can. So a model with **no tools** reads the 50 results and picks the real businesses, saying for each whether the URL is the business's **own site** or a page **about** it. Then code checks every pick (`verifyPicks`, pure, tested):
+- the index must exist, and the **name must literally appear** in that result's title or snippet (for an own site it may also be read from its domain): the model cannot invent a business;
+- an **own site** must be on a business-looking host whose domain **resembles the name** ("Weightmans" ~ weightmans.com). A staging host (`...azurewebsites.net`) or a directory is downgraded to a listing and never given that website;
+- a "name" that reads like an article or ranking ("Top 10...", "How to...") is rejected whoever picked it;
+- a web address given as a name becomes the domain's label.
+
+A **listing** is a business found on someone else's page: the card links to that page and says "Website not found yet". Its source is saved on the lead as a note when added.
+
+**Results on the same 12 real searches** (600 results captured once, so the comparison spends no extra allowance):
+
+| | Before (regex filter) | After (model reads, code verifies) |
+|---|---|---|
+| Items shown | 30 (8 queries) | 64 to 79 (12 queries) |
+| Real businesses among them | about 1 or 2 | nearly all (my reading): e.g. Weightmans, Stephensons, Stowe Family Law, Slater + Gordon (Manchester family law); Lentra, Zenskar, FinBox (Bengaluru SaaS); named Leeds dental practices |
+| With their own website | 0 to 2 | 5 |
+| Cost | none | ~3.5k input + ~120 output tokens per search, about 1 second |
+
+**Known limits:** most finds are listings, so the business's own website is often unknown until the research step; and run-to-run variation exists (the SaaS query, whose results are news articles about startups, returned 10, 10 and 0 on three runs).
+
+**Two failures this round caught, and why they matter:**
+- **A reasoning model is the wrong tool for a quick reading job.** With the founder's `DEEPSEEK_MODEL=deepseek-flash`, this step spent its whole output budget "thinking" and returned nothing (9 of 12 searches, ~18 s each, even with a 4,000-token budget). So the step has its own model, `DISCOVERY_PICK_MODEL` (default `deepseek-chat`, ~1 s), independent of the agent's model. The provider gained a per-call `model` option for this.
+- **No fallback to unreviewed results.** When the reader failed, the first version fell back to the regex filter and showed "Error Page" and "Premierleague" as businesses (seen in the real app). A wrong list is worse than an honest failure, so it now says it couldn't review the results and the approval reopens for a retry.
