@@ -890,3 +890,14 @@ button:not(:disabled):active,
     box-shadow: 0 2px 6px rgba(16, 24, 40, 0.06);
   }
 }
+
+/* ── Voice call orb ─────────────────────────────────────────────────────── */
+@keyframes dis-orb-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+@keyframes dis-orb-spin { to { transform: rotate(360deg); } }
+@keyframes dis-orb-ripple { 0% { transform: scale(0.9); opacity: 0.45; } 100% { transform: scale(1.7); opacity: 0; } }
+.dis-orb-breathe { animation: dis-orb-breathe 1.8s ease-in-out infinite; }
+.dis-orb-spin { animation: dis-orb-spin 2.4s linear infinite; }
+.dis-orb-ripple { animation: dis-orb-ripple 2.2s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .dis-orb-breathe, .dis-orb-spin, .dis-orb-ripple { animation: none; }
+}

@@ -90,6 +90,9 @@ export function useAgent(opts: UseAgentOptions = {}) {
   // that URL change must not be mistaken for someone opening a different one
   // (which would abort the run that is just starting).
   const createdHere = useRef<string | null>(null);
+  // "voice" while a call is open: same conversation, a spoken style (approvals still need a tap).
+  const channelRef = useRef<"web" | "voice">("web");
+  const setChannel = useCallback((c: "web" | "voice") => { channelRef.current = c; }, []);
   const ctxRef = useRef(context);
   ctxRef.current = context;
 
@@ -193,7 +196,7 @@ export function useAgent(opts: UseAgentOptions = {}) {
     };
 
     try {
-      await postStream(`/api/agent/sessions/${sid}/messages`, { text, context: ctxRef.current }, { signal: ac.signal, onEvent });
+      await postStream(`/api/agent/sessions/${sid}/messages`, { text, context: ctxRef.current, channel: channelRef.current }, { signal: ac.signal, onEvent });
       if (!finished) throw new Error("stream ended early");
     } catch (err) {
       if (ac.signal.aborted) {
@@ -293,5 +296,5 @@ export function useAgent(opts: UseAgentOptions = {}) {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  return { sessionId, messages, approvals, running, steps, loading, send, stop, retry, approve, reject, reset };
+  return { sessionId, messages, approvals, running, steps, loading, send, stop, retry, approve, reject, reset, setChannel };
 }

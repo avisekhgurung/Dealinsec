@@ -33,7 +33,8 @@ import { conversationDeps } from "./wiring";
 
 const messageBody = z.object({
   text: z.string().trim().min(1, "Type a message").max(MAX_TEXT, "That message is too long"),
-  channel: z.literal("web").default("web"),
+  // "voice" is a spoken call made from the web app: same session, same approvals (never given by voice), a spoken style.
+  channel: z.enum(["web", "voice"]).default("web"),
   context: z.object({
     page: z.string().max(60).optional(),
     route: z.string().max(100).optional(),

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Phone, Sparkles } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAudience } from "@/hooks/use-audience";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,7 +12,7 @@ type Agent = ReturnType<typeof useAgent>;
 
 const greetingFor = (hour: number) => (hour < 5 ? "Working late" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening");
 
-function Empty({ onPaste, onPrompt, pasteLabel, prompts }: { onPaste: () => void; onPrompt: (p: string) => void; pasteLabel: string; prompts: string[] }) {
+function Empty({ onPaste, onPrompt, pasteLabel, prompts, onCall }: { onPaste: () => void; onPrompt: (p: string) => void; pasteLabel: string; prompts: string[]; onCall?: () => void }) {
   const { user } = useAuth();
   const name = (user as { firstName?: string | null } | undefined)?.firstName?.trim();
   return (
@@ -22,6 +22,12 @@ function Empty({ onPaste, onPrompt, pasteLabel, prompts }: { onPaste: () => void
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
         I can find companies, work your leads and close deals. Tell me what you need, or tap the mic. I ask before I change anything that matters.
       </p>
+      {onCall && (
+        <button type="button" onClick={onCall} data-testid="starter-call"
+          className="gradient-btn mt-5 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-md">
+          <Phone className="h-4 w-4" />Talk to DealInSec
+        </button>
+      )}
       <div className="mt-6 flex flex-wrap justify-center gap-2">
         {prompts.map((p) => (
           <button key={p} type="button" onClick={() => onPrompt(p)}
@@ -43,7 +49,7 @@ function Empty({ onPaste, onPrompt, pasteLabel, prompts }: { onPaste: () => void
  * `emptyState` lets the drawer show the daily briefing instead of the starter.
  */
 export function AgentConversation({
-  agent, compact, emptyState, disabledReason, extraPrompts, voiceLang,
+  agent, compact, emptyState, disabledReason, extraPrompts, voiceLang, onCall,
 }: {
   agent: Agent;
   compact?: boolean;
@@ -52,6 +58,8 @@ export function AgentConversation({
   extraPrompts?: string[];
   /** Language for dictation; when set, the composer shows a microphone. */
   voiceLang?: string;
+  /** Starts a voice call (the welcome shows a Talk to DealInSec button). */
+  onCall?: () => void;
 }) {
   const audience = useAudience();
   const [, setLocation] = useLocation();
@@ -78,7 +86,7 @@ export function AgentConversation({
         onDecline={agent.reject}
         onEditDraft={editDraft}
         compact={compact}
-        header={empty ? (emptyState ?? <Empty onPaste={() => setSeed((x) => ({ text: s.paste, n: x.n + 1 }))} onPrompt={agent.send} pasteLabel={s.pasteLabel} prompts={[...(extraPrompts ?? []), ...s.prompts].slice(0, 5)} />) : agent.loading ? (
+        header={empty ? (emptyState ?? <Empty onCall={onCall} onPaste={() => setSeed((x) => ({ text: s.paste, n: x.n + 1 }))} onPrompt={agent.send} pasteLabel={s.pasteLabel} prompts={[...(extraPrompts ?? []), ...s.prompts].slice(0, 5)} />) : agent.loading ? (
           <div className="space-y-3" aria-busy="true"><div className="h-4 w-2/3 animate-pulse rounded bg-muted" /><div className="h-4 w-1/2 animate-pulse rounded bg-muted" /></div>
         ) : null}
       />

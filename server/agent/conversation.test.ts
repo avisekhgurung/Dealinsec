@@ -53,7 +53,7 @@ describe("one agent, any channel", () => {
     expect(spoken).toEqual(["You have one deal, with Acme."]);
     expect(events.map((e) => e.type)).toContain("agent.searching");
     // The voice style reached the model; the logic did not change.
-    expect(provider.calls[0][0].content).toMatch(/spoken aloud/);
+    expect(provider.calls[0][0].content).toMatch(/live voice call/);
   });
 
   it("the same turn on the web and by voice produces the same run — the loop never branches on channel", async () => {

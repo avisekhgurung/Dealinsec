@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, History, LayoutDashboard, Plus, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, History, LayoutDashboard, Phone, Plus, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { AgentConversation } from "@/components/agent/agent-conversation";
 import { AutonomyControl } from "@/components/agent/autonomy-control";
@@ -19,6 +19,9 @@ import { useAgent } from "@/hooks/use-agent";
 import { useMoney } from "@/hooks/use-locale";
 import { setUiMode, useUiMode } from "@/hooks/use-ui-mode";
 import { useSpeechOutput } from "@/hooks/use-voice";
+import { voiceCallSupported } from "@/hooks/use-voice-call";
+import { VoiceCall } from "@/components/agent/voice-call";
+import { useAuth } from "@/hooks/useAuth";
 import { takePendingAgentMessage } from "@/lib/agent-bus";
 import { trackEvent } from "@/lib/analytics";
 
@@ -32,6 +35,9 @@ export default function AgentPage() {
   const focus = useUiMode() === "agent";
   const { locale } = useMoney();
   const speech = useSpeechOutput(locale);
+  const { user } = useAuth();
+  const [callOpen, setCallOpen] = useState(false);
+  const canCall = voiceCallSupported();
   const toDashboard = () => { setUiMode("app"); navigate("/dashboard"); };
 
   const agent = useAgent({
@@ -63,7 +69,7 @@ export default function AgentPage() {
   // Read the agent's finished reply aloud (when the person has turned that on).
   const wasRunning = useRef(false);
   useEffect(() => {
-    if (wasRunning.current && !agent.running && speech.enabled) {
+    if (wasRunning.current && !agent.running && speech.enabled && !callOpen) {
       const last = [...agent.messages].reverse().find((m) => m.role === "assistant");
       if (last?.content) speech.speak(last.content);
     }
@@ -97,6 +103,12 @@ export default function AgentPage() {
             <h1 className="truncate text-base font-bold leading-tight">DealInSec Agent</h1>
             <p className="hidden truncate text-xs text-muted-foreground sm:block">Your deals, handled in one conversation</p>
           </div>
+          {canCall && (
+            <button type="button" onClick={() => setCallOpen(true)} aria-label="Start a voice call" data-testid="agent-call"
+              className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700">
+              <Phone className="h-4 w-4" /><span className="hidden sm:inline">Call</span>
+            </button>
+          )}
           {speech.supported && (
             <button type="button" onClick={() => speech.setEnabled(!speech.enabled)} aria-pressed={speech.enabled} aria-label={speech.enabled ? "Stop reading replies aloud" : "Read replies aloud"} data-testid="agent-voice-out"
               className={`flex h-9 w-9 items-center justify-center rounded-lg border transition ${speech.enabled ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "border-border text-foreground/70 hover:bg-muted/60"}`}>
@@ -114,8 +126,10 @@ export default function AgentPage() {
           </button>
         </header>
 
-        <AgentConversation agent={agent} disabledReason={unavailable} voiceLang={locale} />
+        <AgentConversation agent={agent} disabledReason={unavailable} voiceLang={locale} onCall={canCall ? () => setCallOpen(true) : undefined} />
       </main>
+
+      {callOpen && <VoiceCall agent={agent} lang={locale} firstName={(user as { firstName?: string | null } | undefined)?.firstName} onClose={() => setCallOpen(false)} />}
 
       <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
         <SheetContent side="left" className="w-[min(20rem,88vw)] p-0">
