@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMoney } from "@/hooks/use-locale";
 import { useAudience } from "@/hooks/use-audience";
 import { useAgent } from "@/hooks/use-agent";
+import { setUiMode } from "@/hooks/use-ui-mode";
 import { COPILOT_EVENT, takePendingCopilot } from "@/lib/copilot-bus";
 import { trackEvent } from "@/lib/analytics";
 import { AgentConversation } from "@/components/agent/agent-conversation";
@@ -135,7 +136,7 @@ export function Copilot() {
                 <RotateCcw className="w-4 h-4" />
               </button>
             )}
-            <Link href={agent.sessionId ? `/agent/${agent.sessionId}` : "/agent"} onClick={() => setOpen(false)} aria-label="Open the full Agent page" data-testid="copilot-expand"
+            <Link href={agent.sessionId ? `/agent/${agent.sessionId}` : "/agent"} onClick={() => { setOpen(false); setUiMode("agent"); }} aria-label="Switch to agent mode: chat and voice only" data-testid="copilot-expand"
               className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/15 transition-colors">
               <Maximize2 className="w-4 h-4" />
             </Link>

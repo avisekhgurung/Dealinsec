@@ -10,6 +10,8 @@ export function starters(a: Pick<AudienceState, "partyLower" | "isBrand">) {
     paste,
     pasteLabel: `Paste a ${a.partyLower} message`,
     prompts: [
+      "Find me companies that could use my services",
+      "What should I do on my leads today?",
       "What needs my attention?",
       `Which ${a.partyLower}s owe me money?`,
       "Show the payment status of everything",

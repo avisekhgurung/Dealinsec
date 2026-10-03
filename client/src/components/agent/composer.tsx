@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Square } from "lucide-react";
+import { ArrowUp, Mic, Square } from "lucide-react";
+import { useSpeechInput } from "@/hooks/use-voice";
 import { cn } from "@/lib/utils";
 
 const MAX_LEN = 4000;
@@ -10,7 +11,7 @@ const MAX_LEN = 4000;
  * the send button becomes Stop. Text-base keeps iOS from zooming on focus.
  */
 export function Composer({
-  onSend, onStop, running, disabled, placeholder, autoFocus, seed,
+  onSend, onStop, running, disabled, placeholder, autoFocus, seed, voiceLang,
 }: {
   onSend: (text: string) => void;
   onStop: () => void;
@@ -20,8 +21,14 @@ export function Composer({
   autoFocus?: boolean;
   /** Fills the box (and focuses it) whenever `n` changes — a starter that needs the person's own text. */
   seed?: { text: string; n: number };
+  /** BCP-47 language for dictation. When set (and the browser can do it) a microphone button appears. */
+  voiceLang?: string;
 }) {
   const [text, setText] = useState("");
+  // Dictation fills the box; the person reads it and presses send themselves.
+  const base = useRef("");
+  const voice = useSpeechInput({ lang: voiceLang ?? "en-US", onTranscript: (t) => setText(`${base.current}${base.current && t ? " " : ""}${t}`.slice(0, MAX_LEN)) });
+  const toggleVoice = () => { if (!voice.listening) base.current = text.trim(); voice.toggle(); };
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -44,6 +51,7 @@ export function Composer({
   const submit = () => {
     const t = text.trim();
     if (!t || running || disabled) return;
+    if (voice.listening) voice.stop();
     onSend(t);
     setText("");
   };
@@ -68,6 +76,13 @@ export function Composer({
         data-testid="agent-input"
         className="max-h-48 min-w-0 flex-1 resize-none bg-transparent py-2 text-base outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
       />
+      {voiceLang && voice.supported && !running && (
+        <button type="button" onClick={toggleVoice} disabled={disabled} aria-label={voice.listening ? "Stop dictating" : "Dictate a message"} aria-pressed={voice.listening} data-testid="agent-mic"
+          title={voice.error ?? "Dictate. Your browser's speech service may process the audio."}
+          className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition", voice.listening ? "animate-pulse border-rose-400 bg-rose-50 text-rose-600 dark:bg-rose-950/40" : "border-border text-foreground/70 hover:bg-muted/60")}>
+          <Mic className="h-[18px] w-[18px]" />
+        </button>
+      )}
       {running ? (
         <button type="button" onClick={onStop} aria-label="Stop" data-testid="agent-stop"
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-white transition hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900">
@@ -79,6 +94,7 @@ export function Composer({
           <ArrowUp className="h-[18px] w-[18px]" />
         </button>
       )}
+      {voice.error && <p role="alert" className="sr-only">{voice.error}</p>}
     </form>
   );
 }

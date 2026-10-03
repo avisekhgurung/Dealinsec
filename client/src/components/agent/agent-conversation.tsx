@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Sparkles } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAudience } from "@/hooks/use-audience";
+import { useAuth } from "@/hooks/useAuth";
 import type { useAgent } from "@/hooks/use-agent";
 import { Composer } from "./composer";
 import { starters } from "./starters";
@@ -9,25 +10,29 @@ import { Thread } from "./thread";
 
 type Agent = ReturnType<typeof useAgent>;
 
+const greetingFor = (hour: number) => (hour < 5 ? "Working late" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening");
+
 function Empty({ onPaste, onPrompt, pasteLabel, prompts }: { onPaste: () => void; onPrompt: (p: string) => void; pasteLabel: string; prompts: string[] }) {
+  const { user } = useAuth();
+  const name = (user as { firstName?: string | null } | undefined)?.firstName?.trim();
   return (
-    <div className="px-1 pb-2 pt-6 text-center sm:pt-12" data-testid="agent-empty">
-      <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-600/10 text-emerald-700 dark:text-emerald-400"><Sparkles className="h-5 w-5" /></span>
-      <h2 className="mt-3 text-xl font-bold tracking-tight sm:text-2xl">What should we handle?</h2>
-      <p className="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground">
-        Paste a message and I'll read it, flag what's missing, and prepare the deal. I ask before I change anything that matters.
+    <div className="px-1 pb-2 pt-8 text-center sm:pt-16" data-testid="agent-empty">
+      <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600/10 text-emerald-700 dark:text-emerald-400"><Sparkles className="h-6 w-6" /></span>
+      <h2 className="mt-4 text-2xl font-bold tracking-tight sm:text-3xl" data-testid="agent-greeting">{greetingFor(new Date().getHours())}{name ? `, ${name}` : ""}</h2>
+      <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+        I can find companies, work your leads and close deals. Tell me what you need, or tap the mic. I ask before I change anything that matters.
       </p>
-      <div className="mt-5 flex flex-wrap justify-center gap-2">
-        <button type="button" onClick={onPaste} data-testid="starter-paste"
-          className="rounded-full border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-          {pasteLabel}
-        </button>
+      <div className="mt-6 flex flex-wrap justify-center gap-2">
         {prompts.map((p) => (
           <button key={p} type="button" onClick={() => onPrompt(p)}
             className="rounded-full border border-border bg-background px-3.5 py-2 text-xs font-medium text-foreground/80 transition hover:bg-muted/60">
             {p}
           </button>
         ))}
+        <button type="button" onClick={onPaste} data-testid="starter-paste"
+          className="rounded-full border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+          {pasteLabel}
+        </button>
       </div>
     </div>
   );
@@ -38,13 +43,15 @@ function Empty({ onPaste, onPrompt, pasteLabel, prompts }: { onPaste: () => void
  * `emptyState` lets the drawer show the daily briefing instead of the starter.
  */
 export function AgentConversation({
-  agent, compact, emptyState, disabledReason, extraPrompts,
+  agent, compact, emptyState, disabledReason, extraPrompts, voiceLang,
 }: {
   agent: Agent;
   compact?: boolean;
   emptyState?: React.ReactNode;
   disabledReason?: string | null;
   extraPrompts?: string[];
+  /** Language for dictation; when set, the composer shows a microphone. */
+  voiceLang?: string;
 }) {
   const audience = useAudience();
   const [, setLocation] = useLocation();
@@ -71,7 +78,7 @@ export function AgentConversation({
         onDecline={agent.reject}
         onEditDraft={editDraft}
         compact={compact}
-        header={empty ? (emptyState ?? <Empty onPaste={() => setSeed((x) => ({ text: s.paste, n: x.n + 1 }))} onPrompt={agent.send} pasteLabel={s.pasteLabel} prompts={[...(extraPrompts ?? []), ...s.prompts].slice(0, 4)} />) : agent.loading ? (
+        header={empty ? (emptyState ?? <Empty onPaste={() => setSeed((x) => ({ text: s.paste, n: x.n + 1 }))} onPrompt={agent.send} pasteLabel={s.pasteLabel} prompts={[...(extraPrompts ?? []), ...s.prompts].slice(0, 5)} />) : agent.loading ? (
           <div className="space-y-3" aria-busy="true"><div className="h-4 w-2/3 animate-pulse rounded bg-muted" /><div className="h-4 w-1/2 animate-pulse rounded bg-muted" /></div>
         ) : null}
       />
@@ -84,7 +91,8 @@ export function AgentConversation({
             running={agent.running}
             disabled={!!disabledReason}
             seed={seed}
-            placeholder="Paste a message or ask…"
+            placeholder="Ask, or tap the mic…"
+            voiceLang={voiceLang}
           />
           <p className="mt-1.5 text-center text-[11px] text-muted-foreground">Check what it prepares before you approve it.</p>
         </div>

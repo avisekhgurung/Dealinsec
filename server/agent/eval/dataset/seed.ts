@@ -3,13 +3,15 @@
  * the `{{deal.acme}}` placeholders in turns and expectations to the ids those
  * records received. Pure apart from mutating the world it is handed.
  */
+import { isoDateInZone } from "@shared/invoice-numbering";
 import { createWorld, seedContract, seedDeal, seedInvoice, seedLead, seedProfile, seedQuote, userRow, ORG1, ORG2, type Row, type World } from "../world";
 import type { WorldSpec } from "./schema";
 
 export type Refs = { deal: Record<string, number>; invoice: Record<string, number>; contract: Record<string, number>; lead: Record<string, number> };
 
 const DAY = 86_400_000;
-const isoIn = (days: number) => new Date(Date.now() + days * DAY).toISOString().slice(0, 10);
+// Dates are the seeded organization's calendar days (India), not UTC days: the two differ for ~5.5 hours every evening.
+const isoIn = (days: number) => isoDateInZone("Asia/Kolkata", new Date(Date.now() + days * DAY));
 
 const leadRow = (l: WorldSpec["leads"][number]) => ({
   companyName: l.companyName, status: l.status,

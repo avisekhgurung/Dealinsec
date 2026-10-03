@@ -6,6 +6,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { AppLoader, RouteLoader } from "@/components/app-loader";
+import { BackToChat } from "@/components/mode-switch";
+import { useUiMode } from "@/hooks/use-ui-mode";
 import { DesktopTopNav } from "@/components/desktop-topnav";
 import { InstallPrompt } from "@/components/install-prompt";
 import { ConfirmProvider } from "@/components/confirm-dialog";
@@ -84,6 +86,7 @@ function isFullBleedRoute(pathname: string) {
 function Router() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const [location, setLocation] = useLocation();
+  const uiMode = useUiMode();
 
   // Fire a GA4 page_view on every SPA route change (and on first render).
   // The gtag config in index.html has send_page_view:false, so this is the
@@ -180,18 +183,23 @@ function Router() {
     );
   }
 
-  const showShell = !isFullBleedRoute(location);
+  // Agent mode: the chat page owns the whole screen (no navigation bars); other pages (opened from a card)
+  // keep the shell and get a one-tap way back to the chat.
+  const agentFocus = uiMode === "agent" && location.startsWith("/agent");
+  const showShell = !isFullBleedRoute(location) && !agentFocus;
+  const home = uiMode === "agent" ? "/agent" : "/dashboard";
 
   return (
     <>
       <AudienceAnalytics />
       {showShell && <DesktopTopNav />}
       {/* Copilot floats on every authed workspace page (not on print/full-bleed views) */}
-      {showShell && (
+      {showShell && uiMode !== "agent" && (
         <Suspense fallback={null}>
           <Copilot />
         </Suspense>
       )}
+      {showShell && uiMode === "agent" && !location.startsWith("/agent") && <BackToChat />}
       {/* Content sits below the desktop top bar via --dis-topnav-h
           (see .app-shell in index.css). */}
       <div className={showShell ? "app-shell" : ""}>
@@ -200,11 +208,11 @@ function Router() {
             {/* Authenticated users hitting `/` go straight to the dashboard
                 — the marketing landing page is for logged-out visitors only. */}
             <Route path="/">
-              <Redirect to="/dashboard" />
+              <Redirect to={home} />
             </Route>
-            <Route path="/auth"><Redirect to="/dashboard" /></Route>
-            <Route path="/forgot-password"><Redirect to="/dashboard" /></Route>
-            <Route path="/reset-password"><Redirect to="/dashboard" /></Route>
+            <Route path="/auth"><Redirect to={home} /></Route>
+            <Route path="/forgot-password"><Redirect to={home} /></Route>
+            <Route path="/reset-password"><Redirect to={home} /></Route>
             <Route path="/dashboard" component={DashboardPage} />
             <Route path="/agent/:id?" component={AgentPage} />
             <Route path="/leads" component={LeadsPage} />

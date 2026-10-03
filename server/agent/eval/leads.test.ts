@@ -24,6 +24,7 @@ import { AGENT_TOOLS } from "../tools";
 import { FakeProvider, call, collect, say, type Step } from "../testing";
 import type { AutonomyLevel } from "../types";
 import { convertToDeal } from "../../services/leads";
+import { isoDateInZone } from "@shared/invoice-numbering";
 import { useWorld } from "./world-mocks";
 import { createWorld, seedLead, seedProfile, userRow, ORG2, type World } from "./world";
 
@@ -441,7 +442,8 @@ describe("finding companies (web search)", () => {
 });
 
 describe("follow-ups: what is due", () => {
-  const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+  // "Today" is the ORGANIZATION's day (the world's org is in India), not UTC: the two differ for ~5.5 hours every evening.
+  const day = (n: number) => isoDateInZone("Asia/Kolkata", new Date(Date.now() + n * 86_400_000));
   const ticket = (leadId: number, title: string, dueAt: string | null, status = "open", org = "org-1") =>
     world().leads.tickets.push({ id: world().leads.tickets.length + 1, leadId, organizationId: org, title, kind: "other", status, dueAt: dueAt ? new Date(dueAt) : null, createdBy: "user", doneAt: null, createdAt: new Date() } as any);
 

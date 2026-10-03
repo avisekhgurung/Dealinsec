@@ -30,6 +30,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
+import { AgentModeButton } from "@/components/mode-switch";
 import { NotificationBell } from "@/components/notification-bell";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -267,6 +268,7 @@ export function DesktopTopNav() {
 
           {/* ── Account ── */}
           <div className="ml-auto flex shrink-0 items-center gap-1.5 xl:gap-2 pl-3">
+            <AgentModeButton />
             {planChip()}
 
             <span aria-hidden="true" className="mx-1 h-6 w-px bg-white/15" />

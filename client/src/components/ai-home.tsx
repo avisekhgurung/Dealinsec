@@ -13,6 +13,7 @@ import { askCopilot } from "@/lib/copilot-bus";
 import { setPendingAgentMessage } from "@/lib/agent-bus";
 import { useAuth } from "@/hooks/useAuth";
 import { useAudience } from "@/hooks/use-audience";
+import { setUiMode } from "@/hooks/use-ui-mode";
 import { memberCan } from "@shared/permissions";
 import { trackEvent } from "@/lib/analytics";
 
@@ -111,9 +112,16 @@ export function AiHome({ firstRun = false }: { firstRun?: boolean }) {
       data-testid="ai-home"
       className="rounded-2xl border border-emerald-200/70 dark:border-emerald-900/50 bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/50 dark:from-emerald-950/30 dark:via-neutral-900 dark:to-teal-950/20 p-4 sm:p-5 lg:p-6 shadow-sm shadow-emerald-900/5"
     >
-      <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
-        <Sparkles className="w-3.5 h-3.5" /> DealInSec AI
-      </p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
+          <Sparkles className="w-3.5 h-3.5" /> DealInSec AI
+        </p>
+        {/* The way into agent mode (chat and voice only) from the dashboard, on phones too. */}
+        <button type="button" onClick={() => { setUiMode("agent"); navigate("/agent"); }} data-testid="ai-home-agent-mode"
+          className="rounded-full border border-emerald-300/70 bg-white/70 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 transition hover:bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+          Agent mode
+        </button>
+      </div>
       <h2 className="text-xl lg:text-2xl font-bold tracking-tight mt-1">
         {firstRun ? `Let's turn your first ${partyLower} message into a deal.` : "What do you want to do?"}
       </h2>

@@ -10,12 +10,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, History, Plus, Sparkles } from "lucide-react";
+import { ArrowLeft, History, LayoutDashboard, Plus, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { AgentConversation } from "@/components/agent/agent-conversation";
 import { AutonomyControl } from "@/components/agent/autonomy-control";
 import { HistoryList } from "@/components/agent/history-list";
 import { useAgent } from "@/hooks/use-agent";
+import { useMoney } from "@/hooks/use-locale";
+import { setUiMode, useUiMode } from "@/hooks/use-ui-mode";
+import { useSpeechOutput } from "@/hooks/use-voice";
 import { takePendingAgentMessage } from "@/lib/agent-bus";
 import { trackEvent } from "@/lib/analytics";
 
@@ -25,6 +28,11 @@ export default function AgentPage() {
   const params = useParams<{ id?: string }>();
   const [, navigate] = useLocation();
   const [historyOpen, setHistoryOpen] = useState(false);
+  // Agent mode: this page IS the app (no navigation bars). App mode: the same page inside the dashboard shell.
+  const focus = useUiMode() === "agent";
+  const { locale } = useMoney();
+  const speech = useSpeechOutput(locale);
+  const toDashboard = () => { setUiMode("app"); navigate("/dashboard"); };
 
   const agent = useAgent({
     sessionId: params.id ?? null,
@@ -52,25 +60,49 @@ export default function AgentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Read the agent's finished reply aloud (when the person has turned that on).
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (wasRunning.current && !agent.running && speech.enabled) {
+      const last = [...agent.messages].reverse().find((m) => m.role === "assistant");
+      if (last?.content) speech.speak(last.content);
+    }
+    wasRunning.current = agent.running;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agent.running]);
+
   const open = (id: string) => { setHistoryOpen(false); navigate(`/agent/${id}`); };
   const fresh = () => { setHistoryOpen(false); agent.reset(); };
 
   return (
-    <div className="flex h-[100dvh] min-h-0 bg-background lg:h-[calc(100dvh-var(--dis-topnav-h))]" data-testid="agent-page">
+    <div className={focus ? "flex h-[100dvh] min-h-0 bg-background" : "flex h-[100dvh] min-h-0 bg-background lg:h-[calc(100dvh-var(--dis-topnav-h))]"} data-testid="agent-page" data-mode={focus ? "agent" : "app"}>
       <aside className="hidden w-72 shrink-0 border-r border-border/70 bg-muted/20 lg:block">
         <HistoryList activeId={agent.sessionId} onOpen={open} onNew={fresh} onDeleted={(id) => { if (id === agent.sessionId) agent.reset(); }} />
       </aside>
 
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex shrink-0 items-center gap-2 border-b border-border/70 px-3 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] sm:px-5 lg:pt-2.5">
-          <Link href="/dashboard" aria-label="Back to the dashboard" className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted lg:hidden">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
+          {focus ? (
+            <button type="button" onClick={toDashboard} aria-label="Open the dashboard" data-testid="agent-to-dashboard"
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-semibold text-foreground/80 transition hover:bg-muted/60">
+              <LayoutDashboard className="h-4 w-4" /><span className="hidden sm:inline">Dashboard</span>
+            </button>
+          ) : (
+            <Link href="/dashboard" aria-label="Back to the dashboard" className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted lg:hidden">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          )}
           <span className="hidden h-8 w-8 items-center justify-center rounded-lg bg-emerald-600/10 text-emerald-700 dark:text-emerald-400 sm:flex"><Sparkles className="h-4 w-4" /></span>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-base font-bold leading-tight">DealInSec Agent</h1>
             <p className="hidden truncate text-xs text-muted-foreground sm:block">Your deals, handled in one conversation</p>
           </div>
+          {speech.supported && (
+            <button type="button" onClick={() => speech.setEnabled(!speech.enabled)} aria-pressed={speech.enabled} aria-label={speech.enabled ? "Stop reading replies aloud" : "Read replies aloud"} data-testid="agent-voice-out"
+              className={`flex h-9 w-9 items-center justify-center rounded-lg border transition ${speech.enabled ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "border-border text-foreground/70 hover:bg-muted/60"}`}>
+              {speech.enabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </button>
+          )}
           <AutonomyControl />
           <button type="button" onClick={() => setHistoryOpen(true)} aria-label="Conversations" data-testid="agent-history-open"
             className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-foreground/80 transition hover:bg-muted/60 lg:hidden">
@@ -82,7 +114,7 @@ export default function AgentPage() {
           </button>
         </header>
 
-        <AgentConversation agent={agent} disabledReason={unavailable} />
+        <AgentConversation agent={agent} disabledReason={unavailable} voiceLang={locale} />
       </main>
 
       <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
