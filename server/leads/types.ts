@@ -39,6 +39,11 @@ export interface ListOptions {
 
 export type LeadRow = Lead & { nextTicket: { id: number; title: string; dueAt: Date | null } | null };
 
+/** An open, dated next step on a lead that is still being worked. */
+export interface DueTicket {
+  id: number; title: string; kind: string; dueAt: Date; leadId: number; companyName: string; leadStatus: string;
+}
+
 export interface LeadDetail {
   lead: Lead;
   events: LeadEvent[];
@@ -57,6 +62,8 @@ export class LeadConflictError extends Error {
 export interface LeadsStore {
   list(orgId: string, opts: ListOptions): Promise<{ rows: LeadRow[]; total: number }>;
   counts(orgId: string): Promise<Record<string, number>>;
+  /** Open dated tickets due on or before `until`, on open, unarchived leads, soonest first. */
+  dueTickets(orgId: string, until: Date, limit: number): Promise<DueTicket[]>;
   get(orgId: string, id: number): Promise<Lead | null>;
   detail(orgId: string, id: number): Promise<LeadDetail | null>;
   findByDomain(orgId: string, domain: string): Promise<Lead | null>;

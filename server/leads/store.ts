@@ -3,11 +3,12 @@
  * never imported by pure modules; tests of the services and tools replace this
  * module with an in-memory store (see server/agent/eval/world-mocks.ts).
  */
-import { and, asc, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import { leadClaims, leadEvents, leads, leadTickets, type Lead, type LeadClaim, type LeadTicket } from "@shared/schema";
 import type { LeadStatus } from "@shared/leads";
-import { LeadConflictError, type LeadDetail, type LeadPatch, type LeadRow, type LeadsStore, type ListOptions, type NewLead } from "./types";
+import { OPEN_STATUSES } from "@shared/leads";
+import { LeadConflictError, type DueTicket, type LeadDetail, type LeadPatch, type LeadRow, type LeadsStore, type ListOptions, type NewLead } from "./types";
 
 const TABLES = ["leads", "lead_events", "lead_tickets", "lead_claims"];
 
@@ -70,6 +71,19 @@ export class DbLeadsStore implements LeadsStore {
     const rows = await db.select({ status: leads.status, n: count() }).from(leads)
       .where(and(eq(leads.organizationId, orgId), isNull(leads.archivedAt))).groupBy(leads.status);
     return Object.fromEntries(rows.map((r) => [r.status, Number(r.n)]));
+  }
+
+  async dueTickets(orgId: string, until: Date, limit: number): Promise<DueTicket[]> {
+    const rows = await db.select({
+      id: leadTickets.id, title: leadTickets.title, kind: leadTickets.kind, dueAt: leadTickets.dueAt,
+      leadId: leads.id, companyName: leads.companyName, leadStatus: leads.status,
+    }).from(leadTickets).innerJoin(leads, and(eq(leads.id, leadTickets.leadId), eq(leads.organizationId, leadTickets.organizationId)))
+      .where(and(
+        eq(leadTickets.organizationId, orgId), eq(leadTickets.status, "open"), isNotNull(leadTickets.dueAt), lte(leadTickets.dueAt, until),
+        isNull(leads.archivedAt), inArray(leads.status, [...OPEN_STATUSES]),
+      ))
+      .orderBy(asc(leadTickets.dueAt), asc(leadTickets.id)).limit(limit);
+    return rows.map((r) => ({ ...r, dueAt: r.dueAt as Date }));
   }
 
   async get(orgId: string, id: number): Promise<Lead | null> {

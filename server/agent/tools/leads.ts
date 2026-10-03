@@ -19,7 +19,7 @@ import { getBillingUser } from "../../entitlements";
 import { buildDealDraft } from "../../copilot/proposals";
 import {
   addClaim, addNote, archiveLead, closeTicket, convertToDeal, createLead, createLeads, createTicket, getLead, listLeads,
-  moveLead, planMove, prepareNewLead, previewConversion, updateLead,
+  listFollowUps, moveLead, planMove, prepareNewLead, previewConversion, updateLead,
 } from "../../services/leads";
 import { allOf, needsPermission, needsRead } from "../policy";
 import type { AgentTool, ToolContext, ToolOutcome } from "../types";
@@ -107,6 +107,27 @@ const getLeadTool: AgentTool<{ leadId: number }> = {
       events.length ? `Recent timeline:\n${events.slice(0, 8).map((e) => `- ${dateLabel(e.createdAt)} ${e.kind.replace("_", " ")}${e.kind === "note" ? `: ${String((e.data as any)?.text ?? "").slice(0, 200)}` : ""}`).join("\n")}` : "",
     ].filter(Boolean);
     return { ok: true, route: route(lead.id), cards: [await leadCard(ctx, lead.companyName, [lead])], summary: out.join("\n") };
+  },
+};
+
+const followUpsTool: AgentTool<{ days?: number }> = {
+  name: "get_lead_followups",
+  description: "What to do on the lead pipeline: next steps that are overdue, due today, and coming up (default the next 7 days), each with its lead. Use for 'what should I do today', 'what's due', 'who do I need to follow up with'.",
+  risk: "READ_ONLY", activity: "searching",
+  input: z.object({ days: z.number().int().min(1).max(30).optional().describe("How many days ahead to include; default 7") }),
+  authorize: readLeads,
+  async run(ctx, { days }): Promise<ToolOutcome> {
+    const r = await listFollowUps(who(ctx), { days });
+    if (!r.ok) return failFrom(r);
+    const all = [...r.overdue, ...r.dueToday, ...r.upcoming];
+    if (!all.length) return { ok: true, route: "/leads", summary: `Nothing is due on your leads in the next ${days ?? 7} days. Leads with no dated next step won't appear here.` };
+    const line = (f: (typeof all)[number]) => `- [lead ${f.leadId}] ${f.companyName} (${stageLabel(f.leadStatus)}): ${f.title} — ${f.due}`;
+    const section = (name: string, xs: typeof all) => (xs.length ? `${name} (${xs.length}):\n${xs.map(line).join("\n")}` : "");
+    const items = all.map((f) => ({ id: f.leadId, company: f.companyName, stage: f.leadStatus, stageLabel: stageLabel(f.leadStatus), route: route(f.leadId), value: null, next: { title: f.title, due: f.due } }));
+    return {
+      ok: true, route: "/leads", cards: [{ kind: "lead", data: { title: "Follow-ups", leads: items } }],
+      summary: [`Today is ${r.today}.`, section("Overdue", r.overdue), section("Due today", r.dueToday), section("Coming up", r.upcoming)].filter(Boolean).join("\n"),
+    };
   },
 };
 
@@ -414,6 +435,6 @@ const convertTool: AgentTool<z.infer<typeof convertInput>> = {
 };
 
 export const LEAD_TOOLS: AgentTool<any>[] = [
-  listLeadsTool, getLeadTool, createLeadTool, createLeadsTool, updateLeadTool, moveLeadTool, noteTool,
+  listLeadsTool, getLeadTool, followUpsTool, createLeadTool, createLeadsTool, updateLeadTool, moveLeadTool, noteTool,
   createTicketTool, completeTicketTool, claimTool, archiveTool, convertTool,
 ];

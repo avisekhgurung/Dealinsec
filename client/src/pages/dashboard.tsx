@@ -1,3 +1,4 @@
+import { FollowUpsPanel } from "@/components/leads/follow-ups";
 import { LeadsStrip } from "@/components/leads/leads-strip";
 import { useAuth } from "@/hooks/useAuth";
 import { useAudience } from "@/hooks/use-audience";
@@ -951,6 +952,7 @@ export default function DashboardPage() {
         <TeamSeatsCard />
 
         <LeadsStrip />
+        <FollowUpsPanel max={4} />
         <MoneyRadarCard />
         <ProtectionIssuesCard isBrand={audience.isBrand} />
 

@@ -63,6 +63,17 @@ export function registerLeadRoutes(app: Express) {
     }
   };
 
+  // Before /api/leads/:id, or "follow-ups" would be read as an id.
+  app.get("/api/leads/follow-ups", ...guard, async (req: any, res) => {
+    try {
+      const days = z.coerce.number().int().min(1).max(30).optional().safeParse(req.query.days);
+      send(res, await leads.listFollowUps(req.user, { days: days.success ? days.data : undefined }));
+    } catch (err) {
+      agentLog("error", { errorType: (err as Error)?.name ?? "Error", where: "leads_followups" });
+      res.status(500).json({ code: "internal", error: "Couldn't load your follow-ups." });
+    }
+  });
+
   app.get("/api/leads", ...guard, async (req: any, res) => {
     try {
       const q = z.object({

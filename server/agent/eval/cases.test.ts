@@ -429,7 +429,7 @@ describe("cross-cutting guarantees", () => {
       get_account_status: {}, get_money_radar: {}, get_deal_health: { dealId: deal.id }, get_recent_activity: {}, get_deal: { dealId: deal.id },
       get_quotation: { dealId: deal.id }, get_agreement: { dealId: deal.id }, get_invoice: { invoiceId: inv.id }, get_payment_status: {},
       draft_payment_followup: { invoiceId: inv.id }, run_protection_check: { dealId: deal.id },
-      list_leads: {}, get_lead: { leadId: lead.id },
+      list_leads: {}, get_lead: { leadId: lead.id }, get_lead_followups: {},
     };
     const reads = AGENT_TOOLS.filter((t) => t.risk === "READ_ONLY" && t.name !== "analyze_deal_message");
     expect(reads.map((t) => t.name).sort()).toEqual(Object.keys(args).sort());

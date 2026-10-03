@@ -28,6 +28,8 @@ const leadSpec = z.object({
   status: z.enum(["new", "researching", "qualified", "contacted", "replied", "meeting", "proposal", "won", "lost"]).default("new"),
   website: z.string().optional(),
   estValueMinor: z.number().int().positive().optional(),
+  /** Open next steps; a negative dueInDays is overdue. */
+  tickets: z.array(z.object({ title: z.string(), dueInDays: z.number().int().optional() })).default([]),
 });
 
 export const worldSpecSchema = z.object({

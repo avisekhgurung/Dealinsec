@@ -140,6 +140,25 @@ async function main() {
   check("complete the ticket", r.status === 200 && r.json?.ticket?.status === "done");
   r = await a.req("PATCH", `/api/leads/${lead.id}/tickets/${ticket.id}`, { status: "done" });
   check("completing it again: 409", r.status === 409, `${r.status}`);
+  console.log("\n━━ 4b. Follow-ups ━━");
+  r = await a.req("POST", `/api/leads/${lead.id}/tickets`, { title: "Chase the old quote", dueAt: "2020-01-01" });
+  const oldTicket = r.json?.ticket;
+  r = await a.req("POST", `/api/leads/${lead.id}/tickets`, { title: "Far future step", dueAt: "2099-01-01" });
+  r = await a.req("GET", "/api/leads/follow-ups");
+  check("follow-ups: the route is not shadowed by /:id", r.status === 200 && Array.isArray(r.json?.overdue), `${r.status} ${r.text}`);
+  check("an old open step is OVERDUE, with its lead", r.json?.overdue?.some((f: any) => f.id === oldTicket.id && f.companyName === "Northwind Logistics"), JSON.stringify(r.json?.overdue));
+  check("a step years away is not listed", ![...(r.json?.overdue ?? []), ...(r.json?.dueToday ?? []), ...(r.json?.upcoming ?? [])].some((f: any) => f.title === "Far future step"));
+  check("'today' is a plain date", /^\d{4}-\d{2}-\d{2}$/.test(r.json?.today ?? ""));
+  r = await a.req("GET", "/api/leads/follow-ups?days=abc");
+  check("a junk window falls back to the default instead of failing", r.status === 200);
+  r = await b.req("GET", "/api/leads/follow-ups");
+  check("another organization sees none of it", r.status === 200 && r.json?.overdue?.length === 0 && r.json?.upcoming?.length === 0, r.text);
+  r = await anon.req("GET", "/api/leads/follow-ups");
+  check("signed out: 401", r.status === 401);
+  await a.req("PATCH", `/api/leads/${lead.id}/tickets/${oldTicket.id}`, { status: "done" });
+  r = await a.req("GET", "/api/leads/follow-ups");
+  check("a completed step leaves the list", !r.json?.overdue?.some((f: any) => f.id === oldTicket.id));
+
   r = await a.req("POST", `/api/leads/${lead.id}/claims`, { field: "headcount", value: "about 200", status: "confirmed" });
   check("a CONFIRMED fact with no source: 400", r.status === 400, `${r.status} ${r.text}`);
   r = await a.req("POST", `/api/leads/${lead.id}/claims`, { field: "headcount", value: "about 200", status: "inferred" });
@@ -150,7 +169,7 @@ async function main() {
   check("a javascript: evidence URL is refused", r.status === 400, `${r.status}`);
   r = await a.req("GET", `/api/leads/${lead.id}`);
   const d = r.json;
-  check("detail: timeline, tickets, claims, allowed moves", r.status === 200 && d?.events?.length >= 6 && d?.tickets?.length === 1 && d?.claims?.length === 2 && r.json?.canConvert === true && Array.isArray(r.json?.moves), `${r.status} events=${d?.events?.length}`);
+  check("detail: timeline, tickets, claims, allowed moves", r.status === 200 && d?.events?.length >= 6 && d?.tickets?.length === 3 && d?.claims?.length === 2 && r.json?.canConvert === true && Array.isArray(r.json?.moves), `${r.status} events=${d?.events?.length}`);
 
   console.log("\n━━ 5. Convert: one lead, one deal ━━");
   const pool = new pg.Pool({ connectionString: DATABASE_URL });

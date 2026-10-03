@@ -10,6 +10,7 @@ import { ChevronRight, Plus, Search, Target, X } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { LeadFormDialog } from "@/components/leads/lead-form-dialog";
+import { FollowUpsPanel } from "@/components/leads/follow-ups";
 import { StageBadge } from "@/components/leads/stage-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -79,6 +80,8 @@ export default function LeadsPage() {
       </header>
 
       <main className="animate-fade-in space-y-4 px-4 py-5 lg:mx-auto lg:max-w-[1600px] lg:space-y-5 lg:px-8 lg:py-6">
+        <FollowUpsPanel />
+
         {/* Stage filter: scrolls sideways inside itself, never the page. */}
         <div className="-mx-4 overflow-x-auto px-4 lg:mx-0 lg:overflow-visible lg:px-0" role="tablist" aria-label="Filter by stage">
           <div className="flex w-max gap-2 lg:w-auto lg:flex-wrap">

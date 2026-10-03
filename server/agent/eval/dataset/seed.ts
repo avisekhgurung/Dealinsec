@@ -49,7 +49,16 @@ export function buildWorld(spec: WorldSpec): { world: World; user: Row; refs: Re
     const row = seedDeal(world, { organizationId: ORG2, userId: "u2", brandName: f.brandName, dealTitle: f.dealTitle });
     refs.deal[f.ref] = row.id;
   }
-  for (const l of spec.leads) refs.lead[l.ref] = seedLead(world, leadRow(l)).id;
+  for (const l of spec.leads) {
+    const row = seedLead(world, leadRow(l));
+    refs.lead[l.ref] = row.id;
+    for (const t of l.tickets) {
+      world.leads.tickets.push({
+        id: world.leads.tickets.length + 1, leadId: row.id, organizationId: ORG1, title: t.title, kind: "other", status: "open",
+        dueAt: t.dueInDays === undefined ? null : new Date(`${isoIn(t.dueInDays)}T00:00:00Z`), createdBy: "user", doneAt: null, createdAt: new Date(),
+      } as any);
+    }
+  }
   for (const l of spec.foreignLeads) refs.lead[l.ref] = seedLead(world, { ...leadRow(l), ownerUserId: "u2" }, ORG2).id;
   return { world, user, refs };
 }

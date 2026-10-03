@@ -71,3 +71,7 @@ export const isOverdue = (due: string | null | undefined) => {
   d.setHours(23, 59, 59, 999);
   return d.getTime() < Date.now();
 };
+
+export interface FollowUpView { id: number; title: string; kind: string; due: string; leadId: number; companyName: string; leadStatus: string }
+export interface FollowUps { today: string; overdue: FollowUpView[]; dueToday: FollowUpView[]; upcoming: FollowUpView[] }
+export const FOLLOWUPS_URL = "/api/leads/follow-ups";

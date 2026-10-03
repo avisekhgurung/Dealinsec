@@ -20,6 +20,7 @@ import { agentLog } from "../agent/log";
 import { leadsStore as store } from "../leads/store";
 import { LeadConflictError, type LeadDetail, type LeadRow } from "../leads/types";
 import { storage } from "../storage";
+import { isoDateInZone } from "@shared/invoice-numbering";
 
 type Fail = { ok: false; status: number; code: string; message: string; [extra: string]: unknown };
 export type Result<T> = ({ ok: true } & T) | Fail;
@@ -131,6 +132,35 @@ export async function listLeads(user: Who, q: { status?: string; q?: string; lim
   // A closed lead has no "next step": an old open ticket on a won or lost lead is not a thing to do.
   const shown = rows.map((r) => (isOpen(r.status as LeadStatus) ? r : { ...r, nextTicket: null }));
   return { ok: true, rows: shown, total, counts };
+}
+
+export interface FollowUp { id: number; title: string; kind: string; due: string; leadId: number; companyName: string; leadStatus: string }
+
+const addDays = (isoDate: string, n: number) => new Date(Date.parse(`${isoDate}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * What to do on the pipeline: overdue, due today and coming up, from the open
+ * next steps of leads still being worked. "Today" is the organization's day,
+ * not the server's.
+ */
+export async function listFollowUps(user: Who, opts: { days?: number } = {}): Promise<Result<{ today: string; overdue: FollowUp[]; dueToday: FollowUp[]; upcoming: FollowUp[] }>> {
+  const gate = readGate(user);
+  if (gate) return gate;
+  const days = Math.min(30, Math.max(1, Math.floor(opts.days ?? 7)));
+  const org = await storage.getOrganization(user.organizationId!);
+  const today = isoDateInZone(resolveLocaleSettings(org, user as any).timezone);
+  const horizon = addDays(today, days);
+  // A day of slack in the query; the exact cut is made on the date strings below.
+  const rows = await store.dueTickets(user.organizationId!, new Date(`${addDays(horizon, 1)}T00:00:00Z`), 200);
+  const out = { today, overdue: [] as FollowUp[], dueToday: [] as FollowUp[], upcoming: [] as FollowUp[] };
+  for (const r of rows) {
+    const due = new Date(r.dueAt).toISOString().slice(0, 10);
+    const item: FollowUp = { id: r.id, title: r.title, kind: r.kind, due, leadId: r.leadId, companyName: r.companyName, leadStatus: r.leadStatus };
+    if (due < today) out.overdue.push(item);
+    else if (due === today) out.dueToday.push(item);
+    else if (due <= horizon) out.upcoming.push(item);
+  }
+  return { ok: true, ...out };
 }
 
 export async function getLead(user: Who, id: number): Promise<Result<{ detail: LeadDetail; moves: readonly LeadStatus[]; canConvert: boolean }>> {

@@ -90,3 +90,10 @@ The 12 extra tool specs raised the input tokens of **every** agent call by rough
 Two real prompt problems the leads run exposed: the model **over-asked** ("where did you see that?") when the user had plainly asked to record a hunch (fix: record it as *inferred* straight away), and it **trimmed a pasted note** and said "I recorded" before the user had approved (fix: notes are saved whole, and nothing is "recorded" until the card is approved).
 
 A product gap the *browser* run exposed: the agent noticed a Won lead still had an overdue open ticket. The fix is in the service (a closed lead has no next step), so the list, the agent and the UI all agree.
+
+## 14. Follow-ups: turning stored state into a daily habit (added 3 Oct 2026)
+A pipeline only helps if it tells you what to do next. `listFollowUps` reads the open, dated tickets on leads still being worked and splits them into **overdue / due today / coming up**, using the *organization's* calendar day (not the server's). Closed, archived and other-organization leads never appear. The same function backs `GET /api/leads/follow-ups`, the `get_lead_followups` agent tool, the dashboard panel and the top of `/leads`, so they cannot disagree.
+
+Two things this taught:
+- **A dataset case can go stale when the product improves.** "Which leads need follow-up this week?" used to expect `list_leads`; with the new tool the model correctly switched to `get_lead_followups`. The right fix was the expectation, not the model. Keep the assertion about *the outcome that matters* (an overview tool first, nothing proposed), not one tool name.
+- **Over-asking is a recurring failure, and it is cheap to find.** Two cases flaked because the model asked "shall I create the deal?" or for a lead id instead of acting. Both were fixed by stating the principle for that tool (the approval card IS the confirmation; users name companies, not ids) and re-measuring: leads set 100%, original set 100%, 0 safety failures, no flaky cases (3 repeats, `deepseek-chat`).

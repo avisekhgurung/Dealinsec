@@ -180,6 +180,37 @@ describe("tickets", () => {
   });
 });
 
+describe("follow-ups: what is due", () => {
+  const day = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+  const ticket = (leadId: number, title: string, dueAt: string | null, status = "open", org = "org-1") =>
+    world().leads.tickets.push({ id: world().leads.tickets.length + 1, leadId, organizationId: org, title, kind: "other", status, dueAt: dueAt ? new Date(dueAt) : null, createdBy: "user", doneAt: null, createdAt: new Date() } as any);
+
+  it("separates overdue, due today and coming up; leaves out done, undated, far-off, closed, archived and foreign", async () => {
+    const live = seedLead(world(), { companyName: "Live Co", status: "contacted" });
+    const won = seedLead(world(), { companyName: "Won Co", status: "won" });
+    const arch = seedLead(world(), { companyName: "Archived Co", status: "new", archivedAt: new Date() });
+    const theirs = seedLead(world(), { companyName: "Foreign Co", status: "new" }, ORG2);
+    ticket(live.id, "Overdue thing", day(-3)); ticket(live.id, "Today thing", day(0)); ticket(live.id, "Soon thing", day(3));
+    ticket(live.id, "Far thing", day(20)); ticket(live.id, "Undated thing", null); ticket(live.id, "Done thing", day(-1), "done");
+    ticket(won.id, "Won leftover", day(-5)); ticket(arch.id, "Archived leftover", day(-5)); ticket(theirs.id, "Their thing", day(-5), "open", ORG2);
+    const { provider } = await run({ steps: [call("get_lead_followups", {}), say("ok")] });
+    const out = toolResult(provider);
+    expect(out).toMatch(/Overdue \(1\):[\s\S]*Overdue thing/);
+    expect(out).toMatch(/Due today \(1\):[\s\S]*Today thing/);
+    expect(out).toMatch(/Coming up \(1\):[\s\S]*Soon thing/);
+    for (const hidden of ["Far thing", "Undated", "Done thing", "Won leftover", "Archived leftover", "Their thing"]) expect(out, hidden).not.toContain(hidden);
+  });
+
+  it("says plainly when nothing is due, and the window can be widened", async () => {
+    const live = seedLead(world(), { companyName: "Live Co", status: "contacted" });
+    ticket(live.id, "Far thing", day(20));
+    const a = await run({ steps: [call("get_lead_followups", {}), say("ok")] });
+    expect(toolResult(a.provider)).toMatch(/Nothing is due/);
+    const b = await run({ steps: [call("get_lead_followups", { days: 30 }), say("ok")] });
+    expect(toolResult(b.provider)).toContain("Far thing");
+  });
+});
+
 describe("closing: converting a lead to a deal", () => {
   const qualified = (over: Record<string, any> = {}) => seedLead(world(), { companyName: "Northwind", status: "qualified", estValueMinor: 5_000_000, currency: "INR", ...over });
 
@@ -292,7 +323,7 @@ describe("isolation and roles", () => {
   it("a role with no permissions can use no lead tool", () => {
     const nobody = userRow({ orgRole: "CUSTOM", customPermissions: [] });
     const leadTools = AGENT_TOOLS.filter((t) => /lead|ticket/.test(t.name));
-    expect(leadTools.length).toBe(12);
+    expect(leadTools.length).toBe(13);
     for (const t of leadTools) expect(authorizeCall(t, nobody, {} as any), t.name).not.toBeNull();
   });
 

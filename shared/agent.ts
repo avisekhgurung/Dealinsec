@@ -86,6 +86,7 @@ const TOOL_LABELS: Record<string, string> = {
   mark_unpaid: "the payment reversal",
   list_leads: "your leads",
   get_lead: "the lead",
+  get_lead_followups: "your lead follow-ups",
   create_lead: "the lead",
   create_leads: "the leads",
   update_lead: "the lead changes",

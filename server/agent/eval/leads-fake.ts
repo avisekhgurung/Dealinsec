@@ -6,7 +6,8 @@
  */
 import type { Lead, LeadClaim, LeadEvent, LeadTicket } from "@shared/schema";
 import type { LeadStatus } from "@shared/leads";
-import { LeadConflictError, type LeadDetail, type LeadPatch, type LeadRow, type LeadsStore, type ListOptions, type NewLead } from "../../leads/types";
+import { OPEN_STATUSES } from "@shared/leads";
+import { LeadConflictError, type DueTicket, type LeadDetail, type LeadPatch, type LeadRow, type LeadsStore, type ListOptions, type NewLead } from "../../leads/types";
 
 export class FakeLeadsStore implements LeadsStore {
   leads: Lead[] = [];
@@ -55,6 +56,16 @@ export class FakeLeadsStore implements LeadsStore {
     const out: Record<string, number> = {};
     for (const l of this.live(orgId)) out[l.status] = (out[l.status] ?? 0) + 1;
     return out;
+  }
+
+  async dueTickets(orgId: string, until: Date, limit: number): Promise<DueTicket[]> {
+    return this.tickets
+      .filter((t) => t.organizationId === orgId && t.status === "open" && t.dueAt && t.dueAt.getTime() <= until.getTime())
+      .map((t) => ({ t, l: this.mine(orgId, t.leadId) }))
+      .filter(({ l }) => l && !l.archivedAt && (OPEN_STATUSES as readonly string[]).includes(l.status))
+      .sort((a, b) => a.t.dueAt!.getTime() - b.t.dueAt!.getTime() || a.t.id - b.t.id)
+      .slice(0, limit)
+      .map(({ t, l }) => ({ id: t.id, title: t.title, kind: t.kind, dueAt: t.dueAt!, leadId: l!.id, companyName: l!.companyName, leadStatus: l!.status }));
   }
 
   async get(orgId: string, id: number) { return this.copy(this.mine(orgId, id)) ?? null; }
