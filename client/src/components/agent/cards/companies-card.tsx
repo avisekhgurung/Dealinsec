@@ -19,7 +19,7 @@ import { CardShell } from "./card-shell";
 interface Item { name: string; domain: string; website: string; alreadyLead: number | null }
 
 export function CompaniesCard({ card }: { card: AgentCard }) {
-  const d = card.data as { query?: string; companies?: Item[]; remainingToday?: number };
+  const d = card.data as { query?: string; companies?: Item[]; remainingToday?: number; provider?: string };
   const items = Array.isArray(d.companies) ? d.companies : [];
   const { user } = useAuth();
   const { toast } = useToast();
@@ -59,7 +59,7 @@ export function CompaniesCard({ card }: { card: AgentCard }) {
           );
         })}
       </ul>
-      <p className="border-t border-border/60 px-3.5 py-1.5 text-[10px] text-muted-foreground">Search by Brave</p>
+      {d.provider && <p className="border-t border-border/60 px-3.5 py-1.5 text-[10px] text-muted-foreground">Search by {d.provider}</p>}
     </CardShell>
   );
 }

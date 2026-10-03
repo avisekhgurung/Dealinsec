@@ -21,7 +21,7 @@ const input = z.object({
 
 export const findCompaniesTool: AgentTool<z.infer<typeof input>> = {
   name: "find_companies",
-  description: "Search the web for companies matching a short description (a paid search; always asks the user first). Returns candidate company names and websites taken from page titles: guesses from the open web, to be checked, not facts. Does not add anything to the pipeline; use create_leads for the ones the user picks.",
+  description: "Search the web for companies matching a short description (it uses a search allowance and sends text to an outside service, so it always asks the user first). Returns candidate company names and websites taken from page titles: guesses from the open web, to be checked, not facts. Does not add anything to the pipeline; use create_leads for the ones the user picks.",
   risk: "SAFE_MUTATION",
   input,
   authorize: needsPermission("deals.create", "finding companies"),
@@ -35,7 +35,7 @@ export const findCompaniesTool: AgentTool<z.infer<typeof input>> = {
       preview: {
         title: "Search the web for companies",
         lines: [{ label: "Search for", value: p.query }, ...(p.country ? [{ label: "Country", value: p.country }] : []), { label: "Searches left today", value: String(p.remainingToday) }],
-        effects: ["Sends only this search text to Brave Search; nothing about your leads, clients or messages.", "Uses one paid search.", "Nothing is added to your pipeline."],
+        effects: [`Sends only this search text to ${p.provider.label}; nothing about your leads, clients or messages.`, p.provider.paid ? "Uses one paid search." : "Uses one search from the free allowance.", "Nothing is added to your pipeline."],
       },
     };
   },
@@ -48,7 +48,7 @@ export const findCompaniesTool: AgentTool<z.infer<typeof input>> = {
     const lines = r.companies.map((c) => `- ${c.name} — ${c.domain}${c.alreadyLead ? ` (already your lead #${c.alreadyLead})` : ""}`);
     return {
       ok: true, route: "/leads",
-      cards: [{ kind: "companies", data: { query: r.query, companies: r.companies, remainingToday: r.remainingToday } }],
+      cards: [{ kind: "companies", data: { query: r.query, companies: r.companies, remainingToday: r.remainingToday, provider: r.provider } }],
       summary: `Found ${r.companies.length} possible ${r.companies.length === 1 ? "company" : "companies"} for "${r.query}" (${r.remainingToday} searches left today). Names are guesses from page titles, so check them before adding:\n${lines.join("\n")}`,
     };
   },

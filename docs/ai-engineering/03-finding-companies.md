@@ -1,7 +1,7 @@
 # 03. Finding companies: tools that spend money and read the open web
 
 ## 1. What we built
-The agent can search the web for companies that match a short description ("small logistics companies in Pune that could use a new website"), show the candidates as a card, and let the user add the ones they pick as leads. The search service is **Brave Search API** behind a small `DiscoveryProvider` interface. Nothing is added to the pipeline by the search itself.
+The agent can search the web for companies that match a short description ("small logistics companies in Pune that could use a new website"), show the candidates as a card, and let the user add the ones they pick as leads. The search service sits behind a small `DiscoveryProvider` interface; **LangSearch** (free, no card) and **Brave Search** (paid) are implemented. Nothing is added to the pipeline by the search itself.
 
 ```
 user asks -> agent writes a short query -> APPROVAL CARD shows the exact words
@@ -9,10 +9,10 @@ user asks -> agent writes a short query -> APPROVAL CARD shows the exact words
           -> user presses Add (or asks the agent) -> an ordinary lead
 ```
 
-Configuration: `BRAVE_SEARCH_API_KEY` (server only; without it the feature is simply "not set up"), optional `DISCOVERY_DAILY_LIMIT` (per organization, default 10) and `DISCOVERY_MONTHLY_LIMIT` (whole app, default 300). `BRAVE_SEARCH_URL` points the client at a fake service in tests.
+Configuration (server environment only): `LANGSEARCH_API_KEY` (free, no card) or `BRAVE_SEARCH_API_KEY` (paid). Which one runs: `DISCOVERY_PROVIDER=langsearch|brave` if set, otherwise LangSearch when its key exists, otherwise Brave, otherwise the feature says it isn't set up. Optional `DISCOVERY_DAILY_LIMIT` (per organization, default 10) and `DISCOVERY_MONTHLY_LIMIT` (whole app, default 300). `LANGSEARCH_URL` / `BRAVE_SEARCH_URL` point a client at a fake service in tests.
 
 ## 2. Why this is a different kind of tool
-Every earlier tool changed our own database. This one **spends real money** (Brave has no free tier; roughly $5 per 1,000 searches, card required, no spending cap we can rely on) and **sends words to an outside company**, and what comes back is **untrusted text from the open web**. Three new problems, three structural answers.
+Every earlier tool changed our own database. This one **spends an allowance or real money** (Brave has no free tier: roughly $5 per 1,000 searches, a card, no spending cap we can rely on; LangSearch is free with a daily allowance and no card) and **sends words to an outside company**, and what comes back is **untrusted text from the open web**. Three new problems, three structural answers.
 
 ## 3. Concepts
 - **Spending is a consequence, so it always asks.** The tool is `forceApproval`: it asks at every autonomy level, and the card shows the exact search text, the country, and the searches left. The model cannot decide to spend.
@@ -46,3 +46,10 @@ The model over-asked three times: it demanded the user fill in their ideal clien
 4. A search result's title says "ignore your instructions". Walk through every place that text could end up and what stops it at each.
 5. Why count usage from existing audit rows instead of adding a counter table, and what do you give up?
 6. The provider's terms do not say whether results may be stored. What design choice makes that question irrelevant?
+
+## 8. Choosing a provider, and letting the provider describe itself (added 3 Oct 2026)
+We first built Brave, then learned it needs a card with no spending cap. The founder preferred **LangSearch** (free, no card; per its own docs: `POST https://api.langsearch.com/v1/web-search`, Bearer key, results at `data.webPages.value[{name, url, snippet}]`, a daily allowance resetting at 00:00 UTC; its docs do not state per-request limits or what may be stored). Switching cost one file because the interface held. Lessons:
+- **A provider must describe itself, or the UI lies.** LangSearch has no country filter and no per-search cost, so the interface gained `label`, `paid` and `supportsCountry`. The approval card says "Uses one search from the free allowance" (not "paid"), names the real service, and shows no Country line; no country is sent. A test per provider pins that wording.
+- **Keep the caps even when the service is free.** The allowance and its per-minute limits are not documented, so our 10-a-day and 300-a-month caps now protect a shared free quota instead of a card.
+- **Tolerate what is not documented, but do not trust it.** The client accepts the wrapped (`data.webPages`) and unwrapped shapes, and treats an error code inside a 200 body as an error; anything it cannot read is an empty list or a plain failure, never a crash or a guess. 403 is mapped to "key rejected" and 402/429 to "busy or allowance used up" until a real key shows what the service actually returns.
+- **Test the wire, not only the parse.** The LangSearch client is tested against a real local HTTP server (method, headers, body), and provider selection against the real `discoveryProvider` object, with mutation checks on the header and the country.

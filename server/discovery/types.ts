@@ -14,6 +14,13 @@ export interface SearchOptions { country?: string; count?: number; signal?: Abor
 
 /** Anything that can turn a short description into web results. Brave is the first; the interface is what lets it be swapped. */
 export interface DiscoveryProvider {
+  /** Short id, for logs and configuration. */
   readonly name: string;
+  /** What to call it in front of a person ("Brave Search"). */
+  readonly label: string;
+  /** Whether a search costs money (so the approval card can say so truthfully). */
+  readonly paid: boolean;
+  /** Whether it can narrow results to a country. If not, none is sent or shown. */
+  readonly supportsCountry: boolean;
   search(query: string, opts?: SearchOptions): Promise<SearchResult[]>;
 }

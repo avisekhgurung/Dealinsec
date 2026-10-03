@@ -19,7 +19,7 @@ const intEnv = (name: string, dflt: number) => { const n = Number(process.env[na
 export const dailyLimit = () => intEnv("DISCOVERY_DAILY_LIMIT", 10);
 export const monthlyLimit = () => intEnv("DISCOVERY_MONTHLY_LIMIT", 300);
 
-export interface SearchPlan { query: string; country: string | null; remainingToday: number }
+export interface SearchPlan { query: string; country: string | null; remainingToday: number; provider: { label: string; paid: boolean } }
 
 /** Everything that can be checked WITHOUT spending a search: what a tool shows before asking. */
 export async function planSearch(user: Who, raw: { query?: unknown; country?: unknown }): Promise<Result<SearchPlan>> {
@@ -28,8 +28,11 @@ export async function planSearch(user: Who, raw: { query?: unknown; country?: un
   if (!discoveryConfigured()) return fail(503, "not_configured", "Finding companies isn't switched on for this workspace yet (no search service is set up).");
   const q = sanitizeQuery(String(raw.query ?? ""));
   if (!q.ok) return fail(400, "invalid", q.reason);
-  const country = typeof raw.country === "string" && /^[A-Za-z]{2}$/.test(raw.country.trim()) ? raw.country.trim().toUpperCase() : null;
-  if (raw.country !== undefined && raw.country !== null && raw.country !== "" && !country) return fail(400, "invalid", "Use a two-letter country code such as IN or GB, or leave it out.");
+  // A provider with no country filter never gets one, and the card never shows one: the place belongs in the words.
+  const wantsCountry = raw.country !== undefined && raw.country !== null && raw.country !== "";
+  const code = typeof raw.country === "string" && /^[A-Za-z]{2}$/.test(raw.country.trim()) ? raw.country.trim().toUpperCase() : null;
+  if (wantsCountry && !code && discoveryProvider.supportsCountry) return fail(400, "invalid", "Use a two-letter country code such as IN or GB, or leave it out.");
+  const country = discoveryProvider.supportsCountry ? code : null;
 
   const now = Date.now();
   const [today, month] = await Promise.all([
@@ -38,12 +41,12 @@ export async function planSearch(user: Who, raw: { query?: unknown; country?: un
   ]);
   if (today >= dailyLimit()) return fail(429, "daily_limit", `You've used today's ${dailyLimit()} company searches. Try again tomorrow, or add companies you already know.`);
   if (month >= monthlyLimit()) return fail(429, "monthly_limit", "Company search has reached its monthly limit for the whole app. It resets on a rolling 30-day basis.");
-  return { ok: true, query: q.query, country, remainingToday: Math.min(dailyLimit() - today, monthlyLimit() - month) };
+  return { ok: true, query: q.query, country, remainingToday: Math.min(dailyLimit() - today, monthlyLimit() - month), provider: { label: discoveryProvider.label, paid: discoveryProvider.paid } };
 }
 
 export interface FoundCompany extends Candidate { alreadyLead: number | null }
 
-export async function searchCompanies(user: Who, raw: { query?: unknown; country?: unknown }, signal?: AbortSignal): Promise<Result<{ query: string; companies: FoundCompany[]; remainingToday: number }>> {
+export async function searchCompanies(user: Who, raw: { query?: unknown; country?: unknown }, signal?: AbortSignal): Promise<Result<{ query: string; companies: FoundCompany[]; remainingToday: number; provider: string }>> {
   const plan = await planSearch(user, raw);
   if (!plan.ok) return plan;
   let results;
@@ -62,5 +65,5 @@ export async function searchCompanies(user: Who, raw: { query?: unknown; country
     const existing = await leadsStore.findByDomain(orgId, c.domain);
     companies.push({ ...c, alreadyLead: existing?.id ?? null });
   }
-  return { ok: true, query: plan.query, companies, remainingToday: Math.max(0, plan.remainingToday - 1) };
+  return { ok: true, query: plan.query, companies, remainingToday: Math.max(0, plan.remainingToday - 1), provider: plan.provider.label };
 }

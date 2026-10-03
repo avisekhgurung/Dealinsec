@@ -352,6 +352,28 @@ describe("finding companies (web search)", () => {
     expect(out.find((e) => e.type === "agent.message").data.text).toMatch(/No company websites came up/);
   });
 
+  it("a FREE provider with no country filter: the card says free allowance, shows no country, and sends none", async () => {
+    world().discovery.provider = { label: "LangSearch", paid: false, supportsCountry: false };
+    world().discovery.results = results();
+    const { store } = await run({ steps: [call("find_companies", ask), ASKED] });
+    const preview = [...store.approvals.values()][0].preview as any;
+    expect(preview.lines.map((l: any) => l.label)).not.toContain("Country");
+    expect(preview.effects.join(" ")).toMatch(/to LangSearch/);
+    expect(preview.effects.join(" ")).toMatch(/free allowance/);
+    expect(preview.effects.join(" ")).not.toMatch(/paid/i);
+    const out: any[] = [];
+    await executeApproval({ store, tools: AGENT_TOOLS }, OWNER(), firstApproval(store), (e) => out.push(e));
+    expect(world().discovery.countries).toEqual([undefined]);
+    expect(out.find((e) => e.type === "agent.message").data.cards[0].data.provider).toBe("LangSearch");
+  });
+
+  it("a PAID provider says so, with its own name", async () => {
+    const { store } = await run({ steps: [call("find_companies", ask), ASKED] });
+    const effects = ([...store.approvals.values()][0].preview as any).effects.join(" ");
+    expect(effects).toMatch(/Uses one paid search/);
+    expect(effects).toMatch(/to Brave Search/);
+  });
+
   it("a role that can't add leads can't search", () => {
     const nobody = userRow({ orgRole: "CUSTOM", customPermissions: [] });
     expect(authorizeCall(AGENT_TOOLS.find((t) => t.name === "find_companies")!, nobody, {} as any)).not.toBeNull();

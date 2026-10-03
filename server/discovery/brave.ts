@@ -14,6 +14,9 @@ const TIMEOUT_MS = 10_000;
 
 export class BraveProvider implements DiscoveryProvider {
   readonly name = "brave";
+  readonly label = "Brave Search";
+  readonly paid = true;
+  readonly supportsCountry = true;
   constructor(private readonly apiKey: string, private readonly endpoint = DEFAULT_URL, private readonly fetchImpl: typeof fetch = fetch) {}
 
   async search(query: string, opts: SearchOptions = {}): Promise<SearchResult[]> {

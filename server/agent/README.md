@@ -95,9 +95,9 @@ and tools; tests inject fakes.
 ## Finding companies (web search)
 
 `find_companies` (`tools/discovery.ts`, `services/discovery.ts`, `server/discovery/*`) searches the web through a
-`DiscoveryProvider` (Brave first). It spends a paid search and sends text out, so it **always asks**, shows the exact
-words, enforces per-organization and whole-app caps, and refuses queries with personal details. Environment:
-`BRAVE_SEARCH_API_KEY` (without it the feature is "not set up"), `DISCOVERY_DAILY_LIMIT` (default 10 per organization),
-`DISCOVERY_MONTHLY_LIMIT` (default 300 overall), `BRAVE_SEARCH_URL` (tests). See
+`DiscoveryProvider` (LangSearch: free, no card; or Brave: paid). It uses a search allowance and sends text out, so it
+**always asks**, shows the exact words, enforces per-organization and whole-app caps, and refuses queries with personal
+details. Environment: `LANGSEARCH_API_KEY` or `BRAVE_SEARCH_API_KEY` (without either the feature is "not set up"),
+`DISCOVERY_PROVIDER` (optional: `langsearch` | `brave`), `DISCOVERY_DAILY_LIMIT` (default 10 per organization),
+`DISCOVERY_MONTHLY_LIMIT` (default 300 overall), `LANGSEARCH_URL` / `BRAVE_SEARCH_URL` (tests). See
 `docs/ai-engineering/03-finding-companies.md`.
-

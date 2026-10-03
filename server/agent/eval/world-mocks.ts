@@ -52,9 +52,13 @@ export const discoveryProviderMock = async () => {
     discoveryConfigured: () => world().discovery.configured,
     discoveryProvider: {
       name: "fake",
-      search: async (q: string) => {
+      get label() { return world().discovery.provider.label; },
+      get paid() { return world().discovery.provider.paid; },
+      get supportsCountry() { return world().discovery.provider.supportsCountry; },
+      search: async (q: string, o?: { country?: string }) => {
         const d = world().discovery;
         d.queries.push(q);
+        d.countries.push(o?.country);
         if (d.error) throw new DiscoveryError(d.error as any, "The search service had a problem.");
         return d.results;
       },
