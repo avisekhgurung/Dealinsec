@@ -279,6 +279,16 @@ describe("isolation and roles", () => {
     expect(toolResult(provider)).not.toMatch(/Theirs/);
   });
 
+  it("a closed lead shows no next step, even if an old ticket was left open", async () => {
+    const won = seedLead(world(), { companyName: "Closed Co", status: "won" });
+    const live = seedLead(world(), { companyName: "Live Co", status: "qualified" });
+    for (const l of [won, live]) world().leads.tickets.push({ id: l.id, leadId: l.id, organizationId: "org-1", title: `Chase ${l.companyName}`, kind: "other", status: "open", dueAt: null, createdBy: "user", doneAt: null, createdAt: new Date() });
+    const { provider } = await run({ steps: [call("list_leads", {}), say("ok")] });
+    const out = toolResult(provider);
+    expect(out).toMatch(/Live Co.*next: Chase Live Co/);
+    expect(out).not.toMatch(/Chase Closed Co/);
+  });
+
   it("a role with no permissions can use no lead tool", () => {
     const nobody = userRow({ orgRole: "CUSTOM", customPermissions: [] });
     const leadTools = AGENT_TOOLS.filter((t) => /lead|ticket/.test(t.name));

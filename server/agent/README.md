@@ -38,8 +38,12 @@ user (web today; voice / email later)
 2. Add it to the list in `tools/index.ts` (`validateRegistry` checks it at startup).
 3. Pick the risk class deliberately: if it makes something available to someone
    else, activates a record or moves money, it is `CONSEQUENTIAL_MUTATION`.
-4. Add a case to `eval/cases.test.ts` (scripted) and one to
-   `eval/dataset/agent-v1.json` (real model).
+4. Add a case to `eval/cases.test.ts` (scripted) and one to a dataset in
+   `eval/dataset/` (real model): `agent-v1.json` is the stable baseline,
+   `agent-v2.json` covers the lead pipeline. Lead tools (`tools/leads.ts`) have
+   their own scripted suite, `eval/leads.test.ts`, against an in-memory lead
+   store (`eval/leads-fake.ts`); records for a case are seeded from the
+   dataset's `world` (`leads`, `foreignLeads`).
 
 ## Tests
 
@@ -49,13 +53,15 @@ user (web today; voice / email later)
   failure/retry, edits and signed-agreement protection, and a seeded fuzz test
   of "no hallucinated fields".
 - **Live evaluation** — `npx tsx --env-file=.env script/agent-eval.mts --live`
-  runs the versioned dataset (`eval/dataset/agent-v1.json`) through the REAL
+  runs a versioned dataset (`eval/dataset/agent-v1.json`, or
+  `--dataset agent-v2.json`) through the REAL
   model with the real loop, policy and tools against the in-memory world. It
   reports pass rate, safety failures (must be zero), invalid and repeated tool
   calls, tokens, estimated cost and latency, and `--compare` shows before →
   after. It spends model calls, so it is a separate vitest config
   (`vitest.live.config.ts`) that `vitest run` never picks up. See
-  `docs/ai-engineering/01-evaluating-an-agent.md`.
+  `docs/ai-engineering/01-evaluating-an-agent.md`. The model is
+  `DEEPSEEK_MODEL` (default `deepseek-chat`); results record which one ran.
 
 ## Voice and email: adding a channel
 

@@ -1,3 +1,4 @@
+import { LeadsStrip } from "@/components/leads/leads-strip";
 import { useAuth } from "@/hooks/useAuth";
 import { useAudience } from "@/hooks/use-audience";
 import { useQuery } from "@tanstack/react-query";
@@ -949,6 +950,7 @@ export default function DashboardPage() {
         <SubscriptionCard user={user} />
         <TeamSeatsCard />
 
+        <LeadsStrip />
         <MoneyRadarCard />
         <ProtectionIssuesCard isBrand={audience.isBrand} />
 

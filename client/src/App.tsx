@@ -27,6 +27,8 @@ const OnboardingPage          = lazy(() => import("@/pages/onboarding"));
 const DashboardPage           = lazy(() => import("@/pages/dashboard"));
 const AgentPage               = lazy(() => import("@/pages/agent"));
 const DealsPage               = lazy(() => import("@/pages/deals"));
+const LeadsPage               = lazy(() => import("@/pages/leads"));
+const LeadDetailsPage         = lazy(() => import("@/pages/lead-details"));
 const CreateDealPage          = lazy(() => import("@/pages/create-deal"));
 const EditDealPage            = lazy(() => import("@/pages/edit-deal"));
 const DealDetailsPage         = lazy(() => import("@/pages/deal-details"));
@@ -205,6 +207,8 @@ function Router() {
             <Route path="/reset-password"><Redirect to="/dashboard" /></Route>
             <Route path="/dashboard" component={DashboardPage} />
             <Route path="/agent/:id?" component={AgentPage} />
+            <Route path="/leads" component={LeadsPage} />
+            <Route path="/leads/:id" component={LeadDetailsPage} />
             <Route path="/deals" component={DealsPage} />
             <Route path="/deals/new" component={CreateDealPage} />
             <Route path="/deals/import" component={DealsImportPage} />

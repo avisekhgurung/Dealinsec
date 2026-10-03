@@ -4,6 +4,7 @@ import { ApprovalCard } from "./cards/approval-card";
 import { DealCard } from "./cards/deal-card";
 import { AgreementCard, QuotationCard } from "./cards/document-card";
 import { FindingsCard } from "./cards/findings-card";
+import { LeadCard } from "./cards/lead-card";
 import { InvoiceCard, PaymentCard } from "./cards/payment-card";
 
 /** One card, chosen by kind. A kind this build doesn't know renders nothing rather than breaking the thread. */
@@ -25,6 +26,7 @@ export function CardView({
     case "agreement": return <AgreementCard card={card} />;
     case "invoice": return <InvoiceCard card={card} />;
     case "payment": return <PaymentCard card={card} />;
+    case "lead": return <LeadCard card={card} />;
     default: return null;
   }
 }

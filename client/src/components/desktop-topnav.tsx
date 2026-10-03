@@ -24,6 +24,7 @@ import {
   Crown,
   Users,
   Zap,
+  Target,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -53,6 +54,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { path: "/dashboard", label: "Dashboard", icon: Home },
   { path: "/agent", label: "Agent", icon: Sparkles },
+  { path: "/leads", label: "Leads", icon: Target, module: "deals" },
   { path: "/deals", label: "Deals", icon: Briefcase, module: "deals" },
   { path: "/quotations", label: "Quotations", icon: FileText, module: "quotations" },
   { path: "/contracts", label: "Agreements", icon: FileCheck, module: "agreements" },
@@ -255,7 +257,8 @@ export function DesktopTopNav() {
                   aria-current={active ? "page" : undefined}
                   className="dis-topnav-tab relative flex items-center gap-2 px-3 xl:px-4 text-[14px] font-semibold whitespace-nowrap outline-none focus-visible:bg-white/10"
                 >
-                  <Icon className="w-[17px] h-[17px]" strokeWidth={active ? 2.3 : 1.9} />
+                  {/* Seven tabs plus the plan chip need the room below 2xl; the label carries the meaning. */}
+                  <Icon className="hidden 2xl:block w-[17px] h-[17px]" strokeWidth={active ? 2.3 : 1.9} />
                   {item.label}
                 </Link>
               );

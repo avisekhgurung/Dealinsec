@@ -128,7 +128,9 @@ export async function listLeads(user: Who, q: { status?: string; q?: string; lim
     store.list(orgId, { status: q.status as LeadStatus | undefined, q: q.q, limit: Math.min(100, Math.max(1, q.limit ?? 50)), offset: Math.max(0, q.offset ?? 0), includeArchived: q.includeArchived }),
     store.counts(orgId),
   ]);
-  return { ok: true, rows, total, counts };
+  // A closed lead has no "next step": an old open ticket on a won or lost lead is not a thing to do.
+  const shown = rows.map((r) => (isOpen(r.status as LeadStatus) ? r : { ...r, nextTicket: null }));
+  return { ok: true, rows: shown, total, counts };
 }
 
 export async function getLead(user: Who, id: number): Promise<Result<{ detail: LeadDetail; moves: readonly LeadStatus[]; canConvert: boolean }>> {
