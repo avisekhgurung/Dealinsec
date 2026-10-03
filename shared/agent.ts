@@ -33,7 +33,7 @@ export interface ApprovalPreview {
   [k: string]: unknown;
 }
 
-export type CardKind = "approval" | "deal" | "findings" | "quotation" | "agreement" | "invoice" | "payment" | "lead";
+export type CardKind = "approval" | "deal" | "findings" | "quotation" | "agreement" | "invoice" | "payment" | "lead" | "companies";
 
 /** A card the UI renders from structured data (never from model prose). */
 export interface AgentCard {
@@ -90,6 +90,7 @@ const TOOL_LABELS: Record<string, string> = {
   get_ideal_client: "your ideal client",
   update_ideal_client: "your ideal client",
   assess_lead_fit: "how well the lead fits",
+  find_companies: "the company search",
   create_lead: "the lead",
   create_leads: "the leads",
   update_lead: "the lead changes",
@@ -125,6 +126,7 @@ const APPROVE_LABELS: Record<string, string> = {
   add_lead_claim: "Record fact",
   archive_lead: "Archive lead",
   update_ideal_client: "Save",
+  find_companies: "Search",
   convert_lead_to_deal: "Create deal",
 };
 export const approveLabel = (tool: unknown): string => APPROVE_LABELS[String(tool)] ?? "Approve";

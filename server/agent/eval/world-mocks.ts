@@ -45,6 +45,26 @@ export const profileStoreMock = () => ({
   },
 });
 
+/** The web search: configured/unconfigured, canned results, and the usage counters, all from the world. */
+export const discoveryProviderMock = async () => {
+  const { DiscoveryError } = await import("../../discovery/types");
+  return {
+    discoveryConfigured: () => world().discovery.configured,
+    discoveryProvider: {
+      name: "fake",
+      search: async (q: string) => {
+        const d = world().discovery;
+        d.queries.push(q);
+        if (d.error) throw new DiscoveryError(d.error as any, "The search service had a problem.");
+        return d.results;
+      },
+    },
+  };
+};
+export const discoveryUsageMock = () => ({
+  searchCount: async (o: { orgId?: string }) => (o.orgId ? world().discovery.usedDay : world().discovery.usedMonth),
+});
+
 export const entitlementsMock = () => ({
   getBillingUser: async (u: any) =>
     world().billing.get(u.organizationId) ?? { id: u.id, plan: "pro", planExpiresAt: new Date(Date.now() + 365 * 86_400_000) },

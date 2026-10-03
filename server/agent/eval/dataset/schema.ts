@@ -58,6 +58,8 @@ export const worldSpecSchema = z.object({
     targetIndustries: z.array(z.string()).default([]), targetLocations: z.array(z.string()).default([]),
     exclusions: z.array(z.string()).default([]), minDealMinor: z.number().int().positive().optional(),
   }).optional(),
+  /** The web search: switched on or off, and what it would return. */
+  discovery: z.object({ configured: z.boolean().default(true), results: z.array(z.object({ title: z.string(), url: z.string() })).default([]) }).optional(),
   leads: z.array(leadSpec).default([]),
   foreignLeads: z.array(leadSpec).default([]),
 });

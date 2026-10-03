@@ -50,6 +50,7 @@ export function buildWorld(spec: WorldSpec): { world: World; user: Row; refs: Re
     const row = seedDeal(world, { organizationId: ORG2, userId: "u2", brandName: f.brandName, dealTitle: f.dealTitle });
     refs.deal[f.ref] = row.id;
   }
+  if (spec.discovery) { world.discovery.configured = spec.discovery.configured; world.discovery.results = spec.discovery.results; }
   if (spec.idealClient) seedProfile(world, { ...spec.idealClient, minDealMinor: spec.idealClient.minDealMinor ?? null, currency: spec.idealClient.minDealMinor ? "INR" : null });
   for (const l of spec.leads) {
     const row = seedLead(world, leadRow(l));

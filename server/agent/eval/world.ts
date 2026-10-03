@@ -32,6 +32,8 @@ export interface World {
   leads: FakeLeadsStore;
   /** orgId -> the ideal-client row. */
   profiles: Map<string, Row>;
+  /** The fake web search: what it returns, what it was asked, and the usage counters. */
+  discovery: { configured: boolean; results: { title: string; url: string; snippet?: string }[]; queries: string[]; error: string | null; usedDay: number; usedMonth: number };
 }
 
 export const ORG1 = "org-1";
@@ -59,6 +61,7 @@ export function createWorld(): World {
     storage: {},
     leads: new FakeLeadsStore(() => w.readOnly),
     profiles: new Map(),
+    discovery: { configured: true, results: [], queries: [], error: null, usedDay: 0, usedMonth: 0 },
   };
   let id = 100;
   const nextId = () => ++id;

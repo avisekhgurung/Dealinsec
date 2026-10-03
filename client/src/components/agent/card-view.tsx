@@ -4,6 +4,7 @@ import { ApprovalCard } from "./cards/approval-card";
 import { DealCard } from "./cards/deal-card";
 import { AgreementCard, QuotationCard } from "./cards/document-card";
 import { FindingsCard } from "./cards/findings-card";
+import { CompaniesCard } from "./cards/companies-card";
 import { LeadCard } from "./cards/lead-card";
 import { InvoiceCard, PaymentCard } from "./cards/payment-card";
 
@@ -27,6 +28,7 @@ export function CardView({
     case "invoice": return <InvoiceCard card={card} />;
     case "payment": return <PaymentCard card={card} />;
     case "lead": return <LeadCard card={card} />;
+    case "companies": return <CompaniesCard card={card} />;
     default: return null;
   }
 }
