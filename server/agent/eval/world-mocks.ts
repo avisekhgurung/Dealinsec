@@ -1,0 +1,68 @@
+/**
+ * The module replacements that let the REAL agent loop, policy, tools and
+ * services run against the in-memory world (./world.ts) with no database,
+ * billing provider, mail server or network.
+ *
+ * vitest requires `vi.mock` calls to sit at the top of each test file, so the
+ * files that need the world (cases.test.ts, live/agent.eval.ts) each declare
+ *
+ *   vi.mock("../../storage", async () => (await import("./world-mocks")).storageMock());
+ *
+ * and share these factories. They read the current world from
+ * `globalThis.__world`, so a test only has to assign a fresh `createWorld()`
+ * before each run. Test-only: never imported by server code.
+ */
+import type { World } from "./world";
+
+const world = () => (globalThis as any).__world as World;
+
+/** Install a world for the next run. */
+export function useWorld(w: World): void {
+  (globalThis as any).__world = w;
+}
+
+export const storageMock = () => ({
+  storage: new Proxy({}, { get: (_t, p) => (...a: any[]) => world().storage[p as string](...a) }),
+});
+
+export const entitlementsMock = () => ({
+  getBillingUser: async (u: any) =>
+    world().billing.get(u.organizationId) ?? { id: u.id, plan: "pro", planExpiresAt: new Date(Date.now() + 365 * 86_400_000) },
+  logOrgActivity: (_u: any, action: string, entityType: string, entityId?: unknown, detail?: string) =>
+    world().activity.push({ action, entityType, entityId, detail }),
+});
+
+export const emailsMock = () => ({
+  appUrl: () => "https://app.test",
+  sendEmail: async (a: any) => { world().emails.push({ to: a.to, subject: a.subject }); },
+  contractSignedEmail: () => ({ subject: "Agreement created", html: "" }),
+  paymentReceivedEmail: () => ({ subject: "Payment received", html: "" }),
+});
+
+export async function routesMock() {
+  const { documentLocaleSettings } = await import("@shared/money");
+  const issuedCurrency = (row: any) => (typeof row?.currency === "string" && row.currency ? row.currency : null);
+  const documentLocaleFor = async (user: any, row?: any) =>
+    documentLocaleSettings(world().orgs.get(user.organizationId), user, issuedCurrency(row) ? { currency: issuedCurrency(row) } : null);
+  return {
+    documentLocaleFor,
+    issuedCurrency,
+    issuingContext: async (user: any) => {
+      const settings = await documentLocaleFor(user);
+      return { owner: user, settings, issued: { issuerSnapshot: {}, currency: settings.currency } };
+    },
+    invoiceableRemainingMinor: async (contract: any, _user: any, excludeId?: number) =>
+      Number(contract.contractValueMinor) - world().invoices
+        .filter((i: any) => i.dealId === contract.dealId && i.contractId === contract.id && i.id !== excludeId)
+        .reduce((s: number, i: any) => s + (i.dealAmountMinor || 0), 0),
+  };
+}
+
+/** A scripted model: the provider's answers come from `world.llm`. */
+export async function scriptedProviderMock(importOriginal: () => Promise<any>) {
+  const real = await importOriginal();
+  return {
+    ...real,
+    aiProvider: { name: "fake", model: "fake", isConfigured: () => true, chat: (m: any[]) => world().llm(m) },
+  };
+}

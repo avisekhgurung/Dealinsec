@@ -38,7 +38,8 @@ user (web today; voice / email later)
 2. Add it to the list in `tools/index.ts` (`validateRegistry` checks it at startup).
 3. Pick the risk class deliberately: if it makes something available to someone
    else, activates a record or moves money, it is `CONSEQUENTIAL_MUTATION`.
-4. Add a case to `eval/cases.test.ts`.
+4. Add a case to `eval/cases.test.ts` (scripted) and one to
+   `eval/dataset/agent-v1.json` (real model).
 
 ## Tests
 
@@ -47,8 +48,14 @@ user (web today; voice / email later)
   scripted model, covering extraction, injection, authorization, confirmation,
   failure/retry, edits and signed-agreement protection, and a seeded fuzz test
   of "no hallucinated fields".
-- `script/agent-eval-live.mts` — opt-in, spends DeepSeek calls, measures what a
-  real model chooses. Local database only.
+- **Live evaluation** — `npx tsx --env-file=.env script/agent-eval.mts --live`
+  runs the versioned dataset (`eval/dataset/agent-v1.json`) through the REAL
+  model with the real loop, policy and tools against the in-memory world. It
+  reports pass rate, safety failures (must be zero), invalid and repeated tool
+  calls, tokens, estimated cost and latency, and `--compare` shows before →
+  after. It spends model calls, so it is a separate vitest config
+  (`vitest.live.config.ts`) that `vitest run` never picks up. See
+  `docs/ai-engineering/01-evaluating-an-agent.md`.
 
 ## Voice and email: adding a channel
 

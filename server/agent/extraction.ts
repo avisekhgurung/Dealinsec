@@ -127,6 +127,10 @@ export function evidenceInSource(evidence: unknown, source: string): boolean {
 }
 
 const PLACEHOLDER = /^(not (specified|stated|mentioned|provided|given|available)|unspecified|unknown|n\/?a|tbd|tba|none stated|-+|\?+)\.?$/i;
+/** A name that is really a placeholder: "Not specified", "TBD", or just "the client". */
+export const isPlaceholderName = (v: unknown): boolean =>
+  typeof v !== "string" || !v.trim() || PLACEHOLDER.test(v.trim()) || /^(?:the |a |an |some )?(?:client|brand|company|customer|someone|somebody|person|unnamed|tbc)\.?$/i.test(v.trim());
+
 const STATUSES: readonly FieldStatus[] = ["explicit", "inferred", "missing", "conflicting"];
 const clip = (s: string, n: number) => s.trim().slice(0, n);
 const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x);

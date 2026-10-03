@@ -84,7 +84,7 @@ const shareQuotation: AgentTool<{ dealId: number }> = {
 
 const createAgreement: AgentTool<{ dealId: number }> = {
   name: "create_agreement",
-  description: "Create the agreement for a deal, built from the deal's own client, dates and value. This activates the deal. A Pro feature; one agreement per deal.",
+  description: "Create the agreement for a deal, built from the deal's own client, dates and value. This activates the deal. A Pro feature; one agreement per deal. A quotation is NOT required first.",
   risk: "CONSEQUENTIAL_MUTATION",
   input: dealId,
   authorize: allOf(needsPermission("agreements.create", "creating agreements"), needsLinkedRead()),
@@ -155,7 +155,7 @@ const createInvoiceInput = z.object({
 
 const createInvoice: AgentTool<z.infer<typeof createInvoiceInput>> = {
   name: "create_invoice",
-  description: "Create an invoice for a deal. The amount is never a figure you supply: it is the whole remaining amount, or amountPercent of it when the user stated a percentage. A Pro feature.",
+  description: "Create an invoice for a deal. The amount is never a figure you supply: it is the whole remaining amount, or amountPercent of it when the user stated a percentage. A Pro feature. The agreement does not need to be signed first.",
   risk: "CONSEQUENTIAL_MUTATION",
   input: createInvoiceInput,
   authorize: allOf(needsPermission("invoices.create", "creating invoices"), needsLinkedRead()),

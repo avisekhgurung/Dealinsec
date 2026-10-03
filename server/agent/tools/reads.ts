@@ -43,7 +43,7 @@ const COPILOT_READS: AgentTool<any>[] = [
   copilotRead("get_account_status", "The caller's plan (free / trial / Pro), role, organization name and seat usage.", z.object({})),
   copilotRead("get_money_radar", "The org's collectible money now: overdue invoices, due this week, and signed agreements not yet invoiced.", z.object({})),
   copilotRead("get_deal_health", "One deal's explainable health score with the signals behind it and its recommended next action.", dealId),
-  copilotRead("get_recent_activity", "Recent organization activity (who did what). Requires the activity.view permission.", z.object({})),
+  copilotRead("get_recent_activity", "A log of who did what recently. Not for deciding what needs attention (use get_pending_work or get_money_radar for that). Requires the activity.view permission.", z.object({})),
 ];
 
 // ── one record in detail ───────────────────────────────────────────────────

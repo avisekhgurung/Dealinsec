@@ -14,47 +14,15 @@
  *   - failure and retry, existing-deal edits, signed-agreement protection
  *
  * Whether a REAL model picks the right tool is measured by the opt-in live run
- * (script/agent-eval-live.mts), not here.
+ * (script/agent-eval.mts, which reuses this world), not here.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../storage", () => ({
-  storage: new Proxy({}, { get: (_t, p) => (...a: any[]) => (globalThis as any).__world.storage[p as string](...a) }),
-}));
-vi.mock("../../entitlements", () => ({
-  getBillingUser: async (u: any) => (globalThis as any).__world.billing.get(u.organizationId) ?? { id: u.id, plan: "pro", planExpiresAt: new Date(Date.now() + 365 * 86_400_000) },
-  logOrgActivity: (_u: any, action: string, entityType: string, entityId?: unknown, detail?: string) =>
-    (globalThis as any).__world.activity.push({ action, entityType, entityId, detail }),
-}));
-vi.mock("../../emails", () => ({
-  appUrl: () => "https://app.test",
-  sendEmail: async (a: any) => { (globalThis as any).__world.emails.push({ to: a.to, subject: a.subject }); },
-  contractSignedEmail: () => ({ subject: "Agreement created", html: "" }),
-  paymentReceivedEmail: () => ({ subject: "Payment received", html: "" }),
-}));
-vi.mock("../../routes", async () => {
-  const { documentLocaleSettings } = await import("@shared/money");
-  const w = () => (globalThis as any).__world;
-  const issuedCurrency = (row: any) => (typeof row?.currency === "string" && row.currency ? row.currency : null);
-  const documentLocaleFor = async (user: any, row?: any) =>
-    documentLocaleSettings(w().orgs.get(user.organizationId), user, issuedCurrency(row) ? { currency: issuedCurrency(row) } : null);
-  return {
-    documentLocaleFor,
-    issuedCurrency,
-    issuingContext: async (user: any) => {
-      const settings = await documentLocaleFor(user);
-      return { owner: user, settings, issued: { issuerSnapshot: {}, currency: settings.currency } };
-    },
-    invoiceableRemainingMinor: async (contract: any, _user: any, excludeId?: number) =>
-      Number(contract.contractValueMinor) - w().invoices
-        .filter((i: any) => i.dealId === contract.dealId && i.contractId === contract.id && i.id !== excludeId)
-        .reduce((s: number, i: any) => s + (i.dealAmountMinor || 0), 0),
-  };
-});
-vi.mock("../../copilot/provider", async (importOriginal) => {
-  const real: any = await importOriginal();
-  return { ...real, aiProvider: { name: "fake", model: "fake", isConfigured: () => true, chat: (m: any[]) => (globalThis as any).__world.llm(m) } };
-});
+vi.mock("../../storage", async () => (await import("./world-mocks")).storageMock());
+vi.mock("../../entitlements", async () => (await import("./world-mocks")).entitlementsMock());
+vi.mock("../../emails", async () => (await import("./world-mocks")).emailsMock());
+vi.mock("../../routes", async () => (await import("./world-mocks")).routesMock());
+vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")).scriptedProviderMock(orig as () => Promise<any>));
 
 import { ProviderError } from "../../copilot/provider";
 import { executeApproval } from "../approvals";
@@ -65,12 +33,13 @@ import { authorizeCall } from "../policy";
 import { AGENT_TOOLS } from "../tools";
 import { FakeProvider, call, calls, collect, say, type Step } from "../testing";
 import type { AutonomyLevel } from "../types";
+import { useWorld } from "./world-mocks";
 import { createWorld, seedContract, seedDeal, seedInvoice, seedQuote, userRow, ORG1, ORG2, type World } from "./world";
 
 const world = () => (globalThis as any).__world as World;
 const OWNER = () => world().users.get("u1")!;
 beforeEach(() => {
-  (globalThis as any).__world = createWorld();
+  useWorld(createWorld());
   vi.spyOn(console, "log").mockImplementation(() => {});
 });
 
@@ -148,6 +117,17 @@ describe("1-4. extraction: stated, missing, nothing invented", () => {
     const { store, provider } = await run({ text: msg, steps: [call("create_deal", { dealAmount: 30000 }), say("I need the brand's name first.")] });
     expect(store.approvals.size).toBe(0);
     expect(toolResult(provider)).toMatch(/invalid_arguments/);
+  });
+
+  it("2b. a placeholder is not a name: create_deal with 'Not specified' or 'the client' is refused, not prepared", async () => {
+    for (const brandName of ["Not specified", "the client", "Client", "TBD", "someone", "N/A", "  "]) {
+      const { store, provider } = await run({ text: "Someone wants 3 reels for ₹30,000, create the deal.", steps: [call("create_deal", { brandName, dealAmount: 30000 }), say("Who is the client?")] });
+      expect(store.approvals.size, brandName).toBe(0);
+      expect(toolResult(provider), brandName).toMatch(/real name|invalid_arguments|missing_client/);
+    }
+    // A real name still works.
+    const ok = await run({ text: "Zest Foods wants 3 reels for ₹30,000, create the deal.", steps: [call("create_deal", { brandName: "Zest Foods", dealAmount: 30000 }), say("Ready.")] });
+    expect(ok.store.approvals.size).toBe(1);
   });
 
   it("3. missing payment terms: named as missing, and the existing Protection Check flags the gap", async () => {
@@ -313,7 +293,7 @@ describe("15-16. authorization and confirmation", () => {
   it("16. consequential actions always ask, at every autonomy level, and run only once approved", async () => {
     for (const autonomy of [0, 1] as AutonomyLevel[]) {
       for (const tool of ["share_quotation", "create_agreement", "create_signing_link", "create_invoice", "mark_paid"]) {
-        (globalThis as any).__world = createWorld(); // a fresh world per case, so each is independent
+        useWorld(createWorld()); // a fresh world per case, so each is independent
         const deal = seedDeal(world());
         seedQuote(world(), deal.id);
         const contract = tool === "create_agreement" ? null : seedContract(world(), deal.id);

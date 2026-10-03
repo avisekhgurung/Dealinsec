@@ -16,7 +16,7 @@ import { readDenial } from "../../copilot/readAccess";
 import { storage } from "../../storage";
 import { reviseDraftQuote } from "../../services/deals";
 import { buildAnalysis } from "../analysis";
-import { currencyMentions, extractionSystemPrompt, extractionUserMessage, parseJsonObject, pickSourceMessage } from "../extraction";
+import { currencyMentions, extractionSystemPrompt, extractionUserMessage, isPlaceholderName, parseJsonObject, pickSourceMessage } from "../extraction";
 import { allOf, needsLinkedRead, needsPermission } from "../policy";
 import type { AgentTool, ToolOutcome } from "../types";
 import { dealFor, fail, money, settingsFor } from "./shared";
@@ -105,6 +105,10 @@ const createDeal: AgentTool<z.infer<typeof createDealInput>> = {
   input: createDealInput,
   authorize: needsPermission("deals.create", "creating deals"),
   async prepare(ctx, input) {
+    // A placeholder is not a name. The model may be tempted to "act" with one; refuse here, where it cannot be argued with.
+    if (isPlaceholderName(input.brandName)) {
+      return { ok: false, code: "missing_client", message: "I need the client's or brand's real name to create a deal. Ask the user for it; never use a placeholder." };
+    }
     const built = await buildDealCandidate(input, ctx.user as any);
     if (!built.ok) return { ok: false, code: "invalid_deal", message: built.message };
     const draft = buildDealDraft(built.data as any, built.amountMajor, built.settings, ctx.userText);

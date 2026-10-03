@@ -24,3 +24,6 @@ DEALINSEC_PRE_LAUNCH_CHECKLIST.md
 ESIGN_RECOMMENDATION.md
 GST_COMPLIANCE_NOTES.md
 .pgdata-test/
+
+# Live model evaluation results (local, regenerable)
+eval-results/
