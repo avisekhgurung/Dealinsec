@@ -33,7 +33,7 @@ export interface ApprovalPreview {
   [k: string]: unknown;
 }
 
-export type CardKind = "approval" | "deal" | "findings" | "quotation" | "agreement" | "invoice" | "payment";
+export type CardKind = "approval" | "deal" | "findings" | "quotation" | "agreement" | "invoice" | "payment" | "lead";
 
 /** A card the UI renders from structured data (never from model prose). */
 export interface AgentCard {
@@ -84,6 +84,18 @@ const TOOL_LABELS: Record<string, string> = {
   create_invoice: "the invoice",
   mark_paid: "the payment",
   mark_unpaid: "the payment reversal",
+  list_leads: "your leads",
+  get_lead: "the lead",
+  create_lead: "the lead",
+  create_leads: "the leads",
+  update_lead: "the lead changes",
+  move_lead: "the stage change",
+  add_lead_note: "the note",
+  create_ticket: "the ticket",
+  complete_ticket: "the ticket",
+  add_lead_claim: "the fact",
+  archive_lead: "the lead",
+  convert_lead_to_deal: "the deal",
 };
 export const toolLabel = (tool: unknown): string => TOOL_LABELS[String(tool)] ?? "that";
 
@@ -99,6 +111,16 @@ const APPROVE_LABELS: Record<string, string> = {
   create_invoice: "Create invoice",
   mark_paid: "Record payment",
   mark_unpaid: "Reverse payment",
+  create_lead: "Add lead",
+  create_leads: "Add leads",
+  update_lead: "Apply changes",
+  move_lead: "Move lead",
+  add_lead_note: "Add note",
+  create_ticket: "Add ticket",
+  complete_ticket: "Update ticket",
+  add_lead_claim: "Record fact",
+  archive_lead: "Archive lead",
+  convert_lead_to_deal: "Create deal",
 };
 export const approveLabel = (tool: unknown): string => APPROVE_LABELS[String(tool)] ?? "Approve";
 

@@ -3,17 +3,23 @@
  * the `{{deal.acme}}` placeholders in turns and expectations to the ids those
  * records received. Pure apart from mutating the world it is handed.
  */
-import { createWorld, seedContract, seedDeal, seedInvoice, seedQuote, userRow, ORG1, ORG2, type Row, type World } from "../world";
+import { createWorld, seedContract, seedDeal, seedInvoice, seedLead, seedQuote, userRow, ORG1, ORG2, type Row, type World } from "../world";
 import type { WorldSpec } from "./schema";
 
-export type Refs = { deal: Record<string, number>; invoice: Record<string, number>; contract: Record<string, number> };
+export type Refs = { deal: Record<string, number>; invoice: Record<string, number>; contract: Record<string, number>; lead: Record<string, number> };
 
 const DAY = 86_400_000;
 const isoIn = (days: number) => new Date(Date.now() + days * DAY).toISOString().slice(0, 10);
 
+const leadRow = (l: WorldSpec["leads"][number]) => ({
+  companyName: l.companyName, status: l.status,
+  ...(l.website ? { website: l.website, domain: l.website.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "") } : {}),
+  ...(l.estValueMinor ? { estValueMinor: l.estValueMinor, currency: "INR" } : {}),
+});
+
 export function buildWorld(spec: WorldSpec): { world: World; user: Row; refs: Refs } {
   const world = createWorld();
-  const refs: Refs = { deal: {}, invoice: {}, contract: {} };
+  const refs: Refs = { deal: {}, invoice: {}, contract: {}, lead: {} };
 
   world.orgs.get(ORG1)!.audience = spec.audience === "client_work" ? null : spec.audience;
   if (spec.plan === "free") world.billing.set(ORG1, { id: "u1", plan: "free" });
@@ -43,13 +49,15 @@ export function buildWorld(spec: WorldSpec): { world: World; user: Row; refs: Re
     const row = seedDeal(world, { organizationId: ORG2, userId: "u2", brandName: f.brandName, dealTitle: f.dealTitle });
     refs.deal[f.ref] = row.id;
   }
+  for (const l of spec.leads) refs.lead[l.ref] = seedLead(world, leadRow(l)).id;
+  for (const l of spec.foreignLeads) refs.lead[l.ref] = seedLead(world, { ...leadRow(l), ownerUserId: "u2" }, ORG2).id;
   return { world, user, refs };
 }
 
-/** Replace `{{deal.acme}}`, `{{invoice.inv1}}`, `{{contract.c1}}` anywhere in a JSON-like value. */
+/** Replace `{{deal.acme}}`, `{{invoice.inv1}}`, `{{contract.c1}}`, `{{lead.north}}` anywhere in a JSON-like value. */
 export function resolveRefs<T>(value: T, refs: Refs): T {
   const sub = (s: string) =>
-    s.replace(/\{\{(deal|invoice|contract)\.([a-z][a-z0-9_]*)\}\}/g, (_m, kind: keyof Refs, name: string) => {
+    s.replace(/\{\{(deal|invoice|contract|lead)\.([a-z][a-z0-9_]*)\}\}/g, (_m, kind: keyof Refs, name: string) => {
       const id = refs[kind][name];
       if (id === undefined) throw new Error(`dataset placeholder {{${kind}.${name}}} has no matching record`);
       return String(id);
@@ -62,5 +70,5 @@ export function resolveRefs<T>(value: T, refs: Refs): T {
 /** A comparable fingerprint of everything the agent could change. */
 export function snapshotWorld(w: World): string {
   const strip = (rows: Row[]) => rows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== "createdAt")));
-  return JSON.stringify({ deals: strip(w.deals), quotes: strip(w.quotes), contracts: strip(w.contracts), invoices: strip(w.invoices) });
+  return JSON.stringify({ deals: strip(w.deals), quotes: strip(w.quotes), contracts: strip(w.contracts), invoices: strip(w.invoices), leads: strip(w.leads.leads as any), tickets: strip(w.leads.tickets as any), claims: strip(w.leads.claims as any), events: w.leads.events.length });
 }

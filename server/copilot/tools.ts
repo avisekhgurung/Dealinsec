@@ -542,6 +542,7 @@ export async function executeCreateDeal(rawArgs: any, user: User) {
       ok: true as const,
       message: `Deal created: "${deal.dealTitle}" for ${deal.brandName} — ${formatMoney(deal.dealAmountMinor, currency, locale)}. Next step: generate its quotation.`,
       route: `/deals/${deal.id}`,
+      dealId: deal.id,
     };
   } catch (err) {
     if (creditSpent) await storage.regrantDealCredit(billing.id).catch(() => {});

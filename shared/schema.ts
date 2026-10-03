@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, text, integer, bigint, boolean, json, serial, varchar, timestamp, index, jsonb, unique, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, bigint, boolean, json, serial, varchar, timestamp, index, uniqueIndex, jsonb, unique, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { dealTypeOptions as TAXONOMY_DEAL_TYPES } from "./dealTypeTaxonomy";
@@ -1130,6 +1130,98 @@ export type AgentSession = typeof agentSessions.$inferSelect;
 export type AgentMessage = typeof agentMessages.$inferSelect;
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type AgentApproval = typeof agentApprovals.$inferSelect;
+
+
+// ── Lead pipeline ──────────────────────────────────────────────────────
+// Companies worth pursuing, worked through explicit stages until one becomes a
+// deal. Created by script/migrate-leads.ts (additive; the server never creates
+// them on boot). The link to the resulting deal lives HERE (`convertedDealId`),
+// not as a column on `deals`, so the existing deal tables are untouched. The
+// stage rules are in shared/leads.ts.
+export const leads = pgTable(
+  "leads",
+  {
+    id: serial("id").primaryKey(),
+    organizationId: varchar("organization_id").notNull(),
+    ownerUserId: varchar("owner_user_id").notNull(),
+    companyName: varchar("company_name", { length: 120 }).notNull(),
+    website: varchar("website", { length: 300 }),
+    /** Normalised host (see normalizeDomain); two leads for one company share it. */
+    domain: varchar("domain", { length: 253 }),
+    industry: varchar("industry", { length: 80 }),
+    location: varchar("location", { length: 80 }),
+    sizeHint: varchar("size_hint", { length: 60 }),
+    source: varchar("source", { length: 16 }).notNull().default("manual"),
+    status: varchar("status", { length: 16 }).notNull().default("new"),
+    statusChangedAt: timestamp("status_changed_at").notNull().defaultNow(),
+    fitSummary: text("fit_summary"),
+    /** MINOR units of `currency`, like every amount in the app. */
+    estValueMinor: bigint("est_value_minor", { mode: "number" }),
+    currency: varchar("currency", { length: 3 }),
+    contactName: varchar("contact_name", { length: 100 }),
+    contactRole: varchar("contact_role", { length: 100 }),
+    contactEmail: varchar("contact_email", { length: 254 }),
+    contactSource: varchar("contact_source", { length: 200 }),
+    doNotContact: boolean("do_not_contact").notNull().default(false),
+    lostReason: varchar("lost_reason", { length: 300 }),
+    /** True while a conversion is in flight: the atomic claim that stops two deals. */
+    converting: boolean("converting").notNull().default(false),
+    convertedDealId: integer("converted_deal_id"),
+    archivedAt: timestamp("archived_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("leads_org_status_idx").on(t.organizationId, t.status, t.updatedAt),
+    uniqueIndex("leads_org_domain_uniq").on(t.organizationId, t.domain).where(sql`${t.domain} IS NOT NULL AND ${t.archivedAt} IS NULL`),
+  ],
+);
+
+export const leadEvents = pgTable("lead_events", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull(),
+  organizationId: varchar("organization_id").notNull(),
+  /** created, status_changed, note, ticket_created, ticket_done, claim_added, converted, archived, updated */
+  kind: varchar("kind", { length: 24 }).notNull(),
+  /** Small, and ids / stages / short text the user wrote — never a pasted message. */
+  data: jsonb("data").$type<Record<string, unknown> | null>(),
+  actor: varchar("actor", { length: 8 }).notNull().default("user"),
+  actorUserId: varchar("actor_user_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const leadTickets = pgTable("lead_tickets", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull(),
+  organizationId: varchar("organization_id").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  kind: varchar("kind", { length: 16 }).notNull().default("other"),
+  status: varchar("status", { length: 12 }).notNull().default("open"),
+  dueAt: timestamp("due_at"),
+  createdBy: varchar("created_by", { length: 8 }).notNull().default("user"),
+  doneAt: timestamp("done_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const leadClaims = pgTable("lead_claims", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull(),
+  organizationId: varchar("organization_id").notNull(),
+  field: varchar("field", { length: 60 }).notNull(),
+  value: varchar("value", { length: 400 }).notNull(),
+  /** confirmed (with evidence) | inferred | unknown | conflicting */
+  status: varchar("status", { length: 12 }).notNull(),
+  evidenceUrl: varchar("evidence_url", { length: 500 }),
+  evidenceSnippet: varchar("evidence_snippet", { length: 500 }),
+  source: varchar("source", { length: 8 }).notNull().default("user"),
+  retrievedAt: timestamp("retrieved_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type Lead = typeof leads.$inferSelect;
+export type LeadEvent = typeof leadEvents.$inferSelect;
+export type LeadTicket = typeof leadTickets.$inferSelect;
+export type LeadClaim = typeof leadClaims.$inferSelect;
 
 
 // ── Human-facing record numbers ────────────────────────────────────────

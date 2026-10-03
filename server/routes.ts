@@ -14,6 +14,7 @@ import { requirePro, requireOrgPermission, withOrg, getBillingUser, logOrgActivi
 import { maybeStartTrial } from "./trial";
 import { registerCopilotRoutes } from "./copilot/routes";
 import { registerAgentRoutes } from "./agent/routes";
+import { registerLeadRoutes } from "./leads/routes";
 import { reviseDraftQuote } from "./services/deals";
 import { notifyAgreementCreated } from "./services/agreements";
 import { afterInvoiceStatusChange, paidAtFor } from "./services/payments";
@@ -588,6 +589,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
   registerCopilotRoutes(app);
   registerAgentRoutes(app);
+  registerLeadRoutes(app);
   registerQuoteShareRoutes(app);
   registerAgreementSignRoutes(app);
 

@@ -25,6 +25,12 @@ export const storageMock = () => ({
   storage: new Proxy({}, { get: (_t, p) => (...a: any[]) => world().storage[p as string](...a) }),
 });
 
+/** The lead store: the world's in-memory one, behind the same module name the services import. */
+export const leadsStoreMock = () => ({
+  leadsStore: new Proxy({}, { get: (_t, p) => (...a: any[]) => (world().leads as any)[p](...a) }),
+  leadsTablesReady: async () => true,
+});
+
 export const entitlementsMock = () => ({
   getBillingUser: async (u: any) =>
     world().billing.get(u.organizationId) ?? { id: u.id, plan: "pro", planExpiresAt: new Date(Date.now() + 365 * 86_400_000) },

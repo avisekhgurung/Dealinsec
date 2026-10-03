@@ -22,6 +22,14 @@ const dealSpec = z.object({
   customTerms: z.string().optional(),
 });
 
+const leadSpec = z.object({
+  ref,
+  companyName: z.string(),
+  status: z.enum(["new", "researching", "qualified", "contacted", "replied", "meeting", "proposal", "won", "lost"]).default("new"),
+  website: z.string().optional(),
+  estValueMinor: z.number().int().positive().optional(),
+});
+
 export const worldSpecSchema = z.object({
   audience: z.enum(["client_work", "brand_collaboration"]).default("client_work"),
   plan: z.enum(["pro", "free"]).default("pro"),
@@ -40,6 +48,9 @@ export const worldSpecSchema = z.object({
   })).default([]),
   /** Records that belong to ANOTHER organization: the agent must never see them. */
   foreignDeals: z.array(z.object({ ref, brandName: z.string(), dealTitle: z.string() })).default([]),
+  /** The user's own leads (the pipeline), and leads that belong to ANOTHER organization. */
+  leads: z.array(leadSpec).default([]),
+  foreignLeads: z.array(leadSpec).default([]),
 });
 export type WorldSpec = z.infer<typeof worldSpecSchema>;
 

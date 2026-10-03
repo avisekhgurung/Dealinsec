@@ -41,7 +41,7 @@ describe("seeding", () => {
     const { world, refs } = buildWorld({
       audience: "brand_collaboration", plan: "free", autonomy: 0,
       deals: [{ ref: "a", brandName: "A", dealTitle: "T", amountMinor: 100, status: "Pending" }],
-      quotes: [], contracts: [], invoices: [],
+      quotes: [], contracts: [], invoices: [], leads: [], foreignLeads: [],
       foreignDeals: [{ ref: "f", brandName: "Rival", dealTitle: "X" }],
     });
     expect(world.deals.find((d) => d.id === refs.deal.f)!.organizationId).toBe("org-2");
@@ -51,6 +51,6 @@ describe("seeding", () => {
     expect(snapshotWorld(world)).not.toBe(before);
   });
   it("an unknown placeholder fails loudly", () => {
-    expect(() => resolveRefs("{{deal.nope}}", { deal: {}, invoice: {}, contract: {} })).toThrow(/no matching record/);
+    expect(() => resolveRefs("{{deal.nope}}", { deal: {}, invoice: {}, contract: {}, lead: {} })).toThrow(/no matching record/);
   });
 });
