@@ -24,3 +24,17 @@ This is as good as the browser's speech services allow, which is free but uneven
 - **Streaming replies.** The model's answer arrives whole, so the first word is spoken after the whole answer is ready (about 4 s with a tool call). Streaming tokens and speaking sentence by sentence would roughly halve the wait.
 - **Better listening.** Server-side speech-to-text (Whisper-class) handles accents and noise better than the browser's.
 - **Real barge-in and "always on".** Reliable talking-over needs echo cancellation we only get from a call-style audio pipeline.
+
+## Update (4 Oct 2026): approving by voice, the person first, and searching freely
+
+**Approving by voice.** The founder asked not to have to tap for every action. Design:
+- After the assistant prepares something, the call reads back the exact details **from the server-checked approval card** (title, up to three facts, the first effect), never the model's own description.
+- The spoken answer is classified by **plain code** (`classifyConfirmation`, 9 tests), never by the model. Routine changes: a short "yes", "approve", "go ahead". Consequential actions (convert to a deal, agreement, invoice, client link, payment): only the explicit word "confirm" or "approve"; a bare "yes" is answered with "say confirm, or no". "No" declines. "Yes, but make it 60,000" is **not** an approval: it goes to the agent as a new request. A long sentence is never a yes.
+- The approval goes through `agent.approve`, the same single-use, re-validated endpoint as a tap. The model has no way to approve anything.
+- An answer is only taken when the assistant is listening, never while it speaks (so it cannot approve its own read-back). Hanging up approves nothing. Several actions are read back one at a time; a tap on the card still works and is announced the same way.
+
+Verified in the real app (speech stand-in, everything else real): "add Northwind as a lead" was read back and "yes" created it; "move to qualified" and "yes" moved it; "create the deal" was read back as consequential, "yes" was refused with "say confirm" (no deal existed afterwards), and "confirm" created the ₹50,000 deal and marked the lead Won.
+
+**The person first.** While the assistant speaks, the recogniser keeps listening and compares what it hears with what it is saying (`isPersonTalking`, tested): its own echo is ignored; new words, or "stop" / "wait", cut it off at once, and the person's turn starts on a clean recogniser so no echo leaks into it. On by default, switchable off for a loudspeaker that fools it. This replaced the earlier level-meter detector, because comparing words works on iPhone too and ignores coughs. Verified: the assistant's own first five words did not interrupt it; new words did, and the next turn contained only the person's words.
+
+**Searching whenever needed.** With a free provider (LangSearch), `find_companies` now runs without asking: `prepare()` declares `changesNothing`, which the policy honours only for a safe action that is not forced (tested). A paid provider still always asks. The caps and the egress rules still apply (tested).

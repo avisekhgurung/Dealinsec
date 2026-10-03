@@ -30,6 +30,12 @@ describe("splitSentences", () => {
     expect(parts.every((p) => /[.!?]$/.test(p))).toBe(true);
     expect(splitSentences("I found three firms. Two have their own websites! Shall I add them?").join(" ")).toBe("I found three firms. Two have their own websites! Shall I add them?");
   });
+  it("never splits inside a web address, a decimal or an abbreviation without a space", () => {
+    const parts = splitSentences("I've added Northwind with northwind.com as its website. The estimate is 1.5 lakh rupees.");
+    expect(parts.join(" ")).toContain("northwind.com");
+    expect(parts.join(" ")).toContain("1.5 lakh");
+    expect(parts.some((p) => /northwind\.\s/.test(p))).toBe(false);
+  });
   it("joins very short fragments to their neighbour", () => {
     const parts = splitSentences("Yes. I have prepared the search for your approval on screen.");
     expect(parts).toHaveLength(1);

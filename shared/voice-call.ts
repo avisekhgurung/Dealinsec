@@ -12,7 +12,11 @@
  *
  * Half-duplex by design: the microphone is off while the agent speaks (it would
  * hear itself); the person interrupts with a tap, or by voice where the device
- * lets that be detected reliably. Approvals are never given by voice.
+ * lets that be detected reliably.
+ *
+ * Approving by voice: the read-back is built from the server-checked approval
+ * card, the answer is classified by code (classifyConfirmation), never by the
+ * model, and the approval goes through the same single-use endpoint as a tap.
  */
 export type CallPhase = "connecting" | "listening" | "thinking" | "speaking" | "ended";
 export type EndReason = "user" | "idle" | "mic_blocked" | "unsupported" | "error";
@@ -29,13 +33,18 @@ export interface CallState {
   turns: number;
   endReason: EndReason | null;
   notice: string | null;
+  /** An action read back and waiting for a spoken yes or no. */
+  confirming: PendingApproval | null;
+  /** Further actions from the same reply, read back one at a time. */
+  queue: PendingApproval[];
 }
 
 export type CallEvent =
   | { type: "started"; greeting?: string }
   | { type: "interim"; text: string }
   | { type: "utterance"; text: string }
-  | { type: "reply"; text: string }
+  | { type: "reply"; text: string; approvals?: PendingApproval[] }
+  | { type: "approval_settled"; approvalId: string; ok: boolean; message: string }
   | { type: "reply_empty" }
   | { type: "speech_done" }
   | { type: "interrupt" }
@@ -51,10 +60,12 @@ export type CallEffect =
   | { kind: "send"; text: string }
   | { kind: "speak"; text: string }
   | { kind: "cancel_speech" }
-  | { kind: "stop_run" };
+  | { kind: "stop_run" }
+  | { kind: "approve"; approvalId: string; tool: string }
+  | { kind: "reject"; approvalId: string; tool: string };
 
 export const initialCall = (): CallState => ({
-  phase: "connecting", muted: false, interim: "", lastUserText: "", lastReply: "", idlePrompted: false, turns: 0, endReason: null, notice: null,
+  phase: "connecting", muted: false, interim: "", lastUserText: "", lastReply: "", idlePrompted: false, turns: 0, endReason: null, notice: null, confirming: null, queue: [],
 });
 
 export const STILL_THERE = "Are you still there?";
@@ -79,14 +90,43 @@ export function reduceCall(s: CallState, e: CallEvent): { state: CallState; effe
       if (s.phase !== "listening") return keep(s);
       return keep({ ...s, interim: e.text, idlePrompted: false });
 
-    case "utterance":
+    case "utterance": {
       if (s.phase !== "listening" || s.muted || !isUtterance(e.text)) return keep(s);
-      return keep({ ...s, phase: "thinking", interim: "", lastUserText: e.text.trim(), idlePrompted: false, turns: s.turns + 1 },
-        [{ kind: "stop_listening" }, { kind: "send", text: e.text.trim() }]);
+      const text = e.text.trim();
+      const heard = { ...s, interim: "", lastUserText: text, idlePrompted: false };
+      if (s.confirming) {
+        const c = s.confirming;
+        const answer = classifyConfirmation(text, c.risk);
+        if (answer === "approve") return keep({ ...heard, phase: "thinking" }, [{ kind: "stop_listening" }, { kind: "approve", approvalId: c.approvalId, tool: c.tool }]);
+        if (answer === "decline") return keep({ ...heard, phase: "thinking" }, [{ kind: "stop_listening" }, { kind: "reject", approvalId: c.approvalId, tool: c.tool }]);
+        if (answer === "repeat") return keep({ ...heard, phase: "speaking", lastReply: c.readback }, [{ kind: "stop_listening" }, { kind: "speak", text: c.readback }]);
+        if (answer === "need_explicit") return keep({ ...heard, phase: "speaking", lastReply: NEED_EXPLICIT }, [{ kind: "stop_listening" }, { kind: "speak", text: NEED_EXPLICIT }]);
+        // Anything else is a new request: the read-back is dropped (the card stays on screen to tap) and the agent hears it.
+        return keep({ ...heard, phase: "thinking", confirming: null, queue: [], turns: s.turns + 1 }, [{ kind: "stop_listening" }, { kind: "send", text }]);
+      }
+      return keep({ ...heard, phase: "thinking", turns: s.turns + 1 }, [{ kind: "stop_listening" }, { kind: "send", text }]);
+    }
 
-    case "reply":
+    case "reply": {
       if (s.phase !== "thinking") return keep(s);
+      const [first, ...rest] = e.approvals ?? [];
+      if (first) {
+        const say = `${e.text} ${first.readback}`.trim();
+        return keep({ ...s, phase: "speaking", lastReply: say, confirming: first, queue: rest }, [{ kind: "speak", text: say }]);
+      }
       return keep({ ...s, phase: "speaking", lastReply: e.text }, [{ kind: "speak", text: e.text }]);
+    }
+
+    case "approval_settled": {
+      // Settled by voice OR by a tap on the card: either way, say how it went and read back the next one.
+      const wasActive = s.confirming?.approvalId === e.approvalId;
+      const queue = wasActive ? s.queue : s.queue.filter((q) => q.approvalId !== e.approvalId);
+      if (!wasActive) return keep({ ...s, queue });
+      const [next, ...rest] = queue;
+      const say = [e.message, next?.readback].filter(Boolean).join(" ");
+      if (s.phase === "speaking") return keep({ ...s, confirming: next ?? null, queue: rest, lastReply: say }, [{ kind: "cancel_speech" }, { kind: "speak", text: say }]);
+      return keep({ ...s, phase: "speaking", confirming: next ?? null, queue: rest, lastReply: say }, [{ kind: "stop_listening" }, { kind: "speak", text: say }]);
+    }
 
     case "reply_empty":
       if (s.phase !== "thinking") return keep(s);
@@ -126,6 +166,77 @@ export function reduceCall(s: CallState, e: CallEvent): { state: CallState; effe
       return keep(s, s.phase === "listening" && !s.muted ? [{ kind: "listen" }] : []);
 
     case "end":
-      return keep({ ...s, phase: "ended", endReason: s.endReason ?? "user" }, [{ kind: "stop_listening" }, { kind: "cancel_speech" }, { kind: "stop_run" }]);
+      // Anything still waiting stays on screen to tap; nothing is approved by hanging up.
+      return keep({ ...s, phase: "ended", endReason: s.endReason ?? "user", confirming: null, queue: [] }, [{ kind: "stop_listening" }, { kind: "cancel_speech" }, { kind: "stop_run" }]);
   }
+}
+
+/* ── approving by voice ─────────────────────────────────────────────────── */
+
+export type ApprovalRisk = "SAFE_MUTATION" | "CONSEQUENTIAL_MUTATION" | string;
+export interface PendingApproval { approvalId: string; tool: string; risk: ApprovalRisk; readback: string }
+export type Confirmation = "approve" | "decline" | "repeat" | "need_explicit" | "other";
+
+const norm = (t: string) => ` ${t.toLowerCase().replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim()} `;
+const has = (t: string, words: string[]) => words.some((w) => t.includes(` ${w} `));
+const NEGATIVE = ["no", "nope", "nah", "don't", "dont", "do not", "cancel", "stop", "wait", "hold on", "decline", "reject", "not now", "never mind", "nevermind", "not yet", "leave it"];
+const EXPLICIT = ["confirm", "confirmed", "i confirm", "approve", "approved", "i approve"];
+const CASUAL = ["yes", "yeah", "yep", "yup", "ok", "okay", "sure", "go ahead", "do it", "go for it", "proceed", "please do", "sounds good", "carry on", "go on", "absolutely", "of course", "correct", "that's right", "right"];
+const REPEAT = ["repeat", "say that again", "what was that", "pardon", "come again", "read it again", "sorry what"];
+/** Words that mean "do something different", not "yes" or "no". */
+const CHANGE = ["but", "change", "instead", "make it", "amount", "rather", "except", "edit", "update", "different", "actually", "also"];
+
+/**
+ * What a spoken answer to a read-back means. Deterministic code, not a model:
+ * a short, unambiguous answer only. Anything longer, or that asks for a change,
+ * is "other" and goes to the agent as an ordinary message. A consequential
+ * action needs the explicit word ("confirm" / "approve"); a bare "yes" asks for it.
+ */
+export function classifyConfirmation(text: string, risk: ApprovalRisk): Confirmation {
+  const t = norm(text);
+  const words = t.trim().split(" ").filter(Boolean);
+  if (!words.length) return "other";
+  if (words.length <= 6 && has(t, REPEAT)) return "repeat";
+  if (words.length > 6 || has(t, CHANGE)) return "other";
+  if (has(t, NEGATIVE)) return "decline";
+  const explicit = has(t, EXPLICIT);
+  if (explicit) return "approve";
+  if (has(t, CASUAL)) return risk === "CONSEQUENTIAL_MUTATION" ? "need_explicit" : "approve";
+  return "other";
+}
+
+export const NEED_EXPLICIT = "This one matters, so I'd like you to say confirm, or no.";
+
+/** The exact words read back before a spoken approval, built from the server-checked preview on the card. */
+export function approvalReadback(preview: { title?: unknown; lines?: unknown; effects?: unknown }, risk: ApprovalRisk): string {
+  const title = String(preview?.title ?? "this").trim().replace(/[.:]+$/, "");
+  const lines = Array.isArray(preview?.lines) ? (preview.lines as { label?: unknown; value?: unknown }[]) : [];
+  const facts = lines
+    .filter((l) => typeof l?.label === "string" && typeof l?.value === "string" && !/check|warning/i.test(String(l.label)))
+    .slice(0, 3)
+    .map((l) => `${String(l.label)}: ${String(l.value).slice(0, 80)}`);
+  const effects = Array.isArray(preview?.effects) ? (preview.effects as unknown[]).filter((e) => typeof e === "string").slice(0, 1) as string[] : [];
+  const ask = risk === "CONSEQUENTIAL_MUTATION" ? "This one matters, so say confirm to go ahead, or no." : "Say approve to go ahead, or no.";
+  return [`Ready for your go-ahead: ${title}.`, facts.length ? `${facts.join(". ")}.` : "", effects[0] ?? "", ask].filter(Boolean).join(" ");
+}
+
+/* ── the person talking over the assistant ──────────────────────────────── */
+
+const wordsOf = (t: string) => t.toLowerCase().replace(/[^a-z0-9À-￿' ]+/g, " ").split(" ").filter((w) => w.length >= 2);
+const STOP_WORDS = ["stop", "wait", "hold on", "hang on", "sorry", "excuse me", "no no", "pause", "enough"];
+
+/**
+ * While the assistant speaks, the microphone also hears the assistant (through
+ * the speaker). Is what it heard the PERSON? It is, if it has words the
+ * assistant isn't saying, or a short "stop" / "wait" the assistant isn't saying.
+ * Words that are mostly the assistant's own are its echo, and are ignored.
+ */
+export function isPersonTalking(heard: string, spoken: string): boolean {
+  const h = wordsOf(heard);
+  if (!h.length) return false;
+  const said = new Set(wordsOf(spoken));
+  const fresh = h.filter((w) => !said.has(w));
+  const t = ` ${h.join(" ")} `;
+  if (STOP_WORDS.some((s) => t.includes(` ${s} `) && !` ${wordsOf(spoken).join(" ")} `.includes(` ${s} `))) return true;
+  return fresh.length >= 2 && fresh.length / h.length >= 0.5;
 }

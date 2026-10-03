@@ -258,7 +258,7 @@ describe("finding companies (web search)", () => {
     ] }), toolCalls: [] });
   };
 
-  it("ALWAYS asks, even at level 1, shows the exact words, and nothing is sent until approved", async () => {
+  it("a PAID search ALWAYS asks, even at level 1, shows the exact words, and nothing is sent until approved", async () => {
     world().discovery.results = results();
     const { result, store } = await run({ autonomy: 1, steps: [call("find_companies", ask), ASKED] });
     expect(result.status).toBe("waiting_for_user");
@@ -412,20 +412,29 @@ describe("finding companies (web search)", () => {
     expect(out.find((e) => e.type === "agent.message").data.text).toMatch(/No businesses stood out/);
   });
 
-  it("a FREE provider with no country filter: the card says free allowance, shows no country, and sends none", async () => {
+  it("a FREE provider: the agent searches straight away (nothing to approve), sends no country, and shows the results", async () => {
     world().discovery.provider = { label: "LangSearch", paid: false, supportsCountry: false };
     world().discovery.results = results();
     pickAll();
-    const { store } = await run({ steps: [call("find_companies", ask), ASKED] });
-    const preview = [...store.approvals.values()][0].preview as any;
-    expect(preview.lines.map((l: any) => l.label)).not.toContain("Country");
-    expect(preview.effects.join(" ")).toMatch(/to LangSearch/);
-    expect(preview.effects.join(" ")).toMatch(/free allowance/);
-    expect(preview.effects.join(" ")).not.toMatch(/paid/i);
-    const out: any[] = [];
-    await executeApproval({ store, tools: AGENT_TOOLS }, OWNER(), firstApproval(store), (e) => out.push(e));
+    const { store, ev, result } = await run({ steps: [call("find_companies", ask), say("Here is what I found.")] });
+    expect(store.approvals.size).toBe(0);
+    expect(result.status).toBe("completed");
+    expect(world().discovery.queries).toEqual([ask.query]);
     expect(world().discovery.countries).toEqual([undefined]);
-    expect(out.find((e) => e.type === "agent.message").data.cards[0].data.provider).toBe("LangSearch");
+    const done = ev.events.find((e) => e.type === "agent.tool_completed" || e.type === "agent.message");
+    expect(done).toBeTruthy();
+    expect(world().leads.leads).toHaveLength(0); // a search still adds nothing
+  });
+
+  it("a FREE search still obeys the caps and the egress rules", async () => {
+    world().discovery.provider = { label: "LangSearch", paid: false, supportsCountry: false };
+    world().discovery.usedDay = 10;
+    const a = await run({ steps: [call("find_companies", ask), say("limit")] });
+    expect(world().discovery.queries).toEqual([]);
+    expect(a.store.approvals.size).toBe(0);
+    world().discovery.usedDay = 0;
+    await run({ steps: [call("find_companies", { query: "logistics ravi@acme.com" }), say("no")] });
+    expect(world().discovery.queries).toEqual([]);
   });
 
   it("a PAID provider says so, with its own name", async () => {

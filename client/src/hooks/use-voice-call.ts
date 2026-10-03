@@ -5,18 +5,21 @@
  * machine in shared/voice-call.ts (tested); this hook only carries out its
  * effects against the browser's microphone and speech.
  *
- * Half-duplex: the recogniser is off while the agent speaks, so it never hears
- * itself. A tap interrupts. Interrupting by voice (a level meter on a microphone
- * stream with echo cancellation, checked by shared/voice.ts's detector) is
- * opt-in, because whether a given device cancels its own speaker's echo can't be
- * known in advance.
+ * The person comes first: while the assistant speaks, the recogniser keeps
+ * listening, and anything that isn't the assistant's own echo (isPersonTalking:
+ * new words, or "stop" / "wait") cuts it off at once. That can be switched off
+ * for a loudspeaker that fools it; a tap always interrupts.
+ *
+ * Approving by voice: the read-back comes from the server-checked approval card,
+ * the answer is classified by code, and the approval goes through agent.approve,
+ * the same single-use endpoint as a tap.
  *
  * The call lives and dies with the component that uses this hook: on unmount
  * everything is released (recogniser, speech, microphone, wake lock).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createBargeInDetector, pickGentlemanVoice, speakable, splitSentences } from "@shared/voice";
-import { initialCall, isUtterance, reduceCall, type CallEffect, type CallEvent, type CallState } from "@shared/voice-call";
+import { pickGentlemanVoice, speakable, splitSentences } from "@shared/voice";
+import { approvalReadback, initialCall, isPersonTalking, isUtterance, reduceCall, type CallEffect, type CallEvent, type CallState, type PendingApproval } from "@shared/voice-call";
 import type { useAgent } from "@/hooks/use-agent";
 
 type Agent = ReturnType<typeof useAgent>;
@@ -54,6 +57,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
   const awaiting = useRef<{ sawRunning: boolean; at: number } | null>(null);
   const speakToken = useRef(0);
   const speakingNow = useRef(false);
+  const speakingText = useRef("");
   const meter = useRef<{ stream: MediaStream; ctx: AudioContext; raf: number } | null>(null);
   const wake = useRef<any>(null);
   const dispatchRef = useRef<(e: CallEvent) => void>(() => {});
@@ -69,6 +73,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     const synth = window.speechSynthesis;
     const parts = splitSentences(speakable(text, 900));
     cancelSpeech();
+    speakingText.current = text;
     if (!parts.length) { dispatchRef.current({ type: "speech_done" }); return; }
     const token = speakToken.current;
     speakingNow.current = true;
@@ -78,7 +83,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     let i = 0;
     const next = () => {
       if (token !== speakToken.current || dead.current) return;
-      if (i >= parts.length) { speakingNow.current = false; dispatchRef.current({ type: "speech_done" }); return; }
+      if (i >= parts.length) { speakingNow.current = false; restartFresh(); dispatchRef.current({ type: "speech_done" }); return; }
       const u = new SpeechSynthesisUtterance(parts[i++]);
       if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = o.lang;
       u.rate = 0.98;   // unhurried
@@ -113,6 +118,16 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     try { r?.abort(); } catch { /* already stopped */ }
   };
 
+  const restartFresh = () => {
+    const r = rec.current;
+    rec.current = null;
+    transcript.current = "";
+    try { r?.abort(); } catch { /* gone */ }
+  };
+
+  /** Listening while the assistant speaks, so the person can cut in. */
+  const listenWhileSpeaking = () => { if (bargeRef.current && !stateRef.current.muted) startRecognition(); };
+
   const startRecognition = () => {
     if (dead.current || stateRef.current.muted) return;
     const Ctor = Recognition();
@@ -129,7 +144,17 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
       if (rec.current !== r) return;
       let t = "";
       for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
-      transcript.current = t.trim();
+      t = t.trim();
+      if (stateRef.current.phase === "speaking") {
+        // The assistant is talking: is this the person, or the assistant's own voice coming back?
+        if (isPersonTalking(t, speakingText.current)) {
+          // Start the person's turn on a clean recogniser, so none of the echo ends up in what they said.
+          restartFresh();
+          dispatchRef.current({ type: "interrupt" });
+        }
+        return;
+      }
+      transcript.current = t;
       dispatchRef.current({ type: "interim", text: transcript.current });
       armEndpoint();
       armIdle();
@@ -162,8 +187,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
       analyser.fftSize = 512;
       ctx.createMediaStreamSource(stream).connect(analyser);
       const buf = new Uint8Array(analyser.fftSize);
-      const detector = createBargeInDetector();
-      let smooth = 0, last = 0, lastPhase = "";
+      let smooth = 0, last = 0;
       const tick = () => {
         analyser.getByteTimeDomainData(buf);
         let sum = 0;
@@ -172,9 +196,6 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
         smooth = smooth * 0.7 + rms * 0.3;
         const now = performance.now();
         if (now - last > 60) { last = now; setLevel(Math.min(1, smooth * 5)); }
-        const st = stateRef.current;
-        if (st.phase !== lastPhase) { lastPhase = st.phase; detector.reset(); }
-        if (bargeRef.current && st.phase === "speaking" && !st.muted && detector.push(now, rms)) dispatchRef.current({ type: "interrupt" });
         if (meter.current) meter.current.raf = requestAnimationFrame(tick);
       };
       meter.current = { stream, ctx, raf: requestAnimationFrame(tick) };
@@ -198,7 +219,17 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     switch (fx.kind) {
       case "listen": startRecognition(); break;
       case "stop_listening": stopRecognition(); break;
-      case "speak": speak(fx.text); break;
+      case "speak":
+        speak(fx.text);
+        // The person comes first: keep an ear open while speaking.
+        window.setTimeout(listenWhileSpeaking, 300);
+        break;
+      case "approve":
+        void agentRef.current.approve(fx.approvalId, fx.tool);
+        break;
+      case "reject":
+        void agentRef.current.reject(fx.approvalId, fx.tool);
+        break;
       case "cancel_speech": cancelSpeech(); break;
       case "send":
         awaiting.current = { sawRunning: false, at: Date.now() };
@@ -231,11 +262,31 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     awaiting.current = null;
     const reply = [...messages].reverse().find((m) => m.role === "assistant");
     const text = speakable(reply?.content ?? "", 900);
-    const needsTap = !!reply?.cards.some((c) => c.kind === "approval");
-    if (isUtterance(text)) dispatchRef.current({ type: "reply", text });
-    else if (needsTap) dispatchRef.current({ type: "reply", text: "That is ready for your approval on your screen, whenever you are." });
+    const pending: PendingApproval[] = (reply?.cards ?? [])
+      .filter((c) => c.kind === "approval" && typeof c.data.approvalId === "string")
+      .map((c) => ({ approvalId: String(c.data.approvalId), tool: String(c.data.tool ?? ""), risk: String(c.data.risk ?? "SAFE_MUTATION"), readback: approvalReadback((c.data.preview ?? {}) as any, String(c.data.risk ?? "")) }));
+    if (pending.length) dispatchRef.current({ type: "reply", text: isUtterance(text) ? text : "", approvals: pending });
+    else if (isUtterance(text)) dispatchRef.current({ type: "reply", text });
     else dispatchRef.current({ type: "reply_empty" });
   }, [running, messages]);
+
+  // An action approved or declined, by voice or by a tap on the card: say how it went.
+  const { approvals } = o.agent;
+  const settled = useRef(new Set<string>());
+  useEffect(() => {
+    const c = stateRef.current.confirming;
+    const ids = [c?.approvalId, ...stateRef.current.queue.map((q) => q.approvalId)].filter(Boolean) as string[];
+    for (const id of ids) {
+      const v = approvals[id];
+      if (!v || v.status === "pending" || v.status === "executing" || settled.current.has(id)) continue;
+      settled.current.add(id);
+      const ok = v.status === "done";
+      const message = ok ? speakable(v.message ?? "Done.", 300)
+        : v.status === "declined" ? "Very well, I've left that alone."
+        : `That didn't go through. ${speakable(v.message ?? "Nothing was changed.", 200)}`;
+      dispatchRef.current({ type: "approval_settled", approvalId: id, ok, message });
+    }
+  }, [approvals]);
 
   // A send that never started a run (the request failed before streaming) must not leave the call thinking forever.
   useEffect(() => {

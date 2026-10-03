@@ -21,7 +21,7 @@ const input = z.object({
 
 export const findCompaniesTool: AgentTool<z.infer<typeof input>> = {
   name: "find_companies",
-  description: "Search the web for companies matching a short description (it uses a search allowance and sends text to an outside service, so it always asks the user first). Returns candidate company names and websites taken from page titles: guesses from the open web, to be checked, not facts. Does not add anything to the pipeline; use create_leads for the ones the user picks.",
+  description: "Search the web for companies matching a short description. On a free search service it runs straight away; on a paid one it asks the user first. Returns candidate company names and websites taken from page titles: guesses from the open web, to be checked, not facts. Does not add anything to the pipeline; use create_leads for the ones the user picks.",
   risk: "SAFE_MUTATION",
   input,
   authorize: needsPermission("deals.create", "finding companies"),
@@ -30,8 +30,10 @@ export const findCompaniesTool: AgentTool<z.infer<typeof input>> = {
     if (!p.ok) return { ok: false, code: p.code, message: p.message };
     return {
       ok: true, args: { query: p.query, ...(p.country ? { country: p.country } : {}) },
-      // Never run unasked: it spends a search and sends words to an outside service.
-      forceApproval: true,
+      // A paid search spends money: always ask. A free one changes nothing in the app and its words are
+      // checked by code, so the agent may search whenever it needs to (the caps still apply).
+      forceApproval: p.provider.paid,
+      changesNothing: !p.provider.paid,
       preview: {
         title: "Search the web for companies",
         lines: [{ label: "Search for", value: p.query }, ...(p.country ? [{ label: "Country", value: p.country }] : []), { label: "Searches left today", value: String(p.remainingToday) }],

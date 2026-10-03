@@ -97,3 +97,13 @@ describe("validateRegistry", () => {
     expect(() => validateRegistry([read("get_thing")].map((t) => ({ ...t, input: z.date() })))).toThrow(/unsupported zod type/);
   });
 });
+
+describe("changesNothing", () => {
+  it("lets a safe call that changes nothing run at level 0, but never a consequential or a forced one", async () => {
+    const { decide } = await import("./policy");
+    expect(decide("SAFE_MUTATION", 0, false, true)).toBe("run");
+    expect(decide("SAFE_MUTATION", 0, false, false)).toBe("approve");
+    expect(decide("SAFE_MUTATION", 1, true, true)).toBe("approve");
+    expect(decide("CONSEQUENTIAL_MUTATION", 1, false, true)).toBe("approve");
+  });
+});

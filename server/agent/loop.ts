@@ -197,7 +197,7 @@ export async function runAgent(
           const prepared = await tool.prepare!(ctx, parsed.data);
           if (!prepared.ok) {
             outcome = { ok: false, code: prepared.code, message: prepared.message, route: prepared.route };
-          } else if (decide(tool.risk, autonomy, prepared.forceApproval) === "run") {
+          } else if (decide(tool.risk, autonomy, prepared.forceApproval, prepared.changesNothing) === "run") {
             await setState("EXECUTING");
             emit("agent.executing", { tool: tool.name });
             outcome = await tool.execute!(ctx, prepared.args);

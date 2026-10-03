@@ -59,6 +59,10 @@ export type Prepared =
       /** Ask the user even where the autonomy level would let this run — for a
        *  change with a cost the user has not agreed to (a monthly credit). */
       forceApproval?: boolean;
+      /** prepare() has established that this call changes nothing in the app and
+       *  costs nothing (a search on a free service): it may run without asking,
+       *  like a read. Only honoured for SAFE_MUTATION, never with forceApproval. */
+      changesNothing?: boolean;
     }
   | { ok: false; code: string; message: string; route?: string };
 

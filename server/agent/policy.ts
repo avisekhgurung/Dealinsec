@@ -16,12 +16,13 @@ export function normalizeAutonomy(x: unknown): AutonomyLevel {
 
 export type Decision = "run" | "approve";
 
-/** READ_ONLY always runs. SAFE_MUTATION runs only at level 1. A consequential
- *  mutation always asks, at every level. */
-export function decide(risk: Risk, autonomy: AutonomyLevel, forceApproval = false): Decision {
+/** READ_ONLY always runs. SAFE_MUTATION runs only at level 1, or when its
+ *  prepare() proved it changes nothing and costs nothing. A consequential
+ *  mutation always asks, at every level; forceApproval always asks. */
+export function decide(risk: Risk, autonomy: AutonomyLevel, forceApproval = false, changesNothing = false): Decision {
   if (risk === "READ_ONLY") return "run";
-  if (risk === "CONSEQUENTIAL_MUTATION") return "approve";
-  return autonomy >= 1 && !forceApproval ? "run" : "approve";
+  if (risk === "CONSEQUENTIAL_MUTATION" || forceApproval) return "approve";
+  return autonomy >= 1 || changesNothing ? "run" : "approve";
 }
 
 /** null when the user may use the tool; otherwise the reason, in words the

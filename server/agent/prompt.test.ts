@@ -45,13 +45,14 @@ describe("channel style", () => {
     expect(agentSystemPrompt(settings("IN"), "client_work", "web")).not.toMatch(/CHANNEL:/);
     expect(agentSystemPrompt(settings("IN"))).toBe(agentSystemPrompt(settings("IN"), "client_work", "web"));
   });
-  it("voice is a short, spoken, gentleman's register, and says approvals aren't possible by voice", () => {
+  it("voice is a short, spoken, gentleman's register, and leaves the approval read-back to the app", () => {
     const v = agentSystemPrompt(settings("IN"), "client_work", "voice");
     expect(v).toMatch(/refined English gentleman/);
     expect(v).toMatch(/one to three short sentences of plain speech/);
     expect(v).toMatch(/no markdown/);
     expect(v).toMatch(/keep "due today" and "overdue" apart/);
-    expect(v).toMatch(/Approvals can't be given by voice, so never ask them to say yes/);
+    expect(v).toMatch(/the app then reads the exact details back and takes their spoken answer itself/);
+    expect(v).toMatch(/never claim it is done before it is/);
   });
   it("the voice persona never loosens the rules: it says they apply in full, and it is DealInSec, not anyone else", () => {
     const v = agentSystemPrompt(settings("IN"), "client_work", "voice");

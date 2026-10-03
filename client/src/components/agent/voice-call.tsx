@@ -1,8 +1,8 @@
 /**
  * The voice call screen: a calm full-screen conversation with DealInSec. An orb
- * that listens, thinks and speaks; live captions of what is being said; mute,
- * interrupt and end. Approvals can't be given by voice, so when something needs
- * one the card appears here to be tapped.
+ * that listens, thinks and speaks; live captions; mute, interrupt and end. When
+ * something needs approval it is read back and can be approved by voice, or by a
+ * tap on the card shown here.
  */
 import { useEffect, useRef, useState } from "react";
 import { Hand, Mic, MicOff, PhoneOff } from "lucide-react";
@@ -21,7 +21,8 @@ const hello = (hour: number, name?: string | null) =>
   `${hour < 5 ? "Good evening" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"}${name ? `, ${name}` : ""}. How may I be of service?`;
 
 export function VoiceCall({ agent, lang, firstName, onClose }: { agent: Agent; lang: string; firstName?: string | null; onClose: () => void }) {
-  const [bargeIn, setBargeIn] = useState(() => { try { return window.localStorage.getItem(BARGE_KEY) === "1"; } catch { return false; } });
+  // On by default: the person comes first. Off only if a loudspeaker keeps fooling it.
+  const [bargeIn, setBargeIn] = useState(() => { try { return window.localStorage.getItem(BARGE_KEY) !== "0"; } catch { return true; } });
   const toggleBarge = () => setBargeIn((v) => { const n = !v; try { window.localStorage.setItem(BARGE_KEY, n ? "1" : "0"); } catch { /* not remembered */ } return n; });
 
   // The agent answers in a spoken register for as long as the call is open.
@@ -38,7 +39,7 @@ export function VoiceCall({ agent, lang, firstName, onClose }: { agent: Agent; l
   const label =
     state.muted && phase === "listening" ? "Muted" :
     phase === "connecting" ? "Connecting…" :
-    phase === "listening" ? (state.interim ? "Listening…" : "Go ahead, I'm listening") :
+    phase === "listening" ? (state.interim ? "Listening…" : state.confirming ? (state.confirming.risk === "CONSEQUENTIAL_MUTATION" ? "Say confirm, or no" : "Say approve, or no") : "Go ahead, I'm listening") :
     phase === "thinking" ? "One moment…" :
     phase === "speaking" ? "Speaking" : "Call ended";
 
@@ -104,9 +105,9 @@ export function VoiceCall({ agent, lang, firstName, onClose }: { agent: Agent; l
           </button>
         </div>
         <button type="button" onClick={toggleBarge} aria-pressed={bargeIn} data-testid="call-barge"
-          title="Lets you talk over the assistant. It works best with headphones; on a loudspeaker it can mistake its own voice for you."
+          title="When on, just start talking and the assistant stops to listen. Turn it off if it keeps stopping itself on a loudspeaker."
           className="text-xs text-white/55 underline-offset-2 hover:text-white/80 hover:underline">
-          Interrupt by voice (beta): {bargeIn ? "on" : "off"}
+          Talk over it to interrupt: {bargeIn ? "on" : "off"}
         </button>
       </footer>
     </div>

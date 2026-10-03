@@ -25,7 +25,8 @@ export function speakable(md: string, max = 700): string {
 export function splitSentences(text: string, maxLen = 220): string[] {
   const t = String(text ?? "").replace(/\s+/g, " ").trim();
   if (!t) return [];
-  const raw = t.match(/[^.!?…]+[.!?…]+["')\]]*\s*|[^.!?…]+$/g) ?? [t];
+  // A sentence ends at . ! ? or … followed by a space or the end, so "northwind.com" and "₹1.5 lakh" stay whole.
+  const raw = t.match(/.+?[.!?…]+["')\]]*(?=\s|$)|.+$/g) ?? [t];
   const merged: string[] = [];
   for (const piece of raw.map((p) => p.trim()).filter(Boolean)) {
     const last = merged[merged.length - 1];
