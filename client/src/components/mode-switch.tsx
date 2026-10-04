@@ -4,23 +4,6 @@ import { MessageSquare, Sparkles } from "lucide-react";
 import { setUiMode } from "@/hooks/use-ui-mode";
 import { setAgentOrigin } from "@/lib/agent-bus";
 
-/** Top-bar button (desktop, app mode): turn the whole product into the chat. */
-export function AgentModeButton() {
-  const [, setLocation] = useLocation();
-  return (
-    <button
-      type="button"
-      onClick={() => { setUiMode("agent"); setLocation("/agent"); }}
-      data-testid="mode-to-agent"
-      aria-label="Switch to agent mode: chat and voice only"
-      title="Agent mode"
-      className="dis-topnav-icon flex h-9 items-center gap-1.5 rounded-[10px] px-2.5 text-[13px] font-semibold text-white/85 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-300/70"
-    >
-      <Sparkles className="h-4 w-4" /><span className="hidden xl:inline">Agent mode</span>
-    </button>
-  );
-}
-
 /** Floating pill shown on app pages while the person is in agent mode: one tap back to the chat. */
 export function BackToChat() {
   const [, setLocation] = useLocation();

@@ -1,8 +1,8 @@
 import { useLocation, Link } from "wouter";
-import { Home, Briefcase, FileText, Receipt } from "lucide-react";
+import { LayoutDashboard, Briefcase, FileText, Receipt } from "lucide-react";
 
 const navItems = [
-  { path: "/dashboard", label: "Home", icon: Home },
+  { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { path: "/brand/deals", label: "Deals", icon: Briefcase },
   { path: "/brand/contracts", label: "Contracts", icon: FileText },
   { path: "/brand/billing", label: "Billing", icon: Receipt },

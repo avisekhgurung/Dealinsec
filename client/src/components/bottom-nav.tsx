@@ -1,10 +1,10 @@
 import { useLocation, Link } from "wouter";
-import { Home, Briefcase, FileCheck, Receipt, FileText, UserCircle } from "lucide-react";
+import { LayoutDashboard, Briefcase, FileCheck, Receipt, FileText, UserCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { canSeeModule } from "@shared/permissions";
 
 const navItems = [
-  { path: "/dashboard", label: "Home", icon: Home },
+  { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { path: "/deals", label: "Deals", icon: Briefcase, module: "deals" as const },
   { path: "/quotations", label: "Quotes", icon: FileText, module: "quotations" as const },
   { path: "/contracts", label: "Agreements", icon: FileCheck, module: "agreements" as const },

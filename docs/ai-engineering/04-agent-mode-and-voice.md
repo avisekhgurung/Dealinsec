@@ -25,7 +25,8 @@ Hands-free wake words, continuous conversation, spoken approvals, a server-side 
 The floating "Ask DealInSec" Copilot drawer is gone. It was already the agent in a small window (same backend and history; all 11 of its tools are wrapped by the agent), so keeping two doors to one thing only split attention.
 - **A floating "Agent mode" button** on every app page replaces it. It carries where you were: from a deal, agreement or invoice page the agent starts knowing which one ("run the Protection Check on this deal" works), and offers questions for that page (`shared/page-context.ts`, tested).
 - **The Daily Briefing** (money to chase, ready to invoice, what needs you; computed server-side, never invented) is now the agent page's opening view, above the existing call and paste actions. The dashboard's "Daily Briefing" chip opens it.
-- **The header menu is removed** (desktop). Its seven destinations were not all reachable another way (Leads and Agreements had no other desktop link), so the dashboard has a "Go to" row (`module-links.tsx`, filtered by the member's role). The mobile bottom bar is unchanged.
+- **The header menu stays** (Dashboard, Agent, Leads, Deals, Quotations, Agreements, Invoices). What goes from the header is the separate "Agent mode" button, because the floating one is now the way in. (I first misread this as "remove the menu" and shipped that; it was corrected the same day.)
+- **The phone's bottom bar** now says **Dashboard** (with a dashboard icon) instead of "Home", for the analytics page. All six labels fit at 375 px; at 320 px "Dashboard" and "Agreements" are truncated.
 - Not changed: the public landing page's own "Ask DealInSec" widget for logged-out visitors.
 - Cost of the change: the drawer let you ask a quick question without leaving the page; now it is a full switch to the agent. If that is missed, a lightweight slide-over on the same agent is the way back.
 
