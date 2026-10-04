@@ -1,10 +1,11 @@
 import { useLocation, Link } from "wouter";
-import { LayoutDashboard, Briefcase, FileCheck, Receipt, FileText, UserCircle } from "lucide-react";
+import { LayoutDashboard, Target, Briefcase, FileCheck, Receipt, FileText, UserCircle } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { canSeeModule } from "@shared/permissions";
 
 const navItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/leads", label: "Leads", icon: Target, module: "deals" as const },
   { path: "/deals", label: "Deals", icon: Briefcase, module: "deals" as const },
   { path: "/quotations", label: "Quotes", icon: FileText, module: "quotations" as const },
   { path: "/contracts", label: "Agreements", icon: FileCheck, module: "agreements" as const },
@@ -15,7 +16,7 @@ const navItems = [
 /**
  * Mobile tab bar — the same lit ink-green surface as the desktop top bar, so
  * the phone app and the desktop app read as one product. Items share the
- * width equally (flex-1, min-w-0) so six tabs fit a 320px phone without
+ * width equally (flex-1, min-w-0) so seven tabs fit a 320px phone (text steps down with the width: 10px from 430px, 9px from 360px, 8.5px from 340px, 8px below) without
  * overflowing; styles live in index.css (.dis-bottomnav*).
  */
 export function BottomNav() {
@@ -47,7 +48,7 @@ export function BottomNav() {
                 <span className="dis-bottomnav-icon relative flex items-center justify-center w-11 h-7 rounded-full">
                   <Icon className="w-[19px] h-[19px]" strokeWidth={active ? 2.4 : 1.8} />
                 </span>
-                <span className={`max-w-full truncate px-0.5 text-[10px] leading-none tracking-tight ${active ? "font-bold" : "font-medium"}`}>
+                <span className={`max-w-full truncate text-[8px] leading-none tracking-tighter min-[340px]:text-[8.5px] min-[360px]:text-[9px] min-[430px]:px-0.5 min-[430px]:text-[10px] min-[430px]:tracking-tight ${active ? "font-bold" : "font-medium"}`}>
                   {item.label}
                 </span>
               </Link>

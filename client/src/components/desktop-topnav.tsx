@@ -53,7 +53,6 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { path: "/dashboard", label: "Dashboard", icon: Home },
-  { path: "/agent", label: "Agent", icon: Sparkles },
   { path: "/leads", label: "Leads", icon: Target, module: "deals" },
   { path: "/deals", label: "Deals", icon: Briefcase, module: "deals" },
   { path: "/quotations", label: "Quotations", icon: FileText, module: "quotations" },
