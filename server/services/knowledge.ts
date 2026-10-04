@@ -166,3 +166,32 @@ export async function searchKnowledge(user: Who, question: string): Promise<Resu
   }
   return { ok: true, hits, empty: false, terms };
 }
+
+export interface RelatedNote { title: string; kind: string; sourceUrl: string | null; text: string }
+
+/**
+ * Passages from the workspace's knowledge that talk about the same things as `text` (a lead's
+ * name, industry, place, summary), as context next to a fit check. NOT a score: a passage is
+ * shown only when it shares at least two of the words (one, if the text has only one), so a
+ * lone common word does not drag in an unrelated note. Never throws; [] when there is nothing.
+ */
+export async function relatedKnowledge(user: Who, text: string, limit = 2): Promise<RelatedNote[]> {
+  try {
+    if (readGate(user)) return [];
+    const terms = queryTerms(text);
+    if (!terms.length) return [];
+    const rows = await store.search(user.organizationId!, terms, limit * 4);
+    const need = Math.min(2, terms.length);
+    const stem = (t: string) => t.slice(0, Math.max(4, t.length - 2));
+    const out: RelatedNote[] = [];
+    const seen = new Set<string>();
+    for (const r of rows) {
+      const body = r.content.toLowerCase();
+      if (terms.filter((t) => body.includes(stem(t))).length < need || seen.has(r.sourceId)) continue;
+      seen.add(r.sourceId);
+      out.push({ title: r.title, kind: r.kind, sourceUrl: r.sourceUrl, text: r.content.slice(0, 300) });
+      if (out.length >= limit) break;
+    }
+    return out;
+  } catch { return []; }
+}

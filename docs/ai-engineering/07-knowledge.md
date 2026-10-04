@@ -44,6 +44,15 @@ First version: the prompt said "search knowledge first". The live eval showed th
 
 Also: "remember that I never work with gambling companies" was routed by the model to `update_ideal_client` (exclusions), which is the *better* tool. The case was wrong, not the model; the case now uses a fact that belongs in a note.
 
+## Knowledge in the fit check (added after the first release)
+`assess_lead_fit` and the lead page's fit card now show up to two passages from the workspace's own knowledge about the same things as the lead (name, industry, place, summary), under "From your knowledge". Design rules:
+- **Context, never score.** The verdict stays the app's plain, explainable rules (`shared/fit.ts`); nothing from free text can change it. A test compares the verdict lines with and without knowledge.
+- **Two shared words or nothing.** A passage appears only when it shares at least two of the lead's words, so one common word ("Lisbon") does not drag in an unrelated note. Tested, and the rule's removal is caught by a mutation.
+- The agent is told the passage is the user's material, not instructions, and to name the source when it says a lead is one they avoid.
+- Never throws (a knowledge problem cannot break a fit check), workspace-scoped, role-gated like the rest.
+
+Not done on purpose: feeding the notes into the company-search *picking* step. That step reads untrusted web results; adding stored free text to it widens what a hostile page could influence, for a gain the fit check already provides after the lead exists.
+
 ## Verified, and not
 Verified: 24 unit/loop tests with 19 mutations (each guard removed makes a test fail); 16 network-guard tests with 13 mutations; **real Postgres** (ranking, tenant isolation, injection-shaped queries, cascade); `script/e2e-knowledge.mts` **56 checks** over HTTP including a real fetch of `example.com` and the refusals; the real browser (add a note, a picture with its thumbnail, a page, the error toast for a refused address, search, remove with confirmation, phone width, no horizontal scroll); the live model on 8 knowledge cases x 5 runs, 100%, 0 safety failures.
 

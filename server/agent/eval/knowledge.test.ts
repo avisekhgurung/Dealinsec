@@ -32,7 +32,7 @@ import { AGENT_TOOLS } from "../tools";
 import { FakeProvider, call, collect, say, type Step } from "../testing";
 import type { AutonomyLevel } from "../types";
 import { useWorld } from "./world-mocks";
-import { createWorld, userRow, ORG1, ORG2, type World } from "./world";
+import { createWorld, seedLead, seedProfile, userRow, ORG1, ORG2, type World } from "./world";
 
 const world = () => (globalThis as any).__world as World;
 const OWNER = () => world().users.get("u1")!;
@@ -283,5 +283,48 @@ describe("the pointer from get_ideal_client to the knowledge", () => {
     await addNote(user(), NOTE);
     expect(await knowledgeCount(user())).toBe(1);
     expect(await knowledgeCount({ ...user(), orgRole: "CUSTOM", customPermissions: [] })).toBe(0);
+  });
+});
+
+describe("assess_lead_fit shows what the user wrote, beside the verdict and never inside it", () => {
+  const fit = async (leadOver: Record<string, any>) => {
+    const lead = seedLead(world(), { companyName: "Casa Alma", industry: "Boutique hotels", location: "Lisbon, Portugal", ...leadOver });
+    const r = await run({ steps: [call("assess_lead_fit", { leadId: lead.id }), say("ok")] });
+    return toolResult(r.provider);
+  };
+  it("adds the matching passage with its source, labelled as context and as the user's material", async () => {
+    seedProfile(world(), { targetIndustries: ["hotels"], targetLocations: ["Portugal"] });
+    await addNote(user(), NOTE);
+    const out = await fit({});
+    expect(out).toMatch(/From the user's own knowledge \(context only/);
+    expect(out).toMatch(/\[1\] Who we help: We design logos and brand systems for boutique hotels/);
+  });
+  it("leaves the verdict and signals exactly as they were without any knowledge", async () => {
+    seedProfile(world(), { targetIndustries: ["hotels"], targetLocations: ["Portugal"] });
+    const verdict = (out: string) => out.split("\n").filter((l) => /^(Strong|Partial|Weak|Excluded|Can't|No ideal)|^- /.test(l)).join("\n");
+    const before = verdict(await fit({}));
+    await addNote(user(), NOTE);
+    const withKnowledge = await fit({});
+    expect(withKnowledge).toMatch(/From the user's own knowledge/);
+    expect(verdict(withKnowledge)).toBe(before);
+    expect(before.length).toBeGreaterThan(20);
+  });
+  it("does not drag in a note because of one shared word", async () => {
+    await addNote(user(), { title: "Past work", text: "We did brand identities for three restaurants in Lisbon and a cafe in Porto last year." });
+    expect(await fit({ companyName: "Tagus Bank", industry: "Banking", location: "Lisbon" })).not.toMatch(/From the user's own knowledge/);
+  });
+  it("says nothing when there is no knowledge, and never shows another workspace's", async () => {
+    expect(await fit({})).not.toMatch(/From the user's own knowledge/);
+    await addNote(OTHER(), NOTE);
+    expect(await fit({})).not.toMatch(/From the user's own knowledge/);
+  });
+  it("returns the passages to the lead page too, and a role that cannot read deals gets none", async () => {
+    await addNote(user(), NOTE);
+    const lead = seedLead(world(), { companyName: "Casa Alma", industry: "Boutique hotels", location: "Lisbon, Portugal" });
+    const { assessLeadFit } = await import("../../services/ideal-client");
+    const r = await assessLeadFit(user(), lead.id);
+    expect(r.ok && r.notes.map((n) => n.title)).toEqual(["Who we help"]);
+    const { relatedKnowledge } = await import("../../services/knowledge");
+    expect(await relatedKnowledge({ ...user(), orgRole: "CUSTOM", customPermissions: [] }, "boutique hotels Portugal")).toEqual([]);
   });
 });

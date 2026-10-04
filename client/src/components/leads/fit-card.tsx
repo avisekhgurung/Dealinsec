@@ -24,7 +24,7 @@ export function FitCard({ leadId }: { leadId: number }) {
   const { user } = useAuth();
   const canEdit = memberCan(user as any, "deals.create");
   const [open, setOpen] = useState(false);
-  const { data, error } = useQuery<{ fit: FitResult; profileSet: boolean }>({ queryKey: [fitUrl(leadId)] });
+  const { data, error } = useQuery<{ fit: FitResult; profileSet: boolean; notes?: { title: string; kind: string; text: string }[] }>({ queryKey: [fitUrl(leadId)] });
   if (profileNotSetUp(error) || !data) return null;
   const f = data.fit;
 
@@ -47,6 +47,17 @@ export function FitCard({ leadId }: { leadId: number }) {
               </li>
             ))}
           </ul>
+        )}
+        {data.notes && data.notes.length > 0 && (
+          <div className="space-y-1.5 border-t pt-2.5" data-testid="fit-notes">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">From your knowledge</p>
+            {data.notes.map((n, i) => (
+              <div key={i} className="rounded-md bg-muted/40 p-2 text-xs">
+                <p className="font-medium text-muted-foreground">{n.title}</p>
+                <p className="line-clamp-3 break-words">{n.text}</p>
+              </div>
+            ))}
+          </div>
         )}
         {f.missing.length > 0 && <p className="text-xs text-muted-foreground">Add {f.missing.join(", ")} to this lead to check more.</p>}
         {canEdit && (

@@ -7,6 +7,7 @@ import { formatMoney } from "@shared/money";
 import { EMPTY_IDEAL_CLIENT, assessFit, idealClientInputSchema, type FitResult, type IdealClient } from "@shared/fit";
 import { MAX_AMOUNT_MINOR, resolveLocaleSettings, toMinor } from "@shared/schema";
 import { leadsStore } from "../leads/store";
+import { relatedKnowledge, type RelatedNote } from "./knowledge";
 import { profileStore } from "../leads/profile-store";
 import { storage } from "../storage";
 import { fail, firstIssue, orgCurrency, readGate, writeGate, type Result, type Who } from "./leads";
@@ -67,7 +68,7 @@ export async function saveIdealClient(user: Who, raw: unknown): Promise<Result<{
   return { ok: true, profile: a, changes: plan.changes };
 }
 
-export async function assessLeadFit(user: Who, leadId: number): Promise<Result<{ fit: FitResult; profileSet: boolean }>> {
+export async function assessLeadFit(user: Who, leadId: number): Promise<Result<{ fit: FitResult; profileSet: boolean; notes: RelatedNote[] }>> {
   const gate = readGate(user);
   if (gate) return gate;
   const orgId = user.organizationId!;
@@ -76,5 +77,7 @@ export async function assessLeadFit(user: Who, leadId: number): Promise<Result<{
   const [row, org] = await Promise.all([profileStore.get(orgId), storage.getOrganization(orgId)]);
   const locale = resolveLocaleSettings(org, user as any).locale;
   const fit = assessFit(toIdeal(row), lead, (m, c) => formatMoney(m, c, locale));
-  return { ok: true, fit, profileSet: !!row };
+  // Context, not a score: what the user has written about the same things. The verdict above never depends on it.
+  const notes = await relatedKnowledge(user, [lead.companyName, lead.industry, lead.location, lead.fitSummary].filter(Boolean).join(" "));
+  return { ok: true, fit, profileSet: !!row, notes };
 }

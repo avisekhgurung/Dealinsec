@@ -191,6 +191,22 @@ async function main() {
   r = await a.req("POST", "/api/knowledge/note", { ...NOTE, title: "A is unaffected" });
   check("another workspace is unaffected", r.status === 201 || r.status === 409, `${r.status}`);
 
+  console.log("\n━━ 9b. The lead page shows what you wrote, beside the verdict ━━");
+  await a.req("PUT", "/api/ideal-client", { targetIndustries: ["hotels"], targetLocations: ["Portugal"] });
+  r = await a.req("POST", "/api/leads", { companyName: "Casa Alma", industry: "Boutique hotels", location: "Lisbon, Portugal" });
+  const hotelLead = r.json?.lead?.id;
+  r = await a.req("POST", "/api/leads", { companyName: "Tagus Bank", industry: "Banking", location: "Lisbon" });
+  const bankLead = r.json?.lead?.id;
+  r = await a.req("GET", `/api/leads/${hotelLead}/fit`);
+  check("a hotel lead: the verdict is there and so is the matching note", r.status === 200 && !!r.json?.fit?.verdict && (r.json?.notes ?? []).some((n: any) => n.title === "Who we help") && r.json.notes.length <= 2, `${r.status} ${r.text}`);
+  const verdictWith = r.json?.fit?.verdict;
+  r = await a.req("GET", `/api/leads/${bankLead}/fit`);
+  check("a bank sharing only 'Lisbon' with a note gets no note", r.status === 200 && (r.json?.notes ?? []).length === 0, `${r.text}`);
+  r = await b.req("POST", "/api/leads", { companyName: "Casa Alma", industry: "Boutique hotels", location: "Lisbon, Portugal" });
+  r = await b.req("GET", `/api/leads/${r.json?.lead?.id}/fit`);
+  check("another workspace's identical lead sees none of our notes", r.status === 200 && (r.json?.notes ?? []).length === 0, `${r.text}`);
+  check("the verdict does not depend on the notes (a plain rule result)", ["strong", "partial", "weak", "excluded", "unclear"].includes(verdictWith), verdictWith);
+
   console.log("\n━━ 10. Nothing orphaned, nothing crossed ━━");
   const orph = (await pool.query(`SELECT (SELECT count(*)::int FROM knowledge_chunks c WHERE NOT EXISTS (SELECT 1 FROM knowledge_sources s WHERE s.id=c.source_id AND s.organization_id=c.organization_id)) chunks,
     (SELECT count(*)::int FROM knowledge_files f WHERE NOT EXISTS (SELECT 1 FROM knowledge_sources s WHERE s.id=f.source_id AND s.organization_id=f.organization_id)) files`)).rows[0];
@@ -207,7 +223,7 @@ async function cleanup() {
   const c = await pool.connect();
   const found = await c.query(`SELECT id, organization_id FROM users WHERE email LIKE 'e2e-knowledge-%@dealinsec.invalid'`);
   const users = found.rows.map((x) => x.id), orgs = Array.from(new Set(found.rows.map((x) => x.organization_id).filter(Boolean)));
-  for (const o of orgs) for (const t of ["knowledge_files", "knowledge_chunks", "knowledge_sources", "activity_logs", "invoice_counters", "invitations", "org_roles"]) await c.query(`DELETE FROM ${t} WHERE organization_id=$1`, [o]).catch(() => {});
+  for (const o of orgs) for (const t of ["knowledge_files", "knowledge_chunks", "knowledge_sources", "lead_claims", "lead_tickets", "lead_events", "leads", "client_profiles", "activity_logs", "invoice_counters", "invitations", "org_roles"]) await c.query(`DELETE FROM ${t} WHERE organization_id=$1`, [o]).catch(() => {});
   for (const u of users) await c.query(`DELETE FROM activity_logs WHERE user_id=$1`, [u]).catch(() => {});
   await c.query(`DELETE FROM users WHERE email LIKE 'e2e-knowledge-%@dealinsec.invalid'`).catch(() => {});
   for (const o of orgs) await c.query(`DELETE FROM organizations WHERE id=$1`, [o]).catch(() => {});
