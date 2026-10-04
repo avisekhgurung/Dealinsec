@@ -30,3 +30,9 @@ The floating "Ask DealInSec" Copilot drawer is gone. It was already the agent in
 - Not changed: the public landing page's own "Ask DealInSec" widget for logged-out visitors.
 - Cost of the change: the drawer let you ask a quick question without leaving the page; now it is a full switch to the agent. If that is missed, a lightweight slide-over on the same agent is the way back.
 
+## Update (4 Oct 2026): the dashboard reads analytics first
+The dashboard is the page for numbers, so for an account that has deals the order is now: a slim one-line profile prompt (only while the profile is incomplete), the five KPI cards, what needs attention (money radar, follow-ups, protection issues, leads), the trend and activity charts, the pipeline funnel and breakdowns, deal status, recent deals, and last an **Account** section (trial and plan, team seats). An account with **no deals yet keeps the setup-first order** (full profile checklist, trial, team), because setting up is what it needs.
+- The "What do you want to do?" card is gone (the floating Agent mode button replaces it).
+- The Earned and Pending tiles are gone as separate cards: Pipeline Value is their sum, so its subtitle now carries the split ("earned · due"), and the invoice cash-flow chart already shows received versus pending.
+- Phone fixes found by looking at it: the profile prompt stacks (title, then a full-width button), and the fifth KPI card spans the row so it does not sit alone in half of one.
+

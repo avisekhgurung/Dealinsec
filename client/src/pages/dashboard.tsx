@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { useMemo, useState, useEffect, useRef } from "react";
 import {
   Plus, Briefcase, FileCheck, Receipt, ChevronRight, LogOut,
-  TrendingUp, IndianRupee, Banknote, Clock, CheckCircle2,
+  TrendingUp, IndianRupee, Banknote, CheckCircle2,
   UserCircle, MapPin, FileText, PenTool, Landmark, X as XIcon, Sparkles,
   Crown, Rocket, Users2, UserPlus2, Settings as SettingsIcon,
   Zap, FileSignature, ArrowUpRight, ShieldAlert
@@ -539,42 +539,6 @@ const MONEY_TINTS = {
   },
 } as const;
 
-function MoneyTile({ label, amountMinor, icon: Icon, tint, fmt }: {
-  label: string;
-  /** Minor units — formatted here, never before. */
-  amountMinor: number;
-  icon: any;
-  tint: keyof typeof MONEY_TINTS;
-  fmt: MoneyFormat;
-}) {
-  const t = MONEY_TINTS[tint];
-  const animated = useCountUp(amountMinor);
-  const text = moneyFrame(animated, amountMinor, fmt);
-  // Measure the FINAL string, not a rupee-shaped guess at it ("$1,250,000.50"
-  // is longer than "₹12,50,000" for similar money) and not the animating one,
-  // so the size is settled before the count-up starts rather than jumping
-  // down a step halfway through it.
-  const long = fmt.money(amountMinor).length > 8;
-  return (
-    <div className={`rounded-xl p-3 lg:p-5 overflow-hidden ${t.card}`}>
-      <div className="flex items-center gap-2 mb-1.5 lg:mb-2.5">
-        <span className={`flex items-center justify-center w-6 h-6 lg:w-7 lg:h-7 rounded-md shrink-0 ${t.chip}`}>
-          <Icon className="w-3.5 h-3.5 lg:w-4 lg:h-4" strokeWidth={2.2} />
-        </span>
-        <span className="text-xs lg:text-sm text-muted-foreground uppercase tracking-wider font-semibold">{label}</span>
-      </div>
-      <p className={`font-bold truncate leading-tight tabular-nums ${t.amount} ${long ? "text-base lg:text-2xl" : "text-xl lg:text-3xl"}`}>
-        {text}
-      </p>
-    </div>
-  );
-}
-
-// ─── Protection issues ───────────────────────────────────────────────────────
-// A count of REAL pending deals whose terms have something worth clarifying,
-// from the same Protection Check the deal page shows. Shown only when there is
-// something to show: a clean account gets no card rather than a made-up "all
-// clear". Mirrors ProtectionSummary in server/copilot/riskcheck.ts.
 function ProtectionIssuesCard({ isBrand }: { isBrand: boolean }) {
   const { data } = useQuery<{
     protection?: { checked: number; withIssues: number; important: number; usageRights: number; exclusivity: number };
@@ -799,50 +763,14 @@ export default function DashboardPage() {
     window.location.href = "/";
   };
 
-  return (
-    <div className="min-h-screen bg-background pb-24 lg:pb-12">
-      {/* Header — compact on mobile, generous on desktop SaaS-style */}
-      <header className="glass-header sticky top-0 z-40 lg:border-b lg:border-neutral-200/60 dark:lg:border-neutral-800/60">
-        <div className="flex items-center justify-between gap-4 px-4 py-4 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-5 xl:px-10">
-          <div>
-            <p className="text-xs text-muted-foreground">{todayLabel}</p>
-            <h1 className="text-lg lg:text-2xl font-bold tracking-tight">
-              {greeting}, {firstNameOnly}
-            </h1>
-          </div>
-          <div className="flex items-center gap-2 lg:gap-3">
-            {canCreateDeal && (
-              <Link href="/deals/new" className="hidden lg:block">
-                <Button size="sm" className="gradient-btn text-white font-semibold" data-testid="header-new-deal">
-                  <Plus className="w-4 h-4 mr-1.5" />
-                  {audience.newDealCta}
-                </Button>
-              </Link>
-            )}
-            {/* Desktop keeps the bell + settings in the sidebar; mobile
-                needs them here (settings isn't in the bottom nav). */}
-            <NotificationBell className="lg:hidden" />
-            <Link href="/settings" className="lg:hidden">
-              <Button variant="ghost" size="icon" aria-label="Settings" data-testid="header-settings">
-                <SettingsIcon className="w-5 h-5" />
-              </Button>
-            </Link>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleLogout}
-              data-testid="button-logout"
-              className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 lg:hidden"
-            >
-              <LogOut className="w-5 h-5" />
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="px-4 py-5 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-6 lg:space-y-5 xl:px-10">
-
-        {/* ── Profile completion nudge — top priority before any action ── */}
+  // ── The dashboard's pieces, arranged by who is looking ─────────────────────────────────────
+  // An account with deals reads analytics first: the numbers, then what needs attention, then the
+  // charts, with account and setup last. An account with no deals yet is still setting up, so its
+  // order stays as it was: setup first.
+  const firstRun = !dealsLoading && deals.length === 0;
+  const nudgeEl = (
+    <>
+{/* ── Profile completion nudge — top priority before any action ── */}
         {showProfileNudge && (
           <Card className="border-amber-200/70 dark:border-amber-900/40 bg-gradient-to-br from-amber-50 via-orange-50/40 to-white dark:from-amber-950/30 dark:via-orange-950/20 dark:to-transparent relative overflow-hidden">
             <CardContent className="p-4 lg:p-6">
@@ -943,16 +871,49 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* ── Plan ── */}
-        <SubscriptionCard user={user} />
-        <TeamSeatsCard />
-
-        <LeadsStrip />
-        <FollowUpsPanel max={4} />
-        <MoneyRadarCard />
-        <ProtectionIssuesCard isBrand={audience.isBrand} />
-
-        {/* ── Stat cards — the funnel, in order: deal → quote → agreement →
+        
+    </>
+  );
+  const profileStripEl = showProfileNudge && profileIncomplete.length > 0 ? (
+    <Card className="border-amber-200/70 dark:border-amber-900/40 bg-amber-50/60 dark:bg-amber-950/20" data-testid="profile-strip">
+      <CardContent className="flex flex-wrap items-center gap-x-3 gap-y-2.5 p-3 lg:gap-x-4 lg:px-5">
+        <UserCircle className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
+        <p className="min-w-[11rem] flex-1 text-sm font-semibold text-foreground">
+          Finish your profile <span className="tabular-nums text-amber-700 dark:text-amber-400">({profileDone}/{profileTotal})</span>
+          <span className="ml-2 hidden font-normal text-muted-foreground sm:inline">so invoices and agreements go through without interruption</span>
+        </p>
+        <div className="hidden h-1.5 w-28 overflow-hidden rounded-full bg-amber-200/60 dark:bg-amber-900/40 sm:block" aria-hidden="true">
+          <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500" style={{ width: `${profilePct}%` }} />
+        </div>
+        <Link href={profileIncomplete[0].href} className="order-last w-full sm:order-none sm:w-auto">
+          <Button size="sm" className="gradient-btn w-full text-white sm:w-auto" data-testid="complete-profile-cta">
+            Complete {profileIncomplete[0].label.toLowerCase()}
+            <ChevronRight className="ml-1 h-4 w-4" />
+          </Button>
+        </Link>
+        <button type="button" onClick={dismissNudge} className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-foreground/5 hover:text-foreground" aria-label="Dismiss for now" data-testid="dismiss-profile-nudge">
+          <XIcon className="h-4 w-4" />
+        </button>
+      </CardContent>
+    </Card>
+  ) : null;
+  const accountEl = (
+    <>
+      <SubscriptionCard user={user} />
+      <TeamSeatsCard />
+    </>
+  );
+  const attentionEl = (
+    <>
+      <MoneyRadarCard />
+      <FollowUpsPanel max={4} />
+      <ProtectionIssuesCard isBrand={audience.isBrand} />
+      <LeadsStrip />
+    </>
+  );
+  const statsEl = (
+    <>
+{/* ── Stat cards — the funnel, in order: deal → quote → agreement →
             invoice → money ── */}
         <section className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4">
           <StatCard title="Deals" value={totalDeals} icon={Briefcase}
@@ -970,6 +931,7 @@ export default function DashboardPage() {
             tone="emerald" href="/invoices" loading={isLoading}
             sub={paidThisWeek > 0 ? `${paidThisWeek} this week` : paidInvoices > 0 ? "all settled" : "none yet"}
             trendUp={paidThisWeek > 0} />
+          <div className="col-span-2 lg:col-span-1">
           <StatCard
             title="Pipeline Value"
             value={totalRevenueMinor + pendingRevenueMinor}
@@ -978,11 +940,21 @@ export default function DashboardPage() {
             tone="slate"
             href="/deals"
             loading={isLoading}
-            sub={`${activeDealsCount} active deal${activeDealsCount !== 1 ? "s" : ""}`}
+            sub={totalRevenueMinor > 0
+              ? `${compactMoney(totalRevenueMinor, fmt)} earned${pendingRevenueMinor > 0 ? ` · ${compactMoney(pendingRevenueMinor, fmt)} due` : ""}`
+              : pendingRevenueMinor > 0
+                ? `${compactMoney(pendingRevenueMinor, fmt)} pending`
+                : `${activeDealsCount} active deal${activeDealsCount !== 1 ? "s" : ""}`}
           />
+          </div>
         </section>
 
-        {/* ── Deal Status breakdown — segmented bar + responsive counts ── */}
+        
+    </>
+  );
+  const dealStatusEl = (
+    <>
+{/* ── Deal Status breakdown — segmented bar + responsive counts ── */}
         {!isLoading && totalDeals > 0 && (() => {
           const pending = deals.filter(d => d.status === "Pending").length;
           const active = deals.filter(d => d.status === "Active").length;
@@ -1051,27 +1023,12 @@ export default function DashboardPage() {
           );
         })()}
 
-        {/* ── Revenue summary strip — money reads as money: tinted tiles ── */}
-        {!isLoading && (totalRevenueMinor > 0 || pendingRevenueMinor > 0) && (
-          <div className="grid grid-cols-2 gap-3 lg:gap-5">
-            <MoneyTile
-              label="Earned"
-              amountMinor={totalRevenueMinor}
-              icon={TrendingUp}
-              tint="emerald"
-              fmt={fmt}
-            />
-            <MoneyTile
-              label="Pending"
-              amountMinor={pendingRevenueMinor}
-              icon={Clock}
-              tint="amber"
-              fmt={fmt}
-            />
-          </div>
-        )}
-
-        {/* ── Analytics: trend + activity + conversion. Palette
+        
+    </>
+  );
+  const analyticsEl = (
+    <>
+{/* ── Analytics: trend + activity + conversion. Palette
             #059669/#F59E0B validated (CVD + normal-vision pass); counts
             share one axis, money gets its own chart — never dual axes. ── */}
         {!isLoading && (() => {
@@ -1217,7 +1174,12 @@ export default function DashboardPage() {
           );
         })()}
 
-        {/* ── Charts (only shown when there's data) ── */}
+        
+    </>
+  );
+  const chartsEl = (
+    <>
+{/* ── Charts (only shown when there's data) ── */}
         {deals.length > 0 && (
           <>
 
@@ -1355,7 +1317,12 @@ export default function DashboardPage() {
           </>
         )}
 
-        {/* ── Recent Deals — one divided list, not three stacked cards ── */}
+        
+    </>
+  );
+  const recentEl = (
+    <>
+{/* ── Recent Deals — one divided list, not three stacked cards ── */}
         {recentDeals.length > 0 && (
           <Card className="glass-card border-0 overflow-hidden">
             <div className="flex items-center justify-between px-4 pt-4 pb-2 lg:px-5 lg:pt-5">
@@ -1401,7 +1368,12 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* ── Empty state ── */}
+        
+    </>
+  );
+  const emptyEl = (
+    <>
+{/* ── Empty state ── */}
         {deals.length === 0 && !isLoading && (
           <Card className="glass-card border-0">
             <CardContent className="py-12 text-center">
@@ -1422,6 +1394,78 @@ export default function DashboardPage() {
               )}
             </CardContent>
           </Card>
+        )}
+    </>
+  );
+
+  return (
+    <div className="min-h-screen bg-background pb-24 lg:pb-12">
+      {/* Header — compact on mobile, generous on desktop SaaS-style */}
+      <header className="glass-header sticky top-0 z-40 lg:border-b lg:border-neutral-200/60 dark:lg:border-neutral-800/60">
+        <div className="flex items-center justify-between gap-4 px-4 py-4 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-5 xl:px-10">
+          <div>
+            <p className="text-xs text-muted-foreground">{todayLabel}</p>
+            <h1 className="text-lg lg:text-2xl font-bold tracking-tight">
+              {greeting}, {firstNameOnly}
+            </h1>
+          </div>
+          <div className="flex items-center gap-2 lg:gap-3">
+            {canCreateDeal && (
+              <Link href="/deals/new" className="hidden lg:block">
+                <Button size="sm" className="gradient-btn text-white font-semibold" data-testid="header-new-deal">
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  {audience.newDealCta}
+                </Button>
+              </Link>
+            )}
+            {/* Desktop keeps the bell + settings in the sidebar; mobile
+                needs them here (settings isn't in the bottom nav). */}
+            <NotificationBell className="lg:hidden" />
+            <Link href="/settings" className="lg:hidden">
+              <Button variant="ghost" size="icon" aria-label="Settings" data-testid="header-settings">
+                <SettingsIcon className="w-5 h-5" />
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleLogout}
+              data-testid="button-logout"
+              className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 lg:hidden"
+            >
+              <LogOut className="w-5 h-5" />
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <main className="px-4 py-5 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-6 lg:space-y-5 xl:px-10">
+        {firstRun ? (
+          <>
+            {nudgeEl}
+            {accountEl}
+            {attentionEl}
+            {statsEl}
+            {dealStatusEl}
+            {analyticsEl}
+            {chartsEl}
+            {recentEl}
+            {emptyEl}
+          </>
+        ) : (
+          <>
+            {profileStripEl}
+            {statsEl}
+            {attentionEl}
+            {analyticsEl}
+            {chartsEl}
+            {dealStatusEl}
+            {recentEl}
+            <section className="space-y-4" aria-label="Account and setup" data-testid="dashboard-account">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Account</h2>
+              {accountEl}
+            </section>
+          </>
         )}
       </main>
 
