@@ -1372,3 +1372,38 @@ export const leadResearch = pgTable("lead_research", {
 }));
 export type LeadResearchRow = typeof leadResearch.$inferSelect;
 
+// ── Outreach: messages to a lead (drafted, approved, sent), one timeline per lead ──
+// V1 sends nothing itself: an approved message is opened in the person's own email app and they mark it sent.
+// body_hash is the hash of the exact subject + body a person approved; approving or sending a different
+// text is refused. At most one unsent (draft or approved) message per lead (a partial unique index, see
+// script/migrate-lead-messages.ts). Timestamps are written from the application in UTC. direction "in" and
+// the channels beyond "manual" are reserved for replies and automatic sending.
+export const leadMessages = pgTable("lead_messages", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull(),
+  organizationId: varchar("organization_id").notNull(),
+  direction: varchar("direction", { length: 3 }).notNull().default("out"), // out | in
+  channel: varchar("channel", { length: 12 }).notNull().default("manual"), // manual | email | whatsapp | sms
+  subject: varchar("subject", { length: 200 }),
+  body: text("body").notNull(),
+  bodyHash: varchar("body_hash", { length: 64 }).notNull(),
+  toAddress: varchar("to_address", { length: 254 }),
+  toSource: varchar("to_source", { length: 8 }), // lead | site
+  status: varchar("status", { length: 12 }).notNull(), // draft | approved | sent | cancelled
+  researchId: integer("research_id"),
+  claimIds: jsonb("claim_ids").notNull().default(sql`'[]'::jsonb`), // the facts the draft was written from
+  promptVersion: varchar("prompt_version", { length: 20 }),
+  edited: boolean("edited").notNull().default(false),
+  createdBy: varchar("created_by", { length: 8 }).notNull().default("user"), // user | agent
+  createdByUser: varchar("created_by_user"),
+  approvedBy: varchar("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  leadIdx: index("lead_messages_lead_idx").on(t.leadId, t.createdAt),
+  orgIdx: index("lead_messages_org_idx").on(t.organizationId, t.createdAt),
+}));
+export type LeadMessageRow = typeof leadMessages.$inferSelect;
+

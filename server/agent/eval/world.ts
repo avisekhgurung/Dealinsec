@@ -36,6 +36,8 @@ export interface World {
   documentStyles: Map<string, Row>;
   /** The sales agent: research runs, the model-call trace, and whether its tables exist. */
   research: Row[]; llmCalls: Row[]; salesReady: boolean;
+  /** Outreach messages, and whether their table exists. */
+  messages: Row[]; messagesReady: boolean;
   /** Knowledge: sources, passages and picture bytes (all with their organization), and the pages the fake web serves. */
   knowledge: { sources: Row[]; chunks: Row[]; files: Map<string, Row>; web: Record<string, { status: number; headers: Record<string, string>; body: string }>; dns: Record<string, string[]> };
   /** The fake web search: what it returns, what it was asked, and the usage counters. */
@@ -68,7 +70,7 @@ export function createWorld(): World {
     leads: new FakeLeadsStore(() => w.readOnly),
     profiles: new Map(),
     documentStyles: new Map(),
-    research: [], llmCalls: [], salesReady: true,
+    research: [], llmCalls: [], salesReady: true, messages: [], messagesReady: true,
     knowledge: { sources: [], chunks: [], files: new Map(), web: {}, dns: {} },
     discovery: { configured: true, results: [], queries: [], countries: [], error: null, usedDay: 0, usedMonth: 0, provider: { label: "Brave Search", paid: true, supportsCountry: true } },
   };

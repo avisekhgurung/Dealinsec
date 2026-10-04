@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FOLLOW_UP_AFTER_DAYS, LOW_SCORE, nextAction, type NextActionInput } from "./next-action";
 
-const base: NextActionInput = { status: "qualified", archived: false, doNotContact: false, hasContactEmail: true, researched: true, fit: "strong", score: { total: 60, knownMax: 80, confidence: "high" }, hasPendingDraft: false, daysSinceContact: null, overdueTicket: false, canConvert: true };
+const base: NextActionInput = { status: "qualified", archived: false, doNotContact: false, hasContactEmail: true, researched: true, fit: "strong", score: { total: 60, knownMax: 80, confidence: "high" }, pendingMessage: null, daysSinceContact: null, overdueTicket: false, canConvert: true };
 const act = (over: Partial<NextActionInput> = {}) => nextAction({ ...base, ...over });
 
 describe("priority order", () => {
@@ -12,7 +12,7 @@ describe("priority order", () => {
   });
   it("do not contact beats every other rule, including a waiting draft, a reply and an overdue step", () => {
     for (const status of ["new", "researching", "qualified", "contacted", "replied", "meeting", "proposal"]) {
-      const r = act({ status, doNotContact: true, hasPendingDraft: true, overdueTicket: true, daysSinceContact: 30, researched: false });
+      const r = act({ status, doNotContact: true, pendingMessage: "approved", overdueTicket: true, daysSinceContact: 30, researched: false });
       expect(r, status).toMatchObject({ action: "none", blockedBy: "do_not_contact" });
     }
   });
@@ -22,15 +22,24 @@ describe("priority order", () => {
   });
   it("an excluded lead is reconsidered before anything is researched or drafted", () => {
     expect(act({ fit: "excluded", researched: false, status: "new" }).action).toBe("reconsider");
-    expect(act({ fit: "excluded", hasPendingDraft: true }).action).toBe("reconsider");
+    expect(act({ fit: "excluded", pendingMessage: "draft" }).action).toBe("reconsider");
   });
   it("an unresearched new or researching lead is researched first", () => {
     for (const status of ["new", "researching"]) expect(act({ status, researched: false }).action, status).toBe("research");
     expect(act({ status: "qualified", researched: false }).action).not.toBe("research");
   });
-  it("a waiting draft is reviewed before anything else", () => {
-    expect(act({ hasPendingDraft: true }).action).toBe("review_draft");
-    expect(act({ hasPendingDraft: true, status: "contacted", daysSinceContact: 10 }).action).toBe("review_draft");
+  it("a waiting draft is reviewed, and an approved message is sent, before anything else", () => {
+    expect(act({ pendingMessage: "draft" }).action).toBe("review_draft");
+    expect(act({ pendingMessage: "draft", status: "contacted", daysSinceContact: 10 }).action).toBe("review_draft");
+    expect(act({ pendingMessage: "approved" }).action).toBe("send_message");
+    expect(act({ pendingMessage: "approved", status: "contacted", daysSinceContact: 10 }).action).toBe("send_message");
+    expect(act({ pendingMessage: "approved" }).reason).toMatch(/email app/);
+    // ...even for a lead that was never researched: the message exists, so it is what to act on
+    for (const status of ["new", "researching"]) {
+      expect(act({ status, researched: false, pendingMessage: "draft" }).action).toBe("review_draft");
+      expect(act({ status, researched: false, pendingMessage: "approved" }).action).toBe("send_message");
+      expect(act({ status, researched: false, pendingMessage: null }).action).toBe("research");
+    }
   });
 });
 
@@ -78,9 +87,9 @@ describe("not yet contacted", () => {
 describe("every answer is complete", () => {
   it("has an action, a label and a reason, for a sweep of states", () => {
     const statuses = ["new", "researching", "qualified", "contacted", "replied", "meeting", "proposal", "won", "lost", "odd"];
-    for (const status of statuses) for (const researched of [true, false]) for (const hasPendingDraft of [true, false]) for (const hasContactEmail of [true, false]) {
-      const r = act({ status, researched, hasPendingDraft, hasContactEmail, daysSinceContact: 4 });
-      expect(r.action && r.label && r.reason, `${status}/${researched}/${hasPendingDraft}/${hasContactEmail}`).toBeTruthy();
+    for (const status of statuses) for (const researched of [true, false]) for (const pendingMessage of ["draft", "approved", null] as const) for (const hasContactEmail of [true, false]) {
+      const r = act({ status, researched, pendingMessage, hasContactEmail, daysSinceContact: 4 });
+      expect(r.action && r.label && r.reason, `${status}/${researched}/${pendingMessage}/${hasContactEmail}`).toBeTruthy();
     }
   });
 });

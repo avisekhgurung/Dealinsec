@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { memberCan } from "@shared/permissions";
 import { Card, CardContent } from "@/components/ui/card";
 import { leadCall, leadError, nextActionUrl, refreshLeads, researchUrl, scoreUrl } from "@/lib/leads";
+import { OutreachPanel } from "./outreach-panel";
 import { cn } from "@/lib/utils";
 import type { LeadScore } from "@shared/lead-score";
 import type { NextAction } from "@shared/next-action";
@@ -147,6 +148,7 @@ export function SalesCard({ leadId, hasWebsite = true }: { leadId: number; hasWe
         </CardContent>
       </Card>
       <ResearchPanel leadId={leadId} hasWebsite={hasWebsite} />
+      <OutreachPanel leadId={leadId} />
     </div>
   );
 }

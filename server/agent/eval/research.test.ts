@@ -16,6 +16,7 @@ vi.mock("../../knowledge/store", async () => (await import("./world-mocks")).kno
 vi.mock("../../knowledge/net-guard", async (orig) => (await import("./world-mocks")).netGuardMock(orig as () => Promise<any>));
 vi.mock("../../leads/store", async () => (await import("./world-mocks")).leadsStoreMock());
 vi.mock("../../sales/research-store", async () => (await import("./world-mocks")).researchStoreMock());
+vi.mock("../../sales/message-store", async () => (await import("./world-mocks")).messageStoreMock());
 vi.mock("../../llm/trace-store", async () => (await import("./world-mocks")).traceStoreMock());
 vi.mock("../../routes", async () => (await import("./world-mocks")).routesMock());
 vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")).scriptedProviderMock(orig as () => Promise<any>));

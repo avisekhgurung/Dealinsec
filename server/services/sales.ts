@@ -12,6 +12,7 @@ import { latestPerField, normField, scoreLead, type LeadScore, type ScoreClaim }
 import { nextAction, type NextAction } from "@shared/next-action";
 import { resolveLocaleSettings, type LeadClaim, type LeadEvent } from "@shared/schema";
 import { profileTableReady } from "../leads/profile-store";
+import { messageStore, messagesTablesReady } from "../sales/message-store";
 import { researchStore, salesTablesReady } from "../sales/research-store";
 import { storage } from "../storage";
 import { assessLeadFit } from "./ideal-client";
@@ -38,9 +39,18 @@ export function lastContactedAt(events: Pick<LeadEvent, "kind" | "data" | "creat
 /** A confirmed business email found on the company's own site counts as a way in, the same as the score treats it. */
 export const hasConfirmedEmail = (claims: ScoreClaim[]): boolean => latestPerField(claims).some((c) => normField(c.field) === "business_email" && c.status === "confirmed");
 
+/** The lead's one unsent message, where the messages table exists. */
+async function pendingMessageOf(orgId: string, leadId: number): Promise<"draft" | "approved" | null> {
+  try {
+    if (!(await messagesTablesReady())) return null;
+    const m = await messageStore.unsent(orgId, leadId);
+    return m ? (m.status === "approved" ? "approved" : "draft") : null;
+  } catch { return null; }
+}
+
 export interface Assessment { score: LeadScore; next: NextAction; fit: FitResult | null; researched: boolean }
 
-export async function assessLead(user: Who, leadId: number, opts: { now?: () => Date; pendingDrafts?: number } = {}): Promise<Result<Assessment>> {
+export async function assessLead(user: Who, leadId: number, opts: { now?: () => Date; pendingMessage?: "draft" | "approved" | null } = {}): Promise<Result<Assessment>> {
   const got = await getLead(user, leadId);
   if (!got.ok) return got;
   const { lead, events, tickets, claims } = got.detail;
@@ -73,7 +83,7 @@ export async function assessLead(user: Who, leadId: number, opts: { now?: () => 
   const next = nextAction({
     status: lead.status, archived: !!lead.archivedAt, doNotContact: !!lead.doNotContact, hasContactEmail: !!lead.contactEmail || hasConfirmedEmail(scoreClaims),
     researched, fit: fit?.verdict ?? null, score: { total: score.total, knownMax: score.knownMax, confidence: score.confidence },
-    hasPendingDraft: (opts.pendingDrafts ?? 0) > 0,
+    pendingMessage: opts.pendingMessage !== undefined ? opts.pendingMessage : await pendingMessageOf(user.organizationId!, leadId),
     daysSinceContact: contacted ? Math.max(0, Math.floor((now.getTime() - contacted.getTime()) / DAY_MS)) : null,
     overdueTicket, canConvert: got.canConvert,
   });

@@ -5,6 +5,12 @@
  *   GET /api/sales/leads/:id/next-action   the next best action and why
  *   POST /api/sales/leads/:id/research     start researching the lead's own website (202; the work continues, poll the GET)
  *   GET  /api/sales/leads/:id/research     the latest run: status, pages read, what was kept and what was thrown away
+ *   GET  /api/sales/leads/:id/messages     the lead's outreach messages, newest first
+ *   POST /api/sales/leads/:id/draft        write the first message (one model call; stored as a draft for review)
+ *   PATCH /api/sales/messages/:id          edit the text (an approved message returns to draft)
+ *   POST /api/sales/messages/:id/approve   approve the text the person read ({ bodyHash })
+ *   POST /api/sales/messages/:id/sent      the person says they sent it from their own email app
+ *   POST /api/sales/messages/:id/cancel    throw the draft away
  *
  * Every rule lives in server/services/sales.ts and the pure modules it calls; a route parses the request and
  * maps the result to HTTP. A lead in another workspace answers 404, like one that does not exist.
@@ -15,6 +21,8 @@ import { agentLog } from "../agent/log";
 import { leadsTablesReady } from "../leads/store";
 import * as sales from "../services/sales";
 import { getResearch, startResearch } from "./research";
+import { approveMessage, cancelMessage, draftOutreach, editDraft, listMessages, markSent } from "./outreach";
+import { messagesTablesReady } from "./message-store";
 import { salesTablesReady } from "./research-store";
 
 export function registerSalesRoutes(app: Express) {
@@ -77,4 +85,40 @@ export function registerSalesRoutes(app: Express) {
       res.status(500).json({ code: "internal", error: "Something went wrong on our side." });
     }
   });
+
+  /** Drafts need their own table and the model trace; without them only outreach is off. */
+  const messagesGate = async (req: Request, res: Response, next: () => void) => {
+    try {
+      if (!(await messagesTablesReady())) return res.status(503).json({ code: "MESSAGES_NOT_SETUP", error: "Outreach drafts aren't set up on this server yet." });
+    } catch (err) {
+      agentLog("error", { errorType: (err as Error)?.name ?? "Error", where: "sales_message_tables" });
+      return res.status(503).json({ code: "MESSAGES_NOT_SETUP", error: "Outreach drafts aren't available right now." });
+    }
+    next();
+  };
+  const notFound = (res: Response) => res.status(404).json({ code: "not_found", error: "That isn't in your workspace." });
+  /** Maps a service result to HTTP: the failure's own status and code, plus the few fields a client acts on. */
+  const reply = (res: Response, r: any, ok: (r: any) => Record<string, unknown>, status = 200) => {
+    if (r.ok) return res.status(status).json(ok(r));
+    const extra: Record<string, unknown> = {};
+    if (r.issues) extra.issues = r.issues;
+    if (r.messageId) extra.messageId = r.messageId;
+    return res.status(r.status).json({ code: r.code, error: r.message, ...extra });
+  };
+  const guarded = (where: string, fn: (req: any, res: Response, id: number) => Promise<unknown>) => async (req: any, res: Response) => {
+    try {
+      const id = idOf(req.params.id);
+      if (!id) return notFound(res);
+      await fn(req, res, id);
+    } catch (err) {
+      agentLog("error", { errorType: (err as Error)?.name ?? "Error", where });
+      res.status(500).json({ code: "internal", error: "Something went wrong on our side." });
+    }
+  };
+  app.get("/api/sales/leads/:id/messages", isAuthenticated, gate, messagesGate, guarded("sales_messages", async (req, res, id) => reply(res, await listMessages(req.user, id), (r) => ({ messages: r.messages }))));
+  app.post("/api/sales/leads/:id/draft", isAuthenticated, gate, messagesGate, guarded("sales_draft", async (req, res, id) => reply(res, await draftOutreach(req.user, id), (r) => ({ message: r.message, retried: r.retried }), 201)));
+  app.patch("/api/sales/messages/:id", isAuthenticated, gate, messagesGate, guarded("sales_message_edit", async (req, res, id) => reply(res, await editDraft(req.user, id, req.body), (r) => ({ message: r.message }))));
+  app.post("/api/sales/messages/:id/approve", isAuthenticated, gate, messagesGate, guarded("sales_message_approve", async (req, res, id) => reply(res, await approveMessage(req.user, id, req.body?.bodyHash), (r) => ({ message: r.message, already: r.already }))));
+  app.post("/api/sales/messages/:id/sent", isAuthenticated, gate, messagesGate, guarded("sales_message_sent", async (req, res, id) => reply(res, await markSent(req.user, id), (r) => ({ message: r.message, already: r.already, movedTo: r.movedTo }))));
+  app.post("/api/sales/messages/:id/cancel", isAuthenticated, gate, messagesGate, guarded("sales_message_cancel", async (req, res, id) => reply(res, await cancelMessage(req.user, id), (r) => ({ message: r.message }))));
 }

@@ -145,6 +145,37 @@ export const researchStoreMock = () => {
   };
 };
 
+/** Outreach messages, in memory, with the database's rules: one unsent (draft or approved) message per lead, and a status change that applies only if the row is still in the status the caller saw. */
+export const messageStoreMock = () => {
+  class DraftExists extends Error { constructor() { super("this lead already has an unsent message"); } }
+  let seq = 0;
+  const w = () => world();
+  const mine = (orgId: string, id: number) => w().messages.find((m) => m.organizationId === orgId && m.id === id);
+  return {
+    DraftExists,
+    messagesTablesReady: async () => w().messagesReady,
+    messageStore: {
+      create: async (m: Record<string, any>) => {
+        if (w().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL");
+        if (w().messages.some((x) => x.organizationId === m.orgId && x.leadId === m.leadId && x.direction === "out" && (x.status === "draft" || x.status === "approved"))) throw new DraftExists();
+        const row = { id: ++seq, leadId: m.leadId, organizationId: m.orgId, direction: "out", channel: "manual", subject: m.subject, body: m.body, bodyHash: m.bodyHash, toAddress: m.toAddress, toSource: m.toSource, status: "draft", researchId: m.researchId, claimIds: m.claimIds, promptVersion: m.promptVersion, edited: false, createdBy: m.by, createdByUser: m.userId, approvedBy: null, approvedAt: null, sentAt: null, createdAt: m.now, updatedAt: m.now };
+        w().messages.push(row);
+        return { ...row };
+      },
+      get: async (orgId: string, id: number) => { const r = mine(orgId, id); return r ? { ...r } : null; },
+      listForLead: async (orgId: string, leadId: number) => w().messages.filter((m) => m.organizationId === orgId && m.leadId === leadId).sort((a, b) => b.createdAt - a.createdAt || b.id - a.id).map((m) => ({ ...m })),
+      unsent: async (orgId: string, leadId: number) => { const r = w().messages.find((m) => m.organizationId === orgId && m.leadId === leadId && m.direction === "out" && (m.status === "draft" || m.status === "approved")); return r ? { ...r } : null; },
+      transition: async (o: { orgId: string; id: number; from: string; to: string; hash?: string; now: Date; set?: Record<string, any> }) => {
+        if (w().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL");
+        const r = mine(o.orgId, o.id);
+        if (!r || r.status !== o.from || (o.hash && r.bodyHash !== o.hash)) return null;
+        Object.assign(r, o.set ?? {}, { status: o.to, updatedAt: o.now });
+        return { ...r };
+      },
+    },
+  };
+};
+
 /** The model-call trace, in memory: what the daily allowances count. */
 export const traceStoreMock = () => ({
   llmTraceReady: async () => world().salesReady,

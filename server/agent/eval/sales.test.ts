@@ -17,6 +17,7 @@ vi.mock("../../knowledge/store", async () => (await import("./world-mocks")).kno
 vi.mock("../../knowledge/net-guard", async (orig) => (await import("./world-mocks")).netGuardMock(orig as () => Promise<any>));
 vi.mock("../../leads/store", async () => (await import("./world-mocks")).leadsStoreMock());
 vi.mock("../../sales/research-store", async () => (await import("./world-mocks")).researchStoreMock());
+vi.mock("../../sales/message-store", async () => (await import("./world-mocks")).messageStoreMock());
 vi.mock("../../llm/trace-store", async () => (await import("./world-mocks")).traceStoreMock());
 vi.mock("../../routes", async () => (await import("./world-mocks")).routesMock());
 vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")).scriptedProviderMock(orig as () => Promise<any>));
@@ -31,7 +32,7 @@ const user = (over: Record<string, any> = {}) => userRow(over) as any;
 const OTHER = () => userRow({ id: "u2", organizationId: ORG2 }) as any;
 const DAY = 86_400_000;
 const NOW = new Date("2026-10-10T12:00:00Z");
-const assess = async (id: number, u = user(), pendingDrafts = 0) => { const r = await assessLead(u, id, { now: () => NOW, pendingDrafts }); if (!r.ok) throw new Error(`${r.code}: ${r.message}`); return r; };
+const assess = async (id: number, u = user(), pendingMessage: "draft" | "approved" | null = null) => { const r = await assessLead(u, id, { now: () => NOW, pendingMessage }); if (!r.ok) throw new Error(`${r.code}: ${r.message}`); return r; };
 const lead = (over: Record<string, any> = {}) => seedLead(world(), { companyName: "Casa Alma", industry: "Boutique hotels", location: "Lisbon, Portugal", ...over });
 const agentClaim = (leadId: number, field: string, status: string, value = `${field} value`) =>
   addClaim(user(), leadId, { field, value, status, ...(status === "confirmed" ? { evidenceUrl: "https://casaalma.pt/about", evidenceSnippet: `${value} (as written on the page)` } : {}) }, { actor: "agent" });
@@ -98,7 +99,8 @@ describe("the next action from a real lead", () => {
   });
   it("a draft waiting for approval comes first", async () => {
     const l = lead({ contactEmail: "a@b.co" }); await agentClaim(l.id, "need", "confirmed"); markResearched(l.id);
-    expect((await assess(l.id, user(), 1)).next.action).toBe("review_draft");
+    expect((await assess(l.id, user(), "draft")).next.action).toBe("review_draft");
+    expect((await assess(l.id, user(), "approved")).next.action).toBe("send_message");
   });
   it("contacted: wait for 2 days, follow up from 3, counted from the stage-change on the timeline", async () => {
     const l = lead({ status: "contacted", contactEmail: "a@b.co" });

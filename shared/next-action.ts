@@ -5,14 +5,15 @@
  *   1  archived, won or lost            -> nothing to do
  *   2  marked do not contact            -> no outreach, whatever else is true
  *   3  matches something you exclude    -> reconsider
- *   4  not researched yet               -> research it
+ *   4  a message is approved, unsent    -> send it (open it in your email app, then mark it sent)
  *   5  a draft is waiting               -> review it
- *   6  they replied                     -> answer them
- *   7  in a meeting or proposal         -> move it forward
- *   8  contacted                        -> wait a few days, then follow up
- *   9  not yet contacted: no email      -> find a contact
- *   10 not yet contacted: low fit       -> reconsider
- *   11 not yet contacted, reachable     -> draft outreach
+ *   6  not researched yet               -> research it
+ *   7  they replied                     -> answer them
+ *   8  in a meeting or proposal         -> move it forward
+ *   9  contacted                        -> wait a few days, then follow up
+ *   10 not yet contacted: no email      -> find a contact
+ *   11 not yet contacted: low fit       -> reconsider
+ *   12 not yet contacted, reachable     -> draft outreach
  *
  * It recommends; the backend validates and performs any stage change (shared/leads.ts), and sending
  * always needs a person's approval.
@@ -20,7 +21,7 @@
 import type { FitVerdict } from "./fit";
 import type { Confidence } from "./lead-score";
 
-export type ActionKey = "none" | "reconsider" | "research" | "review_draft" | "respond" | "move_forward" | "wait" | "follow_up" | "find_contact" | "draft_outreach";
+export type ActionKey = "none" | "reconsider" | "research" | "send_message" | "review_draft" | "respond" | "move_forward" | "wait" | "follow_up" | "find_contact" | "draft_outreach";
 
 export interface NextActionInput {
   status: string;
@@ -31,7 +32,8 @@ export interface NextActionInput {
   researched: boolean;
   fit: FitVerdict | null;
   score: { total: number; knownMax: number; confidence: Confidence } | null;
-  hasPendingDraft: boolean;
+  /** The lead's one unsent message: a draft waiting for review, or approved and waiting to be sent. */
+  pendingMessage: "draft" | "approved" | null;
   /** Whole days since the lead was last contacted; null if never. */
   daysSinceContact: number | null;
   overdueTicket: boolean;
@@ -55,10 +57,11 @@ export function nextAction(i: NextActionInput): NextAction {
 
   if (i.fit === "excluded") return { action: "reconsider", label: "Reconsider this lead", reason: "It matches something you said you do not want." };
 
+  if (i.pendingMessage === "approved") return { action: "send_message", label: "Send your approved message", reason: "It is approved and waiting: open it in your email app, then mark it sent." };
+  if (i.pendingMessage === "draft") return { action: "review_draft", label: "Review your draft", reason: "A message is drafted and waiting for your approval." };
   if (!i.researched && (i.status === "new" || i.status === "researching")) {
     return { action: "research", label: "Research this company", reason: "Nothing has been researched yet, so most of the score is unknown." };
   }
-  if (i.hasPendingDraft) return { action: "review_draft", label: "Review your draft", reason: "A message is drafted and waiting for your approval." };
 
   if (i.status === "replied") return { action: "respond", label: "Reply to the customer", reason: "They replied. Answer while the conversation is warm." };
   if (i.status === "meeting" || i.status === "proposal") {
