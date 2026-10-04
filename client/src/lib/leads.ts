@@ -51,7 +51,7 @@ export const detailUrl = (id: number | string) => `/api/leads/${id}`;
 
 /** Refresh every lead list and detail after a change. */
 export const refreshLeads = () =>
-  queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/leads") });
+  queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && ((q.queryKey[0] as string).startsWith("/api/leads") || (q.queryKey[0] as string).startsWith("/api/sales/")) });
 
 /** A person-readable reason from a failed request. */
 export const leadError = (err: unknown, fallback = "Something went wrong. Nothing was changed.") => parseApiError(err).error ?? fallback;
@@ -80,6 +80,8 @@ export interface IdealClientView { about: string | null; services: string[]; tar
 export interface IdealClientResponse { profile: IdealClientView; isSet: boolean }
 export const IDEAL_CLIENT_URL = "/api/ideal-client";
 export const fitUrl = (id: number | string) => `/api/leads/${id}/fit`;
+export const scoreUrl = (id: number | string) => `/api/sales/leads/${id}/score`;
+export const nextActionUrl = (id: number | string) => `/api/sales/leads/${id}/next-action`;
 export const hasCriteria = (p: IdealClientView | undefined) => !!p && (p.targetIndustries.length > 0 || p.targetLocations.length > 0 || p.exclusions.length > 0 || p.minDealMinor !== null);
 /** Anything under /api/ideal-client or a lead's fit changes when the profile does. */
 export const refreshProfile = () =>
