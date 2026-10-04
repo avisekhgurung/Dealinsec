@@ -41,3 +41,11 @@ Verified in the real app (speech stand-in, everything else real): "add Northwind
 
 ## Update (4 Oct 2026): a neural voice
 With `OPENAI_API_KEY` set, the call speaks each sentence with a neural voice instead of the browser's, falling back to the browser voice per sentence on any failure. See `08-neural-voice.md`.
+
+## Update (4 Oct 2026): phones, where the assistant had no sound
+Reported: on a phone the assistant's voice was silent. The most likely cause (I cannot hear a real phone from here): **on a phone, an open microphone or a running speech recogniser puts the audio into "record" mode, which mutes, ducks or reroutes the assistant's voice to the quiet earpiece.** The call kept the recogniser running while the assistant spoke (so you could talk over it) and, on Android, held a microphone stream open for the level meter.
+- On a phone or tablet (`isPhoneDevice`, tested, including an iPad that says it is a Mac) the call now listens **only between turns**: no meter, no recogniser while speaking. The hand button interrupts by tap; the "talk over it" switch is replaced by a one-line hint ("Tap the hand to interrupt. No sound? Turn the silent switch off and the volume up.").
+- iPhone Safari only allows speech that starts from a tap, so a silent (volume 0) utterance is spoken inside the tap that starts the call, and speech is resumed before each sentence (Chrome on Android can be left paused).
+- Verified under an Android phone profile in the real call: warm-up, then the greeting at full volume, no `getUserMedia`, no recogniser during a three-sentence reply, recogniser back after it. **Desktop unchanged** (meter on, listening while speaking, the switch present).
+- **Not verified: real sound on a real phone.** If it is still silent, the next suspects are the silent switch or a Bluetooth route (the hint covers the first), then iOS needing a second tap.
+

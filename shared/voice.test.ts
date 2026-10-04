@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createBargeInDetector, pickGentlemanVoice, speakable, splitSentences } from "./voice";
+import { createBargeInDetector, pickGentlemanVoice, speakable, splitSentences, isPhoneDevice } from "./voice";
 
 describe("speakable", () => {
   it("drops markdown marks and list bullets", () => {
@@ -107,5 +107,32 @@ describe("createBargeInDetector", () => {
     d.reset();
     expect(feed(d, 10_000, 500, 0.05)).toBeNull();
     expect(feed(d, 10_500, 600, 0.3)).not.toBeNull();
+  });
+});
+
+describe("isPhoneDevice", () => {
+  const UA = {
+    iphone: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+    android: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+    androidTablet: "Mozilla/5.0 (Linux; Android 13; SM-X700) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    ipadOS: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+    chromeIOS: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/126.0.0.0 Mobile/15E148 Safari/604.1",
+    mac: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    windows: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    linux: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+  };
+  it("recognises phones and tablets, including an iPad that says it is a Mac", () => {
+    expect(isPhoneDevice(UA.iphone)).toBe(true);
+    expect(isPhoneDevice(UA.android)).toBe(true);
+    expect(isPhoneDevice(UA.chromeIOS)).toBe(true);
+    expect(isPhoneDevice(UA.ipadOS, 5)).toBe(true);
+    expect(isPhoneDevice(UA.androidTablet)).toBe(true);
+  });
+  it("leaves computers alone, including a Mac or a touch-screen Windows laptop", () => {
+    expect(isPhoneDevice(UA.mac, 0)).toBe(false);
+    expect(isPhoneDevice(UA.windows, 0)).toBe(false);
+    expect(isPhoneDevice(UA.windows, 10)).toBe(false);
+    expect(isPhoneDevice(UA.linux, 0)).toBe(false);
+    expect(isPhoneDevice("")).toBe(false);
   });
 });

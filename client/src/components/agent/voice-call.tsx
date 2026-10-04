@@ -9,7 +9,7 @@ import { Hand, Mic, MicOff, PhoneOff } from "lucide-react";
 import type { AgentCard } from "@shared/agent";
 import type { ApprovalView } from "@/hooks/use-agent";
 import { useAgent } from "@/hooks/use-agent";
-import { useVoiceCall } from "@/hooks/use-voice-call";
+import { useVoiceCall, onPhone } from "@/hooks/use-voice-call";
 import { CardView } from "./card-view";
 import { cn } from "@/lib/utils";
 
@@ -104,11 +104,18 @@ export function VoiceCall({ agent, lang, firstName, onClose }: { agent: Agent; l
             <PhoneOff className="h-6 w-6" />
           </button>
         </div>
+        {onPhone() ? (
+          // A phone cannot listen while it speaks (it would silence the voice): a tap interrupts instead.
+          <p className="max-w-xs text-center text-xs leading-snug text-white/55" data-testid="call-phone-hint">
+            Tap the hand to interrupt. No sound? Turn the silent switch off and the volume up.
+          </p>
+        ) : (
         <button type="button" onClick={toggleBarge} aria-pressed={bargeIn} data-testid="call-barge"
-          title="When on, just start talking and the assistant stops to listen. Turn it off if it keeps stopping itself on a loudspeaker."
-          className="text-xs text-white/55 underline-offset-2 hover:text-white/80 hover:underline">
-          Talk over it to interrupt: {bargeIn ? "on" : "off"}
-        </button>
+            title="When on, just start talking and the assistant stops to listen. Turn it off if it keeps stopping itself on a loudspeaker."
+            className="text-xs text-white/55 underline-offset-2 hover:text-white/80 hover:underline">
+            Talk over it to interrupt: {bargeIn ? "on" : "off"}
+          </button>
+        )}
       </footer>
     </div>
   );

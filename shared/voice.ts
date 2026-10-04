@@ -104,3 +104,15 @@ export function createBargeInDetector(opts: { calibrateMs?: number; factor?: num
     },
   };
 }
+
+/**
+ * A phone or tablet (touch-first device), from the user agent. The call behaves differently there:
+ * a speech recogniser or an open microphone puts a phone's audio into "record" mode, which mutes,
+ * ducks or reroutes the assistant's voice to the quiet earpiece, so on these devices the call
+ * listens only between turns and a tap (not a spoken word) interrupts. iPadOS reports itself as
+ * a Mac, so a "Mac" with a touch screen counts.
+ */
+export function isPhoneDevice(userAgent: string, maxTouchPoints = 0): boolean {
+  if (/Android|iPhone|iPad|iPod|Mobile|CriOS|FxiOS/i.test(userAgent)) return true;
+  return /Macintosh/i.test(userAgent) && maxTouchPoints > 1;
+}

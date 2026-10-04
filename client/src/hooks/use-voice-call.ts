@@ -18,7 +18,7 @@
  * everything is released (recogniser, speech, microphone, wake lock).
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { pickGentlemanVoice, speakable, splitSentences } from "@shared/voice";
+import { isPhoneDevice, pickGentlemanVoice, speakable, splitSentences } from "@shared/voice";
 import { createNeuralSpeaker } from "@shared/neural-speech";
 import { createBrowserNeuralDeps, neuralVoiceAvailable } from "@/lib/neural-voice";
 import { approvalReadback, initialCall, isPersonTalking, isUtterance, reduceCall, type CallEffect, type CallEvent, type CallState, type PendingApproval } from "@shared/voice-call";
@@ -37,6 +37,18 @@ const Recognition = (): (new () => any) | null =>
 export const voiceCallSupported = (): boolean => !!Recognition() && typeof window !== "undefined" && "speechSynthesis" in window;
 
 const isIOS = () => typeof navigator !== "undefined" && /iP(hone|ad|od)/.test(navigator.userAgent);
+/** On a phone, an open microphone or a running recogniser silences or ducks the assistant's voice: it listens only between turns there. */
+export const onPhone = (): boolean => typeof navigator !== "undefined" && isPhoneDevice(navigator.userAgent, navigator.maxTouchPoints ?? 0);
+
+/** Phones only let speech start from a tap: say nothing, silently, inside the tap that starts the call, so the real greeting is allowed. */
+const warmUpSpeech = () => {
+  try {
+    const synth = window.speechSynthesis;
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;
+    synth.speak(u);
+  } catch { /* no speech on this device; the call says so */ }
+};
 
 export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; bargeIn: boolean }) {
   const [state, setState] = useState<CallState>(initialCall);
@@ -78,6 +90,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     const synth = window.speechSynthesis;
     const parts = splitSentences(speakable(text, 900));
     cancelSpeech();
+    try { synth.resume(); } catch { /* not paused */ }   // Chrome on Android can be left paused
     speakingText.current = text;
     if (!parts.length) { dispatchRef.current({ type: "speech_done" }); return; }
     const token = speakToken.current;
@@ -143,7 +156,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
   };
 
   /** Listening while the assistant speaks, so the person can cut in. */
-  const listenWhileSpeaking = () => { if (bargeRef.current && !stateRef.current.muted) startRecognition(); };
+  const listenWhileSpeaking = () => { if (onPhone()) return; if (bargeRef.current && !stateRef.current.muted) startRecognition(); };
 
   const startRecognition = () => {
     if (dead.current || stateRef.current.muted) return;
@@ -194,7 +207,8 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
 
   // ── the microphone level (for the orb, and for interrupting by voice) ────
   const startMeter = async (): Promise<"ok" | "blocked" | "skipped"> => {
-    if (isIOS() || !navigator.mediaDevices?.getUserMedia) return "skipped";
+    // The level meter holds the microphone open, which on a phone quiets the assistant: not there.
+    if (isIOS() || onPhone() || !navigator.mediaDevices?.getUserMedia) return "skipped";
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       if (dead.current) { stream.getTracks().forEach((t) => t.stop()); return "skipped"; }
@@ -322,6 +336,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     // Created and unlocked right away, while the tap that started the call still counts, so later sounds are allowed.
     const audio = createBrowserNeuralDeps();
     audio.unlock();
+    warmUpSpeech();
     (async () => {
       if (!voiceCallSupported()) { audio.dispose(); dispatchRef.current({ type: "error", code: "unsupported" }); return; }
       const m = await startMeter();
