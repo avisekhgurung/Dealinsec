@@ -38,3 +38,6 @@ Verified in the real app (speech stand-in, everything else real): "add Northwind
 **The person first.** While the assistant speaks, the recogniser keeps listening and compares what it hears with what it is saying (`isPersonTalking`, tested): its own echo is ignored; new words, or "stop" / "wait", cut it off at once, and the person's turn starts on a clean recogniser so no echo leaks into it. On by default, switchable off for a loudspeaker that fools it. This replaced the earlier level-meter detector, because comparing words works on iPhone too and ignores coughs. Verified: the assistant's own first five words did not interrupt it; new words did, and the next turn contained only the person's words.
 
 **Searching whenever needed.** With a free provider (LangSearch), `find_companies` now runs without asking: `prepare()` declares `changesNothing`, which the policy honours only for a safe action that is not forced (tested). A paid provider still always asks. The caps and the egress rules still apply (tested).
+
+## Update (4 Oct 2026): a neural voice
+With `OPENAI_API_KEY` set, the call speaks each sentence with a neural voice instead of the browser's, falling back to the browser voice per sentence on any failure. See `08-neural-voice.md`.

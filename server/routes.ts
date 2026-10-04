@@ -17,6 +17,7 @@ import { registerAgentRoutes } from "./agent/routes";
 import { registerLeadRoutes } from "./leads/routes";
 import { registerDocumentStyleRoutes } from "./documents/routes";
 import { registerKnowledgeRoutes } from "./knowledge/routes";
+import { registerVoiceRoutes } from "./voice/routes";
 import { reviseDraftQuote } from "./services/deals";
 import { notifyAgreementCreated } from "./services/agreements";
 import { afterInvoiceStatusChange, paidAtFor } from "./services/payments";
@@ -594,6 +595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerLeadRoutes(app);
   registerDocumentStyleRoutes(app);
   registerKnowledgeRoutes(app);
+  registerVoiceRoutes(app);
   registerQuoteShareRoutes(app);
   registerAgreementSignRoutes(app);
 

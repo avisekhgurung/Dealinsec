@@ -37,6 +37,15 @@
         "DATABASE_URL=postgresql://dealtest@localhost:5544/dealinsec_pdftest NODE_ENV=production PORT=5099 SESSION_SECRET=local-only-not-a-secret node dist/index.cjs"
       ],
       "port": 5099
+    },
+    {
+      "name": "dealinsec-local-db-fake-tts",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "DATABASE_URL=postgresql://dealtest@localhost:5544/dealinsec_pdftest OPENAI_API_KEY=sk-fake-local-test OPENAI_TTS_BASE_URL=http://127.0.0.1:4010/v1 VOICE_DAILY_CHARS=3000 PORT=3000 npm run dev"
+      ],
+      "port": 3000
     }
   ]
 }

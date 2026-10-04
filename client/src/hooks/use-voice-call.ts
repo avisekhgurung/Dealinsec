@@ -19,6 +19,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pickGentlemanVoice, speakable, splitSentences } from "@shared/voice";
+import { createNeuralSpeaker } from "@shared/neural-speech";
+import { createBrowserNeuralDeps, neuralVoiceAvailable } from "@/lib/neural-voice";
 import { approvalReadback, initialCall, isPersonTalking, isUtterance, reduceCall, type CallEffect, type CallEvent, type CallState, type PendingApproval } from "@shared/voice-call";
 import type { useAgent } from "@/hooks/use-agent";
 
@@ -61,11 +63,14 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
   const meter = useRef<{ stream: MediaStream; ctx: AudioContext; raf: number } | null>(null);
   const wake = useRef<any>(null);
   const dispatchRef = useRef<(e: CallEvent) => void>(() => {});
+  // The neural voice, when the server has one: sentences fetched ahead and played; the browser's voice covers any that fail.
+  const neural = useRef<{ speaker: ReturnType<typeof createNeuralSpeaker>; audio: ReturnType<typeof createBrowserNeuralDeps> } | null>(null);
 
   // ── speaking ────────────────────────────────────────────────────────────
   const cancelSpeech = () => {
     speakToken.current++;
     speakingNow.current = false;
+    neural.current?.speaker.cancel();
     try { window.speechSynthesis.cancel(); } catch { /* nothing speaking */ }
   };
 
@@ -80,6 +85,18 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     const voices = synth.getVoices();
     const vi = pickGentlemanVoice(voices, o.lang);
     const voice = vi >= 0 ? voices[vi] : null;
+    const sayWithBrowser = (part: string) => new Promise<void>((resolve) => {
+      const u = new SpeechSynthesisUtterance(part);
+      if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = o.lang;
+      u.rate = 0.98; u.pitch = 0.9;
+      u.onend = () => resolve(); u.onerror = () => resolve();
+      synth.speak(u);
+    });
+    const finished = () => { if (token !== speakToken.current || dead.current) return; speakingNow.current = false; restartFresh(); dispatchRef.current({ type: "speech_done" }); };
+    if (neural.current && !neural.current.speaker.disabled) {
+      neural.current.speaker.speak(parts, { fallback: sayWithBrowser, onDone: finished });
+      return;
+    }
     let i = 0;
     const next = () => {
       if (token !== speakToken.current || dead.current) return;
@@ -302,14 +319,20 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
   useEffect(() => {
     dead.current = false;
     let tick: number | undefined;
+    // Created and unlocked right away, while the tap that started the call still counts, so later sounds are allowed.
+    const audio = createBrowserNeuralDeps();
+    audio.unlock();
     (async () => {
-      if (!voiceCallSupported()) { dispatchRef.current({ type: "error", code: "unsupported" }); return; }
+      if (!voiceCallSupported()) { audio.dispose(); dispatchRef.current({ type: "error", code: "unsupported" }); return; }
       const m = await startMeter();
       if (dead.current) return;
       if (m === "blocked") { dispatchRef.current({ type: "error", code: "mic_blocked" }); return; }
       try { wake.current = await (navigator as any).wakeLock?.request?.("screen"); } catch { /* the screen may dim; fine */ }
       // Voices load lazily in some browsers: nudge the list before the first word.
       try { window.speechSynthesis.getVoices(); } catch { /* none */ }
+      if (await neuralVoiceAvailable()) { if (dead.current) return; neural.current = { speaker: createNeuralSpeaker(audio.deps), audio }; }
+      else audio.dispose();
+      if (dead.current) return;
       dispatchRef.current({ type: "started", greeting: o.greeting });
     })();
     tick = window.setInterval(() => { if (stateRef.current.phase !== "ended") setSeconds((s) => s + 1); }, 1000);
@@ -318,6 +341,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
       window.clearInterval(tick);
       stopRecognition();
       cancelSpeech();
+      audio.dispose();
       stopMeter();
       if (awaiting.current) { awaiting.current = null; agentRef.current.stop(); }
       try { wake.current?.release?.(); } catch { /* released */ }
