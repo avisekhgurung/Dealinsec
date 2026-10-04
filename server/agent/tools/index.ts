@@ -13,12 +13,19 @@
  *   READ_ONLY              reads, analysis, drafts of text (nothing written, nothing sent)
  *   SAFE_MUTATION          create_deal, update_deal, add_protection_term, create_quotation, revise_quotation,
  *                          and the lead pipeline: create_lead(s), update_lead, move_lead, add_lead_note,
- *                          create_ticket, complete_ticket, add_lead_claim, archive_lead
+ *                          create_ticket, complete_ticket, add_lead_claim, archive_lead,
+ *                          update_invoice_details, update_workspace_profile, update_my_details
  *   CONSEQUENTIAL_MUTATION share_quotation, create_agreement, create_signing_link,
- *                          create_invoice, mark_paid, mark_unpaid, convert_lead_to_deal, revise_agreement
+ *                          create_invoice, mark_paid, mark_unpaid, convert_lead_to_deal, revise_agreement,
+ *                          complete_deal
  *
- * Deliberately NOT here: deleting anything, editing an agreement or a signed
- * document, revoking links, billing, team and settings.
+ * Deliberately NOT here, and not to be added without the founder: deleting
+ * anything, editing a signed document, billing and plan, team invitations and
+ * roles, API keys, bank details, signature and seal, email and password,
+ * region and currency, and the agent's own autonomy setting. The agent is a
+ * superuser within the signed-in person's own role and workspace; these stay
+ * with the person because a mistake (or a lead's text trying to steer the
+ * agent) there cannot be undone.
  */
 import type { AgentTool } from "../types";
 import { validateRegistry } from "../registry";
@@ -31,5 +38,6 @@ import { LEAD_TOOLS } from "./leads";
 import { PAYMENT_TOOLS } from "./payments";
 import { REVISE_TOOLS } from "./revise";
 import { READ_TOOLS } from "./reads";
+import { WORKSPACE_TOOLS } from "./workspace";
 
-export const AGENT_TOOLS: readonly AgentTool<any>[] = validateRegistry([...READ_TOOLS, ...DEAL_TOOLS, ...DOCUMENT_TOOLS, ...PAYMENT_TOOLS, ...LEAD_TOOLS, ...IDEAL_CLIENT_TOOLS, ...DISCOVERY_TOOLS, ...REVISE_TOOLS, ...DOCUMENT_STYLE_TOOLS]);
+export const AGENT_TOOLS: readonly AgentTool<any>[] = validateRegistry([...READ_TOOLS, ...DEAL_TOOLS, ...DOCUMENT_TOOLS, ...PAYMENT_TOOLS, ...LEAD_TOOLS, ...IDEAL_CLIENT_TOOLS, ...DISCOVERY_TOOLS, ...REVISE_TOOLS, ...DOCUMENT_STYLE_TOOLS, ...WORKSPACE_TOOLS]);

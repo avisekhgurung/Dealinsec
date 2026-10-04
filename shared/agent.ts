@@ -95,6 +95,10 @@ const TOOL_LABELS: Record<string, string> = {
   revise_agreement: "the agreement changes",
   get_document_style: "how your documents look",
   update_document_style: "the document style",
+  complete_deal: "the deal completion",
+  update_invoice_details: "the invoice changes",
+  update_workspace_profile: "the workspace changes",
+  update_my_details: "your details",
   create_lead: "the lead",
   create_leads: "the leads",
   update_lead: "the lead changes",
@@ -134,6 +138,10 @@ const APPROVE_LABELS: Record<string, string> = {
   revise_quotation: "Revise quotation",
   revise_agreement: "Revise agreement",
   update_document_style: "Apply style",
+  complete_deal: "Complete deal",
+  update_invoice_details: "Save invoice",
+  update_workspace_profile: "Save",
+  update_my_details: "Save",
   convert_lead_to_deal: "Create deal",
 };
 export const approveLabel = (tool: unknown): string => APPROVE_LABELS[String(tool)] ?? "Approve";

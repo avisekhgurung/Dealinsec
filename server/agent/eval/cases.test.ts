@@ -292,7 +292,9 @@ describe("15-16. authorization and confirmation", () => {
   it("15b. a member with no permissions can use only the tools that reveal nothing about the business", () => {
     const nobody = userRow({ orgRole: "CUSTOM", customPermissions: [] });
     const allowed = AGENT_TOOLS.filter((t) => authorizeCall(t, nobody, {} as any) === null).map((t) => t.name).sort();
-    expect(allowed).toEqual(["analyze_deal_message", "get_account_status"]);
+    // update_my_details touches only the caller's own row, which PATCH /api/profile
+    // lets any signed-in person do; it reveals nothing about the business.
+    expect(allowed).toEqual(["analyze_deal_message", "get_account_status", "update_my_details"]);
   });
 
   it("16. consequential actions always ask, at every autonomy level, and run only once approved", async () => {

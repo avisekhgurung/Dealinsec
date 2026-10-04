@@ -77,6 +77,8 @@ export function createWorld(): World {
   w.storage = {
     getOrganization: async (id: string) => w.orgs.get(id),
     getUser: async (id: string) => w.users.get(id),
+    updateUser: guard(async (id: string, u: Row) => { const r = w.users.get(id); if (!r) return undefined; Object.assign(r, u); return r; }),
+    updateOrganization: guard(async (id: string, u: Row) => { const r = w.orgs.get(id); if (!r) return undefined; Object.assign(r, u); return r; }),
     countActiveMembers: async () => 1,
     getActivityLogs: async () => w.activity.slice(0, 10).map((a) => ({ userName: "Asha", ...a })),
 
