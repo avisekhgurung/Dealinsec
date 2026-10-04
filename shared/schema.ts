@@ -1321,3 +1321,28 @@ export const knowledgeFiles = pgTable("knowledge_files", {
   mime: varchar("mime", { length: 40 }).notNull(),
   bytes: bytea("bytes").notNull(),
 });
+
+// ── LLM trace: one row per model call made for a sales feature (metadata only, never the text) ──
+// Durable on purpose: daily allowances are counted from here, because in-memory counters reset
+// whenever the single instance sleeps. A missing table switches the sales features off, nothing else.
+export const llmCalls = pgTable("llm_calls", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  userId: varchar("user_id"),
+  task: varchar("task", { length: 40 }).notNull(),
+  model: varchar("model", { length: 80 }).notNull(),
+  promptVersion: varchar("prompt_version", { length: 20 }).notNull(),
+  tokensIn: integer("tokens_in").notNull().default(0),
+  tokensOut: integer("tokens_out").notNull().default(0),
+  latencyMs: integer("latency_ms").notNull().default(0),
+  costMicroUsd: integer("cost_micro_usd").notNull().default(0),
+  ok: boolean("ok").notNull(),
+  errorCode: varchar("error_code", { length: 30 }),
+  leadId: integer("lead_id"),
+  runId: varchar("run_id", { length: 40 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  orgDayIdx: index("llm_calls_org_created_idx").on(t.organizationId, t.createdAt),
+}));
+export type LlmCallRow = typeof llmCalls.$inferSelect;
+
