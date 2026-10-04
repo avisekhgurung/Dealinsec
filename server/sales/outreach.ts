@@ -157,7 +157,7 @@ export async function draftOutreach(user: Who, leadId: number, opts: { by?: "use
   try {
     const messages: ChatMessage[] = [{ role: "system", content: draftSystemPrompt() }, { role: "user", content: draftUserMessage(input) }];
     for (let attempt = 0; attempt < 2; attempt++) {
-      const reply = await deps.chat(trace, messages, { maxTokens: 700, model });
+      const reply = await deps.chat(trace, messages, { maxTokens: 2500, model });
       draft = asDraft(reply.content);
       issues = draft ? checkDraft(draft, ctx) : [{ code: "body_length", message: "Reply with only the JSON object: {\"subject\":...,\"body\":...}." }];
       if (!issues.length) break;

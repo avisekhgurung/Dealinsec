@@ -24,14 +24,20 @@ describe("cost", () => {
 });
 
 describe("modelFor", () => {
-  it("uses the task's own model, else deepseek-chat, and never inherits the app-wide model (it may be a reasoning model that returns nothing)", () => {
-    expect(modelFor("research", {})).toBe("deepseek-chat");
-    expect(modelFor("research", { DEEPSEEK_MODEL: "deepseek-flash" })).toBe("deepseek-chat");
+  it("uses the task's own model, else DeepSeek Flash, and never inherits the app-wide model (it may be a reasoning model that returns nothing)", () => {
+    expect(modelFor("research", {})).toBe("deepseek-flash");
+    expect(modelFor("research", { DEEPSEEK_MODEL: "something-else" })).toBe("deepseek-flash"); // the app-wide model is not inherited
     expect(modelFor("research", { DEEPSEEK_MODEL: "deepseek-flash", SALES_RESEARCH_MODEL: "deepseek-reasoner" })).toBe("deepseek-reasoner");
-    expect(modelFor("draft", { SALES_RESEARCH_MODEL: "x-research" })).toBe("deepseek-chat");
+    expect(modelFor("draft", { SALES_RESEARCH_MODEL: "x-research" })).toBe("deepseek-flash");
+  });
+  it("routes by task: Flash for everyday work, V4 Pro only for negotiation, each overridable", () => {
+    for (const t of ["research", "draft", "classify"] as const) expect(modelFor(t, {}), t).toBe("deepseek-flash");
+    expect(modelFor("negotiate", {})).toBe("deepseek-v4-pro");
+    expect(modelFor("negotiate", { SALES_NEGOTIATE_MODEL: "other-pro" })).toBe("other-pro");
+    expect(modelFor("research", { SALES_NEGOTIATE_MODEL: "other-pro" })).toBe("deepseek-flash");
   });
   it("ignores a model name that is not a plain identifier", () => {
-    for (const bad of ["", "  ", "a b", "model;rm -rf", "x".repeat(81), "<script>"]) expect(modelFor("draft", { SALES_DRAFT_MODEL: bad }), bad).toBe("deepseek-chat");
+    for (const bad of ["", "  ", "a b", "model;rm -rf", "x".repeat(81), "<script>"]) expect(modelFor("draft", { SALES_DRAFT_MODEL: bad }), bad).toBe("deepseek-flash");
     expect(modelFor("draft", { SALES_DRAFT_MODEL: " openai/gpt-4o-mini " })).toBe("openai/gpt-4o-mini");
   });
 });

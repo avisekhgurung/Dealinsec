@@ -16,6 +16,9 @@ vi.mock("../../documents/style-store", async () => (await import("./world-mocks"
 vi.mock("../../knowledge/store", async () => (await import("./world-mocks")).knowledgeStoreMock());
 vi.mock("../../knowledge/net-guard", async (orig) => (await import("./world-mocks")).netGuardMock(orig as () => Promise<any>));
 vi.mock("../../leads/store", async () => (await import("./world-mocks")).leadsStoreMock());
+vi.mock("../../sales/research-store", async () => (await import("./world-mocks")).researchStoreMock());
+vi.mock("../../sales/message-store", async () => (await import("./world-mocks")).messageStoreMock());
+vi.mock("../../llm/trace-store", async () => (await import("./world-mocks")).traceStoreMock());
 vi.mock("../../routes", async () => (await import("./world-mocks")).routesMock());
 vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")).scriptedProviderMock(orig as () => Promise<any>));
 
@@ -597,7 +600,7 @@ describe("isolation and roles", () => {
   it("a role with no permissions can use no lead tool", () => {
     const nobody = userRow({ orgRole: "CUSTOM", customPermissions: [] });
     const leadTools = AGENT_TOOLS.filter((t) => /lead|ticket|ideal_client/.test(t.name));
-    expect(leadTools.length).toBe(16);
+    expect(leadTools.length).toBe(18); // the 16 pipeline tools, plus get_lead_score and research_lead (the rest of the sales tools are covered in sales-tools.test.ts)
     for (const t of leadTools) expect(authorizeCall(t, nobody, {} as any), t.name).not.toBeNull();
   });
 

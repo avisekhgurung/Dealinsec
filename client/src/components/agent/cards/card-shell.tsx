@@ -40,6 +40,6 @@ export function CardShell({
 export const Row = ({ label, children }: { label: string; children: ReactNode }) => (
   <div className="min-w-0">
     <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
-    <p className="break-words text-sm font-semibold">{children}</p>
+    <p className={cn("break-words text-sm", typeof children === "string" && (children.includes("\n") || children.length > 120) ? "whitespace-pre-line font-normal" : "font-semibold")}>{children}</p>
   </div>
 );

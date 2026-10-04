@@ -3,6 +3,7 @@
  * the `{{deal.acme}}` placeholders in turns and expectations to the ids those
  * records received. Pure apart from mutating the world it is handed.
  */
+import { createHash } from "node:crypto";
 import { isoDateInZone } from "@shared/invoice-numbering";
 import { chunkText } from "@shared/knowledge";
 import { createWorld, seedContract, seedDeal, seedInvoice, seedLead, seedProfile, seedQuote, userRow, ORG1, ORG2, type Row, type World } from "../world";
@@ -19,7 +20,13 @@ const leadRow = (l: WorldSpec["leads"][number]) => ({
   ...(l.industry ? { industry: l.industry } : {}), ...(l.location ? { location: l.location } : {}),
   ...(l.website ? { website: l.website, domain: l.website.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "") } : {}),
   ...(l.estValueMinor ? { estValueMinor: l.estValueMinor, currency: "INR" } : {}),
+  ...(l.contactEmail ? { contactEmail: l.contactEmail } : {}), ...(l.doNotContact ? { doNotContact: true } : {}),
 });
+
+/** The draft every seeded message carries, and its hash (the same formula as server/sales/outreach.ts hashDraft). */
+export const SEED_SUBJECT = "A quick note about Casa Alma Porto";
+export const SEED_BODY = "Hello,\n\nI saw that Casa Alma runs boutique hotels in Lisbon and has just opened a second hotel in Porto. Congratulations. I help small hotel groups keep their client paperwork tidy, and I wondered whether that is something you are thinking about as you grow.\n\nWould a short reply or a quick chat be useful?\n\nBest,\nAsha Rao";
+const seedHash = createHash("sha256").update(`${SEED_SUBJECT.trim()}\n${SEED_BODY.trim()}`).digest("hex");
 
 export function buildWorld(spec: WorldSpec): { world: World; user: Row; refs: Refs } {
   const world = createWorld();
@@ -58,12 +65,21 @@ export function buildWorld(spec: WorldSpec): { world: World; user: Row; refs: Re
   for (const l of spec.leads) {
     const row = seedLead(world, leadRow(l));
     refs.lead[l.ref] = row.id;
+    for (const c of l.claims) {
+      const site = (row.domain as string | undefined) ?? "example.test";
+      world.leads.claims.push({ id: 9000 + world.leads.claims.length, leadId: row.id, organizationId: ORG1, field: c.field, value: c.value, status: c.status, evidenceUrl: c.status === "confirmed" ? `https://${site}/about` : null, evidenceSnippet: c.status === "confirmed" ? c.value : null, source: "agent", retrievedAt: new Date(), createdAt: new Date() } as any);
+    }
+    if (l.researched) world.research.push({ id: world.research.length + 1, leadId: row.id, organizationId: ORG1, status: "done", startedAt: new Date(), claimIds: [] });
     for (const t of l.tickets) {
       world.leads.tickets.push({
         id: world.leads.tickets.length + 1, leadId: row.id, organizationId: ORG1, title: t.title, kind: "other", status: "open",
         dueAt: t.dueInDays === undefined ? null : new Date(`${isoIn(t.dueInDays)}T00:00:00Z`), createdBy: "user", doneAt: null, createdAt: new Date(),
       } as any);
     }
+  }
+  for (const m of spec.messages ?? []) {
+    const now = new Date();
+    world.messages.push({ id: world.messages.length + 1, leadId: refs.lead[m.lead], organizationId: ORG1, direction: "out", channel: "manual", subject: SEED_SUBJECT, body: SEED_BODY, bodyHash: seedHash, toAddress: m.to, toSource: "site", status: m.status, researchId: null, claimIds: [], promptVersion: "draft-v1", edited: false, createdBy: "agent", createdByUser: "u1", approvedBy: m.status === "draft" ? null : "u1", approvedAt: m.status === "draft" ? null : now, sentAt: m.status === "sent" ? now : null, createdAt: now, updatedAt: now });
   }
   (spec.knowledge ?? []).forEach((k, i) => {
     const id = `ks-seed-${i + 1}`;
@@ -91,5 +107,5 @@ export function resolveRefs<T>(value: T, refs: Refs): T {
 /** A comparable fingerprint of everything the agent could change. */
 export function snapshotWorld(w: World): string {
   const strip = (rows: Row[]) => rows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== "createdAt")));
-  return JSON.stringify({ deals: strip(w.deals), quotes: strip(w.quotes), contracts: strip(w.contracts), invoices: strip(w.invoices), leads: strip(w.leads.leads as any), tickets: strip(w.leads.tickets as any), claims: strip(w.leads.claims as any), events: w.leads.events.length, profiles: Array.from(w.profiles.values()).map((p) => ({ ...p, updatedAt: 0 })), knowledge: strip(w.knowledge.sources).map((r: any) => r.id).concat(w.knowledge.chunks.length as any), orgs: Array.from(w.orgs.values()), users: Array.from(w.users.values()) });
+  return JSON.stringify({ deals: strip(w.deals), quotes: strip(w.quotes), contracts: strip(w.contracts), invoices: strip(w.invoices), leads: strip(w.leads.leads as any), tickets: strip(w.leads.tickets as any), claims: strip(w.leads.claims as any), events: w.leads.events.length, messages: strip(w.messages), research: strip(w.research), llmCalls: w.llmCalls.length, profiles: Array.from(w.profiles.values()).map((p) => ({ ...p, updatedAt: 0 })), knowledge: strip(w.knowledge.sources).map((r: any) => r.id).concat(w.knowledge.chunks.length as any), orgs: Array.from(w.orgs.values()), users: Array.from(w.users.values()) });
 }

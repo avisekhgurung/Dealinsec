@@ -27,6 +27,8 @@ export const STALE_MS = 3 * 60_000;
 /** The whole run's own budget; a run past it is recorded as failed and writes nothing more. */
 export const RUN_BUDGET_MS = 100_000;
 const MAX_EXTRA_PAGES = 2;
+/** Output budget for the research call: generous, because a reasoning model counts its thinking against it. */
+const RESEARCH_MAX_TOKENS = 4000;
 
 export interface ResearchDeps {
   store: ResearchStore;
@@ -137,16 +139,20 @@ export async function runResearch(user: Who, runId: number, leadId: number, deps
 
     // 2. One model call reads them and proposes findings.
     model = modelFor("research");
-    const reply = await deps.chat(
-      { task: "research", orgId, userId: user.id, leadId, promptVersion: RESEARCH_PROMPT_VERSION },
-      [{ role: "system", content: researchSystemPrompt() }, { role: "user", content: researchUserMessage(lead.companyName, readable) }],
-      { maxTokens: 1500, model },
-    );
+    // A reasoning model (DeepSeek Flash) spends output tokens thinking before it answers, so the budget is generous, and an empty or
+    // unreadable reply gets ONE more try before the run is recorded as failed. Both calls are traced and count towards the allowance.
+    const messages = [{ role: "system" as const, content: researchSystemPrompt() }, { role: "user" as const, content: researchUserMessage(lead.companyName, readable) }];
+    let raw: unknown = null, content: string | null = null;
+    for (let attempt = 0; attempt < 2 && raw === null; attempt++) {
+      if (attempt > 0 && expired()) break;
+      const reply = await deps.chat({ task: "research", orgId, userId: user.id, leadId, promptVersion: RESEARCH_PROMPT_VERSION }, messages, { maxTokens: RESEARCH_MAX_TOKENS, model });
+      content = reply.content;
+      raw = parseJsonObject(reply.content);
+    }
     if (expired()) { result = { status: "failed", finishedAt: deps.now(), pages, claimIds: [], errorCode: "timeout", model, promptVersion: RESEARCH_PROMPT_VERSION }; await deps.store.finish(orgId, runId, result); return result; }
-    const raw = parseJsonObject(reply.content);
     if (raw === null) {
       // An empty reply (a reasoning model that used its whole budget thinking) is a different problem from a malformed one.
-      const code = (reply.content ?? "").trim() ? "bad_output" : "empty_output";
+      const code = (content ?? "").trim() ? "bad_output" : "empty_output";
       result = { status: "failed", finishedAt: deps.now(), pages, claimIds: [], errorCode: code, model, promptVersion: RESEARCH_PROMPT_VERSION };
       await deps.store.finish(orgId, runId, result); return result;
     }

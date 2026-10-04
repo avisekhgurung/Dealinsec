@@ -23,6 +23,20 @@ describe("agent system prompt", () => {
     expect(p).toMatch(/INSIDE the pasted message itself/);
   });
 
+  it("the sales rules: reports the score as given, never sends, and sends nothing without the user", () => {
+    expect(p).toMatch(/never produce a score or a verdict of your own/);
+    expect(p).toMatch(/say it has STARTED/);
+    expect(p).toMatch(/NOT approved and NOT sent/);
+    expect(p).toMatch(/Call approve_outreach only when the user says to approve that draft/);
+    expect(p).toMatch(/there is no draft, say so and ask whether they want one written: never write a draft they did not ask for/);
+    expect(p).toMatch(/Nothing you do sends a message: the user sends an approved one from their own email app/);
+    expect(p).toMatch(/Call mark_outreach_sent only when the USER says they sent it/);
+    expect(p).toMatch(/never put a price, discount, guarantee or deadline in a message/i);
+    expect(p).toMatch(/never write to a lead marked do-not-contact/);
+    expect(p).toMatch(/never invent either/);
+    expect(p).toMatch(/Nothing you do emails a client/); // the older promise still stands
+  });
+
   it("keeps the tone brief and free of hype", () => {
     expect(p).toMatch(/No hype, no exclamation marks, no emojis/);
   });

@@ -30,6 +30,13 @@ const leadSpec = z.object({
   estValueMinor: z.number().int().positive().optional(),
   industry: z.string().optional(),
   location: z.string().optional(),
+  /** An email address the user recorded, and a do-not-contact flag. */
+  contactEmail: z.string().optional(),
+  doNotContact: z.boolean().default(false),
+  /** Facts on record. "confirmed" ones get evidence from the lead's own site; the value is whatever the case says (it may be hostile). */
+  claims: z.array(z.object({ field: z.string(), value: z.string(), status: z.enum(["confirmed", "inferred"]).default("confirmed") })).default([]),
+  /** A finished research run exists for this lead. */
+  researched: z.boolean().default(false),
   /** Open next steps; a negative dueInDays is overdue. */
   tickets: z.array(z.object({ title: z.string(), dueInDays: z.number().int().optional() })).default([]),
 });
@@ -62,6 +69,8 @@ export const worldSpecSchema = z.object({
   discovery: z.object({ configured: z.boolean().default(true), results: z.array(z.object({ title: z.string(), url: z.string() })).default([]) }).optional(),
   /** Notes the workspace has added to its knowledge (searchable by the agent). */
   knowledge: z.array(z.object({ title: z.string(), text: z.string() })).default([]),
+  /** Outreach messages already on a lead: a draft, an approved one waiting to be sent, or one already sent. */
+  messages: z.array(z.object({ lead: ref, status: z.enum(["draft", "approved", "sent"]), to: z.string().default("hello@casaalma.pt") })).default([]),
   leads: z.array(leadSpec).default([]),
   foreignLeads: z.array(leadSpec).default([]),
 });

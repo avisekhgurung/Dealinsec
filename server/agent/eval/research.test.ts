@@ -225,6 +225,20 @@ describe("whatever the model says is checked before it is believed", () => {
     const s2 = await start(l.id); await s2.run();
     expect(await view(l.id)).toMatchObject({ status: "failed", errorCode: "empty_output" });
   });
+  it("an empty or unreadable first reply gets ONE more try: a good second reply completes the run; two bad ones fail it; both calls are traced", async () => {
+    stdSite();
+    const good = JSON.stringify({ findings: [f("team_size", "12 people", "We are a team of 12 people")] });
+    let n = 0;
+    world().llm = async (m) => { sent.push(m); n++; return { content: n === 1 ? "" : good, toolCalls: [], usage: { inputTokens: 2400, outputTokens: 300 } }; };
+    const l = lead(); const s = await start(l.id); await s.run();
+    expect(await view(l.id)).toMatchObject({ status: "done", errorCode: null, claimCount: 1 });
+    expect(n).toBe(2);
+    expect(world().llmCalls).toHaveLength(2);
+    n = 0; world().llm = async (m) => { sent.push(m); n++; return { content: n === 1 ? "not json at all" : "still not json", toolCalls: [], usage: { inputTokens: 1, outputTokens: 1 } }; };
+    const l2 = lead({ companyName: "Second", domain: "second.pt" }); const s2 = await start(l2.id); await s2.run();
+    expect(await view(l2.id)).toMatchObject({ status: "failed", errorCode: "bad_output" });
+    expect(n).toBe(2); // never a third
+  });
   it("a provider failure fails the run with its code, writes nothing, leaves the stage alone, and is traced as a failure", async () => {
     stdSite();
     const { ProviderError } = await import("../../copilot/provider");

@@ -37,22 +37,30 @@ export function costMicroUsd(tokensIn: number, tokensOut: number, prices: Prices
 }
 
 /** What the sales features ask a model to do. Each can use a different model and has its own daily allowance. */
-export const LLM_TASKS = ["research", "draft", "classify"] as const;
+export const LLM_TASKS = ["research", "draft", "classify", "negotiate"] as const;
 export type LlmTask = (typeof LLM_TASKS)[number];
 
-const MODEL_ENV: Record<LlmTask, string> = { research: "SALES_RESEARCH_MODEL", draft: "SALES_DRAFT_MODEL", classify: "SALES_CLASSIFY_MODEL" };
-const LIMIT_ENV: Record<LlmTask, string> = { research: "SALES_DAILY_RESEARCH_LIMIT", draft: "SALES_DAILY_DRAFT_LIMIT", classify: "SALES_DAILY_CLASSIFY_LIMIT" };
-const DEFAULT_LIMIT: Record<LlmTask, number> = { research: 20, draft: 40, classify: 200 };
+const MODEL_ENV: Record<LlmTask, string> = { research: "SALES_RESEARCH_MODEL", draft: "SALES_DRAFT_MODEL", classify: "SALES_CLASSIFY_MODEL", negotiate: "SALES_NEGOTIATE_MODEL" };
+const LIMIT_ENV: Record<LlmTask, string> = { research: "SALES_DAILY_RESEARCH_LIMIT", draft: "SALES_DAILY_DRAFT_LIMIT", classify: "SALES_DAILY_CLASSIFY_LIMIT", negotiate: "SALES_DAILY_NEGOTIATE_LIMIT" };
+const DEFAULT_LIMIT: Record<LlmTask, number> = { research: 20, draft: 40, classify: 200, negotiate: 20 };
 
 /**
- * The task's own model (SALES_<TASK>_MODEL) if set, else "deepseek-chat". Deliberately NOT the app-wide DEEPSEEK_MODEL:
+ * The task's own model (SALES_<TASK>_MODEL) if set, else DEFAULT_SALES_MODEL ("deepseek-flash", the DeepSeek Flash model, as the founder chose). Deliberately NOT the app-wide DEEPSEEK_MODEL:
  * that is often a reasoning model, which can spend a whole token budget "thinking" and return an empty reply, and these
  * tasks need strict JSON back. (Found the hard way: 2 of 8 real research runs came back empty on deepseek-flash.)
  * A model name is letters, digits and - . _ : / only.
  */
+/**
+ * The model router, as the founder specified it: DeepSeek Flash for the everyday work (research, classification, scoring
+ * explanations, outreach, reply analysis), DeepSeek V4 Pro only for negotiation and other hard multi-step sales decisions.
+ * "negotiate" is reserved for V3 (nothing calls it yet). If the provider names a model differently, set SALES_<TASK>_MODEL:
+ * no code change needed.
+ */
+export const DEFAULT_SALES_MODEL = "deepseek-flash";
+export const DEFAULT_MODEL: Record<LlmTask, string> = { research: DEFAULT_SALES_MODEL, draft: DEFAULT_SALES_MODEL, classify: DEFAULT_SALES_MODEL, negotiate: "deepseek-v4-pro" };
 export function modelFor(task: LlmTask, env: Env = process.env): string {
   const v = env[MODEL_ENV[task]]?.trim();
-  return v && /^[A-Za-z0-9._:/-]{1,80}$/.test(v) ? v : "deepseek-chat";
+  return v && /^[A-Za-z0-9._:/-]{1,80}$/.test(v) ? v : DEFAULT_MODEL[task];
 }
 
 /** How many times a workspace may run this task in 24 hours. A whole number of at least 1; anything else is the default. */

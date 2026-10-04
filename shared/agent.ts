@@ -112,6 +112,12 @@ const TOOL_LABELS: Record<string, string> = {
   add_lead_claim: "the fact",
   archive_lead: "the lead",
   convert_lead_to_deal: "the deal",
+  get_lead_score: "the lead's score",
+  research_lead: "the research",
+  draft_outreach: "the message",
+  get_outreach_draft: "the message",
+  approve_outreach: "the message approval",
+  mark_outreach_sent: "the sent message",
 };
 export const toolLabel = (tool: unknown): string => TOOL_LABELS[String(tool)] ?? "that";
 
@@ -148,6 +154,10 @@ const APPROVE_LABELS: Record<string, string> = {
   add_knowledge_note: "Add note",
   add_knowledge_url: "Add page",
   convert_lead_to_deal: "Create deal",
+  research_lead: "Research",
+  draft_outreach: "Write draft",
+  approve_outreach: "Approve message",
+  mark_outreach_sent: "Record as sent",
 };
 export const approveLabel = (tool: unknown): string => APPROVE_LABELS[String(tool)] ?? "Approve";
 

@@ -60,7 +60,7 @@ export function ApprovalCard({
 
         {d.preview.lines.length > 0 && (
           <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-2">
-            {d.preview.lines.map((l) => <Row key={l.label} label={l.label}>{l.value}</Row>)}
+            {d.preview.lines.map((l) => <div key={l.label} className={l.value.includes("\n") || l.value.length > 120 ? "min-w-0 sm:col-span-2" : "min-w-0"}><Row label={l.label}>{l.value}</Row></div>)}
           </div>
         )}
 

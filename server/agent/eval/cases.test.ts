@@ -28,6 +28,9 @@ vi.mock("../../documents/style-store", async () => (await import("./world-mocks"
 vi.mock("../../knowledge/store", async () => (await import("./world-mocks")).knowledgeStoreMock());
 vi.mock("../../knowledge/net-guard", async (orig) => (await import("./world-mocks")).netGuardMock(orig as () => Promise<any>));
 vi.mock("../../leads/store", async () => (await import("./world-mocks")).leadsStoreMock());
+vi.mock("../../sales/research-store", async () => (await import("./world-mocks")).researchStoreMock());
+vi.mock("../../sales/message-store", async () => (await import("./world-mocks")).messageStoreMock());
+vi.mock("../../llm/trace-store", async () => (await import("./world-mocks")).traceStoreMock());
 vi.mock("../../routes", async () => (await import("./world-mocks")).routesMock());
 vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")).scriptedProviderMock(orig as () => Promise<any>));
 
@@ -438,6 +441,7 @@ describe("cross-cutting guarantees", () => {
       get_quotation: { dealId: deal.id }, get_agreement: { dealId: deal.id }, get_invoice: { invoiceId: inv.id }, get_payment_status: {},
       draft_payment_followup: { invoiceId: inv.id }, run_protection_check: { dealId: deal.id },
       list_leads: {}, get_lead: { leadId: lead.id }, get_lead_followups: {}, get_ideal_client: {}, assess_lead_fit: { leadId: lead.id }, get_document_style: {}, search_knowledge: { question: "hotels in Lisbon" },
+      get_lead_score: { leadId: lead.id }, get_outreach_draft: { leadId: lead.id },
     };
     const reads = AGENT_TOOLS.filter((t) => t.risk === "READ_ONLY" && t.name !== "analyze_deal_message");
     expect(reads.map((t) => t.name).sort()).toEqual(Object.keys(args).sort());
