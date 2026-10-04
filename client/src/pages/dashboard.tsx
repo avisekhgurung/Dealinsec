@@ -3,7 +3,6 @@ import { LeadsStrip } from "@/components/leads/leads-strip";
 import { useAuth } from "@/hooks/useAuth";
 import { useAudience } from "@/hooks/use-audience";
 import { useQuery } from "@tanstack/react-query";
-import { AiHome } from "@/components/ai-home";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -842,9 +841,6 @@ export default function DashboardPage() {
       </header>
 
       <main className="px-4 py-5 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-6 lg:space-y-5 xl:px-10">
-
-        {/* ── AI home: the first thing you see is what you can ask for ── */}
-        <AiHome firstRun={!dealsLoading && deals.length === 0} />
 
         {/* ── Profile completion nudge — top priority before any action ── */}
         {showProfileNudge && (
