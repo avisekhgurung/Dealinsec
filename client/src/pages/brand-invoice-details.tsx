@@ -17,6 +17,7 @@ import { InvoiceAttachments } from "@/components/invoice-attachments";
 import type { BrandInvoice, Deal, InvoiceLineItem } from "@shared/schema";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { PagedDocument, type DocBlock } from "@/components/document/paged";
+import { useDocumentStyle } from "@/hooks/use-document-style";
 import {
   DocHeader, docFooter, SectionTitle, TwoParties, Party, KV, tableBlocks, TotalBlock,
   SignatureCell, DocWarnings, docMoney, docDate,
@@ -44,6 +45,7 @@ export default function BrandInvoiceDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const { style: docStyle } = useDocumentStyle();
   // The ORG's locale — an issued invoice must read the same to every teammate.
   const fmt = useMoney();
   const canRecordPayment = memberCan(user as any, "payments.manage");
@@ -423,7 +425,7 @@ export default function BrandInvoiceDetailsPage() {
         {/* ─────────────────── INVOICE DOCUMENT ─────────────────── */}
         <main className="px-4 py-6 max-w-2xl lg:max-w-4xl mx-auto animate-fade-in">
           <DocWarnings warnings={docWarnings} />
-          <PagedDocument blocks={docBlocks} locale={loc} footer={docFooter(invoice.invoiceNumber)} />
+          <PagedDocument blocks={docBlocks} locale={loc} footer={docFooter(invoice.invoiceNumber, undefined, docStyle.footerNote)} />
 
 
           {/* ── Tax documents (GST / TDS / receipts) ─ hidden in print ── */}

@@ -32,6 +32,8 @@ export interface World {
   leads: FakeLeadsStore;
   /** orgId -> the ideal-client row. */
   profiles: Map<string, Row>;
+  /** orgId -> the document-style row. */
+  documentStyles: Map<string, Row>;
   /** The fake web search: what it returns, what it was asked, and the usage counters. */
   discovery: { configured: boolean; results: { title: string; url: string; snippet?: string }[]; queries: string[]; countries: (string | undefined)[]; error: string | null; usedDay: number; usedMonth: number; provider: { label: string; paid: boolean; supportsCountry: boolean } };
 }
@@ -61,6 +63,7 @@ export function createWorld(): World {
     storage: {},
     leads: new FakeLeadsStore(() => w.readOnly),
     profiles: new Map(),
+    documentStyles: new Map(),
     discovery: { configured: true, results: [], queries: [], countries: [], error: null, usedDay: 0, usedMonth: 0, provider: { label: "Brave Search", paid: true, supportsCountry: true } },
   };
   let id = 100;

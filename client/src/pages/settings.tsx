@@ -42,6 +42,7 @@ import { getThemePref, setThemePref, type ThemePref } from "@/lib/theme";
 import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
 import { pageNumbers } from "@/components/data-table/data-table";
 import { FeedbackCard } from "@/components/feedback-card";
+import { DocumentStyleCard } from "@/components/settings/document-style-card";
 import { RegionFields } from "@/components/region-fields";
 import { AudiencePicker } from "@/components/audience-picker";
 import { normalizeAudience, type Audience } from "@shared/audience";
@@ -476,6 +477,8 @@ export default function SettingsPage() {
                   )}
                 </CardContent>
               </Card>
+
+              <DocumentStyleCard canEdit={memberCan(user as any, "org.settings")} />
 
               <Card className="glass-card">
                 <CardContent className="p-5 lg:p-6 space-y-4">

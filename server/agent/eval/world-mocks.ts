@@ -45,6 +45,20 @@ export const profileStoreMock = () => ({
   },
 });
 
+/** The document-style store: the world's map, behind the module name the service imports. */
+export const documentStyleStoreMock = () => ({
+  documentStyleTableReady: async () => true,
+  documentStyleStore: {
+    get: async (orgId: string) => { const r = world().documentStyles.get(orgId); return r ? { ...r } : null; },
+    save: async (orgId: string, data: Record<string, any>, userId: string) => {
+      if (world().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL");
+      const row = { organizationId: orgId, ...data, updatedBy: userId, updatedAt: new Date() };
+      world().documentStyles.set(orgId, row);
+      return { ...row };
+    },
+  },
+});
+
 /** The web search: configured/unconfigured, canned results, and the usage counters, all from the world. */
 export const discoveryProviderMock = async () => {
   const { DiscoveryError } = await import("../../discovery/types");

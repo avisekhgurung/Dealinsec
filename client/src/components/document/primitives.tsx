@@ -104,7 +104,11 @@ export function DocHeader({
 
 /* ── Footer line (fed to PagedDocument) ────────────────────────────────── */
 
-export function docFooter(ref: string, extra?: string) {
+/**
+ * `note` is the organization's footer note (quotations and invoices only; never an
+ * agreement, because what is printed on a signed document is part of what was signed).
+ */
+export function docFooter(ref: string, extra?: string, note?: string | null) {
   const tail = extra && extra.length > 44 ? `${extra.slice(0, 43)}…` : extra;
   return (page: number, total: number) => (
     <>
@@ -113,6 +117,7 @@ export function docFooter(ref: string, extra?: string) {
         {tail ? <> {" · "}{tail}</> : null}
       </span>
       <span className="doc-num">{page} / {total}</span>
+      {note ? <span style={{ flexBasis: "100%", marginTop: "1.2mm", color: "var(--doc-muted)" }}>{note}</span> : null}
     </>
   );
 }

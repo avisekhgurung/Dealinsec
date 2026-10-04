@@ -1259,3 +1259,16 @@ export const clientProfiles = pgTable("client_profiles", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 export type ClientProfileRow = typeof clientProfiles.$inferSelect;
+
+
+// How the organization's printable documents look (accent, typeface, footer note).
+// One row per organization; presentation only. A missing table switches only this off.
+export const documentStyles = pgTable("document_styles", {
+  organizationId: varchar("organization_id").primaryKey(),
+  accent: varchar("accent", { length: 12 }).notNull().default("emerald"),
+  font: varchar("font", { length: 8 }).notNull().default("sans"),
+  footerNote: varchar("footer_note", { length: 200 }),
+  updatedBy: varchar("updated_by").notNull(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+export type DocumentStyleRow = typeof documentStyles.$inferSelect;

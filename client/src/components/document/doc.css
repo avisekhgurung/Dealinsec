@@ -18,6 +18,7 @@
   --doc-muted: #5b6b78;
   --doc-faint: #8b98a5;
   --doc-brand: #047857;      /* emerald-700 — the DealInSec green, used sparingly */
+  --doc-brand-end: #0d9488;  /* the far end of the header band */
   --doc-brand-soft: #ecfdf5; /* emerald-50 */
   --doc-border: #dde4ea;
   --doc-border-soft: #eaeff3;
@@ -25,7 +26,7 @@
   --doc-amber: #b45309;
   --doc-amber-soft: #fffbeb;
 
-  font-family: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--doc-font, "Inter", -apple-system, "Segoe UI", Roboto, sans-serif);
   color: var(--doc-ink);
   -webkit-font-smoothing: antialiased;
 }
@@ -113,7 +114,7 @@
 
 /* ── Header band ───────────────────────────────────────────────────────── */
 .doc-band {
-  background: linear-gradient(120deg, #047857, #0d9488);
+  background: linear-gradient(120deg, var(--doc-brand), var(--doc-brand-end));
   color: #ffffff;
   margin: -14mm -16mm 6mm;      /* full-bleed against the page padding */
   padding: 7mm 16mm 6mm;
@@ -133,6 +134,7 @@
 /* ── Footer ────────────────────────────────────────────────────────────── */
 .doc-foot {
   flex: none;
+  flex-wrap: wrap;
   border-top: 1px solid var(--doc-border-soft);
   padding-top: 2.5mm;
   margin-top: 3mm;

@@ -12,6 +12,7 @@ vi.mock("../../emails", async () => (await import("./world-mocks")).emailsMock()
 vi.mock("../../leads/profile-store", async () => (await import("./world-mocks")).profileStoreMock());
 vi.mock("../../discovery/provider", async () => (await import("./world-mocks")).discoveryProviderMock());
 vi.mock("../../discovery/usage", async () => (await import("./world-mocks")).discoveryUsageMock());
+vi.mock("../../documents/style-store", async () => (await import("./world-mocks")).documentStyleStoreMock());
 vi.mock("../../leads/store", async () => (await import("./world-mocks")).leadsStoreMock());
 vi.mock("../../routes", async () => (await import("./world-mocks")).routesMock());
 vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")).scriptedProviderMock(orig as () => Promise<any>));

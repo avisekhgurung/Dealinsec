@@ -24,6 +24,7 @@ import {
   useLayoutEffect, useEffect, useMemo, useRef, useState, type ReactNode,
 } from "react";
 import type { LocaleSettings } from "@shared/schema";
+import { useDocumentStyle } from "@/hooks/use-document-style";
 import { DocLocaleProvider } from "./locale";
 import "./doc.css";
 
@@ -153,15 +154,18 @@ export function PagedDocument({
   const byKey = useMemo(() => new Map(blocks.map((b) => [b.key, b.node])), [blocks]);
   const byKey2 = useMemo(() => new Map(blocks.map((b) => [b.key, b.className ?? ""])), [blocks]);
   const laidOut = pages ?? [blocks.map((b) => b.key)];
+  // The organization's accent and typeface, on BOTH the visible sheets and the off-screen measurer: a different
+  // typeface changes how tall each block is, and so where pages break.
+  const { vars: styleVarsForDoc } = useDocumentStyle();
   const pageWmm = 210;
 
   return (
     <DocLocaleProvider settings={locale}>
-    <div ref={wrapRef} className={`doc-pages doc-print-root ${className}`}>
+    <div ref={wrapRef} className={`doc-pages doc-print-root ${className}`} style={styleVarsForDoc as React.CSSProperties}>
       {/* Offscreen measurer at exact printable width */}
       <div className="doc-measurer" aria-hidden="true">
         <div ref={probeRef} style={{ height: "100mm" }} />
-        <div ref={measRef} className="doc-meas-col doc-pages">
+        <div ref={measRef} className="doc-meas-col doc-pages" style={styleVarsForDoc as React.CSSProperties}>
           {blocks.map((b) => (
             <div key={b.key} data-block={b.key} className={`doc-block ${b.className ?? ""}`}>{b.node}</div>
           ))}

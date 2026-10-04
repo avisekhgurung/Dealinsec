@@ -27,6 +27,7 @@ import { STANDARD_TERMS, termsForPhase, recordNo, hasProAccess } from "@shared/s
 import { getDeliverableLabels } from "@shared/dealTypeTaxonomy";
 import { brandTermRows, dealAudienceLabels } from "@shared/audience";
 import { PagedDocument, type DocBlock } from "@/components/document/paged";
+import { useDocumentStyle } from "@/hooks/use-document-style";
 import {
   DocHeader, docFooter, SectionTitle, TwoParties, Party, tableBlocks, TotalBlock,
   SignatureCell, DocWarnings, docMoney, docDate, KV,
@@ -52,6 +53,7 @@ const STEPS = [
 export default function QuotePreviewPage() {
   const params = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { style: docStyle } = useDocumentStyle();
   const issuer = useIssuer();
   // The ORG's locale — a quotation prints the same currency for every teammate.
   const fmt = useMoney();
@@ -403,7 +405,7 @@ export default function QuotePreviewPage() {
         <PagedDocument
           blocks={blocks}
           locale={loc}
-          footer={docFooter(quoteNumber, `Deal ${recordNo("deal", deal.id)}`)}
+          footer={docFooter(quoteNumber, `Deal ${recordNo("deal", deal.id)}`, docStyle.footerNote)}
         />
 
         <div className="mt-4 print:hidden">
