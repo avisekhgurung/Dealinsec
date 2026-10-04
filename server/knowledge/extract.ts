@@ -79,3 +79,24 @@ export async function extractHtml(bytes: Uint8Array): Promise<Extracted> {
     return { ok: false, message: "I couldn't read that page." };
   }
 }
+
+export interface HtmlLink { href: string; text: string }
+
+/** The links on a page (address and visible text), for choosing which other pages of a site to read. Bounded: 200 links, 80 characters of text each. Never throws. */
+export async function extractLinks(bytes: Uint8Array): Promise<HtmlLink[]> {
+  try {
+    const { parseHTML } = await import("linkedom");
+    const source = decode(bytes);
+    const { document } = parseHTML(/<html[\s>]/i.test(source) ? source : `<!doctype html><html><body>${source}</body></html>`);
+    const out: HtmlLink[] = [];
+    for (const a of Array.from(document.querySelectorAll("a[href]"))) {
+      const href = String(a.getAttribute("href") ?? "").trim();
+      if (!href || href.startsWith("#")) continue;
+      out.push({ href: href.slice(0, 500), text: cleanText(a.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 80) });
+      if (out.length >= 200) break;
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}

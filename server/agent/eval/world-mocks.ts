@@ -116,6 +116,45 @@ export const netGuardMock = async (orig: () => Promise<any>) => {
   return { ...actual, realPageIO, fetchPublicPage: (raw: string, io = realPageIO, max?: number) => actual.fetchPublicPage(raw, io, max) };
 };
 
+/** The sales agent's research store, in memory. One running run per lead id (as the database's partial unique index guarantees). */
+export const researchStoreMock = () => {
+  class RunBusy extends Error { constructor() { super("research is already running for this lead"); } }
+  let seq = 0;
+  const w = () => world();
+  return {
+    RunBusy,
+    salesTablesReady: async () => w().salesReady,
+    researchStore: {
+      startRun: async (o: { orgId: string; leadId: number; by: string; userId: string; now: Date; staleMs: number }) => {
+        if (w().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL");
+        for (const r of w().research) if (r.organizationId === o.orgId && r.leadId === o.leadId && r.status === "running" && r.startedAt < new Date(o.now.getTime() - o.staleMs)) { r.status = "failed"; r.errorCode = "stale"; r.finishedAt = o.now; }
+        if (w().research.some((r) => r.leadId === o.leadId && r.status === "running")) throw new RunBusy();
+        const row = { id: ++seq, leadId: o.leadId, organizationId: o.orgId, status: "running", startedAt: o.now, finishedAt: null, pages: [], claimIds: [], summary: null, errorCode: null, model: null, promptVersion: null, createdBy: o.by, createdByUser: o.userId };
+        w().research.push(row);
+        return { ...row };
+      },
+      finish: async (orgId: string, id: number, r: Record<string, any>) => {
+        const row = w().research.find((x) => x.id === id && x.organizationId === orgId && x.status === "running");
+        if (row) Object.assign(row, { status: r.status, finishedAt: r.finishedAt, pages: r.pages, claimIds: r.claimIds, summary: r.summary ?? null, errorCode: r.errorCode ?? null, model: r.model ?? null, promptVersion: r.promptVersion ?? null });
+      },
+      latest: async (orgId: string, leadId: number) => {
+        const rows = w().research.filter((x) => x.organizationId === orgId && x.leadId === leadId).sort((a, b) => b.startedAt - a.startedAt || b.id - a.id);
+        return rows[0] ? { ...rows[0] } : null;
+      },
+    },
+  };
+};
+
+/** The model-call trace, in memory: what the daily allowances count. */
+export const traceStoreMock = () => ({
+  llmTraceReady: async () => world().salesReady,
+  traceStore: {
+    record: async (row: Record<string, any>) => { world().llmCalls.push({ ...row, createdAt: new Date() }); },
+    count: async (o: { orgId: string; task: string; since: Date }) => world().llmCalls.filter((c) => c.organizationId === o.orgId && c.task === o.task && c.ok && c.createdAt >= o.since).length,
+    spendMicroUsd: async (o: { orgId: string; since: Date }) => world().llmCalls.filter((c) => c.organizationId === o.orgId && c.createdAt >= o.since).reduce((n, c) => n + c.costMicroUsd, 0),
+  },
+});
+
 /** The web search: configured/unconfigured, canned results, and the usage counters, all from the world. */
 export const discoveryProviderMock = async () => {
   const { DiscoveryError } = await import("../../discovery/types");

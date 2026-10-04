@@ -24,9 +24,9 @@ describe("cost", () => {
 });
 
 describe("modelFor", () => {
-  it("uses the task's model, then the app's, then the default", () => {
+  it("uses the task's own model, else deepseek-chat, and never inherits the app-wide model (it may be a reasoning model that returns nothing)", () => {
     expect(modelFor("research", {})).toBe("deepseek-chat");
-    expect(modelFor("research", { DEEPSEEK_MODEL: "deepseek-flash" })).toBe("deepseek-flash");
+    expect(modelFor("research", { DEEPSEEK_MODEL: "deepseek-flash" })).toBe("deepseek-chat");
     expect(modelFor("research", { DEEPSEEK_MODEL: "deepseek-flash", SALES_RESEARCH_MODEL: "deepseek-reasoner" })).toBe("deepseek-reasoner");
     expect(modelFor("draft", { SALES_RESEARCH_MODEL: "x-research" })).toBe("deepseek-chat");
   });

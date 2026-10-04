@@ -1346,3 +1346,29 @@ export const llmCalls = pgTable("llm_calls", {
 }));
 export type LlmCallRow = typeof llmCalls.$inferSelect;
 
+// ── Research: one row per run of the sales agent's research on a lead ──
+// The findings themselves are lead_claims (with their evidence); this row is the run: when, which pages
+// were read, which claims it wrote, what was thrown away and why. At most one run per lead is "running"
+// (a partial unique index, see script/migrate-lead-research.ts). Timestamps are written from the
+// application in UTC (the columns have no time zone). A missing table switches only the sales agent off.
+export const leadResearch = pgTable("lead_research", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull(),
+  organizationId: varchar("organization_id").notNull(),
+  status: varchar("status", { length: 12 }).notNull(), // running | done | failed
+  startedAt: timestamp("started_at").notNull(),
+  finishedAt: timestamp("finished_at"),
+  pages: jsonb("pages").notNull().default(sql`'[]'::jsonb`), // [{ url, ok, note? }]
+  claimIds: jsonb("claim_ids").notNull().default(sql`'[]'::jsonb`),
+  summary: jsonb("summary"), // { kept, confirmed, inferred, rejected: { reason: n } }
+  errorCode: varchar("error_code", { length: 30 }),
+  model: varchar("model", { length: 80 }),
+  promptVersion: varchar("prompt_version", { length: 20 }),
+  createdBy: varchar("created_by", { length: 8 }).notNull().default("user"), // user | agent
+  createdByUser: varchar("created_by_user"),
+}, (t) => ({
+  leadIdx: index("lead_research_lead_idx").on(t.leadId, t.startedAt),
+  orgIdx: index("lead_research_org_idx").on(t.organizationId, t.startedAt),
+}));
+export type LeadResearchRow = typeof leadResearch.$inferSelect;
+

@@ -195,7 +195,7 @@ export default function LeadDetailsPage() {
           </TabsList>
 
           <TabsContent value="overview" className="mt-4 space-y-3">
-            <SalesCard leadId={lead.id} />
+            <SalesCard leadId={lead.id} hasWebsite={!!lead.website} />
             <FitCard leadId={lead.id} />
             <Card className="glass-card"><CardContent className="grid gap-x-4 gap-y-3 p-4 sm:grid-cols-2">
               <Fact label="Website">{lead.website ? <a className="inline-flex items-center gap-1 text-primary hover:underline" href={safeHref(lead.website) ?? `https://${lead.website}`} target="_blank" rel="noopener noreferrer">{lead.website}<ExternalLink className="h-3 w-3" /></a> : "—"}</Fact>

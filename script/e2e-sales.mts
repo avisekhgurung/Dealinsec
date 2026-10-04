@@ -63,6 +63,7 @@ async function signup(j: ReturnType<typeof jar>, who: typeof A) {
 const comp = (s: any, k: string) => s?.components?.find((c: any) => c.key === k);
 
 async function main() {
+  const db = new pg.Pool({ connectionString: DATABASE_URL });
   console.log("\n━━ 0. Access ━━");
   let r: any = await anon.req("GET", "/api/sales/leads/1/score");
   check("signed out: score is 401", r.status === 401, `${r.status}`);
@@ -117,6 +118,55 @@ async function main() {
   r = await a.req("POST", `/api/leads/${lead}/archive`, {});
   r = await a.req("GET", `/api/sales/leads/${lead}/next-action`);
   check("an archived lead: none, blocked by archived", r.json?.next?.action === "none" && r.json.next.blockedBy === "archived", r.text);
+
+  console.log("\n━━ 5. Research: the real chain (real fetch of example.com, real model) ━━");
+  r = await anon.req("POST", `/api/sales/leads/${lead}/research`, {});
+  check("signed out: start is 401", r.status === 401, `${r.status}`);
+  r = await a.req("POST", "/api/leads", { companyName: "No Site Co", industry: "Retail" });
+  const noSite = r.json?.lead?.id;
+  r = await a.req("POST", `/api/sales/leads/${noSite}/research`, {});
+  check("a lead with no website: 422 no_website, no run created", r.status === 422 && r.json?.code === "no_website", `${r.status} ${r.text}`);
+  r = await a.req("POST", "/api/leads", { companyName: "Local Co", website: "https://localhost/" });
+  if (r.json?.lead?.id) {
+    const local = r.json.lead.id;
+    r = await a.req("POST", `/api/sales/leads/${local}/research`, {});
+    check("a website that is not public (localhost): 422 bad_website", r.status === 422 && r.json?.code === "bad_website", `${r.status} ${r.text}`);
+  } else console.log("  (the lead form already refuses localhost; skipped)");
+  r = await b.req("POST", `/api/sales/leads/${lead}/research`, {});
+  check("B starting research on A's lead: 404", r.status === 404, `${r.status}`);
+  r = await b.req("GET", `/api/sales/leads/${lead}/research`);
+  check("B reading A's research: 404", r.status === 404, `${r.status}`);
+
+  r = await a.req("POST", "/api/leads", { companyName: "Example Domain", website: "https://example.com", industry: "Reference" });
+  const ex = r.json?.lead?.id;
+  check("a lead with a real website", r.status === 201 && !!ex, `${r.status} ${r.text}`);
+  r = await a.req("GET", `/api/sales/leads/${ex}/research`);
+  check("before any run: research is null", r.status === 200 && r.json?.research === null, r.text);
+  const t0 = Date.now();
+  r = await a.req("POST", `/api/sales/leads/${ex}/research`, {});
+  check("starting returns 202 immediately, running", r.status === 202 && r.json?.status === "running" && Date.now() - t0 < 3000, `${r.status} ${Date.now() - t0}ms ${r.text}`);
+  const second = await a.req("POST", `/api/sales/leads/${ex}/research`, {});
+  check("a second start while it runs: 409 running (the database allows one)", second.status === 409 && second.json?.code === "running", `${second.status} ${second.text}`);
+  let run: any = null;
+  for (let i = 0; i < 40; i++) { await new Promise((x) => setTimeout(x, 3000)); r = await a.req("GET", `/api/sales/leads/${ex}/research`); run = r.json?.research; if (run && run.status !== "running") break; }
+  check("it finishes (done or failed with a reason) within two minutes", !!run && run.status !== "running", JSON.stringify(run)?.slice(0, 200));
+  console.log(`     -> ${run?.status}${run?.errorCode ? " (" + run.errorCode + ")" : ""}; pages: ${JSON.stringify(run?.pages)}; summary: ${JSON.stringify(run?.summary)}`);
+  if (run?.status === "done") {
+    check("the home page was read", run.pages?.[0]?.ok === true && /example\.com/.test(run.pages[0].url), JSON.stringify(run.pages));
+    const traced = (await db.query(`SELECT task, ok, prompt_version, tokens_in, tokens_out, cost_micro_usd FROM llm_calls WHERE lead_id = $1`, [ex])).rows;
+    check("exactly one traced model call, with tokens and a cost, and no text stored", traced.length === 1 && traced[0].task === "research" && traced[0].ok && traced[0].prompt_version === "research-v1" && traced[0].tokens_in > 0 && traced[0].cost_micro_usd >= 0, JSON.stringify(traced));
+    const cl = (await db.query(`SELECT field, status, source, evidence_url, evidence_snippet FROM lead_claims WHERE lead_id = $1`, [ex])).rows;
+    check("every claim the run saved is by the agent, evidenced by a page of that site, and judgments are never 'confirmed'", cl.every((c) => c.source === "agent" && /^https:\/\/(www\.)?example\.com/.test(c.evidence_url) && !!c.evidence_snippet && !(["pain_point", "opportunity", "buying_signal", "timing"].includes(c.field) && c.status === "confirmed")), JSON.stringify(cl));
+    r = await a.req("GET", `/api/sales/leads/${ex}/score`);
+    check("the lead now counts as researched", r.json?.researched === true, r.text);
+    r = await a.req("GET", `/api/leads/${ex}`);
+    check("a new lead moved to 'researching' through the validated stage change", r.json?.lead?.status === "researching", r.json?.lead?.status);
+    const none = (await db.query(`SELECT count(*)::int n FROM lead_events WHERE lead_id = $1 AND kind = 'researched'`, [ex])).rows[0].n;
+    check("a 'researched' event is on the timeline", none === 1, String(none));
+  }
+  const nothingSent = (await db.query(`SELECT count(*)::int n FROM leads WHERE id = $1 AND contact_email IS NOT NULL`, [ex])).rows[0].n;
+  check("research never sets the lead's own contact email", nothingSent === 0, String(nothingSent));
+  await db.end();
 }
 
 async function cleanup() {
@@ -124,7 +174,7 @@ async function cleanup() {
   const c = await pool.connect();
   const found = await c.query(`SELECT id, organization_id FROM users WHERE email LIKE 'e2e-sales-%@dealinsec.invalid'`);
   const users = found.rows.map((x) => x.id), orgs = Array.from(new Set(found.rows.map((x) => x.organization_id).filter(Boolean)));
-  for (const o of orgs) for (const t of ["lead_claims", "lead_tickets", "lead_events", "leads", "client_profiles", "llm_calls", "activity_logs", "invoice_counters", "invitations", "org_roles"]) await c.query(`DELETE FROM ${t} WHERE organization_id=$1`, [o]).catch(() => {});
+  for (const o of orgs) for (const t of ["lead_research", "lead_claims", "lead_tickets", "lead_events", "leads", "client_profiles", "llm_calls", "activity_logs", "invoice_counters", "invitations", "org_roles"]) await c.query(`DELETE FROM ${t} WHERE organization_id=$1`, [o]).catch(() => {});
   for (const u of users) await c.query(`DELETE FROM activity_logs WHERE user_id=$1`, [u]).catch(() => {});
   await c.query(`DELETE FROM users WHERE email LIKE 'e2e-sales-%@dealinsec.invalid'`).catch(() => {});
   for (const o of orgs) await c.query(`DELETE FROM organizations WHERE id=$1`, [o]).catch(() => {});

@@ -44,10 +44,15 @@ const MODEL_ENV: Record<LlmTask, string> = { research: "SALES_RESEARCH_MODEL", d
 const LIMIT_ENV: Record<LlmTask, string> = { research: "SALES_DAILY_RESEARCH_LIMIT", draft: "SALES_DAILY_DRAFT_LIMIT", classify: "SALES_DAILY_CLASSIFY_LIMIT" };
 const DEFAULT_LIMIT: Record<LlmTask, number> = { research: 20, draft: 40, classify: 200 };
 
-/** The task's own model if set, else the app's default model, else deepseek-chat. A model name is letters, digits and - . _ : / only. */
+/**
+ * The task's own model (SALES_<TASK>_MODEL) if set, else "deepseek-chat". Deliberately NOT the app-wide DEEPSEEK_MODEL:
+ * that is often a reasoning model, which can spend a whole token budget "thinking" and return an empty reply, and these
+ * tasks need strict JSON back. (Found the hard way: 2 of 8 real research runs came back empty on deepseek-flash.)
+ * A model name is letters, digits and - . _ : / only.
+ */
 export function modelFor(task: LlmTask, env: Env = process.env): string {
-  const ok = (v: string | undefined) => (v && /^[A-Za-z0-9._:/-]{1,80}$/.test(v.trim()) ? v.trim() : null);
-  return ok(env[MODEL_ENV[task]]) ?? ok(env.DEEPSEEK_MODEL) ?? "deepseek-chat";
+  const v = env[MODEL_ENV[task]]?.trim();
+  return v && /^[A-Za-z0-9._:/-]{1,80}$/.test(v) ? v : "deepseek-chat";
 }
 
 /** How many times a workspace may run this task in 24 hours. A whole number of at least 1; anything else is the default. */

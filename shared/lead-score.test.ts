@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { assessFit, type FitResult, type IdealClient } from "./fit";
-import { COMPONENTS, FIELD_FAMILIES, TOTAL_MAX, latestPerField, normField, scoreLead, type ScoreClaim } from "./lead-score";
+import { ACTIVITY_FIELDS, COMPONENTS, FIELD_FAMILIES, TOTAL_MAX, latestPerField, normField, scoreLead, type ScoreClaim } from "./lead-score";
 
 const fit = (verdict: FitResult["verdict"], headline = `fit: ${verdict}`): FitResult => ({ verdict, headline, signals: [], excludedBy: [], missing: [] });
 let id = 0;
@@ -110,6 +110,32 @@ describe("edge cases that would quietly change a score", () => {
     const s = scoreLead(null, {}, [claim("Pain Point", "confirmed", "old", "2026-10-01T00:00:00Z"), claim("pain_point", "unknown", "", "2026-10-05T00:00:00Z")]);
     expect(comp(s, "need").points).toBeNull();
     expect(latestPerField([claim("Pain Point", "confirmed"), claim("pain_point", "inferred")])).toHaveLength(1);
+  });
+});
+
+describe("activity on a company's own site is not proof of buying intent", () => {
+  it.each(ACTIVITY_FIELDS)("a confirmed %s earns at most half of the buying-signal points, and says it is activity", (f) => {
+    const c = comp(scoreLead(null, {}, [claim(f, "confirmed", "Opened a second site")]), "signal");
+    expect(c.points).toBe(10); expect(c.reason).toMatch(/Activity on the site \(not proof of intent\): Opened a second site/);
+  });
+  it("an inferred activity claim is also half, never more", () => {
+    expect(comp(scoreLead(null, {}, [claim("hiring", "inferred")]), "signal").points).toBe(10);
+  });
+  it("a real buying signal still earns in full when confirmed, and wins over activity", () => {
+    expect(comp(scoreLead(null, {}, [claim("buying_signal", "confirmed"), claim("hiring", "confirmed")]), "signal").points).toBe(20);
+    expect(comp(scoreLead(null, {}, [claim("signal", "confirmed")]), "signal").points).toBe(20);
+    expect(comp(scoreLead(null, {}, [claim("buying_signal", "inferred"), claim("launch", "confirmed")]), "signal").points).toBe(10);
+  });
+  it("several activity claims do not add up to more than half", () => {
+    expect(comp(scoreLead(null, {}, [claim("hiring", "confirmed"), claim("launch", "confirmed"), claim("recent_news", "confirmed")]), "signal").points).toBe(10);
+  });
+  it("conflicting activity is 0, and unknown activity is not known", () => {
+    expect(comp(scoreLead(null, {}, [claim("launch", "conflicting")]), "signal").points).toBe(0);
+    expect(comp(scoreLead(null, {}, [claim("launch", "unknown")]), "signal").points).toBeNull();
+  });
+  it("research can therefore never fill the buying-signal component on its own (it only writes confirmed activity and inferred judgments)", () => {
+    const researched = [claim("hiring", "confirmed"), claim("launch", "confirmed"), claim("recent_news", "confirmed"), claim("buying_signal", "inferred")];
+    expect(comp(scoreLead(null, {}, researched), "signal").points).toBeLessThanOrEqual(10);
   });
 });
 

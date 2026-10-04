@@ -16,11 +16,13 @@ vi.mock("../../documents/style-store", async () => (await import("./world-mocks"
 vi.mock("../../knowledge/store", async () => (await import("./world-mocks")).knowledgeStoreMock());
 vi.mock("../../knowledge/net-guard", async (orig) => (await import("./world-mocks")).netGuardMock(orig as () => Promise<any>));
 vi.mock("../../leads/store", async () => (await import("./world-mocks")).leadsStoreMock());
+vi.mock("../../sales/research-store", async () => (await import("./world-mocks")).researchStoreMock());
+vi.mock("../../llm/trace-store", async () => (await import("./world-mocks")).traceStoreMock());
 vi.mock("../../routes", async () => (await import("./world-mocks")).routesMock());
 vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")).scriptedProviderMock(orig as () => Promise<any>));
 
 import { addClaim, closeTicket, createTicket } from "../../services/leads";
-import { assessLead, hasResearch, lastContactedAt } from "../../services/sales";
+import { assessLead, hasConfirmedEmail, hasResearch, lastContactedAt } from "../../services/sales";
 import { useWorld } from "./world-mocks";
 import { createWorld, seedLead, seedProfile, userRow, ORG1, ORG2, type World } from "./world";
 
@@ -33,6 +35,8 @@ const assess = async (id: number, u = user(), pendingDrafts = 0) => { const r = 
 const lead = (over: Record<string, any> = {}) => seedLead(world(), { companyName: "Casa Alma", industry: "Boutique hotels", location: "Lisbon, Portugal", ...over });
 const agentClaim = (leadId: number, field: string, status: string, value = `${field} value`) =>
   addClaim(user(), leadId, { field, value, status, ...(status === "confirmed" ? { evidenceUrl: "https://casaalma.pt/about", evidenceSnippet: `${value} (as written on the page)` } : {}) }, { actor: "agent" });
+/** A finished research run, the signal that a lead has been researched. */
+const markResearched = (leadId: number) => world().research.push({ id: world().research.length + 1, leadId, organizationId: ORG1, status: "done", startedAt: NOW, claimIds: [] });
 const comp = (a: Awaited<ReturnType<typeof assess>>, k: string) => a.score.components.find((c) => c.key === k)!;
 
 beforeEach(() => { useWorld(createWorld()); vi.spyOn(console, "log").mockImplementation(() => {}); });
@@ -57,6 +61,7 @@ describe("the score from a real lead", () => {
     await agentClaim(l.id, "pain_point", "confirmed", "Outdated booking page");
     await agentClaim(l.id, "buying_signal", "inferred", "Recently opened a second hotel");
     await agentClaim(l.id, "timing", "unknown", "");
+    markResearched(l.id);
     const a = await assess(l.id);
     expect(comp(a, "need").points).toBe(25);
     expect(comp(a, "signal").points).toBe(10);
@@ -84,14 +89,15 @@ describe("the next action from a real lead", () => {
     const l = lead({ contactEmail: "hello@casaalma.pt" });
     expect((await assess(l.id)).next.action).toBe("research");
     await agentClaim(l.id, "pain_point", "confirmed");
+    markResearched(l.id);
     expect((await assess(l.id)).next.action).toBe("draft_outreach");
   });
   it("a researched lead with no email needs a contact first", async () => {
-    const l = lead(); await agentClaim(l.id, "pain_point", "confirmed");
+    const l = lead(); await agentClaim(l.id, "pain_point", "confirmed"); markResearched(l.id);
     expect((await assess(l.id)).next.action).toBe("find_contact");
   });
   it("a draft waiting for approval comes first", async () => {
-    const l = lead({ contactEmail: "a@b.co" }); await agentClaim(l.id, "need", "confirmed");
+    const l = lead({ contactEmail: "a@b.co" }); await agentClaim(l.id, "need", "confirmed"); markResearched(l.id);
     expect((await assess(l.id, user(), 1)).next.action).toBe("review_draft");
   });
   it("contacted: wait for 2 days, follow up from 3, counted from the stage-change on the timeline", async () => {
@@ -134,6 +140,38 @@ describe("who may ask", () => {
     const r = await assessLead(nobody, l.id, { now: () => NOW });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe("forbidden");
+  });
+});
+
+describe("research and the research record", () => {
+  it("a confirmed business email found on the site counts as a way in for the next action, as it does for the score", async () => {
+    const l = lead(); await agentClaim(l.id, "pain_point", "confirmed"); markResearched(l.id);
+    expect((await assess(l.id)).next.action).toBe("find_contact");
+    await agentClaim(l.id, "business_email", "confirmed", "hello@casaalma.pt");
+    const a = await assess(l.id);
+    expect(comp(a, "contact").points).toBe(6);
+    expect(a.next.action).toBe("draft_outreach");
+  });
+  it("an inferred or newer-unknown email does not count", () => {
+    const c = (id: number, status: string, at: string) => ({ id, field: "business_email", value: "x", status, createdAt: at });
+    expect(hasConfirmedEmail([c(1, "inferred", "2026-10-01")])).toBe(false);
+    expect(hasConfirmedEmail([c(1, "confirmed", "2026-10-01"), c(2, "unknown", "2026-10-05")])).toBe(false);
+    expect(hasConfirmedEmail([c(1, "confirmed", "2026-10-01")])).toBe(true);
+  });
+  it("where the research table exists, 'researched' means a run finished: agent claims alone do not count, and a finished run with no findings does", async () => {
+    const l = lead(); await agentClaim(l.id, "pain_point", "confirmed");
+    expect((await assess(l.id)).researched).toBe(false);          // claims exist, no run recorded
+    world().research.push({ id: 1, leadId: l.id, organizationId: ORG1, status: "running", startedAt: NOW, claimIds: [] });
+    expect((await assess(l.id)).researched).toBe(false);          // still running
+    world().research[0].status = "done";
+    expect((await assess(l.id)).researched).toBe(true);
+    world().research[0].status = "failed";
+    expect((await assess(l.id)).researched).toBe(false);
+  });
+  it("where the research table does not exist yet, the older rule applies (an agent claim with evidence)", async () => {
+    world().salesReady = false;
+    const l = lead(); await agentClaim(l.id, "pain_point", "confirmed");
+    expect((await assess(l.id)).researched).toBe(true);
   });
 });
 

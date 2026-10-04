@@ -8,10 +8,11 @@
  */
 import { isoDateInZone } from "@shared/invoice-numbering";
 import { assessFit, type FitResult } from "@shared/fit";
-import { scoreLead, type LeadScore, type ScoreClaim } from "@shared/lead-score";
+import { latestPerField, normField, scoreLead, type LeadScore, type ScoreClaim } from "@shared/lead-score";
 import { nextAction, type NextAction } from "@shared/next-action";
 import { resolveLocaleSettings, type LeadClaim, type LeadEvent } from "@shared/schema";
 import { profileTableReady } from "../leads/profile-store";
+import { researchStore, salesTablesReady } from "../sales/research-store";
 import { storage } from "../storage";
 import { assessLeadFit } from "./ideal-client";
 import { getLead } from "./leads";
@@ -19,7 +20,7 @@ import type { Result, Who } from "./leads";
 
 const DAY_MS = 86_400_000;
 
-/** A research run has produced findings for this lead (an agent-written claim with its evidence). Increment 3 refines this with the run's own record. */
+/** The fallback for "researched" where the research table does not exist: an agent wrote a claim with its evidence. */
 export const hasResearch = (claims: Pick<LeadClaim, "source" | "evidenceUrl">[]): boolean => claims.some((c) => c.source === "agent" && !!c.evidenceUrl);
 
 /** When the lead was last moved to "contacted", from its timeline; the stage's own timestamp if the timeline has no entry. */
@@ -33,6 +34,9 @@ export function lastContactedAt(events: Pick<LeadEvent, "kind" | "data" | "creat
   if (best === null && status === "contacted" && statusChangedAt) { const t = new Date(statusChangedAt as any).getTime(); if (Number.isFinite(t)) best = t; }
   return best === null ? null : new Date(best);
 }
+
+/** A confirmed business email found on the company's own site counts as a way in, the same as the score treats it. */
+export const hasConfirmedEmail = (claims: ScoreClaim[]): boolean => latestPerField(claims).some((c) => normField(c.field) === "business_email" && c.status === "confirmed");
 
 export interface Assessment { score: LeadScore; next: NextAction; fit: FitResult | null; researched: boolean }
 
@@ -59,10 +63,15 @@ export async function assessLead(user: Who, leadId: number, opts: { now?: () => 
   const today = isoDateInZone(resolveLocaleSettings(org, user as any).timezone, now);
   const overdueTicket = tickets.some((t) => t.status === "open" && t.dueAt && new Date(t.dueAt).toISOString().slice(0, 10) < today);
   const contacted = lastContactedAt(events, lead.status, lead.statusChangedAt);
-  const researched = hasResearch(claims);
+  // Researched = a research run finished for this lead. Where the research table does not exist yet, fall back to
+  // "an agent wrote a claim with evidence".
+  let researched = hasResearch(claims);
+  try {
+    if (await salesTablesReady()) researched = (await researchStore.latest(user.organizationId!, leadId))?.status === "done";
+  } catch { /* the heuristic stands */ }
 
   const next = nextAction({
-    status: lead.status, archived: !!lead.archivedAt, doNotContact: !!lead.doNotContact, hasContactEmail: !!lead.contactEmail,
+    status: lead.status, archived: !!lead.archivedAt, doNotContact: !!lead.doNotContact, hasContactEmail: !!lead.contactEmail || hasConfirmedEmail(scoreClaims),
     researched, fit: fit?.verdict ?? null, score: { total: score.total, knownMax: score.knownMax, confidence: score.confidence },
     hasPendingDraft: (opts.pendingDrafts ?? 0) > 0,
     daysSinceContact: contacted ? Math.max(0, Math.floor((now.getTime() - contacted.getTime()) / DAY_MS)) : null,

@@ -37,6 +37,13 @@ export const FIELD_FAMILIES: Record<Exclude<ComponentKey, "fit">, readonly strin
   timing: ["timing", "deadline", "timeline", "urgency"],
 };
 
+/**
+ * Facts a company states about its own ACTIVITY (a launch, a hiring notice, news). They show a business is moving; they
+ * are not evidence anyone wants to buy from you, so even when confirmed they earn at most HALF of the buying-signal points.
+ * Only a claim of an actual buying signal (shared by the person, or confirmed elsewhere) earns the whole.
+ */
+export const ACTIVITY_FIELDS = ["recent_news", "hiring", "launch"] as const;
+
 export type ClaimStatus = "confirmed" | "inferred" | "unknown" | "conflicting";
 export interface ScoreClaim { id: number; field: string; value: string; status: ClaimStatus | string; evidenceUrl?: string | null; createdAt?: Date | string | null }
 export interface ScoreLead { contactEmail?: string | null; contactName?: string | null; estValueMinor?: number | null; doNotContact?: boolean | null }
@@ -96,6 +103,19 @@ function byTier(key: ComponentKey, max: number, label: string, claims: ScoreClai
   return { key, label, max, points: null, reason: `Nothing found about ${noun}`, evidenceClaimIds: [] };
 }
 
+/** Buying signal: a real signal counts in full when confirmed; activity on the site (a launch, hiring, news) counts at most half. */
+function signal(claims: ScoreClaim[]): ScoreComponent {
+  const label = "Buying signal", max = 20;
+  const strongFields = FIELD_FAMILIES.signal.filter((f) => !(ACTIVITY_FIELDS as readonly string[]).includes(f));
+  const strong = tierOf(claims, strongFields);
+  const activity = tierOf(claims, ACTIVITY_FIELDS);
+  if (strong.tier === "confirmed") return { key: "signal", label, max, points: max, reason: `Confirmed: ${strong.sample}`, evidenceClaimIds: strong.ids };
+  if (strong.tier === "inferred") return { key: "signal", label, max, points: max / 2, reason: `Likely, not confirmed: ${strong.sample}`, evidenceClaimIds: strong.ids };
+  if (activity.tier === "confirmed" || activity.tier === "inferred") return { key: "signal", label, max, points: max / 2, reason: `Activity on the site (not proof of intent): ${activity.sample}`, evidenceClaimIds: activity.ids };
+  if (strong.tier === "conflicting" || activity.tier === "conflicting") return { key: "signal", label, max, points: 0, reason: "Sources disagree about buying signals", evidenceClaimIds: [...strong.ids, ...activity.ids] };
+  return { key: "signal", label, max, points: null, reason: "Nothing found about buying signals", evidenceClaimIds: [] };
+}
+
 export function scoreLead(fit: FitResult | null, lead: ScoreLead, claims: ScoreClaim[]): LeadScore {
   const comps: ScoreComponent[] = [];
   const missing: string[] = [];
@@ -106,7 +126,7 @@ export function scoreLead(fit: FitResult | null, lead: ScoreLead, claims: ScoreC
   if (fitPts === null) missing.push(!fit || fit.verdict === "no_profile" ? "Set your ideal client, so fit can be judged" : "More about the company (industry, location), so fit can be judged");
 
   comps.push(byTier("need", 25, "Need or pain", claims, "a need or pain point"));
-  comps.push(byTier("signal", 20, "Buying signal", claims, "buying signals"));
+  comps.push(signal(claims));
 
   // Budget: a researched/confirmed figure, or the person's own estimate on the lead (counts as likely, half).
   const budget = byTier("budget", 15, "Budget potential", claims, "budget");
