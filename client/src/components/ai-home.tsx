@@ -148,7 +148,7 @@ export function AiHome({ firstRun = false }: { firstRun?: boolean }) {
           aria-label="Tell DealInSec what you want to do"
           data-testid="ai-home-input"
           // text-base keeps iOS from zooming the page when the box is focused.
-          className="flex-1 resize-none bg-transparent py-2 text-base outline-none placeholder:text-muted-foreground/70 max-h-40"
+          className="flex-1 resize-none bg-transparent py-2 text-base outline-none focus-visible:outline-none placeholder:text-muted-foreground/70 max-h-40"
         />
         <button
           type="submit"

@@ -74,7 +74,7 @@ export function TaxonomyCombobox({
             value={value === OTHER_OPTION ? "" : value}
             onChange={(e) => onChange(e.target.value)}
             placeholder={isFreeForm ? "Type your category" : "Type a custom value"}
-            className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground/60 outline-none pl-2.5"
+            className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground/60 outline-none focus-visible:outline-none pl-2.5"
             data-testid={testId}
           />
         </div>

@@ -74,7 +74,7 @@ export function Composer({
         placeholder={placeholder}
         aria-label="Message the agent"
         data-testid="agent-input"
-        className="max-h-48 min-w-0 flex-1 resize-none bg-transparent py-2 text-base outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
+        className="max-h-48 min-w-0 flex-1 resize-none bg-transparent py-2 text-base outline-none focus-visible:outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
       />
       {voiceLang && voice.supported && !running && (
         <button type="button" onClick={toggleVoice} disabled={disabled} aria-label={voice.listening ? "Stop dictating" : "Dictate a message"} aria-pressed={voice.listening} data-testid="agent-mic"
