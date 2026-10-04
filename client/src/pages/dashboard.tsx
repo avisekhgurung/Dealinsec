@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAudience } from "@/hooks/use-audience";
 import { useQuery } from "@tanstack/react-query";
 import { AiHome } from "@/components/ai-home";
+import { ModuleLinks } from "@/components/module-links";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -845,6 +846,9 @@ export default function DashboardPage() {
 
         {/* ── AI home: the first thing you see is what you can ask for ── */}
         <AiHome firstRun={!dealsLoading && deals.length === 0} />
+
+        {/* ── Where everything lives (the header has no menu) ── */}
+        <ModuleLinks />
 
         {/* ── Profile completion nudge — top priority before any action ── */}
         {showProfileNudge && (

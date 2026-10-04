@@ -49,11 +49,13 @@ function Empty({ onPaste, onPrompt, pasteLabel, prompts, onCall }: { onPaste: ()
  * `emptyState` lets the drawer show the daily briefing instead of the starter.
  */
 export function AgentConversation({
-  agent, compact, emptyState, disabledReason, extraPrompts, voiceLang, onCall,
+  agent, compact, emptyState, beforeEmpty, disabledReason, extraPrompts, voiceLang, onCall,
 }: {
   agent: Agent;
   compact?: boolean;
   emptyState?: React.ReactNode;
+  /** Shown above the default starter (the daily briefing), without replacing it. */
+  beforeEmpty?: React.ReactNode;
   disabledReason?: string | null;
   extraPrompts?: string[];
   /** Language for dictation; when set, the composer shows a microphone. */
@@ -86,7 +88,7 @@ export function AgentConversation({
         onDecline={agent.reject}
         onEditDraft={editDraft}
         compact={compact}
-        header={empty ? (emptyState ?? <Empty onCall={onCall} onPaste={() => setSeed((x) => ({ text: s.paste, n: x.n + 1 }))} onPrompt={agent.send} pasteLabel={s.pasteLabel} prompts={[...(extraPrompts ?? []), ...s.prompts].slice(0, 5)} />) : agent.loading ? (
+        header={empty ? <>{beforeEmpty}{emptyState ?? <Empty onCall={onCall} onPaste={() => setSeed((x) => ({ text: s.paste, n: x.n + 1 }))} onPrompt={agent.send} pasteLabel={s.pasteLabel} prompts={[...(extraPrompts ?? []), ...s.prompts].slice(0, 5)} />}</> : agent.loading ? (
           <div className="space-y-3" aria-busy="true"><div className="h-4 w-2/3 animate-pulse rounded bg-muted" /><div className="h-4 w-1/2 animate-pulse rounded bg-muted" /></div>
         ) : null}
       />

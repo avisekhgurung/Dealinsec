@@ -12,20 +12,7 @@
  */
 import { useEffect, useReducer } from "react";
 import { useLocation, Link } from "wouter";
-import {
-  Home,
-  Briefcase,
-  FileCheck,
-  Receipt,
-  FileText,
-  Settings,
-  LogOut,
-  Sparkles,
-  Crown,
-  Users,
-  Zap,
-  Target,
-} from "lucide-react";
+import { Settings, LogOut, Sparkles, Crown, Users, Zap } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -41,26 +28,7 @@ import {
   hasLapsedTrial,
   getTrialDaysLeft,
 } from "@shared/schema";
-import { canSeeModule } from "@shared/permissions";
 import { usePlanPrices, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
-
-interface NavItem {
-  path: string;
-  label: string;
-  icon: typeof Home;
-  /** Module key — hidden for custom roles with no permission in it. */
-  module?: "deals" | "quotations" | "agreements" | "invoices";
-}
-
-const NAV: NavItem[] = [
-  { path: "/dashboard", label: "Dashboard", icon: Home },
-  { path: "/agent", label: "Agent", icon: Sparkles },
-  { path: "/leads", label: "Leads", icon: Target, module: "deals" },
-  { path: "/deals", label: "Deals", icon: Briefcase, module: "deals" },
-  { path: "/quotations", label: "Quotations", icon: FileText, module: "quotations" },
-  { path: "/contracts", label: "Agreements", icon: FileCheck, module: "agreements" },
-  { path: "/invoices", label: "Invoices", icon: Receipt, module: "invoices" },
-];
 
 /** Plan lifecycle states, resolved strictly in this order. */
 type PlanState =
@@ -243,29 +211,6 @@ export function DesktopTopNav() {
               Deal<span className="text-emerald-300">insec</span>
             </span>
           </Link>
-          <span aria-hidden="true" className="self-center h-8 w-px mr-1 bg-gradient-to-b from-white/0 via-white/20 to-white/0" />
-
-          {/* ── Workspace tabs ── */}
-          <nav aria-label="Workspace" className="flex items-stretch min-w-0 pl-1">
-            {NAV.filter((i) => !i.module || canSeeModule(user as any, i.module)).map((item) => {
-              const active = isActive(item.path);
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.path}
-                  href={item.path}
-                  data-testid={`topnav-${item.label.toLowerCase()}`}
-                  aria-current={active ? "page" : undefined}
-                  className="dis-topnav-tab relative flex items-center gap-2 px-3 xl:px-4 text-[14px] font-semibold whitespace-nowrap outline-none focus-visible:bg-white/10"
-                >
-                  {/* Seven tabs plus the plan chip need the room below 2xl; the label carries the meaning. */}
-                  <Icon className="hidden 2xl:block w-[17px] h-[17px]" strokeWidth={active ? 2.3 : 1.9} />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-
           {/* ── Account ── */}
           <div className="ml-auto flex shrink-0 items-center gap-1.5 xl:gap-2 pl-3">
             <AgentModeButton />

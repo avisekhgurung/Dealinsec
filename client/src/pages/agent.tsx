@@ -7,12 +7,13 @@
  * composer owns the bottom edge); desktop gets the conversation history beside
  * the thread.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, History, LayoutDashboard, Phone, Plus, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { AgentConversation } from "@/components/agent/agent-conversation";
+import { BriefingStart } from "@/components/agent/briefing-start";
 import { AutonomyControl } from "@/components/agent/autonomy-control";
 import { HistoryList } from "@/components/agent/history-list";
 import { useAgent } from "@/hooks/use-agent";
@@ -22,7 +23,8 @@ import { useSpeechOutput } from "@/hooks/use-voice";
 import { voiceCallSupported } from "@/hooks/use-voice-call";
 import { VoiceCall } from "@/components/agent/voice-call";
 import { useAuth } from "@/hooks/useAuth";
-import { takePendingAgentMessage } from "@/lib/agent-bus";
+import { clearAgentOrigin, peekAgentOrigin, takePendingAgentMessage } from "@/lib/agent-bus";
+import { contextPrompts, pageContext } from "@shared/page-context";
 import { trackEvent } from "@/lib/analytics";
 
 interface AgentStatus { enabled: boolean; tablesReady: boolean; providerConfigured: boolean }
@@ -40,9 +42,14 @@ export default function AgentPage() {
   const canCall = voiceCallSupported();
   const toDashboard = () => { setUiMode("app"); navigate("/dashboard"); };
 
+  // Where the person was when they opened the agent (a deal, an invoice): it starts with that in mind.
+  const [origin] = useState(() => peekAgentOrigin());
+  useEffect(() => { clearAgentOrigin(); }, []);
+  const ctx = useMemo(() => (origin ? pageContext(origin) : null), [origin]);
+
   const agent = useAgent({
     sessionId: params.id ?? null,
-    context: { page: "agent", route: "/agent" },
+    context: ctx ? { page: ctx.page, route: ctx.route, dealId: ctx.entityType === "deal" ? ctx.entityId : undefined } : { page: "agent", route: "/agent" },
     // The URL follows the conversation, so a reload or a shared tab reopens it.
     onSessionChange: (id) => navigate(id ? `/agent/${id}` : "/agent", { replace: true }),
   });
@@ -126,7 +133,11 @@ export default function AgentPage() {
           </button>
         </header>
 
-        <AgentConversation agent={agent} disabledReason={unavailable} voiceLang={locale} onCall={canCall ? () => setCallOpen(true) : undefined} />
+        <AgentConversation
+          agent={agent} disabledReason={unavailable} voiceLang={locale} onCall={canCall ? () => setCallOpen(true) : undefined}
+          extraPrompts={ctx ? contextPrompts(ctx) : undefined}
+          beforeEmpty={unavailable ? undefined : <BriefingStart onFollowUp={(n) => void agent.send(`Prepare a professional payment follow-up for invoice ${n}`)} />}
+        />
       </main>
 
       {callOpen && <VoiceCall agent={agent} lang={locale} firstName={(user as { firstName?: string | null } | undefined)?.firstName} onClose={() => setCallOpen(false)} />}

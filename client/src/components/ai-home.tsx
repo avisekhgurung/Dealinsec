@@ -9,7 +9,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Sparkles, ArrowUp, Plus, FileText, Receipt, AlertTriangle, Sun, ListChecks, Wand2 } from "lucide-react";
-import { askCopilot } from "@/lib/copilot-bus";
 import { setPendingAgentMessage } from "@/lib/agent-bus";
 import { useAuth } from "@/hooks/useAuth";
 import { useAudience } from "@/hooks/use-audience";
@@ -182,7 +181,7 @@ export function AiHome({ firstRun = false }: { firstRun?: boolean }) {
               type="button"
               className={cls}
               data-testid={`ai-chip-${label.toLowerCase().replace(/[^a-z]+/g, "-")}`}
-              onClick={() => (ask ? openAgent(ask) : askCopilot())}
+              onClick={() => (ask ? openAgent(ask) : navigate("/agent"))}
             >
               {inner}
             </button>

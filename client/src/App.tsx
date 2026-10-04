@@ -6,13 +6,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import { AppLoader, RouteLoader } from "@/components/app-loader";
-import { BackToChat } from "@/components/mode-switch";
+import { AgentModeFab, BackToChat } from "@/components/mode-switch";
 import { useUiMode } from "@/hooks/use-ui-mode";
 import { DesktopTopNav } from "@/components/desktop-topnav";
 import { InstallPrompt } from "@/components/install-prompt";
 import { ConfirmProvider } from "@/components/confirm-dialog";
 import { UpgradeModalProvider } from "@/components/upgrade-modal";
-const Copilot = lazy(() => import("@/components/copilot/copilot").then((m) => ({ default: m.Copilot })));
 import { trackPageView, trackEvent } from "@/lib/analytics";
 import { setAppShell } from "@/lib/theme";
 import { useAudience } from "@/hooks/use-audience";
@@ -193,12 +192,8 @@ function Router() {
     <>
       <AudienceAnalytics />
       {showShell && <DesktopTopNav />}
-      {/* Copilot floats on every authed workspace page (not on print/full-bleed views) */}
-      {showShell && uiMode !== "agent" && (
-        <Suspense fallback={null}>
-          <Copilot />
-        </Suspense>
-      )}
+      {/* One way into the agent on every authed workspace page (not on print/full-bleed views, nor the agent page itself) */}
+      {showShell && uiMode !== "agent" && !location.startsWith("/agent") && isAuthenticated && <AgentModeFab />}
       {showShell && uiMode === "agent" && !location.startsWith("/agent") && <BackToChat />}
       {/* Content sits below the desktop top bar via --dis-topnav-h
           (see .app-shell in index.css). */}
