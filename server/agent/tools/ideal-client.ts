@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { VERDICT_LABEL } from "@shared/fit";
 import { assessLeadFit, getIdealClient, planIdealClient, saveIdealClient } from "../../services/ideal-client";
+import { knowledgeCount } from "../../services/knowledge";
 import { needsPermission, needsRead } from "../policy";
 import type { AgentTool, ToolContext, ToolOutcome } from "../types";
 import { fail, money, settingsFor } from "./shared";
@@ -24,14 +25,17 @@ const getIdealClientTool: AgentTool<Record<string, never>> = {
     if (!r.ok) return failFrom(r);
     const p = r.profile;
     const s = await settingsFor(ctx);
-    if (!r.isSet) return { ok: true, route: "/leads", summary: "The user hasn't set their ideal client yet. Ask what they sell and who they want to work with before judging any lead." };
+    // What they have already written down is checked before they are asked to repeat themselves.
+    const sources = await knowledgeCount(who(ctx));
+    const hint = sources ? ` The user has also added ${sources} knowledge source${sources === 1 ? "" : "s"} (notes, pages, PDFs, pictures): call search_knowledge with a few words about who they want to work with before asking them anything.` : "";
+    if (!r.isSet) return { ok: true, route: "/leads", summary: `The user hasn't set their ideal client yet.${hint || " Ask what they sell and who they want to work with before judging any lead."}` };
     const list = (xs: string[]) => (xs.length ? xs.join(", ") : "not set");
     return {
       ok: true, route: "/leads",
       summary: [
         `About: ${p.about ?? "not set"}`, `Services: ${list(p.services)}`, `Target industries: ${list(p.targetIndustries)}`, `Target locations: ${list(p.targetLocations)}`,
         `Minimum deal: ${p.minDealMinor && p.currency ? money(p.minDealMinor, s, p.currency) : "not set"}`, `Exclusions: ${list(p.exclusions)}`,
-      ].join("\n"),
+      ].join("\n") + (hint ? `\n\n${hint.trim()}` : ""),
     };
   },
 };

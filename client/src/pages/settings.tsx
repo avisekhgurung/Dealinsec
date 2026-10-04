@@ -43,6 +43,7 @@ import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components
 import { pageNumbers } from "@/components/data-table/data-table";
 import { FeedbackCard } from "@/components/feedback-card";
 import { DocumentStyleCard } from "@/components/settings/document-style-card";
+import { KnowledgeCard } from "@/components/settings/knowledge-card";
 import { RegionFields } from "@/components/region-fields";
 import { AudiencePicker } from "@/components/audience-picker";
 import { normalizeAudience, type Audience } from "@shared/audience";
@@ -479,6 +480,8 @@ export default function SettingsPage() {
               </Card>
 
               <DocumentStyleCard canEdit={memberCan(user as any, "org.settings")} />
+
+              <KnowledgeCard canEdit={memberCan(user as any, "deals.create")} />
 
               <Card className="glass-card">
                 <CardContent className="p-5 lg:p-6 space-y-4">

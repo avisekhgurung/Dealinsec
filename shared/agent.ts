@@ -99,6 +99,9 @@ const TOOL_LABELS: Record<string, string> = {
   update_invoice_details: "the invoice changes",
   update_workspace_profile: "the workspace changes",
   update_my_details: "your details",
+  search_knowledge: "your knowledge",
+  add_knowledge_note: "the note",
+  add_knowledge_url: "the page",
   create_lead: "the lead",
   create_leads: "the leads",
   update_lead: "the lead changes",
@@ -142,6 +145,8 @@ const APPROVE_LABELS: Record<string, string> = {
   update_invoice_details: "Save invoice",
   update_workspace_profile: "Save",
   update_my_details: "Save",
+  add_knowledge_note: "Add note",
+  add_knowledge_url: "Add page",
   convert_lead_to_deal: "Create deal",
 };
 export const approveLabel = (tool: unknown): string => APPROVE_LABELS[String(tool)] ?? "Approve";

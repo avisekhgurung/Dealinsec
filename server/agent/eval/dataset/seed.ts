@@ -4,6 +4,7 @@
  * records received. Pure apart from mutating the world it is handed.
  */
 import { isoDateInZone } from "@shared/invoice-numbering";
+import { chunkText } from "@shared/knowledge";
 import { createWorld, seedContract, seedDeal, seedInvoice, seedLead, seedProfile, seedQuote, userRow, ORG1, ORG2, type Row, type World } from "../world";
 import type { WorldSpec } from "./schema";
 
@@ -64,6 +65,12 @@ export function buildWorld(spec: WorldSpec): { world: World; user: Row; refs: Re
       } as any);
     }
   }
+  (spec.knowledge ?? []).forEach((k, i) => {
+    const id = `ks-seed-${i + 1}`;
+    const chunks = chunkText(k.text);
+    world.knowledge.sources.push({ id, organizationId: ORG1, kind: "note", title: k.title, sourceUrl: null, sha256: `seed-${i + 1}`, chars: k.text.length, chunkCount: chunks.length, truncated: false, createdAt: new Date() });
+    chunks.forEach((content, position) => world.knowledge.chunks.push({ sourceId: id, organizationId: ORG1, position, content }));
+  });
   for (const l of spec.foreignLeads) refs.lead[l.ref] = seedLead(world, { ...leadRow(l), ownerUserId: "u2" }, ORG2).id;
   return { world, user, refs };
 }
@@ -84,5 +91,5 @@ export function resolveRefs<T>(value: T, refs: Refs): T {
 /** A comparable fingerprint of everything the agent could change. */
 export function snapshotWorld(w: World): string {
   const strip = (rows: Row[]) => rows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== "createdAt")));
-  return JSON.stringify({ deals: strip(w.deals), quotes: strip(w.quotes), contracts: strip(w.contracts), invoices: strip(w.invoices), leads: strip(w.leads.leads as any), tickets: strip(w.leads.tickets as any), claims: strip(w.leads.claims as any), events: w.leads.events.length, profiles: Array.from(w.profiles.values()).map((p) => ({ ...p, updatedAt: 0 })) });
+  return JSON.stringify({ deals: strip(w.deals), quotes: strip(w.quotes), contracts: strip(w.contracts), invoices: strip(w.invoices), leads: strip(w.leads.leads as any), tickets: strip(w.leads.tickets as any), claims: strip(w.leads.claims as any), events: w.leads.events.length, profiles: Array.from(w.profiles.values()).map((p) => ({ ...p, updatedAt: 0 })), knowledge: strip(w.knowledge.sources).map((r: any) => r.id).concat(w.knowledge.chunks.length as any), orgs: Array.from(w.orgs.values()), users: Array.from(w.users.values()) });
 }

@@ -30,10 +30,12 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  // A file upload goes as it is: the browser writes the multipart boundary, so no Content-Type here.
+  const isForm = typeof FormData !== "undefined" && data instanceof FormData;
   const res = await fetch(url, {
     method,
-    headers: data ? { ...CLIENT_HEADERS, "Content-Type": "application/json" } : CLIENT_HEADERS,
-    body: data ? JSON.stringify(data) : undefined,
+    headers: data && !isForm ? { ...CLIENT_HEADERS, "Content-Type": "application/json" } : CLIENT_HEADERS,
+    body: isForm ? (data as FormData) : data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
 

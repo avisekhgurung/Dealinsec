@@ -59,6 +59,63 @@ export const documentStyleStoreMock = () => ({
   },
 });
 
+/** The knowledge store, in memory, behind the module name the service imports. Search counts matching words; the real ranking is Postgres (checked in the smoke test, not here). */
+export const knowledgeStoreMock = () => {
+  const w = () => world();
+  const guardWrite = () => { if (w().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL"); };
+  const words = (t: string) => t.toLowerCase().split(/[^a-z0-9\u00c0-\uffff]+/).filter(Boolean).map((x) => x.replace(/(ies|es|s)$/, ""));
+  let n = 0;
+  return {
+    knowledgeTablesReady: async () => true,
+    knowledgeStore: {
+      list: async (orgId: string) => w().knowledge.sources.filter((r) => r.organizationId === orgId).map((r) => ({ ...r })),
+      get: async (orgId: string, id: string) => { const r = w().knowledge.sources.find((x) => x.organizationId === orgId && x.id === id); return r ? { ...r } : null; },
+      usage: async (orgId: string) => ({ sources: w().knowledge.sources.filter((r) => r.organizationId === orgId).length, chunks: w().knowledge.chunks.filter((c) => c.organizationId === orgId).length }),
+      findByHash: async (orgId: string, sha: string) => { const r = w().knowledge.sources.find((x) => x.organizationId === orgId && x.sha256 === sha); return r ? { ...r } : null; },
+      create: async (orgId: string, input: Record<string, any>, chunks: string[], file?: { mime: string; bytes: Buffer }) => {
+        guardWrite();
+        if (w().knowledge.sources.some((x) => x.organizationId === orgId && x.sha256 === input.sha256)) throw Object.assign(new Error("duplicate"), { code: "23505" });
+        const row = { id: `ks-${++n}`, organizationId: orgId, sourceUrl: null, fileName: null, mime: null, sizeBytes: null, description: null, createdAt: new Date(), ...input, chunkCount: chunks.length };
+        w().knowledge.sources.push(row);
+        chunks.forEach((content, position) => w().knowledge.chunks.push({ sourceId: row.id, organizationId: orgId, position, content }));
+        if (file) w().knowledge.files.set(row.id, { organizationId: orgId, ...file });
+        return { ...row };
+      },
+      remove: async (orgId: string, id: string) => {
+        guardWrite();
+        const i = w().knowledge.sources.findIndex((x) => x.organizationId === orgId && x.id === id);
+        if (i < 0) return false;
+        w().knowledge.sources.splice(i, 1);
+        w().knowledge.chunks = w().knowledge.chunks.filter((c) => c.sourceId !== id);
+        w().knowledge.files.delete(id);
+        return true;
+      },
+      file: async (orgId: string, id: string) => { const f = w().knowledge.files.get(id); return f && f.organizationId === orgId ? { mime: f.mime, bytes: f.bytes } : null; },
+      search: async (orgId: string, terms: string[], limit: number) => {
+        const want = terms.flatMap(words);
+        return w().knowledge.chunks.filter((c) => c.organizationId === orgId)
+          .map((c) => { const have = new Set(words(c.content)); return { c, rank: want.filter((t) => have.has(t)).length }; })
+          .filter((x) => x.rank > 0).sort((a, b) => b.rank - a.rank).slice(0, limit)
+          .map(({ c, rank }) => { const s = w().knowledge.sources.find((x) => x.id === c.sourceId)!; return { sourceId: c.sourceId, title: s.title, kind: s.kind, sourceUrl: s.sourceUrl, position: c.position, content: c.content, rank }; });
+      },
+    },
+  };
+};
+
+/** The network guard with the real rules and a fake web: pages and DNS answers come from the world. */
+export const netGuardMock = async (orig: () => Promise<any>) => {
+  const actual = await orig();
+  const realPageIO = {
+    lookup: async (host: string) => { const a = world().knowledge.dns[host]; if (!a) throw new Error("ENOTFOUND"); return a; },
+    get: async (url: URL) => {
+      const page = world().knowledge.web[url.hostname + url.pathname];
+      if (!page) throw new Error("ECONNREFUSED");
+      return { status: page.status, headers: page.headers, read: async () => new TextEncoder().encode(page.body) };
+    },
+  };
+  return { ...actual, realPageIO, fetchPublicPage: (raw: string, io = realPageIO, max?: number) => actual.fetchPublicPage(raw, io, max) };
+};
+
 /** The web search: configured/unconfigured, canned results, and the usage counters, all from the world. */
 export const discoveryProviderMock = async () => {
   const { DiscoveryError } = await import("../../discovery/types");

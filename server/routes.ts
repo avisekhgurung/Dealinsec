@@ -16,6 +16,7 @@ import { registerCopilotRoutes } from "./copilot/routes";
 import { registerAgentRoutes } from "./agent/routes";
 import { registerLeadRoutes } from "./leads/routes";
 import { registerDocumentStyleRoutes } from "./documents/routes";
+import { registerKnowledgeRoutes } from "./knowledge/routes";
 import { reviseDraftQuote } from "./services/deals";
 import { notifyAgreementCreated } from "./services/agreements";
 import { afterInvoiceStatusChange, paidAtFor } from "./services/payments";
@@ -592,6 +593,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerAgentRoutes(app);
   registerLeadRoutes(app);
   registerDocumentStyleRoutes(app);
+  registerKnowledgeRoutes(app);
   registerQuoteShareRoutes(app);
   registerAgreementSignRoutes(app);
 

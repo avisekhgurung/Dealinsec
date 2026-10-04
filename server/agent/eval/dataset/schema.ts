@@ -60,6 +60,8 @@ export const worldSpecSchema = z.object({
   }).optional(),
   /** The web search: switched on or off, and what it would return. */
   discovery: z.object({ configured: z.boolean().default(true), results: z.array(z.object({ title: z.string(), url: z.string() })).default([]) }).optional(),
+  /** Notes the workspace has added to its knowledge (searchable by the agent). */
+  knowledge: z.array(z.object({ title: z.string(), text: z.string() })).default([]),
   leads: z.array(leadSpec).default([]),
   foreignLeads: z.array(leadSpec).default([]),
 });

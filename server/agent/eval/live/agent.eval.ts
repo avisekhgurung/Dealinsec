@@ -20,6 +20,8 @@ vi.mock("../../../leads/profile-store", async () => (await import("../world-mock
 vi.mock("../../../discovery/provider", async () => (await import("../world-mocks")).discoveryProviderMock());
 vi.mock("../../../discovery/usage", async () => (await import("../world-mocks")).discoveryUsageMock());
 vi.mock("../../../documents/style-store", async () => (await import("../world-mocks")).documentStyleStoreMock());
+vi.mock("../../../knowledge/store", async () => (await import("../world-mocks")).knowledgeStoreMock());
+vi.mock("../../../knowledge/net-guard", async (orig) => (await import("../world-mocks")).netGuardMock(orig as () => Promise<any>));
 vi.mock("../../../leads/store", async () => (await import("../world-mocks")).leadsStoreMock());
 vi.mock("../../../routes", async () => (await import("../world-mocks")).routesMock());
 
