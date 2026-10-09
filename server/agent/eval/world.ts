@@ -38,6 +38,10 @@ export interface World {
   research: Row[]; llmCalls: Row[]; salesReady: boolean;
   /** Outreach messages, and whether their table exists. */
   messages: Row[]; messagesReady: boolean;
+  /** AI Outbound: runs, prospects, run items, findings, provider calls, and whether the tables exist. */
+  outbound: { runs: Row[]; prospects: Row[]; items: Row[]; findings: Row[]; providerCalls: Row[]; ready: boolean };
+  /** Test hook: the next outbound saveStep throws (a crash inside the transaction). */
+  outboundFailNextSave?: boolean;
   /** Knowledge: sources, passages and picture bytes (all with their organization), and the pages the fake web serves. */
   knowledge: { sources: Row[]; chunks: Row[]; files: Map<string, Row>; web: Record<string, { status: number; headers: Record<string, string>; body: string }>; dns: Record<string, string[]> };
   /** The fake web search: what it returns, what it was asked, and the usage counters. */
@@ -71,6 +75,7 @@ export function createWorld(): World {
     profiles: new Map(),
     documentStyles: new Map(),
     research: [], llmCalls: [], salesReady: true, messages: [], messagesReady: true,
+    outbound: { runs: [], prospects: [], items: [], findings: [], providerCalls: [], ready: true },
     knowledge: { sources: [], chunks: [], files: new Map(), web: {}, dns: {} },
     discovery: { configured: true, results: [], queries: [], countries: [], error: null, usedDay: 0, usedMonth: 0, provider: { label: "Brave Search", paid: true, supportsCountry: true } },
   };

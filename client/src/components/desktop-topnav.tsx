@@ -25,6 +25,7 @@ import {
   Users,
   Zap,
   Target,
+  Radar,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -53,6 +54,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { path: "/dashboard", label: "Dashboard", icon: Home },
+  { path: "/outbound", label: "AI Outbound", icon: Radar, module: "deals" },
   { path: "/leads", label: "Leads", icon: Target, module: "deals" },
   { path: "/deals", label: "Deals", icon: Briefcase, module: "deals" },
   { path: "/quotations", label: "Quotations", icon: FileText, module: "quotations" },

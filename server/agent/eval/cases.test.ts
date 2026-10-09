@@ -30,6 +30,7 @@ vi.mock("../../knowledge/net-guard", async (orig) => (await import("./world-mock
 vi.mock("../../leads/store", async () => (await import("./world-mocks")).leadsStoreMock());
 vi.mock("../../sales/research-store", async () => (await import("./world-mocks")).researchStoreMock());
 vi.mock("../../sales/message-store", async () => (await import("./world-mocks")).messageStoreMock());
+vi.mock("../../outbound/store", async () => (await import("./world-mocks")).outboundStoreMock());
 vi.mock("../../llm/trace-store", async () => (await import("./world-mocks")).traceStoreMock());
 vi.mock("../../routes", async () => (await import("./world-mocks")).routesMock());
 vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")).scriptedProviderMock(orig as () => Promise<any>));
@@ -434,6 +435,8 @@ describe("cross-cutting guarantees", () => {
     const inv = seedInvoice(world(), deal.id);
     const lead = seedLead(world(), { companyName: "Northwind", status: "qualified" });
     world().llm = async () => ({ content: "Hi, a gentle reminder about the invoice.", toolCalls: [] });
+    const t0 = new Date("2026-10-08T00:00:00Z");
+    world().outbound.prospects.push({ id: 1, organizationId: "org-1", domain: "northwind.com", name: "Northwind", website: "https://northwind.com", status: "enriched", rejectReason: null, sources: [], profile: {}, fit: null, score: null, angle: null, ready: false, contentHash: null, verifiedAt: t0, researchedAt: null, leadId: null, createdAt: t0, updatedAt: t0 });
     world().readOnly = true;
     const args: Record<string, object> = {
       get_workflow_status: { dealId: deal.id }, search_deals: {}, search_quotations: {}, search_agreements: {}, search_invoices: {}, get_pending_work: {},
@@ -442,6 +445,7 @@ describe("cross-cutting guarantees", () => {
       draft_payment_followup: { invoiceId: inv.id }, run_protection_check: { dealId: deal.id },
       list_leads: {}, get_lead: { leadId: lead.id }, get_lead_followups: {}, get_ideal_client: {}, assess_lead_fit: { leadId: lead.id }, get_document_style: {}, search_knowledge: { question: "hotels in Lisbon" },
       get_lead_score: { leadId: lead.id }, get_outreach_draft: { leadId: lead.id },
+      parse_icp: { request: "US SEO agencies" }, get_discovery_run: {}, get_prospect_intelligence: { prospectId: 1 },
     };
     const reads = AGENT_TOOLS.filter((t) => t.risk === "READ_ONLY" && t.name !== "analyze_deal_message");
     expect(reads.map((t) => t.name).sort()).toEqual(Object.keys(args).sort());

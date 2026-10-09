@@ -113,7 +113,7 @@ export const netGuardMock = async (orig: () => Promise<any>) => {
       return { status: page.status, headers: page.headers, read: async () => new TextEncoder().encode(page.body) };
     },
   };
-  return { ...actual, realPageIO, fetchPublicPage: (raw: string, io = realPageIO, max?: number) => actual.fetchPublicPage(raw, io, max) };
+  return { ...actual, realPageIO, fetchPublicPage: (raw: string, io = realPageIO, max?: number, opts?: unknown) => actual.fetchPublicPage(raw, io, max, opts) };
 };
 
 /** The sales agent's research store, in memory. One running run per lead id (as the database's partial unique index guarantees). */
@@ -176,6 +176,89 @@ export const messageStoreMock = () => {
   };
 };
 
+/** AI Outbound's store, in memory, with the database's guarantees: one active run per organization and ICP, one prospect per organization and domain, one item per run and prospect, an atomic lease claim, and saveStep all-or-nothing. */
+export const outboundStoreMock = () => {
+  class RunActive extends Error { constructor(public runId: string) { super("a run with this ICP is already in progress"); } }
+  let pseq = 0, iseq = 0, fseq = 0;
+  const o = () => world().outbound;
+  const ro = () => { if (world().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL"); };
+  const copy = <T extends object | null | undefined>(x: T): T => (x ? JSON.parse(JSON.stringify(x), (k, v) => (typeof v === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(v) && /(At|Until|at)$/.test(k) ? new Date(v) : v)) : x);
+  const withP = (items: any[], orgId?: string) => items.map((i) => ({ ...copy(i), prospect: copy(o().prospects.find((p) => p.id === i.prospectId && (!orgId || p.organizationId === orgId))) })).filter((x) => x.prospect);
+  const order = (a: any, b: any) => b.rank - a.rank || a.id - b.id;
+  return {
+    RunActive,
+    prospectsTablesReady: async () => o().ready && world().salesReady,
+    outboundStore: {
+      async createRun(r: any) {
+        ro();
+        const active = o().runs.find((x) => x.organizationId === r.orgId && x.idemKey === r.idemKey && x.status === "running");
+        if (active) throw new RunActive(active.id);
+        const row = { id: r.id, organizationId: r.orgId, createdByUser: r.userId, createdBy: r.by, request: r.request, icp: r.icp, quantity: r.quantity, status: "running", stage: "search", counters: {}, queries: r.queries, costMicroUsd: 0, errorCode: null, idemKey: r.idemKey, leaseUntil: null, attempts: 0, createdAt: r.now, updatedAt: r.now, finishedAt: null };
+        o().runs.push(row);
+        return copy(row);
+      },
+      async getRun(orgId: string, id: string) { return copy(o().runs.find((x) => x.organizationId === orgId && x.id === id) ?? null); },
+      async listRuns(orgId: string, limit: number) { return o().runs.filter((x) => x.organizationId === orgId).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit).map(copy); },
+      async countRunsSince(orgId: string, since: Date) { return o().runs.filter((x) => x.organizationId === orgId && x.createdAt >= since).length; },
+      async claimRun(now: Date, leaseMs: number) {
+        const r = o().runs.filter((x) => x.status === "running" && (!x.leaseUntil || x.leaseUntil < now)).sort((a, b) => a.updatedAt - b.updatedAt)[0];
+        if (!r) return null;
+        r.leaseUntil = new Date(now.getTime() + leaseMs); r.attempts += 1; r.updatedAt = now;
+        return copy(r);
+      },
+      async updateRun(id: string, set: any) { ro(); const r = o().runs.find((x) => x.id === id); if (r) Object.assign(r, copy(set)); },
+      async releaseRun(id: string) { const r = o().runs.find((x) => x.id === id); if (r) r.leaseUntil = null; },
+      async setRunStatus(orgId: string, id: string, from: string, to: string, now: Date, errorCode: string | null = null) {
+        const r = o().runs.find((x) => x.organizationId === orgId && x.id === id && x.status === from);
+        if (!r) return false;
+        Object.assign(r, { status: to, updatedAt: now, finishedAt: to === "running" ? null : now, errorCode, leaseUntil: null });
+        return true;
+      },
+      async upsertProspect(orgId: string, p: any, now: Date) {
+        ro();
+        const cur = o().prospects.find((x) => x.organizationId === orgId && x.domain === p.domain);
+        if (cur) { cur.sources = [...cur.sources, ...p.sources].slice(0, 20); cur.updatedAt = now; return copy(cur); }
+        const row = { id: ++pseq, organizationId: orgId, domain: p.domain, name: p.name.slice(0, 120), website: p.website, status: "candidate", rejectReason: null, sources: p.sources, profile: {}, fit: null, score: null, angle: null, ready: false, contentHash: null, verifiedAt: null, researchedAt: null, leadId: null, createdAt: now, updatedAt: now };
+        o().prospects.push(row);
+        return copy(row);
+      },
+      async getProspect(orgId: string, id: number) { return copy(o().prospects.find((x) => x.organizationId === orgId && x.id === id) ?? null); },
+      async updateProspect(orgId: string, id: number, set: any) { ro(); const p = o().prospects.find((x) => x.organizationId === orgId && x.id === id); if (!p) return null; Object.assign(p, copy(set)); return copy(p); },
+      async linkLead(orgId: string, id: number, leadId: number) { const p = o().prospects.find((x) => x.organizationId === orgId && x.id === id && !x.leadId); if (!p) return false; p.leadId = leadId; return true; },
+      async prospectMatching(orgId: string, m: { domain: string | null; name: string }) { return copy(o().prospects.find((x) => x.organizationId === orgId && (m.domain ? x.domain === m.domain : x.name.toLowerCase() === m.name.toLowerCase())) ?? null); },
+      async prospectsLike(orgId: string, text: string, limit: number) { const t = text.toLowerCase(); return o().prospects.filter((x) => x.organizationId === orgId && (x.name.toLowerCase().includes(t) || x.domain.includes(t))).sort((a, b) => b.id - a.id).slice(0, limit).map(copy); },
+      async prospectByLead(orgId: string, leadId: number) { return copy(o().prospects.find((x) => x.organizationId === orgId && x.leadId === leadId) ?? null); },
+      async addRunItem(i: any) {
+        ro();
+        if (o().items.some((x) => x.runId === i.runId && x.prospectId === i.prospectId)) return;
+        o().items.push({ id: ++iseq, runId: i.runId, organizationId: i.orgId, prospectId: i.prospectId, rank: 0, stage: i.stage, attempts: 0, errorCode: null, nextAttemptAt: null, updatedAt: i.now });
+      },
+      async itemsAt(runId: string, stage: string, limit: number, now: Date) { return withP(o().items.filter((x) => x.runId === runId && x.stage === stage && (!x.nextAttemptAt || x.nextAttemptAt <= now)).sort(order).slice(0, limit)); },
+      async runItems(orgId: string, runId: string) { return withP(o().items.filter((x) => x.organizationId === orgId && x.runId === runId).sort(order), orgId); },
+      async setItem(id: number, set: any) { ro(); const i = o().items.find((x) => x.id === id); if (i) Object.assign(i, copy(set)); },
+      async findings(orgId: string, prospectId: number) { return o().findings.filter((f) => f.organizationId === orgId && f.prospectId === prospectId).sort((a, b) => a.id - b.id).map(copy); },
+      async findingsFor(orgId: string, ids: number[]) { return o().findings.filter((f) => f.organizationId === orgId && ids.includes(f.prospectId)).sort((a, b) => a.id - b.id).map(copy); },
+      async saveStep(s: any) {
+        ro();
+        if (world().outboundFailNextSave) { world().outboundFailNextSave = false; throw new Error("simulated crash inside the transaction"); }
+        o().findings = o().findings.filter((f) => !(f.organizationId === s.orgId && f.prospectId === s.prospectId && f.batch === s.batch));
+        const saved: any[] = [];
+        for (const f of s.findings) {
+          const supportingIds = (f.supports ?? []).map((x: any) => x.findingId ?? saved[x.local ?? -1]?.id).filter((x: any) => typeof x === "number");
+          const row = { id: ++fseq, organizationId: s.orgId, prospectId: s.prospectId, kind: f.kind, type: f.type.slice(0, 40), value: f.value.slice(0, 400), status: f.status, sourceUrl: f.sourceUrl ?? null, sourceType: f.sourceType, quote: f.quote ?? null, contentHash: f.contentHash ?? null, observedAt: f.observedAt ?? null, confidence: f.confidence ?? "medium", supportingIds, meta: f.meta ?? {}, batch: s.batch, retrievedAt: s.now };
+          o().findings.push(row); saved.push(row);
+        }
+        if (s.prospect) { const p = o().prospects.find((x) => x.organizationId === s.orgId && x.id === s.prospectId); if (p) Object.assign(p, copy(s.prospect), { updatedAt: s.now }); }
+        if (s.itemId && s.item) { const i = o().items.find((x) => x.id === s.itemId && x.organizationId === s.orgId); if (i) Object.assign(i, copy(s.item), { updatedAt: s.now }); }
+        return saved.map(copy);
+      },
+      async recordProviderCall(r: any) { o().providerCalls.push({ organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: r.operation, ok: r.ok, errorCode: r.errorCode, latencyMs: r.latencyMs, costMicroUsd: r.costMicroUsd, createdAt: r.now }); },
+      async countProviderCalls(q: { orgId?: string; operation: string; since: Date }) { return o().providerCalls.filter((c) => (!q.orgId || c.organizationId === q.orgId) && c.operation === q.operation && c.createdAt >= q.since).length; },
+      async runCostMicroUsd(runId: string) { return world().llmCalls.filter((c) => c.runId === runId).reduce((n, c) => n + (c.costMicroUsd ?? 0), 0) + o().providerCalls.filter((c) => c.runId === runId).reduce((n, c) => n + c.costMicroUsd, 0); },
+    },
+  };
+};
+
 /** The model-call trace, in memory: what the daily allowances count. */
 export const traceStoreMock = () => ({
   llmTraceReady: async () => world().salesReady,
@@ -189,9 +272,7 @@ export const traceStoreMock = () => ({
 /** The web search: configured/unconfigured, canned results, and the usage counters, all from the world. */
 export const discoveryProviderMock = async () => {
   const { DiscoveryError } = await import("../../discovery/types");
-  return {
-    discoveryConfigured: () => world().discovery.configured,
-    discoveryProvider: {
+  const provider = {
       name: "fake",
       get label() { return world().discovery.provider.label; },
       get paid() { return world().discovery.provider.paid; },
@@ -203,7 +284,11 @@ export const discoveryProviderMock = async () => {
         if (d.error) throw new DiscoveryError(d.error as any, "The search service had a problem.");
         return d.results;
       },
-    },
+  };
+  return {
+    discoveryConfigured: () => world().discovery.configured,
+    discoveryProvider: provider,
+    outboundSearchProviders: async () => (world().discovery.configured ? [provider] : []),
   };
 };
 export const discoveryUsageMock = () => ({

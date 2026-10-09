@@ -12,6 +12,7 @@ import { canReadModule, memberCan } from "@shared/permissions";
 import {
   CONVERTIBLE_FROM, MAX_BATCH, TICKET_KINDS, allowedMoves, canMove, canConvertFrom, claimInputSchema, isLeadStatus, isOpen,
   leadFieldsSchema, leadStatusLabels, normalizeDomain, type LeadStatus,
+  type LeadSource,
 } from "@shared/leads";
 import { fromMinor, resolveLocaleSettings, toMinor, MAX_AMOUNT_MINOR, type Lead, type LeadClaim, type LeadTicket, type User } from "@shared/schema";
 import { z } from "zod";
@@ -77,7 +78,7 @@ export async function prepareNewLead(user: Who, raw: unknown): Promise<Result<{ 
   return { ok: true, fields: f, domain, estValueMinor, currency };
 }
 
-export async function createLead(user: Who, raw: unknown, opts: { source?: "manual" | "agent" | "import"; actor?: Actor } = {}): Promise<Result<{ lead: Lead }>> {
+export async function createLead(user: Who, raw: unknown, opts: { source?: LeadSource; actor?: Actor } = {}): Promise<Result<{ lead: Lead }>> {
   const prep = await prepareNewLead(user, raw);
   if (!prep.ok) return prep;
   const { fields: f, domain, estValueMinor, currency } = prep;
@@ -103,7 +104,7 @@ export interface BatchOutcome {
 }
 
 /** Several leads at once. Duplicates and invalid rows are skipped and reported, never fatal to the rest. */
-export async function createLeads(user: Who, items: unknown[], opts: { source?: "manual" | "agent" | "import"; actor?: Actor } = {}): Promise<Result<BatchOutcome>> {
+export async function createLeads(user: Who, items: unknown[], opts: { source?: LeadSource; actor?: Actor } = {}): Promise<Result<BatchOutcome>> {
   const gate = writeGate(user);
   if (gate) return gate;
   if (!Array.isArray(items) || !items.length) return fail(400, "invalid", "There are no leads to add.");

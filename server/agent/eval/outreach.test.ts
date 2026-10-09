@@ -85,7 +85,7 @@ describe("writing a draft", () => {
   it("traces the call (task, prompt version, tokens, cost) and records neither the prompt nor the draft", async () => {
     const l = await researched(); await draft(l.id);
     expect(world().llmCalls).toHaveLength(1);
-    expect(world().llmCalls[0]).toMatchObject({ task: "draft", ok: true, promptVersion: "draft-v1", tokensIn: 900, tokensOut: 180, leadId: l.id, organizationId: ORG1 });
+    expect(world().llmCalls[0]).toMatchObject({ task: "draft", ok: true, promptVersion: "draft-v2", tokensIn: 900, tokensOut: 180, leadId: l.id, organizationId: ORG1 });
     expect(JSON.stringify(world().llmCalls)).not.toMatch(/Casa Alma|boutique|hello@/i);
   });
   it("the timeline records ids and counts, never the message text", async () => {

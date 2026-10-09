@@ -122,7 +122,7 @@ export const leadFieldsSchema = z.object({
 });
 export type LeadFields = z.infer<typeof leadFieldsSchema>;
 
-export const LEAD_SOURCES = ["manual", "agent", "import"] as const;
+export const LEAD_SOURCES = ["manual", "agent", "import", "outbound"] as const;
 export type LeadSource = (typeof LEAD_SOURCES)[number];
 
 export const MAX_BATCH = 20;

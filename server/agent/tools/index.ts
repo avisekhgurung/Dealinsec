@@ -10,13 +10,15 @@
  * Every tool declares its risk class and its authorization. The loop's policy
  * decides run-versus-approve from those — the model decides nothing about that.
  *
- *   READ_ONLY              reads (including search_knowledge, get_lead_score, get_outreach_draft), analysis, drafts of text (nothing written, nothing sent)
+ *   READ_ONLY              reads (including search_knowledge, get_lead_score, get_outreach_draft, parse_icp, get_discovery_run, get_prospect_intelligence), analysis, drafts of text (nothing written, nothing sent)
  *   SAFE_MUTATION          create_deal, update_deal, add_protection_term, create_quotation, revise_quotation,
  *                          and the lead pipeline: create_lead(s), update_lead, move_lead, add_lead_note,
  *                          create_ticket, complete_ticket, add_lead_claim, archive_lead,
  *                          update_invoice_details, update_workspace_profile, update_my_details,
  *                          add_knowledge_note, add_knowledge_url (both always ask: forceApproval),
- *                          research_lead (always asks), draft_outreach, mark_outreach_sent
+ *                          research_lead (always asks), draft_outreach, mark_outreach_sent,
+ *                          discover_prospects, research_prospect, find_decision_maker (all always ask),
+ *                          get_outreach_angle, add_prospect_to_leads
  *   CONSEQUENTIAL_MUTATION share_quotation, create_agreement, create_signing_link,
  *                          create_invoice, mark_paid, mark_unpaid, convert_lead_to_deal, revise_agreement,
  *                          complete_deal, approve_outreach (shows the exact text; nothing is ever sent by the agent)
@@ -41,7 +43,8 @@ import { LEAD_TOOLS } from "./leads";
 import { PAYMENT_TOOLS } from "./payments";
 import { REVISE_TOOLS } from "./revise";
 import { READ_TOOLS } from "./reads";
+import { OUTBOUND_TOOLS } from "./outbound";
 import { SALES_TOOLS } from "./sales";
 import { WORKSPACE_TOOLS } from "./workspace";
 
-export const AGENT_TOOLS: readonly AgentTool<any>[] = validateRegistry([...READ_TOOLS, ...DEAL_TOOLS, ...DOCUMENT_TOOLS, ...PAYMENT_TOOLS, ...LEAD_TOOLS, ...IDEAL_CLIENT_TOOLS, ...DISCOVERY_TOOLS, ...REVISE_TOOLS, ...DOCUMENT_STYLE_TOOLS, ...WORKSPACE_TOOLS, ...KNOWLEDGE_TOOLS, ...SALES_TOOLS]);
+export const AGENT_TOOLS: readonly AgentTool<any>[] = validateRegistry([...READ_TOOLS, ...DEAL_TOOLS, ...DOCUMENT_TOOLS, ...PAYMENT_TOOLS, ...LEAD_TOOLS, ...IDEAL_CLIENT_TOOLS, ...DISCOVERY_TOOLS, ...REVISE_TOOLS, ...DOCUMENT_STYLE_TOOLS, ...WORKSPACE_TOOLS, ...KNOWLEDGE_TOOLS, ...SALES_TOOLS, ...OUTBOUND_TOOLS]);

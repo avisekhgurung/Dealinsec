@@ -54,7 +54,7 @@ export interface FitLead {
 }
 
 export type SignalStatus = "match" | "mismatch" | "unknown";
-export interface FitSignal { key: "industry" | "location" | "value"; label: string; status: SignalStatus; detail: string }
+export interface FitSignal { key: "industry" | "location" | "value" | "size" | "market"; label: string; status: SignalStatus; detail: string }
 export type FitVerdict = "no_profile" | "excluded" | "strong" | "partial" | "weak" | "unclear";
 export interface FitResult {
   verdict: FitVerdict;
@@ -70,12 +70,12 @@ export const VERDICT_LABEL: Record<FitVerdict, string> = {
   no_profile: "No ideal client set", excluded: "Excluded", strong: "Strong fit", partial: "Partial fit", weak: "Weak fit", unclear: "Can't tell yet",
 };
 
-const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-const words = (s: string) => norm(s).split(" ").filter((w) => w.length >= 4);
+export const normText = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const words = (s: string) => normText(s).split(" ").filter((w) => w.length >= 4);
 
 /** One text matches another when either contains the other, or they share a whole word of 4+ letters. */
 export function textMatches(a: string, b: string): boolean {
-  const x = norm(a), y = norm(b);
+  const x = normText(a), y = normText(b);
   if (!x || !y) return false;
   if (x.length >= 3 && y.includes(x)) return true;
   if (y.length >= 3 && x.includes(y)) return true;
@@ -112,17 +112,26 @@ export function assessFit(profile: IdealClient | null | undefined, lead: FitLead
 
   // Exclusions are stricter than targets: a lead is only called Excluded on an exact whole-phrase hit in
   // what it says about itself ("online gambling" must not exclude "online retail").
-  const haystack = ` ${norm([lead.companyName, lead.industry, lead.location, lead.fitSummary].filter(Boolean).join(" "))} `;
-  const excludedBy = profile.exclusions.filter((x) => norm(x) && haystack.includes(` ${norm(x)} `));
+  const haystack = ` ${normText([lead.companyName, lead.industry, lead.location, lead.fitSummary].filter(Boolean).join(" "))} `;
+  const excludedBy = profile.exclusions.filter((x) => normText(x) && haystack.includes(` ${normText(x)} `));
 
-  const matches = signals.filter((s) => s.status === "match").length;
-  const mismatches = signals.filter((s) => s.status === "mismatch").length;
-  const unknowns = signals.filter((s) => s.status === "unknown").length;
   const missing = [
     ind?.status === "unknown" ? "an industry" : null, loc?.status === "unknown" ? "a location" : null,
     signals.find((s) => s.key === "value" && s.status === "unknown") ? "an estimated value" : null,
   ].filter((x): x is string => !!x);
 
+  const { verdict, headline } = verdictFrom(signals, excludedBy);
+  return { verdict, headline, signals, excludedBy, missing };
+}
+
+/**
+ * The verdict from a list of compared signals and any exclusion hits. Shared by the lead fit check above and by the
+ * prospect fit check (shared/icp.ts), which adds company-size and target-market signals: one rule, never two.
+ */
+export function verdictFrom(signals: FitSignal[], excludedBy: string[]): { verdict: FitVerdict; headline: string } {
+  const matches = signals.filter((s) => s.status === "match").length;
+  const mismatches = signals.filter((s) => s.status === "mismatch").length;
+  const unknowns = signals.filter((s) => s.status === "unknown").length;
   let verdict: FitVerdict;
   let headline: string;
   if (excludedBy.length) { verdict = "excluded"; headline = `Matches something you exclude: ${excludedBy.join(", ")}.`; }
@@ -133,5 +142,5 @@ export function assessFit(profile: IdealClient | null | undefined, lead: FitLead
   else if (matches >= 2 && unknowns === 0) { verdict = "strong"; headline = "Matches what you're looking for."; }
   else if (matches >= 1) { verdict = "partial"; headline = unknowns ? `Matches on ${matches === 1 ? "one thing" : `${matches} things`} so far; the rest can't be checked yet.` : "Matches on the one thing you set."; }
   else { verdict = "unclear"; headline = "There isn't enough on the lead to compare yet."; }
-  return { verdict, headline, signals, excludedBy, missing };
+  return { verdict, headline };
 }

@@ -383,6 +383,8 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
     () => {
       log(`serving on ${host}:${port}`);
       log(`PayU configured: KEY=${!!process.env.PAYU_MERCHANT_KEY} SALT=${!!process.env.PAYU_SALT}`);
+      // Resume any prospect run a restart or sleep interrupted (its lease has expired). Does nothing without the tables.
+      import("./outbound/runner").then((m) => m.outboundRunner.kick()).catch(() => {});
     },
   );
 })();

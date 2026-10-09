@@ -18,6 +18,7 @@ vi.mock("../../knowledge/net-guard", async (orig) => (await import("./world-mock
 vi.mock("../../leads/store", async () => (await import("./world-mocks")).leadsStoreMock());
 vi.mock("../../sales/research-store", async () => (await import("./world-mocks")).researchStoreMock());
 vi.mock("../../sales/message-store", async () => (await import("./world-mocks")).messageStoreMock());
+vi.mock("../../outbound/store", async () => (await import("./world-mocks")).outboundStoreMock());
 vi.mock("../../llm/trace-store", async () => (await import("./world-mocks")).traceStoreMock());
 vi.mock("../../routes", async () => (await import("./world-mocks")).routesMock());
 vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")).scriptedProviderMock(orig as () => Promise<any>));
@@ -600,7 +601,7 @@ describe("isolation and roles", () => {
   it("a role with no permissions can use no lead tool", () => {
     const nobody = userRow({ orgRole: "CUSTOM", customPermissions: [] });
     const leadTools = AGENT_TOOLS.filter((t) => /lead|ticket|ideal_client/.test(t.name));
-    expect(leadTools.length).toBe(18); // the 16 pipeline tools, plus get_lead_score and research_lead (the rest of the sales tools are covered in sales-tools.test.ts)
+    expect(leadTools.length).toBe(19); // the 16 pipeline tools, plus get_lead_score, research_lead and add_prospect_to_leads (the rest of the sales tools are covered in sales-tools.test.ts)
     for (const t of leadTools) expect(authorizeCall(t, nobody, {} as any), t.name).not.toBeNull();
   });
 

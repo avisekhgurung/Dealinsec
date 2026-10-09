@@ -21,6 +21,7 @@ import {
   addClaim, addNote, archiveLead, closeTicket, convertToDeal, createLead, createLeads, createTicket, getLead, listLeads,
   listFollowUps, moveLead, planMove, prepareNewLead, previewConversion, updateLead,
 } from "../../services/leads";
+import { prospectMatch, prospectsNamed } from "../../outbound/lead-angle";
 import { allOf, needsPermission, needsRead } from "../policy";
 import type { AgentTool, ToolContext, ToolOutcome } from "../types";
 import { dateLabel, fail, money, settingsFor } from "./shared";
@@ -73,7 +74,14 @@ const listLeadsTool: AgentTool<{ status?: LeadStatus; query?: string; limit?: nu
     const r = await listLeads(who(ctx), { status, q: query, limit: limit ?? 20 });
     if (!r.ok) return failFrom(r);
     const counts = LEAD_STATUSES.filter((s) => r.counts[s]).map((s) => `${stageLabel(s)} ${r.counts[s]}`).join(", ") || "none yet";
-    if (!r.rows.length) return { ok: true, route: "/leads", summary: `No leads match. Leads by stage: ${counts}.` };
+    if (!r.rows.length) {
+      // A company that isn't a lead may be a PROSPECT AI Outbound found: say so here, where the agent is looking.
+      const found = query ? await prospectsNamed(who(ctx).organizationId, query) : [];
+      const hint = found.length
+        ? `\nBut ${found.length === 1 ? "a prospect" : "prospects"} from a prospect search match${found.length === 1 ? "es" : ""} "${query}":\n${found.map((p) => `- [${p.id}] ${p.name} (${p.domain})${p.leadId ? ` — already lead ${p.leadId}` : p.aside ? ` — set aside (${p.aside})` : ""}`).join("\n")}\nUse get_prospect_intelligence for what is known, and add_prospect_to_leads (not create_lead) to add one.`
+        : "";
+      return { ok: true, route: "/leads", summary: `No leads match. Leads by stage: ${counts}.${hint}` };
+    }
     const lines = r.rows.map((l) => `- [${l.id}] ${l.companyName} — ${stageLabel(l.status)}${l.nextTicket ? `; next: ${l.nextTicket.title}${l.nextTicket.dueAt ? ` (due ${dateLabel(l.nextTicket.dueAt)})` : ""}` : ""}`);
     return {
       ok: true, route: "/leads", cards: [await leadCard(ctx, "Leads", r.rows)],
@@ -140,6 +148,13 @@ const createLeadTool: AgentTool<z.infer<z.ZodObject<typeof leadFields>>> = {
   input: z.object(leadFields),
   authorize: canWrite,
   async prepare(ctx, input) {
+    // A company AI Outbound already found is added with its evidence (add_prospect_to_leads), never again from just its name.
+    const hit = await prospectMatch(who(ctx).organizationId, { companyName: String(input.companyName ?? ""), website: input.website });
+    if (hit && !hit.leadId) {
+      return hit.rejectLabel
+        ? { ok: false, code: "prospect_set_aside", message: `${hit.name} was found by a prospect search and set aside (${hit.rejectLabel}), so it isn't added automatically. Tell the user why; they can add it themselves from the Leads page if they still want it.` }
+        : { ok: false, code: "is_prospect", message: `${hit.name} is already one of the user's prospects (id ${hit.id}). Call add_prospect_to_leads with prospectId ${hit.id} now, in this turn: the approval card is the user's confirmation, so don't ask first. It brings the evidence along.` };
+    }
     const r = await prepareNewLead(who(ctx), input);
     if (!r.ok) return { ok: false, code: r.code, message: r.message, ...(typeof r.existingId === "number" ? { route: route(r.existingId) } : {}) };
     const f = r.fields;

@@ -66,8 +66,17 @@ export function checkStructure(d: Draft): Issue[] {
 
 /** The extra rules for a MODEL-written draft. */
 export function checkDraft(d: Draft, ctx: DraftContext): Issue[] {
-  const out = checkStructure(d);
-  const text = `${d.subject.trim().slice(0, SCAN.subject)}\n${d.body.trim().slice(0, SCAN.body)}`;
+  return [...checkStructure(d), ...contentIssues(`${d.subject.trim().slice(0, SCAN.subject)}\n${d.body.trim().slice(0, SCAN.body)}`, ctx)];
+}
+
+/**
+ * The content rules on any model-written outreach text (a draft, or an outreach angle that a draft will be written
+ * from): no price, discount or guarantee, no link or address off the company's own site, no invented history, nothing
+ * that reads like an instruction. The text is bounded by the caller.
+ */
+export function contentIssues(rawText: string, ctx: DraftContext): Issue[] {
+  const out: Issue[] = [];
+  const text = rawText.slice(0, SCAN.subject + SCAN.body + 1);
   const site = ctx.siteHost.toLowerCase().replace(/^www\./, "");
   const to = ctx.to.trim().toLowerCase();
 

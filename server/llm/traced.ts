@@ -33,6 +33,14 @@ export async function assertWithinCap(task: LlmTask, orgId: string, deps: Partia
   if (used >= limit) throw new CapExceeded(task, used, limit);
 }
 
+/** How many calls of this task the workspace may still make in the rolling 24 hours (0 when used up; throws CapUnavailable if it can't be counted). */
+export async function remainingToday(task: LlmTask, orgId: string, deps: Partial<TraceDeps> = {}, env: Record<string, string | undefined> = process.env): Promise<number> {
+  const d = { ...defaultDeps(), ...deps };
+  let used: number;
+  try { used = await d.store.count({ orgId, task, since: new Date(d.now() - DAY_MS) }); } catch { throw new CapUnavailable(); }
+  return Math.max(0, dailyLimit(task, env) - used);
+}
+
 /** A tool-less chat call, traced. The task's allowance is checked first; errors from the provider are rethrown after being recorded. */
 export async function tracedChat(ctx: TraceCtx, messages: ChatMessage[], opts: ChatOptions = {}, deps: Partial<TraceDeps> = {}, env: Record<string, string | undefined> = process.env): Promise<ChatResult> {
   const d = { ...defaultDeps(), ...deps };

@@ -101,16 +101,18 @@ export interface PageResponse { status: number; headers: Record<string, string |
 export interface PageIO {
   lookup(host: string): Promise<string[]>;
   /** Connect to `address` (not the name), speak TLS for `url.hostname`, send one GET. */
-  get(url: URL, address: string, signal: AbortSignal): Promise<PageResponse>;
+  get(url: URL, address: string, signal: AbortSignal, opts?: { userAgent?: string }): Promise<PageResponse>;
 }
+/** Per-call options. XML (a sitemap) is refused unless the caller asks for it; the user agent says honestly why the page is read. */
+export interface FetchOptions { allowXml?: boolean; userAgent?: string }
 export type PageResult =
-  | { ok: true; url: URL; contentType: "html" | "text" | "pdf"; bytes: Uint8Array }
+  | { ok: true; url: URL; contentType: "html" | "text" | "pdf" | "xml"; bytes: Uint8Array }
   | { ok: false; code: "blocked" | "unreachable" | "bad_response" | "too_big" | "unsupported"; message: string };
 
 const MAX_REDIRECTS = 3;
 const TOTAL_MS = 15_000;
 
-export async function fetchPublicPage(raw: string, io: PageIO = realPageIO, maxBytes: number = LIMITS.pageBytes): Promise<PageResult> {
+export async function fetchPublicPage(raw: string, io: PageIO = realPageIO, maxBytes: number = LIMITS.pageBytes, opts: FetchOptions = {}): Promise<PageResult> {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), TOTAL_MS);
   try {
@@ -125,14 +127,15 @@ export async function fetchPublicPage(raw: string, io: PageIO = realPageIO, maxB
       // One private answer among public ones is how rebinding is dressed up: refuse the lot.
       if (addresses.some(isBlockedAddress)) return { ok: false, code: "blocked", message: "That address isn't a public website." };
       let res: PageResponse;
-      try { res = await io.get(url, addresses[0], ac.signal); } catch { return { ok: false, code: "unreachable", message: ac.signal.aborted ? "That website took too long to answer." : "I couldn't reach that website." }; }
+      try { res = await io.get(url, addresses[0], ac.signal, { userAgent: opts.userAgent }); } catch { return { ok: false, code: "unreachable", message: ac.signal.aborted ? "That website took too long to answer." : "I couldn't reach that website." }; }
       if (res.status >= 300 && res.status < 400 && res.headers.location) {
         try { current = new URL(res.headers.location, url).toString(); } catch { return { ok: false, code: "bad_response", message: "That website sent me somewhere that isn't valid." }; }
         continue;
       }
       if (res.status !== 200) return { ok: false, code: "bad_response", message: `That website answered with an error (${res.status}).` };
       const type = (res.headers["content-type"] ?? "").toLowerCase().split(";")[0].trim();
-      const contentType = type === "text/html" || type === "application/xhtml+xml" ? "html" : type === "text/plain" ? "text" : type === "application/pdf" ? "pdf" : null;
+      const contentType = type === "text/html" || type === "application/xhtml+xml" ? "html" : type === "text/plain" ? "text" : type === "application/pdf" ? "pdf"
+        : opts.allowXml && (type === "application/xml" || type === "text/xml") ? "xml" : null;
       if (!contentType) return { ok: false, code: "unsupported", message: "That link isn't a web page, text or PDF." };
       const declared = Number(res.headers["content-length"]);
       if (Number.isFinite(declared) && declared > maxBytes) return { ok: false, code: "too_big", message: "That page is too large." };
@@ -152,11 +155,11 @@ export const realPageIO: PageIO = {
     const r = await dns.lookup(host, { all: true, verbatim: true });
     return r.map((a) => a.address);
   },
-  get(url, address, signal) {
+  get(url, address, signal, opts) {
     return new Promise<PageResponse>((resolve, reject) => {
       const req = https.request({
         host: address, port: 443, method: "GET", path: url.pathname + url.search, servername: url.hostname,
-        headers: { Host: url.hostname, "User-Agent": "DealInSec/1.0 (adds a page you chose to your workspace)", Accept: "text/html,text/plain,application/pdf;q=0.8", "Accept-Encoding": "identity" },
+        headers: { Host: url.hostname, "User-Agent": opts?.userAgent ?? "DealInSec/1.0 (adds a page you chose to your workspace)", Accept: "text/html,text/plain,application/pdf;q=0.8", "Accept-Encoding": "identity" },
         signal, timeout: 10_000,
       }, (res) => {
         const headers: Record<string, string | undefined> = {};

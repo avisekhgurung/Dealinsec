@@ -36,6 +36,7 @@ export const NOT_A_COMPANY_SITE = new Set([
   "glassdoor.com", "indeed.com", "naukri.com", "monster.com", "ziprecruiter.com", "angel.co", "wellfound.com",
   "crunchbase.com", "zoominfo.com", "dnb.com", "owler.com", "apollo.io", "rocketreach.co", "lusha.com", "cbinsights.com", "pitchbook.com",
   "yelp.com", "justdial.com", "indiamart.com", "tradeindia.com", "yellowpages.com", "sulekha.com", "mapquest.com",
+  "crowdreviews.com", "twine.net", "bark.com", "expertise.com", "themanifest.com", "upcity.com", "agencyspotter.com", "topseos.com", "sortlist.co.uk", "agencyvista.com", "peopleperhour.com", "freelancer.com", "toptal.com",
   "clutch.co", "goodfirms.co", "g2.com", "capterra.com", "trustpilot.com", "sortlist.com", "designrush.com", "upwork.com", "fiverr.com",
   "google.com", "bing.com", "amazon.com", "ebay.com", "alibaba.com", "forbes.com", "bloomberg.com", "reuters.com",
   // Seen in real search results for "logistics company Pune": news, directories, classifieds, slide decks, lookup tools.
@@ -73,9 +74,9 @@ export function registrableDomain(host: string): string | null {
 const JUNK_HOST = /(^|[.-])(news|times|herald|gazette|yellowpages|directory|classifieds?|listings?|wiki|forum|blogs?|jobs|careers)([.-]|$)/;
 const NON_BUSINESS_LABELS = new Set(["gov", "edu", "ac", "mil", "nic"]);
 /** A path that says "this is an article / listing / search page", not a company's own page. */
-const JUNK_PATH = /\/(news|blogs?|articles?|posts?|category|categories|tags?|search|results|directory|listings?|wiki|forum|questions?|profiles?|biz|business(es)?|companies|jobs|press|events|handle|collections?|question)(\/|\.|$)|\/search\.\w+$|\.(pdf|docx?|pptx?|xlsx?)$/i;
+export const JUNK_PATH = /\/(news|blogs?|articles?|posts?|category|categories|tags?|search|results|directory|listings?|wiki|forum|questions?|profiles?|biz|business(es)?|companies|jobs|press|events|handle|collections?|question)(\/|\.|$)|\/search\.\w+$|\.(pdf|docx?|pptx?|xlsx?)$/i;
 /** A title that reads like an article, a list or a lookup result rather than a company name. */
-const JUNK_TITLE = /^(top|best|\d+)\s|\bhow to\b|\bwhat is\b|\blist of\b|\bdirectory\b|\byellow pages\b|\bsearch results\b|\bfor sale\b|\bsought\b|\binvestment opportunit|\breviews?\b|\bguide\b|\bways\b|\btips\b|\bwikipedia\b|\bwhois\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b[^|]{0,12}\b(19|20)\d\d\b|^\d{1,2}(st|nd|rd|th)\b/i;
+export const JUNK_TITLE = /^(top|best|\d+)\s|\bhow to\b|\bwhat is\b|\blist of\b|\bdirectory\b|\byellow pages\b|\bsearch results\b|\bfor sale\b|\bsought\b|\binvestment opportunit|\breviews?\b|\bguide\b|\bways\b|\btips\b|\bwikipedia\b|\bwhois\b|\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b[^|]{0,12}\b(19|20)\d\d\b|^\d{1,2}(st|nd|rd|th)\b/i;
 const GENERIC_TITLES = new Set(["description", "products", "home", "index", "untitled", "browser", "blogs collection", "page not found"]);
 
 /**

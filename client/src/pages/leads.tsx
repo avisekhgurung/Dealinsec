@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ChevronRight, Crosshair, FileUp, Plus, Search, Target, X } from "lucide-react";
+import { ChevronRight, Crosshair, FileUp, Plus, Radar, Search, Target, X } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { IdealClientDialog } from "@/components/leads/ideal-client-dialog";
@@ -74,6 +74,9 @@ export default function LeadsPage() {
             </div>
             <div className="flex items-center gap-2">
               <NotificationBell className="lg:hidden" />
+              <Button size="sm" variant="outline" asChild data-testid="link-outbound">
+                <Link href="/outbound" aria-label="AI Outbound: find new prospects"><Radar className="h-4 w-4 lg:mr-1.5" /><span className="hidden lg:inline">AI Outbound</span></Link>
+              </Button>
               {canEdit && (
                 <Button size="sm" variant="outline" onClick={() => setImportOpen(true)} aria-label="Import leads from a CSV" data-testid="button-import-leads">
                   <FileUp className="h-4 w-4 lg:mr-1.5" /><span className="hidden lg:inline">Import</span>

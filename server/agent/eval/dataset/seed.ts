@@ -9,7 +9,7 @@ import { chunkText } from "@shared/knowledge";
 import { createWorld, seedContract, seedDeal, seedInvoice, seedLead, seedProfile, seedQuote, userRow, ORG1, ORG2, type Row, type World } from "../world";
 import type { WorldSpec } from "./schema";
 
-export type Refs = { deal: Record<string, number>; invoice: Record<string, number>; contract: Record<string, number>; lead: Record<string, number> };
+export type Refs = { deal: Record<string, number>; invoice: Record<string, number>; contract: Record<string, number>; lead: Record<string, number>; prospect: Record<string, number> };
 
 const DAY = 86_400_000;
 // Dates are the seeded organization's calendar days (India), not UTC days: the two differ for ~5.5 hours every evening.
@@ -30,7 +30,7 @@ const seedHash = createHash("sha256").update(`${SEED_SUBJECT.trim()}\n${SEED_BOD
 
 export function buildWorld(spec: WorldSpec): { world: World; user: Row; refs: Refs } {
   const world = createWorld();
-  const refs: Refs = { deal: {}, invoice: {}, contract: {}, lead: {} };
+  const refs: Refs = { deal: {}, invoice: {}, contract: {}, lead: {}, prospect: {} };
 
   world.orgs.get(ORG1)!.audience = spec.audience === "client_work" ? null : spec.audience;
   if (spec.plan === "free") world.billing.set(ORG1, { id: "u1", plan: "free" });
@@ -77,6 +77,26 @@ export function buildWorld(spec: WorldSpec): { world: World; user: Row; refs: Re
       } as any);
     }
   }
+  if ((spec.prospects ?? []).length) {
+    const t0 = new Date();
+    const ICP = { industry: "digital marketing agency", keywords: [], countries: ["US"], locations: [], employeeMin: 5, employeeMax: 30, targetMarket: ["SaaS"], roles: ["Founder"], exclusions: [], quantity: 5 };
+    world.outbound.runs.push({ id: "pr_seed1", organizationId: ORG1, createdByUser: "u1", createdBy: "user", request: "x", icp: ICP, quantity: 5, status: "done", stage: "done", counters: { discovered: (spec.prospects ?? []).length, verified: (spec.prospects ?? []).filter((x) => x.status !== "rejected").length, icpMatch: (spec.prospects ?? []).filter((x) => x.status === "ready").length, ready: (spec.prospects ?? []).filter((x) => x.status === "ready").length, signals: (spec.prospects ?? []).filter((x) => x.signal).length, decisionMakers: (spec.prospects ?? []).filter((x) => x.person).length }, queries: [], costMicroUsd: 0, errorCode: null, idemKey: "k", leaseUntil: null, attempts: 1, createdAt: t0, updatedAt: t0, finishedAt: t0 });
+    (spec.prospects ?? []).forEach((p, idx) => {
+      const id = idx + 1;
+      const rejected = p.status === "rejected";
+      const ready = p.status === "ready";
+      world.outbound.prospects.push({ id, organizationId: ORG1, domain: p.domain, name: p.name, website: `https://${p.domain}`, status: p.status, rejectReason: p.rejectReason ?? null, sources: [], profile: {}, fit: rejected ? null : { verdict: "strong", headline: "Matches what you're looking for.", signals: [] },
+        score: p.score === undefined ? null : { total: p.score, max: 100, knownMax: 80, unknownPoints: 20, confidence: "high", components: [{ key: "fit", label: "Company fit", max: 20, points: 20, reason: "Matches" }], missing: [], readyMissing: [] },
+        angle: null, ready, contentHash: null, verifiedAt: t0, researchedAt: t0, leadId: p.lead ? refs.lead[p.lead] ?? null : null, createdAt: t0, updatedAt: t0 });
+      world.outbound.items.push({ id, runId: "pr_seed1", organizationId: ORG1, prospectId: id, rank: 10 - idx, stage: rejected ? "rejected" : "done", attempts: 0, errorCode: rejected ? p.rejectReason ?? "poor_fit" : null, nextAttemptAt: null, updatedAt: t0 });
+      refs.prospect[p.ref] = id;
+      const add = (kind: string, type: string, value: string, o: Record<string, unknown> = {}) => world.outbound.findings.push({ id: world.outbound.findings.length + 1, organizationId: ORG1, prospectId: id, kind, type, value, status: "confirmed", sourceUrl: `https://${p.domain}/about`, sourceType: "website", quote: value.slice(0, 120).padEnd(8, "."), contentHash: null, observedAt: null, confidence: "high", supportingIds: [], meta: {}, batch: "research", retrievedAt: t0, ...o });
+      if (p.signal) add("signal", "HIRING", p.signal, { observedAt: new Date(t0.getTime() - 3 * 86_400_000) });
+      if (p.person) add("decision_maker", "Head of Growth", p.person, { meta: { name: p.person.split(",")[0], title: "Head of Growth", rank: 0, email: null, emailStatus: null } });
+      if (p.opportunity) add("opportunity", "opportunity", p.opportunity, { status: "inferred", sourceUrl: null, sourceType: "derived", quote: null, confidence: "medium" });
+      if (p.fact) add("fact", "description", p.fact, { batch: "enrich" });
+    });
+  }
   for (const m of spec.messages ?? []) {
     const now = new Date();
     world.messages.push({ id: world.messages.length + 1, leadId: refs.lead[m.lead], organizationId: ORG1, direction: "out", channel: "manual", subject: SEED_SUBJECT, body: SEED_BODY, bodyHash: seedHash, toAddress: m.to, toSource: "site", status: m.status, researchId: null, claimIds: [], promptVersion: "draft-v1", edited: false, createdBy: "agent", createdByUser: "u1", approvedBy: m.status === "draft" ? null : "u1", approvedAt: m.status === "draft" ? null : now, sentAt: m.status === "sent" ? now : null, createdAt: now, updatedAt: now });
@@ -94,7 +114,7 @@ export function buildWorld(spec: WorldSpec): { world: World; user: Row; refs: Re
 /** Replace `{{deal.acme}}`, `{{invoice.inv1}}`, `{{contract.c1}}`, `{{lead.north}}` anywhere in a JSON-like value. */
 export function resolveRefs<T>(value: T, refs: Refs): T {
   const sub = (s: string) =>
-    s.replace(/\{\{(deal|invoice|contract|lead)\.([a-z][a-z0-9_]*)\}\}/g, (_m, kind: keyof Refs, name: string) => {
+    s.replace(/\{\{(deal|invoice|contract|lead|prospect)\.([a-z][a-z0-9_]*)\}\}/g, (_m, kind: keyof Refs, name: string) => {
       const id = refs[kind][name];
       if (id === undefined) throw new Error(`dataset placeholder {{${kind}.${name}}} has no matching record`);
       return String(id);
@@ -107,5 +127,5 @@ export function resolveRefs<T>(value: T, refs: Refs): T {
 /** A comparable fingerprint of everything the agent could change. */
 export function snapshotWorld(w: World): string {
   const strip = (rows: Row[]) => rows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== "createdAt")));
-  return JSON.stringify({ deals: strip(w.deals), quotes: strip(w.quotes), contracts: strip(w.contracts), invoices: strip(w.invoices), leads: strip(w.leads.leads as any), tickets: strip(w.leads.tickets as any), claims: strip(w.leads.claims as any), events: w.leads.events.length, messages: strip(w.messages), research: strip(w.research), llmCalls: w.llmCalls.length, profiles: Array.from(w.profiles.values()).map((p) => ({ ...p, updatedAt: 0 })), knowledge: strip(w.knowledge.sources).map((r: any) => r.id).concat(w.knowledge.chunks.length as any), orgs: Array.from(w.orgs.values()), users: Array.from(w.users.values()) });
+  return JSON.stringify({ deals: strip(w.deals), quotes: strip(w.quotes), contracts: strip(w.contracts), invoices: strip(w.invoices), leads: strip(w.leads.leads as any), tickets: strip(w.leads.tickets as any), claims: strip(w.leads.claims as any), events: w.leads.events.length, outbound: { runs: strip(w.outbound.runs), prospects: strip(w.outbound.prospects), items: strip(w.outbound.items), findings: w.outbound.findings.length }, messages: strip(w.messages), research: strip(w.research), profiles: Array.from(w.profiles.values()).map((p) => ({ ...p, updatedAt: 0 })), knowledge: strip(w.knowledge.sources).map((r: any) => r.id).concat(w.knowledge.chunks.length as any), orgs: Array.from(w.orgs.values()), users: Array.from(w.users.values()) });
 }

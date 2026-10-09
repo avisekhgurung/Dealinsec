@@ -1407,3 +1407,119 @@ export const leadMessages = pgTable("lead_messages", {
 }));
 export type LeadMessageRow = typeof leadMessages.$inferSelect;
 
+
+// ── AI Outbound: prospect discovery and intelligence (docs/ai-outbound-engine-architecture.md) ──
+// A search result is NOT a lead. A run discovers companies (prospects), verifies and researches them, and the person
+// adds the good ones to Leads. All five tables are additive (script/migrate-prospects.ts); timestamps are written from
+// the application in UTC. Every query is scoped by organization.
+
+/** One discovery run, which is also its own durable job (the lease columns). */
+export const prospectRuns = pgTable("prospect_runs", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  createdByUser: varchar("created_by_user").notNull(),
+  createdBy: varchar("created_by", { length: 8 }).notNull().default("user"), // user | agent
+  request: text("request").notNull(),
+  icp: jsonb("icp").notNull(),
+  quantity: integer("quantity").notNull(),
+  status: varchar("status", { length: 12 }).notNull(), // running | done | failed | cancelled
+  stage: varchar("stage", { length: 16 }).notNull(), // search | verify | enrich | research | finalize | done
+  counters: jsonb("counters").notNull().default(sql`'{}'::jsonb`),
+  queries: jsonb("queries").notNull().default(sql`'[]'::jsonb`),
+  costMicroUsd: integer("cost_micro_usd").notNull().default(0),
+  errorCode: varchar("error_code", { length: 30 }),
+  idemKey: varchar("idem_key", { length: 64 }).notNull(),
+  leaseUntil: timestamp("lease_until"),
+  attempts: integer("attempts").notNull().default(0),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+  finishedAt: timestamp("finished_at"),
+}, (t) => ({
+  orgIdx: index("prospect_runs_org_idx").on(t.organizationId, t.createdAt),
+}));
+export type ProspectRunRow = typeof prospectRuns.$inferSelect;
+
+/** One company per organization and registrable domain, shared by every run that finds it. */
+export const prospects = pgTable("prospects", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  domain: varchar("domain", { length: 253 }).notNull(),
+  name: varchar("name", { length: 120 }).notNull(),
+  website: varchar("website", { length: 300 }).notNull(),
+  status: varchar("status", { length: 12 }).notNull(), // candidate | verified | enriched | qualified | ready | rejected
+  rejectReason: varchar("reject_reason", { length: 40 }),
+  sources: jsonb("sources").notNull().default(sql`'[]'::jsonb`), // provenance: [{provider, query, url, title, at}]
+  profile: jsonb("profile").notNull().default(sql`'{}'::jsonb`), // structured company fields, each {value, source, findingId?}
+  fit: jsonb("fit"),
+  score: jsonb("score"),
+  angle: jsonb("angle"),
+  ready: boolean("ready").notNull().default(false),
+  contentHash: varchar("content_hash", { length: 64 }),
+  verifiedAt: timestamp("verified_at"),
+  researchedAt: timestamp("researched_at"),
+  leadId: integer("lead_id"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  orgDomain: uniqueIndex("prospects_org_domain_uq").on(t.organizationId, t.domain),
+}));
+export type ProspectRow = typeof prospects.$inferSelect;
+
+/** Which prospects a run found, how far each got in that run, and whether it failed there. */
+export const prospectRunItems = pgTable("prospect_run_items", {
+  id: serial("id").primaryKey(),
+  runId: varchar("run_id", { length: 40 }).notNull(),
+  organizationId: varchar("organization_id").notNull(),
+  prospectId: integer("prospect_id").notNull(),
+  rank: integer("rank").notNull().default(0),
+  stage: varchar("stage", { length: 12 }).notNull(), // found | verified | enriched | researched | done | rejected | failed
+  attempts: integer("attempts").notNull().default(0),
+  errorCode: varchar("error_code", { length: 30 }),
+  nextAttemptAt: timestamp("next_attempt_at"),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  runProspect: uniqueIndex("prospect_run_items_run_prospect_uq").on(t.runId, t.prospectId),
+  runStage: index("prospect_run_items_run_stage_idx").on(t.runId, t.stage),
+}));
+export type ProspectRunItemRow = typeof prospectRunItems.$inferSelect;
+
+/** Evidence-first findings about a prospect: facts, buying signals, decision makers and opportunities. */
+export const prospectFindings = pgTable("prospect_findings", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  prospectId: integer("prospect_id").notNull(),
+  kind: varchar("kind", { length: 16 }).notNull(), // fact | signal | decision_maker | opportunity
+  type: varchar("type", { length: 40 }).notNull(), // field name, signal type, role, or "opportunity"
+  value: varchar("value", { length: 400 }).notNull(),
+  status: varchar("status", { length: 12 }).notNull(), // confirmed | inferred | unknown | conflicting
+  sourceUrl: varchar("source_url", { length: 500 }),
+  sourceType: varchar("source_type", { length: 12 }).notNull(), // website | provider | search | derived
+  quote: varchar("quote", { length: 500 }),
+  contentHash: varchar("content_hash", { length: 64 }),
+  observedAt: timestamp("observed_at"), // the date the evidence itself states (a job posted, a launch), for freshness
+  confidence: varchar("confidence", { length: 8 }).notNull().default("medium"), // high | medium | low
+  supportingIds: jsonb("supporting_ids").notNull().default(sql`'[]'::jsonb`),
+  meta: jsonb("meta").notNull().default(sql`'{}'::jsonb`),
+  batch: varchar("batch", { length: 60 }).notNull(), // the step that wrote it; rewriting a step replaces its batch
+  retrievedAt: timestamp("retrieved_at").notNull(),
+}, (t) => ({
+  prospectIdx: index("prospect_findings_prospect_idx").on(t.prospectId, t.kind),
+}));
+export type ProspectFindingRow = typeof prospectFindings.$inferSelect;
+
+/** Non-LLM provider usage (search, enrichment, page reading services): what allowances and run cost are counted from. */
+export const providerCalls = pgTable("provider_calls", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  runId: varchar("run_id", { length: 40 }),
+  provider: varchar("provider", { length: 24 }).notNull(),
+  operation: varchar("operation", { length: 24 }).notNull(), // search | company | contact | page
+  ok: boolean("ok").notNull(),
+  errorCode: varchar("error_code", { length: 30 }),
+  latencyMs: integer("latency_ms").notNull().default(0),
+  costMicroUsd: integer("cost_micro_usd").notNull().default(0),
+  createdAt: timestamp("created_at").notNull(),
+}, (t) => ({
+  orgDayIdx: index("provider_calls_org_created_idx").on(t.organizationId, t.createdAt),
+}));
+export type ProviderCallRow = typeof providerCalls.$inferSelect;

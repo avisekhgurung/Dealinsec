@@ -134,7 +134,7 @@
         "core"
       ],
       "turns": [
-        "Find me 5 companies that need a website redesign and add them as leads."
+        "Do a quick web search for 5 companies that need a website redesign and add them as leads."
       ],
       "expect": [
         {

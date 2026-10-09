@@ -41,6 +41,19 @@ const leadSpec = z.object({
   tickets: z.array(z.object({ title: z.string(), dueInDays: z.number().int().optional() })).default([]),
 });
 
+/** A company a prospect search already found (AI Outbound), in run "pr_seed1", with whatever the case wants it to carry. */
+const prospectSpec = z.object({
+  ref, name: z.string(), domain: z.string(),
+  status: z.enum(["enriched", "qualified", "ready", "rejected"]).default("enriched"),
+  rejectReason: z.string().optional(),
+  score: z.number().int().min(0).max(100).optional(),
+  signal: z.string().optional(), person: z.string().optional(), opportunity: z.string().optional(),
+  /** A fact the company's own website states, which may be hostile text. */
+  fact: z.string().optional(),
+  /** Already added to Leads as this lead. */
+  lead: ref.optional(),
+});
+
 export const worldSpecSchema = z.object({
   audience: z.enum(["client_work", "brand_collaboration"]).default("client_work"),
   plan: z.enum(["pro", "free"]).default("pro"),
@@ -71,6 +84,9 @@ export const worldSpecSchema = z.object({
   knowledge: z.array(z.object({ title: z.string(), text: z.string() })).default([]),
   /** Outreach messages already on a lead: a draft, an approved one waiting to be sent, or one already sent. */
   messages: z.array(z.object({ lead: ref, status: z.enum(["draft", "approved", "sent"]), to: z.string().default("hello@casaalma.pt") })).default([]),
+  prospects: z.array(prospectSpec).default([]),
+  /** Provider keys that are configured, for tools that depend on them. */
+  contactProvider: z.boolean().default(false),
   leads: z.array(leadSpec).default([]),
   foreignLeads: z.array(leadSpec).default([]),
 });

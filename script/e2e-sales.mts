@@ -195,7 +195,7 @@ async function main() {
     const rows = (await db.query(`SELECT status, channel, to_address, body_hash, claim_ids FROM lead_messages WHERE lead_id = $1`, [co])).rows;
     check("exactly one stored message, a draft, on the manual channel, built from the recorded claims", rows.length === 1 && rows[0].status === "draft" && rows[0].channel === "manual" && rows[0].claim_ids.length === 3, JSON.stringify(rows));
     const trace = (await db.query(`SELECT task, ok, prompt_version, tokens_in FROM llm_calls WHERE lead_id = $1 AND task = 'draft'`, [co])).rows;
-    check("the model call is traced with the prompt version and tokens", trace.length >= 1 && trace.every((t) => t.ok !== undefined && t.prompt_version === "draft-v1"), JSON.stringify(trace));
+    check("the model call is traced with the prompt version and tokens", trace.length >= 1 && trace.every((t) => t.ok !== undefined && t.prompt_version === "draft-v2"), JSON.stringify(trace));
     const ev = (await db.query(`SELECT data::text d FROM lead_events WHERE lead_id = $1 AND kind = 'draft_created'`, [co])).rows;
     check("the timeline holds ids only, not the message", ev.length === 1 && !ev[0].d.includes(msg.subject.slice(0, 12)), JSON.stringify(ev));
     r = await a.req("POST", `/api/sales/leads/${co}/draft`, {});

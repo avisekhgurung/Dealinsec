@@ -118,6 +118,14 @@ const TOOL_LABELS: Record<string, string> = {
   get_outreach_draft: "the message",
   approve_outreach: "the message approval",
   mark_outreach_sent: "the sent message",
+  parse_icp: "who you want to reach",
+  discover_prospects: "the prospect search",
+  get_discovery_run: "the prospect search",
+  get_prospect_intelligence: "the company brief",
+  research_prospect: "the research",
+  find_decision_maker: "the people there",
+  get_outreach_angle: "the outreach angle",
+  add_prospect_to_leads: "the lead",
 };
 export const toolLabel = (tool: unknown): string => TOOL_LABELS[String(tool)] ?? "that";
 
@@ -158,6 +166,11 @@ const APPROVE_LABELS: Record<string, string> = {
   draft_outreach: "Write draft",
   approve_outreach: "Approve message",
   mark_outreach_sent: "Record as sent",
+  discover_prospects: "Start search",
+  research_prospect: "Research",
+  find_decision_maker: "Look up",
+  get_outreach_angle: "Write angle",
+  add_prospect_to_leads: "Add lead",
 };
 export const approveLabel = (tool: unknown): string => APPROVE_LABELS[String(tool)] ?? "Approve";
 

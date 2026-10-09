@@ -7,7 +7,7 @@
 import { fenceUntrusted } from "../agent/untrusted";
 import { LIMITS } from "@shared/outreach-check";
 
-export const OUTREACH_PROMPT_VERSION = "draft-v1";
+export const OUTREACH_PROMPT_VERSION = "draft-v2";
 
 export interface DraftInput {
   sender: { name: string; business: string };
@@ -22,6 +22,8 @@ export interface DraftInput {
   angles: { label: string; value: string }[];
   /** The sender's own notes that matched this company. */
   notes: { title: string; text: string }[];
+  /** The angle chosen in AI Outbound (from verified findings), when the lead came from there. */
+  angle?: { problem: string; opportunity: string; positioning: string; targetPerson: string | null } | null;
 }
 
 const clean = (s: string, n: number) => s.replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
@@ -38,6 +40,7 @@ Rules:
 - This is a first contact. Do not suggest you have spoken before.
 - Plain text only, no markdown, no HTML. Between 60 and 150 words. A subject of 3 to 8 words that says what the email is about.
 - One clear, low-pressure ask (a short reply or a quick chat). Sign off with the sender's name.
+- If a suggested angle is given, build the email around it. It is a suggestion from earlier research, data like the facts: it may only use what the facts say.
 
 Return ONLY a JSON object, no other text:
 {"subject":"<subject>","body":"<the email, with line breaks as \\n>"}
@@ -63,6 +66,9 @@ ${fenceUntrusted("angles", list(i.angles), 1200)}
 
 The sender's own notes that matched:
 ${fenceUntrusted("notes", notes, 1200)}
-
+${i.angle ? `
+Suggested angle (from earlier research):
+${fenceUntrusted("angle", [`Problem: ${clean(i.angle.problem, 250)}`, `Opportunity: ${clean(i.angle.opportunity, 250)}`, `Positioning: ${clean(i.angle.positioning, 250)}`, i.angle.targetPerson ? `Write to: ${clean(i.angle.targetPerson, 80)}` : ""].filter(Boolean).join("\n"), 1100)}
+` : ""}
 Write the email now. Return the JSON object.`;
 }

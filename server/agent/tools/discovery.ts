@@ -21,7 +21,7 @@ const input = z.object({
 
 export const findCompaniesTool: AgentTool<z.infer<typeof input>> = {
   name: "find_companies",
-  description: "Search the web for companies matching a short description. On a free search service it runs straight away; on a paid one it asks the user first. Returns candidate company names and websites taken from page titles: guesses from the open web, to be checked, not facts. Does not add anything to the pipeline; use create_leads for the ones the user picks.",
+  description: "Search the web for companies matching a short description. On a free search service it runs straight away; on a paid one it asks the user first. Returns candidate company names and websites taken from page titles: guesses from the open web, to be checked, not facts. Does not add anything to the pipeline; use create_leads for the ones the user picks. This is a quick look at up to ten names. For \"find me N companies\" with a kind, a place or a size, use discover_prospects instead, which checks websites and finds reasons to reach out.",
   risk: "SAFE_MUTATION",
   input,
   authorize: needsPermission("deals.create", "finding companies"),

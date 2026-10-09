@@ -148,6 +148,7 @@ export async function draftOutreach(user: Who, leadId: number, opts: { by?: "use
     offer: ideal.ok ? { about: ideal.profile.about, services: ideal.profile.services } : { about: null, services: [] },
     company: lead.companyName, greetName: lead.contactName?.trim() || null,
     facts, angles, notes: notes.map((n) => ({ title: n.title, text: n.text })),
+    angle: await import("../outbound/lead-angle").then((m) => m.angleForLead(orgId, leadId)).catch(() => null),
   };
   const ctx = { to: to.address, siteHost: siteHost(lead.domain || (() => { try { return new URL(lead.website ?? "").hostname; } catch { return ""; } })()) };
   const trace = { task: "draft" as const, orgId, userId: user.id, leadId, promptVersion: OUTREACH_PROMPT_VERSION };

@@ -50,7 +50,7 @@ export const quoteInPage = (quote: string, pageText: string): boolean => {
   return q.length >= LIMITS.quoteMin && normalizeForQuote(pageText).includes(q);
 };
 // eslint-disable-next-line no-control-regex
-const cleanLine = (s: string) => s.replace(/[\u0000-\u001f\u007f<>]/g, " ").replace(/\s+/g, " ").trim();
+export const cleanLine = (s: string) => s.replace(/[\u0000-\u001f\u007f<>]/g, " ").replace(/\s+/g, " ").trim();
 
 /** Phrases that read like an instruction to an AI. A page can contain them; a stored fact should not. */
 const INJECTION = /(ignore|disregard|forget|override)\s+(all\s+|any\s+|the\s+|your\s+)?(previous|prior|above|earlier|system)|system\s+(prompt|override|message)|you\s+are\s+(now\s+)?(an?\s+)?(ai|assistant|language model|chatgpt)|as\s+an?\s+ai\b|new\s+instructions?\b|<\/?untrusted|reveal\s+(your|the)\s+(prompt|instructions)/i;
@@ -59,13 +59,14 @@ export const injectionLike = (s: string): boolean => INJECTION.test(s);
 export const siteHost = (h: string): string => h.trim().toLowerCase().replace(/\.$/, "").replace(/^www\./, "");
 /** The same site: equal hosts, ignoring a leading www. */
 export const sameSite = (a: string, b: string): boolean => siteHost(a) === siteHost(b);
-const onSite = (host: string, site: string) => siteHost(host) === siteHost(site) || siteHost(host).endsWith(`.${siteHost(site)}`);
+export const onSite = (host: string, site: string) => siteHost(host) === siteHost(site) || siteHost(host).endsWith(`.${siteHost(site)}`);
 const digits = (s: string) => s.replace(/\D/g, "");
 
 // ── finding-specific checks ────────────────────────────────────────────────
 
 const EMAIL = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i;
-function checkContact(field: ResearchField, value: string, quote: string, site: string): boolean {
+/** Field-specific checks on a quoted contact detail (exported for the prospect validators, shared/prospect-intel.ts). */
+export function checkContact(field: ResearchField, value: string, quote: string, site: string): boolean {
   const q = normalizeForQuote(quote).toLowerCase();
   switch (field) {
     case "business_email": {

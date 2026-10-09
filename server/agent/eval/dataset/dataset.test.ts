@@ -51,6 +51,6 @@ describe("seeding", () => {
     expect(snapshotWorld(world)).not.toBe(before);
   });
   it("an unknown placeholder fails loudly", () => {
-    expect(() => resolveRefs("{{deal.nope}}", { deal: {}, invoice: {}, contract: {}, lead: {} })).toThrow(/no matching record/);
+    expect(() => resolveRefs("{{deal.nope}}", { deal: {}, invoice: {}, contract: {}, lead: {}, prospect: {} })).toThrow(/no matching record/);
   });
 });
