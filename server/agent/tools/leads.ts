@@ -24,7 +24,7 @@ import {
 import { prospectMatch, prospectsNamed } from "../../outbound/lead-angle";
 import { allOf, needsPermission, needsRead } from "../policy";
 import type { AgentTool, ToolContext, ToolOutcome } from "../types";
-import { dateLabel, fail, money, settingsFor } from "./shared";
+import { dateLabel, fail, money, safeName, settingsFor } from "./shared";
 
 const canWrite = needsPermission("deals.create", "changing leads");
 const readLeads = needsRead("deals");
@@ -152,8 +152,8 @@ const createLeadTool: AgentTool<z.infer<z.ZodObject<typeof leadFields>>> = {
     const hit = await prospectMatch(who(ctx).organizationId, { companyName: String(input.companyName ?? ""), website: input.website });
     if (hit && !hit.leadId) {
       return hit.rejectLabel
-        ? { ok: false, code: "prospect_set_aside", message: `${hit.name} was found by a prospect search and set aside (${hit.rejectLabel}), so it isn't added automatically. Tell the user why; they can add it themselves from the Leads page if they still want it.` }
-        : { ok: false, code: "is_prospect", message: `${hit.name} is already one of the user's prospects (id ${hit.id}). Call add_prospect_to_leads with prospectId ${hit.id} now, in this turn: the approval card is the user's confirmation, so don't ask first. It brings the evidence along.` };
+        ? { ok: false, code: "prospect_set_aside", message: `${safeName(hit.name)} was found by a prospect search and set aside (${hit.rejectLabel}), so it isn't added automatically. Tell the user why; they can add it themselves from the Leads page if they still want it.` }
+        : { ok: false, code: "is_prospect", message: `${safeName(hit.name)} is already one of the user's prospects (id ${hit.id}). Call add_prospect_to_leads with prospectId ${hit.id} now, in this turn: the approval card is the user's confirmation, so don't ask first. It brings the evidence along.` };
     }
     const r = await prepareNewLead(who(ctx), input);
     if (!r.ok) return { ok: false, code: r.code, message: r.message, ...(typeof r.existingId === "number" ? { route: route(r.existingId) } : {}) };

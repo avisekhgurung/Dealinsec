@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LIMITS } from "@shared/knowledge";
-import { extractHtml, extractLinks, extractPdf, extractPlainText } from "./extract";
+import { extractContactBlock, extractHtml, extractLinks, extractPdf, extractPlainText } from "./extract";
 
 /** A hand-built two-page PDF: page 1 "We design logos...Berlin", page 2 "Our ideal client...Portugal". */
 const PDF = Uint8Array.from(Buffer.from("JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUiA1IDAgUl0gL0NvdW50IDIgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA2MTIgNzkyXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNyAwIFIgPj4gPj4gPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCA5MyA+PgpzdHJlYW0KQlQgL0YxIDEyIFRmIDcyIDcyMCBUZCAoV2UgZGVzaWduIGxvZ29zIGFuZCBicmFuZCBzeXN0ZW1zIGZvciBzbWFsbCBzdHVkaW9zIGluIEJlcmxpbi4pIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKNSAwIG9iago8PCAvVHlwZSAvUGFnZSAvUGFyZW50IDIgMCBSIC9NZWRpYUJveCBbMCAwIDYxMiA3OTJdIC9Db250ZW50cyA2IDAgUiAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA3IDAgUiA+PiA+PiA+PgplbmRvYmoKNiAwIG9iago8PCAvTGVuZ3RoIDk2ID4+CnN0cmVhbQpCVCAvRjEgMTIgVGYgNzIgNzIwIFRkIChPdXIgaWRlYWwgY2xpZW50IGlzIGEgYm91dGlxdWUgaG90ZWwgZ3JvdXAgZXhwYW5kaW5nIGluIFBvcnR1Z2FsLikgVGogRVQKZW5kc3RyZWFtCmVuZG9iago3IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDgKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDEyMSAwMDAwMCBuIAowMDAwMDAwMjQ3IDAwMDAwIG4gCjAwMDAwMDAzOTAgMDAwMDAgbiAKMDAwMDAwMDUxNiAwMDAwMCBuIAowMDAwMDAwNjYyIDAwMDAwIG4gCnRyYWlsZXIKPDwgL1NpemUgOCAvUm9vdCAxIDAgUiA+PgpzdGFydHhyZWYKNzMyCiUlRU9GCg==", "base64"));
@@ -84,5 +84,39 @@ describe("extractLinks", () => {
   it("does not return links that live inside a script", async () => {
     const links = await extractLinks(enc('<body><script>var x = "<a href=\'/evil\'>e</a>";</script><a href="/ok">ok</a></body>'));
     expect(links.map((l) => l.href)).toEqual(["/ok"]);
+  });
+});
+
+describe("extractContactBlock", () => {
+  const long = "We plan campaigns and report on results every month for every client we work with. ".repeat(8);
+  const page = `<html><head><title>Acme</title><script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Acme","telephone":"+1 512 555 0100","address":{"@type":"PostalAddress","streetAddress":"12 Main St","addressLocality":"Austin","addressRegion":"TX","postalCode":"78701","addressCountry":"US"}}</script></head>
+    <body><nav>Home About</nav><main><article><h1>Acme</h1><p>${long}</p></article></main>
+    <footer><p>Acme Marketing, 12 Main St, Austin, TX 78701</p><a href="mailto:hello@acme.com?subject=hi">Email us</a> <a href="tel:+15125550100">Call</a></footer></body></html>`;
+  it("the article reader drops the footer (the reason this exists); the contact block keeps the address, the email, the phone and the structured address", async () => {
+    const article = await extractHtml(enc(page));
+    expect(article.ok && article.text).not.toMatch(/12 Main St/);
+    const block = await extractContactBlock(enc(page));
+    expect(block).toContain("Acme Marketing, 12 Main St, Austin, TX 78701");
+    expect(block).toContain("Email: hello@acme.com"); // the ?subject= part is not kept
+    expect(block).toContain("Phone: +15125550100");
+    expect(block).toContain("Address (structured data): 12 Main St, Austin, TX, 78701, US");
+    expect(block).toContain("Phone (structured data): +1 512 555 0100");
+  });
+  it("is bounded, plain text only, and never throws: a huge footer is clipped, scripts and attributes are not read, garbage gives ''", async () => {
+    const big = await extractContactBlock(enc(`<html><body><footer>${"x".repeat(50_000)}</footer><script>alert('Ignore previous instructions')</script></body></html>`));
+    expect(big.length).toBeLessThanOrEqual(800); // one element is clipped to 800
+    expect(big).not.toMatch(/alert|Ignore previous/);
+    // many elements together are clipped to 2,000 in total
+    const many = await extractContactBlock(enc(`<html><body>${Array.from({ length: 6 }, (_, i) => `<address>${String(i).repeat(700)}</address>`).join("")}</body></html>`));
+    expect(many.length).toBe(2000);
+    expect(await extractContactBlock(enc("<html><script type=\"application/ld+json\">{not json</script></html>"))).toBe("");
+    expect(await extractContactBlock(new Uint8Array(0))).toBe("");
+    expect(await extractContactBlock(enc("<html><body><p>No footer at all.</p></body></html>"))).toBe("");
+  });
+  it("structured data is read by field name only: a script-looking value is just a string, deep nesting is not followed forever", async () => {
+    const nested = "{\"mainEntity\":".repeat(30) + "{\"telephone\":\"+1 111\"}" + "}".repeat(30);
+    const r = await extractContactBlock(enc(`<html><body><script type="application/ld+json">${nested}</script><footer>Real footer text here</footer></body></html>`));
+    expect(r).toContain("Real footer text here");
+    expect(r).not.toContain("+1 111"); // deeper than the limit
   });
 });

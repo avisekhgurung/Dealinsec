@@ -113,7 +113,9 @@ export function cleanName(title: string, domain: string): string {
   // eslint-disable-next-line no-control-regex
   const t = String(title ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
   const segs = t.split(/\s+[|–—·•:-]\s+|\s*\|\s*/).map((s) => s.trim()).filter((s) => s.length >= 2 && !GENERIC.test(s));
-  let name = segs.find((s) => s.length <= 50) ?? "";
+  const short = segs.filter((s) => s.length <= 50);
+  // "SaaS Marketing Services | Kuno Creative" on kunocreative.com: the brand is the segment the domain spells, not the first one.
+  let name = short.find((s) => nameResemblesDomain(s, domain)) ?? short[0] ?? "";
   // Keep to ordinary name characters: whatever else a page title holds is not a company name.
   // (A removal list, not a whitelist, so names in any script survive.)
   name = name.replace(/[<>{}[\]\\`$%^*=~|/;:"@#!?_\u2000-\u2018\u201A-\u2BFF\uD800-\uDFFF\uFE00-\uFE0F]/g, "").replace(/\s+/g, " ").trim().slice(0, 50).trim();

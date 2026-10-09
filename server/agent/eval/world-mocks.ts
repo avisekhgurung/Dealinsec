@@ -204,10 +204,19 @@ export const outboundStoreMock = () => {
         const r = o().runs.filter((x) => x.status === "running" && (!x.leaseUntil || x.leaseUntil < now)).sort((a, b) => a.updatedAt - b.updatedAt)[0];
         if (!r) return null;
         r.leaseUntil = new Date(now.getTime() + leaseMs); r.attempts += 1; r.updatedAt = now;
-        return copy(r);
+        return { ...copy(r), fence: r.attempts };
       },
-      async updateRun(id: string, set: any) { ro(); const r = o().runs.find((x) => x.id === id); if (r) Object.assign(r, copy(set)); },
-      async releaseRun(id: string) { const r = o().runs.find((x) => x.id === id); if (r) r.leaseUntil = null; },
+      // Fenced like the real store: the claim number must still match and the run must still be running.
+      async updateRun(id: string, fence: number, set: any) { ro(); const r = o().runs.find((x) => x.id === id && x.attempts === fence && x.status === "running"); if (!r) return false; Object.assign(r, copy(set)); return true; },
+      async setLease(id: string, fence: number, until: Date | null) { const r = o().runs.find((x) => x.id === id && x.attempts === fence && x.status === "running"); if (!r) return false; r.leaseUntil = until; return true; },
+      async finishRun(orgId: string, id: string, fence: number, s: any) {
+        ro();
+        const r = o().runs.find((x) => x.organizationId === orgId && x.id === id && x.attempts === fence && x.status === "running");
+        if (!r) return false;
+        Object.assign(r, { stage: "done", status: s.status, counters: copy(s.counters), costMicroUsd: s.costMicroUsd, errorCode: s.errorCode, finishedAt: s.now, updatedAt: s.now, leaseUntil: null });
+        return true;
+      },
+      async nextLeaseExpiry(now: Date) { const t = o().runs.filter((x) => x.status === "running" && x.leaseUntil && x.leaseUntil > now).map((x) => x.leaseUntil.getTime()); return t.length ? new Date(Math.min(...t)) : null; },
       async setRunStatus(orgId: string, id: string, from: string, to: string, now: Date, errorCode: string | null = null) {
         const r = o().runs.find((x) => x.organizationId === orgId && x.id === id && x.status === from);
         if (!r) return false;

@@ -96,6 +96,15 @@ describe("is it the company's own site", () => {
     expect(checkSite(c, { title: "Northwind Digital | Home", text })).toEqual({ ok: true, identity: "title" });
     expect(checkSite(c, { title: "Home", text: "Welcome. ".repeat(50) + "northwind" })).toEqual({ ok: true, identity: "domain" });
     expect(checkSite(c, { title: "x", text: "short" }).reason).toBe("thin_site");
+    // the site shows the brand without the domain's corporate tail
+    const cb = { name: "Callboxinc", domain: "callboxinc.com" };
+    expect(checkSite(cb, { title: "Callbox - Leading B2B Lead Generation Agency", text: "Callbox helps software companies grow. ".repeat(12) })).toEqual({ ok: true, identity: "domain" });
+    // …but only the tail is dropped: an unrelated page, or one that shares only a short stem, is still no match
+    expect(checkSite(cb, { title: "A page about gardening", text: "Tomatoes and basil grow well in pots. ".repeat(12) }).reason).toBe("no_identity");
+    expect(checkSite({ name: "Abcinc", domain: "abcinc.com" }, { title: "ABC Rentals", text: "We rent chairs and tables for events. ".repeat(12) }).reason).toBe("no_identity"); // brand "abc" is under 4 letters
+    expect(checkSite(cb, { title: "callbox", text: "This domain is for sale. Buy this domain today! ".repeat(10) }).reason).toBe("parked");
+    // an accent on the brand is the same brand
+    expect(checkSite({ name: "Roketto", domain: "sovyn.com" }, { title: "Sōvyn l healthcare tech marketing + PR agency", text: "Sōvyn helps health tech companies grow. ".repeat(12) })).toEqual({ ok: true, identity: "domain" });
     expect(checkSite(c, { title: "northwind.com", text: "This domain is for sale. Buy this domain today! ".repeat(10) }).reason).toBe("parked");
     expect(checkSite(c, { title: "Bakery", text: "Fresh bread every morning in our shop. ".repeat(10) }).reason).toBe("no_identity");
   });

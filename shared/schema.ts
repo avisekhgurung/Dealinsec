@@ -1436,6 +1436,8 @@ export const prospectRuns = pgTable("prospect_runs", {
   finishedAt: timestamp("finished_at"),
 }, (t) => ({
   orgIdx: index("prospect_runs_org_idx").on(t.organizationId, t.createdAt),
+  // One running run per workspace and search: the same search started twice is the same run (created by script/migrate-prospects.ts).
+  oneActive: uniqueIndex("prospect_runs_one_active").on(t.organizationId, t.idemKey).where(sql`${t.status} = 'running'`),
 }));
 export type ProspectRunRow = typeof prospectRuns.$inferSelect;
 

@@ -100,3 +100,42 @@ export async function extractLinks(bytes: Uint8Array): Promise<HtmlLink[]> {
     return [];
   }
 }
+
+/**
+ * What a company's page says about WHERE and HOW to reach it: footer and address text, mailto:/tel: links, and the
+ * address fields of its schema.org structured data. extractHtml's article reader drops footers on purpose (right for
+ * articles, wrong for a company site, whose address and contact details live there). Plain text only, bounded
+ * (about 2,000 characters), nothing executed. It is page text like any other: still untrusted, still needs a quote.
+ */
+export async function extractContactBlock(bytes: Uint8Array): Promise<string> {
+  try {
+    const { parseHTML } = await import("linkedom");
+    const source = decode(bytes);
+    const { document } = parseHTML(/<html[\s>]/i.test(source) ? source : `<!doctype html><html><body>${source}</body></html>`);
+    const lines: string[] = [];
+    const add = (l: string) => { const t = cleanText(l).replace(/\s+/g, " ").trim(); if (t && !lines.includes(t)) lines.push(t); };
+    // Structured data: only a few plain string fields, found by name, never executed or followed.
+    const address = (o: any, depth = 0): void => {
+      if (!o || typeof o !== "object" || depth > 4) return;
+      if (Array.isArray(o)) { for (const x of o.slice(0, 20)) address(x, depth + 1); return; }
+      const str = (v: unknown) => (typeof v === "string" ? v : v && typeof v === "object" && typeof (v as any).name === "string" ? (v as any).name : "");
+      const a = o.address && typeof o.address === "object" ? o.address : null;
+      if (a) { const parts = [a.streetAddress, a.addressLocality, a.addressRegion, a.postalCode, a.addressCountry].map(str).filter(Boolean); if (parts.length) add(`Address (structured data): ${parts.join(", ")}`); }
+      if (typeof o.telephone === "string") add(`Phone (structured data): ${o.telephone}`);
+      if (typeof o.email === "string") add(`Email (structured data): ${o.email}`);
+      for (const k of ["@graph", "mainEntity", "publisher", "provider", "organization"]) if (o[k]) address(o[k], depth + 1);
+    };
+    for (const sc of Array.from(document.querySelectorAll('script[type="application/ld+json"]')).slice(0, 5)) {
+      try { address(JSON.parse(String(sc.textContent ?? "").slice(0, 60_000))); } catch { /* not JSON */ }
+    }
+    for (const el of Array.from(document.querySelectorAll("footer, address, [role=contentinfo]")).slice(0, 6)) add(String(el.textContent ?? "").slice(0, 800));
+    for (const a of Array.from(document.querySelectorAll('a[href^="mailto:" i], a[href^="tel:" i]')).slice(0, 8)) {
+      const href = String(a.getAttribute("href") ?? "").trim();
+      const v = decodeURIComponent(href.replace(/^(mailto|tel):/i, "").split("?")[0]).slice(0, 120);
+      if (v) add(`${/^mailto/i.test(href) ? "Email" : "Phone"}: ${v}`);
+    }
+    return lines.join("\n").slice(0, 2000);
+  } catch {
+    return "";
+  }
+}

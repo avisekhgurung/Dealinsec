@@ -8,7 +8,7 @@
  */
 import { createHash } from "node:crypto";
 import { sameSite, siteHost, type PageLink } from "@shared/research";
-import { extractHtml, extractLinks } from "../knowledge/extract";
+import { extractContactBlock, extractHtml, extractLinks } from "../knowledge/extract";
 import { fetchPublicPage, realPageIO, validatePublicUrl } from "../knowledge/net-guard";
 import { callJson, str } from "../discovery/http";
 import { DiscoveryError } from "../discovery/types";
@@ -38,7 +38,9 @@ export const builtinReader: PageReader = {
     if (r.contentType !== "html") return { ok: false, code: "not_html" };
     const ex = await extractHtml(r.bytes);
     if (!ex.ok) return { ok: false, code: "unreadable" };
-    const text = ex.text.slice(0, PAGE_TEXT_CHARS);
+    // The article reader drops footers; a company's address and contact details live there. Added as a separate, labelled block.
+    const block = await extractContactBlock(r.bytes);
+    const text = block ? `${ex.text.slice(0, Math.max(2000, PAGE_TEXT_CHARS - block.length - 40))}\n\n[Footer and contact details]\n${block}` : ex.text.slice(0, PAGE_TEXT_CHARS);
     return { ok: true, url: r.url.toString(), title: ex.title ?? "", text, links: await extractLinks(r.bytes), hash: hashOf(text) };
   },
 };

@@ -180,14 +180,19 @@ export async function relatedKnowledge(user: Who, text: string, limit = 2): Prom
     if (readGate(user)) return [];
     const terms = queryTerms(text);
     if (!terms.length) return [];
-    const rows = await store.search(user.organizationId!, terms, limit * 4);
+    // "Cryptocurrency exchange" must find a note that says "crypto": a long word is also searched by its first six letters.
+    const searchTerms = Array.from(new Set(terms.flatMap((t) => (t.length >= 8 ? [t, t.slice(0, 6)] : [t]))));
+    const rows = await store.search(user.organizationId!, searchTerms, limit * 4);
     const need = Math.min(2, terms.length);
     const stem = (t: string) => t.slice(0, Math.max(4, t.length - 2));
+    // A term counts when the note holds its stem, or a word that begins like it (the first five letters or the whole shorter word).
+    const hits = (body: string, words: string[], t: string) => body.includes(stem(t)) || words.some((w) => w.length >= 5 && t.length >= 5 && (t.startsWith(w.slice(0, 5)) && w.startsWith(t.slice(0, 5))));
     const out: RelatedNote[] = [];
     const seen = new Set<string>();
     for (const r of rows) {
       const body = r.content.toLowerCase();
-      if (terms.filter((t) => body.includes(stem(t))).length < need || seen.has(r.sourceId)) continue;
+      const words = body.split(/[^a-z0-9À-￿]+/).filter(Boolean);
+      if (terms.filter((t) => hits(body, words, t)).length < need || seen.has(r.sourceId)) continue;
       seen.add(r.sourceId);
       out.push({ title: r.title, kind: r.kind, sourceUrl: r.sourceUrl, text: r.content.slice(0, 300) });
       if (out.length >= limit) break;

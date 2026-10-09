@@ -12,10 +12,12 @@
  */
 import { contentIssues } from "./outreach-check";
 import { COUNTRIES, roleRank, type Icp } from "./icp";
+import { nameFromDomain, nameResemblesDomain } from "./discovery";
+import { normText } from "./fit";
 import { isSignalType, parseEvidenceDate, type SignalType } from "./prospect";
 import { checkContact, cleanLine, injectionLike, normalizeForQuote, quoteInPage, LIMITS as QUOTE, type ResearchPage } from "./research";
 
-export type Reason = "not_an_object" | "bad_field" | "bad_page" | "bad_value" | "bad_quote" | "quote_not_found" | "suspicious" | "invalid_contact" | "duplicate" | "bad_type" | "bad_person" | "bad_support" | "bad_text";
+export type Reason = "not_an_object" | "bad_field" | "bad_page" | "bad_value" | "bad_quote" | "quote_not_found" | "suspicious" | "invalid_contact" | "duplicate" | "bad_type" | "bad_person" | "not_staff" | "bad_support" | "bad_text";
 export interface Rejection { reason: Reason; what?: string }
 const tally = (rs: Rejection[]) => rs.reduce<Record<string, number>>((m, r) => ((m[r.reason] = (m[r.reason] ?? 0) + 1), m), {});
 
@@ -90,7 +92,21 @@ const GENERIC_PERSON = /^(our|the|meet|team|about|contact|founder|ceo|staff|lead
  * opportunity may cite them, or the new findings by their position (#n). A citation of anything else is rejected,
  * and so is an opportunity whose cited new findings were themselves rejected.
  */
-export function normalizeResearch(raw: unknown, pages: ResearchPage[], site: string, opts: { retrievedAt: Date; icp: Pick<Icp, "roles">; knownFactIds: number[] }): ResearchResult {
+/** How close (in characters of the page's text) a date has to be to the statement it dates. A post's date and its title or excerpt sit this near on a blog or news page. */
+export const DATE_NEAR_CHARS = 400;
+/** True when the date text appears on the page within DATE_NEAR_CHARS before or after the claim's quote. */
+export function dateBesideClaim(pageText: string, claimQuote: string, dateQuote: string): boolean {
+  const page = normalizeForQuote(pageText), claim = normalizeForQuote(claimQuote), date = normalizeForQuote(dateQuote);
+  if (!claim || !date) return false;
+  const c = page.indexOf(claim);
+  if (c < 0) return false;
+  for (let i = page.indexOf(date); i >= 0; i = page.indexOf(date, i + 1)) {
+    if (i + date.length >= c - DATE_NEAR_CHARS && i <= c + claim.length + DATE_NEAR_CHARS) return true;
+  }
+  return false;
+}
+
+export function normalizeResearch(raw: unknown, pages: ResearchPage[], site: string, opts: { retrievedAt: Date; icp: Pick<Icp, "roles">; knownFactIds: number[]; companyName?: string }): ResearchResult {
   const rejected: Rejection[] = [];
   const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const list = Array.isArray(obj.findings) ? (obj.findings as unknown[]).slice(0, 40) : [];
@@ -107,9 +123,10 @@ export function normalizeResearch(raw: unknown, pages: ResearchPage[], site: str
       const value = cleanLine(f.value).slice(0, 300);
       const q = quoted(f, pages, value);
       if (typeof q === "string") { rejected.push({ reason: q, what: "signal" }); return; }
-      // The date: from the quote itself, or from a second exact quote on the SAME page that states it. Never the model's say-so.
+      // The date: from the quote itself, or from a second exact quote on the SAME page that states it AND sits right beside the
+      // claim (a date elsewhere on the page, such as another post's, says nothing about THIS statement). Never the model's say-so.
       let observedAt = parseEvidenceDate(q.quote, opts.retrievedAt), dateQuote: string | null = null;
-      if (!observedAt && typeof f.date_quote === "string" && cleanLine(f.date_quote).length >= 4 && cleanLine(f.date_quote).length <= 120 && normalizeForQuote(q.page.text).includes(normalizeForQuote(f.date_quote))) {
+      if (!observedAt && typeof f.date_quote === "string" && cleanLine(f.date_quote).length >= 4 && cleanLine(f.date_quote).length <= 120 && dateBesideClaim(q.page.text, q.quote, f.date_quote)) {
         observedAt = parseEvidenceDate(f.date_quote, opts.retrievedAt);
         if (observedAt) dateQuote = cleanLine(f.date_quote);
       }
@@ -129,6 +146,11 @@ export function normalizeResearch(raw: unknown, pages: ResearchPage[], site: str
       const titleWords = words(title).filter((w) => w.length >= 3);
       const okTitle = titleWords.length >= 1 && titleWords.every((w) => qw.has(w));
       if (!okName || !okTitle) { rejected.push({ reason: "bad_person" }); return; }
+      // The page must say the person works HERE. A client quoted in a testimonial ("Sam Rivera, CEO, Orchard Labs" under a review) has a
+      // name and a role in a real quote and is still not someone at this company: the model names the employer, the code compares it.
+      const employer = typeof f.employer === "string" ? cleanLine(f.employer).slice(0, 80) : "";
+      const sameCompany = !!employer && (nameResemblesDomain(employer, site) || nameFromDomain(employer, site) || (!!opts.companyName && normText(employer) === normText(opts.companyName)));
+      if (!sameCompany) { rejected.push({ reason: "not_staff", what: "person" }); return; }
       const key = `person:${name.toLowerCase()}`;
       if (seen.has(key)) { rejected.push({ reason: "duplicate", what: "person" }); return; }
       seen.add(key); kept.set(idx, true);

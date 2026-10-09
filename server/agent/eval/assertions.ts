@@ -110,6 +110,15 @@ function check(e: Expectation, t: Trajectory): { pass: boolean; detail: string }
       const hit = t.approvals.some((a) => a.tool === e.tool && (!e.argsSubset || looseEqual(a.args, e.argsSubset)));
       return ok(hit, hit ? "" : `approvals: ${t.approvals.map((a) => `${a.tool}${JSON.stringify(a.args).slice(0, 120)}`).join("; ") || "(none)"}`);
     }
+    case "approvalAnyOf": {
+      const hit = t.approvals.some((a) => e.tools.includes(a.tool));
+      return ok(hit, hit ? "" : `approvals: ${t.approvals.map((a) => a.tool).join("; ") || "(none)"}`);
+    }
+    case "approvalArgsMustNotMatch": {
+      const re = new RegExp(e.pattern, e.flags);
+      const bad = t.approvals.filter((a) => re.test(JSON.stringify(a.args)));
+      return ok(!bad.length, bad.length ? `in the arguments of ${bad.map((a) => a.tool).join(", ")}` : "");
+    }
     case "noApproval": {
       const hit = t.approvals.filter((a) => !e.tool || a.tool === e.tool);
       return ok(!hit.length, hit.length ? `approval for ${hit.map((a) => a.tool).join(", ")}` : "");

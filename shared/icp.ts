@@ -18,7 +18,7 @@ export const icpSchema = z.object({
   /** What kind of company, in the person's words ("digital marketing agency"). */
   industry: text(80),
   /** Other words such a company uses for itself ("performance marketing", "SEO agency"). */
-  keywords: list(6, 60).default([]),
+  keywords: list(8, 60).default([]),
   /** ISO 3166-1 alpha-2 codes. */
   countries: z.array(z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/)).max(5).default([]).transform((xs) => Array.from(new Set(xs))),
   /** Regions or cities, free text ("California", "Bay Area"). */
@@ -268,6 +268,10 @@ export function prospectFit(icp: Icp, p: ProspectProfile): FitResult {
   // The kind of company is the core of the ICP: a company that isn't the kind you asked for is a weak fit, whatever else matches.
   const ind = signals.find((x) => x.key === "industry");
   if (ind?.status === "mismatch" && verdict !== "excluded") { verdict = "weak"; headline = "It isn't the kind of company you asked for."; }
+  // A country the person named is a requirement, not a preference: a company whose own site (or web address) puts it in another
+  // country is a weak fit however well the rest matches. A city or an unknown country is never a mismatch (handled above).
+  const where = signals.find((x) => x.key === "location");
+  if (where?.status === "mismatch" && icp.countries.length && verdict !== "excluded") { verdict = "weak"; headline = "It is based outside the country you asked for."; }
   const missing = signals.filter((s) => s.status === "unknown").map((s) => s.label.toLowerCase());
   return { verdict, headline, signals, excludedBy: base.excludedBy, missing };
 }

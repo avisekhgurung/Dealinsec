@@ -144,11 +144,17 @@ export function checkSite(c: Pick<Candidate, "name" | "domain">, page: { title: 
   const text = `${page.title}\n${page.text}`;
   if (PARKED.test(text.slice(0, 4000))) return { ok: false, reason: "parked" };
   if (page.text.replace(/\s+/g, " ").trim().length < 200) return { ok: false, reason: "thin_site" };
-  const t = ` ${normText(page.title)} `, body = ` ${normText(page.text.slice(0, 20000))} `;
-  const name = normText(c.name), label = c.domain.split(".")[0].toLowerCase();
+  const fold = (s: string) => s.normalize("NFKD").replace(/[\u0300-\u036f]/g, ""); // "Sōvyn" is "sovyn": a brand's accent is not a different brand
+  const t = ` ${normText(fold(page.title))} `, body = ` ${normText(fold(page.text.slice(0, 20000)))} `;
+  const name = normText(fold(c.name)), label = fold(c.domain.split(".")[0].toLowerCase());
+  // The brand a page shows is often the domain without its corporate tail (callboxinc.com -> "Callbox"). Only the legal
+  // and "group"-style tails count, and the rest must still be 4+ letters; thin and parked pages were rejected above.
+  const brand = label.replace(/(inc|llc|ltd|corp|co|hq|group|usa)$/, "");
   if (name.length >= 2 && t.includes(` ${name} `)) return { ok: true, identity: "title" };
   if (name.length >= 3 && body.includes(` ${name} `)) return { ok: true, identity: "text" };
-  if (label.length >= 4 && (t.replace(/ /g, "").includes(label) || body.replace(/ /g, "").includes(label))) return { ok: true, identity: "domain" };
+  const tight = t.replace(/ /g, ""), bodyTight = body.replace(/ /g, "");
+  if (label.length >= 4 && (tight.includes(label) || bodyTight.includes(label))) return { ok: true, identity: "domain" };
+  if (brand !== label && brand.length >= 4 && (tight.includes(brand) || bodyTight.includes(brand))) return { ok: true, identity: "domain" };
   return { ok: false, reason: "no_identity" };
 }
 
@@ -164,7 +170,7 @@ export const SIGNAL_LABEL: Record<SignalType, string> = {
 export const isSignalType = (x: unknown): x is SignalType => typeof x === "string" && (SIGNAL_TYPES as readonly string[]).includes(x);
 
 export type Freshness = "strong" | "medium" | "weak" | "stale" | "unknown";
-export const FRESHNESS_LABEL: Record<Freshness, string> = { strong: "This month", medium: "Last 3 months", weak: "This year", stale: "Over a year old", unknown: "Undated" };
+export const FRESHNESS_LABEL: Record<Freshness, string> = { strong: "Last 30 days", medium: "Last 3 months", weak: "Last 12 months", stale: "Over a year old", unknown: "Undated" };
 
 const DAY = 86_400_000;
 /** How recent a signal is: ≤30 days strong, ≤90 medium, ≤365 weak, older stale; no date (or a date in the future) = unknown. */

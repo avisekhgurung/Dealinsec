@@ -25,7 +25,10 @@ vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")
 import { DiscoveryError, type DiscoveryProvider } from "../../discovery/types";
 import { ProviderError } from "../../copilot/provider";
 import { addToLeads, cancelRun, findContacts, generateAngle, getProspect, getRun, listRuns, parseIcp, researchProspect, startRun } from "../../outbound/service";
-import { clearPageCache, pipelineDeps, stepRun, type PipelineDeps } from "../../outbound/pipeline";
+import { LeaseLost, MAX_TOKENS, clearPageCache, enrichOne, pipelineDeps, stepRun, type PipelineDeps } from "../../outbound/pipeline";
+import { outboundWorkflow } from "../../outbound/runner";
+import { parseIcpFallback } from "@shared/icp";
+import type { ClaimedRun } from "../../outbound/store";
 import { outboundStore } from "../../outbound/store";
 import { createRunner } from "../../workflow/runner";
 import type { ContactEnrichmentProvider } from "../../outbound/providers";
@@ -107,7 +110,7 @@ const taskOf = (m: { role: string; content: string }[]): Task => {
   const s = m[0].content;
   return /structured profile/.test(s) ? "icp" : /about the company itself/.test(s) ? "enrich" : /for a salesperson/.test(s) ? "signals" : "angle";
 };
-const companyOf = (m: { content: string }[]) => { const c = (m[1].content.match(/Company: ([^\n]+)/)?.[1] ?? "").trim(); return Object.keys(ENRICH).find((k) => c.startsWith(k)) ?? c; };
+const companyOf = (m: { content: string }[]) => { const c = (m[1].content.match(/Company: <untrusted[^>]*>\n([^\n]+)\n/)?.[1] ?? m[1].content.match(/Company: ([^\n]+)/)?.[1] ?? "").trim(); return Object.keys(ENRICH).find((k) => c.startsWith(k)) ?? c; };
 const ENRICH: Record<string, unknown> = {
   "Northwind Digital": { facts: [
     { field: "industry", value: "Digital marketing agency", quote: "Northwind Digital is a digital marketing agency", page: 1 },
@@ -146,8 +149,8 @@ function researchFor(company: string, user: string) {
       { kind: "signal", type: "HIRING", value: "Hiring a Senior SEO Strategist", quote: "We are hiring a Senior SEO Strategist to join our SaaS team", page: pageNo("/careers"), date_quote: "Posted September 30, 2026" },
       { kind: "signal", type: "NEW_SERVICE", value: "Launched a PPC practice for SaaS", quote: "In September 2026 we launched our PPC practice for SaaS brands", page: pageNo("/news") },
       { kind: "signal", type: "FUNDING", value: "Raised a Series A", quote: "Northwind raised a $5M Series A", page: pageNo("/news") },
-      { kind: "person", name: "Ana Silva", title: "Founder and CEO", quote: "Ana Silva, Founder and CEO", page: pageNo("/team") },
-      { kind: "person", name: "Ben Okafor", title: "Head of Growth", quote: "Ben Okafor, Head of Growth", page: pageNo("/team") },
+      { kind: "person", name: "Ana Silva", title: "Founder and CEO", employer: "Northwind Digital", quote: "Ana Silva, Founder and CEO", page: pageNo("/team") },
+      { kind: "person", name: "Ben Okafor", title: "Head of Growth", employer: "Northwind", quote: "Ben Okafor, Head of Growth", page: pageNo("/team") },
     ], opportunities: [
       { text: "They may need outbound help to fill the new PPC practice's pipeline", supports: ["#1", `F${fact("Who they serve")}`], confidence: "medium" },
       { text: "They could use help spending their Series A", supports: ["#2"], confidence: "medium" },
@@ -204,7 +207,7 @@ const cards = async (runId: string, u = user()) => { const r = await getRun(u, r
 const byName = (cs: any[], name: string) => cs.find((c) => c.name.startsWith(name));
 
 beforeEach(() => { useWorld(createWorld()); fakeWeb(); seedLead(world(), { companyName: "LeadCo", website: "https://leadco.com", domain: "leadco.com" }); searches = []; calls = { icp: 0, enrich: 0, signals: 0, angle: 0 }; script = {}; model(); clearPageCache(); vi.spyOn(console, "log").mockImplementation(() => {}); });
-afterEach(() => { for (const k of ["SALES_DAILY_ENRICH_LIMIT", "OUTBOUND_DAILY_RUNS", "OUTBOUND_DAILY_SEARCHES"]) delete process.env[k]; });
+afterEach(() => { for (const k of ["SALES_DAILY_ENRICH_LIMIT", "OUTBOUND_DAILY_RUNS", "OUTBOUND_DAILY_SEARCHES", "OUTBOUND_DAILY_COMPANY_LOOKUPS"]) delete process.env[k]; });
 
 describe("the definition-of-done run", () => {
   it("parses, searches several ways, normalizes, dedupes, verifies, enriches, researches, scores and ranks", async () => {
@@ -245,7 +248,7 @@ describe("the definition-of-done run", () => {
     expect(c.fit.verdict).toBe("strong");
     expect(c.score.total).toBeGreaterThan(50);
     expect(c.score.components.map((x: any) => x.key)).toEqual(["fit", "need", "signal", "budget", "contact", "timing"]);
-    expect(c.whyNow).toMatchObject({ type: "HIRING", freshness: "This month", observedAt: "2026-09-30T00:00:00.000Z", url: "https://northwind.com/careers" });
+    expect(c.whyNow).toMatchObject({ type: "HIRING", freshness: "Last 30 days", observedAt: "2026-09-30T00:00:00.000Z", url: "https://northwind.com/careers" });
     expect(c.decisionMaker.value).toBe("Ben Okafor, Head of Growth"); // the ICP put Head of Growth first, not the Founder
     expect(c.opportunity.status).toBe("inferred");
     const brief = (await getProspect(user(), c.id, deps())) as any;
@@ -449,15 +452,261 @@ describe("the durable runner", () => {
         for (const it of world().outbound.items) if (it.nextAttemptAt) it.nextAttemptAt = new Date(0);
         return stepRun(fresh, deadline, full);
       },
-      release: (run) => outboundStore.releaseRun(run.id),
+      release: async (run) => { await outboundStore.setLease(run.id, run.fence, null); },
       // Simulates the lease running out after a crash (the real runner waits for it to expire).
-      failed: async (run) => { await outboundStore.releaseRun(run.id); },
+      failed: async (run) => { await outboundStore.setLease(run.id, run.fence, null); },
     }, { sliceMs: 60_000, log: () => {} });
     runner.kick(); await runner.idle();
     const run = await outboundStore.getRun(ORG1, id);
     expect(run!.status).toBe("done");
     expect(crashes).toBe(1);
     expect(byName((await cards(id)).prospects, "Northwind").ready).toBe(true);
+  });
+});
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+/** A store that counts every call made to it: proof that a parked run costs the database nothing while it waits. */
+function countingStore() {
+  const counts: Record<string, number> = {}; let total = 0;
+  const store = new Proxy(outboundStore as any, { get: (t, k: string) => (typeof t[k] === "function" ? (...a: unknown[]) => { counts[k] = (counts[k] ?? 0) + 1; total++; return t[k](...a); } : t[k]) });
+  return { store: store as typeof outboundStore, counts, total: () => total };
+}
+/** Steps a run (no real waiting for retries) until it reaches a stage. */
+async function advanceTo(runId: string, stage: string, full: PipelineDeps) {
+  for (let i = 0; i < 100; i++) {
+    const r = (await outboundStore.getRun(ORG1, runId))!;
+    if (r.stage === stage) return;
+    await stepRun(r, Date.now() + 60_000, full);
+    for (const it of world().outbound.items) if (it.nextAttemptAt) it.nextAttemptAt = null;
+  }
+  throw new Error(`never reached ${stage}`);
+}
+const expireLease = (runId: string) => { world().outbound.runs.find((r) => r.id === runId)!.leaseUntil = new Date(0); };
+
+describe("ownership of a run: leases, fences and takeover", () => {
+  it("the claim number is a fence: after a takeover the old holder's writes, renewals and releases do nothing, and the new holder's lease is untouched", async () => {
+    const id = await start();
+    const a = (await outboundStore.claimRun(new Date(), 90_000))!;
+    expireLease(id);
+    const b = (await outboundStore.claimRun(new Date(), 90_000))!;
+    expect([a.fence, b.fence]).toEqual([1, 2]);
+    const held = world().outbound.runs[0].leaseUntil;
+    expect(await outboundStore.updateRun(id, a.fence, { stage: "verify" })).toBe(false);
+    expect(await outboundStore.setLease(id, a.fence, null)).toBe(false);
+    expect(await outboundStore.setLease(id, a.fence, new Date(Date.now() + 1e6))).toBe(false);
+    expect(await outboundStore.finishRun(ORG1, id, a.fence, { status: "done", counters: {}, costMicroUsd: 0, errorCode: null, now: new Date() })).toBe(false);
+    expect(world().outbound.runs[0]).toMatchObject({ stage: "search", status: "running" });
+    expect(world().outbound.runs[0].leaseUntil).toEqual(held); // the new holder's lease survived the stale release
+    expect(await outboundStore.setLease(id, b.fence, null)).toBe(true);
+    expect(await outboundStore.updateRun(id, b.fence, { stage: "verify" })).toBe(true);
+  });
+  it("a stale worker halts at its first write: LeaseLost, and the run row is exactly as the new holder left it", async () => {
+    const id = await start();
+    const a = (await outboundStore.claimRun(new Date(), 90_000))!;
+    expireLease(id);
+    await outboundStore.claimRun(new Date(), 90_000);
+    const before = JSON.stringify(world().outbound.runs[0]);
+    await expect(stepRun(a, Date.now() + 60_000, { ...pipelineDeps(), ...deps() } as PipelineDeps)).rejects.toBeInstanceOf(LeaseLost);
+    expect(JSON.stringify(world().outbound.runs[0])).toBe(before);
+  });
+  it("a cancelled run can't be finished or written by its old worker", async () => {
+    const id = await start();
+    const a = (await outboundStore.claimRun(new Date(), 90_000))!;
+    await cancelRun(user(), id, deps());
+    expect(await outboundStore.finishRun(ORG1, id, a.fence, { status: "done", counters: {}, costMicroUsd: 0, errorCode: null, now: new Date() })).toBe(false);
+    await expect(stepRun(a, Date.now() + 60_000, { ...pipelineDeps(), ...deps() } as PipelineDeps)).rejects.toBeInstanceOf(LeaseLost);
+    expect(world().outbound.runs[0].status).toBe("cancelled");
+  });
+  it("a worker that lost its lease finishes the slice in flight but starts no new one; the new holder does the rest and nothing is paid for twice", async () => {
+    const id = await start();
+    const full = { ...pipelineDeps(), ...deps() } as PipelineDeps;
+    await advanceTo(id, "enrich", full);
+    // Worker A's first three model calls hang (a stalled process); meanwhile its lease runs out and B claims the run.
+    const base = world().llm; let release!: () => void; const gate = new Promise<void>((r) => { release = r; });
+    world().llm = async (m) => { if (taskOf(m) === "enrich") await gate; return base(m); };
+    const wfA = outboundWorkflow(() => full, { leaseMs: 300, renewMs: 20, ready: async () => true, log: () => {} });
+    const wfB = outboundWorkflow(() => full, { leaseMs: 300, renewMs: 20, ready: async () => true, log: () => {} });
+    const a = (await wfA.claim(new Date()))!;
+    const stepA = wfA.step(a, Date.now() + 60_000);
+    await sleep(40);
+    expireLease(id); // no renewal of A's reached the database in time
+    const b = (await wfB.claim(new Date()))!;
+    expect(b.fence).toBe(a.fence + 1);
+    await sleep(60); // A's next renewal finds the run is no longer its own
+    release();
+    expect(await stepA).toBe("done"); // handled (LeaseLost), not a crash
+    expect(calls.enrich).toBe(3); // only the slice already in flight: before the check, A went on to the other three
+    for (let i = 0; i < 100; i++) { const st = await wfB.step(b, Date.now() + 60_000); if (st === "done") break; if (typeof st === "object") for (const it of world().outbound.items) it.nextAttemptAt = null; }
+    expect(calls.enrich).toBe(6); // the six companies, once each
+    expect(world().outbound.runs[0].status).toBe("done");
+  });
+  it("a long step keeps its lease by renewing it: nobody else can claim the run while it works, and it finishes", async () => {
+    const id = await start();
+    const full = { ...pipelineDeps(), ...deps() } as PipelineDeps;
+    await advanceTo(id, "enrich", full);
+    const base = world().llm; let slow = false;
+    world().llm = async (m) => { if (taskOf(m) === "enrich" && !slow) { slow = true; await sleep(700); } return base(m); };
+    const store = countingStore();
+    const wf = outboundWorkflow(() => full, { store: store.store, leaseMs: 200, renewMs: 40, ready: async () => true, log: () => {} });
+    const run = (await wf.claim(new Date()))!;
+    const step = wf.step(run, Date.now() + 60_000);
+    let stolen = 0;
+    for (let i = 0; i < 6; i++) { await sleep(110); if (await outboundStore.claimRun(new Date(), 200)) stolen++; }
+    expect(stolen).toBe(0); // the lease is 200 ms and the step took 700 ms: only renewal kept it
+    expect(store.counts.setLease).toBeGreaterThanOrEqual(4);
+    await step;
+    expect(world().outbound.items.some((i) => i.stage === "enriched")).toBe(true);
+  });
+});
+
+describe("waiting costs nothing: a run whose only work is a retry back-off is parked", () => {
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW); });
+  afterEach(() => { vi.useRealTimers(); });
+  it("parked until the retry is due with zero store calls meanwhile, then it resumes by itself and finishes", async () => {
+    let failed = false;
+    script.enrich = (m) => (companyOf(m) === "Acme Growth" && !failed ? ((failed = true), new ProviderError("timeout", "slow")) : ENRICH[companyOf(m)] ?? { facts: [] });
+    const d = deps({ now: () => new Date() });
+    const id = await start(d);
+    const store = countingStore();
+    const full = { ...pipelineDeps(), ...d, store: store.store } as PipelineDeps;
+    const runner = createRunner(outboundWorkflow(() => full, { store: store.store, ready: async () => true, log: () => {} }), { log: () => {} });
+    runner.kick(); await runner.idle();
+    // Two things in this run wait on a back-off (down.com's unreachable site, then Acme's model timeout): parked each time.
+    let parks = 0;
+    for (let i = 0; i < 8; i++) {
+      const row = world().outbound.runs.find((r) => r.id === id)!;
+      if (row.status !== "running") break;
+      parks++;
+      const wait = row.leaseUntil!.getTime() - Date.now();
+      expect(wait).toBeGreaterThanOrEqual(10_000); expect(wait).toBeLessThanOrEqual(60_000); // parked until the back-off ends
+      const quiet = store.total();
+      await vi.advanceTimersByTimeAsync(wait - 2000);
+      expect(store.total()).toBe(quiet); // not one query while it waits (before: ~8 per loop, flat out)
+      await vi.advanceTimersByTimeAsync(4000);
+      await runner.idle();
+    }
+    expect(parks).toBeGreaterThanOrEqual(2);
+    expect(world().outbound.runs.find((r) => r.id === id)).toMatchObject({ status: "done", attempts: parks + 1 }); // one claim per park, no more
+    expect(world().outbound.items.find((i) => world().outbound.prospects.find((p) => p.id === i.prospectId)!.domain === "acmegrowth.io")!.stage).toBe("done"); // the retried company made it through
+  });
+});
+
+describe("a run finishes in one statement, and an old half-finished one is healed", () => {
+  it("stage done but status still running (a crash between the two old writes) is finished again with its original outcome, once", async () => {
+    const id = await start();
+    const row = world().outbound.runs.find((r) => r.id === id)!;
+    Object.assign(row, { stage: "done", counters: { stoppedBy: "search_unavailable" } });
+    const store = countingStore();
+    const full = { ...pipelineDeps(), ...deps(), store: store.store } as PipelineDeps;
+    const runner = createRunner(outboundWorkflow(() => full, { store: store.store, ready: async () => true, log: () => {} }), { log: () => {} });
+    runner.kick(); await runner.idle();
+    expect(row).toMatchObject({ status: "failed", errorCode: "search_unavailable", stage: "done", attempts: 1 });
+    expect(row.finishedAt).toBeTruthy();
+    expect(store.counts.finishRun).toBe(1);
+  });
+  it("too many claims without finishing marks the run stuck instead of retrying it forever", async () => {
+    const id = await start();
+    world().outbound.runs.find((r) => r.id === id)!.attempts = 500;
+    const wf = outboundWorkflow(() => ({ ...pipelineDeps(), ...deps() } as PipelineDeps), { ready: async () => true, log: () => {} });
+    expect(await wf.claim(new Date())).toBeNull();
+    expect(world().outbound.runs[0]).toMatchObject({ status: "failed", errorCode: "stuck" });
+  });
+});
+
+describe("what is cached and what is paid for", () => {
+  it("a failed page read is never remembered: the same page is read again and works", async () => {
+    const reader = pipelineDeps().reader;
+    let n = 0;
+    const flaky = { name: "flaky", read: async (u: string) => (n++ === 0 ? ({ ok: false, code: "unreachable" } as const) : reader.read(u)) };
+    const d = deps({ reader: flaky }) as PipelineDeps;
+    const icp = parseIcpFallback(REQUEST)!;
+    const p = await outboundStore.upsertProspect(ORG1, { domain: "northwind.com", name: "Northwind Digital", website: "https://northwind.com", sources: [] }, NOW);
+    const run = { id: "pr_x", organizationId: ORG1, createdByUser: "u1" };
+    await enrichOne(run, icp, null, d, p);
+    expect(world().outbound.findings).toHaveLength(0); // the first read failed: nothing stored, and nothing remembered
+    await enrichOne(run, icp, null, d, p);
+    expect(world().outbound.findings.length).toBeGreaterThan(0);
+    expect(n).toBeGreaterThan(1);
+  });
+  it("company data (Apollo) has its own daily allowance, counted from the database: past it the provider is skipped and the run carries on", async () => {
+    process.env.OUTBOUND_DAILY_COMPANY_LOOKUPS = "2";
+    let asked = 0;
+    const company = { name: "fakeapollo", enrich: async () => { asked++; return { employees: "20", sourceUrl: "https://fakeapollo.example/x" } as any; } };
+    const id = await start(deps({ company })); const run = await drive(id, deps({ company }));
+    expect(run!.status).toBe("done");
+    expect(asked).toBe(2); // six companies were enriched; only two lookups were allowed
+    expect(world().outbound.providerCalls.filter((c) => c.operation === "company")).toHaveLength(2);
+    expect(world().outbound.findings.filter((f) => f.batch === "company").length).toBeGreaterThan(0);
+  });
+  it("a failing allowance count skips the provider (fail closed) instead of spending", async () => {
+    let asked = 0;
+    const company = { name: "fakeapollo", enrich: async () => { asked++; return null; } };
+    const store = countingStore();
+    const broken = new Proxy(store.store as any, { get: (t, k: string) => (k === "countProviderCalls" ? async (q: any) => { if (q.operation === "company") throw new Error("db down"); return t[k](q); } : t[k]) });
+    const d = deps({ company, store: broken });
+    const id = await start(d); const run = await drive(id, d);
+    expect(run!.status).toBe("done");
+    expect(asked).toBe(0);
+  });
+  it("a paid contact lookup is priced in the run's cost, and is refused for a company that was set aside", async () => {
+    process.env.PROVIDER_COST_USD_FAKEHUNTER = "0.03";
+    try {
+      const id = await start(); await drive(id);
+      const nw = world().outbound.prospects.find((p) => p.domain === "northwind.com")!;
+      const contact: ContactEnrichmentProvider = { name: "fakehunter", findPeople: async () => [{ name: "Ben Okafor", title: "Head of Growth", email: "ben@northwind.com", emailStatus: "verified", confidence: 96, source: "fakehunter" }] };
+      await findContacts(user(), nw.id, id, deps({ contact }));
+      expect(world().outbound.providerCalls.find((c) => c.operation === "contact")!.costMicroUsd).toBe(30_000);
+      const parked = world().outbound.prospects.find((p) => p.domain === "parkedagency.com")!;
+      const before = world().outbound.providerCalls.length;
+      expect(await findContacts(user(), parked.id, id, deps({ contact }))).toMatchObject({ ok: false, code: "rejected" });
+      expect(world().outbound.providerCalls).toHaveLength(before); // nothing was bought
+    } finally { delete process.env.PROVIDER_COST_USD_FAKEHUNTER; }
+  });
+  it("the built-in reader gives enrichment the footer: an address and an email that only the footer holds can be quoted and are kept", async () => {
+    world().knowledge.dns["footerco.com"] = ["93.184.216.34"];
+    page("footerco.com", "/", html("Footer Co", `<p>Footer Co is a digital marketing agency for SaaS companies. ${filler}</p>`).replace("</main>", "</main><footer>Footer Co, 9 Oak Road, Boston, MA, United States. Write to hello@footerco.com</footer>"));
+    const text = (await pipelineDeps().reader.read("https://footerco.com/")) as any;
+    expect(text.ok).toBe(true);
+    expect(text.text).toContain("[Footer and contact details]");
+    expect(text.text).toContain("9 Oak Road, Boston, MA, United States");
+    // quotes are checked against exactly this text, so a quote taken from the footer is a valid quote
+    const { normalizeEnrichment } = await import("@shared/prospect-intel");
+    const n = normalizeEnrichment({ facts: [{ field: "location", value: "Boston, MA", quote: "9 Oak Road, Boston, MA, United States", page: 1 }, { field: "business_email", value: "hello@footerco.com", quote: "hello@footerco.com", page: 1 }] }, [{ index: 1, url: text.url, text: text.text }], "footerco.com");
+    expect(n.facts.map((f: any) => f.field).sort()).toEqual(["business_email", "location"]);
+    // and a quote that is NOT on the page is still dropped
+    const forged = normalizeEnrichment({ facts: [{ field: "location", value: "London", quote: "1 Fake Street, London, UK", page: 1 }] }, [{ index: 1, url: text.url, text: text.text }], "footerco.com");
+    expect(forged.facts).toHaveLength(0);
+  });
+  it("a model that returns nothing is a failed call to retry, never 'the company says nothing': it is not set aside as unclear, and it succeeds on the retry", async () => {
+    let n = 0;
+    script.enrich = (m) => (companyOf(m) === "Northwind Digital" && n++ < 2 ? "" : ENRICH[companyOf(m)] ?? { facts: [] }); // two empty replies = one whole attempt (the call itself retries once)
+    const id = await start(); const run = await drive(id);
+    expect(run!.status).toBe("done");
+    const item = world().outbound.items.find((i) => world().outbound.prospects.find((p) => p.id === i.prospectId)!.domain === "northwind.com")!;
+    expect(item.attempts).toBe(1); // one retry was needed
+    expect(item.stage).toBe("done"); // and it went on to be researched and scored
+    expect(item.errorCode).not.toBe("unclear");
+  });
+  it("a model that keeps returning nothing ends as a FAILED company with the reason, not as 'unclear'", async () => {
+    script.enrich = (m) => (companyOf(m) === "Northwind Digital" ? "" : ENRICH[companyOf(m)] ?? { facts: [] });
+    const id = await start(); const run = await drive(id);
+    expect(run!.status).toBe("done");
+    const item = world().outbound.items.find((i) => world().outbound.prospects.find((p) => p.id === i.prospectId)!.domain === "northwind.com")!;
+    expect(item).toMatchObject({ stage: "failed", errorCode: "invalid_response" });
+    expect((await cards(id)).run.counters.failed).toBeGreaterThanOrEqual(1);
+  });
+  it("the model gets room to think: enrich and research ask for a large output budget (a reasoning model returned nothing at 3,000)", () => {
+    expect(MAX_TOKENS.enrich).toBeGreaterThanOrEqual(6000);
+    expect(MAX_TOKENS.signals).toBeGreaterThanOrEqual(6000);
+  });
+  it("a company name is fenced as untrusted data in every prompt that carries it", async () => {
+    const seen: string[] = [];
+    const base = world().llm;
+    world().llm = async (m) => { seen.push(m[1].content); return base(m); };
+    const id = await start(); await drive(id);
+    const withCompany = seen.filter((c) => /Company: /.test(c));
+    expect(withCompany.length).toBeGreaterThan(5);
+    expect(withCompany.every((c) => /Company: <untrusted source="company">\n[^\n]+\n<\/untrusted>/.test(c))).toBe(true);
   });
 });
 

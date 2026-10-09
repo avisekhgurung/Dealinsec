@@ -27,7 +27,7 @@ vi.mock("../../llm/trace-store", async () => (await import("./world-mocks")).tra
 vi.mock("../../routes", async () => (await import("./world-mocks")).routesMock());
 vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")).scriptedProviderMock(orig as () => Promise<any>));
 
-import { addImage, addNote, addPdf, addUrl, knowledgeCount, listKnowledge, readImage, removeSource, searchKnowledge } from "../../services/knowledge";
+import { addImage, addNote, addPdf, addUrl, knowledgeCount, listKnowledge, readImage, relatedKnowledge, removeSource, searchKnowledge } from "../../services/knowledge";
 import { executeApproval } from "../approvals";
 import { runAgent } from "../loop";
 import { MemoryAgentStore } from "../memory-store";
@@ -330,5 +330,17 @@ describe("assess_lead_fit shows what the user wrote, beside the verdict and neve
     expect(r.ok && r.notes.map((n) => n.title)).toEqual(["Who we help"]);
     const { relatedKnowledge } = await import("../../services/knowledge");
     expect(await relatedKnowledge({ ...user(), orgRole: "CUSTOM", customPermissions: [] }, "boutique hotels Portugal")).toEqual([]);
+  });
+});
+
+describe("notes shown next to a fit check (relatedKnowledge)", () => {
+  it('"Cryptocurrency exchange" finds the note that says "crypto"; a note about something else is not shown for it', async () => {
+    await addNote(user(), { title: "Who we avoid", text: "We never work with crypto, gambling or tobacco companies. We only take hospitality clients in Portugal and Spain." });
+    await addNote(user(), { title: "Our pricing", text: "Retainers start at a fixed monthly fee for marketing agencies and bakeries alike." });
+    const crypto = await relatedKnowledge(user(), "BlockNest Exchange Cryptocurrency exchange Lisbon, Portugal");
+    expect(crypto.map((n) => n.title)).toEqual(["Who we avoid"]);
+    // two independent matches are still required: a single shared word is not enough
+    expect(await relatedKnowledge(user(), "Quiet Cryptic Bakery")).toEqual([]);
+    expect(await relatedKnowledge(user(), "Rio Bakery Brazil")).toEqual([]);
   });
 });

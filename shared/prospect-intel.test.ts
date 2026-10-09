@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeAngle, normalizeEnrichment, normalizeResearch } from "./prospect-intel";
+import { dateBesideClaim, normalizeAngle, normalizeEnrichment, normalizeResearch } from "./prospect-intel";
 import type { ResearchPage } from "./research";
 
 const RETRIEVED = new Date("2026-10-08T00:00:00Z");
@@ -53,8 +53,8 @@ describe("research: signals, people, pains, opportunities", () => {
     findings: [
       { kind: "signal", type: "HIRING", value: "Hiring a Senior SEO Strategist", quote: "We are hiring a Senior SEO Strategist to join our SaaS team", page: 2, date_quote: "Posted September 30, 2026" },
       { kind: "signal", type: "NEW_SERVICE", value: "Launched PPC for SaaS", quote: "In March 2026 we launched our PPC practice for SaaS brands", page: 3 },
-      { kind: "person", name: "Ana Silva", title: "Founder and CEO", quote: "Ana Silva, Founder and CEO", page: 2 },
-      { kind: "person", name: "Ben Okafor", title: "Head of Growth", quote: "Ben Okafor, Head of Growth", page: 2 },
+      { kind: "person", name: "Ana Silva", title: "Founder and CEO", employer: "Northwind Digital", quote: "Ana Silva, Founder and CEO", page: 2 },
+      { kind: "person", name: "Ben Okafor", title: "Head of Growth", employer: "Northwind", quote: "Ben Okafor, Head of Growth", page: 2 },
       { kind: "pain", value: "Growing faster than the team can hire", quote: "We are hiring a Senior SEO Strategist", page: 2 },
     ],
     opportunities: [{ text: "They may need outbound help to sell the new PPC practice", supports: ["#1", "F7"], confidence: "medium" }],
@@ -66,6 +66,31 @@ describe("research: signals, people, pains, opportunities", () => {
     expect(r.people.map((p) => p.name)).toEqual(["Ben Okafor", "Ana Silva"]); // Head of Growth first: the ICP said so
     expect(r.pains).toHaveLength(1);
     expect(r.opportunities).toEqual([{ text: "They may need outbound help to sell the new PPC practice", supports: [{ newIndex: 1 }, { findingId: 7 }], confidence: "medium" }]);
+  });
+  it("a person must work AT this company: a client quoted in a testimonial has a real quote and is still not staff", () => {
+    const find = (who: Record<string, unknown>) => normalizeResearch({ findings: [{ kind: "person", name: "Ana Silva", title: "Founder and CEO", quote: "Ana Silva, Founder and CEO", page: 2, ...who }] }, pages, "northwind.com", { retrievedAt: RETRIEVED, icp, knownFactIds: [], companyName: "Northwind Digital" });
+    expect(find({ employer: "Northwind Digital" }).people).toHaveLength(1); // staff: the company's name
+    expect(find({ employer: "Northwind" }).people).toHaveLength(1);         // or the brand part of its domain
+    expect(find({ employer: "Northwind Digital Ltd" }).people).toHaveLength(1);
+    const client = find({ employer: "Orchard Labs" });                            // a client named in a testimonial
+    expect(client.people).toHaveLength(0);
+    expect(client.rejected).toEqual({ not_staff: 1 });
+    expect(find({}).people).toHaveLength(0);                               // no employer given: nothing to trust
+    expect(find({ employer: "" }).people).toHaveLength(0);
+    expect(find({ employer: "Southwind Partners" }).people).toHaveLength(0); // a lookalike name is not the company
+    expect(find({ employer: 42 as any }).people).toHaveLength(0);
+  });
+  it("a date elsewhere on the page does not date a statement: it has to sit beside it", () => {
+    const filler = "Our team plans campaigns and reports on results every month for each client. ".repeat(12); // ~900 characters
+    const near: ResearchPage = { index: 1, url: "https://northwind.com/news", text: `Posted September 30, 2026. We launched our new PPC practice for SaaS brands. ${filler}` };
+    const far: ResearchPage = { index: 1, url: "https://northwind.com/news", text: `We have worked with large national brands since 2008. ${filler} Posted September 30, 2026. A different post about something else.` };
+    const sig = (page: ResearchPage, quote: string) => normalizeResearch({ findings: [{ kind: "signal", type: "GROWTH_SIGNAL", value: "Growth", quote, page: 1, date_quote: "Posted September 30, 2026" }] }, [page], "northwind.com", { retrievedAt: RETRIEVED, icp, knownFactIds: [] }).signals[0];
+    expect(sig(near, "We launched our new PPC practice for SaaS brands").observedAt?.toISOString().slice(0, 10)).toBe("2026-09-30");
+    expect(sig(far, "We have worked with large national brands since 2008").observedAt?.getUTCFullYear()).toBe(2008); // "since 2008" is the quote's own date…
+    expect(sig({ ...far, text: far.text.replace("since 2008", "for a long time") }, "We have worked with large national brands for a long time").observedAt).toBeNull(); // …and the far-away post date is not borrowed
+    expect(dateBesideClaim("a b c Posted May 1, 2026 d e f We hire. g", "We hire.", "Posted May 1, 2026")).toBe(true);
+    expect(dateBesideClaim("x ".repeat(300) + "Posted May 1, 2026 " + "y ".repeat(300) + "We hire.", "We hire.", "Posted May 1, 2026")).toBe(false);
+    expect(dateBesideClaim("nothing", "We hire.", "Posted May 1, 2026")).toBe(false);
   });
   it("a date the model asserts but the page doesn't state is not taken", () => {
     const r = normalizeResearch({ findings: [{ kind: "signal", type: "HIRING", value: "Hiring", quote: "We are hiring a Senior SEO Strategist", page: 2, date_quote: "Posted October 7, 2026" }] }, pages, "northwind.com", { retrievedAt: RETRIEVED, icp, knownFactIds: [] });

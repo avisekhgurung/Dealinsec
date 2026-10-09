@@ -35,3 +35,6 @@ export const dateLabel = (d: string | Date | null | undefined) => {
   const t = new Date(d as any);
   return Number.isFinite(t.getTime()) ? t.toISOString().slice(0, 10) : null;
 };
+
+/** A name that came from the web (a search-result title), made safe to quote inside a message to the model: one short line, no tags or quotes. */
+export const safeName = (name: unknown): string => `"${String(name ?? "").replace(/[\r\n\t]+/g, " ").replace(/[<>"]/g, "").replace(/\s+/g, " ").trim().slice(0, 80)}"`;

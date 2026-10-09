@@ -28,7 +28,8 @@ import type { ChatMessage } from "../copilot/provider";
 import { PROMPT_VERSIONS, enrichSystemPrompt, enrichUserMessage, signalsSystemPrompt, signalsUserMessage } from "./prompts";
 import { companyProvider, contactProvider, costMicroUsd, pageReader, readSitemap, type CompanyEnrichmentProvider, type ContactEnrichmentProvider, type PageRead, type PageReader } from "./providers";
 import { outboundStore, type ItemWithProspect, type NewFinding, type OutboundStore } from "./store";
-import { dailySearchLimit } from "./limits";
+import { dailyCompanyLimit, dailySearchLimit } from "./limits";
+import type { StepResult } from "../workflow/runner";
 
 export const CACHE_DAYS = 14;
 const DAY = 86_400_000;
@@ -49,6 +50,18 @@ export interface PipelineDeps {
   allowance: (task: "enrich" | "signals", orgId: string) => Promise<number>;
   /** Wakes the runner after a run starts (tests pass a no-op and drive the steps themselves). */
   kick?: () => void;
+  /** False once this worker's lease was lost (a renewal found the run taken over): work stops at the next slice. */
+  leaseHeld?: () => boolean;
+}
+
+/** This worker no longer holds the run (another claimed it, or it was cancelled): stop, write nothing more. */
+export class LeaseLost extends Error { constructor(public runId: string) { super("lease lost"); } }
+/** The claim number a fenced write must match: the claimed copy carries it; a plain row (tests) falls back to its attempts. */
+const fenceOf = (r: ProspectRunRow & { fence?: number }) => r.fence ?? r.attempts;
+const holds = (deps: PipelineDeps) => deps.leaseHeld ?? (() => true);
+/** A fenced write to the run row; losing the fence stops the step. */
+async function writeRun(deps: PipelineDeps, run: ProspectRunRow, set: Partial<ProspectRunRow>): Promise<void> {
+  if (!(await deps.store.updateRun(run.id, fenceOf(run), set))) throw new LeaseLost(run.id);
 }
 export const pipelineDeps = (): PipelineDeps => ({
   store: outboundStore, chat: tracedChat, reader: pageReader(), sitemap: (s) => readSitemap(s), searchProviders: () => outboundSearchProviders(),
@@ -66,21 +79,32 @@ async function readPage(deps: PipelineDeps, url: string): Promise<PageRead> {
   const hit = pageCache.get(url);
   if (hit && deps.now().getTime() - hit.at < 30 * 60_000) return hit.page;
   const page = await deps.reader.read(url);
-  if (pageCache.size > 300) pageCache.delete(pageCache.keys().next().value as string);
-  pageCache.set(url, { at: deps.now().getTime(), page });
+  // A failure is never remembered: it is retried after its back-off, and a cached failure would make every retry a no-op.
+  if (page.ok) {
+    if (pageCache.size > 300) pageCache.delete(pageCache.keys().next().value as string);
+    pageCache.set(url, { at: deps.now().getTime(), page });
+  }
   return page;
 }
 /** Test hook: the cache is per process. */
 export const clearPageCache = () => pageCache.clear();
 
-async function inSlices<T>(items: T[], n: number, deadline: number, now: () => number, fn: (x: T) => Promise<void>): Promise<void> {
+async function inSlices<T>(items: T[], n: number, deadline: number, now: () => number, held: () => boolean, runId: string, fn: (x: T) => Promise<void>): Promise<void> {
   for (let i = 0; i < items.length; i += n) {
+    if (!held()) throw new LeaseLost(runId);
     if (now() >= deadline) return;
     await Promise.all(items.slice(i, i + n).map(fn));
   }
 }
 
 const fresh = (d: Date | string | null | undefined, now: Date, days = CACHE_DAYS) => !!d && now.getTime() - new Date(d).getTime() < days * DAY;
+
+/**
+ * Output budgets. A reasoning model spends part of its output on thinking before it writes the JSON; at 3,000 tokens
+ * DeepSeek Flash used all of it and returned NOTHING on real company pages (measured: 2 empty replies in a row on 2 of
+ * 3 sites; at 6,000 all succeeded, using up to 5,650). The ceiling is generous because only what is used is paid for.
+ */
+export const MAX_TOKENS = { enrich: 8000, signals: 8000 } as const;
 
 /** Calls a model, with one retry for an empty or unreadable reply. Returns the parsed object or null. */
 async function askJson(deps: PipelineDeps, ctx: TraceCtx, messages: ChatMessage[], maxTokens: number): Promise<unknown> {
@@ -123,7 +147,7 @@ const classify = (e: unknown): "stop" | "retry" => (e instanceof CapExceeded ? "
 
 /* ── the step dispatcher ─────────────────────────────────────────────────── */
 
-export async function stepRun(run: ProspectRunRow, deadline: number, deps: PipelineDeps = pipelineDeps()): Promise<"more" | "done"> {
+export async function stepRun(run: ProspectRunRow, deadline: number, deps: PipelineDeps = pipelineDeps()): Promise<StepResult> {
   const icp = run.icp as Icp;
   try {
     switch (run.stage) {
@@ -132,7 +156,9 @@ export async function stepRun(run: ProspectRunRow, deadline: number, deps: Pipel
       case "enrich": return await enrichStep(run, icp, deadline, deps);
       case "research": return await researchStep(run, icp, deadline, deps);
       case "finalize": return await finalize(run, icp, deps, null);
-      default: return "done";
+      // Stage "done" with the run still running: a crash fell between the two writes of an older finish. Finish it again
+      // (idempotent), with the outcome it already had.
+      default: return await finalize(run, icp, deps, (run.counters as RunCountersExt)?.stoppedBy ?? null);
     }
   } catch (e) {
     if (e instanceof StopRun) return finalize(run, icp, deps, e.code);
@@ -143,12 +169,24 @@ export async function stepRun(run: ProspectRunRow, deadline: number, deps: Pipel
 
 async function setStage(deps: PipelineDeps, run: ProspectRunRow, stage: string): Promise<void> {
   run.stage = stage;
-  await deps.store.updateRun(run.id, { stage, updatedAt: deps.now() });
+  await writeRun(deps, run, { stage, updatedAt: deps.now() });
+}
+
+/**
+ * Everything left is waiting for a retry back-off: report when the first one is due instead of polling. At least 10 s
+ * (every re-claim counts against the run) and at most 60 s (a restart or a changed run is noticed within a minute).
+ */
+async function waitFor(run: ProspectRunRow, stage: string, deps: PipelineDeps): Promise<StepResult> {
+  const now = deps.now().getTime();
+  const due = (await deps.store.runItems(run.organizationId, run.id)).filter((i) => i.stage === stage && i.nextAttemptAt).map((i) => new Date(i.nextAttemptAt!).getTime()).filter((t) => t > now);
+  if (!due.length) return "more";
+  return { wait: new Date(Math.min(Math.max(Math.min(...due), now + 10_000), now + 60_000)) };
 }
 
 /* ── search ─────────────────────────────────────────────────────────────── */
 
-async function searchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps: PipelineDeps): Promise<"more" | "done"> {
+async function searchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps: PipelineDeps): Promise<StepResult> {
+  if (!holds(deps)()) throw new LeaseLost(run.id);
   const plan = run.queries as QueryPlan[];
   const next = plan.find((q) => !q.done);
   const counters: RunCountersExt = { ...emptyCounters(), ...(run.counters as RunCountersExt) };
@@ -179,14 +217,14 @@ async function searchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps:
         next.done = true; next.ok = false; next.error = e instanceof DiscoveryError ? e.code : "error";
       }
     }
-    await deps.store.updateRun(run.id, { queries: plan, counters, updatedAt: deps.now() });
+    await writeRun(deps, run, { queries: plan, counters, updatedAt: deps.now() });
     run.queries = plan; run.counters = counters;
     if (plan.some((q) => !q.done)) return "more";
   }
   return rankStep(run, icp, deps);
 }
 
-async function rankStep(run: ProspectRunRow, icp: Icp, deps: PipelineDeps): Promise<"more" | "done"> {
+async function rankStep(run: ProspectRunRow, icp: Icp, deps: PipelineDeps): Promise<StepResult> {
   const plan = run.queries as QueryPlan[];
   const items = await deps.store.runItems(run.organizationId, run.id);
   if (!items.length) {
@@ -211,14 +249,14 @@ async function rankStep(run: ProspectRunRow, icp: Icp, deps: PipelineDeps): Prom
 
 /* ── verify ─────────────────────────────────────────────────────────────── */
 
-async function verifyStep(run: ProspectRunRow, deadline: number, deps: PipelineDeps): Promise<"more" | "done"> {
+async function verifyStep(run: ProspectRunRow, deadline: number, deps: PipelineDeps): Promise<StepResult> {
   const batch = await deps.store.itemsAt(run.id, "found", deps.concurrency * 2, deps.now());
   if (!batch.length) {
-    if ((await deps.store.itemsAt(run.id, "found", 1, new Date(deps.now().getTime() + 365 * DAY))).length) return "more"; // waiting on a retry
+    if ((await deps.store.itemsAt(run.id, "found", 1, new Date(deps.now().getTime() + 365 * DAY))).length) return waitFor(run, "found", deps); // waiting on a retry
     await setStage(deps, run, "enrich");
     return "more";
   }
-  await inSlices(batch, deps.concurrency, deadline, () => Date.now(), (item) => verifyOne(run, item, deps));
+  await inSlices(batch, deps.concurrency, deadline, () => Date.now(), holds(deps), run.id, (item) => verifyOne(run, item, deps));
   return "more";
 }
 
@@ -263,13 +301,13 @@ export const flatProfile = (name: string, profile: Record<string, { value: strin
   location: profile.location?.value ?? null, country: profile.country?.value ?? null, employees: profile.team_size?.value ?? null, targetCustomers: profile.target_customers?.value ?? null,
 });
 
-async function enrichStep(run: ProspectRunRow, icp: Icp, deadline: number, deps: PipelineDeps): Promise<"more" | "done"> {
+async function enrichStep(run: ProspectRunRow, icp: Icp, deadline: number, deps: PipelineDeps): Promise<StepResult> {
   const budget = runBudget(run.quantity);
   const all = await deps.store.runItems(run.organizationId, run.id);
   const done = all.filter((i) => ["enriched", "done"].includes(i.stage) || (i.stage === "rejected" && ["poor_fit", "unclear", "not_a_company"].includes(i.errorCode ?? ""))).length;
   const batch = await deps.store.itemsAt(run.id, "verified", deps.concurrency * 2, deps.now());
   if (!batch.length) {
-    if ((await deps.store.itemsAt(run.id, "verified", 1, new Date(deps.now().getTime() + 365 * DAY))).length) return "more";
+    if ((await deps.store.itemsAt(run.id, "verified", 1, new Date(deps.now().getTime() + 365 * DAY))).length) return waitFor(run, "verified", deps);
     await setStage(deps, run, "research");
     return "more";
   }
@@ -279,7 +317,7 @@ async function enrichStep(run: ProspectRunRow, icp: Icp, deadline: number, deps:
   if (!todo.length) return "more";
   const left = await allowanceOrStop(deps, "enrich", run.organizationId);
   if (left <= 0) throw new StopRun("daily_limit");
-  await inSlices(todo.slice(0, left), Math.min(deps.concurrency, left), deadline, () => Date.now(), (item) => enrichOne(run, icp, item, deps));
+  await inSlices(todo.slice(0, left), Math.min(deps.concurrency, left), deadline, () => Date.now(), holds(deps), run.id, (item) => enrichOne(run, icp, item, deps));
   return "more";
 }
 
@@ -294,13 +332,17 @@ export async function enrichOne(run: Pick<ProspectRunRow, "id" | "organizationId
       const others = await Promise.all(extra.map((u) => readPage(deps, u)));
       const pages: ResearchPage[] = [home, ...others].filter((x): x is Extract<PageRead, { ok: true }> => x.ok && sameSite(new URL(x.url).hostname, p.domain)).map((x, i) => ({ index: i + 1, url: x.url, text: x.text }));
       const raw = await askJson(deps, { task: "enrich", orgId, userId: run.createdByUser, runId: run.id, promptVersion: PROMPT_VERSIONS.enrich },
-        [{ role: "system", content: enrichSystemPrompt() }, { role: "user", content: enrichUserMessage(p.name, pages) }], 3000);
+        [{ role: "system", content: enrichSystemPrompt() }, { role: "user", content: enrichUserMessage(p.name, pages) }], MAX_TOKENS.enrich);
+      // No answer at all is a failed call to retry, never "this company says nothing" (which sets it aside for good).
+      if (raw === null) throw new ProviderError("invalid_response", "empty_output");
       const n = normalizeEnrichment(raw, pages, p.domain);
       const drafts: NewFinding[] = n.facts.map((f: FactDraft) => ({ kind: "fact", type: f.field, value: f.value, status: "confirmed", sourceUrl: f.url, sourceType: "website", quote: f.quote, contentHash: (home as any).hash, confidence: "high" }));
       facts = await deps.store.saveStep({ orgId, prospectId: p.id, batch: "enrich", findings: drafts, now });
       // Firmographics from a data provider fill gaps. They are a third party's estimate: inferred, never "confirmed".
       if (deps.company) {
         try {
+          // Its own daily allowance, counted from the database; a count that can't be made skips the provider (fail closed).
+          if ((await deps.store.countProviderCalls({ orgId, operation: "company", since: new Date(now.getTime() - DAY) })) >= dailyCompanyLimit()) throw new Error("company_allowance");
           const c = await trackProvider(deps, { orgId, runId: run.id, provider: deps.company.name, operation: "company" }, () => deps.company!.enrich(p.domain));
           if (c) {
             const pf: NewFinding[] = [];
@@ -330,7 +372,7 @@ export async function enrichOne(run: Pick<ProspectRunRow, "id" | "organizationId
 
 const FIT_ORDER: Record<string, number> = { strong: 0, partial: 1, unclear: 2 };
 
-async function researchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps: PipelineDeps): Promise<"more" | "done"> {
+async function researchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps: PipelineDeps): Promise<StepResult> {
   const budget = runBudget(run.quantity);
   const all = await deps.store.runItems(run.organizationId, run.id);
   const researched = all.filter((i) => i.stage === "done").length;
@@ -338,13 +380,13 @@ async function researchStep(run: ProspectRunRow, icp: Icp, deadline: number, dep
   const dueNow = waiting.filter((i) => !i.nextAttemptAt || new Date(i.nextAttemptAt) <= deps.now())
     .sort((a, b) => (FIT_ORDER[(a.prospect.fit as any)?.verdict] ?? 3) - (FIT_ORDER[(b.prospect.fit as any)?.verdict] ?? 3) || b.rank - a.rank);
   if (!waiting.length) return finalize(run, icp, deps, null);
-  if (!dueNow.length) return "more";
+  if (!dueNow.length) return waitFor(run, "enriched", deps);
   const room = Math.max(0, budget.research - researched);
   if (room === 0) return finalize(run, icp, deps, null); // the rest keep their enrichment; finalize scores them
   const left = await allowanceOrStop(deps, "signals", run.organizationId);
   if (left <= 0) throw new StopRun("daily_limit");
   const batch = dueNow.slice(0, Math.min(room, deps.concurrency, left));
-  await inSlices(batch, deps.concurrency, deadline, () => Date.now(), async (item) => { await researchOne(run, icp, item, deps); });
+  await inSlices(batch, deps.concurrency, deadline, () => Date.now(), holds(deps), run.id, async (item) => { await researchOne(run, icp, item, deps); });
   return "more";
 }
 
@@ -366,8 +408,9 @@ export async function researchOne(run: Pick<ProspectRunRow, "id" | "organization
     const pages: ResearchPage[] = [home, ...reads].filter((x): x is Extract<PageRead, { ok: true }> => x.ok && sameSite(new URL(x.url).hostname, p.domain)).slice(0, 5).map((x, i) => ({ index: i + 1, url: x.url, text: x.text }));
     const known = (await deps.store.findings(orgId, p.id)).filter((f) => f.kind === "fact" && (f.batch === "enrich" || f.batch === "company"));
     const raw = await askJson(deps, { task: "signals", orgId, userId: run.createdByUser, runId: run.id, promptVersion: PROMPT_VERSIONS.signals },
-      [{ role: "system", content: signalsSystemPrompt() }, { role: "user", content: signalsUserMessage(p.name, icp, opts.offer ?? null, known.map((k) => ({ id: k.id, label: LABELS[k.type] ?? k.type, value: k.value })), pages) }], 4000);
-    const r = normalizeResearch(raw, pages, p.domain, { retrievedAt: now, icp, knownFactIds: known.map((k) => k.id) });
+      [{ role: "system", content: signalsSystemPrompt() }, { role: "user", content: signalsUserMessage(p.name, icp, opts.offer ?? null, known.map((k) => ({ id: k.id, label: LABELS[k.type] ?? k.type, value: k.value })), pages) }], MAX_TOKENS.signals);
+    if (raw === null) throw new ProviderError("invalid_response", "empty_output");
+    const r = normalizeResearch(raw, pages, p.domain, { retrievedAt: now, icp, knownFactIds: known.map((k) => k.id), companyName: p.name });
 
     const list: NewFinding[] = [];
     const localOf = new Map<number, number>();
@@ -450,9 +493,9 @@ async function finalize(run: ProspectRunRow, icp: Icp, deps: PipelineDeps, stopp
     if (i.stage === "found" || i.stage === "verified") await deps.store.setItem(i.id, { stage: "rejected", errorCode: why, updatedAt: deps.now() });
   }
   const counters = await computeCounters({ ...run, counters: { ...(run.counters as object), stoppedBy: stoppedBy ?? (run.counters as RunCountersExt)?.stoppedBy ?? null } as any }, deps);
-  await deps.store.updateRun(run.id, { counters, costMicroUsd: counters.costMicroUsd ?? 0, stage: "done", updatedAt: deps.now() });
+  // One statement: the stage and the status can't be left half-written by a crash between two of them.
   const failed = stoppedBy === "search_unavailable";
-  await deps.store.setRunStatus(run.organizationId, run.id, "running", failed ? "failed" : "done", deps.now(), stoppedBy);
+  if (!(await deps.store.finishRun(run.organizationId, run.id, fenceOf(run), { status: failed ? "failed" : "done", counters, costMicroUsd: counters.costMicroUsd ?? 0, errorCode: stoppedBy, now: deps.now() }))) throw new LeaseLost(run.id);
   run.stage = "done";
   return "done";
 }
@@ -460,7 +503,7 @@ async function finalize(run: ProspectRunRow, icp: Icp, deps: PipelineDeps, stopp
 /** Checkpoints the funnel mid-run so the page shows progress. Cheap enough to call after every slice. */
 export async function checkpoint(run: ProspectRunRow, deps: PipelineDeps): Promise<void> {
   const counters = await computeCounters(run, deps);
-  await deps.store.updateRun(run.id, { counters, costMicroUsd: counters.costMicroUsd ?? 0, updatedAt: deps.now() });
+  await writeRun(deps, run, { counters, costMicroUsd: counters.costMicroUsd ?? 0, updatedAt: deps.now() });
 }
 
 /** A unique run id. */

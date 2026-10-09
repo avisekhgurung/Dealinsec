@@ -25,6 +25,7 @@ import { pipelineDeps, newRunId, researchOne, enrichOne, scoreProspect, type Pip
 import { prospectsTablesReady, RunActive } from "./store";
 import { dailyContactLimit, dailyRunLimit } from "./limits";
 import { outboundRunner } from "./runner";
+import { costMicroUsd } from "./providers";
 
 const DAY = 86_400_000;
 const NOT_SETUP = () => fail(503, "PROSPECTS_NOT_SETUP", "AI Outbound isn't set up on this server yet.");
@@ -85,6 +86,12 @@ export const runView = (r: ProspectRunRow): RunView => ({
 
 const stable = (v: unknown): string => (Array.isArray(v) ? `[${v.map(stable).join(",")}]` : v && typeof v === "object" ? `{${Object.keys(v as object).sort().map((k) => `${k}:${stable((v as any)[k])}`).join(",")}}` : JSON.stringify(v));
 
+/** Whether any web-search provider is connected, so a tool can say "not set up" before it spends a model call on the profile. */
+export async function searchAvailable(d: Partial<PipelineDeps> = {}): Promise<boolean> {
+  const deps = { ...pipelineDeps(), ...d };
+  return (await deps.searchProviders()).length > 0;
+}
+
 export async function startRun(user: Who, raw: { request?: unknown; icp?: unknown; searches?: unknown }, opts: { by?: "user" | "agent" } = {}, d: Partial<PipelineDeps> = {}): Promise<Result<{ run: RunView; existing: boolean }>> {
   const deps = { ...pipelineDeps(), ...d };
   const gate = writeGate(user);
@@ -95,7 +102,7 @@ export async function startRun(user: Who, raw: { request?: unknown; icp?: unknow
   const orgId = user.organizationId!;
   const icp = withSavedExclusions(parsed.data, await savedProfile(orgId));
   const providers = await deps.searchProviders();
-  if (!providers.length) return fail(503, "DISCOVERY_NOT_SETUP", "Web search isn't connected on this server yet, so I can't look for companies.");
+  if (!providers.length) return fail(503, "DISCOVERY_NOT_SETUP", "Web search isn't set up on this server yet, so I can't search for companies.");
   const now = deps.now();
   if ((await deps.store.countRunsSince(orgId, new Date(now.getTime() - DAY))) >= dailyRunLimit()) return fail(429, "daily_limit", `You've started today's ${dailyRunLimit()} prospect searches. Try again tomorrow.`);
   // The searches the person saw (and may have edited) are the plan, each re-checked; none given = the default strategies.
@@ -288,6 +295,8 @@ export async function findContacts(user: Who, id: number, runId: unknown, d: Par
   const orgId = user.organizationId!;
   const p = await deps.store.getProspect(orgId, id);
   if (!p) return fail(404, "not_found", "That company isn't in your workspace.");
+  // A paid lookup for a company that was set aside would pay to contact someone who will not be contacted.
+  if (p.status === "rejected") return fail(409, "rejected", "That company was set aside, so no contact lookup was made.");
   const run = await runFor(orgId, id, runId, deps);
   const icp = (run?.icp as Icp | undefined) ?? { roles: [] as string[] } as unknown as Icp;
   const now = deps.now();
@@ -296,9 +305,9 @@ export async function findContacts(user: Who, id: number, runId: unknown, d: Par
   const t0 = Date.now();
   try {
     people = await deps.contact.findPeople(p.domain, { limit: 10 });
-    await deps.store.recordProviderCall({ orgId, runId: run?.id ?? null, provider: deps.contact.name, operation: "contact", ok: true, errorCode: null, latencyMs: Date.now() - t0, costMicroUsd: 0, now });
+    await deps.store.recordProviderCall({ orgId, runId: run?.id ?? null, provider: deps.contact.name, operation: "contact", ok: true, errorCode: null, latencyMs: Date.now() - t0, costMicroUsd: costMicroUsd(deps.contact.name), now });
   } catch (e) {
-    await deps.store.recordProviderCall({ orgId, runId: run?.id ?? null, provider: deps.contact.name, operation: "contact", ok: false, errorCode: e instanceof DiscoveryError ? e.code : "error", latencyMs: Date.now() - t0, costMicroUsd: 0, now });
+    await deps.store.recordProviderCall({ orgId, runId: run?.id ?? null, provider: deps.contact.name, operation: "contact", ok: false, errorCode: e instanceof DiscoveryError ? e.code : "error", latencyMs: Date.now() - t0, costMicroUsd: e instanceof DiscoveryError && e.code === "auth" ? 0 : costMicroUsd(deps.contact.name), now });
     return fail(502, "provider_unavailable", "The contact data service didn't answer. Try again later.");
   }
   // A provider's person is a third party's record: stored as INFERRED, with the provider's own email status, never upgraded.
@@ -330,7 +339,7 @@ export async function generateAngle(user: Who, id: number, d: Partial<PipelineDe
   try {
     for (let attempt = 0; attempt < 2 && !angle; attempt++) {
       const reply = await deps.chat({ task: "angle", orgId, userId: user.id, promptVersion: PROMPT_VERSIONS.angle },
-        [{ role: "system", content: angleSystemPrompt() }, { role: "user", content: angleUserMessage(p.name, saved?.about ?? null, list, people) }], { maxTokens: 2000 });
+        [{ role: "system", content: angleSystemPrompt() }, { role: "user", content: angleUserMessage(p.name, saved?.about ?? null, list, people) }], { maxTokens: 4000 });
       const r = normalizeAngle(parseJsonObject(reply.content), { allowedIds: list.map((x) => x.id), people, siteHost: p.domain });
       angle = r.angle; why = r.reason ?? "";
     }

@@ -44,6 +44,11 @@ describe("cleanName", () => {
     expect(cleanName("Northwind Logistics | Freight forwarding in Pune", "northwind.com")).toBe("Northwind Logistics");
     expect(cleanName("Home - Acme Interiors", "acme.com")).toBe("Acme Interiors");
     expect(cleanName("Welcome | Orchid Labs", "orchid.example")).toBe("Orchid Labs");
+    // the brand is the segment the domain spells, wherever it sits in the title
+    expect(cleanName("SaaS Marketing Services | Kuno Creative", "kunocreative.com")).toBe("Kuno Creative");
+    expect(cleanName("B2B Lead Generation Agency - Callbox", "callboxinc.com")).toBe("Callbox");
+    // no segment resembles the domain: the first plain one, as before
+    expect(cleanName("Best Pizza in Town | Open Daily", "example.com")).toBe("Best Pizza in Town");
   });
   it("keeps it short and plain, and falls back to the domain", () => {
     expect(cleanName("", "northwind.com")).toBe("Northwind");

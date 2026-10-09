@@ -15,6 +15,9 @@ import { tablesReadyCheck } from "../leads/ready";
 /** The feature needs its own five tables and the model trace (allowances are counted from it). */
 export const prospectsTablesReady = tablesReadyCheck(["prospect_runs", "prospects", "prospect_run_items", "prospect_findings", "provider_calls", "llm_calls"]);
 
+/** A run as its worker claimed it. `fence` is the claim number: every fenced write must still match it, so a worker whose lease was taken over can no longer change the run. It is kept apart from `attempts` on purpose (a refreshed row would otherwise adopt the new holder's value). */
+export type ClaimedRun = ProspectRunRow & { fence: number };
+
 export class RunActive extends Error { constructor(public runId: string) { super("a run with this ICP is already in progress"); } }
 
 export interface NewRun {
@@ -35,10 +38,15 @@ export interface OutboundStore {
   listRuns(orgId: string, limit: number): Promise<ProspectRunRow[]>;
   countRunsSince(orgId: string, since: Date): Promise<number>;
   /** One atomic claim of a running run whose lease is free (or expired). */
-  claimRun(now: Date, leaseMs: number): Promise<ProspectRunRow | null>;
-  /** Changes a run only while this worker still holds it (lease not taken over). */
-  updateRun(id: string, set: Partial<ProspectRunRow>): Promise<void>;
-  releaseRun(id: string): Promise<void>;
+  claimRun(now: Date, leaseMs: number): Promise<ClaimedRun | null>;
+  /** Changes a run only while this worker still holds it (claim number unchanged, run still running). False = not held any more. */
+  updateRun(id: string, fence: number, set: Partial<ProspectRunRow>): Promise<boolean>;
+  /** Renews (a later time), parks (a time up to a minute ahead) or releases (null) the lease; fenced like updateRun. */
+  setLease(id: string, fence: number, until: Date | null): Promise<boolean>;
+  /** Ends a run in ONE statement (stage, status, counters, cost, finish time, lease), fenced and only while it is running. */
+  finishRun(orgId: string, id: string, fence: number, o: { status: "done" | "failed"; counters: unknown; costMicroUsd: number; errorCode: string | null; now: Date }): Promise<boolean>;
+  /** The earliest time a running run's lease ends after `now` (a parked run to wake for), or null. */
+  nextLeaseExpiry(now: Date): Promise<Date | null>;
   setRunStatus(orgId: string, id: string, from: string, to: string, now: Date, errorCode?: string | null): Promise<boolean>;
 
   /** Inserts the prospect, or merges new sources into the existing one for this organization and domain. */
@@ -109,18 +117,34 @@ export const outboundStore: OutboundStore = {
     return r?.n ?? 0;
   },
   async claimRun(now, leaseMs) {
+    // Times go to SQL as UTC text, like the query builder writes them: a Date handed to the driver is written in the
+    // process's local time, which these zone-less columns would then read back as UTC.
+    const at = now.toISOString(), until = new Date(now.getTime() + leaseMs).toISOString();
     const r = await db.execute(sql`
-      UPDATE prospect_runs SET lease_until = ${new Date(now.getTime() + leaseMs)}, attempts = attempts + 1, updated_at = ${now}
-      WHERE id = (SELECT id FROM prospect_runs WHERE status = 'running' AND (lease_until IS NULL OR lease_until < ${now}) ORDER BY updated_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED)
-      RETURNING id, organization_id`);
-    const row = (r as unknown as { rows: { id: string; organization_id: string }[] }).rows[0];
-    return row ? await this.getRun(row.organization_id, row.id) : null;
+      UPDATE prospect_runs SET lease_until = ${until}::timestamp, attempts = attempts + 1, updated_at = ${at}::timestamp
+      WHERE id = (SELECT id FROM prospect_runs WHERE status = 'running' AND (lease_until IS NULL OR lease_until < ${at}::timestamp) ORDER BY updated_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED)
+      RETURNING id, organization_id, attempts`);
+    const row = (r as unknown as { rows: { id: string; organization_id: string; attempts: number }[] }).rows[0];
+    const run = row ? await this.getRun(row.organization_id, row.id) : null;
+    return run && row ? { ...run, fence: Number(row.attempts) } : null;
   },
-  async updateRun(id, set) {
-    await db.update(prospectRuns).set(set).where(eq(prospectRuns.id, id));
+  async updateRun(id, fence, set) {
+    const r = await db.update(prospectRuns).set(set).where(and(eq(prospectRuns.id, id), eq(prospectRuns.attempts, fence), eq(prospectRuns.status, "running"))).returning({ id: prospectRuns.id });
+    return r.length > 0;
   },
-  async releaseRun(id) {
-    await db.update(prospectRuns).set({ leaseUntil: null }).where(eq(prospectRuns.id, id));
+  async setLease(id, fence, until) {
+    const r = await db.update(prospectRuns).set({ leaseUntil: until }).where(and(eq(prospectRuns.id, id), eq(prospectRuns.attempts, fence), eq(prospectRuns.status, "running"))).returning({ id: prospectRuns.id });
+    return r.length > 0;
+  },
+  async finishRun(orgId, id, fence, o) {
+    const r = await db.update(prospectRuns).set({ stage: "done", status: o.status, counters: o.counters, costMicroUsd: o.costMicroUsd, errorCode: o.errorCode, finishedAt: o.now, updatedAt: o.now, leaseUntil: null })
+      .where(and(eq(prospectRuns.organizationId, orgId), eq(prospectRuns.id, id), eq(prospectRuns.attempts, fence), eq(prospectRuns.status, "running"))).returning({ id: prospectRuns.id });
+    return r.length > 0;
+  },
+  async nextLeaseExpiry(now) {
+    const r = await db.execute(sql`SELECT to_char(min(lease_until), 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS at FROM prospect_runs WHERE status = 'running' AND lease_until > ${now.toISOString()}::timestamp`);
+    const at = (r as unknown as { rows: { at: string | null }[] }).rows[0]?.at;
+    return at ? new Date(at) : null;
   },
   async setRunStatus(orgId, id, from, to, now, errorCode = null) {
     const r = await db.update(prospectRuns).set({ status: to, updatedAt: now, finishedAt: to === "running" ? null : now, errorCode, leaseUntil: null })

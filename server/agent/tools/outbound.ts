@@ -16,11 +16,11 @@ import { z } from "zod";
 import { dailyLimit } from "@shared/llm-cost";
 import { icpSchema } from "@shared/icp";
 import { runBudget } from "@shared/prospect";
-import { addToLeads, findContacts, generateAngle, getProspect, getRun, listRuns, parseIcp, researchProspect, startRun, type ProspectBrief, type RunView } from "../../outbound/service";
+import { addToLeads, findContacts, generateAngle, getProspect, getRun, listRuns, parseIcp, researchProspect, searchAvailable, startRun, type ProspectBrief, type RunView } from "../../outbound/service";
 import { dailyRunLimit } from "../../outbound/limits";
 import { needsPermission, needsRead } from "../policy";
 import type { AgentTool, ToolContext, ToolOutcome } from "../types";
-import { fail } from "./shared";
+import { fail, safeName } from "./shared";
 
 const canWrite = needsPermission("deals.create", "changing leads");
 const readLeads = needsRead("deals");
@@ -73,6 +73,8 @@ const discoverTool: AgentTool<z.infer<typeof requestInput>> = {
   risk: "SAFE_MUTATION", input: requestInput,
   authorize: canWrite,
   async prepare(ctx, { request }) {
+    // No search connected: say so before a model call is spent on the profile, and never put up a card for a search that can't run.
+    if (!(await searchAvailable())) return { ok: false, code: "DISCOVERY_NOT_SETUP", message: "Web search isn't set up on this server yet, so I can't search for companies. Tell the user plainly; do not offer a prospect search." };
     const p = await parseIcp(who(ctx), request);
     if (!p.ok) return { ok: false, code: p.code, message: p.message };
     const b = runBudget(p.icp.quantity);
@@ -190,7 +192,7 @@ const angleTool: AgentTool<{ prospectId: number }> = {
   async prepare(ctx, { prospectId }) {
     const r = await getProspect(who(ctx), prospectId);
     if (!r.ok) return { ok: false, code: r.code, message: r.message };
-    return { ok: true, args: { prospectId }, preview: { title: `Choose an outreach angle for ${r.brief.prospect.name}`, lines: [], effects: ["Uses the AI once, on the findings already stored for this company.", "Saved as a suggestion. Nothing is sent."] } };
+    return { ok: true, args: { prospectId }, forceApproval: true, preview: { title: `Choose an outreach angle for ${r.brief.prospect.name}`, lines: [], effects: ["Uses the AI once, on the findings already stored for this company.", "Saved as a suggestion. Nothing is sent."] } };
   },
   async execute(ctx, args): Promise<ToolOutcome> {
     const r = await generateAngle(who(ctx), Number(args.prospectId));
@@ -208,8 +210,8 @@ const addTool: AgentTool<{ prospectId: number; contactFindingId?: number }> = {
     const r = await getProspect(who(ctx), prospectId);
     if (!r.ok) return { ok: false, code: r.code, message: r.message };
     const p = r.brief.prospect;
-    if (p.leadId) return { ok: false, code: "already_lead", message: `${p.name} is already lead ${p.leadId}.` };
-    if (p.rejectReason) return { ok: false, code: "rejected", message: `${p.name} was set aside (${p.rejectLabel}).` };
+    if (p.leadId) return { ok: false, code: "already_lead", message: `${safeName(p.name)} is already lead ${p.leadId}.` };
+    if (p.rejectReason) return { ok: false, code: "rejected", message: `${safeName(p.name)} was set aside (${p.rejectLabel}).` };
     return { ok: true, args: { prospectId, ...(contactFindingId ? { contactFindingId } : {}) }, preview: { title: `Add lead: ${p.name}`, lines: [{ label: "Website", value: p.domain }, ...(p.score ? [{ label: "Score", value: `${p.score.total} / 100` }] : []), ...(p.decisionMaker ? [{ label: "Contact", value: p.decisionMaker.value }] : [])], effects: ["Adds it to your pipeline as a New lead, with what was found as its facts.", "Nothing is sent to the company."] } };
   },
   async execute(ctx, args): Promise<ToolOutcome> {

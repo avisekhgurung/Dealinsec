@@ -66,7 +66,11 @@ search result → candidate → verified → enriched → qualified → ready   
 ## 4. Durable workflow
 
 `prospect_runs` is the job table, and `server/workflow/` holds a small generic runner:
-- **Atomic claim.** `UPDATE ... SET lease_until = now() + 90 s WHERE status = 'running' AND (lease_until IS NULL OR lease_until < now()) RETURNING`. Only one worker anywhere can hold a run.
+- **Atomic claim.** One `UPDATE ... SET lease_until = now + 90 s, attempts = attempts + 1 WHERE id = (SELECT ... WHERE status = 'running' AND (lease_until IS NULL OR lease_until < now) ... FOR UPDATE SKIP LOCKED) RETURNING`. Only one worker anywhere can hold a run. Times are sent as UTC text (the columns have no time zone, and a raw `Date` is written in the process's local zone).
+- **Ownership (fence).** The claim number the claim returns (`attempts`) travels with the run as `fence`, kept apart from the row so a refreshed row can't adopt a newer holder's number. Every write to the run (`updateRun`, `setLease`, `finishRun`) must still match it *and* the run must still be `running`: after a takeover or a cancel the old worker's writes do nothing and it stops with `LeaseLost`.
+- **Lease renewal.** While a step works, the lease is renewed every 30 s. A renewal that finds the run taken over stops the work at the next slice (the slice in flight finishes; per-item idempotency keeps its results from being paid for twice). A renewal that merely errors is not a loss.
+- **Parking, not polling.** When everything left is waiting on a retry back-off, the step returns `{ wait }` (the earliest due time, 10-60 s ahead) and the run is *parked*: its lease is held until then, so nothing claims it and the database sees no queries at all while it waits. One timer wakes the runner at that time, and when the loop goes idle a single `min(lease_until)` query schedules the next wake, so a parked run resumes after a restart with no request. Each re-claim counts against `MAX_CLAIMS` (500).
+- **One-statement finish.** `finishRun` sets stage, status, counters, cost, error, finish time and clears the lease together, so a crash can't leave a finished-looking run that still says `running`. A row left that way by older code is finished again on its next claim, with the outcome it already had.
 - **Bounded steps.** Each step processes a small slice of prospects. Each prospect's results and its next stage are written in one transaction, so a crash never leaves half a write or a duplicate.
 - **Retries.** Provider and timeout errors are retried with a backoff, up to 3 attempts per item. After that the item fails, with a code, and the run carries on.
 - **Resume.** A crash or a sleeping instance leaves an expired lease, and the next tick continues from the last checkpoint. Ticks come from an in-process loop that runs only while there is work, a check at boot, and any request to the outbound API. The GitHub keep-warm ping keeps Render awake.
@@ -97,15 +101,15 @@ Domain code depends only on the interfaces. Every adapter is tested against a fa
 
 - **Tenant isolation.** Every query is scoped to the organisation, and a foreign id answers "not found".
 - **Safe fetching.** Every fetch goes through net-guard: SSRF protection, DNS pinning, private-IP blocking, redirect re-checks, size and time limits, at most one fetch per domain at a time and at most 6 pages per site.
-- **Untrusted data.** Page text, snippets and provider data are always fenced as data. Findings need exact quotes, and text that reads like an instruction is dropped.
-- **Nothing in the pipeline can call an agent tool.** The agent's tools that spend allowance or write data always ask first.
+- **Untrusted data.** Page text, snippets, provider data and company names (which come from search-result titles) are always fenced as data. Findings need exact quotes, and text that reads like an instruction is dropped. A company name quoted inside a tool's message to the model is clipped to one short line without tags.
+- **Nothing in the pipeline can call an agent tool.** Every agent tool that spends a daily allowance or writes asks first (`discover_prospects`, `research_prospect`, `find_decision_maker`, `get_outreach_angle`, `add_prospect_to_leads`). The one exception is `parse_icp`: it reads, writes nothing, and makes one capped, cheap model call to explain a request. `discover_prospects` says "not set up" before it builds a card or calls a model when no search is connected.
 - **Keys and logs.** Keys stay on the server. Logs and traces hold ids, codes, counts and costs, never prompts, page text or personal data.
 - **Contacts.** A provider-sourced person is stored with its source and the provider's verification status, shown, and accepted by the person. No email is ever constructed.
 
 ## 8. Cost controls
 
 - **Run budget.** Each run's budget scales with quantity: maximum queries, verifications, enrichments, research calls and LLM calls.
-- **Daily allowances per workspace.** Runs, searches and each LLM task are capped. They are counted from `provider_calls` and `llm_calls` and fail closed.
+- **Daily allowances per workspace.** Runs, searches, company-data lookups (Apollo), contact lookups and each LLM task are capped. They are counted from `provider_calls` and `llm_calls` and fail closed (a count that can't be made skips the paid call).
 - **Cheap filters first.** Rule-based filters run before any LLM call, and the fit gate runs before deep research.
 - **Research cache.** A company is not researched again within 14 days unless the person forces it.
 - **Visible cost.** Each run shows its estimated cost.
@@ -145,6 +149,7 @@ Out of scope: automatic sending, inbound replies, WhatsApp, LinkedIn scraping or
 | `OUTBOUND_DAILY_RUNS` | 5 | Prospect searches per workspace per 24 h |
 | `OUTBOUND_DAILY_SEARCHES` | 60 | Search-provider calls per workspace per 24 h |
 | `OUTBOUND_DAILY_CONTACT_LOOKUPS` | 30 | Contact-provider lookups per workspace per 24 h |
+| `OUTBOUND_DAILY_COMPANY_LOOKUPS` | 100 | Company-data (Apollo) lookups per workspace per 24 h |
 | `OUTBOUND_SEARCH_PROVIDERS` | the configured discovery provider | e.g. `tavily,brave`: spread the queries over several |
 | `SALES_ICP_MODEL`, `SALES_ENRICH_MODEL`, `SALES_SIGNALS_MODEL`, `SALES_ANGLE_MODEL` | `deepseek-flash` | Model per task |
 | `SALES_DAILY_ICP_LIMIT` / `_ENRICH_` / `_SIGNALS_` / `_ANGLE_` | 60 / 400 / 250 / 80 | Model calls per workspace per 24 h, counted from `llm_calls` |
@@ -180,3 +185,29 @@ The first real run (real search, real websites, real model) passed every invaria
 | `agent-v2` (45 x 3), second run | 96% pass rate, 99% of assertions, 0 safety failures |
 
 Notes: the first `agent-v2`/`agent-v3` runs dropped to 56%/73% because the model provider timed out ("couldn't reach the AI service", ~21 s); they were re-run. `lead-find-without-names` now reads "quick web search" because a batch request is correctly routed to `discover_prospects` (covered by `agent-v4`). Two reply-wording checks (`knowledge-shown-in-fit-check`, `discovery-not-set-up`) are flaky, not unsafe.
+
+### Reliability pass (9 Oct 2026, after the audit of `ab3f244`)
+Fixed, each with a regression test that fails when the fix is removed (16 of 16 deliberate breakages caught):
+- a run whose only work was a retry back-off looped against the database at full speed (now parked, zero queries while it waits);
+- no lease renewal and unfenced writes (now fenced, renewed, with `LeaseLost`); raw-SQL timestamps now UTC (proved on the local database under `America/Los_Angeles`: the old SQL stored the lease 7 hours off);
+- a failed page read was cached for 30 minutes, so retries were no-ops (failures are never cached);
+- the run's finish was two statements (now one; half-finished rows heal);
+- company enrichment had no daily allowance; contact lookups were recorded at zero cost and ran for set-aside companies;
+- `discover_prospects` built an approval card before checking that a search was connected;
+- `get_outreach_angle` ran without asking at autonomy 1; company names were unfenced in prompts and quoted raw in tool messages;
+- the related-note lookup missed "crypto" for "Cryptocurrency exchange" (the fit verdict itself is unchanged);
+- `shared/schema.ts` now declares the `prospect_runs_one_active` index the migration already creates.
+
+Known and left as is: item-level writes are not fenced (a worker that just lost its lease can land the slice already in flight; unique indexes and per-item freshness keep that from duplicating rows or spend); two concurrent "Add to Leads" clicks can leave the second lead without copied evidence; no per-domain fetch mutex (3 items at a time, up to 5 pages each).
+
+### Benchmark-driven changes (10 Oct 2026)
+Measured against 72 companies verified from their own websites (`docs/ai-outbound-benchmark-2026-10.md`, `script/outbound-benchmark*.mts`). Each has a test that fails without it.
+- **Page reader:** a bounded, labelled block of footer / `address` / `mailto:` / `tel:` / structured-data address text is added to each page (the article extractor drops footers). Location was unknown for 50 of 54 companies before; 24 of 54 after. Quotes are checked against exactly this text.
+- **Model budget:** enrich and research ask for 8,000 output tokens; a reasoning model returned nothing at 3,000. An empty reply is a failed call (retried 3 times, then `failed` with a code), never "unclear".
+- **Fit:** a country the person named is a requirement (a stated or web-address-evident other country is a weak fit). The ICP prompt asks for the specialist kinds of the same company (up to 8 keywords).
+- **Identity check:** accepts the domain without its legal tail (`callboxinc.com` shows "Callbox"), folds accents; titles prefer the segment the domain spells.
+- **People:** the model names each person's employer; only a match with the company (name or domain) is kept, so a client quoted in a testimonial is not a decision maker.
+- **Freshness labels** say what the bands are: "Last 30 days", "Last 3 months", "Last 12 months".
+Tried and not shipped: matching ICP phrases by their words (admitted an IP-lookup site and a market-research report on real search results).
+
+The full benchmark report, the truth set and the raw results name third-party companies and people, so they are kept local (not in this public repository). The reproducible parts are committed: `script/bench/normalize.mts`, `script/outbound-benchmark.mts` (search diagnostics and the real end-to-end run), `script/outbound-benchmark-injected.mts` (every stage after search, on its own) and `script/check-outbound-store.mts` (the lease SQL on a real database). Deploying: `docs/ai-outbound-staging-checklist.md`.

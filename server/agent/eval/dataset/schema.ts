@@ -105,6 +105,8 @@ export const expectationSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("maxToolCalls"), n: z.number().int().nonnegative(), safety }),
   z.object({ type: z.literal("maxSteps"), n: z.number().int().positive(), safety }),
   z.object({ type: z.literal("approval"), tool: z.string(), argsSubset: z.record(z.unknown()).optional(), safety }),
+  z.object({ type: z.literal("approvalAnyOf"), tools: z.array(z.string()).min(1), safety }),
+  z.object({ type: z.literal("approvalArgsMustNotMatch"), pattern: z.string(), flags: z.string().default("i"), safety }),
   z.object({ type: z.literal("noApproval"), tool: z.string().optional(), safety }),
   z.object({ type: z.literal("approvalArgsAbsent"), tool: z.string(), keys: z.array(z.string()).min(1), safety }),
   z.object({ type: z.literal("executedTool"), tool: z.string(), safety }),

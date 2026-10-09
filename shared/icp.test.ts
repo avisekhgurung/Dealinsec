@@ -97,6 +97,14 @@ describe("headcounts", () => {
   });
 });
 
+describe("the ICP's keywords", () => {
+  it("up to eight are kept (the specialist kinds of the same company), a ninth is refused", () => {
+    const kw = (n: number) => Array.from({ length: n }, (_, i) => `kind ${i}`);
+    expect(icpSchema.parse({ industry: "digital marketing agency", keywords: kw(8) }).keywords).toHaveLength(8);
+    expect(icpSchema.safeParse({ industry: "digital marketing agency", keywords: kw(9) }).success).toBe(false);
+  });
+});
+
 describe("prospect fit", () => {
   const p = { name: "Northwind Digital", industry: "Digital marketing agency", location: "Austin, Texas", country: "US", employees: "a team of 18", targetCustomers: "B2B SaaS companies" };
   it("strong only when everything checkable matches", () => {
@@ -113,6 +121,21 @@ describe("prospect fit", () => {
   it("a size outside the range is a mismatch", () => {
     expect(prospectFit(icp(), { ...p, employees: "250 employees" }).signals.find((s) => s.key === "size")!.status).toBe("mismatch");
     expect(prospectFit(icp(), { ...p, employees: "250 employees" }).verdict).toBe("partial");
+  });
+  it("a country the person named is a requirement: a company stated to be elsewhere is a WEAK fit however well the rest matches", () => {
+    const uk = prospectFit(icp(), { ...p, country: "GB", location: "London" });
+    expect(uk.signals.find((s) => s.key === "location")!.status).toBe("mismatch");
+    expect(uk.signals.filter((s) => s.status === "match").map((s) => s.key)).toEqual(["industry", "size", "market"]); // everything else matched
+    expect(uk.verdict).toBe("weak");
+    expect(uk.headline).toMatch(/outside the country you asked for/);
+    // its web address alone is evidence too
+    expect(prospectFit(icp(), { ...p, country: null, location: null, domain: "examplemarketing.co.uk" } as any).verdict).toBe("weak");
+    // …but a city with no country, an unknown place, or the right country is not
+    expect(prospectFit(icp(), { ...p, country: null, location: "London" }).verdict).not.toBe("weak");
+    expect(prospectFit(icp(), { ...p, country: null, location: null }).verdict).not.toBe("weak");
+    expect(prospectFit(icp(), p).verdict).toBe("strong");
+    // no country asked for: where it is makes no difference
+    expect(prospectFit(icp({ countries: [] }), { ...p, country: "GB" }).verdict).not.toBe("weak");
   });
   it("not mentioning the target market is unknown, not a mismatch", () => {
     expect(prospectFit(icp(), { ...p, targetCustomers: "local restaurants" }).signals.find((s) => s.key === "market")!.status).toBe("unknown");
@@ -154,7 +177,7 @@ describe("what real companies taught us", () => {
     const f = prospectFit(icp(), { name: "Koozai", domain: "koozai.co.uk", industry: "Digital marketing agency", location: "Southampton" });
     expect(f.signals.find((s) => s.key === "location")).toMatchObject({ status: "mismatch" });
     expect(f.signals.find((s) => s.key === "location")!.detail).toMatch(/\.uk/);
-    expect(f.verdict).toBe("partial");
+    expect(f.verdict).toBe("weak"); // was "partial": a country the person named is a requirement (the benchmark showed UK/India agencies becoming "ready")
   });
   it("a stated country beats the web address; .com and generic endings say nothing", () => {
     expect(prospectFit(icp(), { name: "X", domain: "x.co.uk", industry: "Digital marketing agency", country: "US" }).signals.find((s) => s.key === "location")!.status).toBe("match");

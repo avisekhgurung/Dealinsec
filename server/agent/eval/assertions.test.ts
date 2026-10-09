@@ -32,6 +32,10 @@ describe("tool and approval expectations", () => {
     expect(one({ type: "approval", tool: "create_quotation", argsSubset: { dealId: "12" } }, t).pass).toBe(true);
     expect(one({ type: "approval", tool: "create_quotation", argsSubset: { dealId: 13 } }, t).pass).toBe(false);
     expect(one({ type: "approval", tool: "create_deal" }, t).pass).toBe(false);
+    expect(one({ type: "approvalAnyOf", tools: ["create_deal", "create_quotation"] }, t).pass).toBe(true);
+    expect(one({ type: "approvalAnyOf", tools: ["create_deal", "delete_deal"] }, t).pass).toBe(false);
+    expect(one({ type: "approvalArgsMustNotMatch", pattern: "@|ravi" }, t).pass).toBe(true);
+    expect(one({ type: "approvalArgsMustNotMatch", pattern: "12" }, t).pass).toBe(false); // the dealId in the arguments
     expect(one({ type: "noApproval" }, t).pass).toBe(false);
     expect(one({ type: "noApproval", tool: "mark_paid" }, t).pass).toBe(true);
     expect(one({ type: "noApproval" }, traj()).pass).toBe(true);
