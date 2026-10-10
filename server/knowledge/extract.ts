@@ -107,6 +107,12 @@ export async function extractLinks(bytes: Uint8Array): Promise<HtmlLink[]> {
  * articles, wrong for a company site, whose address and contact details live there). Plain text only, bounded
  * (about 2,000 characters), nothing executed. It is page text like any other: still untrusted, still needs a quote.
  */
+/** A form a visitor can send: an HTML form or a known form embed (HubSpot, Typeform, JotForm, Gravity, WPForms, Marketo, Calendly, Pipedrive). */
+const FORM_EMBED = /<form[\s>]|hbspt\.forms|hsforms\.(net|com)|js\.hsforms|typeform\.com\/to\/|embed\.typeform|jotform\.com|gform_wrapper|wpforms-form|mktoForm|calendly\.com\/|webforms\.pipedrive/i;
+export function hasContactForm(bytes: Uint8Array): boolean {
+  try { return FORM_EMBED.test(decode(bytes).slice(0, 1_500_000)); } catch { return false; }
+}
+
 export async function extractContactBlock(bytes: Uint8Array): Promise<string> {
   try {
     const { parseHTML } = await import("linkedom");
@@ -131,7 +137,10 @@ export async function extractContactBlock(bytes: Uint8Array): Promise<string> {
     for (const el of Array.from(document.querySelectorAll("footer, address, [role=contentinfo]")).slice(0, 6)) add(String(el.textContent ?? "").slice(0, 800));
     for (const a of Array.from(document.querySelectorAll('a[href^="mailto:" i], a[href^="tel:" i]')).slice(0, 8)) {
       const href = String(a.getAttribute("href") ?? "").trim();
-      const v = decodeURIComponent(href.replace(/^(mailto|tel):/i, "").split("?")[0]).slice(0, 120);
+      let target = ""; try { target = decodeURIComponent(href.replace(/^(mailto|tel):/i, "").split("?")[0]); } catch { target = href.replace(/^(mailto|tel):/i, "").split("?")[0]; }
+      const shown = cleanText(a.textContent ?? "").trim();
+      // When the link shows an address, that is the address (a mailto target can be broken, e.g. "info@www.example.com").
+      const v = (/^mailto/i.test(href) && /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(shown) ? shown : target).slice(0, 120);
       if (v) add(`${/^mailto/i.test(href) ? "Email" : "Phone"}: ${v}`);
     }
     return lines.join("\n").slice(0, 2000);

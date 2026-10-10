@@ -111,14 +111,18 @@ export function buildWorld(spec: WorldSpec): { world: World; user: Row; refs: Re
   return { world, user, refs };
 }
 
-/** Replace `{{deal.acme}}`, `{{invoice.inv1}}`, `{{contract.c1}}`, `{{lead.north}}` anywhere in a JSON-like value. */
-export function resolveRefs<T>(value: T, refs: Refs): T {
+/**
+ * Replace `{{deal.acme}}`, `{{invoice.inv1}}`, `{{contract.c1}}`, `{{lead.north}}` anywhere in a JSON-like value, and
+ * `{{date+N}}` / `{{date-N}}` with the UTC date N days from `now` (YYYY-MM-DD): a case about "a date in the future" stays
+ * about the future (a fixed "2026-10-09" became yesterday and the agent rightly asked about it).
+ */
+export function resolveRefs<T>(value: T, refs: Refs, now: Date = new Date()): T {
   const sub = (s: string) =>
     s.replace(/\{\{(deal|invoice|contract|lead|prospect)\.([a-z][a-z0-9_]*)\}\}/g, (_m, kind: keyof Refs, name: string) => {
       const id = refs[kind][name];
       if (id === undefined) throw new Error(`dataset placeholder {{${kind}.${name}}} has no matching record`);
       return String(id);
-    });
+    }).replace(/\{\{date([+-])(\d{1,4})\}\}/g, (_m, sign: string, n: string) => new Date(now.getTime() + (sign === "+" ? 1 : -1) * Number(n) * 86_400_000).toISOString().slice(0, 10));
   const walk = (v: unknown): unknown =>
     typeof v === "string" ? sub(v) : Array.isArray(v) ? v.map(walk) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)])) : v;
   return walk(value) as T;

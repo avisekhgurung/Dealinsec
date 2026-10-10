@@ -13,7 +13,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { collectCandidates, checkSite, emptyCounters, findingsAsClaims, preRank, relevance, MIN_RELEVANCE, readiness, runBudget, pickResearchLinks, SIGNAL_LABEL, freshness, type RejectReason, type RunCounters, type SearchHit, type FindingLike } from "@shared/prospect";
-import { normalizeEnrichment, normalizeResearch, type FactDraft } from "@shared/prospect-intel";
+import { contactFormFinding, normalizeEnrichment, normalizeResearch, type FactDraft } from "@shared/prospect-intel";
 import { industryMatched, prospectFit, type Icp, type ProspectProfile } from "@shared/icp";
 import { scoreLead } from "@shared/lead-score";
 import { pickLinks, sameSite, type ResearchPage } from "@shared/research";
@@ -213,8 +213,10 @@ async function searchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps:
         for (const r of rejected) counters.searchRejectedBy[r.reason] = (counters.searchRejectedBy[r.reason] ?? 0) + 1;
         next.done = true; next.ok = true; next.results = results.length;
       } catch (e) {
-        // Billed searches are not retried; a failed query is recorded and the run carries on with the others.
-        next.done = true; next.ok = false; next.error = e instanceof DiscoveryError ? e.code : "error";
+        // Billed searches are not retried; a failed query is recorded and the run carries on with the others. A failure that
+        // is not the provider's own answer keeps its type (never its message, which could hold page text) so it is visible.
+        next.done = true; next.ok = false; next.error = e instanceof DiscoveryError ? e.code : `error:${String((e as Error)?.name ?? "unknown").slice(0, 20)}`;
+        console.log(JSON.stringify({ kind: "outbound_search_failed", provider: provider.name, errorType: e instanceof DiscoveryError ? e.code : (e as Error)?.name ?? "unknown" }));
       }
     }
     await writeRun(deps, run, { queries: plan, counters, updatedAt: deps.now() });
@@ -337,6 +339,12 @@ export async function enrichOne(run: Pick<ProspectRunRow, "id" | "organizationId
       if (raw === null) throw new ProviderError("invalid_response", "empty_output");
       const n = normalizeEnrichment(raw, pages, p.domain);
       const drafts: NewFinding[] = n.facts.map((f: FactDraft) => ({ kind: "fact", type: f.field, value: f.value, status: "confirmed", sourceUrl: f.url, sourceType: "website", quote: f.quote, contentHash: (home as any).hash, confidence: "high" }));
+      // The model often skips a contact form. Code checks for one on the pages already read: a contact page of this site that
+      // holds a real form, quoted from that page. (Measured: 7 of 37 not-ready companies lacked only a contact route.)
+      if (!drafts.some((f) => f.type === "contact_form")) {
+        const form = [home, ...others].map((x) => (x.ok ? contactFormFinding(x, p.domain) : null)).find((x) => x);
+        if (form) drafts.push({ kind: "fact", type: "contact_form", value: form.value, status: "confirmed", sourceUrl: form.url, sourceType: "website", quote: form.quote, contentHash: (home as any).hash, confidence: "high", meta: { detectedBy: "form" } });
+      }
       facts = await deps.store.saveStep({ orgId, prospectId: p.id, batch: "enrich", findings: drafts, now });
       // Firmographics from a data provider fill gaps. They are a third party's estimate: inferred, never "confirmed".
       if (deps.company) {

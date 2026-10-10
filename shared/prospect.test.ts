@@ -53,6 +53,12 @@ describe("the junk filter", () => {
   });
   it("a company's own page passes", () => {
     expect(junkReason(hit("https://northwind.com"))).toBeNull();
+    // platforms seen in real results and on real list pages are not companies, in any country ending
+    for (const u of ["https://dribbble.com/someagency", "https://vimeo.com/123", "https://www.pinterest.co.uk/x", "https://pinterest.de", "https://searchengineland.com/x", "https://acme.applytojob.com/apply", "https://amazon.co.uk/x", "https://www.behance.net/studio"])
+      expect(junkReason(hit(u, "Some Agency")), u).toBe("blocked_site");
+    // …while a company whose name merely contains a platform word is not blocked
+    expect(junkReason(hit("https://pinterestmarketingpros.com", "Pinterest Marketing Pros"))).toBeNull();
+    expect(junkReason(hit("https://googleadsagency.com", "Google Ads Agency"))).toBeNull();
     expect(junkReason(hit("https://northwind.com/services/saas-seo", "SaaS SEO | Northwind"))).toBeNull();
   });
 });
@@ -121,6 +127,12 @@ describe("dates and freshness", () => {
     expect(parseEvidenceDate("Since 2019 we have helped", read)!.toISOString().slice(0, 10)).toBe("2019-01-01");
     expect(parseEvidenceDate("We are hiring a strategist", read)).toBeNull();
     expect(parseEvidenceDate("February 30, 2026", read)).toBeNull();
+  });
+  it("a bare 'today' or 'yesterday' in marketing copy is not a date: only a posting is (found: a newsletter page dated with the time it was read)", () => {
+    for (const t of ["Subscribe today", "Book a call today and grow", "Get started today!", "Join 10,000 marketers today", "Yesterday's tactics won't work"]) expect(parseEvidenceDate(t, read), t).toBeNull();
+    expect(parseEvidenceDate("Posted today", read)!.toISOString().slice(0, 10)).toBe("2026-10-08");
+    expect(parseEvidenceDate("Published yesterday by Ana", read)!.toISOString().slice(0, 10)).toBe("2026-10-07");
+    expect(parseEvidenceDate("Just posted: our PPC practice", read)!.toISOString().slice(0, 10)).toBe("2026-10-08");
   });
   it("bands", () => {
     expect(freshness("2026-10-05T00:00:00Z", NOW).band).toBe("strong");

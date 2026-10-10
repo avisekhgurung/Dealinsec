@@ -510,7 +510,7 @@
         ]
       },
       "turns": [
-        "Remind me to follow up with Northwind on 2026-10-09."
+        "Remind me to follow up with Northwind on {{date+14}}."
       ],
       "expect": [
         {

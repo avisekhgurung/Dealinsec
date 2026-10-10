@@ -133,6 +133,12 @@ describe("contact details are checked against what they claim to be", () => {
     expect(email("hello@casaalma.pt.evil.com").claims).toEqual([]);
     expect(email("hello@notcasaalma.pt").claims).toEqual([]);
     expect(email("info@casaalma.pt", "Write to hello@casaalma.pt or call +351").claims).toEqual([]);
+    // a web host is not a mail domain (found: a broken mailto target "info@www.firebrand.marketing")
+    const page = (q: string) => [{ ...HOME, text: `${HOME.text} ${q}` }];
+    expect(run([f("business_email", "info@casaalma.pt", "Write to info@casaalma.pt")], page("Write to info@casaalma.pt")).claims).toHaveLength(1); // the same page, a real mail domain: kept
+    const www = run([f("business_email", "info@www.casaalma.pt", "Write to info@www.casaalma.pt")], page("Write to info@www.casaalma.pt"));
+    expect(www.claims).toEqual([]);
+    expect(www.rejected[0].reason).toBe("invalid_contact");
     expect(email("not an email").claims).toEqual([]);
   });
   it("an address on a page is not enough: a partner's, a lookalike's and a suffix-trick domain are refused even when the page really contains them", () => {

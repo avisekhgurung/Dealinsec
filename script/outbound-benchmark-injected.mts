@@ -108,7 +108,16 @@ async function main() {
     const per = E.map((e) => ({ domain: e.domain, class: e.class, outcome: where(e), score: card.get(e.domain)?.score?.total ?? null, person: card.get(e.domain)?.decisionMaker?.value ?? null, whyNow: card.get(e.domain)?.whyNow ? `${card.get(e.domain).whyNow.label} · ${card.get(e.domain).whyNow.freshness}` : null }));
 
     // evidence: every confirmed quote re-found on the live page by the engine's own reader
-    const fnd = (await db.query(`SELECT f.kind, f.status, f.type, f.quote, f.source_url, f.observed_at, p.domain FROM prospect_findings f JOIN prospects p ON p.id=f.prospect_id WHERE f.organization_id=$1`, [me.organizationId])).rows;
+    const fnd = (await db.query(`SELECT f.kind, f.status, f.type, f.value, f.quote, f.source_url, f.observed_at, f.meta, f.batch, p.domain FROM prospect_findings f JOIN prospects p ON p.id=f.prospect_id WHERE f.organization_id=$1`, [me.organizationId])).rows;
+    // The evidence behind each researched company, so every ready claim can be checked by a reader (kept local, never committed).
+    const detail = (d: string) => {
+      const rows = fnd.filter((x) => x.domain === d);
+      return {
+        signals: rows.filter((x) => x.kind === "signal").map((x) => ({ type: x.type, status: x.status, value: String(x.value).slice(0, 160), quote: String(x.quote ?? "").slice(0, 220), dateQuote: x.meta?.dateQuote ?? null, observedAt: x.observed_at ? new Date(x.observed_at).toISOString().slice(0, 10) : null, band: x.observed_at ? freshness(x.observed_at, new Date()).band : "unknown", url: x.source_url })),
+        people: rows.filter((x) => x.kind === "decision_maker").map((x) => ({ name: x.meta?.name, title: x.meta?.title, rank: x.meta?.rank, source: x.meta?.provider ? "provider" : "website", quote: String(x.quote ?? "").slice(0, 160), url: x.source_url })),
+        contact: rows.filter((x) => x.kind === "fact" && ["business_email", "contact_form", "business_phone"].includes(x.type)).map((x) => ({ type: x.type, value: String(x.value).slice(0, 120), quote: String(x.quote ?? "").slice(0, 160), url: x.source_url })),
+      };
+    };
     const confirmed = fnd.filter((x) => x.status === "confirmed" && x.quote && x.source_url);
     const reader = pageReader(); const text = new Map<string, string | null>();
     for (const url of Array.from(new Set(confirmed.map((x) => x.source_url as string)))) { try { const p = await reader.read(url); text.set(url, p.ok ? p.text : null); } catch { text.set(url, null); } await sleep(120); }
@@ -135,7 +144,9 @@ async function main() {
       evidence: { confirmed: confirmed.length, readableNow: readable.length, found: readable.length - bad.length, notFound: bad.length, accuracyPct: pct(readable.length - bad.length, readable.length), judgmentsNeverConfirmed: judgments.every((x) => x.status !== "confirmed"), judgments: judgments.length, notFoundSamples: bad.slice(0, 8).map((x) => ({ domain: x.domain, url: x.source_url, quote: String(x.quote).slice(0, 110) })) },
       perTruth: per.map((p) => ({ ...p, fit: card.get(p.domain)?.fit ? { verdict: card.get(p.domain).fit.verdict, signals: card.get(p.domain).fit.signals.map((x: any) => `${x.key}:${x.status}`).join(" ") } : null, profile: card.get(p.domain)?.profile ?? null, factTypes: fnd.filter((x) => x.domain === p.domain && x.kind === "fact").map((x) => x.type), signalTypes: fnd.filter((x) => x.domain === p.domain && x.kind === "signal").map((x) => `${x.type}${x.observed_at ? "@dated" : "@undated"}`) })),
       extraProbes: EXTRA.map((e) => ({ domain: e.domain, outcome: where(e as any), fit: card.get(e.domain)?.fit ?? null, profile: card.get(e.domain)?.profile ?? null, score: card.get(e.domain)?.score?.total ?? null })),
-      readyCards: cards.filter((c) => c.ready).map((c) => ({ domain: c.domain, name: c.name, label: T.get(c.domain)?.class ?? "not_in_truth", score: c.score?.total, whyNow: c.whyNow ? `${c.whyNow.label} ${c.whyNow.freshness}: ${String(c.whyNow.value).slice(0, 90)}` : null, person: c.decisionMaker?.value ?? null })),
+      readyCards: cards.filter((c) => c.ready).map((c) => ({ domain: c.domain, name: c.name, label: T.get(c.domain)?.class ?? "not_in_truth", score: c.score?.total, whyNow: c.whyNow ? `${c.whyNow.label} ${c.whyNow.freshness}: ${String(c.whyNow.value).slice(0, 90)}` : null, whyNowEvidence: c.whyNow ? { quote: c.whyNow.quote, url: c.whyNow.url, observedAt: c.whyNow.observedAt, type: c.whyNow.type } : null, person: c.decisionMaker?.value ?? null, personEvidence: c.decisionMaker ? { quote: c.decisionMaker.quote, url: c.decisionMaker.url } : null, evidence: detail(c.domain) })),
+      // Every researched truth company: what research found, and what the readiness rule said it lacked.
+      researchedDetail: E.filter((e) => card.get(e.domain)?.researched).map((e) => ({ domain: e.domain, class: e.class, ready: !!card.get(e.domain)?.ready, missing: card.get(e.domain)?.score?.readyMissing ?? [], evidence: detail(e.domain) })),
     };
     writeFileSync(join(here, "bench", "results", `${STAMP}-injected.json`), JSON.stringify(out, null, 1));
     console.log(JSON.stringify({ recallPositivePct: out.recallPositivePct, lenientRecallPct: out.lenientRecallPct, reachedPositive: out.reachedPositive, reachedAmbiguous: out.reachedAmbiguous, reachedNegative: out.reachedNegative, negativesQualifiedOrReady: out.negativesQualifiedOrReady, precisionAtReady: out.precisionAtReady, decisionMakers: out.decisionMakers, datedSignals: out.datedSignals, evidence: { ...out.evidence, notFoundSamples: undefined }, costUsd: out.costUsd }, null, 1));

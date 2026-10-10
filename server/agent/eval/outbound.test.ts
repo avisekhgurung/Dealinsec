@@ -384,6 +384,19 @@ describe("failures", () => {
     const id2 = await start(dead); const run2 = await drive(id2, dead);
     expect(run2).toMatchObject({ status: "failed", errorCode: "search_unavailable" });
   });
+  it("a search failure that is not the provider's own answer keeps its error type on the plan (never its message), and the run view shows it", async () => {
+    const d = deps({ searchProviders: async () => [fakeSearch((q) => (/case study/.test(q) ? new TypeError("secret page text in a message") : RESULTS))] });
+    const id = await start(d); const run = await drive(id, d);
+    expect(run!.status).toBe("done");
+    const failed = (run!.queries as any[]).filter((q) => q.ok === false);
+    expect(failed.length).toBeGreaterThan(0);
+    expect(failed.every((q) => q.error === "error:TypeError")).toBe(true);
+    const view = (await cards(id)).run;
+    expect(view.queries.filter((q) => q.error === "error:TypeError").length).toBe(failed.length);
+    expect(JSON.stringify(view)).not.toMatch(/secret page text/);
+    const provider = await fakeSearch(() => new DiscoveryError("rate_limited", "busy")).search("x").catch((e) => e);
+    expect(provider).toBeInstanceOf(DiscoveryError); // the provider's own answer still reads as its code (checked by the existing failure test)
+  });
   it("the model failing for one company is retried, then that company alone is marked failed; the run finishes", async () => {
     script.enrich = (m) => (companyOf(m) === "Acme Growth" ? new ProviderError("timeout", "slow") : ENRICH[companyOf(m)] ?? { facts: [] });
     const id = await start(); const run = await drive(id);
@@ -676,6 +689,31 @@ describe("what is cached and what is paid for", () => {
     // and a quote that is NOT on the page is still dropped
     const forged = normalizeEnrichment({ facts: [{ field: "location", value: "London", quote: "1 Fake Street, London, UK", page: 1 }] }, [{ index: 1, url: text.url, text: text.text }], "footerco.com");
     expect(forged.facts).toHaveLength(0);
+  });
+  it("a contact page that holds a real form becomes a confirmed, quoted contact route even when the model reports none; a newsletter form on the home page does not", async () => {
+    const icp = parseIcpFallback(REQUEST)!;
+    const run = { id: "pr_form", organizationId: ORG1, createdByUser: "u1" };
+    const site = (host: string, homeExtra: string, contact: string | null) => {
+      world().knowledge.dns[host] = ["93.184.216.34"];
+      page(host, "/", html("Formco", `<p>Formco is a digital marketing agency in Denver, United States serving SaaS companies. ${filler}</p>${homeExtra}`, contact ? ["/contact"] : []));
+      if (contact) page(host, "/contact", html("Contact Formco", contact));
+    };
+    script.enrich = () => ({ facts: [{ field: "industry", value: "Digital marketing agency", quote: "Formco is a digital marketing agency", page: 1 }] });
+    site("formco.com", "", `<p>Get in touch with Formco about your SaaS growth. ${filler}</p><form action="/send"><input name="email"></form>`);
+    const p1 = await outboundStore.upsertProspect(ORG1, { domain: "formco.com", name: "Formco", website: "https://formco.com", sources: [] }, NOW);
+    await enrichOne(run, icp, null, deps() as PipelineDeps, p1);
+    const form = world().outbound.findings.find((f) => f.prospectId === p1.id && f.type === "contact_form");
+    expect(form).toMatchObject({ status: "confirmed", value: "https://formco.com/contact", sourceUrl: "https://formco.com/contact", quote: "Get in touch with Formco about your SaaS growth.", meta: { detectedBy: "form" } });
+    // a newsletter form on the home page and no contact page: nothing
+    site("newsco.com", `<form><input name="email" placeholder="Subscribe to our newsletter"></form>`, null);
+    const p2 = await outboundStore.upsertProspect(ORG1, { domain: "newsco.com", name: "Formco", website: "https://newsco.com", sources: [] }, NOW);
+    await enrichOne(run, icp, null, deps() as PipelineDeps, p2);
+    expect(world().outbound.findings.some((f) => f.prospectId === p2.id && f.type === "contact_form")).toBe(false);
+    // a contact page with no form: nothing either (an address, if any, is the model's to quote)
+    site("noformco.com", "", `<p>Get in touch: we reply within a day. ${filler}</p>`);
+    const p3 = await outboundStore.upsertProspect(ORG1, { domain: "noformco.com", name: "Formco", website: "https://noformco.com", sources: [] }, NOW);
+    await enrichOne(run, icp, null, deps() as PipelineDeps, p3);
+    expect(world().outbound.findings.some((f) => f.prospectId === p3.id && f.type === "contact_form")).toBe(false);
   });
   it("a model that returns nothing is a failed call to retry, never 'the company says nothing': it is not set aside as unclear, and it succeeds on the retry", async () => {
     let n = 0;

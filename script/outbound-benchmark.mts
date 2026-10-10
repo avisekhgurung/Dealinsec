@@ -6,6 +6,7 @@
  *   DATABASE_URL=postgresql://dealtest@localhost:5544/dealinsec_pdftest PORT=3000 npm run dev
  *   npx tsx --env-file=.env script/outbound-benchmark.mts                (everything)
  *   BENCH_PHASE=search ...                                                (search diagnostics only: no model calls, no run)
+ *   BENCH_PHASE=engine ...                                                (the run only: no search diagnostics; 8 provider calls)
  *   BENCH_REQUEST="..." BENCH_KEEP=1 ...
  * Writes script/bench/results/<stamp>.json (every number below comes from it).
  *
@@ -172,17 +173,21 @@ async function main() {
     const { icp, searches } = r.json as { icp: Icp; searches: string[] };
     console.log(`ICP: ${JSON.stringify(icp)}\nSearches (${searches.length}):\n${searches.map((q) => "  - " + q).join("\n")}`);
 
-    console.log("\n━━ search diagnostics (no model calls) ━━");
-    const sd = await searchDiagnostics(icp, searches);
-    const out: any = { stamp: new Date(STAMP).toISOString(), request: REQUEST, icp, searches, truthCounts: truth.counts, truthSources: truth.sources, search: { ...sd, found20: undefined } };
-    const f = (list: TruthEntry[]) => sd.found20(list);
-    out.search.recall = { positive20: `${f(POS)}/${POS.length}`, positive20pct: pct(f(POS), POS.length), lenient20pct: pct(f(POS) + f(AMB), POS.length + AMB.length), negativesReturned: f(NEG), positive50: `${sd.perTruth.filter((e) => e.class === "positive" && (e.in20 || e.in50)).length}/${POS.length}` };
-    console.log(JSON.stringify({ totals: sd.totals, recall: out.search.recall, lists: { ...sd.lists, truthLinked: sd.lists.truthLinked.length } }, null, 1));
-    delete out.search.rawResults; // kept in a sibling file
-    writeFileSync(join(here, "bench", "results", `${STAMP}-search-raw.json`), JSON.stringify(sd.rawResults));
+    const out: any = { stamp: new Date(STAMP).toISOString(), request: REQUEST, icp, searches, truthCounts: truth.counts, truthSources: truth.sources, phase: PHASE };
+    let sd: Awaited<ReturnType<typeof searchDiagnostics>> | null = null;
+    const diagnostics = async () => {
+      console.log("\n━━ search diagnostics (no model calls) ━━");
+      sd = await searchDiagnostics(icp, searches);
+      out.search = { ...sd, found20: undefined };
+      const f = (list: TruthEntry[]) => sd!.found20(list);
+      out.search.recall = { positive20: `${f(POS)}/${POS.length}`, positive20pct: pct(f(POS), POS.length), lenient20pct: pct(f(POS) + f(AMB), POS.length + AMB.length), negativesReturned: f(NEG), positive50: `${sd.perTruth.filter((e) => e.class === "positive" && (e.in20 || e.in50)).length}/${POS.length}` };
+      console.log(JSON.stringify({ totals: sd.totals, recall: out.search.recall, lists: { ...sd.lists, truthLinked: sd.lists.truthLinked.length } }, null, 1));
+      delete out.search.rawResults; // kept in a sibling file
+      writeFileSync(join(here, "bench", "results", `${STAMP}-search-raw.json`), JSON.stringify(sd.rawResults));
+    };
+    if (PHASE === "search") { await diagnostics(); writeFileSync(join(here, "bench", "results", `${STAMP}.json`), JSON.stringify(out, null, 1)); return; }
 
-    if (PHASE === "search") { writeFileSync(join(here, "bench", "results", `${STAMP}.json`), JSON.stringify(out, null, 1)); return; }
-
+    // The run goes FIRST: its 8 searches must not find the provider's per-minute limit already spent by the ~30 diagnostic calls.
     console.log("\n━━ engine run ━━");
     const run = await engineRun(icp, searches, req);
     const view = run.view; const counters = view.run.counters; const cards: any[] = view.prospects ?? [];
@@ -202,7 +207,10 @@ async function main() {
     const per = truth.entries.map((e) => ({ domain: e.domain, class: e.class, discovered: card.has(e.domain), stage: stageOf(card.get(e.domain)), ready: !!card.get(e.domain)?.ready, score: card.get(e.domain)?.score?.total ?? null }));
     const levels = ["found", "verified", "enriched", "icpMatch", "researched", "ready"] as const;
     const cum = (list: TruthEntry[]) => Object.fromEntries(levels.map((l) => [l, list.filter((e) => reached(card.get(e.domain), l)).length]));
-    out.engine = { runId: run.id, status: view.run.status, errorCode: view.run.errorCode, seconds: run.seconds, costUsd: view.run.costUsd, counters, perTruth: per, reachedPositive: cum(POS), reachedAmbiguous: cum(AMB), reachedNegative: cum(NEG) };
+    const queries = (view.run.queries ?? []) as { q: string; provider: string; done: boolean; ok?: boolean; results?: number; error?: string }[];
+    const providerErrors = queries.filter((q) => q.done && !q.ok).map((q) => ({ provider: q.provider, error: q.error ?? "error", q: q.q.slice(0, 80) }));
+    if (providerErrors.length) console.log(`   provider errors: ${JSON.stringify(providerErrors)}`);
+    out.engine = { runId: run.id, status: view.run.status, errorCode: view.run.errorCode, seconds: run.seconds, costUsd: view.run.costUsd, counters, queries, providerErrors, perTruth: per, reachedPositive: cum(POS), reachedAmbiguous: cum(AMB), reachedNegative: cum(NEG) };
 
     out.engine.cards = cards.map((c) => ({ domain: c.domain, name: c.name, website: c.website, label: T.get(c.domain)?.class ?? "not_in_truth", outcome: stageOf(c), fit: c.fit?.verdict ?? null, industry: c.profile?.industry ?? null, location: c.profile?.location ?? null, country: c.profile?.country ?? null, employees: c.profile?.employees ?? null, serves: c.profile?.serves ?? null, score: c.score?.total ?? null, ready: !!c.ready, whyNow: c.whyNow ? `${c.whyNow.label} · ${c.whyNow.freshness}` : null, person: c.decisionMaker?.value ?? null }));
     // ready / qualified cards: what are they?
@@ -230,12 +238,13 @@ async function main() {
     const llm = (await db.query(`SELECT task, model, count(*)::int n, coalesce(sum(cost_micro_usd),0)::int cost FROM llm_calls WHERE organization_id=$1 GROUP BY 1,2`, [org])).rows;
     out.engine.calls = { provider: calls, llm };
 
+    if (PHASE !== "engine") { await sleep(20_000); await diagnostics(); }
     // yields + recall + loss attribution
-    const sdMap = new Map<string, any>(sd.perTruth.map((e) => [e.domain, e]));
+    const sdMap = new Map<string, any>((sd?.perTruth ?? []).map((e) => [e.domain, e]));
     const recall = (list: TruthEntry[], l: (typeof levels)[number]) => pct(list.filter((e) => reached(card.get(e.domain), l)).length, list.length);
     out.metrics = {
-      searchRecallStrictPct: pct(sd.perTruth.filter((e) => e.class === "positive" && e.in20).length, POS.length),
-      searchRecallLenientPct: pct(sd.perTruth.filter((e) => (e.class === "positive" || e.class === "ambiguous") && e.in20).length, POS.length + AMB.length),
+      searchRecallStrictPct: sd ? pct(sd.perTruth.filter((e) => e.class === "positive" && e.in20).length, POS.length) : null,
+      searchRecallLenientPct: sd ? pct(sd.perTruth.filter((e) => (e.class === "positive" || e.class === "ambiguous") && e.in20).length, POS.length + AMB.length) : null,
       pipelineRecallStrictPct: Object.fromEntries(levels.map((l) => [l, recall(POS, l)])),
       pipelineRecallLenientPct: Object.fromEntries(levels.map((l) => [l, recall([...POS, ...AMB], l)])),
       verificationYieldPct: pct(counters.verified, counters.discovered), qualificationYieldPct: pct(counters.icpMatch, counters.enriched), readyYieldPct: pct(counters.ready, counters.discovered),

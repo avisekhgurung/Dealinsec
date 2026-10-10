@@ -204,8 +204,9 @@ export function parseEvidenceDate(text: string, retrievedAt: Date): Date | null 
   if (m) return utc(+m[2], MONTHS[m[1]], 1);
   m = t.match(/\b(\d{1,3})\s+(day|week|month|year)s?\s+ago\b/);
   if (m) { const n = +m[1]; const unit = { day: 1, week: 7, month: 30, year: 365 }[m[2] as "day"]; return new Date(retrievedAt.getTime() - n * unit * DAY); }
-  if (/\b(yesterday)\b/.test(t)) return new Date(retrievedAt.getTime() - DAY);
-  if (/\b(today|just posted|posted today)\b/.test(t)) return new Date(retrievedAt.getTime());
+  // Only a posting date counts: "Subscribe today" or "Book a call today" says nothing about when anything happened.
+  if (/\b(posted|published|announced)\s+yesterday\b/.test(t)) return new Date(retrievedAt.getTime() - DAY);
+  if (/\b(posted|published|announced)\s+today\b|\bjust posted\b/.test(t)) return new Date(retrievedAt.getTime());
   m = t.match(/\b(?:in|since|from|during|of)\s+(20\d\d)\b/);
   if (m) return utc(+m[1], 0, 1);
   return null;

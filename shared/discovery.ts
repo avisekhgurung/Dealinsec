@@ -44,7 +44,14 @@ export const NOT_A_COMPANY_SITE = new Set([
   "loglink.com", "nexnews.org", "viesearch.com", "mapsofindia.com", "tuffclassified.com", "paperindex.com", "gktoday.in", "kashmirsearch.com",
   "indianexpress.com", "livemint.com", "hindustantimes.com", "ndtv.com", "timesofindia.com", "thehindu.com", "economictimes.com", "gridinsoft.com",
   "academia.edu", "researchgate.net", "archive.org", "blogspot.com", "wordpress.com", "wixsite.com", "weebly.com", "tumblr.com",
+  // Seen in real results and on real "best agencies" pages: media, design, job-application and trade-press platforms, not companies.
+  "dribbble.com", "behance.net", "vimeo.com", "flickr.com", "soundcloud.com", "spotify.com", "apple.com", "play.google.com", "producthunt.com",
+  "searchengineland.com", "searchenginejournal.com", "hubspot.com", "semrush.com", "ahrefs.com", "moz.com", "techcrunch.com", "builtin.com",
+  "applytojob.com", "greenhouse.io", "lever.co", "workable.com", "bamboohr.com", "jobvite.com", "smartrecruiters.com", "ashbyhq.com",
+  "calendly.com", "typeform.com", "linktr.ee", "bit.ly", "t.co", "wa.me", "whatsapp.com", "telegram.me", "t.me", "discord.gg", "discord.com",
 ]);
+/** A platform's own country domains (pinterest.co.uk, amazon.de…) are the same platform: matched by name, whatever the ending. */
+const PLATFORM_NAMES = new Set(["pinterest", "amazon", "ebay", "google", "linkedin", "facebook", "instagram", "youtube", "yelp", "glassdoor", "indeed", "trustpilot", "clutch", "sortlist"]);
 
 // Second-level public suffixes where the registrable domain has three labels (co.uk, com.au ...).
 const SECOND_LEVEL = new Set(["co", "com", "org", "net", "ac", "gov", "edu", "ltd", "plc"]);
@@ -104,7 +111,7 @@ export function looksLikeCompanyPage(url: string, title: string, domain: string)
 }
 
 export const isBlockedSite = (domain: string) =>
-  NOT_A_COMPANY_SITE.has(domain) || Array.from(NOT_A_COMPANY_SITE).some((d) => domain.endsWith(`.${d}`));
+  NOT_A_COMPANY_SITE.has(domain) || Array.from(NOT_A_COMPANY_SITE).some((d) => domain.endsWith(`.${d}`)) || PLATFORM_NAMES.has(domain.split(".")[0]);
 
 const GENERIC = /^(home|homepage|welcome|about( us)?|contact( us)?|official( site| website)?|index|services|our services|blog|news)$/i;
 

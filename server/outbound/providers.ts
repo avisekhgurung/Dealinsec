@@ -8,7 +8,7 @@
  */
 import { createHash } from "node:crypto";
 import { sameSite, siteHost, type PageLink } from "@shared/research";
-import { extractContactBlock, extractHtml, extractLinks } from "../knowledge/extract";
+import { extractContactBlock, extractHtml, extractLinks, hasContactForm } from "../knowledge/extract";
 import { fetchPublicPage, realPageIO, validatePublicUrl } from "../knowledge/net-guard";
 import { callJson, str } from "../discovery/http";
 import { DiscoveryError } from "../discovery/types";
@@ -18,7 +18,7 @@ const PAGE_BYTES = 1_500_000;
 export const PAGE_TEXT_CHARS = 8000;
 
 export type PageRead =
-  | { ok: true; url: string; title: string; text: string; links: PageLink[]; hash: string }
+  | { ok: true; url: string; title: string; text: string; links: PageLink[]; hash: string; hasForm?: boolean }
   | { ok: false; code: "blocked" | "unreachable" | "bad_response" | "too_big" | "unsupported" | "not_html" | "unreadable" | "provider" };
 
 export interface PageReader {
@@ -41,7 +41,7 @@ export const builtinReader: PageReader = {
     // The article reader drops footers; a company's address and contact details live there. Added as a separate, labelled block.
     const block = await extractContactBlock(r.bytes);
     const text = block ? `${ex.text.slice(0, Math.max(2000, PAGE_TEXT_CHARS - block.length - 40))}\n\n[Footer and contact details]\n${block}` : ex.text.slice(0, PAGE_TEXT_CHARS);
-    return { ok: true, url: r.url.toString(), title: ex.title ?? "", text, links: await extractLinks(r.bytes), hash: hashOf(text) };
+    return { ok: true, url: r.url.toString(), title: ex.title ?? "", text, links: await extractLinks(r.bytes), hash: hashOf(text), hasForm: hasContactForm(r.bytes) };
   },
 };
 

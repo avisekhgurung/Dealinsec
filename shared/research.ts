@@ -73,6 +73,7 @@ export function checkContact(field: ResearchField, value: string, quote: string,
       const v = value.trim().toLowerCase();
       if (!EMAIL.test(v)) return false;
       const [local, domain] = v.split("@");
+      if (domain.startsWith("www.")) return false; // a web host, not a mail domain: such an address bounces
       return (ROLE_LOCALS as readonly string[]).includes(local) && onSite(domain, site) && q.includes(v);
     }
     case "business_phone": { const d = digits(value); return d.length >= 7 && d.length <= 15 && digits(quote).includes(d); }

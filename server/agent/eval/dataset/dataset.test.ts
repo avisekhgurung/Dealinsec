@@ -52,5 +52,15 @@ describe("seeding", () => {
   });
   it("an unknown placeholder fails loudly", () => {
     expect(() => resolveRefs("{{deal.nope}}", { deal: {}, invoice: {}, contract: {}, lead: {}, prospect: {} })).toThrow(/no matching record/);
+    // relative dates: always N days from "now", so a case about the future never expires
+    const none = { deal: {}, invoice: {}, contract: {}, lead: {}, prospect: {} };
+    const at = new Date("2026-10-10T18:00:00Z");
+    expect(resolveRefs("on {{date+14}} or {{date-1}}", none, at)).toBe("on 2026-10-24 or 2026-10-09");
+    expect(resolveRefs({ a: ["{{date+0}}"] }, none, at)).toEqual({ a: ["2026-10-10"] });
+    // no fixed calendar date in a case's turns may already be in the past (that is how a case silently changes meaning)
+    for (const f of files) {
+      const ds = JSON.parse(readFileSync(path.join(dir, f), "utf8"));
+      for (const c of ds.cases) for (const t of c.turns as string[]) for (const m of t.match(/\b20\d\d-\d\d-\d\d\b/g) ?? []) expect(m >= new Date().toISOString().slice(0, 10), `${f} ${c.id}: "${m}" is in the past`).toBe(true);
+    }
   });
 });

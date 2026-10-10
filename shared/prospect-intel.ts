@@ -15,7 +15,7 @@ import { COUNTRIES, roleRank, type Icp } from "./icp";
 import { nameFromDomain, nameResemblesDomain } from "./discovery";
 import { normText } from "./fit";
 import { isSignalType, parseEvidenceDate, type SignalType } from "./prospect";
-import { checkContact, cleanLine, injectionLike, normalizeForQuote, quoteInPage, LIMITS as QUOTE, type ResearchPage } from "./research";
+import { checkContact, cleanLine, injectionLike, normalizeForQuote, onSite, quoteInPage, LIMITS as QUOTE, type ResearchPage } from "./research";
 
 export type Reason = "not_an_object" | "bad_field" | "bad_page" | "bad_value" | "bad_quote" | "quote_not_found" | "suspicious" | "invalid_contact" | "duplicate" | "bad_type" | "bad_person" | "not_staff" | "bad_support" | "bad_text";
 export interface Rejection { reason: Reason; what?: string }
@@ -217,4 +217,26 @@ export function normalizeAngle(raw: unknown, ctx: { allowedIds: number[]; people
   const targetPerson = tp ? (ctx.people.find((p) => p.toLowerCase() === tp.toLowerCase() || tp.toLowerCase().startsWith(p.toLowerCase())) ?? null) : null;
   if (tp && !targetPerson && !/^(none|null|unknown|n\/a)$/i.test(tp)) return { angle: null, reason: "unknown_person" };
   return { angle: { problem, opportunity, positioning, reason, targetPerson, evidenceIds: Array.from(new Set(ev.map((m) => Number(m![1])))), confidence: a.confidence === "medium" ? "medium" : "low" } };
+}
+
+/* ── a contact form the site itself offers ──────────────────────────────── */
+
+/** A page whose address says it is for getting in touch. */
+const CONTACT_PATH = /\/(contact|contact-us|get-in-touch|talk-to-us|lets-talk|let-s-talk|reach-us|enquir|inquir|work-with-us|start-a-project)/i;
+/** A line on that page that says what the form is for, quoted exactly as the evidence. */
+const CONTACT_LINE = /\b(contact|get in touch|talk to|let'?s talk|send (us )?a message|reach out|fill (out|in)|tell us about|book a (call|meeting|demo)|request a (quote|proposal)|start a project|work with us)\b/i;
+
+/**
+ * The company's own contact form as a finding, decided by code, not by the model: a page of this site whose address is a
+ * contact page, that really holds a form (the reader saw an HTML form or a known form embed), and a line of that page that
+ * says so, quoted exactly. A newsletter form on the home page is not one (the address must be a contact page).
+ */
+export function contactFormFinding(page: { url: string; text: string; hasForm?: boolean }, site: string): { field: "contact_form"; value: string; quote: string; url: string } | null {
+  if (!page.hasForm) return null;
+  let u: URL; try { u = new URL(page.url); } catch { return null; }
+  if (u.protocol !== "https:" || !onSite(u.hostname, site) || !CONTACT_PATH.test(u.pathname)) return null;
+  const lines = page.text.split(/\n+|(?<=[.!?])\s+/).map((l) => cleanLine(l)).filter((l) => l.length >= 8 && l.length <= 200);
+  const line = lines.find((l) => CONTACT_LINE.test(l) && !injectionLike(l) && quoteInPage(l, page.text));
+  if (!line) return null;
+  return { field: "contact_form", value: `${u.origin}${u.pathname}`.replace(/\/+$/, ""), quote: line, url: page.url };
 }

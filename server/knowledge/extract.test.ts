@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LIMITS } from "@shared/knowledge";
-import { extractContactBlock, extractHtml, extractLinks, extractPdf, extractPlainText } from "./extract";
+import { extractContactBlock, extractHtml, extractLinks, extractPdf, extractPlainText, hasContactForm } from "./extract";
 
 /** A hand-built two-page PDF: page 1 "We design logos...Berlin", page 2 "Our ideal client...Portugal". */
 const PDF = Uint8Array.from(Buffer.from("JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUiA1IDAgUl0gL0NvdW50IDIgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA2MTIgNzkyXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNyAwIFIgPj4gPj4gPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCA5MyA+PgpzdHJlYW0KQlQgL0YxIDEyIFRmIDcyIDcyMCBUZCAoV2UgZGVzaWduIGxvZ29zIGFuZCBicmFuZCBzeXN0ZW1zIGZvciBzbWFsbCBzdHVkaW9zIGluIEJlcmxpbi4pIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKNSAwIG9iago8PCAvVHlwZSAvUGFnZSAvUGFyZW50IDIgMCBSIC9NZWRpYUJveCBbMCAwIDYxMiA3OTJdIC9Db250ZW50cyA2IDAgUiAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA3IDAgUiA+PiA+PiA+PgplbmRvYmoKNiAwIG9iago8PCAvTGVuZ3RoIDk2ID4+CnN0cmVhbQpCVCAvRjEgMTIgVGYgNzIgNzIwIFRkIChPdXIgaWRlYWwgY2xpZW50IGlzIGEgYm91dGlxdWUgaG90ZWwgZ3JvdXAgZXhwYW5kaW5nIGluIFBvcnR1Z2FsLikgVGogRVQKZW5kc3RyZWFtCmVuZG9iago3IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDgKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDEyMSAwMDAwMCBuIAowMDAwMDAwMjQ3IDAwMDAwIG4gCjAwMDAwMDAzOTAgMDAwMDAgbiAKMDAwMDAwMDUxNiAwMDAwMCBuIAowMDAwMDAwNjYyIDAwMDAwIG4gCnRyYWlsZXIKPDwgL1NpemUgOCAvUm9vdCAxIDAgUiA+PgpzdGFydHhyZWYKNzMyCiUlRU9GCg==", "base64"));
@@ -87,6 +87,15 @@ describe("extractLinks", () => {
   });
 });
 
+describe("hasContactForm", () => {
+  it("sees an HTML form or a known form embed, and nothing else", () => {
+    for (const h of ['<form action="/send"><input name="email"></form>', '<script src="//js.hsforms.net/forms/v2.js"></script><script>hbspt.forms.create({})</script>', '<iframe src="https://form.jotform.com/123"></iframe>', '<div class="gform_wrapper"></div>', '<div class="wpforms-form"></div>', '<form id="mktoForm_12"></form>', '<a href="https://calendly.com/acme/intro">Book</a>'])
+      expect(hasContactForm(enc(`<html><body>${h}</body></html>`)), h).toBe(true);
+    for (const h of ["<p>Write to us at hello@acme.com</p>", "<p>The word form appears in this sentence: platform, formation, uniform.</p>", ""])
+      expect(hasContactForm(enc(`<html><body>${h}</body></html>`)), h).toBe(false);
+  });
+});
+
 describe("extractContactBlock", () => {
   const long = "We plan campaigns and report on results every month for every client we work with. ".repeat(8);
   const page = `<html><head><title>Acme</title><script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Acme","telephone":"+1 512 555 0100","address":{"@type":"PostalAddress","streetAddress":"12 Main St","addressLocality":"Austin","addressRegion":"TX","postalCode":"78701","addressCountry":"US"}}</script></head>
@@ -98,6 +107,11 @@ describe("extractContactBlock", () => {
     const block = await extractContactBlock(enc(page));
     expect(block).toContain("Acme Marketing, 12 Main St, Austin, TX 78701");
     expect(block).toContain("Email: hello@acme.com"); // the ?subject= part is not kept
+    // the address a reader SEES wins over a broken mailto target (found: "info@www.firebrand.marketing" behind "info@firebrand.marketing")
+    const broken = await extractContactBlock(enc('<html><body><footer><a href="mailto:info@www.acme.com">info@acme.com</a> <a href="mailto:sales@acme.com">Email sales</a></footer></body></html>'));
+    expect(broken).toContain("Email: info@acme.com");
+    expect(broken).not.toContain("info@www.acme.com");
+    expect(broken).toContain("Email: sales@acme.com"); // link text is not an address: the target is used
     expect(block).toContain("Phone: +15125550100");
     expect(block).toContain("Address (structured data): 12 Main St, Austin, TX, 78701, US");
     expect(block).toContain("Phone (structured data): +1 512 555 0100");
