@@ -11,6 +11,7 @@ import {
 } from "@shared/schema";
 import type { Provenance } from "@shared/prospect";
 import { tablesReadyCheck } from "../leads/ready";
+import { clipCodeOrNull } from "@shared/error-code";
 
 /** The feature needs its own five tables and the model trace (allowances are counted from it). */
 export const prospectsTablesReady = tablesReadyCheck(["prospect_runs", "prospects", "prospect_run_items", "prospect_findings", "provider_calls", "llm_calls"]);
@@ -147,7 +148,7 @@ export const outboundStore: OutboundStore = {
     return r.length > 0;
   },
   async finishRun(orgId, id, fence, o) {
-    const r = await db.update(prospectRuns).set({ stage: "done", status: o.status, counters: o.counters, costMicroUsd: o.costMicroUsd, errorCode: o.errorCode, finishedAt: o.now, updatedAt: o.now, leaseUntil: null })
+    const r = await db.update(prospectRuns).set({ stage: "done", status: o.status, counters: o.counters, costMicroUsd: o.costMicroUsd, errorCode: clipCodeOrNull(o.errorCode), finishedAt: o.now, updatedAt: o.now, leaseUntil: null })
       .where(and(eq(prospectRuns.organizationId, orgId), eq(prospectRuns.id, id), eq(prospectRuns.attempts, fence), eq(prospectRuns.status, "running"))).returning({ id: prospectRuns.id });
     return r.length > 0;
   },
@@ -157,7 +158,7 @@ export const outboundStore: OutboundStore = {
     return at ? new Date(at) : null;
   },
   async setRunStatus(orgId, id, from, to, now, errorCode = null) {
-    const r = await db.update(prospectRuns).set({ status: to, updatedAt: now, finishedAt: to === "running" ? null : now, errorCode, leaseUntil: null })
+    const r = await db.update(prospectRuns).set({ status: to, updatedAt: now, finishedAt: to === "running" ? null : now, errorCode: clipCodeOrNull(errorCode), leaseUntil: null })
       .where(and(eq(prospectRuns.organizationId, orgId), eq(prospectRuns.id, id), eq(prospectRuns.status, from))).returning({ id: prospectRuns.id });
     return r.length > 0;
   },
@@ -213,7 +214,7 @@ export const outboundStore: OutboundStore = {
     return withProspects(rows, orgId);
   },
   async setItem(id, set) {
-    await db.update(prospectRunItems).set(set).where(eq(prospectRunItems.id, id));
+    await db.update(prospectRunItems).set("errorCode" in set ? { ...set, errorCode: clipCodeOrNull(set.errorCode) } : set).where(eq(prospectRunItems.id, id));
   },
 
   async findings(orgId, prospectId) {
@@ -243,7 +244,7 @@ export const outboundStore: OutboundStore = {
   },
 
   async recordProviderCall(r) {
-    await db.insert(providerCalls).values({ organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: r.operation, ok: r.ok, errorCode: r.errorCode, latencyMs: r.latencyMs, costMicroUsd: r.costMicroUsd, createdAt: r.now });
+    await db.insert(providerCalls).values({ organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: r.operation, ok: r.ok, errorCode: clipCodeOrNull(r.errorCode), latencyMs: r.latencyMs, costMicroUsd: r.costMicroUsd, createdAt: r.now });
   },
   async countProviderCalls({ orgId, operation, since }) {
     const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(providerCalls).where(and(orgId ? eq(providerCalls.organizationId, orgId) : undefined, eq(providerCalls.operation, operation), gte(providerCalls.createdAt, since)));
@@ -260,7 +261,7 @@ export const outboundStore: OutboundStore = {
     });
   },
   async settleProviderCall(id, r) {
-    await db.update(providerCalls).set({ ok: r.ok, errorCode: r.errorCode, latencyMs: r.latencyMs, costMicroUsd: r.costMicroUsd }).where(eq(providerCalls.id, id));
+    await db.update(providerCalls).set({ ok: r.ok, errorCode: clipCodeOrNull(r.errorCode), latencyMs: r.latencyMs, costMicroUsd: r.costMicroUsd }).where(eq(providerCalls.id, id));
   },
   async runCostMicroUsd(runId) {
     const [a] = await db.select({ n: sql<number>`COALESCE(sum(${llmCalls.costMicroUsd}), 0)::int` }).from(llmCalls).where(eq(llmCalls.runId, runId));

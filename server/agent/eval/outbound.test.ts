@@ -843,6 +843,23 @@ describe("what is cached and what is paid for", () => {
     expect(report.byCode).toEqual({ "research:invalid_response": 1 });
     expect((await cards(id)).run.counters.failed).toBe(1);
   });
+  it("B1: a company failing with a long error type ends FAILED with a code that fits the column, and the run still finishes (it can't stall)", async () => {
+    class AVeryLongCustomErrorNameThatGoesOnAndOn extends Error { name = "AVeryLongCustomErrorNameThatGoesOnAndOn"; }
+    script.signals = (m) => { if (companyOf(m) === "Northwind Digital") throw new AVeryLongCustomErrorNameThatGoesOnAndOn("secret page text"); return researchFor(companyOf(m), m[1].content); };
+    const id = await start(); const run = await drive(id);
+    expect(run!.status).toBe("done");
+    const item = world().outbound.items.find((i) => world().outbound.prospects.find((p) => p.id === i.prospectId)!.domain === "northwind.com")!;
+    expect(item.stage).toBe("failed");
+    expect(item.errorCode.length).toBeLessThanOrEqual(30);
+    expect(item.errorCode).toMatch(/^research:/);
+  });
+  it("B1: the in-memory store refuses an error code the database would refuse (more than 30 characters)", async () => {
+    const p = await outboundStore.upsertProspect(ORG1, { domain: "len.example", name: "Len", website: "https://len.example", sources: [] }, NOW);
+    await outboundStore.addRunItem({ runId: "pr_len", orgId: ORG1, prospectId: p.id, stage: "enriched", now: NOW });
+    const item = world().outbound.items.find((i) => i.prospectId === p.id)!;
+    await expect(outboundStore.setItem(item.id, { errorCode: "research:page_error:bad_response" })).rejects.toThrow(/too long/);
+    await expect(outboundStore.setItem(item.id, { errorCode: "research:page:bad_response" })).resolves.toBeUndefined();
+  });
   it("an unexpected error is recorded by its type only, never its message (it may hold page text)", async () => {
     script.signals = (m) => { if (companyOf(m) === "Northwind Digital") throw new TypeError("secret page text"); return researchFor(companyOf(m), m[1].content); };
     const id = await start(); await drive(id);

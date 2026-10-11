@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { failureLine, failureReport, readFailureReport, splitFailureCode } from "./diagnostics";
+import { failureCode, failureLine, failureReport, readFailureReport, retryCode, splitFailureCode } from "./diagnostics";
+import { ERROR_CODE_MAX, clipCode } from "@shared/error-code";
 
 describe("failure report (kept by the benchmark before its rows are cleaned up)", () => {
   it("splits the step from the code; an older code without a step is 'unknown', never guessed", () => {
@@ -44,5 +45,30 @@ describe("readFailureReport (both benchmark scripts call it before cleaning up)"
     expect(seen.every((q) => q.params[0] === "org-bench" && /organization_id = \$1/.test(q.text))).toBe(true);
     for (const q of seen) expect(q.text).not.toMatch(/\b(quote|value|meta|content|prompt|email|name|title)\b/i);
     expect(failureLine(r)).toBe(`failures: 1 failed, 0 still retrying {"research:timeout":1}; model calls ["signals/timeout=3"]`);
+  });
+});
+
+describe("B1: every stored error code fits the database column (30 characters)", () => {
+  const PAGE = ["blocked", "unreachable", "bad_response", "too_big", "unsupported", "not_html", "unreadable", "provider"];
+  const MODEL = ["timeout", "rate_limited", "upstream", "invalid_response", "aborted", "cap_unavailable"];
+  it("every step with every page, model and unexpected-error reason fits, keeps its step, and stays readable", () => {
+    for (const step of ["verify", "enrich", "research"]) {
+      for (const why of [...PAGE.map((c) => `page_error:${c}`), ...MODEL, "page_error", "unreachable", "error:TypeError", "error:AVeryLongCustomErrorNameThatGoesOnAndOn"]) {
+        const c = failureCode(step, why);
+        expect(c.length, c).toBeLessThanOrEqual(ERROR_CODE_MAX);
+        expect(splitFailureCode(c).step, c).toBe(step);
+      }
+    }
+    expect(failureCode("research", "page_error:bad_response")).toBe("research:page:bad_response");
+    expect(failureCode("research", "invalid_response")).toBe("research:invalid_response");
+    expect(failureCode("research", "error:AVeryLongCustomErrorNameThatGoesOnAndOn")).toBe("research:error:AVeryLongCusto");
+    expect(retryCode("error:AVeryLongCustomErrorNameThatGoesOnAndOn").length).toBeLessThanOrEqual(ERROR_CODE_MAX);
+    expect(retryCode("page_error:bad_response")).toBe("page:bad_response");
+  });
+  it("clipCode makes anything safe for the column: never longer, never empty, only plain characters", () => {
+    expect(clipCode("x".repeat(100))).toHaveLength(ERROR_CODE_MAX);
+    expect(clipCode("")).toBe("error");
+    expect(clipCode("<script>alert(1)</script> page text")).toBe("scriptalert1scriptpagetext");
+    expect(ERROR_CODE_MAX).toBe(30);
   });
 });

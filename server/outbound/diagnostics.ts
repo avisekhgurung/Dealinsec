@@ -1,9 +1,19 @@
 /**
  * Why a run's companies failed, from what the database already holds: each failed or still-retrying item's step and
- * error code (the pipeline stores "research:invalid_response", "enrich:timeout", "research:page_error:unreachable"),
+ * error code (the pipeline stores "research:invalid_response", "enrich:timeout", "research:page:unreachable"),
  * and the model calls' outcomes per task. Codes and counts only: no page text, no prompts, no people, no messages.
  * Used by the benchmark harness to keep the evidence a failed run needs before its rows are cleaned up.
  */
+import { clipCode } from "@shared/error-code";
+
+/** The reason part of a code, in its short form: "page_error:bad_response" -> "page:bad_response", an unexpected error's type at most 14 characters. */
+export const retryCode = (code: string): string => clipCode(String(code ?? "").replace(/^page_error(?=:|$)/, "page").replace(/^error:(.*)$/, (_, n: string) => `error:${n.slice(0, 14)}`));
+/**
+ * A failed company's code: "<step>:<reason>" ("research:page:bad_response", "enrich:timeout", "research:error:TypeError"),
+ * at most 30 characters (the column's size: shared/error-code.ts). Every step with every reason fits; tested exhaustively.
+ */
+export const failureCode = (step: string, code: string): string => clipCode(`${step}:${retryCode(code)}`);
+
 export interface ItemRow { domain: string; stage: string; errorCode: string | null; attempts: number }
 export interface CallRow { task: string; ok: boolean; errorCode: string | null; n: number; avgLatencyMs?: number | null; maxTokensOut?: number | null }
 export interface FailureEntry { domain: string; step: string; code: string; attempts: number }
@@ -16,7 +26,7 @@ export interface FailureReport {
   calls: { task: string; ok: boolean; errorCode: string | null; n: number; avgLatencyMs: number | null; maxTokensOut: number | null }[];
 }
 
-/** "research:page_error:unreachable" -> step "research", code "page_error:unreachable". A code from before steps were recorded has step "unknown". */
+/** "research:page:unreachable" -> step "research", code "page:unreachable". A code from before steps were recorded has step "unknown". */
 export function splitFailureCode(code: string | null | undefined): { step: string; code: string } {
   const c = String(code ?? "").trim();
   if (!c) return { step: "unknown", code: "unknown" };

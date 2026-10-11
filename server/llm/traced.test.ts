@@ -5,13 +5,13 @@ vi.mock("./trace-store", () => ({ traceStore: {}, llmTraceReady: async () => tru
 
 import { ProviderError, type AIProvider, type ChatResult } from "../copilot/provider";
 import { CapExceeded, CapUnavailable, GlobalCapExceeded, assertWithinCap, estimateCallMicroUsd, tracedChat, type TraceCtx, type TraceDeps } from "./traced";
-import { globalDailySpendMicroUsd } from "@shared/llm-cost";
+import { budgetPoolOf, globalDailySpendMicroUsd, poolDailySpendMicroUsd } from "@shared/llm-cost";
 import type { TraceRow, TraceStore } from "./trace-store";
 
 const CTX: TraceCtx = { task: "research", orgId: "org-1", userId: "u1", leadId: 7, promptVersion: "r1" };
 const MSGS = [{ role: "system" as const, content: "SECRET PROMPT TEXT" }, { role: "user" as const, content: "private customer words" }];
 
-function rig(over: { chat?: AIProvider["chat"]; used?: number; countFails?: boolean; settleFails?: boolean; reserveFails?: boolean; ledger?: { at: number; cost: number }[] } = {}) {
+function rig(over: { chat?: AIProvider["chat"]; used?: number; countFails?: boolean; settleFails?: boolean; reserveFails?: boolean; ledger?: { at: number; cost: number; task?: string }[] } = {}) {
   const rows: TraceRow[] = []; const logs: any[] = []; const calls: any[] = [];
   let t = Date.UTC(2026, 9, 11, 12, 0, 0);
   // The platform-wide ledger: every reserved or settled call's cost, with when it was made.
@@ -24,9 +24,10 @@ function rig(over: { chat?: AIProvider["chat"]; used?: number; countFails?: bool
     // Atomic like the database's: the check and the insert happen with nothing in between.
     reserve: async (r, o) => {
       if (over.reserveFails) throw new Error("db down");
-      const used = ledger.filter((x) => x.at >= o.since.getTime()).reduce((n, x) => n + x.cost, 0);
-      if (used + r.costMicroUsd > o.limitMicroUsd) return null;
-      rows.push({ ...r }); ledger.push({ at: t, cost: r.costMicroUsd });
+      const today = ledger.filter((x) => x.at >= o.since.getTime());
+      const used = today.reduce((n, x) => n + x.cost, 0), pool = today.filter((x) => o.poolTasks.includes(x.task ?? "research")).reduce((n, x) => n + x.cost, 0);
+      if (used + r.costMicroUsd > o.overallMicroUsd || pool + r.costMicroUsd > o.poolMicroUsd) return null;
+      rows.push({ ...r }); ledger.push({ at: t, cost: r.costMicroUsd, task: r.task });
       return rows.length - 1;
     },
     settle: async (id, r) => { if (over.settleFails) throw new Error("table missing"); Object.assign(rows[id], r); ledger[ledger.length - rows.length + id] = { ...ledger[ledger.length - rows.length + id], cost: r.costMicroUsd }; },
@@ -156,5 +157,53 @@ describe("the platform-wide model budget (every workspace, one UTC day)", () => 
   it("the estimate grows with the prompt and the output budget asked for", () => {
     expect(estimateCallMicroUsd(MSGS, 1000)).toBeLessThan(estimateCallMicroUsd(MSGS, 8000));
     expect(estimateCallMicroUsd([{ role: "user", content: "x".repeat(30_000) }], 1000)).toBeGreaterThan(estimateCallMicroUsd(MSGS, 1000));
+  });
+});
+
+/* ── option (a): AI Outbound and the other metered features have separate allocations under one hard ceiling ── */
+describe("separate allocations: AI Outbound can't use up the budget for lead research and drafting", () => {
+  const OUT: TraceCtx = { task: "enrich", orgId: "org-1", promptVersion: "e1" };
+  const today = Date.UTC(2026, 9, 11, 1);
+  it("defaults: $1.00 overall, $0.50 for AI Outbound (icp, enrich, signals, angle), $0.50 for the rest; a pool can never exceed the overall ceiling", () => {
+    expect(budgetPoolOf("enrich")).toBe("outbound"); expect(budgetPoolOf("signals")).toBe("outbound"); expect(budgetPoolOf("icp")).toBe("outbound"); expect(budgetPoolOf("angle")).toBe("outbound");
+    expect(budgetPoolOf("research")).toBe("sales"); expect(budgetPoolOf("draft")).toBe("sales"); expect(budgetPoolOf("classify")).toBe("sales"); expect(budgetPoolOf("negotiate")).toBe("sales");
+    expect(poolDailySpendMicroUsd("outbound", {})).toBe(500_000);
+    expect(poolDailySpendMicroUsd("sales", {})).toBe(500_000);
+    expect(poolDailySpendMicroUsd("outbound", { LLM_OUTBOUND_DAILY_SPEND_USD: "5" })).toBe(1_000_000); // capped by the $1 ceiling
+    expect(poolDailySpendMicroUsd("sales", { LLM_SALES_DAILY_SPEND_USD: "abc" })).toBe(500_000);
+    expect(poolDailySpendMicroUsd("outbound", { LLM_OUTBOUND_DAILY_SPEND_USD: "0.2" })).toBe(200_000);
+  });
+  it("AI Outbound has used its $0.50: outbound calls are refused (its own code), lead research still runs", async () => {
+    const r = rig({ ledger: [{ at: today, cost: 499_000, task: "signals" }] });
+    const e = await tracedChat(OUT, MSGS, {}, r.deps, {}).catch((x) => x);
+    expect(e).toBeInstanceOf(GlobalCapExceeded);
+    expect(e.pool).toBe("outbound");
+    await expect(tracedChat(CTX, MSGS, {}, r.deps, {})).resolves.toMatchObject({ content: "ok" });
+  });
+  it("lead research and drafting have used their $0.50: they are refused, AI Outbound still runs", async () => {
+    const r = rig({ ledger: [{ at: today, cost: 499_000, task: "research" }] });
+    const e = await tracedChat({ ...CTX, task: "draft" }, MSGS, {}, r.deps, {}).catch((x) => x);
+    expect(e).toBeInstanceOf(GlobalCapExceeded);
+    expect(e.pool).toBe("sales");
+    await expect(tracedChat(OUT, MSGS, {}, r.deps, {})).resolves.toMatchObject({ content: "ok" });
+  });
+  it("the overall ceiling always holds, even when the pools are set to add up to more than it", async () => {
+    const env = { LLM_OUTBOUND_DAILY_SPEND_USD: "0.8", LLM_SALES_DAILY_SPEND_USD: "0.8" };
+    const r = rig({ ledger: [{ at: today, cost: 700_000, task: "enrich" }, { at: today, cost: 295_000, task: "research" }] });
+    // Each pool still has room (0.8), but 0.995 of the 1.00 ceiling is spent: both are refused.
+    await expect(tracedChat(OUT, MSGS, {}, r.deps, env)).rejects.toBeInstanceOf(GlobalCapExceeded);
+    await expect(tracedChat(CTX, MSGS, {}, r.deps, env)).rejects.toBeInstanceOf(GlobalCapExceeded);
+    expect(r.calls).toHaveLength(0);
+  });
+  it("many calls from both pools at once never pass either pool or the ceiling", async () => {
+    const r = rig();
+    const est = estimateCallMicroUsd(MSGS, undefined);
+    const env = { LLM_GLOBAL_DAILY_SPEND_USD: String((5 * est + est / 2) / 1e6), LLM_OUTBOUND_DAILY_SPEND_USD: String((3 * est + est / 2) / 1e6), LLM_SALES_DAILY_SPEND_USD: String((3 * est + est / 2) / 1e6) };
+    const out = await Promise.allSettled([...Array.from({ length: 8 }, () => tracedChat(OUT, MSGS, {}, r.deps, env)), ...Array.from({ length: 8 }, () => tracedChat(CTX, MSGS, {}, r.deps, env))]);
+    const ok = (from: number, to: number) => out.slice(from, to).filter((x) => x.status === "fulfilled").length;
+    expect(ok(0, 8)).toBeLessThanOrEqual(3);
+    expect(ok(8, 16)).toBeLessThanOrEqual(3);
+    expect(ok(0, 16)).toBeLessThanOrEqual(5);
+    expect(ok(0, 16)).toBe(5); // and the ceiling is used, not wasted
   });
 });

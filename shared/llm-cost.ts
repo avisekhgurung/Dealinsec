@@ -85,3 +85,21 @@ export function globalDailySpendMicroUsd(env: Env = process.env): number {
 
 /** The start of the UTC day `at` falls in: when the platform-wide daily budgets roll over. */
 export const utcDayStart = (at: number | Date): Date => { const d = new Date(at); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); };
+
+/**
+ * Two allocations under the platform-wide ceiling, each enforced on its own, so AI Outbound can never use up what lead
+ * research and drafting need (and the reverse):
+ *   outbound  icp, enrich, signals, angle             LLM_OUTBOUND_DAILY_SPEND_USD (default $0.50)
+ *   sales     every other metered task (research, draft, classify, negotiate)  LLM_SALES_DAILY_SPEND_USD (default $0.50)
+ * A pool is never more than the overall ceiling (LLM_GLOBAL_DAILY_SPEND_USD, $1.00), and the ceiling is checked too.
+ */
+export const OUTBOUND_TASKS: readonly LlmTask[] = ["icp", "enrich", "signals", "angle"];
+export type BudgetPool = "outbound" | "sales";
+export const budgetPoolOf = (task: LlmTask | string): BudgetPool => ((OUTBOUND_TASKS as readonly string[]).includes(task) ? "outbound" : "sales");
+export const poolTasks = (pool: BudgetPool): readonly LlmTask[] => (pool === "outbound" ? OUTBOUND_TASKS : LLM_TASKS.filter((t) => !(OUTBOUND_TASKS as readonly string[]).includes(t)));
+export const DEFAULT_POOL_DAILY_SPEND_USD = 0.5;
+export function poolDailySpendMicroUsd(pool: BudgetPool, env: Env = process.env): number {
+  const n = Number(pool === "outbound" ? env.LLM_OUTBOUND_DAILY_SPEND_USD : env.LLM_SALES_DAILY_SPEND_USD);
+  const micro = Math.round((Number.isFinite(n) && n > 0 ? n : DEFAULT_POOL_DAILY_SPEND_USD) * 1_000_000);
+  return Math.min(micro, globalDailySpendMicroUsd(env));
+}

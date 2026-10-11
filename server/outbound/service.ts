@@ -31,7 +31,7 @@ const DAY = 86_400_000;
 const NOT_SETUP = () => fail(503, "PROSPECTS_NOT_SETUP", "AI Outbound isn't set up on this server yet.");
 async function ready(): Promise<boolean> { try { return await prospectsTablesReady(); } catch { return false; } }
 const capFail = (e: unknown, task: Parameters<typeof dailyLimit>[0]) =>
-  e instanceof GlobalCapExceeded ? fail(429, "global_limit", "Today's AI budget for everyone on DealInSec is used up. It resets at midnight UTC.")
+  e instanceof GlobalCapExceeded ? fail(429, "global_limit", "Today's AI Outbound budget for everyone on DealInSec is used up. Lead research and drafting are not affected. It resets at midnight UTC.")
   : e instanceof CapExceeded ? fail(429, "daily_limit", `You've used today's AI allowance for this (${dailyLimit(task)} a day). Try again tomorrow.`)
     : e instanceof CapUnavailable ? NOT_SETUP() : null;
 

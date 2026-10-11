@@ -30,6 +30,7 @@ import { companyProvider, contactProvider, costMicroUsd, pageReader, readSitemap
 import { outboundStore, type ItemWithProspect, type NewFinding, type OutboundStore } from "./store";
 import { dailyCompanyLimit, dailySearchLimit, globalSearchLimit } from "./limits";
 import { utcDayStart } from "@shared/llm-cost";
+import { failureCode, retryCode } from "./diagnostics";
 import type { StepResult } from "../workflow/runner";
 
 export const CACHE_DAYS = 14;
@@ -142,12 +143,13 @@ async function trackProvider<T>(deps: PipelineDeps, o: { orgId: string; runId: s
 export const STEP_OF_STAGE: Record<string, string> = { found: "verify", verified: "enrich", enriched: "research" };
 /**
  * A transient problem: the item is retried later (with back-off), up to MAX_ATTEMPTS, then marked failed. A failed item
- * keeps WHERE and WHY in its error code ("research:invalid_response", "enrich:timeout"), never a message (it may hold page text).
+ * keeps WHERE and WHY in its error code ("research:invalid_response", "research:page:unreachable"), never a message (it may hold page text).
  */
 async function retryLater(deps: PipelineDeps, item: ItemWithProspect, code: string): Promise<void> {
   const attempts = item.attempts + 1;
-  if (attempts >= MAX_ATTEMPTS) await deps.store.setItem(item.id, { stage: "failed", attempts, errorCode: `${STEP_OF_STAGE[item.stage] ?? item.stage}:${code}`.slice(0, 60), updatedAt: deps.now() });
-  else await deps.store.setItem(item.id, { attempts, errorCode: code, nextAttemptAt: new Date(deps.now().getTime() + 15_000 * 2 ** attempts), updatedAt: deps.now() });
+  // Codes are shaped to fit their 30-character column (B1: a longer one made the write fail and the run retry forever).
+  if (attempts >= MAX_ATTEMPTS) await deps.store.setItem(item.id, { stage: "failed", attempts, errorCode: failureCode(STEP_OF_STAGE[item.stage] ?? item.stage, code), updatedAt: deps.now() });
+  else await deps.store.setItem(item.id, { attempts, errorCode: retryCode(code), nextAttemptAt: new Date(deps.now().getTime() + 15_000 * 2 ** attempts), updatedAt: deps.now() });
 }
 const rejectItem = (deps: PipelineDeps, item: ItemWithProspect, reason: RejectReason) => deps.store.setItem(item.id, { stage: "rejected", errorCode: reason, updatedAt: deps.now() });
 

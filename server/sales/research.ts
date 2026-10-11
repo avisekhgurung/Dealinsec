@@ -79,7 +79,7 @@ export async function startResearch(user: Who, leadId: number, opts: { by?: "use
 
   try { await assertWithinCap("research", user.organizationId!); }
   catch (e) {
-    if (e instanceof GlobalCapExceeded) return fail(429, "global_limit", "Today's AI budget for everyone on DealInSec is used up. It resets at midnight UTC.");
+    if (e instanceof GlobalCapExceeded) return fail(429, "global_limit", "Today's AI budget for lead research and drafting is used up for everyone on DealInSec. It resets at midnight UTC.");
     if (e instanceof CapExceeded) return fail(429, "daily_limit", `You've used today's ${dailyLimit("research")} research runs. Try again tomorrow.`);
     if (e instanceof CapUnavailable) return fail(503, "SALES_NOT_SETUP", "The sales agent isn't set up on this server yet.");
     throw e;

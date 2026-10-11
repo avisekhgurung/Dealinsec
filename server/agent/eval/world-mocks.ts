@@ -177,6 +177,12 @@ export const messageStoreMock = () => {
 };
 
 /** AI Outbound's store, in memory, with the database's guarantees: one active run per organization and ICP, one prospect per organization and domain, one item per run and prospect, an atomic lease claim, and saveStep all-or-nothing. */
+/**
+ * The error_code columns are varchar(30): Postgres refuses a longer value and the write fails. The in-memory stores
+ * refuse it the same way, so a code built too long is caught by the tests (B1), not in production.
+ */
+const col30 = (v: unknown) => { if (typeof v === "string" && v.length > 30) throw new Error(`value too long for type character varying(30): "${v.slice(0, 40)}"`); };
+
 export const outboundStoreMock = () => {
   class RunActive extends Error { constructor(public runId: string) { super("a run with this ICP is already in progress"); } }
   let pseq = 0, iseq = 0, fseq = 0;
@@ -207,12 +213,13 @@ export const outboundStoreMock = () => {
         return { ...copy(r), fence: r.attempts };
       },
       // Fenced like the real store: the claim number must still match and the run must still be running.
-      async updateRun(id: string, fence: number, set: any) { ro(); const r = o().runs.find((x) => x.id === id && x.attempts === fence && x.status === "running"); if (!r) return false; Object.assign(r, copy(set)); return true; },
+      async updateRun(id: string, fence: number, set: any) { ro(); col30(set?.errorCode); const r = o().runs.find((x) => x.id === id && x.attempts === fence && x.status === "running"); if (!r) return false; Object.assign(r, copy(set)); return true; },
       async setLease(id: string, fence: number, until: Date | null) { const r = o().runs.find((x) => x.id === id && x.attempts === fence && x.status === "running"); if (!r) return false; r.leaseUntil = until; return true; },
       async finishRun(orgId: string, id: string, fence: number, s: any) {
         ro();
         const r = o().runs.find((x) => x.organizationId === orgId && x.id === id && x.attempts === fence && x.status === "running");
         if (!r) return false;
+        col30(s.errorCode);
         Object.assign(r, { stage: "done", status: s.status, counters: copy(s.counters), costMicroUsd: s.costMicroUsd, errorCode: s.errorCode, finishedAt: s.now, updatedAt: s.now, leaseUntil: null });
         return true;
       },
@@ -220,6 +227,7 @@ export const outboundStoreMock = () => {
       async setRunStatus(orgId: string, id: string, from: string, to: string, now: Date, errorCode: string | null = null) {
         const r = o().runs.find((x) => x.organizationId === orgId && x.id === id && x.status === from);
         if (!r) return false;
+        col30(errorCode);
         Object.assign(r, { status: to, updatedAt: now, finishedAt: to === "running" ? null : now, errorCode, leaseUntil: null });
         return true;
       },
@@ -244,7 +252,7 @@ export const outboundStoreMock = () => {
       },
       async itemsAt(runId: string, stage: string, limit: number, now: Date) { return withP(o().items.filter((x) => x.runId === runId && x.stage === stage && (!x.nextAttemptAt || x.nextAttemptAt <= now)).sort(order).slice(0, limit)); },
       async runItems(orgId: string, runId: string) { return withP(o().items.filter((x) => x.organizationId === orgId && x.runId === runId).sort(order), orgId); },
-      async setItem(id: number, set: any) { ro(); const i = o().items.find((x) => x.id === id); if (i) Object.assign(i, copy(set)); },
+      async setItem(id: number, set: any) { ro(); col30(set?.errorCode); const i = o().items.find((x) => x.id === id); if (i) Object.assign(i, copy(set)); },
       async findings(orgId: string, prospectId: number) { return o().findings.filter((f) => f.organizationId === orgId && f.prospectId === prospectId).sort((a, b) => a.id - b.id).map(copy); },
       async findingsFor(orgId: string, ids: number[]) { return o().findings.filter((f) => f.organizationId === orgId && ids.includes(f.prospectId)).sort((a, b) => a.id - b.id).map(copy); },
       async saveStep(s: any) {
@@ -258,10 +266,11 @@ export const outboundStoreMock = () => {
           o().findings.push(row); saved.push(row);
         }
         if (s.prospect) { const p = o().prospects.find((x) => x.organizationId === s.orgId && x.id === s.prospectId); if (p) Object.assign(p, copy(s.prospect), { updatedAt: s.now }); }
+        col30(s.item?.errorCode);
         if (s.itemId && s.item) { const i = o().items.find((x) => x.id === s.itemId && x.organizationId === s.orgId); if (i) Object.assign(i, copy(s.item), { updatedAt: s.now }); }
         return saved.map(copy);
       },
-      async recordProviderCall(r: any) { o().providerCalls.push({ organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: r.operation, ok: r.ok, errorCode: r.errorCode, latencyMs: r.latencyMs, costMicroUsd: r.costMicroUsd, createdAt: r.now }); },
+      async recordProviderCall(r: any) { col30(r.errorCode); o().providerCalls.push({ organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: r.operation, ok: r.ok, errorCode: r.errorCode, latencyMs: r.latencyMs, costMicroUsd: r.costMicroUsd, createdAt: r.now }); },
       async countProviderCalls(q: { orgId?: string; operation: string; since: Date }) { return o().providerCalls.filter((c) => (!q.orgId || c.organizationId === q.orgId) && c.operation === q.operation && c.createdAt >= q.since).length; },
       // Atomic like the database's advisory lock: the count and the insert happen with no await in between.
       async reserveSearch(r: { orgId: string; runId: string | null; provider: string; costMicroUsd: number; limit: number; since: Date; now: Date }) {
@@ -271,7 +280,7 @@ export const outboundStoreMock = () => {
         o().providerCalls.push({ id, organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: "search", ok: false, errorCode: "reserved", latencyMs: 0, costMicroUsd: r.costMicroUsd, createdAt: r.now });
         return id;
       },
-      async settleProviderCall(id: number, r: { ok: boolean; errorCode: string | null; latencyMs: number; costMicroUsd: number }) { Object.assign(o().providerCalls.find((c) => c.id === id) ?? {}, r); },
+      async settleProviderCall(id: number, r: { ok: boolean; errorCode: string | null; latencyMs: number; costMicroUsd: number }) { col30(r.errorCode); Object.assign(o().providerCalls.find((c) => c.id === id) ?? {}, r); },
       async runCostMicroUsd(runId: string) { return world().llmCalls.filter((c) => c.runId === runId).reduce((n, c) => n + (c.costMicroUsd ?? 0), 0) + o().providerCalls.filter((c) => c.runId === runId).reduce((n, c) => n + c.costMicroUsd, 0); },
     },
   };
@@ -281,19 +290,21 @@ export const outboundStoreMock = () => {
 export const traceStoreMock = () => ({
   llmTraceReady: async () => world().salesReady,
   traceStore: {
-    record: async (row: Record<string, any>) => { world().llmCalls.push({ ...row, createdAt: new Date() }); },
+    record: async (row: Record<string, any>) => { col30(row.errorCode); world().llmCalls.push({ ...row, createdAt: new Date() }); },
     count: async (o: { orgId: string; task: string; since: Date }) => world().llmCalls.filter((c) => c.organizationId === o.orgId && c.task === o.task && c.ok && c.createdAt >= o.since).length,
     spendMicroUsd: async (o: { orgId: string; since: Date }) => world().llmCalls.filter((c) => c.organizationId === o.orgId && c.createdAt >= o.since).reduce((n, c) => n + c.costMicroUsd, 0),
     // The platform-wide model budget, atomic like the database's (no await between the sum and the insert).
-    reserve: async (row: Record<string, any>, q: { limitMicroUsd: number; since: Date }) => {
+    reserve: async (row: Record<string, any>, q: { since: Date; overallMicroUsd: number; poolMicroUsd: number; poolTasks: readonly string[] }) => {
       if (world().outbound.failReserve) throw new Error("db down");
-      const spent = world().llmCalls.filter((c) => c.createdAt >= q.since).reduce((n, c) => n + (c.costMicroUsd ?? 0), 0);
-      if (spent + row.costMicroUsd > q.limitMicroUsd) return null;
+      col30(row.errorCode);
+      const today = world().llmCalls.filter((c) => c.createdAt >= q.since);
+      const spent = today.reduce((n, c) => n + (c.costMicroUsd ?? 0), 0), pool = today.filter((c) => q.poolTasks.includes(c.task)).reduce((n, c) => n + (c.costMicroUsd ?? 0), 0);
+      if (spent + row.costMicroUsd > q.overallMicroUsd || pool + row.costMicroUsd > q.poolMicroUsd) return null;
       const id = world().llmCalls.length + 1;
       world().llmCalls.push({ ...row, id, createdAt: new Date() });
       return id;
     },
-    settle: async (id: number, row: Record<string, any>) => { Object.assign(world().llmCalls.find((c) => c.id === id) ?? {}, row); },
+    settle: async (id: number, row: Record<string, any>) => { col30(row.errorCode); Object.assign(world().llmCalls.find((c) => c.id === id) ?? {}, row); },
   },
 });
 

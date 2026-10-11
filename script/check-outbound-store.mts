@@ -65,6 +65,24 @@ try {
   await store.setRunStatus(ORG, cancelled, "running", "cancelled", new Date(), "cancelled");
   check("a cancelled run is never claimed", (await db.query(`SELECT status FROM prospect_runs WHERE id=$1`, [cancelled])).rows[0].status === "cancelled" && !(await store.updateRun(cancelled, 0, { stage: "x" })));
 
+  // ── B1: error codes fit their varchar(30) column; a code that would not is clipped by the store, never a failed write ──
+  {
+    const { failureCode } = await import("../server/outbound/diagnostics.ts");
+    const runB = await mkRun("b1");
+    const pB = await store.upsertProspect(ORG, { domain: "b1-check.example", name: "B1", website: "https://b1-check.example", sources: [] }, new Date());
+    await store.addRunItem({ runId: runB, orgId: ORG, prospectId: pB.id, stage: "enriched", now: new Date() });
+    const itemB = (await store.runItems(ORG, runB))[0];
+    const longest = ["verify", "enrich", "research"].flatMap((st) => ["page_error:bad_response", "page_error:unreachable", "invalid_response", "cap_unavailable", "error:AVeryLongCustomErrorNameThatGoesOnAndOn"].map((w) => failureCode(st, w))).sort((x, y) => y.length - x.length)[0];
+    let wrote = true; try { await store.setItem(itemB.id, { stage: "failed", attempts: 3, errorCode: longest, updatedAt: new Date() }); } catch { wrote = false; }
+    const stored = (await db.query(`SELECT error_code FROM prospect_run_items WHERE id=$1`, [itemB.id])).rows[0].error_code;
+    check(`the longest failure code the pipeline can make (${longest.length} chars, "${longest}") is stored as it is`, wrote && stored === longest, String(stored));
+    let clipped = true; try { await store.setItem(itemB.id, { errorCode: "research:page_error:bad_response_and_more" }); } catch { clipped = false; }
+    const after = (await db.query(`SELECT error_code FROM prospect_run_items WHERE id=$1`, [itemB.id])).rows[0].error_code;
+    check("a code that would not fit is clipped to 30 by the store, never a failed write (a failed company can't stall the run)", clipped && after.length === 30, String(after));
+    await db.query(`DELETE FROM prospect_run_items WHERE organization_id=$1`, [ORG]);
+    await db.query(`DELETE FROM prospects WHERE organization_id=$1`, [ORG]);
+  }
+
   // ── the platform-wide budgets: concurrent reservations over separate connections never pass the limit ──
   // Searches are dated in a far-future day so nothing else in this database counts; the model budget is measured from now.
   const day = new Date(Date.UTC(2099, 0, 1)), at = new Date(Date.UTC(2099, 0, 1, 0, 0, 1));
@@ -81,12 +99,24 @@ try {
   const since = new Date(Date.now() - 1000);
   const spent0 = Number((await db.query(`SELECT coalesce(sum(cost_micro_usd),0)::bigint n FROM llm_calls WHERE created_at >= $1`, [since.toISOString()])).rows[0].n);
   const row = (cost: number) => ({ organizationId: ORG, userId: null, task: "signals", model: "chk", promptVersion: "chk", tokensIn: 0, tokensOut: 0, latencyMs: 0, costMicroUsd: cost, ok: false, errorCode: "reserved", leadId: null, runId: null });
-  const ids = await Promise.all(Array.from({ length: 10 }, () => traceStore.reserve(row(10_000), { limitMicroUsd: spent0 + 35_000, since })));
+  const SALES = ["research", "draft", "classify", "negotiate"], OUT = ["icp", "enrich", "signals", "angle"];
+  const lim = (overall: number, pool: number, tasks: string[]) => ({ since, overallMicroUsd: overall, poolMicroUsd: pool, poolTasks: tasks });
+  const ids = await Promise.all(Array.from({ length: 10 }, () => traceStore.reserve(row(10_000), lim(spent0 + 35_000, 1e12, OUT))));
   check("ten model calls reserved at once with room for three estimates: exactly three granted", ids.filter((x) => x !== null).length === 3, JSON.stringify(ids));
   const one = ids.find((x) => x !== null)!;
   await traceStore.settle(one, { ...row(400), tokensIn: 1000, tokensOut: 100, ok: true, errorCode: null });
-  check("settling replaces the estimate with the real cost, which frees room for another call", (await traceStore.reserve(row(10_000), { limitMicroUsd: spent0 + 35_000, since })) !== null);
+  check("settling replaces the estimate with the real cost, which frees room for another call", (await traceStore.reserve(row(10_000), lim(spent0 + 35_000, 1e12, OUT))) !== null);
   check("…and a settled call counts for its workspace's allowance; a reservation in flight doesn't", (await traceStore.count({ orgId: ORG, task: "signals", since })) === 1);
+  // Two allocations under one ceiling, at once: 10 AI Outbound and 10 research calls, room for 3 in each pool and 5 overall.
+  await db.query(`DELETE FROM llm_calls WHERE organization_id=$1`, [ORG]);
+  const sums = (await db.query(`SELECT coalesce(sum(cost_micro_usd),0)::bigint a, coalesce(sum(cost_micro_usd) FILTER (WHERE task = ANY($2)),0)::bigint o, coalesce(sum(cost_micro_usd) FILTER (WHERE task = ANY($3)),0)::bigint s FROM llm_calls WHERE created_at >= $1`, [since.toISOString(), OUT, SALES])).rows[0];
+  const [a0, o0, s0] = [Number(sums.a), Number(sums.o), Number(sums.s)];
+  const mixed = await Promise.all([
+    ...Array.from({ length: 10 }, () => traceStore.reserve({ ...row(10_000), task: "signals" }, lim(a0 + 55_000, o0 + 35_000, OUT))),
+    ...Array.from({ length: 10 }, () => traceStore.reserve({ ...row(10_000), task: "research" }, lim(a0 + 55_000, s0 + 35_000, SALES))),
+  ]);
+  const gOut = mixed.slice(0, 10).filter((x) => x !== null).length, gSales = mixed.slice(10).filter((x) => x !== null).length;
+  check("both allocations at once: neither pool passes its 3, and together they never pass the ceiling's 5", gOut <= 3 && gSales <= 3 && gOut + gSales === 5, JSON.stringify({ gOut, gSales }));
 } finally {
   await db.query(`DELETE FROM prospect_runs WHERE organization_id=$1`, [ORG]);
   await db.query(`DELETE FROM provider_calls WHERE organization_id=$1`, [ORG]);
