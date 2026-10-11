@@ -29,7 +29,7 @@ import { ProviderError, type ChatMessage } from "../copilot/provider";
 import { agentLog } from "../agent/log";
 import { parseJsonObject } from "../agent/extraction";
 import { leadsStore } from "../leads/store";
-import { CapExceeded, CapUnavailable, assertWithinCap, tracedChat } from "../llm/traced";
+import { CapExceeded, CapUnavailable, GlobalCapExceeded, assertWithinCap, tracedChat } from "../llm/traced";
 import { getIdealClient } from "../services/ideal-client";
 import { relatedKnowledge } from "../services/knowledge";
 import { createTicket, fail, getLead, moveLead, readGate, writeGate, type Result, type Who } from "../services/leads";
@@ -132,6 +132,7 @@ export async function draftOutreach(user: Who, leadId: number, opts: { by?: "use
 
   try { await assertWithinCap("draft", orgId); }
   catch (e) {
+    if (e instanceof GlobalCapExceeded) return fail(429, "global_limit", "Today's AI budget for everyone on DealInSec is used up. It resets at midnight UTC.");
     if (e instanceof CapExceeded) return fail(429, "daily_limit", `You've used today's ${dailyLimit("draft")} drafts. Try again tomorrow.`);
     if (e instanceof CapUnavailable) return fail(503, "SALES_NOT_SETUP", "The sales agent isn't set up on this server yet.");
     throw e;
@@ -166,6 +167,7 @@ export async function draftOutreach(user: Who, leadId: number, opts: { by?: "use
       messages.push({ role: "assistant", content: reply.content ?? "" }, { role: "user", content: `That draft cannot be used. Fix these problems and return the JSON object again:\n${issuesForRetry(issues)}` });
     }
   } catch (e) {
+    if (e instanceof GlobalCapExceeded) return fail(429, "global_limit", "Today's AI budget for everyone on DealInSec is used up. It resets at midnight UTC.");
     if (e instanceof CapExceeded) return fail(429, "daily_limit", `You've used today's ${dailyLimit("draft")} drafts. Try again tomorrow.`);
     if (e instanceof CapUnavailable) return fail(503, "SALES_NOT_SETUP", "The sales agent isn't set up on this server yet.");
     agentLog("error", { errorType: (e as Error)?.name ?? "Error", where: "sales_draft", code: e instanceof ProviderError ? e.code : "internal" }); // never the text

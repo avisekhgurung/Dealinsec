@@ -263,6 +263,15 @@ export const outboundStoreMock = () => {
       },
       async recordProviderCall(r: any) { o().providerCalls.push({ organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: r.operation, ok: r.ok, errorCode: r.errorCode, latencyMs: r.latencyMs, costMicroUsd: r.costMicroUsd, createdAt: r.now }); },
       async countProviderCalls(q: { orgId?: string; operation: string; since: Date }) { return o().providerCalls.filter((c) => (!q.orgId || c.organizationId === q.orgId) && c.operation === q.operation && c.createdAt >= q.since).length; },
+      // Atomic like the database's advisory lock: the count and the insert happen with no await in between.
+      async reserveSearch(r: { orgId: string; runId: string | null; provider: string; costMicroUsd: number; limit: number; since: Date; now: Date }) {
+        if (o().failReserve) throw new Error("db down");
+        if (o().providerCalls.filter((c) => c.operation === "search" && c.createdAt >= r.since).length >= r.limit) return null;
+        const id = o().providerCalls.length + 1;
+        o().providerCalls.push({ id, organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: "search", ok: false, errorCode: "reserved", latencyMs: 0, costMicroUsd: r.costMicroUsd, createdAt: r.now });
+        return id;
+      },
+      async settleProviderCall(id: number, r: { ok: boolean; errorCode: string | null; latencyMs: number; costMicroUsd: number }) { Object.assign(o().providerCalls.find((c) => c.id === id) ?? {}, r); },
       async runCostMicroUsd(runId: string) { return world().llmCalls.filter((c) => c.runId === runId).reduce((n, c) => n + (c.costMicroUsd ?? 0), 0) + o().providerCalls.filter((c) => c.runId === runId).reduce((n, c) => n + c.costMicroUsd, 0); },
     },
   };
@@ -275,6 +284,16 @@ export const traceStoreMock = () => ({
     record: async (row: Record<string, any>) => { world().llmCalls.push({ ...row, createdAt: new Date() }); },
     count: async (o: { orgId: string; task: string; since: Date }) => world().llmCalls.filter((c) => c.organizationId === o.orgId && c.task === o.task && c.ok && c.createdAt >= o.since).length,
     spendMicroUsd: async (o: { orgId: string; since: Date }) => world().llmCalls.filter((c) => c.organizationId === o.orgId && c.createdAt >= o.since).reduce((n, c) => n + c.costMicroUsd, 0),
+    // The platform-wide model budget, atomic like the database's (no await between the sum and the insert).
+    reserve: async (row: Record<string, any>, q: { limitMicroUsd: number; since: Date }) => {
+      if (world().outbound.failReserve) throw new Error("db down");
+      const spent = world().llmCalls.filter((c) => c.createdAt >= q.since).reduce((n, c) => n + (c.costMicroUsd ?? 0), 0);
+      if (spent + row.costMicroUsd > q.limitMicroUsd) return null;
+      const id = world().llmCalls.length + 1;
+      world().llmCalls.push({ ...row, id, createdAt: new Date() });
+      return id;
+    },
+    settle: async (id: number, row: Record<string, any>) => { Object.assign(world().llmCalls.find((c) => c.id === id) ?? {}, row); },
   },
 });
 

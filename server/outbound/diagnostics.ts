@@ -37,3 +37,21 @@ export function failureReport(items: ItemRow[], calls: CallRow[]): FailureReport
     calls: calls.map((c) => ({ task: c.task, ok: c.ok, errorCode: c.errorCode ?? null, n: c.n, avgLatencyMs: c.avgLatencyMs ?? null, maxTokensOut: c.maxTokensOut ?? null })),
   };
 }
+
+/** Anything that runs a parameterised query (a pg Pool or Client): kept tiny so the benchmark scripts and tests share it. */
+export type Query = (text: string, params: unknown[]) => Promise<{ rows: any[] }>;
+/**
+ * The failure report for one workspace, read before its rows are cleaned up: items' stage, step:code and attempts, and
+ * the model calls' outcomes (task, ok, error code, count, average latency, largest output). No text column is selected.
+ */
+export async function readFailureReport(query: Query, orgId: string): Promise<FailureReport> {
+  const items = (await query(`SELECT p.domain, i.stage, i.error_code, i.attempts FROM prospect_run_items i JOIN prospects p ON p.id = i.prospect_id WHERE i.organization_id = $1`, [orgId])).rows;
+  const llm = (await query(`SELECT task, ok, error_code, count(*)::int AS n, round(avg(latency_ms))::int AS lat, max(tokens_out)::int AS maxout FROM llm_calls WHERE organization_id = $1 GROUP BY 1, 2, 3 ORDER BY 1, 2, 3`, [orgId])).rows;
+  return failureReport(
+    items.map((r) => ({ domain: String(r.domain), stage: String(r.stage), errorCode: r.error_code ?? null, attempts: Number(r.attempts ?? 0) })),
+    llm.map((r) => ({ task: String(r.task), ok: !!r.ok, errorCode: r.error_code ?? null, n: Number(r.n), avgLatencyMs: r.lat ?? null, maxTokensOut: r.maxout ?? null })),
+  );
+}
+/** One log line for a person reading a benchmark log: counts and codes only. */
+export const failureLine = (r: FailureReport) =>
+  `failures: ${r.failed.length} failed, ${r.retrying.length} still retrying ${JSON.stringify(r.byCode)}; model calls ${JSON.stringify(r.calls.map((c) => `${c.task}/${c.ok ? "ok" : c.errorCode ?? "error"}=${c.n}`))}`;

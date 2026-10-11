@@ -39,7 +39,8 @@ export interface World {
   /** Outreach messages, and whether their table exists. */
   messages: Row[]; messagesReady: boolean;
   /** AI Outbound: runs, prospects, run items, findings, provider calls, and whether the tables exist. */
-  outbound: { runs: Row[]; prospects: Row[]; items: Row[]; findings: Row[]; providerCalls: Row[]; ready: boolean };
+  /** failReserve: the platform-wide budget can't be counted (the database is down for that query). */
+  outbound: { runs: Row[]; prospects: Row[]; items: Row[]; findings: Row[]; providerCalls: Row[]; ready: boolean; failReserve?: boolean };
   /** Test hook: the next outbound saveStep throws (a crash inside the transaction). */
   outboundFailNextSave?: boolean;
   /** Knowledge: sources, passages and picture bytes (all with their organization), and the pages the fake web serves. */

@@ -88,11 +88,26 @@ describe("extractLinks", () => {
 });
 
 describe("hasContactForm", () => {
-  it("sees an HTML form or a known form embed, and nothing else", () => {
-    for (const h of ['<form action="/send"><input name="email"></form>', '<script src="//js.hsforms.net/forms/v2.js"></script><script>hbspt.forms.create({})</script>', '<iframe src="https://form.jotform.com/123"></iframe>', '<div class="gform_wrapper"></div>', '<div class="wpforms-form"></div>', '<form id="mktoForm_12"></form>', '<a href="https://calendly.com/acme/intro">Book</a>'])
+  it("sees a form a visitor can write to the company with, or a known form embed", () => {
+    for (const h of ['<form action="/send"><input name="name"><input type="email" name="email"><textarea name="message"></textarea><button>Send</button></form>',
+      '<form action="/send"><input name="name"><input type="email" name="email"><input name="company"><button>Get a proposal</button></form>',
+      '<script src="//js.hsforms.net/forms/v2.js"></script><script>hbspt.forms.create({})</script>', '<iframe src="https://form.jotform.com/123"></iframe>', '<div class="gform_wrapper"></div>', '<div class="wpforms-form"></div>', '<form id="mktoForm_12"></form>', '<a href="https://calendly.com/acme/intro">Book</a>'])
       expect(hasContactForm(enc(`<html><body>${h}</body></html>`)), h).toBe(true);
-    for (const h of ["<p>Write to us at hello@acme.com</p>", "<p>The word form appears in this sentence: platform, formation, uniform.</p>", ""])
+  });
+  it("R1: a link, a newsletter sign-up, a search box, a login or a lone email box is not a contact form", () => {
+    for (const h of ["<p>Write to us at hello@acme.com</p>", "<p>The word form appears in this sentence: platform, formation, uniform.</p>", "",
+      '<nav><a href="/contact-us">Contact Us</a></nav>', // a menu link only
+      '<form action="https://acme.us1.list-manage.com/subscribe/post"><input type="email" name="EMAIL"><button>Subscribe</button></form>', // newsletter
+      '<form><input name="name"><input type="email" name="email" placeholder="Your email"><button>Join our newsletter</button></form>', // newsletter with a name box
+      '<form role="search"><input type="search" name="q"><button>Search</button></form>', '<form action="/"><input name="s"><input type="submit" value="Search"></form>', // site search
+      '<form action="/search"><input name="query"><select name="category"><option>All</option></select><button>Go</button></form>', // a search form with two fields
+      '<form action="/login"><input type="email" name="email"><input type="password" name="password"><button>Sign in</button></form>', // login
+      '<form><input type="email" name="email"><button>Go</button></form>', // one email box: can't tell, so not a route
+      '<form><input type="hidden" name="token"><input type="submit"></form>',
+      '<form id="commentform" action="https://acme.com/wp-comments-post.php"><textarea name="comment"></textarea><input name="author"><input name="email"></form>'])
       expect(hasContactForm(enc(`<html><body>${h}</body></html>`)), h).toBe(false);
+    // A real contact form next to a newsletter box still counts.
+    expect(hasContactForm(enc('<html><body><form><input type="email" name="email"><button>Subscribe</button></form><form><input name="name"><input type="email" name="email"><textarea name="message"></textarea></form></body></html>'))).toBe(true);
   });
 });
 

@@ -9,8 +9,8 @@
  *
  *   parse_icp, get_discovery_run, get_prospect_intelligence      reads
  *   discover_prospects, research_prospect, find_decision_maker   always ask (they spend the day's allowance)
- *   get_outreach_angle                                           writes a suggestion onto the prospect; runs unasked at level 1
- *   add_prospect_to_leads                                        creates a lead: asks like create_lead
+ *   get_outreach_angle                                           always asks (it spends the allowance and writes a suggestion)
+ *   add_prospect_to_leads                                        always asks, at every autonomy level (a lead only on the person's say-so)
  */
 import { z } from "zod";
 import { dailyLimit } from "@shared/llm-cost";
@@ -212,7 +212,8 @@ const addTool: AgentTool<{ prospectId: number; contactFindingId?: number }> = {
     const p = r.brief.prospect;
     if (p.leadId) return { ok: false, code: "already_lead", message: `${safeName(p.name)} is already lead ${p.leadId}.` };
     if (p.rejectReason) return { ok: false, code: "rejected", message: `${safeName(p.name)} was set aside (${p.rejectLabel}).` };
-    return { ok: true, args: { prospectId, ...(contactFindingId ? { contactFindingId } : {}) }, preview: { title: `Add lead: ${p.name}`, lines: [{ label: "Website", value: p.domain }, ...(p.score ? [{ label: "Score", value: `${p.score.total} / 100` }] : []), ...(p.decisionMaker ? [{ label: "Decision maker", value: p.decisionMaker.value }] : p.contactPerson ? [{ label: "Contact (employee)", value: p.contactPerson.value }] : [])], effects: ["Adds it to your pipeline as a New lead, with what was found as its facts.", "Nothing is sent to the company."] } };
+    // Always a confirmation card, at every autonomy level: a prospect becomes a lead only when the person says so.
+    return { ok: true, args: { prospectId, ...(contactFindingId ? { contactFindingId } : {}) }, forceApproval: true, preview: { title: `Add lead: ${p.name}`, lines: [{ label: "Website", value: p.domain }, ...(p.score ? [{ label: "Score", value: `${p.score.total} / 100` }] : []), ...(p.decisionMaker ? [{ label: "Decision maker", value: p.decisionMaker.value }] : p.contactPerson ? [{ label: "Contact (employee)", value: p.contactPerson.value }] : [])], effects: ["Adds it to your pipeline as a New lead, with what was found as its facts.", "Nothing is sent to the company."] } };
   },
   async execute(ctx, args): Promise<ToolOutcome> {
     const r = await addToLeads(who(ctx), Number(args.prospectId), { contactFindingId: args.contactFindingId });

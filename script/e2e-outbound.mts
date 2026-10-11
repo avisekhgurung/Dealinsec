@@ -21,11 +21,21 @@ const A = { email: `e2e-ob-a-${STAMP}@dealinsec.invalid`, password: PW, firstNam
 const B = { email: `e2e-ob-b-${STAMP}@dealinsec.invalid`, password: PW, firstName: "Bob", lastName: "Owner" };
 const REQUEST = process.env.E2E_REQUEST ?? "Find 8 US digital marketing agencies with 5–30 employees that serve SaaS companies.";
 
-let pass = 0, fail = 0;
-const failures: string[] = [];
+let pass = 0, fail = 0, skipped = 0;
+const failures: string[] = [], skips: string[] = [];
+/** Set when a run can't start because a provider isn't configured here: every check that needs a run is then SKIPPED, never counted as passed or failed. */
+let unconfigured: string | null = null;
+function skip(name: string, why: string) { skipped++; skips.push(`${name} — ${why}`); console.log(`  – ${name}  [skipped: ${why}]`); }
 function check(name: string, ok: boolean, detail = "") {
+  if (unconfigured) return skip(name, `unconfigured (${unconfigured})`);
   if (ok) { pass++; console.log(`  ✓ ${name}`); } else { fail++; failures.push(`${name}${detail ? " — " + detail : ""}`); console.log(`  ✗ ${name}${detail ? "  [" + detail + "]" : ""}`); }
 }
+/** A check about a set: an empty set proves nothing, so it is skipped ("nothing to check"), never a vacuous pass. */
+function checkSet(name: string, items: unknown[], ok: () => boolean, detail = "") {
+  if (!unconfigured && !items.length) return skip(name, "nothing to check");
+  check(name, !unconfigured && ok(), detail);
+}
+const checkEach = <T,>(name: string, items: T[], ok: (x: T) => boolean, detail = "") => checkSet(name, items, () => items.every(ok), detail);
 function jar() {
   let cookie = "";
   return {
@@ -91,6 +101,10 @@ async function main() {
   const quantity = Number(process.env.E2E_QUANTITY ?? 8);
   const icp = { ...parsed.icp, quantity };
   r = await a.req("POST", "/api/outbound/runs", { request: REQUEST, icp, searches: parsed.searches });
+  if (r.status === 503 && /_NOT_SETUP$/.test(String(r.json?.code ?? ""))) {
+    unconfigured = String(r.json.code);
+    console.log(`  – a run can't start on this server: ${unconfigured}. Every check that needs a run is SKIPPED (not passed, not failed).`);
+  }
   check("starting a run returns 201 at once", r.status === 201 && !!r.json?.run?.id, `${r.status} ${r.text}`);
   const runId = r.json?.run?.id as string;
   const again = await a.req("POST", "/api/outbound/runs", { request: REQUEST, icp, searches: parsed.searches });
@@ -101,7 +115,7 @@ async function main() {
   check("another workspace cannot cancel it: 404", r.status === 404, `${r.status}`);
 
   let view: any = null; const t0 = Date.now();
-  for (let i = 0; i < 120; i++) {
+  for (let i = 0; i < (unconfigured ? 0 : 120); i++) {
     await new Promise((x) => setTimeout(x, 5000));
     r = await a.req("GET", `/api/outbound/runs/${runId}`); view = r.json;
     if (i % 4 === 0) console.log(`     ... ${Math.round((Date.now() - t0) / 1000)}s ${view?.run?.status}/${view?.run?.stage} ${JSON.stringify(view?.run?.counters && { d: view.run.counters.discovered, v: view.run.counters.verified, e: view.run.counters.enriched, r: view.run.counters.researched })}`);
@@ -117,25 +131,26 @@ async function main() {
 
   console.log("\n━━ 4. What it stored ━━");
   const rows = (await db.query(`SELECT p.id, p.domain, p.status, p.ready, p.score, p.fit, p.sources FROM prospects p WHERE p.organization_id = $1`, [ua.orgId])).rows;
-  check("one prospect per domain", new Set(rows.map((x) => x.domain)).size === rows.length, String(rows.length));
-  check("no prospect is a known directory, social network or news site", rows.every((x) => !/(linkedin|facebook|clutch|yelp|crunchbase|wikipedia|reddit|medium)\./.test(x.domain)), rows.map((x) => x.domain).join(","));
-  check("every prospect keeps where it was found (provider, query, url)", rows.every((x) => x.sources.length >= 1 && x.sources.every((s: any) => s.provider && s.query && s.url)), "");
+  checkSet("one prospect per domain", rows, () => new Set(rows.map((x) => x.domain)).size === rows.length, String(rows.length));
+  checkEach("no prospect is a known directory, social network or news site", rows, (x) => !/(linkedin|facebook|clutch|yelp|crunchbase|wikipedia|reddit|medium)\./.test(x.domain), rows.map((x) => x.domain).join(","));
+  checkEach("every prospect keeps where it was found (provider, query, url)", rows, (x) => x.sources.length >= 1 && x.sources.every((s: any) => s.provider && s.query && s.url));
   const fnd = (await db.query(`SELECT f.* FROM prospect_findings f WHERE f.organization_id = $1`, [ua.orgId])).rows;
   console.log(`     -> ${rows.length} prospects, ${fnd.length} findings (${[...new Set(fnd.map((f) => f.kind))].join(", ")})`);
-  check("every confirmed finding has a source page and an exact quote", fnd.filter((f) => f.status === "confirmed").every((f) => f.source_url && f.quote && f.quote.length >= 8), "");
-  check("opportunities and judgments are never 'confirmed'", fnd.filter((f) => f.kind === "opportunity" || f.type === "pain_point").every((f) => f.status === "inferred"), "");
-  check("every opportunity cites findings of the SAME prospect", fnd.filter((f) => f.kind === "opportunity").every((o) => (o.supporting_ids as number[]).length > 0 && (o.supporting_ids as number[]).every((id) => fnd.find((x) => x.id === id && x.prospect_id === o.prospect_id))), "");
-  check("every quote really is on a page of that company's own domain (source URL host)", fnd.filter((f) => f.status === "confirmed" && f.source_type === "website").every((f) => { const d = rows.find((x) => x.id === f.prospect_id)?.domain; try { const h = new URL(f.source_url).hostname.replace(/^www\./, ""); return !!d && (h === d || h.endsWith("." + d)); } catch { return false; } }), "");
-  check("no decision maker has an email we didn't get from a provider (none is guessed)", fnd.filter((f) => f.kind === "decision_maker").every((f) => !f.meta?.email), "");
-  check("no instruction-like text was stored from any website", !fnd.some((f) => /ignore (all |any )?(previous|prior)|system prompt|you are now/i.test(f.value + " " + (f.quote ?? ""))), "");
+  checkEach("every confirmed finding has a source page and an exact quote", fnd.filter((f) => f.status === "confirmed"), (f) => !!(f.source_url && f.quote && f.quote.length >= 8));
+  checkEach("opportunities and judgments are never 'confirmed'", fnd.filter((f) => f.kind === "opportunity" || f.type === "pain_point"), (f) => f.status === "inferred");
+  checkEach("every opportunity cites findings of the SAME prospect", fnd.filter((f) => f.kind === "opportunity"), (o) => (o.supporting_ids as number[]).length > 0 && (o.supporting_ids as number[]).every((id) => fnd.find((x) => x.id === id && x.prospect_id === o.prospect_id)));
+  checkEach("every quote really is on a page of that company's own domain (source URL host)", fnd.filter((f) => f.status === "confirmed" && f.source_type === "website"), (f) => { const d = rows.find((x) => x.id === f.prospect_id)?.domain; try { const h = new URL(f.source_url).hostname.replace(/^www\./, ""); return !!d && (h === d || h.endsWith("." + d)); } catch { return false; } });
+  checkEach("no decision maker has an email we didn't get from a provider (none is guessed)", fnd.filter((f) => f.kind === "decision_maker"), (f) => !f.meta?.email);
+  checkEach("a contact form that is a way in was confirmed by the page reader (R1)", fnd.filter((f) => f.type === "contact_form" && f.status === "confirmed"), (f) => f.meta?.formConfirmed === true || f.meta?.detectedBy === "form");
+  checkSet("no instruction-like text was stored from any website", fnd, () => !fnd.some((f) => /ignore (all |any )?(previous|prior)|system prompt|you are now/i.test(f.value + " " + (f.quote ?? ""))));
   const sc = rows.filter((x) => x.score);
-  check("scored prospects have six components and total ≤ 100, unknown parts earn 0", sc.every((x) => x.score.components.length === 6 && x.score.total <= 100 && x.score.components.every((k: any) => k.points === null || (k.points >= 0 && k.points <= k.max)) && x.score.total === x.score.components.reduce((n: number, k: any) => n + (k.points ?? 0), 0)), "");
-  check("'ready' prospects meet the rule: a verified site, a fit, a current reason, a person or address", rows.filter((x) => x.ready).every((x) => !!x.score && (x.score.readyMissing ?? []).length === 0 && ["strong", "partial", "unclear"].includes(x.fit?.verdict)), "");
+  checkEach("scored prospects have six components and total ≤ 100, unknown parts earn 0", sc, (x) => x.score.components.length === 6 && x.score.total <= 100 && x.score.components.every((k: any) => k.points === null || (k.points >= 0 && k.points <= k.max)) && x.score.total === x.score.components.reduce((n: number, k: any) => n + (k.points ?? 0), 0));
+  checkEach("'ready' prospects meet the rule: a verified site, a strong or partial fit, a dated reason, a way in", rows.filter((x) => x.ready), (x) => !!x.score && (x.score.readyMissing ?? []).length === 0 && ["strong", "partial"].includes(x.fit?.verdict));
 
-  const traced = (await db.query(`SELECT task, ok, prompt_version, tokens_in, cost_micro_usd FROM llm_calls WHERE run_id = $1`, [runId])).rows;
-  check("every model call is traced against the run with a prompt version and tokens", traced.length > 0 && traced.every((t) => t.prompt_version && t.tokens_in > 0), JSON.stringify(traced.slice(0, 2)));
-  const pc = (await db.query(`SELECT operation, provider, ok FROM provider_calls WHERE run_id = $1`, [runId])).rows;
-  check("every search is recorded as a provider call", pc.filter((x) => x.operation === "search").length === (run?.queries ?? []).filter((q: any) => q.done).length, JSON.stringify(pc.length));
+  const traced = (await db.query(`SELECT task, ok, error_code, prompt_version, tokens_in, cost_micro_usd FROM llm_calls WHERE run_id = $1`, [runId])).rows;
+  check("every model call is traced against the run with a prompt version, tokens when it answered, and no reservation left open", traced.length > 0 && traced.every((t) => t.prompt_version && t.error_code !== "reserved" && (!t.ok || t.tokens_in > 0)), JSON.stringify(traced.slice(0, 2)));
+  const pc = (await db.query(`SELECT operation, provider, ok, error_code FROM provider_calls WHERE run_id = $1`, [runId])).rows;
+  checkSet("every search is recorded as a provider call, with no reservation left open", run?.queries ?? [], () => pc.filter((x) => x.operation === "search").length === (run?.queries ?? []).filter((q: any) => q.done && q.error !== "daily_limit" && q.error !== "global_limit" && q.error !== "not_configured").length && !pc.some((x) => x.error_code === "reserved"), JSON.stringify(pc.length));
   const textInTrace = (await db.query(`SELECT count(*)::int n FROM llm_calls WHERE run_id = $1 AND (error_code ~* 'http|@')`, [runId])).rows[0].n;
   check("no page text or address in the trace", textInTrace === 0, "");
 
@@ -148,7 +163,7 @@ async function main() {
     check("another workspace cannot read the brief: 404", r.status === 404, `${r.status}`);
     r = await a.req("GET", `/api/outbound/prospects/${best.id}`);
     check("the brief separates facts, signals, people and inferences", r.status === 200 && Array.isArray(r.json?.brief?.facts) && Array.isArray(r.json?.brief?.signals) && Array.isArray(r.json?.brief?.inferences), r.text);
-    check("nothing in 'facts' is an inference", (r.json?.brief?.facts ?? []).every((f: any) => f.status === "confirmed"), "");
+    checkEach("nothing in 'facts' is an inference", r.json?.brief?.facts ?? [], (f: any) => f.status === "confirmed");
     r = await a.req("POST", `/api/outbound/prospects/${best.id}/contacts`, { runId });
     check("no contact provider connected: contacts says so (503) and invents nobody", r.status === 503 && r.json?.code === "CONTACTS_NOT_SETUP", `${r.status} ${r.text}`);
     r = await a.req("POST", `/api/outbound/prospects/${best.id}/angle`, {});
@@ -201,7 +216,9 @@ await requireServerOnLocalDatabase();
 try { await main(); } catch (e: any) { console.log("\nRUN ABORTED:", e?.message); fail++; failures.push("run aborted: " + e?.message); }
 finally {
   if (!process.env.E2E_KEEP) await cleanup();
-  console.log(`\n═══ ${pass} passed, ${fail} failed ═══`);
+  console.log(`\n═══ ${pass} passed, ${fail} failed, ${skipped} skipped${unconfigured ? ` (unconfigured: ${unconfigured})` : ""} ═══`);
   if (failures.length) { console.log("\nFAILURES:"); failures.forEach((f) => console.log("  ·", f)); }
-  process.exit(fail ? 1 : 0);
+  if (skips.length) { console.log("\nSKIPPED (not evidence either way):"); skips.forEach((f) => console.log("  ·", f)); }
+  // 1 = something failed; 3 = nothing failed but checks were skipped (an incomplete run is not a pass); 0 = everything ran and passed.
+  process.exit(fail ? 1 : skipped ? 3 : 0);
 }

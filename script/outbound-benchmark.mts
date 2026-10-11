@@ -28,6 +28,7 @@ import { outboundSearchProviders } from "../server/discovery/provider.ts";
 import { fetchPublicPage } from "../server/knowledge/net-guard.ts";
 import { extractLinks } from "../server/knowledge/extract.ts";
 import { pageReader } from "../server/outbound/providers.ts";
+import { failureLine, readFailureReport } from "../server/outbound/diagnostics.ts";
 
 const DATABASE_URL = requireLocalDatabaseUrl("outbound-benchmark.mts");
 const BASE = "http://localhost:3000";
@@ -268,6 +269,16 @@ async function main() {
     writeFileSync(join(here, "bench", "results", `${STAMP}.json`), JSON.stringify(out, null, 1));
     console.log(`\nwritten script/bench/results/${STAMP}.json`);
   } finally {
+    // Why companies failed, kept BEFORE the rows are cleaned up (and even when the run itself crashed): codes and counts only.
+    try {
+      const org = (await db.query(`SELECT organization_id FROM users WHERE email = $1`, [WHO.email])).rows[0]?.organization_id;
+      if (org) {
+        const report = await readFailureReport((t, p) => db.query(t, p), org);
+        writeFileSync(join(here, "bench", "results", `${STAMP}-diagnostics.json`), JSON.stringify(report, null, 1));
+        console.log(failureLine(report));
+        console.log(`written script/bench/results/${STAMP}-diagnostics.json`);
+      }
+    } catch (e) { console.log(`diagnostics not written: ${(e as Error)?.name ?? "Error"}`); }
     if (!process.env.BENCH_KEEP) {
       const users = (await db.query(`SELECT id, organization_id FROM users WHERE email = $1`, [WHO.email])).rows;
       for (const u of users) {

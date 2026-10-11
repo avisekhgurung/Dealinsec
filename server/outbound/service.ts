@@ -10,13 +10,13 @@ import { createHash } from "node:crypto";
 import { sanitizeQuery } from "@shared/discovery";
 import { describeIcp, icpSchema, mergeIcp, parseIcpFallback, searchStrategies, withSavedExclusions, type Icp } from "@shared/icp";
 import { normalizeAngle } from "@shared/prospect-intel";
-import { FRESHNESS_LABEL, PROSPECT_CLASS_LABEL, REJECT_LABEL, SIGNAL_LABEL, TIMING_LABEL, dateLabel, isDecisionMaker, isSignalType, readiness, runBudget, signalDating, timingOf, type FindingLike, type ProspectClass, type RejectReason, type Timing } from "@shared/prospect";
+import { FRESHNESS_LABEL, PROSPECT_CLASS_LABEL, REJECT_LABEL, SIGNAL_LABEL, TIMING_LABEL, dateLabel, isContactFormRoute, isDecisionMaker, isSignalType, readiness, runBudget, signalDating, timingOf, type FindingLike, type ProspectClass, type RejectReason, type Timing } from "@shared/prospect";
 import { roleRank } from "@shared/icp";
 import type { ProspectFindingRow, ProspectRow, ProspectRunRow } from "@shared/schema";
 import { parseJsonObject } from "../agent/extraction";
 import { agentLog } from "../agent/log";
 import { DiscoveryError } from "../discovery/types";
-import { CapExceeded, CapUnavailable, tracedChat } from "../llm/traced";
+import { CapExceeded, CapUnavailable, GlobalCapExceeded, tracedChat } from "../llm/traced";
 import { dailyLimit } from "@shared/llm-cost";
 import { profileStore } from "../leads/profile-store";
 import { addClaim, addNote, createLead, fail, readGate, writeGate, type Result, type Who } from "../services/leads";
@@ -31,7 +31,8 @@ const DAY = 86_400_000;
 const NOT_SETUP = () => fail(503, "PROSPECTS_NOT_SETUP", "AI Outbound isn't set up on this server yet.");
 async function ready(): Promise<boolean> { try { return await prospectsTablesReady(); } catch { return false; } }
 const capFail = (e: unknown, task: Parameters<typeof dailyLimit>[0]) =>
-  e instanceof CapExceeded ? fail(429, "daily_limit", `You've used today's AI allowance for this (${dailyLimit(task)} a day). Try again tomorrow.`)
+  e instanceof GlobalCapExceeded ? fail(429, "global_limit", "Today's AI budget for everyone on DealInSec is used up. It resets at midnight UTC.")
+  : e instanceof CapExceeded ? fail(429, "daily_limit", `You've used today's AI allowance for this (${dailyLimit(task)} a day). Try again tomorrow.`)
     : e instanceof CapUnavailable ? NOT_SETUP() : null;
 
 async function savedProfile(orgId: string) { try { return await profileStore.get(orgId); } catch { return null; } }
@@ -172,7 +173,7 @@ function evidenceOf(f: ProspectFindingRow, now: Date): Evidence {
   const d = f.kind === "signal" ? signalDating(likeOf(f), now) : null;
   const fr = d ? (d.usable ? { band: d.band } : { band: "unknown" as const }) : null;
   // A named employee who is not a senior decision-maker is labelled for what they are.
-  const label = f.kind === "signal" ? (isSignalType(f.type) ? SIGNAL_LABEL[f.type] : f.type) : f.kind === "decision_maker" ? (senior(f) ? "Decision maker" : "Employee") : f.kind === "opportunity" ? "Opportunity" : LABEL[f.type] ?? f.type;
+  const label = f.kind === "signal" ? (isSignalType(f.type) ? SIGNAL_LABEL[f.type] : f.type) : f.kind === "decision_maker" ? (senior(f) ? "Decision maker" : "Employee") : f.kind === "opportunity" ? "Opportunity" : f.type === "contact_form" && !isContactFormRoute(likeOf(f)) ? "Contact page (no form confirmed)" : LABEL[f.type] ?? f.type;
   return {
     id: f.id, kind: f.kind, type: f.type, label, value: f.value, status: f.status, source: f.sourceType, url: f.sourceUrl, quote: f.quote, observedAt: iso(f.observedAt),
     freshness: fr ? FRESHNESS_LABEL[fr.band] : undefined, date: d ? dateLabel(likeOf(f)) : undefined, datePrecision: d ? d.precision : undefined, timing: d ? timingOf([{ ...likeOf(f), status: "confirmed" }], now).timing : undefined, supports: (f.supportingIds as number[]) ?? [], meta: f.kind === "decision_maker" ? (f.meta as Record<string, unknown>) : undefined, senior: f.kind === "decision_maker" ? senior(f) : undefined,
@@ -420,7 +421,8 @@ export async function addToLeads(user: Who, id: number, raw: { contactFindingId?
     // A named employee who is not a senior decision-maker is copied as a contact person, which the lead score does not count as a decision-maker.
     const field = f.kind === "signal" ? CLAIM_FIELD[f.type] ?? "recent_news" : f.kind === "decision_maker" ? (senior(f) ? "decision_maker" : "contact_person") : f.kind === "opportunity" ? "opportunity" : f.type;
     const value = f.kind === "signal" ? `${isSignalType(f.type) ? SIGNAL_LABEL[f.type] : f.type}: ${f.value}` : f.value;
-    const confirmed = f.status === "confirmed" && !!f.sourceUrl && !!f.quote && f.quote.length >= 8;
+    // A contact form goes to the lead as confirmed only when the page reader confirmed it (R1); otherwise as a guess.
+    const confirmed = f.status === "confirmed" && !!f.sourceUrl && !!f.quote && f.quote.length >= 8 && (f.type !== "contact_form" || isContactFormRoute(likeOf(f)));
     await addClaim(user, leadId, { field, value: value.slice(0, 400), status: confirmed ? "confirmed" : "inferred", ...(f.sourceUrl ? { evidenceUrl: f.sourceUrl } : {}), ...(f.quote && f.quote.length >= 8 ? { evidenceSnippet: f.quote.slice(0, 500) } : {}) }, { actor: "agent" });
   }
   await addNote(user, leadId, `Added from AI Outbound${score ? ` (score ${score.total}/100)` : ""}. Evidence copied to Facts.`, { actor: "user" });

@@ -1,7 +1,8 @@
 /**
  * The real SQL behind the prospect-run lease (server/outbound/store.ts), against the LOCAL test database only:
  * the atomic claim, the claim number (fence) on every write, renew/park/release, the one-statement finish, and that
- * the stored times are UTC whatever the process's timezone is (run it with TZ=America/Los_Angeles to prove it).
+ * the stored times are UTC whatever the process's timezone is (run it with TZ=America/Los_Angeles to prove it), and the
+ * platform-wide search and model budgets under real concurrency (separate connections, one advisory lock).
  *   TZ=America/Los_Angeles DATABASE_URL=postgresql://dealtest@localhost:5544/dealinsec_pdftest npx tsx script/check-outbound-store.mts
  */
 import { randomUUID } from "node:crypto";
@@ -63,8 +64,33 @@ try {
   const cancelled = await mkRun("d");
   await store.setRunStatus(ORG, cancelled, "running", "cancelled", new Date(), "cancelled");
   check("a cancelled run is never claimed", (await db.query(`SELECT status FROM prospect_runs WHERE id=$1`, [cancelled])).rows[0].status === "cancelled" && !(await store.updateRun(cancelled, 0, { stage: "x" })));
+
+  // ── the platform-wide budgets: concurrent reservations over separate connections never pass the limit ──
+  // Searches are dated in a far-future day so nothing else in this database counts; the model budget is measured from now.
+  const day = new Date(Date.UTC(2099, 0, 1)), at = new Date(Date.UTC(2099, 0, 1, 0, 0, 1));
+  const grants = await Promise.all(Array.from({ length: 12 }, () => store.reserveSearch({ orgId: ORG, runId: null, provider: "chk", costMicroUsd: 8000, limit: 5, since: day, now: at })));
+  const rows = (await db.query(`SELECT id, ok, error_code FROM provider_calls WHERE organization_id=$1 AND operation='search'`, [ORG])).rows;
+  check("twelve searches reserved at once against a limit of five: exactly five granted, five rows", grants.filter((g) => g !== null).length === 5 && rows.length === 5, JSON.stringify({ granted: grants.filter((g) => g !== null).length, rows: rows.length }));
+  const first = grants.find((g) => g !== null)!;
+  await store.settleProviderCall(first, { ok: false, errorCode: "rate_limited", latencyMs: 12, costMicroUsd: 8000 });
+  const settled = (await db.query(`SELECT ok, error_code, latency_ms FROM provider_calls WHERE id=$1`, [first])).rows[0];
+  check("a settled search keeps one row (no second insert) with what really happened; a failure still counts", settled.error_code === "rate_limited" && settled.latency_ms === 12 && (await store.reserveSearch({ orgId: ORG, runId: null, provider: "chk", costMicroUsd: 8000, limit: 5, since: day, now: at })) === null);
+  const nextDay = new Date(Date.UTC(2099, 0, 2));
+  check("the next UTC day starts empty (rollover)", (await store.reserveSearch({ orgId: ORG, runId: null, provider: "chk", costMicroUsd: 8000, limit: 5, since: nextDay, now: new Date(nextDay.getTime() + 1000) })) !== null);
+  const { traceStore } = await import("../server/llm/trace-store.ts");
+  const since = new Date(Date.now() - 1000);
+  const spent0 = Number((await db.query(`SELECT coalesce(sum(cost_micro_usd),0)::bigint n FROM llm_calls WHERE created_at >= $1`, [since.toISOString()])).rows[0].n);
+  const row = (cost: number) => ({ organizationId: ORG, userId: null, task: "signals", model: "chk", promptVersion: "chk", tokensIn: 0, tokensOut: 0, latencyMs: 0, costMicroUsd: cost, ok: false, errorCode: "reserved", leadId: null, runId: null });
+  const ids = await Promise.all(Array.from({ length: 10 }, () => traceStore.reserve(row(10_000), { limitMicroUsd: spent0 + 35_000, since })));
+  check("ten model calls reserved at once with room for three estimates: exactly three granted", ids.filter((x) => x !== null).length === 3, JSON.stringify(ids));
+  const one = ids.find((x) => x !== null)!;
+  await traceStore.settle(one, { ...row(400), tokensIn: 1000, tokensOut: 100, ok: true, errorCode: null });
+  check("settling replaces the estimate with the real cost, which frees room for another call", (await traceStore.reserve(row(10_000), { limitMicroUsd: spent0 + 35_000, since })) !== null);
+  check("…and a settled call counts for its workspace's allowance; a reservation in flight doesn't", (await traceStore.count({ orgId: ORG, task: "signals", since })) === 1);
 } finally {
   await db.query(`DELETE FROM prospect_runs WHERE organization_id=$1`, [ORG]);
+  await db.query(`DELETE FROM provider_calls WHERE organization_id=$1`, [ORG]);
+  await db.query(`DELETE FROM llm_calls WHERE organization_id=$1`, [ORG]);
   await db.end();
 }
 console.log(failed ? `\n${failed} check(s) FAILED` : "\nall checks passed");

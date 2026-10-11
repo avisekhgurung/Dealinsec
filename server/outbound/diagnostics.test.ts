@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { failureReport, splitFailureCode } from "./diagnostics";
+import { failureLine, failureReport, readFailureReport, splitFailureCode } from "./diagnostics";
 
 describe("failure report (kept by the benchmark before its rows are cleaned up)", () => {
   it("splits the step from the code; an older code without a step is 'unknown', never guessed", () => {
@@ -26,5 +26,23 @@ describe("failure report (kept by the benchmark before its rows are cleaned up)"
   it("holds codes and counts only: no field for page text, quotes, names or messages", () => {
     const r = failureReport([{ domain: "a.com", stage: "failed", errorCode: "research:invalid_response", attempts: 3 }], []);
     expect(Object.keys(r.failed[0]).sort()).toEqual(["attempts", "code", "domain", "step"]);
+  });
+});
+
+describe("readFailureReport (both benchmark scripts call it before cleaning up)", () => {
+  it("selects codes, counts and timings only, scoped to the one workspace; never a text column", async () => {
+    const seen: { text: string; params: unknown[] }[] = [];
+    const query = async (text: string, params: unknown[]) => {
+      seen.push({ text, params });
+      return /prospect_run_items/.test(text)
+        ? { rows: [{ domain: "a.com", stage: "failed", error_code: "research:timeout", attempts: 3 }, { domain: "b.com", stage: "done", error_code: null, attempts: 0 }] }
+        : { rows: [{ task: "signals", ok: false, error_code: "timeout", n: 3, lat: 45000, maxout: null }] };
+    };
+    const r = await readFailureReport(query, "org-bench");
+    expect(r.byCode).toEqual({ "research:timeout": 1 });
+    expect(r.calls).toEqual([{ task: "signals", ok: false, errorCode: "timeout", n: 3, avgLatencyMs: 45000, maxTokensOut: null }]);
+    expect(seen.every((q) => q.params[0] === "org-bench" && /organization_id = \$1/.test(q.text))).toBe(true);
+    for (const q of seen) expect(q.text).not.toMatch(/\b(quote|value|meta|content|prompt|email|name|title)\b/i);
+    expect(failureLine(r)).toBe(`failures: 1 failed, 0 still retrying {"research:timeout":1}; model calls ["signals/timeout=3"]`);
   });
 });

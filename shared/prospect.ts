@@ -41,7 +41,7 @@ export function domainOf(url: string): string | null {
 export type RejectReason =
   | "not_a_url" | "blocked_site" | "non_business_host" | "listing_page" | "file" | "excluded_word"
   | "duplicate" | "already_lead" | "unreachable" | "not_html" | "offsite_redirect" | "parked" | "no_identity" | "thin_site"
-  | "poor_fit" | "unclear" | "off_topic" | "not_a_company" | "budget" | "daily_limit" | "failed";
+  | "poor_fit" | "unclear" | "off_topic" | "not_a_company" | "budget" | "daily_limit" | "global_limit" | "failed";
 
 export const REJECT_LABEL: Record<RejectReason, string> = {
   not_a_url: "Not a web address", blocked_site: "A directory, social or news site", non_business_host: "Not a business website",
@@ -50,7 +50,8 @@ export const REJECT_LABEL: Record<RejectReason, string> = {
   not_html: "Not a web page", offsite_redirect: "Website redirects to another company", parked: "Domain parked or for sale",
   no_identity: "Couldn't tell whose site it is", thin_site: "Too little on the site to judge", poor_fit: "Doesn't fit who you want",
   unclear: "Couldn't tell what they do", off_topic: "Nothing about what you asked for", not_a_company: "A directory, marketplace, publication or institution",
-  budget: "Not checked (this run's limit was reached)", daily_limit: "Not checked (today's AI allowance ran out)", failed: "Couldn't be checked",
+  budget: "Not checked (this run's limit was reached)", daily_limit: "Not checked (today's AI allowance ran out)",
+  global_limit: "Not checked (today's platform-wide AI or search budget ran out)", failed: "Couldn't be checked",
 };
 
 /** Why a search result can't be a company's own site, or null when it might be. Judged on host and title, never the model. */
@@ -323,7 +324,8 @@ export function findingsAsClaims(findings: FindingLike[], now: Date): ScoreClaim
   const out: ScoreClaim[] = [];
   for (const f of findings) {
     const base = { id: f.id, value: f.value, status: f.status, evidenceUrl: f.sourceUrl ?? null, createdAt: f.retrievedAt ?? null };
-    if (f.kind === "fact") out.push({ ...base, field: f.type });
+    // A contact form the reader never confirmed is a guess about a way in, not a confirmed one.
+    if (f.kind === "fact") out.push({ ...base, field: f.type, ...(f.type === "contact_form" && !isContactFormRoute(f) ? { status: "inferred" } : {}) });
     else if (f.kind === "decision_maker") {
       // Only a senior decision-maker counts as one; another employee is a named contact, which the score does not count.
       if (isDecisionMaker(f)) out.push({ ...base, field: "decision_maker" });
@@ -350,6 +352,13 @@ export function findingsAsClaims(findings: FindingLike[], now: Date): ScoreClaim
  */
 export const personTitle = (f: Pick<FindingLike, "type" | "value" | "meta">): string => String(f.meta?.title ?? f.type ?? "");
 export const isDecisionMaker = (f: Pick<FindingLike, "kind" | "type" | "value" | "meta">): boolean => f.kind === "decision_maker" && isSeniorDecisionMaker(personTitle(f));
+/**
+ * A contact form that is a way in: confirmed, and a real form on that exact page of the company's site was seen by the
+ * page reader (found by code, `detectedBy: "form"`, or reported by the model and then checked, `formConfirmed: true`).
+ * A "Contact Us" link, a contact-page address or a form stored before this check is not enough.
+ */
+export const isContactFormRoute = (f: Pick<FindingLike, "kind" | "type" | "status" | "meta">): boolean =>
+  f.kind === "fact" && f.type === "contact_form" && f.status === "confirmed" && (f.meta?.formConfirmed === true || f.meta?.detectedBy === "form");
 /** A provider-verified business email on a person: an email route, whatever the person's seniority. */
 export const hasVerifiedEmail = (f: Pick<FindingLike, "kind" | "meta">): boolean => f.kind === "decision_maker" && f.meta?.emailStatus === "verified" && typeof f.meta?.email === "string";
 
@@ -389,9 +398,9 @@ export function readiness(i: ReadyInput): Readiness {
   // An undated, year-only or stale signal still scores, but is not enough to call a prospect outreach-ready.
   const reason = t.timing === "strong" || t.timing === "context" || i.findings.some((f) => f.status === "confirmed" && f.kind === "fact" && ["pain_point", "need"].includes(f.type));
   if (!reason) missing.push(MISSING_REASON);
-  // A way in: a senior decision-maker named on their site, or an email or contact form. Email and form routes do not
-  // depend on anyone's seniority; a named employee who is not a decision-maker is not, on their own, a way in.
-  const contact = i.findings.some((f) => (f.status === "confirmed" && (isDecisionMaker(f) || (f.kind === "fact" && ["business_email", "contact_form"].includes(f.type)))) || hasVerifiedEmail(f));
+  // A way in: a senior decision-maker named on their site, a business email, or a contact form the reader confirmed. Each
+  // stands on its own: email and form routes don't depend on anyone's seniority; a named employee alone is not a way in.
+  const contact = i.findings.some((f) => (f.status === "confirmed" && (isDecisionMaker(f) || (f.kind === "fact" && f.type === "business_email"))) || isContactFormRoute(f) || hasVerifiedEmail(f));
   if (!contact) missing.push(MISSING_CONTACT);
   if (i.doNotContact) missing.push("permission to contact (marked do-not-contact)");
   const ready = missing.length === 0;

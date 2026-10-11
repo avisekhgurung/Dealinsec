@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EVENT_SIGNAL_TYPES, MIN_RELEVANCE, MISSING_CONTACT, MISSING_REASON, hasVerifiedEmail, isDecisionMaker, relevance, canonicalUrl, checkSite, collectCandidates, dateLabel, domainOf, evidenceDate, findingsAsClaims, freshness, junkReason, parseEvidenceDate, pickResearchLinks, preRank, readiness, runBudget, signalDating, timingOf, type FindingLike, type SearchHit } from "./prospect";
+import { EVENT_SIGNAL_TYPES, MIN_RELEVANCE, MISSING_CONTACT, isContactFormRoute, MISSING_REASON, hasVerifiedEmail, isDecisionMaker, relevance, canonicalUrl, checkSite, collectCandidates, dateLabel, domainOf, evidenceDate, findingsAsClaims, freshness, junkReason, parseEvidenceDate, pickResearchLinks, preRank, readiness, runBudget, signalDating, timingOf, type FindingLike, type SearchHit } from "./prospect";
 import { icpSchema } from "./icp";
 import { scoreLead } from "./lead-score";
 
@@ -324,7 +324,7 @@ describe("research reads a dedicated team page before a generic about page", () 
 describe("only a senior decision-maker is one; email and form routes do not depend on seniority", () => {
   const sig = { id: 1, kind: "signal", type: "HIRING", value: "x", status: "confirmed", observedAt: daysAgo(10), meta: { datePrecision: "day" } };
   const person = (id: number, title: string, meta: Record<string, unknown> = {}) => ({ id, kind: "decision_maker", type: title.slice(0, 40), value: `Dana Ortiz, ${title}`, status: "confirmed", meta: { name: "Dana Ortiz", title, ...meta } });
-  const fact = (id: number, type: string) => ({ id, kind: "fact", type, value: "v", status: "confirmed" });
+  const fact = (id: number, type: string) => ({ id, kind: "fact", type, value: "v", status: "confirmed", meta: type === "contact_form" ? { detectedBy: "form" } : {} }); // a form the reader confirmed (R1)
   const judge = (...fs: any[]) => readiness({ verified: true, fitVerdict: "strong", findings: [sig, ...fs], now: today() });
   it("a senior person named on the site is a way in and a decision-maker", () => {
     expect(judge(person(2, "Founder & CEO"))).toMatchObject({ ready: true, classification: "ready" });
@@ -356,5 +356,32 @@ describe("only a senior decision-maker is one; email and form routes do not depe
   it("a title stored before this rule is judged by the same rule (read from the stored title, not a saved flag)", () => {
     expect(isDecisionMaker({ kind: "decision_maker", type: "Content Strategist", value: "x", meta: { title: "Content Strategist", senior: true } })).toBe(false);
     expect(isDecisionMaker({ kind: "decision_maker", type: "Founder", value: "x", meta: {} })).toBe(true);
+  });
+});
+
+describe("R1: a contact form is a way in only when the page reader confirmed a real form on that page", () => {
+  const sig = { id: 1, kind: "signal", type: "HIRING", value: "x", status: "confirmed", observedAt: daysAgo(10), meta: { datePrecision: "day" } };
+  const form = (meta: Record<string, unknown>, status = "confirmed") => ({ id: 3, kind: "fact", type: "contact_form", value: "https://acme.com/contact", status, meta });
+  const judge = (...fs: any[]) => readiness({ verified: true, fitVerdict: "strong", findings: [sig, ...fs], now: today() });
+  it("confirmed by the reader (found by code, or reported by the model and then confirmed): a route", () => {
+    expect(judge(form({ detectedBy: "form" })).ready).toBe(true);
+    expect(judge(form({ formConfirmed: true })).ready).toBe(true);
+    expect(isContactFormRoute(form({ formConfirmed: true }))).toBe(true);
+  });
+  it("a model-reported form with no confirmation (stored before this rule, or the reader found none) is not a route", () => {
+    expect(judge(form({})).ready).toBe(false);
+    expect(judge(form({}, "confirmed")).missing).toEqual([MISSING_CONTACT]);
+    expect(judge(form({ formConfirmed: false }, "inferred")).ready).toBe(false);
+    expect(judge(form({ formConfirmed: true }, "inferred")).ready).toBe(false); // never a route unless confirmed
+  });
+  it("email, verified-email and senior-person routes stand on their own, whatever the form", () => {
+    expect(judge(form({ formConfirmed: false }, "inferred"), { id: 4, kind: "fact", type: "business_email", value: "hello@acme.com", status: "confirmed" }).ready).toBe(true);
+    expect(judge(form({}), { id: 5, kind: "decision_maker", type: "Founder", value: "Dana Ortiz, Founder", status: "confirmed", meta: { title: "Founder" } }).ready).toBe(true);
+    expect(judge(form({}), { id: 6, kind: "decision_maker", type: "Content Strategist", value: "x", status: "inferred", meta: { title: "Content Strategist", email: "d@acme.com", emailStatus: "verified" } }).ready).toBe(true);
+  });
+  it("the score counts an unconfirmed form as a guess, not as a confirmed way in", () => {
+    const claim = (f: any) => findingsAsClaims([{ ...f, sourceUrl: "https://acme.com/contact", retrievedAt: today() } as FindingLike], today())[0];
+    expect(claim(form({ detectedBy: "form" }))).toMatchObject({ field: "contact_form", status: "confirmed" });
+    expect(claim(form({}))).toMatchObject({ field: "contact_form", status: "inferred" });
   });
 });

@@ -107,10 +107,31 @@ export async function extractLinks(bytes: Uint8Array): Promise<HtmlLink[]> {
  * articles, wrong for a company site, whose address and contact details live there). Plain text only, bounded
  * (about 2,000 characters), nothing executed. It is page text like any other: still untrusted, still needs a quote.
  */
-/** A form a visitor can send: an HTML form or a known form embed (HubSpot, Typeform, JotForm, Gravity, WPForms, Marketo, Calendly, Pipedrive). */
-const FORM_EMBED = /<form[\s>]|hbspt\.forms|hsforms\.(net|com)|js\.hsforms|typeform\.com\/to\/|embed\.typeform|jotform\.com|gform_wrapper|wpforms-form|mktoForm|calendly\.com\/|webforms\.pipedrive/i;
+/** A known form embed (HubSpot, Typeform, JotForm, Gravity, WPForms, Marketo, Calendly, Pipedrive): its fields are drawn by script, so it is taken as a form a visitor can send. */
+const FORM_EMBED = /hbspt\.forms|hsforms\.(net|com)|js\.hsforms|typeform\.com\/to\/|embed\.typeform|jotform\.com|gform_wrapper|wpforms-form|mktoForm|calendly\.com\/|webforms\.pipedrive/i;
+/** Words that make a form a newsletter sign-up, not a way to write to the company. */
+const NEWSLETTER = /subscri|newsletter|mailchimp|list-manage\.com|mailing list|sign up for (our )?(updates|emails|news)|join (our )?(list|community)|get (our )?(updates|insights) in your inbox/i;
+/** A field a visitor fills in (not hidden, a button, a checkbox, a password or a search box). */
+const FIELD = /<(?:input\b(?![^>]*\btype\s*=\s*["']?(?:hidden|submit|button|image|reset|checkbox|radio|password|search)\b)[^>]*|select\b[^>]*)>/gi;
+/**
+ * True when the page holds a form a visitor can use to write to the company: a known form embed, or an HTML form with a
+ * message box, or with at least two fields to fill in. Not a contact form: a newsletter sign-up, a site search, a login,
+ * a blog comment box, or a lone email box (which can't be told apart from a newsletter). A link that says "Contact Us" is not a form at all.
+ */
 export function hasContactForm(bytes: Uint8Array): boolean {
-  try { return FORM_EMBED.test(decode(bytes).slice(0, 1_500_000)); } catch { return false; }
+  try {
+    const html = decode(bytes).slice(0, 1_500_000);
+    if (FORM_EMBED.test(html)) return true;
+    const forms = html.match(/<form\b[\s\S]{0,50000}?(?:<\/form>|$)/gi) ?? [];
+    return forms.slice(0, 20).some((f) => {
+      const open = f.match(/^<form\b[^>]*>/i)?.[0] ?? "";
+      if (/\brole\s*=\s*["']?search|\bsearch\b/i.test(open) || /type\s*=\s*["']?(password|search)\b|\bname\s*=\s*["']?(q|s|search)["'\s>]/i.test(f)) return false;
+      if (/commentform|comment-form|wp-comments-post/i.test(open)) return false; // a blog's "leave a reply" box is not a way to reach the company
+      if (/<textarea\b/i.test(f)) return true; // a message box is what a contact form is for
+      if (NEWSLETTER.test(f)) return false;
+      return (f.match(FIELD) ?? []).length >= 2;
+    });
+  } catch { return false; }
 }
 
 /**

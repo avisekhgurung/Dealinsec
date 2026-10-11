@@ -71,3 +71,17 @@ export function dailyLimit(task: LlmTask, env: Env = process.env): number {
   const n = Number(env[LIMIT_ENV[task]]);
   return Number.isInteger(n) && n >= 1 ? n : DEFAULT_LIMIT[task];
 }
+
+/**
+ * The platform-wide model budget for one UTC day, every workspace together, in millionths of a dollar:
+ * LLM_GLOBAL_DAILY_SPEND_USD (default $1.00, about two full 50-company prospect runs). On top of each workspace's
+ * per-task allowance, never instead of it. A missing, zero, negative or unreadable value is the default, never "no limit".
+ */
+export const DEFAULT_GLOBAL_DAILY_SPEND_USD = 1;
+export function globalDailySpendMicroUsd(env: Env = process.env): number {
+  const n = Number(env.LLM_GLOBAL_DAILY_SPEND_USD);
+  return Math.round((Number.isFinite(n) && n > 0 ? n : DEFAULT_GLOBAL_DAILY_SPEND_USD) * 1_000_000);
+}
+
+/** The start of the UTC day `at` falls in: when the platform-wide daily budgets roll over. */
+export const utcDayStart = (at: number | Date): Date => { const d = new Date(at); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); };

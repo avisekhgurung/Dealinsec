@@ -16,7 +16,7 @@ import { parseJsonObject } from "../agent/extraction";
 import { leadsStore } from "../leads/store";
 import { extractHtml, extractLinks } from "../knowledge/extract";
 import { fetchPublicPage, validatePublicUrl, type PageResult } from "../knowledge/net-guard";
-import { CapExceeded, CapUnavailable, assertWithinCap, tracedChat } from "../llm/traced";
+import { CapExceeded, CapUnavailable, GlobalCapExceeded, assertWithinCap, tracedChat } from "../llm/traced";
 import { addClaim, fail, getLead, moveLead, writeGate, type Result, type Who } from "../services/leads";
 import { modelFor, dailyLimit } from "@shared/llm-cost";
 import { PAGE_TEXT_CHARS, RESEARCH_PROMPT_VERSION, researchSystemPrompt, researchUserMessage } from "./research-prompt";
@@ -79,6 +79,7 @@ export async function startResearch(user: Who, leadId: number, opts: { by?: "use
 
   try { await assertWithinCap("research", user.organizationId!); }
   catch (e) {
+    if (e instanceof GlobalCapExceeded) return fail(429, "global_limit", "Today's AI budget for everyone on DealInSec is used up. It resets at midnight UTC.");
     if (e instanceof CapExceeded) return fail(429, "daily_limit", `You've used today's ${dailyLimit("research")} research runs. Try again tomorrow.`);
     if (e instanceof CapUnavailable) return fail(503, "SALES_NOT_SETUP", "The sales agent isn't set up on this server yet.");
     throw e;
@@ -95,7 +96,7 @@ export async function startResearch(user: Who, leadId: number, opts: { by?: "use
 }
 
 const errorCode = (e: unknown): string =>
-  e instanceof CapExceeded ? "daily_limit" : e instanceof CapUnavailable ? "cap_unavailable" : e instanceof ProviderError ? e.code : "internal";
+  e instanceof GlobalCapExceeded ? "global_limit" : e instanceof CapExceeded ? "daily_limit" : e instanceof CapUnavailable ? "cap_unavailable" : e instanceof ProviderError ? e.code : "internal";
 
 /** The work. Never throws: whatever happens, the run is finished (done or failed) and says why. Returns what it recorded. */
 export async function runResearch(user: Who, runId: number, leadId: number, deps: ResearchDeps = defaults()): Promise<RunResult> {

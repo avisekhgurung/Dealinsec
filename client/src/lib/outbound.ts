@@ -50,8 +50,9 @@ export const RUN_STAGE_LABEL: Record<string, string> = {
 };
 export const RUN_ERROR: Record<string, string> = {
   daily_limit: "Today's allowance ran out partway; what was found so far is below.",
+  global_limit: "Today's platform-wide AI or search budget ran out partway; what was found so far is below. It resets at midnight UTC.",
   search_unavailable: "Web search didn't answer, so nothing could be found. Try again later.",
-  cap_unavailable: "The AI allowance couldn't be checked, so the search stopped safely.",
+  cap_unavailable: "The AI or search budget couldn't be checked, so the search stopped safely.",
   cancelled: "You stopped this search.",
   stuck: "This search stopped responding and was ended.",
 };

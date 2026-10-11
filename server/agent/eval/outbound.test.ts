@@ -30,7 +30,7 @@ import { outboundWorkflow } from "../../outbound/runner";
 import { angleSystemPrompt, angleUserMessage } from "../../outbound/prompts";
 import { failureReport } from "../../outbound/diagnostics";
 import { parseIcpFallback } from "@shared/icp";
-import { MISSING_REASON } from "@shared/prospect";
+import { MISSING_REASON, isContactFormRoute } from "@shared/prospect";
 import type { ClaimedRun } from "../../outbound/store";
 import { outboundStore } from "../../outbound/store";
 import { createRunner } from "../../workflow/runner";
@@ -210,7 +210,7 @@ const cards = async (runId: string, u = user()) => { const r = await getRun(u, r
 const byName = (cs: any[], name: string) => cs.find((c) => c.name.startsWith(name));
 
 beforeEach(() => { useWorld(createWorld()); fakeWeb(); seedLead(world(), { companyName: "LeadCo", website: "https://leadco.com", domain: "leadco.com" }); searches = []; calls = { icp: 0, enrich: 0, signals: 0, angle: 0 }; script = {}; model(); clearPageCache(); vi.spyOn(console, "log").mockImplementation(() => {}); });
-afterEach(() => { for (const k of ["SALES_DAILY_ENRICH_LIMIT", "OUTBOUND_DAILY_RUNS", "OUTBOUND_DAILY_SEARCHES", "OUTBOUND_DAILY_COMPANY_LOOKUPS"]) delete process.env[k]; });
+afterEach(() => { for (const k of ["SALES_DAILY_ENRICH_LIMIT", "OUTBOUND_DAILY_RUNS", "OUTBOUND_DAILY_SEARCHES", "OUTBOUND_DAILY_COMPANY_LOOKUPS", "OUTBOUND_GLOBAL_DAILY_SEARCHES", "LLM_GLOBAL_DAILY_SPEND_USD"]) delete process.env[k]; world().outbound.failReserve = false; });
 
 describe("the definition-of-done run", () => {
   it("parses, searches several ways, normalizes, dedupes, verifies, enriches, researches, scores and ranks", async () => {
@@ -703,7 +703,7 @@ describe("what is cached and what is paid for", () => {
       if (contact) page(host, "/contact", html("Contact Formco", contact));
     };
     script.enrich = () => ({ facts: [{ field: "industry", value: "Digital marketing agency", quote: "Formco is a digital marketing agency", page: 1 }] });
-    site("formco.com", "", `<p>Get in touch with Formco about your SaaS growth. ${filler}</p><form action="/send"><input name="email"></form>`);
+    site("formco.com", "", `<p>Get in touch with Formco about your SaaS growth. ${filler}</p><form action="/send"><input name="name"><input type="email" name="email"><textarea name="message"></textarea></form>`);
     const p1 = await outboundStore.upsertProspect(ORG1, { domain: "formco.com", name: "Formco", website: "https://formco.com", sources: [] }, NOW);
     await enrichOne(run, icp, null, deps() as PipelineDeps, p1);
     const form = world().outbound.findings.find((f) => f.prospectId === p1.id && f.type === "contact_form");
@@ -718,6 +718,48 @@ describe("what is cached and what is paid for", () => {
     const p3 = await outboundStore.upsertProspect(ORG1, { domain: "noformco.com", name: "Formco", website: "https://noformco.com", sources: [] }, NOW);
     await enrichOne(run, icp, null, deps() as PipelineDeps, p3);
     expect(world().outbound.findings.some((f) => f.prospectId === p3.id && f.type === "contact_form")).toBe(false);
+  });
+  it("R1: a contact form the MODEL reports is a way in only when the reader finds a real form on that exact page: real form yes; menu link, no form, newsletter only, unreadable page no", async () => {
+    const icp = parseIcpFallback(REQUEST)!;
+    const run = { id: "pr_r1", organizationId: ORG1, createdByUser: "u1" };
+    const realForm = `<form action="/send"><input name="name"><input type="email" name="email"><textarea name="message"></textarea><button>Send</button></form>`;
+    const cases: [string, string, string | null, number, string][] = [
+      // [host, home extra, the page the model calls a contact form (null = none), its HTTP status, what that page holds]
+      ["realco.com", "", "/contact", 200, `<p>Tell us about your project. ${filler}</p>${realForm}`],
+      ["menuco.com", "", "/contact-us", 200, `<p>Our office is in Denver. ${filler}</p>`],
+      ["homeco.com", "", null, 200, ""],
+      ["newsco2.com", "", "/contact", 200, `<p>Stay in the loop. ${filler}</p><form action="https://x.us1.list-manage.com/subscribe/post"><input type="email" name="EMAIL"><button>Subscribe</button></form>`],
+      ["deadco.com", "", "/contact", 500, "error"],
+    ];
+    const names: Record<string, string> = {};
+    for (const [host, extra, path, status, body] of cases) {
+      const name = host.split(".")[0].replace(/^./, (c) => c.toUpperCase()).replace(/\d/g, "");
+      names[name] = host;
+      world().knowledge.dns[host] = ["93.184.216.34"];
+      page(host, "/", html(name, `<p>${name} is a digital marketing agency in Denver, United States serving SaaS companies. ${filler}</p><p>Contact Us to start a project.</p>${extra}`, path ? [path] : []));
+      if (path) page(host, path, status === 200 ? html(`Contact ${name}`, body) : body, status);
+    }
+    script.enrich = (m) => {
+      const name = companyOf(m), host = names[name];
+      const path = cases.find((c) => c[0] === host)![2];
+      return { facts: [
+        { field: "industry", value: "Digital marketing agency", quote: `${name} is a digital marketing agency`, page: 1 },
+        { field: "contact_form", value: `https://${host}${path ?? "/"}`, quote: "Contact Us to start a project.", page: 1 }, // the menu-link words, as the model quoted them
+      ] };
+    };
+    const form = async (host: string) => {
+      const name = Object.keys(names).find((n) => names[n] === host)!;
+      const p = await outboundStore.upsertProspect(ORG1, { domain: host, name, website: `https://${host}`, sources: [] }, NOW);
+      await enrichOne(run, icp, null, deps() as PipelineDeps, p);
+      return world().outbound.findings.filter((f) => f.prospectId === p.id && f.type === "contact_form");
+    };
+    expect(await form("realco.com")).toEqual([expect.objectContaining({ status: "confirmed", value: "https://realco.com/contact", meta: expect.objectContaining({ formConfirmed: true }) })]);
+    for (const [host, why] of [["menuco.com", "no_form"], ["homeco.com", "no_form"], ["newsco2.com", "no_form"], ["deadco.com", "unreadable"]] as const) {
+      const fs = await form(host);
+      expect(fs, host).toHaveLength(1);
+      expect(fs[0], host).toMatchObject({ status: "inferred", meta: expect.objectContaining({ formConfirmed: false, formCheck: why }) });
+      expect(isContactFormRoute(fs[0] as any), host).toBe(false);
+    }
   });
   it("DM-1: a team grid the article reader drops still reaches research; an employee is kept, a client quoted on the same page is not", async () => {
     world().knowledge.dns["gridco.com"] = ["93.184.216.34"];
@@ -824,6 +866,82 @@ describe("what is cached and what is paid for", () => {
   });
 });
 
+/* ── R3: platform-wide daily budgets (every workspace together), on top of each workspace's own ─────────────── */
+describe("the platform-wide search and model budgets", () => {
+  const othersSearched = (n: number, at: Date) => { for (let i = 0; i < n; i++) world().outbound.providerCalls.push({ organizationId: "org-someone-else", runId: null, provider: "fake", operation: "search", ok: true, errorCode: null, latencyMs: 1, costMicroUsd: 8000, createdAt: at }); };
+  const DAY = 86_400_000;
+  it("used up by OTHER workspaces today: a new run makes no search, stops with global_limit and keeps nothing it didn't find", async () => {
+    process.env.OUTBOUND_GLOBAL_DAILY_SEARCHES = "3";
+    othersSearched(3, NOW);
+    const id = await start(); const run = await drive(id);
+    expect(searches).toHaveLength(0);
+    expect(run).toMatchObject({ status: "done", errorCode: "global_limit" });
+    expect((run!.queries as any[]).every((q) => q.error === "global_limit")).toBe(true);
+  });
+  it("rolls over at midnight UTC: yesterday's searches don't count today", async () => {
+    process.env.OUTBOUND_GLOBAL_DAILY_SEARCHES = "3";
+    othersSearched(50, new Date(Date.UTC(NOW.getUTCFullYear(), NOW.getUTCMonth(), NOW.getUTCDate()) - 1000));
+    const id = await start(); await drive(id);
+    expect(searches.length).toBeGreaterThan(0);
+  });
+  it("partway through: the searches already made are kept, the rest stop with global_limit, and the count never passes the limit", async () => {
+    process.env.OUTBOUND_GLOBAL_DAILY_SEARCHES = "4";
+    othersSearched(2, NOW);
+    const id = await start(); const run = await drive(id);
+    expect(searches).toHaveLength(2);
+    expect(world().outbound.providerCalls.filter((c) => c.operation === "search")).toHaveLength(4);
+    expect((run!.queries as any[]).filter((q) => q.ok)).toHaveLength(2);
+    expect(run!.status).toBe("done");
+  });
+  it("the workspace's own limit is checked first and reserves nothing", async () => {
+    process.env.OUTBOUND_DAILY_SEARCHES = "1";
+    process.env.OUTBOUND_GLOBAL_DAILY_SEARCHES = "100";
+    const id = await start(); const run = await drive(id);
+    expect(searches).toHaveLength(1);
+    expect(world().outbound.providerCalls.filter((c) => c.operation === "search")).toHaveLength(1);
+    expect((run!.queries as any[]).some((q) => q.error === "daily_limit")).toBe(true);
+  });
+  it("a search the provider fails still counts for the day (it may be billed) and its row says why, never 'reserved'", async () => {
+    process.env.OUTBOUND_GLOBAL_DAILY_SEARCHES = "100";
+    const dead = deps({ searchProviders: async () => [fakeSearch(() => new DiscoveryError("rate_limited", "busy"))] });
+    const id = await start(dead); await drive(id, dead);
+    const rows = world().outbound.providerCalls.filter((c) => c.operation === "search");
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((c) => c.ok === false && c.errorCode === "rate_limited")).toBe(true);
+  });
+  it("two runs at once share the budget: together they never make more searches than the limit", async () => {
+    process.env.OUTBOUND_GLOBAL_DAILY_SEARCHES = "5";
+    const a = await start();
+    const p2 = await parseIcp(user(), "Find 3 US SEO agencies that serve SaaS companies.", deps());
+    if (!p2.ok) throw new Error(p2.code);
+    const b = await startRun(user(), { request: "Find 3 US SEO agencies that serve SaaS companies.", icp: p2.icp, searches: p2.searches }, {}, deps());
+    if (!b.ok) throw new Error(b.code);
+    const full = { ...pipelineDeps(), ...deps() } as PipelineDeps;
+    for (let i = 0; i < 40; i++) {
+      const runs = (await Promise.all([a, b.run.id].map((id) => outboundStore.getRun(ORG1, id)))).filter((r) => r && r.status === "running" && r.stage === "search");
+      if (!runs.length) break;
+      await Promise.all(runs.map((r) => stepRun(r!, Date.now() + 60_000, full).catch(() => "more")));
+    }
+    expect(searches.length).toBeLessThanOrEqual(5);
+    expect(world().outbound.providerCalls.filter((c) => c.operation === "search").length).toBeLessThanOrEqual(5);
+  });
+  it("can't count today's searches: the run stops (cap_unavailable) before any search is made", async () => {
+    world().outbound.failReserve = true;
+    const id = await start(); const run = await drive(id);
+    expect(searches).toHaveLength(0);
+    expect(run).toMatchObject({ errorCode: "cap_unavailable" });
+  });
+  it("the model budget used up: the run stops with global_limit, keeps what it found, and no model call is made past it", async () => {
+    const id = await start();
+    process.env.LLM_GLOBAL_DAILY_SPEND_USD = "0.000001";
+    const before = calls.enrich + calls.signals;
+    const run = await drive(id);
+    expect(calls.enrich + calls.signals).toBe(before);
+    expect(run).toMatchObject({ status: "done", errorCode: "global_limit" });
+    expect((run!.counters as any).discovered).toBeGreaterThan(0);
+  });
+});
+
 describe("isolation and permissions", () => {
   it("another workspace sees, researches, contacts and adds nothing of this one: every answer is not found", async () => {
     const id = await start(); await drive(id);
@@ -894,6 +1012,16 @@ describe("on demand: research, contacts, angle", () => {
 });
 
 describe("into Leads", () => {
+  it("R1: a contact form the reader never confirmed reaches the lead as a guess, never as a confirmed way in", async () => {
+    const id = await start(); await drive(id);
+    const nw = world().outbound.prospects.find((p) => p.domain === "northwind.com")!;
+    // A form stored before R1 (status confirmed, no reader confirmation) next to the company's facts.
+    await outboundStore.saveStep({ orgId: ORG1, prospectId: nw.id, batch: "legacy", findings: [{ kind: "fact", type: "contact_form", value: "https://northwind.com/contact-us", status: "confirmed", sourceUrl: "https://northwind.com/", sourceType: "website", quote: "Contact Us to start a project", confidence: "high" }], now: NOW });
+    const r = await addToLeads(user(), nw.id, {}, deps()) as any;
+    const forms = world().leads.claims.filter((c) => c.leadId === r.leadId && c.field === "contact_form");
+    expect(forms.length).toBeGreaterThan(0);
+    expect(forms.every((c) => c.status === "inferred")).toBe(true);
+  });
   it("creates one lead through the lead service, copies evidence once, links the prospect; a second click returns the same lead", async () => {
     const id = await start(); await drive(id);
     const nw = world().outbound.prospects.find((p) => p.domain === "northwind.com")!;

@@ -16,7 +16,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { LOCAL_TEST_DATABASE_URL, requireLocalDatabaseUrl } from "./local-db-guard.ts";
-import { failureReport } from "../server/outbound/diagnostics.ts";
+import { failureLine, readFailureReport } from "../server/outbound/diagnostics.ts";
 
 const DATABASE_URL = requireLocalDatabaseUrl("outbound-benchmark-injected.mts");
 process.env.DATABASE_URL = DATABASE_URL;
@@ -158,11 +158,9 @@ async function main() {
     // Why companies failed, kept BEFORE the rows are cleaned up (and even when the run itself crashed): each failed or
     // retrying item's step and error code, and the model calls' outcomes. Codes and counts only (no page text, people or prompts).
     try {
-      const items = (await db.query(`SELECT p.domain, i.stage, i.error_code, i.attempts FROM prospect_run_items i JOIN prospects p ON p.id=i.prospect_id WHERE i.organization_id=$1`, [me.organizationId])).rows;
-      const llm = (await db.query(`SELECT task, ok, error_code, count(*)::int n, round(avg(latency_ms))::int lat, max(tokens_out)::int maxout FROM llm_calls WHERE organization_id=$1 GROUP BY 1,2,3 ORDER BY 1,2,3`, [me.organizationId])).rows;
-      const report = failureReport(items.map((r: any) => ({ domain: r.domain, stage: r.stage, errorCode: r.error_code, attempts: r.attempts })), llm.map((r: any) => ({ task: r.task, ok: r.ok, errorCode: r.error_code, n: r.n, avgLatencyMs: r.lat, maxTokensOut: r.maxout })));
+      const report = await readFailureReport((t, p) => db.query(t, p), me.organizationId);
       writeFileSync(join(here, "bench", "results", `${STAMP}-diagnostics.json`), JSON.stringify(report, null, 1));
-      console.log(`failures: ${report.failed.length} failed, ${report.retrying.length} still retrying ${JSON.stringify(report.byCode)}; model calls ${JSON.stringify(report.calls.map((c) => `${c.task}/${c.ok ? "ok" : c.errorCode ?? "error"}=${c.n}`))}`);
+      console.log(failureLine(report));
       console.log(`written script/bench/results/${STAMP}-diagnostics.json`);
     } catch (e) { console.log(`diagnostics not written: ${(e as Error)?.name ?? "Error"}`); }
     if (!process.env.BENCH_KEEP) {

@@ -83,6 +83,25 @@ describe("what always asks, and what runs", () => {
       expect(card.effects.join(" ")).toMatch(/Nothing is sent to any company and no lead is created/);
     }
   });
+  it("R2: add_prospect_to_leads asks for confirmation at autonomy 1 too; no lead exists until it is approved", async () => {
+    seedRun();
+    const { store } = await run({ autonomy: 1, steps: [call("add_prospect_to_leads", { prospectId: 1 }), ASKED] });
+    expect(store.approvals.size).toBe(1);
+    expect(world().leads.leads).toHaveLength(0);
+    await approve(store, firstApproval(store));
+    expect(world().leads.leads).toHaveLength(1);
+  });
+  it("R2: a declined confirmation adds nothing, at either level, and can't be executed afterwards", async () => {
+    seedRun();
+    for (const autonomy of [0, 1] as AutonomyLevel[]) {
+      const { store } = await run({ autonomy, steps: [call("add_prospect_to_leads", { prospectId: 1 }), ASKED] });
+      const id = firstApproval(store);
+      expect(await store.rejectApproval(id, OWNER())).toBe(true);
+      const r = await approve(store, id);
+      expect(r.status).toBe(409);
+      expect(world().leads.leads).toHaveLength(0);
+    }
+  });
   it("research_prospect and find_decision_maker always ask; the contact lookup refuses outright when no provider is connected", async () => {
     seedRun();
     const a = await run({ autonomy: 1, steps: [call("research_prospect", { prospectId: 1, runId: "pr_seed1" }), ASKED] });

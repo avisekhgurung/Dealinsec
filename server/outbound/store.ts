@@ -77,6 +77,13 @@ export interface OutboundStore {
 
   recordProviderCall(r: { orgId: string; runId: string | null; provider: string; operation: string; ok: boolean; errorCode: string | null; latencyMs: number; costMicroUsd: number; now: Date }): Promise<void>;
   countProviderCalls(o: { orgId?: string; operation: string; since: Date }): Promise<number>;
+  /**
+   * The platform-wide search budget, atomically: if every workspace's searches since `since` (made, failed or in flight)
+   * are fewer than `limit`, a provider_calls row is inserted as this search's reservation and its id returned; otherwise
+   * null. Throws when the searches can't be counted (the caller refuses). The row is completed by settleProviderCall.
+   */
+  reserveSearch(r: { orgId: string; runId: string | null; provider: string; costMicroUsd: number; limit: number; since: Date; now: Date }): Promise<number | null>;
+  settleProviderCall(id: number, r: { ok: boolean; errorCode: string | null; latencyMs: number; costMicroUsd: number }): Promise<void>;
   runCostMicroUsd(runId: string): Promise<number>;
 }
 
@@ -88,6 +95,9 @@ async function withProspects(rows: ProspectRunItemRow[], orgId?: string): Promis
   const by = new Map(ps.map((p) => [p.id, p]));
   return rows.filter((r) => by.has(r.prospectId)).map((r) => ({ ...r, prospect: by.get(r.prospectId)! }));
 }
+
+/** Advisory-lock key for the platform-wide search budget (server/llm/trace-store.ts holds the model budget's). */
+export const GLOBAL_SEARCH_BUDGET_LOCK = 7_310_002;
 
 export const outboundStore: OutboundStore = {
   async createRun(r) {
@@ -238,6 +248,19 @@ export const outboundStore: OutboundStore = {
   async countProviderCalls({ orgId, operation, since }) {
     const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(providerCalls).where(and(orgId ? eq(providerCalls.organizationId, orgId) : undefined, eq(providerCalls.operation, operation), gte(providerCalls.createdAt, since)));
     return r?.n ?? 0;
+  },
+  async reserveSearch(r) {
+    return db.transaction(async (tx) => {
+      // Serialises check-then-reserve across every process; held for the count and the insert only, never across the search.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${GLOBAL_SEARCH_BUDGET_LOCK})`);
+      const [c] = await tx.select({ n: sql<number>`count(*)::int` }).from(providerCalls).where(and(eq(providerCalls.operation, "search"), gte(providerCalls.createdAt, r.since)));
+      if ((c?.n ?? 0) >= r.limit) return null;
+      const [ins] = await tx.insert(providerCalls).values({ organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: "search", ok: false, errorCode: "reserved", latencyMs: 0, costMicroUsd: r.costMicroUsd, createdAt: r.now }).returning({ id: providerCalls.id });
+      return ins.id;
+    });
+  },
+  async settleProviderCall(id, r) {
+    await db.update(providerCalls).set({ ok: r.ok, errorCode: r.errorCode, latencyMs: r.latencyMs, costMicroUsd: r.costMicroUsd }).where(eq(providerCalls.id, id));
   },
   async runCostMicroUsd(runId) {
     const [a] = await db.select({ n: sql<number>`COALESCE(sum(${llmCalls.costMicroUsd}), 0)::int` }).from(llmCalls).where(eq(llmCalls.runId, runId));

@@ -23,12 +23,13 @@ import { parseJsonObject } from "../agent/extraction";
 import { DiscoveryError, type DiscoveryProvider } from "../discovery/types";
 import { outboundSearchProviders } from "../discovery/provider";
 import { leadsStore } from "../leads/store";
-import { CapExceeded, CapUnavailable, remainingToday, tracedChat, type TraceCtx } from "../llm/traced";
+import { CapExceeded, CapUnavailable, GlobalCapExceeded, remainingToday, tracedChat, type TraceCtx } from "../llm/traced";
 import type { ChatMessage } from "../copilot/provider";
 import { PROMPT_VERSIONS, enrichSystemPrompt, enrichUserMessage, signalsSystemPrompt, signalsUserMessage } from "./prompts";
 import { companyProvider, contactProvider, costMicroUsd, pageReader, readSitemap, type CompanyEnrichmentProvider, type ContactEnrichmentProvider, type PageRead, type PageReader } from "./providers";
 import { outboundStore, type ItemWithProspect, type NewFinding, type OutboundStore } from "./store";
-import { dailyCompanyLimit, dailySearchLimit } from "./limits";
+import { dailyCompanyLimit, dailySearchLimit, globalSearchLimit } from "./limits";
+import { utcDayStart } from "@shared/llm-cost";
 import type { StepResult } from "../workflow/runner";
 
 export const CACHE_DAYS = 14;
@@ -116,6 +117,14 @@ async function askJson(deps: PipelineDeps, ctx: TraceCtx, messages: ChatMessage[
   return null;
 }
 
+/** A search whose platform-wide reservation is completed with what really happened (a failure keeps its cost: it may be billed, and it is not retried). */
+async function settledSearch<T>(deps: PipelineDeps, id: number, provider: string, fn: () => Promise<T>): Promise<T> {
+  const t0 = Date.now();
+  const settle = (ok: boolean, errorCode: string | null) => deps.store.settleProviderCall(id, { ok, errorCode, latencyMs: Date.now() - t0, costMicroUsd: ok || errorCode !== "auth" ? costMicroUsd(provider) : 0 }).catch(() => {});
+  try { const r = await fn(); await settle(true, null); return r; }
+  catch (e) { await settle(false, e instanceof DiscoveryError ? e.code : "error"); throw e; }
+}
+
 async function trackProvider<T>(deps: PipelineDeps, o: { orgId: string; runId: string | null; provider: string; operation: string }, fn: () => Promise<T>): Promise<T> {
   const t0 = Date.now();
   try {
@@ -170,7 +179,7 @@ export async function stepRun(run: ProspectRunRow, deadline: number, deps: Pipel
     }
   } catch (e) {
     if (e instanceof StopRun) return finalize(run, icp, deps, e.code);
-    if (e instanceof CapExceeded) return finalize(run, icp, deps, "daily_limit");
+    if (e instanceof CapExceeded) return finalize(run, icp, deps, e instanceof GlobalCapExceeded ? "global_limit" : "daily_limit");
     throw e;
   }
 }
@@ -202,12 +211,20 @@ async function searchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps:
     const providers = await deps.searchProviders();
     const provider = providers.find((p) => p.name === next.provider) ?? providers[0];
     const used = await deps.store.countProviderCalls({ orgId: run.organizationId, operation: "search", since: new Date(deps.now().getTime() - DAY) });
+    // The platform-wide budget is reserved (atomically, for every workspace together) only after the workspace's own
+    // limit passed; a reservation that can't be made because the searches can't be counted stops the run (fail closed).
+    let reservation: number | null = null;
+    if (provider && used < dailySearchLimit()) {
+      try { reservation = await deps.store.reserveSearch({ orgId: run.organizationId, runId: run.id, provider: provider.name, costMicroUsd: costMicroUsd(provider.name), limit: globalSearchLimit(), since: utcDayStart(deps.now()), now: deps.now() }); }
+      catch { throw new StopRun("cap_unavailable"); }
+    }
     if (!provider) { next.done = true; next.ok = false; next.error = "not_configured"; }
     else if (used >= dailySearchLimit()) { for (const q of plan) if (!q.done) { q.done = true; q.ok = false; q.error = "daily_limit"; } counters.stoppedBy = "daily_limit"; }
+    else if (reservation === null) { for (const q of plan) if (!q.done) { q.done = true; q.ok = false; q.error = "global_limit"; } counters.stoppedBy = "global_limit"; }
     else {
       const budget = runBudget(run.quantity);
       try {
-        const results = await trackProvider(deps, { orgId: run.organizationId, runId: run.id, provider: provider.name, operation: "search" }, () =>
+        const results = await settledSearch(deps, reservation, provider.name, () =>
           provider.search(next.q, { count: budget.resultsPerQuery, country: provider.supportsCountry ? icp.countries[0] : undefined }));
         const at = deps.now().toISOString();
         const hits: SearchHit[] = results.map((r) => ({ ...r, provider: provider.name, query: next.q, at }));
@@ -238,7 +255,7 @@ async function rankStep(run: ProspectRunRow, icp: Icp, deps: PipelineDeps): Prom
   const plan = run.queries as QueryPlan[];
   const items = await deps.store.runItems(run.organizationId, run.id);
   if (!items.length) {
-    const code = plan.length && plan.every((q) => !q.ok) ? (plan.some((q) => q.error === "daily_limit") ? "daily_limit" : "search_unavailable") : null;
+    const code = plan.length && plan.every((q) => !q.ok) ? (plan.some((q) => q.error === "global_limit") ? "global_limit" : plan.some((q) => q.error === "daily_limit") ? "daily_limit" : "search_unavailable") : null;
     return finalize(run, icp, deps, code);
   }
   const budget = runBudget(run.quantity);
@@ -347,11 +364,23 @@ export async function enrichOne(run: Pick<ProspectRunRow, "id" | "organizationId
       if (raw === null) throw new ProviderError("invalid_response", "empty_output");
       const n = normalizeEnrichment(raw, pages, p.domain);
       const drafts: NewFinding[] = n.facts.map((f: FactDraft) => ({ kind: "fact", type: f.field, value: f.value, status: "confirmed", sourceUrl: f.url, sourceType: "website", quote: f.quote, contentHash: (home as any).hash, confidence: "high" }));
+      // A contact form the MODEL reports is only a way in when the page reader saw a real form on that exact page of the site
+      // (a "Contact Us" link or a contact-page address is not one; measured: a menu link was offered as a form). Otherwise it is
+      // kept as a guess, with why. Email and person routes are judged on their own.
+      const read = [home, ...others].filter((x): x is Extract<PageRead, { ok: true }> => x.ok && sameSite(new URL(x.url).hostname, p.domain));
+      for (const d of drafts.filter((f) => f.type === "contact_form")) {
+        const check = await confirmForm(deps, d.value, read, p.domain);
+        if (check === "ok") d.meta = { formConfirmed: true };
+        else { d.status = "inferred"; d.confidence = "low"; d.meta = { formConfirmed: false, formCheck: check }; }
+      }
       // The model often skips a contact form. Code checks for one on the pages already read: a contact page of this site that
       // holds a real form, quoted from that page. (Measured: 7 of 37 not-ready companies lacked only a contact route.)
-      if (!drafts.some((f) => f.type === "contact_form")) {
-        const form = [home, ...others].map((x) => (x.ok ? contactFormFinding(x, p.domain) : null)).find((x) => x);
-        if (form) drafts.push({ kind: "fact", type: "contact_form", value: form.value, status: "confirmed", sourceUrl: form.url, sourceType: "website", quote: form.quote, contentHash: (home as any).hash, confidence: "high", meta: { detectedBy: "form" } });
+      if (!drafts.some((f) => f.type === "contact_form" && f.status === "confirmed")) {
+        const form = read.map((x) => contactFormFinding(x, p.domain)).find((x) => x);
+        if (form) {
+          for (let i = drafts.length - 1; i >= 0; i--) if (drafts[i].type === "contact_form") drafts.splice(i, 1); // the confirmed one replaces the guess
+          drafts.push({ kind: "fact", type: "contact_form", value: form.value, status: "confirmed", sourceUrl: form.url, sourceType: "website", quote: form.quote, contentHash: (home as any).hash, confidence: "high", meta: { detectedBy: "form", formConfirmed: true } });
+        }
       }
       facts = await deps.store.saveStep({ orgId, prospectId: p.id, batch: "enrich", findings: drafts, now });
       // Firmographics from a data provider fill gaps. They are a third party's estimate: inferred, never "confirmed".
@@ -382,6 +411,24 @@ export async function enrichOne(run: Pick<ProspectRunRow, "id" | "organizationId
     if (classify(e) === "stop" || !item) throw e;
     await retryLater(deps, item, e instanceof ProviderError ? e.code : e instanceof CapUnavailable ? "cap_unavailable" : errorType(e));
   }
+}
+
+/** One spelling per page for comparing addresses: host without www, path without a trailing slash. */
+const pageKey = (u: string) => { try { const x = new URL(u); return `${x.hostname.replace(/^www\./, "").toLowerCase()}${x.pathname.replace(/\/+$/, "") || "/"}`; } catch { return ""; } };
+/**
+ * Whether a page the model called a contact form really holds one: the page already read, or read now (one more fetch, no
+ * model call); "unreadable" when it can't be read or leaves the site, "no_form" when the reader saw no contact form on it.
+ */
+export async function confirmForm(deps: Pick<PipelineDeps, "reader" | "now">, url: string, read: Extract<PageRead, { ok: true }>[], domain: string): Promise<"ok" | "no_form" | "unreadable"> {
+  const key = pageKey(url);
+  if (!key) return "unreadable";
+  let page = read.find((x) => pageKey(x.url) === key);
+  if (!page) {
+    const r = await readPage(deps as PipelineDeps, url).catch(() => null);
+    if (!r || !r.ok || !sameSite(new URL(r.url).hostname, domain)) return "unreadable";
+    page = r;
+  }
+  return page.hasForm === true ? "ok" : "no_form";
 }
 
 /* ── research: why now, who, what ───────────────────────────────────────── */
@@ -511,7 +558,7 @@ async function finalize(run: ProspectRunRow, icp: Icp, deps: PipelineDeps, stopp
   for (const i of items) {
     if (i.stage === "enriched" || i.stage === "done") await scoreProspect(run.organizationId, i.prospectId, deps);
     if (i.stage === "enriched") await deps.store.setItem(i.id, { stage: "done", errorCode: stoppedBy ? stoppedBy : "not_researched", updatedAt: deps.now() });
-    const why = stoppedBy === "daily_limit" ? "daily_limit" : stoppedBy ? "failed" : "budget";
+    const why = stoppedBy === "daily_limit" || stoppedBy === "global_limit" ? stoppedBy : stoppedBy ? "failed" : "budget";
     if (i.stage === "found" || i.stage === "verified") await deps.store.setItem(i.id, { stage: "rejected", errorCode: why, updatedAt: deps.now() });
   }
   const counters = await computeCounters({ ...run, counters: { ...(run.counters as object), stoppedBy: stoppedBy ?? (run.counters as RunCountersExt)?.stoppedBy ?? null } as any }, deps);

@@ -30,7 +30,7 @@ interface ResearchView {
 }
 const FAILED: Record<string, string> = {
   no_pages: "I couldn't read the company's website.", bad_output: "The research didn't come back in a usable form.", empty_output: "The AI returned nothing for this site. Try again.", timeout: "The research took too long.",
-  daily_limit: "Today's research allowance is used up.", stale: "The research was interrupted.", upstream: "The AI service had a problem.", rate_limited: "The AI service is busy.",
+  daily_limit: "Today's research allowance is used up.", global_limit: "Today's AI budget for everyone is used up; it resets at midnight UTC.", stale: "The research was interrupted.", upstream: "The AI service had a problem.", rate_limited: "The AI service is busy.",
   cap_unavailable: "The sales agent isn't set up on this server yet.",
 };
 const when = (iso: string) => { try { return new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
