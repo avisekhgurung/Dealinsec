@@ -122,22 +122,23 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit }: { id: 
               </Section>
             )}
 
-            <Section title="Why now · signals" tone="signal" hint="stated on their site">
+            <Section title="Why now · signals" tone="signal" hint={`stated on their site · ${p.timingLabel ?? ""}`}>
               {b.signals.length ? b.signals.map((e) => (
-                <div key={e.id} className="rounded-lg bg-orange-50/70 px-3 py-2 text-sm dark:bg-orange-950/20">
-                  <p className="flex items-center gap-1.5 text-[11px] font-semibold text-orange-700 dark:text-orange-400"><Flame className="h-3 w-3" />{e.label} · {e.freshness}</p>
+                <div key={e.id} className={cn("rounded-lg px-3 py-2 text-sm", e.timing === "strong" ? "bg-orange-50/70 dark:bg-orange-950/20" : "border")}>
+                  <p className={cn("flex items-center gap-1.5 text-[11px] font-semibold", e.timing === "strong" ? "text-orange-700 dark:text-orange-400" : "text-muted-foreground")}>{e.timing === "strong" && <Flame className="h-3 w-3" />}{e.label} · {e.date ?? e.freshness}{e.freshness && e.date && e.freshness !== "Undated" ? ` (${e.freshness.toLowerCase()})` : ""} · {e.timing === "strong" ? "strong timing" : e.timing === "context" ? "context, not urgency" : e.timing === "stale" ? "over a year old" : "no usable date"}</p>
                   <p className="break-words">{e.value}</p><Quote e={e} />
                 </div>
               )) : <p className="text-sm text-muted-foreground">No dated change found on their site{p.researched ? "." : " yet. Research it to look."}</p>}
             </Section>
 
-            <Section title="People" hint="ranked by the roles you want">
+            <Section title="People" hint="decision makers first, then other employees">
               {b.people.length ? b.people.map((e) => (
                 <label key={e.id} className="flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm">
                   {canEdit && !p.leadId && <input type="radio" name="contact" className="mt-1" checked={contact === e.id} onChange={() => setContact(e.id)} aria-label={`Use ${e.value} as the lead's contact`} />}
                   <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="min-w-0">
                     <span className="block break-words font-medium">{e.value}</span>
+                    <span className={cn("block text-[11px]", e.senior ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>{e.senior ? "Decision maker" : "Employee · not a senior decision-maker"}</span>
                     {e.meta?.email && <span className="block text-xs">{e.meta.email} · <span className={e.meta.emailStatus === "verified" ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}>{e.meta.emailStatus === "verified" ? "verified by provider" : e.meta.emailStatus === "accept_all" ? "domain accepts all (unverified)" : "not verified"}</span></span>}
                     <Quote e={e} />
                   </span>

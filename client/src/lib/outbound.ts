@@ -12,7 +12,7 @@ export interface ParsedIcp { icp: Icp; searches: string[]; description: string; 
 
 export interface Counters {
   searched: number; results: number; discovered: number; rejected: number; rejectedBy: Record<string, number>; verified: number; enriched: number;
-  icpMatch: number; researched: number; signals: number; decisionMakers: number; ready: number; failed: number; searchRejectedBy?: Record<string, number>; stoppedBy?: string | null;
+  icpMatch: number; researched: number; signals: number; strongTiming?: number; decisionMakers: number; ready: number; failed: number; searchRejectedBy?: Record<string, number>; stoppedBy?: string | null;
 }
 export interface RunView {
   id: string; status: "running" | "done" | "failed" | "cancelled"; stage: string; request: string; icp: Icp; description: string; quantity: number;
@@ -21,15 +21,16 @@ export interface RunView {
 }
 export interface Evidence {
   id: number; kind: "fact" | "signal" | "decision_maker" | "opportunity"; type: string; label: string; value: string; status: string;
-  source: string; url: string | null; quote: string | null; observedAt: string | null; freshness?: string; supports?: number[]; meta?: Record<string, any>;
+  source: string; url: string | null; quote: string | null; observedAt: string | null; freshness?: string; date?: string; datePrecision?: "day" | "month" | "year" | null; timing?: "strong" | "context" | "stale" | "undated" | "none"; senior?: boolean; supports?: number[]; meta?: Record<string, any>;
 }
 export interface ScoreComponent { key: string; label: string; max: number; points: number | null; reason: string }
 export interface ProspectCard {
   id: number; runItemId?: number; name: string; domain: string; website: string; status: string; stage?: string; rejectReason: string | null; rejectLabel: string | null;
   score: { total: number; knownMax: number; unknownPoints: number; confidence: "low" | "medium" | "high"; components: ScoreComponent[]; missing: string[]; readyMissing?: string[] } | null;
   ready: boolean; fit: { verdict: string; headline: string; signals: { key: string; label: string; status: string; detail: string }[] } | null;
+  classification?: "ready" | "qualified" | "insufficient_evidence" | "not_a_fit"; classificationLabel?: string; timing?: "strong" | "context" | "stale" | "undated" | "none"; timingLabel?: string;
   profile: { industry: string | null; location: string | null; country: string | null; employees: string | null; serves: string | null };
-  whyNow: Evidence | null; opportunity: Evidence | null; decisionMaker: Evidence | null; evidenceCount: number; leadId: number | null; researched: boolean;
+  whyNow: Evidence | null; opportunity: Evidence | null; decisionMaker: Evidence | null; contactPerson?: Evidence | null; evidenceCount: number; leadId: number | null; researched: boolean;
 }
 export interface Angle { problem: string; opportunity: string; positioning: string; targetPerson: string | null; reason: string; evidenceIds: number[]; confidence: "low" | "medium" }
 export interface Brief {

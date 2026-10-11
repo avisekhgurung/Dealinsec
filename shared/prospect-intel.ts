@@ -14,7 +14,7 @@ import { contentIssues } from "./outreach-check";
 import { COUNTRIES, roleRank, type Icp } from "./icp";
 import { nameFromDomain, nameResemblesDomain } from "./discovery";
 import { normText } from "./fit";
-import { isSignalType, parseEvidenceDate, type SignalType } from "./prospect";
+import { evidenceDate, isSignalType, type DatePrecision, type EvidenceDate, type SignalType } from "./prospect";
 import { checkContact, cleanLine, injectionLike, normalizeForQuote, onSite, quoteInPage, LIMITS as QUOTE, type ResearchPage } from "./research";
 
 export type Reason = "not_an_object" | "bad_field" | "bad_page" | "bad_value" | "bad_quote" | "quote_not_found" | "suspicious" | "invalid_contact" | "duplicate" | "bad_type" | "bad_person" | "not_staff" | "bad_support" | "bad_text";
@@ -79,7 +79,11 @@ export function normalizeEnrichment(raw: unknown, pages: ResearchPage[], site: s
 
 /* ── research: signals, people, pain points, opportunities ──────────────── */
 
-export interface SignalDraft { index: number; type: SignalType; value: string; quote: string; url: string; observedAt: Date | null; dateQuote: string | null }
+/**
+ * observedAt is set only for a date stated to the day or month; a year alone ("Top agencies in 2026") keeps its year in
+ * dateYear with precision "year" and no observedAt, so nothing downstream can read it as a day.
+ */
+export interface SignalDraft { index: number; type: SignalType; value: string; quote: string; url: string; observedAt: Date | null; datePrecision: DatePrecision | null; dateYear: number | null; dateQuote: string | null }
 export interface PersonDraft { index: number; name: string; title: string; quote: string; url: string; rank: number }
 export interface PainDraft { index: number; value: string; quote: string; url: string }
 export interface OpportunityDraft { text: string; supports: { newIndex?: number; findingId?: number }[]; confidence: "low" | "medium" }
@@ -125,15 +129,17 @@ export function normalizeResearch(raw: unknown, pages: ResearchPage[], site: str
       if (typeof q === "string") { rejected.push({ reason: q, what: "signal" }); return; }
       // The date: from the quote itself, or from a second exact quote on the SAME page that states it AND sits right beside the
       // claim (a date elsewhere on the page, such as another post's, says nothing about THIS statement). Never the model's say-so.
-      let observedAt = parseEvidenceDate(q.quote, opts.retrievedAt), dateQuote: string | null = null;
-      if (!observedAt && typeof f.date_quote === "string" && cleanLine(f.date_quote).length >= 4 && cleanLine(f.date_quote).length <= 120 && dateBesideClaim(q.page.text, q.quote, f.date_quote)) {
-        observedAt = parseEvidenceDate(f.date_quote, opts.retrievedAt);
-        if (observedAt) dateQuote = cleanLine(f.date_quote);
+      // A year alone in the quote (often a title: "...In The US In 2026") is the weakest date: a day or month beside the claim replaces it.
+      let date: EvidenceDate | null = evidenceDate(q.quote, opts.retrievedAt), dateQuote: string | null = null;
+      if ((!date || date.precision === "year") && typeof f.date_quote === "string" && cleanLine(f.date_quote).length >= 4 && cleanLine(f.date_quote).length <= 120 && dateBesideClaim(q.page.text, q.quote, f.date_quote)) {
+        const beside = evidenceDate(f.date_quote, opts.retrievedAt);
+        if (beside && (!date || beside.precision !== "year")) { date = beside; dateQuote = cleanLine(f.date_quote); }
       }
+      const observedAt = date && date.precision !== "year" ? date.at : null;
       const key = `signal:${f.type}:${normalizeForQuote(q.quote).toLowerCase()}`;
       if (seen.has(key)) { rejected.push({ reason: "duplicate", what: "signal" }); return; }
       seen.add(key); kept.set(idx, true);
-      signals.push({ index: idx, type: f.type, value, quote: q.quote, url: q.page.url, observedAt, dateQuote });
+      signals.push({ index: idx, type: f.type, value, quote: q.quote, url: q.page.url, observedAt, datePrecision: date?.precision ?? null, dateYear: date?.precision === "year" ? date.at.getUTCFullYear() : null, dateQuote });
     } else if (f.kind === "person") {
       const name = typeof f.name === "string" ? cleanLine(f.name).slice(0, 80) : "";
       const title = typeof f.title === "string" ? cleanLine(f.title).slice(0, 100) : "";

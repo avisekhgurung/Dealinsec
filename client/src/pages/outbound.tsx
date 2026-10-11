@@ -34,10 +34,10 @@ function Funnel({ run }: { run: RunView }) {
   const c = run.counters;
   const steps = [
     { n: c.discovered ?? 0, label: "discovered" }, { n: c.verified ?? 0, label: "verified" }, { n: c.icpMatch ?? 0, label: "match your ICP" },
-    { n: c.signals ?? 0, label: "with a reason now" }, { n: c.decisionMakers ?? 0, label: "with a person" }, { n: c.ready ?? 0, label: "outreach-ready", strong: true },
+    { n: c.signals ?? 0, label: "with a dated reason" }, { n: c.strongTiming ?? 0, label: "strong timing" }, { n: c.decisionMakers ?? 0, label: "with a decision maker" }, { n: c.ready ?? 0, label: "outreach-ready", strong: true },
   ];
   return (
-    <div className="grid grid-cols-3 gap-2 sm:grid-cols-6" data-testid="funnel">
+    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7" data-testid="funnel">
       {steps.map((s) => (
         <div key={s.label} className={cn("rounded-xl border px-3 py-2", s.strong && "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30")}>
           <p className="text-xl font-bold tabular-nums leading-tight">{s.n}</p>

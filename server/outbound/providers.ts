@@ -8,7 +8,7 @@
  */
 import { createHash } from "node:crypto";
 import { sameSite, siteHost, type PageLink } from "@shared/research";
-import { extractContactBlock, extractHtml, extractLinks, hasContactForm } from "../knowledge/extract";
+import { extractContactBlock, extractHtml, extractLinks, extractPeopleBlock, hasContactForm } from "../knowledge/extract";
 import { fetchPublicPage, realPageIO, validatePublicUrl } from "../knowledge/net-guard";
 import { callJson, str } from "../discovery/http";
 import { DiscoveryError } from "../discovery/types";
@@ -29,6 +29,9 @@ export interface PageReader {
 
 const hashOf = (t: string) => createHash("sha256").update(t).digest("hex");
 
+/** A page whose address says it is about the people: where a people block is worth adding. */
+const TEAM_PATH = /(team|leadership|people|about|who-we-are|founders?|staff|meet)/i;
+
 /** The built-in reader: net-guard (https only, DNS pinned, private addresses refused, redirects re-checked, size and time caps). */
 export const builtinReader: PageReader = {
   name: "builtin",
@@ -38,9 +41,12 @@ export const builtinReader: PageReader = {
     if (r.contentType !== "html") return { ok: false, code: "not_html" };
     const ex = await extractHtml(r.bytes);
     if (!ex.ok) return { ok: false, code: "unreadable" };
-    // The article reader drops footers; a company's address and contact details live there. Added as a separate, labelled block.
+    // The article reader drops footers (a company's address and contact details live there) and card grids (where a team
+    // page lists its people). Each is added back as a separate, labelled block; people only on a team or about page.
     const block = await extractContactBlock(r.bytes);
-    const text = block ? `${ex.text.slice(0, Math.max(2000, PAGE_TEXT_CHARS - block.length - 40))}\n\n[Footer and contact details]\n${block}` : ex.text.slice(0, PAGE_TEXT_CHARS);
+    const people = TEAM_PATH.test(r.url.pathname) ? await extractPeopleBlock(r.bytes) : "";
+    const extra = [people ? `[People on this page]\n${people}` : "", block ? `[Footer and contact details]\n${block}` : ""].filter(Boolean).join("\n\n");
+    const text = extra ? `${ex.text.slice(0, Math.max(2000, PAGE_TEXT_CHARS - extra.length - 4))}\n\n${extra}` : ex.text.slice(0, PAGE_TEXT_CHARS);
     return { ok: true, url: r.url.toString(), title: ex.title ?? "", text, links: await extractLinks(r.bytes), hash: hashOf(text), hasForm: hasContactForm(r.bytes) };
   },
 };

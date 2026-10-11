@@ -10,7 +10,7 @@ import { createHash } from "node:crypto";
 import { sanitizeQuery } from "@shared/discovery";
 import { describeIcp, icpSchema, mergeIcp, parseIcpFallback, searchStrategies, withSavedExclusions, type Icp } from "@shared/icp";
 import { normalizeAngle } from "@shared/prospect-intel";
-import { FRESHNESS_LABEL, REJECT_LABEL, SIGNAL_LABEL, freshness, isSignalType, runBudget, type RejectReason } from "@shared/prospect";
+import { FRESHNESS_LABEL, PROSPECT_CLASS_LABEL, REJECT_LABEL, SIGNAL_LABEL, TIMING_LABEL, dateLabel, isDecisionMaker, isSignalType, readiness, runBudget, signalDating, timingOf, type FindingLike, type ProspectClass, type RejectReason, type Timing } from "@shared/prospect";
 import { roleRank } from "@shared/icp";
 import type { ProspectFindingRow, ProspectRow, ProspectRunRow } from "@shared/schema";
 import { parseJsonObject } from "../agent/extraction";
@@ -150,34 +150,51 @@ export async function cancelRun(user: Who, id: string, d: Partial<PipelineDeps> 
 
 /* ── 3. prospects: the card and the brief ───────────────────────────────── */
 
-export interface Evidence { id: number; kind: string; type: string; label: string; value: string; status: string; source: string; url: string | null; quote: string | null; observedAt: string | null; freshness?: string; supports?: number[]; meta?: Record<string, unknown> }
+/** For a signal: `date` is the date at the precision the page gave ("14 Sep 2026", "Sep 2026", "2026 (year only)", "Undated"); `freshness` its age band, or "Undated" when no usable date. */
+export interface Evidence { id: number; kind: string; type: string; label: string; value: string; status: string; source: string; url: string | null; quote: string | null; observedAt: string | null; freshness?: string; date?: string; datePrecision?: string | null; timing?: Timing; senior?: boolean; supports?: number[]; meta?: Record<string, unknown> }
 export interface ProspectCard {
   id: number; runItemId?: number; name: string; domain: string; website: string; status: string; stage?: string; rejectReason: string | null; rejectLabel: string | null;
   score: { total: number; knownMax: number; unknownPoints: number; confidence: string; components: { key: string; label: string; max: number; points: number | null; reason: string }[]; missing: string[]; readyMissing?: string[] } | null;
   ready: boolean; fit: { verdict: string; headline: string; signals: { key: string; label: string; status: string; detail: string }[] } | null;
+  /** Where it stands (shared/prospect.ts readiness): ready / qualified / insufficient evidence / not a fit, and the timing of its best signal. */
+  classification: ProspectClass; classificationLabel: string; timing: Timing; timingLabel: string;
   profile: { industry: string | null; location: string | null; country: string | null; employees: string | null; serves: string | null };
-  whyNow: Evidence | null; opportunity: Evidence | null; decisionMaker: Evidence | null; evidenceCount: number; leadId: number | null; researched: boolean;
+  /** The best signal: a strong timing signal when there is one, otherwise context (see `timing`). Never a stale one. */
+  /** decisionMaker: a SENIOR decision-maker only. contactPerson: when there is none, the best other named employee (a real person, not a decision-maker). */
+  whyNow: Evidence | null; opportunity: Evidence | null; decisionMaker: Evidence | null; contactPerson: Evidence | null; evidenceCount: number; leadId: number | null; researched: boolean;
 }
 
 const LABEL: Record<string, string> = { description: "What it does", services: "Services", industry: "Industry", location: "Location", country: "Country", team_size: "Team size", target_customers: "Who they serve", business_email: "Business email", business_phone: "Phone", contact_form: "Contact page", pain_point: "Possible pain point" };
 
+const likeOf = (f: ProspectFindingRow): FindingLike => ({ id: f.id, kind: f.kind, type: f.type, value: f.value, status: f.status, sourceUrl: f.sourceUrl, observedAt: f.observedAt, retrievedAt: f.retrievedAt, meta: f.meta as Record<string, unknown> });
+
 function evidenceOf(f: ProspectFindingRow, now: Date): Evidence {
-  const fr = f.kind === "signal" ? freshness(f.observedAt, now) : null;
-  const label = f.kind === "signal" ? (isSignalType(f.type) ? SIGNAL_LABEL[f.type] : f.type) : f.kind === "decision_maker" ? "Decision maker" : f.kind === "opportunity" ? "Opportunity" : LABEL[f.type] ?? f.type;
+  const d = f.kind === "signal" ? signalDating(likeOf(f), now) : null;
+  const fr = d ? (d.usable ? { band: d.band } : { band: "unknown" as const }) : null;
+  // A named employee who is not a senior decision-maker is labelled for what they are.
+  const label = f.kind === "signal" ? (isSignalType(f.type) ? SIGNAL_LABEL[f.type] : f.type) : f.kind === "decision_maker" ? (senior(f) ? "Decision maker" : "Employee") : f.kind === "opportunity" ? "Opportunity" : LABEL[f.type] ?? f.type;
   return {
     id: f.id, kind: f.kind, type: f.type, label, value: f.value, status: f.status, source: f.sourceType, url: f.sourceUrl, quote: f.quote, observedAt: iso(f.observedAt),
-    freshness: fr ? FRESHNESS_LABEL[fr.band] : undefined, supports: (f.supportingIds as number[]) ?? [], meta: f.kind === "decision_maker" ? (f.meta as Record<string, unknown>) : undefined,
+    freshness: fr ? FRESHNESS_LABEL[fr.band] : undefined, date: d ? dateLabel(likeOf(f)) : undefined, datePrecision: d ? d.precision : undefined, timing: d ? timingOf([{ ...likeOf(f), status: "confirmed" }], now).timing : undefined, supports: (f.supportingIds as number[]) ?? [], meta: f.kind === "decision_maker" ? (f.meta as Record<string, unknown>) : undefined, senior: f.kind === "decision_maker" ? senior(f) : undefined,
   };
 }
 
-/** The best why-now signal: confirmed, not stale, freshest first. */
-function bestSignal(fs: ProspectFindingRow[], now: Date): ProspectFindingRow | null {
-  const order = { strong: 0, medium: 1, weak: 2, unknown: 3, stale: 9 } as const;
-  return fs.filter((f) => f.kind === "signal" && f.status === "confirmed" && freshness(f.observedAt, now).band !== "stale")
-    .sort((a, b) => order[freshness(a.observedAt, now).band] - order[freshness(b.observedAt, now).band])[0] ?? null;
+/** One signal's timing for the angle model: "strong timing, 14 Sep 2026", "context, Sep 2026", "undated". */
+function signalTiming(f: FindingLike, now: Date): string {
+  const t = timingOf([{ ...f, status: "confirmed" }], now).timing;
+  return t === "strong" ? `strong timing, ${dateLabel(f)}` : t === "context" ? `context, ${dateLabel(f)}` : t === "stale" ? `old, ${dateLabel(f)}` : "undated";
 }
+
+/** The signal to show: a concrete event from the last 90 days first, then dated context (an event before a blog post), then an undated one. Never a stale one. */
+function bestSignal(fs: ProspectFindingRow[], now: Date): ProspectFindingRow | null {
+  const best = timingOf(fs.map(likeOf), now).best;
+  return best ? fs.find((f) => f.id === best.id) ?? null : null;
+}
+const senior = (f: ProspectFindingRow) => isDecisionMaker(likeOf(f));
+/** The best person: senior decision-makers first (by the ICP's role order), then other named employees. */
 function bestPerson(fs: ProspectFindingRow[]): ProspectFindingRow | null {
   return fs.filter((f) => f.kind === "decision_maker").sort((a, b) => {
+    if (senior(a) !== senior(b)) return senior(a) ? -1 : 1;
     const ra = Number((a.meta as any)?.rank ?? 99), rb = Number((b.meta as any)?.rank ?? 99);
     const va = (a.meta as any)?.emailStatus === "verified" ? 0 : 1, vb = (b.meta as any)?.emailStatus === "verified" ? 0 : 1;
     return ra - rb || va - vb || (a.status === "confirmed" ? -1 : 1);
@@ -190,11 +207,15 @@ export function prospectCard(p: ProspectRow, fs: ProspectFindingRow[], now: Date
   const sig = bestSignal(fs, now), person = bestPerson(fs);
   const opp = fs.filter((f) => f.kind === "opportunity").sort((a, b) => (a.confidence === "medium" ? -1 : 1) - (b.confidence === "medium" ? -1 : 1))[0] ?? null;
   const fit = (p.fit as any) ?? null;
+  // Worked out again from the stored evidence (pure, cheap), so the card always says what the evidence says today. `ready` stays the stored flag the run counted.
+  const r = readiness({ verified: !!p.verifiedAt && p.status !== "rejected", fitVerdict: fit?.verdict ?? null, findings: fs.map(likeOf), now });
+  const classification: ProspectClass = p.status === "rejected" && r.classification !== "not_a_fit" ? "insufficient_evidence" : p.ready ? "ready" : r.classification === "ready" ? "qualified" : r.classification;
   return {
     id: p.id, runItemId: item?.id, name: p.name, domain: p.domain, website: p.website, status: p.status, stage: item?.stage, rejectReason: reason, rejectLabel: reason ? REJECT_LABEL[reason] ?? reason : null,
     score: (p.score as any) ?? null, ready: p.ready, fit: fit ? { verdict: fit.verdict, headline: fit.headline, signals: fit.signals ?? [] } : null,
+    classification, classificationLabel: PROSPECT_CLASS_LABEL[classification], timing: r.timing, timingLabel: TIMING_LABEL[r.timing],
     profile: { industry: prof.industry?.value ?? null, location: prof.location?.value ?? null, country: prof.country?.value ?? null, employees: prof.team_size?.value ?? null, serves: prof.target_customers?.value ?? null },
-    whyNow: sig ? evidenceOf(sig, now) : null, opportunity: opp ? evidenceOf(opp, now) : null, decisionMaker: person ? evidenceOf(person, now) : null,
+    whyNow: sig ? evidenceOf(sig, now) : null, opportunity: opp ? evidenceOf(opp, now) : null, decisionMaker: person && senior(person) ? evidenceOf(person, now) : null, contactPerson: person && !senior(person) ? evidenceOf(person, now) : null,
     evidenceCount: fs.filter((f) => f.kind !== "opportunity").length, leadId: p.leadId, researched: fs.some((f) => f.batch === "research"),
   };
 }
@@ -238,7 +259,7 @@ export async function getProspect(user: Who, id: number, d: Partial<PipelineDeps
       prospect: prospectCard(p, fs, now),
       facts: ev.filter((e) => e.kind === "fact" && e.status === "confirmed"),
       signals: ev.filter((e) => e.kind === "signal"),
-      people: ev.filter((e) => e.kind === "decision_maker").sort((a, b) => Number((a.meta as any)?.rank ?? 99) - Number((b.meta as any)?.rank ?? 99)),
+      people: ev.filter((e) => e.kind === "decision_maker").sort((a, b) => Number(!!b.senior) - Number(!!a.senior) || Number((a.meta as any)?.rank ?? 99) - Number((b.meta as any)?.rank ?? 99)),
       inferences: ev.filter((e) => e.kind === "fact" && e.status !== "confirmed"),
       opportunities: ev.filter((e) => e.kind === "opportunity"),
       sources: (p.sources as ProspectBrief["sources"]) ?? [], angle: (p.angle as StoredAngle | null) ?? null, providers: { contact: !!deps.contact },
@@ -330,11 +351,12 @@ export async function generateAngle(user: Who, id: number, d: Partial<PipelineDe
   const orgId = user.organizationId!;
   const p = await deps.store.getProspect(orgId, id);
   if (!p) return fail(404, "not_found", "That company isn't in your workspace.");
-  const fs = (await deps.store.findings(orgId, id)).filter((f) => f.kind !== "decision_maker" && (f.kind !== "signal" || freshness(f.observedAt, deps.now()).band !== "stale"));
+  const fs = (await deps.store.findings(orgId, id)).filter((f) => f.kind !== "decision_maker" && (f.kind !== "signal" || signalDating(likeOf(f), deps.now()).band !== "stale"));
   if (!fs.some((f) => f.kind === "signal" || f.kind === "opportunity" || f.type === "pain_point")) return fail(422, "no_evidence", "There's nothing yet that says why to reach out now. Research the company first.");
   const people = (await deps.store.findings(orgId, id)).filter((f) => f.kind === "decision_maker").map((f) => String((f.meta as any)?.name ?? f.value.split(",")[0]));
   const saved = await savedProfile(orgId);
-  const list = fs.map((f) => ({ id: f.id, label: f.kind === "signal" ? `Signal (${isSignalType(f.type) ? SIGNAL_LABEL[f.type] : f.type})` : f.kind === "opportunity" ? "Opportunity" : LABEL[f.type] ?? f.type, value: f.value, inferred: f.status !== "confirmed" }));
+  const now = deps.now();
+  const list = fs.map((f) => ({ id: f.id, label: f.kind === "signal" ? `Signal (${isSignalType(f.type) ? SIGNAL_LABEL[f.type] : f.type})` : f.kind === "opportunity" ? "Opportunity" : LABEL[f.type] ?? f.type, value: f.value, inferred: f.status !== "confirmed", timing: f.kind === "signal" ? signalTiming(likeOf(f), now) : undefined }));
   let angle = null, why = "";
   try {
     for (let attempt = 0; attempt < 2 && !angle; attempt++) {
@@ -395,7 +417,8 @@ export async function addToLeads(user: Who, id: number, raw: { contactFindingId?
   if (!(await deps.store.linkLead(orgId, id, leadId))) return { ok: true, leadId, existing: false };
   for (const f of fs) {
     if (f.kind === "opportunity" && !f.value) continue;
-    const field = f.kind === "signal" ? CLAIM_FIELD[f.type] ?? "recent_news" : f.kind === "decision_maker" ? "decision_maker" : f.kind === "opportunity" ? "opportunity" : f.type;
+    // A named employee who is not a senior decision-maker is copied as a contact person, which the lead score does not count as a decision-maker.
+    const field = f.kind === "signal" ? CLAIM_FIELD[f.type] ?? "recent_news" : f.kind === "decision_maker" ? (senior(f) ? "decision_maker" : "contact_person") : f.kind === "opportunity" ? "opportunity" : f.type;
     const value = f.kind === "signal" ? `${isSignalType(f.type) ? SIGNAL_LABEL[f.type] : f.type}: ${f.value}` : f.value;
     const confirmed = f.status === "confirmed" && !!f.sourceUrl && !!f.quote && f.quote.length >= 8;
     await addClaim(user, leadId, { field, value: value.slice(0, 400), status: confirmed ? "confirmed" : "inferred", ...(f.sourceUrl ? { evidenceUrl: f.sourceUrl } : {}), ...(f.quote && f.quote.length >= 8 ? { evidenceSnippet: f.quote.slice(0, 500) } : {}) }, { actor: "agent" });

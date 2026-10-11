@@ -201,15 +201,16 @@ describe("what the agent is told", () => {
     const t = toolResult(provider);
     expect(t).toMatch(/<untrusted source="tool:get_prospect_intelligence">/);
     expect(t).toMatch(/Score 82\/100 \(20 of 100 points unknown, confidence high\)/);
-    expect(t).toMatch(/SIGNALS \(why now; stated on their site\):\n- Hiring, Last 30 days: Hiring a Senior SEO Strategist/);
-    expect(t).toMatch(/PEOPLE:\n- Ben Okafor, Head of Growth/);
+    expect(t).toMatch(/SIGNALS \(stated on their site; date as precise as the page gives it\):\n- Hiring, \d{1,2} [A-Z][a-z]{2} \d{4} \(Last 30 days\): Hiring a Senior SEO Strategist/);
+    expect(t).toMatch(/OUTREACH-READY\. Timing: Strong timing signal/);
+    expect(t).toMatch(/PEOPLE \(named on their site or by a data provider; only those marked decision maker are senior\):\n- Ben Okafor, Head of Growth \(decision maker\)/);
     expect(t).toMatch(/INFERENCES \(guesses, never state as fact\):\n- Opportunity: They may need outbound help/);
     expect(t.indexOf("SIGNALS")).toBeLessThan(t.indexOf("INFERENCES"));
   });
   it("get_discovery_run lists the best prospects with why-now and the funnel, and lists recent searches without an id", async () => {
     seedRun();
     const a = await run({ steps: [call("get_discovery_run", { runId: "pr_seed1" }), say("ok")] });
-    expect(toolResult(a.provider)).toMatch(/\[1\] Northwind Digital \(northwind\.com\) 82\/100 READY — why now: Hiring, Last 30 days/);
+    expect(toolResult(a.provider)).toMatch(/\[1\] Northwind Digital \(northwind\.com\) 82\/100 READY — why now \(strong timing\): Hiring, \d{1,2} [A-Z][a-z]{2} \d{4}: Hiring a Senior/);
     expect(toolResult(a.provider)).toMatch(/2 discovered, 2 verified, 1 match the ICP/);
     const b = await run({ steps: [call("get_discovery_run", {}), say("ok")] });
     expect(toolResult(b.provider)).toMatch(/pr_seed1/);

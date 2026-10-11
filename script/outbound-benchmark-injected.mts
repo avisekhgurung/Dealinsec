@@ -16,11 +16,13 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { LOCAL_TEST_DATABASE_URL, requireLocalDatabaseUrl } from "./local-db-guard.ts";
+import { failureReport } from "../server/outbound/diagnostics.ts";
 
 const DATABASE_URL = requireLocalDatabaseUrl("outbound-benchmark-injected.mts");
 process.env.DATABASE_URL = DATABASE_URL;
 const { domainOf, freshness } = await import("../shared/prospect.ts");
 const { quoteInPage } = await import("../shared/research.ts");
+const { isSeniorDecisionMaker } = await import("../shared/icp.ts");
 const { pipelineDeps, stepRun } = await import("../server/outbound/pipeline.ts");
 const svc = await import("../server/outbound/service.ts");
 const { outboundStore } = await import("../server/outbound/store.ts");
@@ -113,8 +115,8 @@ async function main() {
     const detail = (d: string) => {
       const rows = fnd.filter((x) => x.domain === d);
       return {
-        signals: rows.filter((x) => x.kind === "signal").map((x) => ({ type: x.type, status: x.status, value: String(x.value).slice(0, 160), quote: String(x.quote ?? "").slice(0, 220), dateQuote: x.meta?.dateQuote ?? null, observedAt: x.observed_at ? new Date(x.observed_at).toISOString().slice(0, 10) : null, band: x.observed_at ? freshness(x.observed_at, new Date()).band : "unknown", url: x.source_url })),
-        people: rows.filter((x) => x.kind === "decision_maker").map((x) => ({ name: x.meta?.name, title: x.meta?.title, rank: x.meta?.rank, source: x.meta?.provider ? "provider" : "website", quote: String(x.quote ?? "").slice(0, 160), url: x.source_url })),
+        signals: rows.filter((x) => x.kind === "signal").map((x) => ({ type: x.type, status: x.status, value: String(x.value).slice(0, 160), quote: String(x.quote ?? "").slice(0, 220), dateQuote: x.meta?.dateQuote ?? null, datePrecision: x.meta?.datePrecision ?? null, dateYear: x.meta?.dateYear ?? null, observedAt: x.observed_at ? new Date(x.observed_at).toISOString().slice(0, 10) : null, band: x.observed_at ? freshness(x.observed_at, new Date()).band : "unknown", url: x.source_url })),
+        people: rows.filter((x) => x.kind === "decision_maker").map((x) => ({ name: x.meta?.name, title: x.meta?.title, rank: x.meta?.rank, senior: isSeniorDecisionMaker(x.meta?.title ?? x.type), source: x.meta?.provider ? "provider" : "website", quote: String(x.quote ?? "").slice(0, 160), url: x.source_url })),
         contact: rows.filter((x) => x.kind === "fact" && ["business_email", "contact_form", "business_phone"].includes(x.type)).map((x) => ({ type: x.type, value: String(x.value).slice(0, 120), quote: String(x.quote ?? "").slice(0, 160), url: x.source_url })),
       };
     };
@@ -126,6 +128,7 @@ async function main() {
     const judgments = fnd.filter((x) => x.kind === "opportunity" || x.type === "pain_point");
     const researched = cards.filter((c) => c.researched);
     const personOf = (d: string) => fnd.some((x) => x.domain === d && x.kind === "decision_maker");
+    const seniorOf = (d: string) => fnd.some((x) => x.domain === d && x.kind === "decision_maker" && isSeniorDecisionMaker(x.meta?.title ?? x.type));
     const sigDated = (d: string) => fnd.some((x) => x.domain === d && x.kind === "signal" && x.status === "confirmed" && x.observed_at && freshness(x.observed_at, new Date()).band !== "stale");
     const POS = of("positive"), AMB = of("ambiguous"), NEG = of("negative");
     const calls = (await db.query(`SELECT task, model, count(*)::int n, coalesce(sum(cost_micro_usd),0)::int micro FROM llm_calls WHERE organization_id=$1 GROUP BY 1,2`, [me.organizationId])).rows;
@@ -139,19 +142,29 @@ async function main() {
       negativesRejectedAtVerifyOrEnrich: NEG.filter((e) => !reached(card.get(e.domain), "icpMatch")).length,
       precisionAtReady: (() => { const r = cards.filter((c) => c.ready); const lab = (c: any) => T.get(c.domain)?.class ?? "not_in_truth"; return { n: r.length, positive: r.filter((c) => lab(c) === "positive").length, ambiguous: r.filter((c) => lab(c) === "ambiguous").length, negative: r.filter((c) => lab(c) === "negative").length, strictPct: pct(r.filter((c) => lab(c) === "positive").length, r.length), lenientPct: pct(r.filter((c) => ["positive", "ambiguous"].includes(lab(c))).length, r.length) }; })(),
       qualifiedByClass: { positive: cum(POS).icpMatch, ambiguous: cum(AMB).icpMatch, negative: cum(NEG).icpMatch },
-      decisionMakers: { researched: researched.length, withPerson: researched.filter((c) => personOf(c.domain)).length, pct: pct(researched.filter((c) => personOf(c.domain)).length, researched.length), positivesResearched: POS.filter((e) => card.get(e.domain)?.researched).length, positivesWithPerson: POS.filter((e) => card.get(e.domain)?.researched && personOf(e.domain)).length, readyWithPerson: cards.filter((c) => c.ready && c.decisionMaker).length, ready: cards.filter((c) => c.ready).length },
+      decisionMakers: { researched: researched.length, withPerson: researched.filter((c) => personOf(c.domain)).length, withDecisionMaker: researched.filter((c) => seniorOf(c.domain)).length, pct: pct(researched.filter((c) => personOf(c.domain)).length, researched.length), positivesResearched: POS.filter((e) => card.get(e.domain)?.researched).length, positivesWithPerson: POS.filter((e) => card.get(e.domain)?.researched && personOf(e.domain)).length, readyWithPerson: cards.filter((c) => c.ready && c.decisionMaker).length, ready: cards.filter((c) => c.ready).length },
       datedSignals: { researched: researched.length, withDatedFreshSignal: researched.filter((c) => sigDated(c.domain)).length },
       evidence: { confirmed: confirmed.length, readableNow: readable.length, found: readable.length - bad.length, notFound: bad.length, accuracyPct: pct(readable.length - bad.length, readable.length), judgmentsNeverConfirmed: judgments.every((x) => x.status !== "confirmed"), judgments: judgments.length, notFoundSamples: bad.slice(0, 8).map((x) => ({ domain: x.domain, url: x.source_url, quote: String(x.quote).slice(0, 110) })) },
       perTruth: per.map((p) => ({ ...p, fit: card.get(p.domain)?.fit ? { verdict: card.get(p.domain).fit.verdict, signals: card.get(p.domain).fit.signals.map((x: any) => `${x.key}:${x.status}`).join(" ") } : null, profile: card.get(p.domain)?.profile ?? null, factTypes: fnd.filter((x) => x.domain === p.domain && x.kind === "fact").map((x) => x.type), signalTypes: fnd.filter((x) => x.domain === p.domain && x.kind === "signal").map((x) => `${x.type}${x.observed_at ? "@dated" : "@undated"}`) })),
       extraProbes: EXTRA.map((e) => ({ domain: e.domain, outcome: where(e as any), fit: card.get(e.domain)?.fit ?? null, profile: card.get(e.domain)?.profile ?? null, score: card.get(e.domain)?.score?.total ?? null })),
-      readyCards: cards.filter((c) => c.ready).map((c) => ({ domain: c.domain, name: c.name, label: T.get(c.domain)?.class ?? "not_in_truth", score: c.score?.total, whyNow: c.whyNow ? `${c.whyNow.label} ${c.whyNow.freshness}: ${String(c.whyNow.value).slice(0, 90)}` : null, whyNowEvidence: c.whyNow ? { quote: c.whyNow.quote, url: c.whyNow.url, observedAt: c.whyNow.observedAt, type: c.whyNow.type } : null, person: c.decisionMaker?.value ?? null, personEvidence: c.decisionMaker ? { quote: c.decisionMaker.quote, url: c.decisionMaker.url } : null, evidence: detail(c.domain) })),
+      readyCards: cards.filter((c) => c.ready).map((c) => ({ domain: c.domain, name: c.name, label: T.get(c.domain)?.class ?? "not_in_truth", score: c.score?.total, whyNow: c.whyNow ? `${c.whyNow.label} ${c.whyNow.freshness}: ${String(c.whyNow.value).slice(0, 90)}` : null, whyNowEvidence: c.whyNow ? { quote: c.whyNow.quote, url: c.whyNow.url, observedAt: c.whyNow.observedAt, type: c.whyNow.type, date: c.whyNow.date ?? null, datePrecision: c.whyNow.datePrecision ?? null } : null, classification: c.classification ?? null, timing: c.timing ?? null, person: c.decisionMaker?.value ?? null, personEvidence: c.decisionMaker ? { quote: c.decisionMaker.quote, url: c.decisionMaker.url } : null, employee: c.contactPerson?.value ?? null, evidence: detail(c.domain) })),
       // Every researched truth company: what research found, and what the readiness rule said it lacked.
-      researchedDetail: E.filter((e) => card.get(e.domain)?.researched).map((e) => ({ domain: e.domain, class: e.class, ready: !!card.get(e.domain)?.ready, missing: card.get(e.domain)?.score?.readyMissing ?? [], evidence: detail(e.domain) })),
+      researchedDetail: E.filter((e) => card.get(e.domain)?.researched).map((e) => ({ domain: e.domain, class: e.class, ready: !!card.get(e.domain)?.ready, classification: card.get(e.domain)?.classification ?? null, timing: card.get(e.domain)?.timing ?? null, missing: card.get(e.domain)?.score?.readyMissing ?? [], evidence: detail(e.domain) })),
     };
     writeFileSync(join(here, "bench", "results", `${STAMP}-injected.json`), JSON.stringify(out, null, 1));
     console.log(JSON.stringify({ recallPositivePct: out.recallPositivePct, lenientRecallPct: out.lenientRecallPct, reachedPositive: out.reachedPositive, reachedAmbiguous: out.reachedAmbiguous, reachedNegative: out.reachedNegative, negativesQualifiedOrReady: out.negativesQualifiedOrReady, precisionAtReady: out.precisionAtReady, decisionMakers: out.decisionMakers, datedSignals: out.datedSignals, evidence: { ...out.evidence, notFoundSamples: undefined }, costUsd: out.costUsd }, null, 1));
     console.log(`written script/bench/results/${STAMP}-injected.json`);
   } finally {
+    // Why companies failed, kept BEFORE the rows are cleaned up (and even when the run itself crashed): each failed or
+    // retrying item's step and error code, and the model calls' outcomes. Codes and counts only (no page text, people or prompts).
+    try {
+      const items = (await db.query(`SELECT p.domain, i.stage, i.error_code, i.attempts FROM prospect_run_items i JOIN prospects p ON p.id=i.prospect_id WHERE i.organization_id=$1`, [me.organizationId])).rows;
+      const llm = (await db.query(`SELECT task, ok, error_code, count(*)::int n, round(avg(latency_ms))::int lat, max(tokens_out)::int maxout FROM llm_calls WHERE organization_id=$1 GROUP BY 1,2,3 ORDER BY 1,2,3`, [me.organizationId])).rows;
+      const report = failureReport(items.map((r: any) => ({ domain: r.domain, stage: r.stage, errorCode: r.error_code, attempts: r.attempts })), llm.map((r: any) => ({ task: r.task, ok: r.ok, errorCode: r.error_code, n: r.n, avgLatencyMs: r.lat, maxTokensOut: r.maxout })));
+      writeFileSync(join(here, "bench", "results", `${STAMP}-diagnostics.json`), JSON.stringify(report, null, 1));
+      console.log(`failures: ${report.failed.length} failed, ${report.retrying.length} still retrying ${JSON.stringify(report.byCode)}; model calls ${JSON.stringify(report.calls.map((c) => `${c.task}/${c.ok ? "ok" : c.errorCode ?? "error"}=${c.n}`))}`);
+      console.log(`written script/bench/results/${STAMP}-diagnostics.json`);
+    } catch (e) { console.log(`diagnostics not written: ${(e as Error)?.name ?? "Error"}`); }
     if (!process.env.BENCH_KEEP) {
       for (const t of ["prospect_findings", "prospect_run_items", "prospects", "prospect_runs", "provider_calls", "lead_messages", "lead_research", "lead_claims", "lead_tickets", "lead_events", "leads", "client_profiles", "llm_calls", "activity_logs", "invoice_counters", "invitations", "org_roles"]) await db.query(`DELETE FROM ${t} WHERE organization_id=$1`, [me.organizationId]).catch(() => {});
       await db.query(`DELETE FROM activity_logs WHERE user_id=$1`, [me.id]).catch(() => {}); await db.query(`DELETE FROM agent_sessions WHERE user_id=$1`, [me.id]).catch(() => {});

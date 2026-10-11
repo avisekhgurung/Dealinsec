@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LIMITS } from "@shared/knowledge";
-import { extractContactBlock, extractHtml, extractLinks, extractPdf, extractPlainText, hasContactForm } from "./extract";
+import { extractContactBlock, extractHtml, extractLinks, extractPdf, extractPlainText, extractPeopleBlock, hasContactForm } from "./extract";
 
 /** A hand-built two-page PDF: page 1 "We design logos...Berlin", page 2 "Our ideal client...Portugal". */
 const PDF = Uint8Array.from(Buffer.from("JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUiA1IDAgUl0gL0NvdW50IDIgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA2MTIgNzkyXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNyAwIFIgPj4gPj4gPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCA5MyA+PgpzdHJlYW0KQlQgL0YxIDEyIFRmIDcyIDcyMCBUZCAoV2UgZGVzaWduIGxvZ29zIGFuZCBicmFuZCBzeXN0ZW1zIGZvciBzbWFsbCBzdHVkaW9zIGluIEJlcmxpbi4pIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKNSAwIG9iago8PCAvVHlwZSAvUGFnZSAvUGFyZW50IDIgMCBSIC9NZWRpYUJveCBbMCAwIDYxMiA3OTJdIC9Db250ZW50cyA2IDAgUiAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA3IDAgUiA+PiA+PiA+PgplbmRvYmoKNiAwIG9iago8PCAvTGVuZ3RoIDk2ID4+CnN0cmVhbQpCVCAvRjEgMTIgVGYgNzIgNzIwIFRkIChPdXIgaWRlYWwgY2xpZW50IGlzIGEgYm91dGlxdWUgaG90ZWwgZ3JvdXAgZXhwYW5kaW5nIGluIFBvcnR1Z2FsLikgVGogRVQKZW5kc3RyZWFtCmVuZG9iago3IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDgKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDEyMSAwMDAwMCBuIAowMDAwMDAwMjQ3IDAwMDAwIG4gCjAwMDAwMDAzOTAgMDAwMDAgbiAKMDAwMDAwMDUxNiAwMDAwMCBuIAowMDAwMDAwNjYyIDAwMDAwIG4gCnRyYWlsZXIKPDwgL1NpemUgOCAvUm9vdCAxIDAgUiA+PgpzdGFydHhyZWYKNzMyCiUlRU9GCg==", "base64"));
@@ -132,5 +132,42 @@ describe("extractContactBlock", () => {
     const r = await extractContactBlock(enc(`<html><body><script type="application/ld+json">${nested}</script><footer>Real footer text here</footer></body></html>`));
     expect(r).toContain("Real footer text here");
     expect(r).not.toContain("+1 111"); // deeper than the limit
+  });
+});
+
+describe("extractPeopleBlock (team grids the article reader drops)", () => {
+  const filler = "We plan campaigns and report on results every month for every client. ".repeat(6);
+  const grid = `<html><body><main><article><h1>Our team</h1><p>${filler}</p></article>
+    <section class="team"><div class="card"><h3>Mara Whitfield</h3><p>Founder</p></div><div class="card"><h3>Ana Silva</h3><p>Head of Growth</p></div>
+    <div class="card"><p>Inês Duarte</p><p>Content Strategist</p></div></section>
+    <section class="quotes"><blockquote>They doubled our pipeline.</blockquote><p>Tess Harlow, Head of Marketing, Brightline</p></section>
+    <nav><a href="/x">For Business Owner</a> <a href="/y">Native Performance Partner</a><div><a href="/z">Jordan Blake</a><span>Managing Partner</span></div></nav></body></html>`;
+  it("the block keeps each name with its role, in the page's own words (the article reader, when it keeps a grid at all, never pairs them)", async () => {
+    const article = await extractHtml(enc(grid));
+    expect(article.ok && article.text).not.toContain("Mara Whitfield, Founder");
+    const b = await extractPeopleBlock(enc(grid));
+    expect(b).toContain("Mara Whitfield, Founder");
+    expect(b).toContain("Ana Silva, Head of Growth");
+    expect(b).toContain("Tess Harlow, Head of Marketing, Brightline"); // a client: kept as text; the staff check (employer) decides later
+    expect(b).not.toMatch(/Business Owner|Performance Partner|Jordan Blake/); // a menu is never read for people
+  });
+  it("a card that puts the role first is read in its own order: a name is never paired with the next person's role", async () => {
+    const roleFirst = `<html><body><section><div><p>Founder</p><h3>Dana Ortiz</h3></div><div><p>Head of Growth</p><h3>Lee Park</h3></div></section></body></html>`;
+    const b = await extractPeopleBlock(enc(roleFirst));
+    expect(b).toContain("Dana Ortiz, Founder");
+    expect(b).toContain("Lee Park, Head of Growth");
+    expect(b).not.toContain("Dana Ortiz, Head of Growth");
+    const flat = `<html><body><section><h2>Leadership</h2><h3>Dana Ortiz</h3><p>Founder</p><h3>Lee Park</h3><p>Head of Growth</p></section></body></html>`;
+    expect(await extractPeopleBlock(enc(flat))).toBe("Dana Ortiz, Founder\nLee Park, Head of Growth");
+    const inline = `<html><body><div class="card"><a href="/team/dana">Dana Ortiz</a><span>Founder</span></div></body></html>`;
+    expect(await extractPeopleBlock(enc(inline))).toBe("Dana Ortiz, Founder");
+  });
+  it("is bounded and never throws: at most 20 people, about 1,500 characters, garbage gives ''", async () => {
+    const many = `<html><body>${Array.from({ length: 40 }, (_, i) => `<div><h3>Person Number${String.fromCharCode(65 + (i % 26))}x</h3><p>Director of Marketing</p></div>`).join("")}</body></html>`;
+    const b = await extractPeopleBlock(enc(many));
+    expect(b.split("\n").length).toBeLessThanOrEqual(20);
+    expect(b.length).toBeLessThanOrEqual(1500);
+    expect(await extractPeopleBlock(new Uint8Array(0))).toBe("");
+    expect(await extractPeopleBlock(enc("<html><body><p>No people here.</p></body></html>"))).toBe("");
   });
 });

@@ -12,9 +12,9 @@
  * crash redoes at most the slice in flight. The model only ever proposes; shared/prospect-intel.ts decides.
  */
 import { randomUUID } from "node:crypto";
-import { collectCandidates, checkSite, emptyCounters, findingsAsClaims, preRank, relevance, MIN_RELEVANCE, readiness, runBudget, pickResearchLinks, SIGNAL_LABEL, freshness, type RejectReason, type RunCounters, type SearchHit, type FindingLike } from "@shared/prospect";
+import { collectCandidates, checkSite, emptyCounters, findingsAsClaims, preRank, relevance, MIN_RELEVANCE, readiness, runBudget, pickResearchLinks, SIGNAL_LABEL, timingOf, isDecisionMaker, type RejectReason, type RunCounters, type SearchHit, type FindingLike } from "@shared/prospect";
 import { contactFormFinding, normalizeEnrichment, normalizeResearch, type FactDraft } from "@shared/prospect-intel";
-import { industryMatched, prospectFit, type Icp, type ProspectProfile } from "@shared/icp";
+import { industryMatched, isSeniorDecisionMaker, prospectFit, type Icp, type ProspectProfile } from "@shared/icp";
 import { scoreLead } from "@shared/lead-score";
 import { pickLinks, sameSite, type ResearchPage } from "@shared/research";
 import type { ProspectFindingRow, ProspectRow, ProspectRunRow } from "@shared/schema";
@@ -129,13 +129,21 @@ async function trackProvider<T>(deps: PipelineDeps, o: { orgId: string; runId: s
   }
 }
 
-/** A transient problem: the item is retried later (with back-off), up to MAX_ATTEMPTS, then marked failed. */
+/** The step an item was in when it failed, from the stage it had reached: found -> verify, verified -> enrich, enriched -> research. */
+export const STEP_OF_STAGE: Record<string, string> = { found: "verify", verified: "enrich", enriched: "research" };
+/**
+ * A transient problem: the item is retried later (with back-off), up to MAX_ATTEMPTS, then marked failed. A failed item
+ * keeps WHERE and WHY in its error code ("research:invalid_response", "enrich:timeout"), never a message (it may hold page text).
+ */
 async function retryLater(deps: PipelineDeps, item: ItemWithProspect, code: string): Promise<void> {
   const attempts = item.attempts + 1;
-  if (attempts >= MAX_ATTEMPTS) await deps.store.setItem(item.id, { stage: "failed", attempts, errorCode: code, updatedAt: deps.now() });
+  if (attempts >= MAX_ATTEMPTS) await deps.store.setItem(item.id, { stage: "failed", attempts, errorCode: `${STEP_OF_STAGE[item.stage] ?? item.stage}:${code}`.slice(0, 60), updatedAt: deps.now() });
   else await deps.store.setItem(item.id, { attempts, errorCode: code, nextAttemptAt: new Date(deps.now().getTime() + 15_000 * 2 ** attempts), updatedAt: deps.now() });
 }
 const rejectItem = (deps: PipelineDeps, item: ItemWithProspect, reason: RejectReason) => deps.store.setItem(item.id, { stage: "rejected", errorCode: reason, updatedAt: deps.now() });
+
+/** An unexpected error's type only ("error:TypeError"), never its message. */
+const errorType = (e: unknown) => `error:${String((e as Error)?.name ?? "Error").replace(/[^A-Za-z0-9_]/g, "").slice(0, 40) || "Error"}`;
 
 class StopRun extends Error { constructor(public code: string) { super(code); } }
 /** The allowance left today; a count that can't be made stops the run (fail closed), it is never retried forever. */
@@ -329,7 +337,7 @@ export async function enrichOne(run: Pick<ProspectRunRow, "id" | "organizationId
     let facts = (await deps.store.findings(orgId, p.id)).filter((f) => f.batch === "enrich" || f.batch === "company");
     if (!(facts.some((f) => f.batch === "enrich" && fresh(f.retrievedAt, now)) || (fresh(p.researchedAt, now) && facts.length))) {
       const home = await readPage(deps, `https://${p.domain}/`);
-      if (!home.ok) { if (item) await retryLater(deps, item, "page_error"); return; }
+      if (!home.ok) { if (item) await retryLater(deps, item, `page_error:${home.code}`); return; }
       const extra = pickLinks(home.links, new URL(home.url), 2);
       const others = await Promise.all(extra.map((u) => readPage(deps, u)));
       const pages: ResearchPage[] = [home, ...others].filter((x): x is Extract<PageRead, { ok: true }> => x.ok && sameSite(new URL(x.url).hostname, p.domain)).map((x, i) => ({ index: i + 1, url: x.url, text: x.text }));
@@ -372,7 +380,7 @@ export async function enrichOne(run: Pick<ProspectRunRow, "id" | "organizationId
     if (item) await deps.store.setItem(item.id, why ? { stage: "rejected", errorCode: why, updatedAt: now } : { stage: "enriched", updatedAt: now });
   } catch (e) {
     if (classify(e) === "stop" || !item) throw e;
-    await retryLater(deps, item, e instanceof ProviderError ? e.code : e instanceof CapUnavailable ? "cap_unavailable" : "error");
+    await retryLater(deps, item, e instanceof ProviderError ? e.code : e instanceof CapUnavailable ? "cap_unavailable" : errorType(e));
   }
 }
 
@@ -407,7 +415,7 @@ export async function researchOne(run: Pick<ProspectRunRow, "id" | "organization
       return { kept: 0 };
     }
     const home = await readPage(deps, `https://${p.domain}/`);
-    if (!home.ok) { if (item) await retryLater(deps, item, "page_error"); return null; }
+    if (!home.ok) { if (item) await retryLater(deps, item, `page_error:${home.code}`); return null; }
     const homeUrl = new URL(home.url);
     let links = home.links.map((l) => l.href);
     let picked = pickResearchLinks(links, homeUrl, 4);
@@ -424,11 +432,11 @@ export async function researchOne(run: Pick<ProspectRunRow, "id" | "organization
     const localOf = new Map<number, number>();
     for (const s of r.signals) {
       localOf.set(s.index, list.length);
-      list.push({ kind: "signal", type: s.type, value: s.value, status: "confirmed", sourceUrl: s.url, sourceType: "website", quote: s.quote, observedAt: s.observedAt, confidence: s.observedAt ? "high" : "medium", meta: { dateQuote: s.dateQuote, label: SIGNAL_LABEL[s.type] } });
+      list.push({ kind: "signal", type: s.type, value: s.value, status: "confirmed", sourceUrl: s.url, sourceType: "website", quote: s.quote, observedAt: s.observedAt, confidence: s.observedAt ? "high" : "medium", meta: { dateQuote: s.dateQuote, datePrecision: s.datePrecision, dateYear: s.dateYear, label: SIGNAL_LABEL[s.type] } });
     }
     for (const m of r.people) {
       localOf.set(m.index, list.length);
-      list.push({ kind: "decision_maker", type: m.title.slice(0, 40), value: `${m.name}, ${m.title}`.slice(0, 400), status: "confirmed", sourceUrl: m.url, sourceType: "website", quote: m.quote, confidence: "high", meta: { name: m.name, title: m.title, rank: m.rank, email: null, emailStatus: null } });
+      list.push({ kind: "decision_maker", type: m.title.slice(0, 40), value: `${m.name}, ${m.title}`.slice(0, 400), status: "confirmed", sourceUrl: m.url, sourceType: "website", quote: m.quote, confidence: "high", meta: { name: m.name, title: m.title, rank: m.rank, senior: isSeniorDecisionMaker(m.title), email: null, emailStatus: null } });
     }
     for (const x of r.pains) {
       localOf.set(x.index, list.length);
@@ -443,7 +451,7 @@ export async function researchOne(run: Pick<ProspectRunRow, "id" | "organization
     return { kept: list.length };
   } catch (e) {
     if (classify(e) === "stop") throw e;
-    if (item) { await retryLater(deps, item, e instanceof ProviderError ? e.code : "error"); return null; }
+    if (item) { await retryLater(deps, item, e instanceof ProviderError ? e.code : errorType(e)); return null; }
     throw e;
   }
 }
@@ -461,7 +469,9 @@ export async function scoreProspect(orgId: string, prospectId: number, deps: Pic
   const score = scoreLead(fit, {}, findingsAsClaims(asLike, now));
   const ready = readiness({ verified: !!p.verifiedAt && p.status !== "rejected", fitVerdict: fit?.verdict ?? null, findings: asLike, now });
   const researched = findings.some((f) => f.batch === "research");
-  return deps.store.updateProspect(orgId, prospectId, { score: { ...score, readyMissing: ready.missing }, ready: ready.ready, status: p.status === "rejected" ? "rejected" : ready.ready ? "ready" : researched ? "qualified" : p.status, updatedAt: now });
+  // "qualified" only when it fits on evidence; a researched company whose fit can't be judged keeps its earlier status.
+  const status = p.status === "rejected" ? "rejected" : ready.ready ? "ready" : researched && ready.classification === "qualified" ? "qualified" : p.status === "ready" || p.status === "qualified" ? "enriched" : p.status;
+  return deps.store.updateProspect(orgId, prospectId, { score: { ...score, readyMissing: ready.missing, classification: ready.classification, timing: ready.timing }, ready: ready.ready, status, updatedAt: now });
 }
 
 export async function computeCounters(run: ProspectRunRow, deps: PipelineDeps): Promise<RunCountersExt> {
@@ -483,8 +493,12 @@ export async function computeCounters(run: ProspectRunRow, deps: PipelineDeps): 
     if (["enriched", "done"].includes(i.stage) && (v === "strong" || v === "partial")) c.icpMatch++;
     const f = by.get(i.prospectId) ?? [];
     if (f.some((x) => x.batch === "research")) c.researched++;
-    if (f.some((x) => x.kind === "signal" && x.status === "confirmed" && freshness(x.observedAt, deps.now()).band !== "stale")) c.signals++;
-    if (f.some((x) => x.kind === "decision_maker")) c.decisionMakers++;
+    // A dated reason to get in touch (last 12 months, day or month precision); a strong timing signal is counted on its own.
+    const t = timingOf(f as unknown as FindingLike[], deps.now()).timing;
+    if (t === "strong" || t === "context") c.signals++;
+    if (t === "strong") c.strongTiming = (c.strongTiming ?? 0) + 1;
+    // A senior decision-maker, not just any named employee.
+    if (f.some((x) => x.kind === "decision_maker" && isDecisionMaker(x as unknown as FindingLike))) c.decisionMakers++;
     if (i.prospect.ready && i.stage === "done") c.ready++;
   }
   c.costMicroUsd = await deps.store.runCostMicroUsd(run.id).catch(() => prev.costMicroUsd ?? 0);

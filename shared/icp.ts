@@ -218,6 +218,27 @@ export const countryFromDomain = (domain: string | null | undefined): string | n
 };
 
 /**
+ * A place that can only be in Canada: a province or territory (its name, or its code after a comma: "Montréal, QC"), or
+ * a large city with no well-known namesake elsewhere. A city that exists in several countries (London, Vancouver,
+ * Hamilton, Kingston, Halifax, Victoria) proves nothing, and neither does any text that also names a US state or the
+ * US (several offices): those stay unknown, never a mismatch.
+ */
+const CA_PROVINCE_CODE = /,\s*(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)\b/;
+const CA_PLACE = /\b(alberta|british columbia|manitoba|new brunswick|newfoundland|nova scotia|northwest territories|nunavut|ontario|prince edward island|qu[eé]bec|saskatchewan|yukon|toronto|montr[eé]al|calgary|ottawa|edmonton|winnipeg|mississauga|saskatoon|brampton|markham|gatineau|kitchener)\b/i;
+const US_STATE_CODE = /,\s*(A[KLRZ]|C[AOT]|D[CE]|FL|GA|HI|I[ADLN]|K[SY]|LA|M[ADEINOST]|N[CDEHJMVY]|O[HKR]|PA|RI|S[CD]|T[NX]|UT|V[AT]|W[AIVY])\b/;
+const US_NAMED = /\b(usa|u\.s\.a?\.?|united states|america)\b/i;
+export function countryFromPlace(location: string | null | undefined): string | null {
+  const t = String(location ?? "").slice(0, 200);
+  if (!t.trim() || US_STATE_CODE.test(t) || US_NAMED.test(t)) return null;
+  return CA_PROVINCE_CODE.test(t) || CA_PLACE.test(t) ? "CA" : null;
+}
+
+/** Words that say a company serves businesses or software/tech companies, and words that say it serves consumers. */
+const B2B_WORDS = /\b(b2b|saas|software|tech|technology|enterprise|business[- ]to[- ]business|startups?)\b/i;
+const B2C_WORDS = /\b(b2c|d2c|dtc|direct[- ]to[- ]consumer|consumer brands?|consumer products?|e-?commerce brands?)\b/i;
+const B2B_MARKET = /\b(saas|b2b|software|tech)/i;
+
+/**
  * How well a company matches the run's ICP: the lead fit check (industry, place, exclusions) plus company size and
  * target market, combined by the SAME verdict rule (verdictFrom). Unknown is never a mismatch.
  */
@@ -238,10 +259,12 @@ export function prospectFit(icp: Icp, p: ProspectProfile): FitResult {
     const want = [...icp.countries.map(countryLabel), ...icp.locations].join(", ");
     const stated = p.country?.trim().toUpperCase() || null;
     const fromDomain = stated ? null : countryFromDomain(p.domain);
-    const country = stated ?? fromDomain;
+    // A Canadian province or city on the company's own page is evidence of Canada (a stated country or web address wins).
+    const fromPlace = stated || fromDomain ? null : countryFromPlace(p.location);
+    const country = stated ?? fromDomain ?? fromPlace;
     const placeText = [p.location, country ? countryLabel(country) : null].filter(Boolean).join(", ");
     const placeHit = icp.locations.find((l) => placeText && textMatches(l, placeText));
-    if (country && icp.countries.length && !icp.countries.includes(country)) signals.push({ key: "location", label: "Location", status: "mismatch", detail: `It is in ${countryLabel(country)}${fromDomain ? ` (its web address ends .${p.domain!.split(".").pop()})` : ""}, not ${want}.` });
+    if (country && icp.countries.length && !icp.countries.includes(country)) signals.push({ key: "location", label: "Location", status: "mismatch", detail: `It is in ${countryLabel(country)}${fromDomain ? ` (its web address ends .${p.domain!.split(".").pop()})` : fromPlace ? ` (its site says ${p.location!.trim().slice(0, 60)})` : ""}, not ${want}.` });
     else if ((country && icp.countries.includes(country) && !icp.locations.length) || placeHit) signals.push({ key: "location", label: "Location", status: "match", detail: `It is in ${placeText}, which matches ${want}.` });
     else if (placeText && icp.locations.length && country && icp.countries.includes(country)) signals.push({ key: "location", label: "Location", status: "unknown", detail: `It is in ${placeText}; not clear if that is ${icp.locations.join(", ")}.` });
     // A city or region alone is not compared with a country: unknown, never a mismatch.
@@ -261,6 +284,8 @@ export function prospectFit(icp: Icp, p: ProspectProfile): FitResult {
     const hit = said ? icp.targetMarket.find((m) => textMatches(m, said)) : undefined;
     if (!said) signals.push({ key: "market", label: "Who they serve", status: "unknown", detail: "Who they serve isn't known yet." });
     else if (hit) signals.push({ key: "market", label: "Who they serve", status: "match", detail: `They mention serving ${hit}.` });
+    // Saying it serves ONLY consumers is a statement, not a silence: for a B2B or software market it is a mismatch.
+    else if (icp.targetMarket.some((m) => B2B_MARKET.test(m)) && B2C_WORDS.test(said) && !B2B_WORDS.test(said)) signals.push({ key: "market", label: "Who they serve", status: "mismatch", detail: `They say they serve consumer (B2C) brands, not ${icp.targetMarket.join(" or ")}.` });
     // Not saying it is not the same as not doing it: a company that doesn't mention your market is unknown, not a mismatch.
     else signals.push({ key: "market", label: "Who they serve", status: "unknown", detail: `Their site doesn't mention ${icp.targetMarket.join(" or ")}.` });
   }
@@ -272,12 +297,39 @@ export function prospectFit(icp: Icp, p: ProspectProfile): FitResult {
   // country is a weak fit however well the rest matches. A city or an unknown country is never a mismatch (handled above).
   const where = signals.find((x) => x.key === "location");
   if (where?.status === "mismatch" && icp.countries.length && verdict !== "excluded") { verdict = "weak"; headline = "It is based outside the country you asked for."; }
+  // The same for a market the company says it does not serve (only consumers, when you asked for B2B or software companies).
+  const market = signals.find((x) => x.key === "market");
+  if (market?.status === "mismatch" && verdict !== "excluded" && verdict !== "weak") { verdict = "weak"; headline = "It says it serves consumers, not the market you asked for."; }
   const missing = signals.filter((s) => s.status === "unknown").map((s) => s.label.toLowerCase());
   return { verdict, headline, signals, excludedBy: base.excludedBy, missing };
 }
 
 /** True when the company is known to be the kind of business the ICP asks for. Anything less is not worth deeper research. */
 export const industryMatched = (fit: Pick<FitResult, "signals"> | null | undefined): boolean => !!fit?.signals.some((x) => x.key === "industry" && x.status === "match");
+
+/**
+ * A senior decision-maker for buying services, from the title the company's own page gives: an owner or the top of
+ * the company (founder, owner, CEO, president, managing director, managing or founding partner, a partner, general
+ * manager) or the head of the function that buys (a head, VP, director or chief of marketing, growth, sales, revenue,
+ * business development, demand generation, go-to-market or brand). Everyone else named on the site (an SEO director,
+ * a growth marketing manager, a content strategist, an assistant to the CEO) is a real employee, never a decision-maker.
+ * Measured: 4 of 9 people shown as "decision maker" on ready cards were staff in delivery roles.
+ */
+const NOT_SENIOR = /\b(assistant|associate|intern|junior|jr|trainee|apprentice|deputy|coordinator|to the|product owner)\b/;
+const VP = /\b(vice[- ]president|vp|svp|evp)\b/;
+const TOP = /\b(co-?founder|founder|founding partner|owner|co-?owner|ceo|chief executive|president|managing director|managing partner|general manager|proprietor)\b/;
+const C_LEVEL = /\b(cmo|cro|cgo|chief (marketing|growth|revenue|sales|commercial|business|operating) officer)\b/;
+const LEAD = /\b(head|director|chief)\b/;
+const BUYING_FUNCTION = /\b(marketing|growth|sales|revenue|business development|biz ?dev|demand gen(eration)?|go[- ]to[- ]market|gtm|commercial|brand)\b/;
+export function isSeniorDecisionMaker(title: string | null | undefined): boolean {
+  const t = ` ${String(title ?? "").toLowerCase().replace(/&/g, " and ").replace(/\s+/g, " ").trim()} `;
+  if (t.trim().length < 2 || NOT_SENIOR.test(t)) return false;
+  if (VP.test(t)) return BUYING_FUNCTION.test(t); // "VP, Tech Enablement" is not; "VP of Marketing" is
+  if (TOP.test(t) || C_LEVEL.test(t)) return true;
+  // "Partner" as a title (an agency's owners), not "Partnerships Manager" or "Partner Success Lead".
+  if (/\b(senior |equity |principal )?partner\b/.test(t) && !/\bpartner(s|ships?)?\s+(manager|marketing|success|lead|specialist|program|relations)\b|\bpartnerships?\b/.test(t)) return true;
+  return LEAD.test(t) && BUYING_FUNCTION.test(t);
+}
 
 /** Decision-maker relevance: earlier in the ICP's role list is more relevant; a title that matches none is still kept, ranked last. */
 export function roleRank(icp: Pick<Icp, "roles">, title: string): number {

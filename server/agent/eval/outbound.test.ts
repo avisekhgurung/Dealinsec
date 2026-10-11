@@ -24,10 +24,13 @@ vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")
 
 import { DiscoveryError, type DiscoveryProvider } from "../../discovery/types";
 import { ProviderError } from "../../copilot/provider";
-import { addToLeads, cancelRun, findContacts, generateAngle, getProspect, getRun, listRuns, parseIcp, researchProspect, startRun } from "../../outbound/service";
-import { LeaseLost, MAX_TOKENS, clearPageCache, enrichOne, pipelineDeps, stepRun, type PipelineDeps } from "../../outbound/pipeline";
+import { addToLeads, cancelRun, findContacts, generateAngle, getProspect, getRun, listRuns, parseIcp, prospectCard, researchProspect, startRun } from "../../outbound/service";
+import { LeaseLost, MAX_TOKENS, clearPageCache, enrichOne, pipelineDeps, researchOne, stepRun, type PipelineDeps } from "../../outbound/pipeline";
 import { outboundWorkflow } from "../../outbound/runner";
+import { angleSystemPrompt, angleUserMessage } from "../../outbound/prompts";
+import { failureReport } from "../../outbound/diagnostics";
 import { parseIcpFallback } from "@shared/icp";
+import { MISSING_REASON } from "@shared/prospect";
 import type { ClaimedRun } from "../../outbound/store";
 import { outboundStore } from "../../outbound/store";
 import { createRunner } from "../../workflow/runner";
@@ -270,7 +273,8 @@ describe("the definition-of-done run", () => {
     expect(c.ready).toBe(false);
     expect(c.whyNow).toBeNull();
     expect(c.score.components.find((x: any) => x.key === "timing").points).toBeNull();
-    expect(c.score.readyMissing).toContain("a dated reason to reach out now (a recent signal)");
+    expect(c.score.readyMissing).toContain(MISSING_REASON);
+    expect(c.timing).toBe("stale"); // labelled as old evidence, never as recent
   });
   it("a hostile website: its instruction text is dropped everywhere and nothing about the lead pipeline changes", async () => {
     const leadsBefore = JSON.stringify(world().leads.leads);
@@ -402,7 +406,7 @@ describe("failures", () => {
     const id = await start(); const run = await drive(id);
     expect(run!.status).toBe("done");
     const item = world().outbound.items.find((i) => world().outbound.prospects.find((p) => p.id === i.prospectId)!.domain === "acmegrowth.io")!;
-    expect(item).toMatchObject({ stage: "failed", attempts: 3, errorCode: "timeout" });
+    expect(item).toMatchObject({ stage: "failed", attempts: 3, errorCode: "enrich:timeout" }); // where and why
     expect(byName((await cards(id)).prospects, "Northwind").ready).toBe(true);
   });
   it("a crash inside a step's transaction leaves nothing half-written; the step is redone and nothing is duplicated", async () => {
@@ -715,6 +719,58 @@ describe("what is cached and what is paid for", () => {
     await enrichOne(run, icp, null, deps() as PipelineDeps, p3);
     expect(world().outbound.findings.some((f) => f.prospectId === p3.id && f.type === "contact_form")).toBe(false);
   });
+  it("DM-1: a team grid the article reader drops still reaches research; an employee is kept, a client quoted on the same page is not", async () => {
+    world().knowledge.dns["gridco.com"] = ["93.184.216.34"];
+    page("gridco.com", "/", html("Gridco", `<p>Gridco is a digital marketing agency in Denver, United States serving SaaS companies. ${filler}</p>`, ["/team", "/blog"]));
+    page("gridco.com", "/team", `<html><head><title>Team</title></head><body><main><article><h1>Our team</h1><p>${filler}</p></article><section><div><h3>Dana Ortiz</h3><p>Founder and CEO</p></div><div><h3>Lee Park</h3><p>Head of Growth</p></div></section><section><blockquote>Great partner.</blockquote><p>Sam Rivera, VP of Marketing, Orchard Labs</p></section></main></body></html>`);
+    page("gridco.com", "/blog", `<html><head><title>Blog</title></head><body><main><article><h1>Blog</h1><p>${filler}</p></article><div><h3>Lee Park</h3><p>Head of Growth</p></div></main></body></html>`);
+    const team = (await pipelineDeps().reader.read("https://gridco.com/team")) as any;
+    expect(team.ok).toBe(true);
+    expect(team.text).toContain("Dana Ortiz, Founder and CEO");
+    expect((await pipelineDeps().reader.read("https://gridco.com/blog") as any).text).not.toContain("[People on this page]"); // only team/about pages get the block
+    const teamPage = (m: { content: string }[]) => Number(m[1].content.match(/Page (\d+):\n<untrusted[^>]*>\nURL: https:\/\/gridco\.com\/team/)?.[1] ?? 0);
+    script.signals = (m) => ({ findings: [
+      { kind: "person", name: "Dana Ortiz", title: "Founder and CEO", employer: "Gridco", quote: "Dana Ortiz, Founder and CEO", page: teamPage(m) },
+      { kind: "person", name: "Sam Rivera", title: "VP of Marketing", employer: "Orchard Labs", quote: "Sam Rivera, VP of Marketing, Orchard Labs", page: teamPage(m) },
+    ], opportunities: [] });
+    const p0 = await outboundStore.upsertProspect(ORG1, { domain: "gridco.com", name: "Gridco", website: "https://gridco.com", sources: [] }, NOW);
+    await researchOne({ id: "pr_grid", organizationId: ORG1, createdByUser: "u1" }, parseIcpFallback(REQUEST)!, null, deps() as PipelineDeps, { prospect: p0, force: true });
+    const people = world().outbound.findings.filter((f) => f.prospectId === p0.id && f.kind === "decision_maker").map((f) => f.meta.name);
+    expect(people).toEqual(["Dana Ortiz"]);
+  });
+  it("the why-now shown is a concrete recent event before a blog post; a blog post alone is shown as context, never as strong timing", async () => {
+    const recent = (days: number) => new Date(Date.now() - days * 86_400_000);
+    const row = { id: 9, organizationId: ORG1, domain: "acme.com", name: "Acme", website: "https://acme.com", status: "enriched", rejectReason: null, sources: [], profile: {}, fit: null, score: null, angle: null, ready: false, leadId: null } as any;
+    const fnd = (id: number, type: string, days: number, precision = "day") => ({ id, organizationId: ORG1, prospectId: 9, kind: "signal", type, value: `${type} value`, status: "confirmed", sourceUrl: "https://acme.com/x", sourceType: "website", quote: "q", observedAt: recent(days), confidence: "high", supportingIds: [], meta: { datePrecision: precision }, batch: "research", retrievedAt: new Date() }) as any;
+    const card = prospectCard(row, [fnd(1, "CONTENT_ACTIVITY", 2), fnd(2, "HIRING", 40)], new Date());
+    expect(card.whyNow!.type).toBe("HIRING");
+    expect(card.timing).toBe("strong");
+    const blogOnly = prospectCard(row, [fnd(1, "CONTENT_ACTIVITY", 2)], new Date());
+    expect(blogOnly.whyNow!.type).toBe("CONTENT_ACTIVITY"); // still visible as context
+    expect(blogOnly.timing).toBe("context");
+    expect(blogOnly.whyNow!.date).toMatch(/^\d{1,2} [A-Z][a-z]{2} \d{4}$/); // the date as the page gave it, to the day
+    const old = prospectCard(row, [fnd(1, "HIRING", 400)], new Date());
+    expect(old.whyNow).toBeNull(); // stale evidence is never offered as a reason
+    expect(old.timing).toBe("stale");
+    expect(prospectCard(row, [fnd(1, "HIRING", 10, "year"), fnd(2, "NEW_SERVICE", 30)], new Date()).whyNow!.type).toBe("NEW_SERVICE"); // a year-only date is not a "now"
+  });
+  it("the card calls only a senior person a decision maker; another real employee is shown as an employee, not dropped", () => {
+    const row = { id: 9, organizationId: ORG1, domain: "acme.com", name: "Acme", website: "https://acme.com", status: "enriched", rejectReason: null, sources: [], profile: {}, fit: null, score: null, angle: null, ready: false, leadId: null } as any;
+    const person = (id: number, name: string, title: string, rank: number) => ({ id, organizationId: ORG1, prospectId: 9, kind: "decision_maker", type: title, value: `${name}, ${title}`, status: "confirmed", sourceUrl: "https://acme.com/team", sourceType: "website", quote: `${name}, ${title}`, observedAt: null, confidence: "high", supportingIds: [], meta: { name, title, rank }, batch: "research", retrievedAt: new Date() }) as any;
+    const onlyStaff = prospectCard(row, [person(1, "Rory Quill", "Growth Marketing Manager", 1)], new Date());
+    expect(onlyStaff.decisionMaker).toBeNull();
+    expect(onlyStaff.contactPerson).toMatchObject({ value: "Rory Quill, Growth Marketing Manager", label: "Employee", senior: false });
+    // A senior person wins even when the ICP's role order ranks the employee's title first.
+    const both = prospectCard(row, [person(1, "Rory Quill", "Growth Marketing Manager", 0), person(2, "Jo Marsh", "Founder & CEO", 3)], new Date());
+    expect(both.decisionMaker).toMatchObject({ value: "Jo Marsh, Founder & CEO", label: "Decision maker", senior: true });
+    expect(both.contactPerson).toBeNull();
+  });
+  it("blog-only evidence: the angle model is told a blog post is context, never urgency; only a concrete recent event is strong timing", () => {
+    expect(angleSystemPrompt()).toMatch(/\[context\][^.]*never present it as urgency/);
+    const msg = angleUserMessage("Acme", null, [{ id: 1, label: "Signal (Publishing activity)", value: "A new blog post", inferred: false, timing: "context, 14 Sep 2026" }, { id: 2, label: "Signal (Hiring)", value: "Hiring a PPC lead", inferred: false, timing: "strong timing, 1 Oct 2026" }], []);
+    expect(msg).toContain("F1 Signal (Publishing activity) [context, 14 Sep 2026]: A new blog post");
+    expect(msg).toContain("F2 Signal (Hiring) [strong timing, 1 Oct 2026]: Hiring a PPC lead");
+  });
   it("a model that returns nothing is a failed call to retry, never 'the company says nothing': it is not set aside as unclear, and it succeeds on the retry", async () => {
     let n = 0;
     script.enrich = (m) => (companyOf(m) === "Northwind Digital" && n++ < 2 ? "" : ENRICH[companyOf(m)] ?? { facts: [] }); // two empty replies = one whole attempt (the call itself retries once)
@@ -730,8 +786,28 @@ describe("what is cached and what is paid for", () => {
     const id = await start(); const run = await drive(id);
     expect(run!.status).toBe("done");
     const item = world().outbound.items.find((i) => world().outbound.prospects.find((p) => p.id === i.prospectId)!.domain === "northwind.com")!;
-    expect(item).toMatchObject({ stage: "failed", errorCode: "invalid_response" });
+    expect(item).toMatchObject({ stage: "failed", errorCode: "enrich:invalid_response" });
     expect((await cards(id)).run.counters.failed).toBeGreaterThanOrEqual(1);
+  });
+  it("research failure reporting: a company whose research keeps failing ends FAILED with its step and code, and the run's failure report names it (codes only, no page text)", async () => {
+    script.signals = (m) => (companyOf(m) === "Northwind Digital" ? "" : researchFor(companyOf(m), m[1].content));
+    const id = await start(); const run = await drive(id);
+    expect(run!.status).toBe("done");
+    const domainOf = (pid: number) => world().outbound.prospects.find((p) => p.id === pid)!.domain;
+    const item = world().outbound.items.find((i) => domainOf(i.prospectId) === "northwind.com")!;
+    expect(item).toMatchObject({ stage: "failed", attempts: 3, errorCode: "research:invalid_response" });
+    const report = failureReport(world().outbound.items.map((i) => ({ domain: domainOf(i.prospectId), stage: i.stage, errorCode: i.errorCode ?? null, attempts: i.attempts ?? 0 })), []);
+    expect(report.failed).toEqual([{ domain: "northwind.com", step: "research", code: "invalid_response", attempts: 3 }]);
+    expect(report.byCode).toEqual({ "research:invalid_response": 1 });
+    expect((await cards(id)).run.counters.failed).toBe(1);
+  });
+  it("an unexpected error is recorded by its type only, never its message (it may hold page text)", async () => {
+    script.signals = (m) => { if (companyOf(m) === "Northwind Digital") throw new TypeError("secret page text"); return researchFor(companyOf(m), m[1].content); };
+    const id = await start(); await drive(id);
+    const item = world().outbound.items.find((i) => world().outbound.prospects.find((p) => p.id === i.prospectId)!.domain === "northwind.com")!;
+    expect(item.stage).toBe("failed");
+    expect(item.errorCode).toMatch(/^research:/);
+    expect(JSON.stringify(world().outbound.items)).not.toMatch(/secret page text/);
   });
   it("the model gets room to think: enrich and research ask for a large output budget (a reasoning model returned nothing at 3,000)", () => {
     expect(MAX_TOKENS.enrich).toBeGreaterThanOrEqual(6000);

@@ -28,7 +28,7 @@ export function ProspectCard({ p, onOpen, onAdd, adding, canEdit }: { p: Card; o
   const meta = [where, p.profile.industry, p.profile.employees].filter(Boolean);
   const fits = (p.fit?.signals ?? []).filter((s) => s.status === "match").slice(0, 3);
   const misses = (p.fit?.signals ?? []).filter((s) => s.status === "mismatch").slice(0, 1);
-  const person = p.decisionMaker;
+  const person = p.decisionMaker ?? p.contactPerson ?? null;
   return (
     <div className={cn("flex min-w-0 flex-col gap-3 rounded-2xl border bg-background p-4 transition-shadow hover:shadow-sm", p.ready && "border-emerald-300 dark:border-emerald-800")} data-testid="prospect-card">
       <div className="flex items-start gap-3">
@@ -37,6 +37,8 @@ export function ProspectCard({ p, onOpen, onAdd, adding, canEdit }: { p: Card; o
           <div className="flex flex-wrap items-center gap-x-2">
             <button onClick={onOpen} className="truncate text-left text-base font-semibold hover:underline" data-testid="prospect-name">{p.name}</button>
             {p.ready && <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Ready</span>}
+            {!p.ready && !p.rejectReason && p.classificationLabel && p.classification !== "not_a_fit" && <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground" data-testid="prospect-class">{p.classificationLabel}</span>}
+            {p.timing === "strong" && <span className="rounded-full bg-orange-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white" title="A concrete event from the last 90 days">Strong timing</span>}
           </div>
           <a href={p.website} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">{p.domain}<ExternalLink className="h-3 w-3" /></a>
           {meta.length > 0 && <p className="mt-0.5 truncate text-xs text-muted-foreground">{meta.join(" · ")}</p>}
@@ -50,12 +52,18 @@ export function ProspectCard({ p, onOpen, onAdd, adding, canEdit }: { p: Card; o
         </ul>
       )}
 
-      {p.whyNow && (
+      {p.whyNow && (p.timing === "strong" || !p.timing ? (
         <div className="rounded-xl bg-orange-50 px-3 py-2 text-sm dark:bg-orange-950/30" data-testid="prospect-why-now">
-          <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400"><Flame className="h-3 w-3" />Why now · {p.whyNow.label}{p.whyNow.freshness ? ` · ${p.whyNow.freshness}` : ""}</p>
+          <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-orange-700 dark:text-orange-400"><Flame className="h-3 w-3" />Why now · {p.whyNow.label}{p.whyNow.date ? ` · ${p.whyNow.date}` : p.whyNow.freshness ? ` · ${p.whyNow.freshness}` : ""}</p>
           <p className="mt-0.5 break-words">{line(p.whyNow)}</p>
         </div>
-      )}
+      ) : (
+        // A blog post, an older event or an undated statement: shown as background, never as a reason to write now.
+        <div className="rounded-xl border px-3 py-2 text-sm" data-testid="prospect-context">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{p.timing === "undated" ? "Undated" : "Context, not urgency"} · {p.whyNow.label}{p.whyNow.date ? ` · ${p.whyNow.date}` : ""}</p>
+          <p className="mt-0.5 break-words">{line(p.whyNow)}</p>
+        </div>
+      ))}
       {p.opportunity && (
         <div className="rounded-xl border border-dashed px-3 py-2 text-sm" data-testid="prospect-opportunity">
           <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground"><Lightbulb className="h-3 w-3" />Possible opportunity · inference</p>
@@ -66,6 +74,7 @@ export function ProspectCard({ p, onOpen, onAdd, adding, canEdit }: { p: Card; o
         <p className="flex items-center gap-1.5 text-sm" data-testid="prospect-person">
           <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="min-w-0 truncate">{person.value}</span>
+          {!p.decisionMaker && <span className="shrink-0 rounded bg-muted px-1.5 text-[10px] text-muted-foreground" title="Named on their site, but not a senior decision-maker">employee</span>}
           {person.source === "provider" && <span className="shrink-0 rounded bg-muted px-1.5 text-[10px] text-muted-foreground">{person.meta?.emailStatus === "verified" ? "email verified by provider" : "from data provider"}</span>}
         </p>
       )}

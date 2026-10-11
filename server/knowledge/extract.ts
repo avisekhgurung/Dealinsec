@@ -113,6 +113,72 @@ export function hasContactForm(bytes: Uint8Array): boolean {
   try { return FORM_EMBED.test(decode(bytes).slice(0, 1_500_000)); } catch { return false; }
 }
 
+/**
+ * The people a team page names, as "Name, Role" lines in the page's own words. The article reader keeps a page's prose
+ * and drops its card grids, which is where a team page lists people ("<h3>Dana Ortiz</h3><p>Founder</p>"). A name and a
+ * role are joined only when they sit in the same card (the smallest container holding both), in the order the card
+ * uses. Navigation, header, footer and forms are skipped. A "Name, Role, Company" line (often a client under a
+ * testimonial) is kept as written: whether that person works HERE is decided later by the staff check, not here.
+ * Plain text only, bounded (20 lines, about 1,500 characters), never throws.
+ */
+const BLOCK_TAGS = new Set(["DIV", "P", "H1", "H2", "H3", "H4", "H5", "H6", "LI", "UL", "OL", "SECTION", "ARTICLE", "MAIN", "ASIDE", "FIGURE", "FIGCAPTION", "BLOCKQUOTE", "DL", "DT", "DD", "TABLE", "TBODY", "TR", "TD", "TH", "HEADER", "FOOTER"]);
+const ROLE_WORD = /\b(founder|co-?founder|owner|ceo|cto|coo|cmo|cfo|cro|president|partner|principal|director|head|vp|vice president|manager|lead|chief|officer|strategist|specialist|consultant|designer|developer|engineer|marketer|executive|coordinator|analyst|associate|editor|writer|producer|architect|advisor|chair(?:man|woman)?)\b/i;
+const NOT_A_NAME = /\b(our|the|and|for|with|meet|team|about|contact|services?|marketing|agency|digital|business|growth|sales|careers?|clients?|work|blog|home|learn|more|read|view|book|call|get|free|new|all|news|company|studio|group|solutions|media|partners?)\b/i;
+/** 2 to 4 capitalised words, letters in any script ("Inês Duarte", "Seán Doyle"). */
+const PERSON_NAME = new RegExp("^\\p{Lu}[\\p{L}'’.-]+(?:\\s+\\p{Lu}[\\p{L}'’.-]+){1,3}$", "u");
+export async function extractPeopleBlock(bytes: Uint8Array): Promise<string> {
+  try {
+    if (!bytes.length) return "";
+    const { parseHTML } = await import("linkedom");
+    const source = decode(bytes).slice(0, 1_500_000);
+    const { document } = parseHTML(/<html[\s>]/i.test(source) ? source : `<!doctype html><html><body>${source}</body></html>`);
+    for (const el of Array.from(document.querySelectorAll("script, style, noscript, template, svg, iframe, nav, header, footer, form, select, button, [role=navigation]"))) el.remove();
+    const text = (el: Element) => cleanText(el.textContent ?? "").replace(/\s+/g, " ").trim();
+    // Leaves: elements with text and no block-level child (inline markup inside a name is fine), outermost only.
+    const all = Array.from(document.querySelectorAll("body *")) as Element[];
+    const isLeaf = (el: Element) => BLOCK_TAGS.has(el.tagName) || el.tagName === "SPAN" || el.tagName === "STRONG" || el.tagName === "B" || el.tagName === "A";
+    const leaves: Element[] = [];
+    const leafSet = new Set<Element>();
+    for (const el of all) {
+      if (!isLeaf(el) || Array.from(el.children).some((c) => BLOCK_TAGS.has((c as Element).tagName))) continue;
+      // A card built from inline pieces (<div><a>Dana Ortiz</a><span>Founder</span></div>): the pieces are the leaves, not the run-together whole.
+      const own = Array.from(el.childNodes).filter((n: any) => n.nodeType === 3).map((n: any) => String(n.textContent ?? "")).join("").trim();
+      if (BLOCK_TAGS.has(el.tagName) && !own && Array.from(el.children).filter((c) => text(c as Element)).length >= 2) continue;
+      let up = el.parentElement, inside = false;
+      while (up) { if (leafSet.has(up)) { inside = true; break; } up = up.parentElement; }
+      const t = text(el);
+      if (inside || !t || t.length > 120) continue;
+      leaves.push(el); leafSet.add(el);
+      if (leaves.length >= 3000) break;
+    }
+    const isName = (t: string) => t.length <= 40 && PERSON_NAME.test(t) && !NOT_A_NAME.test(t) && !ROLE_WORD.test(t);
+    const isRole = (t: string) => t.length <= 80 && t.split(" ").length <= 8 && ROLE_WORD.test(t) && !/[.!?]$/.test(t);
+    const lines: string[] = [];
+    const add = (l: string) => { if (!lines.includes(l) && lines.length < 20 && lines.join("\n").length + l.length + 1 <= 1500) lines.push(l); };
+    leaves.forEach((el, i) => {
+      const t = text(el);
+      // Already one line: "Tess Harlow, Head of Marketing, Brightline" / "Dana Ortiz – Founder".
+      const one = t.match(/^(.{3,40}?)\s*(?:,|\s[–—|-]\s)\s*(.{2,80})$/);
+      if (one && isName(one[1].trim()) && isRole(one[2].split(/,|\s[–—|-]\s/)[0].trim())) { add(`${one[1].trim()}, ${one[2].trim()}`); return; }
+      if (!isName(t)) return;
+      // The card: the nearest ancestor holding more than this one leaf (at most 3 levels up).
+      let card: Element | null = el.parentElement;
+      for (let k = 0; card && k < 3 && leaves.filter((x) => x !== el && card!.contains(x)).length === 0; k++) card = card.parentElement;
+      if (!card) return;
+      const inCard = leaves.filter((x) => card!.contains(x));
+      const at = inCard.indexOf(el);
+      // Which way the card reads (name then role, or role then name) is set by its first name-or-role leaf.
+      const first = inCard.find((x) => isName(text(x)) || isRole(text(x)));
+      const roleFirst = !!first && isRole(text(first));
+      const role = roleFirst ? inCard[at - 1] : inCard[at + 1];
+      if (role && isRole(text(role)) && leaves.indexOf(role) === (roleFirst ? i - 1 : i + 1)) add(`${t}, ${text(role)}`);
+    });
+    return lines.join("\n");
+  } catch {
+    return "";
+  }
+}
+
 export async function extractContactBlock(bytes: Uint8Array): Promise<string> {
   try {
     const { parseHTML } = await import("linkedom");

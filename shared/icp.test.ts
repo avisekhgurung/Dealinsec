@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countryFromDomain, describeIcp, icpSchema, industryMatched, mergeIcp, parseHeadcount, parseIcpFallback, prospectFit, roleRank, searchStrategies, singular, withSavedExclusions, MAX_QUANTITY, type Icp } from "./icp";
+import { countryFromDomain, describeIcp, isSeniorDecisionMaker, icpSchema, industryMatched, mergeIcp, parseHeadcount, parseIcpFallback, prospectFit, roleRank, searchStrategies, singular, withSavedExclusions, MAX_QUANTITY, type Icp } from "./icp";
 
 const DOD = "Find 30 US digital marketing agencies with 5–30 employees that serve SaaS companies.";
 const icp = (over: Partial<Icp> = {}): Icp => icpSchema.parse({ industry: "digital marketing agency", countries: ["US"], employeeMin: 5, employeeMax: 30, targetMarket: ["SaaS"], quantity: 30, ...over });
@@ -193,5 +193,62 @@ describe("decision-maker relevance", () => {
     expect(roleRank(i, "Head of Growth")).toBe(0);
     expect(roleRank(i, "Co-Founder & CEO")).toBe(1);
     expect(roleRank(i, "Office Manager")).toBe(2);
+  });
+});
+
+/* ── Phase 2 policy: Canada evidence (F1) and an explicit B2C-only market (F2) ─────────────────────────────── */
+describe("F1: a Canadian city or province is evidence of Canada", () => {
+  const p = { name: "Maple Growth", industry: "Digital marketing agency", targetCustomers: "B2B SaaS companies" };
+  it("Montréal, QC / Toronto, ON / Calgary / British Columbia: Canada, so a US-only ICP is a confirmed mismatch (weak)", () => {
+    for (const location of ["Montréal, QC", "Montreal, Quebec", "Toronto, ON", "Toronto, Ontario", "Calgary", "Vancouver, BC", "Halifax, Nova Scotia", "Ottawa"]) {
+      const f = prospectFit(icp(), { ...p, location, country: null });
+      expect(f.signals.find((s) => s.key === "location")!.status, location).toBe("mismatch");
+      expect(f.verdict, location).toBe("weak");
+    }
+  });
+  it("genuinely unknown stays unknown: no location, a city that exists in both countries, or a US state code", () => {
+    for (const location of [null, "London", "Vancouver", "Hamilton", "Kingston", "Vancouver, WA", "Portland, OR", "Austin, TX", "Remote", "Toronto, ON and Austin, TX", "Toronto and New York, USA"]) {
+      const f = prospectFit(icp(), { ...p, location: location as any, country: null });
+      expect(f.signals.find((s) => s.key === "location")!.status, String(location)).toBe("unknown");
+    }
+  });
+  it("a stated country still wins over a city, and a Canadian ICP matches Canadian evidence", () => {
+    expect(prospectFit(icp(), { ...p, location: "Toronto, ON", country: "US" }).signals.find((s) => s.key === "location")!.status).toBe("match");
+    expect(prospectFit(icp({ countries: ["CA"] }), { ...p, location: "Montréal, QC", country: null }).signals.find((s) => s.key === "location")!.status).toBe("match");
+  });
+});
+
+describe("F2: an explicit B2C-only market is a mismatch for a B2B/SaaS ICP", () => {
+  const p = { name: "Consumer Co", industry: "Digital marketing agency", location: "Leesburg, VA", country: "US" };
+  it("'for B2C brands', 'consumer brands', 'DTC' with no B2B/SaaS/software/tech wording: market mismatch, weak fit", () => {
+    for (const targetCustomers of ["Media, measurement and SEO for $100M+ B2C brands", "We grow consumer brands", "DTC and e-commerce brands", "direct-to-consumer brands"]) {
+      const f = prospectFit(icp(), { ...p, targetCustomers });
+      expect(f.signals.find((s) => s.key === "market")!.status, targetCustomers).toBe("mismatch");
+      expect(f.verdict, targetCustomers).toBe("weak");
+    }
+  });
+  it("missing SaaS wording alone is NOT a mismatch; B2B and B2C together is not B2C-only", () => {
+    for (const targetCustomers of ["small businesses", "local restaurants", "healthcare organizations", "both B2B and B2C businesses", "B2C and B2B SaaS brands", "consumer tech and SaaS companies"])
+      expect(prospectFit(icp(), { ...p, targetCustomers }).signals.find((s) => s.key === "market")!.status, targetCustomers).not.toBe("mismatch");
+  });
+  it("an ICP that does not target B2B/SaaS is never mismatched by a B2C statement", () => {
+    expect(prospectFit(icp({ targetMarket: ["restaurants"] }), { ...p, targetCustomers: "B2C brands" }).signals.find((s) => s.key === "market")!.status).not.toBe("mismatch");
+  });
+});
+
+/* ── who counts as a decision-maker: senior titles only (measured: 4 of 9 "decision makers" on ready cards were delivery staff) ── */
+describe("senior decision-maker titles", () => {
+  it("owners, executives and the heads of the buying function are senior", () => {
+    for (const t of ["Founder", "Co-Founder & CEO", "Founder and Growth Manager", "Owner", "President", "CEO", "Managing Director", "Managing Partner", "Partner", "Senior Partner",
+      "General Manager", "CMO", "Chief Marketing Officer", "Chief Revenue Officer", "Head of Growth", "Head of Sales", "VP of Marketing", "VP, Sales", "Vice President of Growth",
+      "Director of Growth", "Marketing Director", "Sales Director", "Head of Business Development", "Director of Demand Generation"])
+      expect(isSeniorDecisionMaker(t), t).toBe(true);
+  });
+  it("other real employees are not: delivery directors, managers, strategists, assistants, a VP of another function, a partnerships role", () => {
+    for (const t of ["SEO Director", "Growth Marketing Manager", "Growth Marketing Analyst", "Content Strategist", "VP, Tech Enablement and Apps", "Assistant to the CEO",
+      "Associate Director of Marketing", "Marketing Coordinator", "Partnerships Manager", "Partner Success Lead", "Product Owner", "Creative Director", "Account Executive",
+      "Head of Design", "Growth Strategist", "Senior Designer", "Vice President, Engineering", "", "Team"])
+      expect(isSeniorDecisionMaker(t), t).toBe(false);
+    expect(isSeniorDecisionMaker(null)).toBe(false);
   });
 });

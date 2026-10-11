@@ -35,19 +35,19 @@ const prospectInput = z.object({ prospectId: z.number().int().positive().describ
 const money = (u: number) => `$${u.toFixed(2)}`;
 function runLine(r: RunView): string {
   const c = r.counters;
-  return `${r.status}${r.status === "running" ? ` (${r.stage})` : ""}: ${c.discovered ?? 0} discovered, ${c.verified ?? 0} verified, ${c.icpMatch ?? 0} match the ICP, ${c.signals ?? 0} with a recent reason to reach out, ${c.decisionMakers ?? 0} with a named person, ${c.ready ?? 0} outreach-ready. Cost so far ${money(r.costUsd)}.`;
+  return `${r.status}${r.status === "running" ? ` (${r.stage})` : ""}: ${c.discovered ?? 0} discovered, ${c.verified ?? 0} verified, ${c.icpMatch ?? 0} match the ICP, ${c.signals ?? 0} with a dated reason to get in touch (last 12 months${typeof c.strongTiming === "number" ? `; ${c.strongTiming} with a strong timing signal from the last 90 days` : ""}), ${c.decisionMakers ?? 0} with a named senior decision maker, ${c.ready ?? 0} outreach-ready. Cost so far ${money(r.costUsd)}.`;
 }
 const prospectLine = (p: import("../../outbound/service").ProspectCard) =>
-  `- [${p.id}] ${p.name} (${p.domain}) ${p.score ? `${p.score.total}/100` : "not scored"}${p.ready ? " READY" : ""}${p.whyNow ? ` — why now: ${p.whyNow.label}, ${p.whyNow.freshness}: ${p.whyNow.value}` : ""}${p.decisionMaker ? ` — person: ${p.decisionMaker.value}` : ""}`;
+  `- [${p.id}] ${p.name} (${p.domain}) ${p.score ? `${p.score.total}/100` : "not scored"}${p.ready ? " READY" : ` ${p.classificationLabel.toUpperCase()}`}${p.whyNow ? ` — ${p.timing === "strong" ? "why now (strong timing)" : p.timing === "context" ? "context only, not urgency" : "undated, no timing"}: ${p.whyNow.label}, ${p.whyNow.date}: ${p.whyNow.value}` : ""}${p.decisionMaker ? ` — decision maker: ${p.decisionMaker.value}` : p.contactPerson ? ` — employee (not a verified decision maker): ${p.contactPerson.value}` : ""}`;
 function briefText(b: ProspectBrief): string {
   const p = b.prospect;
   const lines = [
-    `${p.name} (${p.domain}) — prospect ${p.id}${p.leadId ? `, already lead ${p.leadId}` : ""}${p.ready ? ", OUTREACH-READY" : ""}`,
+    `${p.name} (${p.domain}) — prospect ${p.id}${p.leadId ? `, already lead ${p.leadId}` : ""}${p.ready ? ", OUTREACH-READY" : `, ${p.classificationLabel.toUpperCase()}`}. Timing: ${p.timingLabel}${p.timing === "strong" ? " (a concrete event from the last 90 days)" : p.timing === "context" ? " (no concrete event in the last 90 days; a blog post or an older event is background, not urgency)" : ""}.`,
     p.score ? `Score ${p.score.total}/100 (${p.score.unknownPoints} of 100 points unknown, confidence ${p.score.confidence}). ${p.score.components.map((c) => `${c.label} ${c.points === null ? "unknown" : `${c.points}/${c.max}`}`).join(", ")}.` : "Not scored yet (not researched).",
     p.fit ? `Fit: ${p.fit.verdict} — ${p.fit.headline}` : "",
     b.facts.length ? `FACTS (stated on their site):\n${b.facts.map((e) => `- ${e.label}: ${e.value} [F${e.id}]`).join("\n")}` : "No confirmed facts yet.",
-    b.signals.length ? `SIGNALS (why now; stated on their site):\n${b.signals.map((e) => `- ${e.label}${e.freshness ? `, ${e.freshness}` : ""}: ${e.value} [F${e.id}]`).join("\n")}` : "No signals found.",
-    b.people.length ? `PEOPLE:\n${b.people.map((e) => `- ${e.value}${e.meta?.email ? `, ${e.meta.email} (${e.meta.emailStatus})` : ""}${e.source === "provider" ? " [from data provider]" : ""} [F${e.id}]`).join("\n")}` : "No named decision maker yet.",
+    b.signals.length ? `SIGNALS (stated on their site; date as precise as the page gives it):\n${b.signals.map((e) => `- ${e.label}, ${e.date ?? "Undated"}${e.freshness && e.freshness !== "Undated" ? ` (${e.freshness})` : ""}: ${e.value} [F${e.id}]`).join("\n")}` : "No signals found.",
+    b.people.length ? `PEOPLE (named on their site or by a data provider; only those marked decision maker are senior):\n${b.people.map((e) => `- ${e.value} (${e.senior ? "decision maker" : "employee, not a verified decision maker"})${e.meta?.email ? `, ${e.meta.email} (${e.meta.emailStatus})` : ""}${e.source === "provider" ? " [from data provider]" : ""} [F${e.id}]`).join("\n")}` : "No named decision maker yet.",
     b.inferences.length || b.opportunities.length ? `INFERENCES (guesses, never state as fact):\n${[...b.inferences, ...b.opportunities].map((e) => `- ${e.label}: ${e.value} [F${e.id}]`).join("\n")}` : "",
     b.angle ? `OUTREACH ANGLE (${b.angle.confidence} confidence): problem — ${b.angle.problem}; opportunity — ${b.angle.opportunity}; positioning — ${b.angle.positioning}${b.angle.targetPerson ? `; write to ${b.angle.targetPerson}` : ""}.` : "",
     p.score?.missing.length ? `Not known: ${p.score.missing.join("; ")}.` : "",
@@ -212,7 +212,7 @@ const addTool: AgentTool<{ prospectId: number; contactFindingId?: number }> = {
     const p = r.brief.prospect;
     if (p.leadId) return { ok: false, code: "already_lead", message: `${safeName(p.name)} is already lead ${p.leadId}.` };
     if (p.rejectReason) return { ok: false, code: "rejected", message: `${safeName(p.name)} was set aside (${p.rejectLabel}).` };
-    return { ok: true, args: { prospectId, ...(contactFindingId ? { contactFindingId } : {}) }, preview: { title: `Add lead: ${p.name}`, lines: [{ label: "Website", value: p.domain }, ...(p.score ? [{ label: "Score", value: `${p.score.total} / 100` }] : []), ...(p.decisionMaker ? [{ label: "Contact", value: p.decisionMaker.value }] : [])], effects: ["Adds it to your pipeline as a New lead, with what was found as its facts.", "Nothing is sent to the company."] } };
+    return { ok: true, args: { prospectId, ...(contactFindingId ? { contactFindingId } : {}) }, preview: { title: `Add lead: ${p.name}`, lines: [{ label: "Website", value: p.domain }, ...(p.score ? [{ label: "Score", value: `${p.score.total} / 100` }] : []), ...(p.decisionMaker ? [{ label: "Decision maker", value: p.decisionMaker.value }] : p.contactPerson ? [{ label: "Contact (employee)", value: p.contactPerson.value }] : [])], effects: ["Adds it to your pipeline as a New lead, with what was found as its facts.", "Nothing is sent to the company."] } };
   },
   async execute(ctx, args): Promise<ToolOutcome> {
     const r = await addToLeads(who(ctx), Number(args.prospectId), { contactFindingId: args.contactFindingId });

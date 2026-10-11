@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MIN_RELEVANCE, relevance, canonicalUrl, checkSite, collectCandidates, domainOf, findingsAsClaims, freshness, junkReason, parseEvidenceDate, preRank, readiness, runBudget, type FindingLike, type SearchHit } from "./prospect";
+import { EVENT_SIGNAL_TYPES, MIN_RELEVANCE, MISSING_CONTACT, MISSING_REASON, hasVerifiedEmail, isDecisionMaker, relevance, canonicalUrl, checkSite, collectCandidates, dateLabel, domainOf, evidenceDate, findingsAsClaims, freshness, junkReason, parseEvidenceDate, pickResearchLinks, preRank, readiness, runBudget, signalDating, timingOf, type FindingLike, type SearchHit } from "./prospect";
 import { icpSchema } from "./icp";
 import { scoreLead } from "./lead-score";
 
@@ -170,17 +170,17 @@ describe("outreach-ready is a rule", () => {
   const sig = { id: 1, kind: "signal", type: "HIRING", value: "x", status: "confirmed", observedAt: "2026-10-01T00:00:00Z" };
   const dm = { id: 2, kind: "decision_maker", type: "Founder", value: "Ana Silva, Founder", status: "confirmed" };
   it("needs all four: verified, a fit, a current reason, a way in", () => {
-    expect(readiness({ verified: true, fitVerdict: "strong", findings: [sig, dm], now: NOW })).toEqual({ ready: true, missing: [] });
+    expect(readiness({ verified: true, fitVerdict: "strong", findings: [sig, dm], now: NOW })).toMatchObject({ ready: true, missing: [] });
     expect(readiness({ verified: false, fitVerdict: "strong", findings: [sig, dm], now: NOW }).ready).toBe(false);
     expect(readiness({ verified: true, fitVerdict: "weak", findings: [sig, dm], now: NOW }).ready).toBe(false);
-    expect(readiness({ verified: true, fitVerdict: "strong", findings: [dm], now: NOW }).missing).toContain("a dated reason to reach out now (a recent signal)");
+    expect(readiness({ verified: true, fitVerdict: "strong", findings: [dm], now: NOW }).missing).toContain(MISSING_REASON);
     expect(readiness({ verified: true, fitVerdict: "strong", findings: [{ ...sig, observedAt: "2023-01-01T00:00:00Z" }, dm], now: NOW }).ready).toBe(false);
     expect(readiness({ verified: true, fitVerdict: "strong", findings: [sig], now: NOW }).ready).toBe(false);
     expect(readiness({ verified: true, fitVerdict: "strong", findings: [sig, dm], doNotContact: true, now: NOW }).ready).toBe(false);
   });
   it("an UNDATED signal still scores but is not a reason to call a prospect outreach-ready (a why-now needs a date)", () => {
     const undated = { ...sig, observedAt: null };
-    expect(readiness({ verified: true, fitVerdict: "strong", findings: [undated, dm], now: NOW })).toMatchObject({ ready: false, missing: ["a dated reason to reach out now (a recent signal)"] });
+    expect(readiness({ verified: true, fitVerdict: "strong", findings: [undated, dm], now: NOW })).toMatchObject({ ready: false, missing: [MISSING_REASON] });
     expect(findingsAsClaims([{ ...undated, id: 5, sourceUrl: "https://n.com", retrievedAt: NOW } as FindingLike], NOW).map((c) => c.field)).toEqual(["hiring"]);
   });
   it("an inferred signal is not a reason to reach out", () => {
@@ -193,5 +193,168 @@ describe("run budget", () => {
     expect(runBudget(30)).toEqual({ queries: 8, resultsPerQuery: 20, verify: 100, enrich: 70, research: 50, llmCalls: 122 });
     expect(runBudget(500).verify).toBe(120);
     expect(runBudget(0).verify).toBe(13);
+  });
+});
+
+/* ── Phase 2 readiness: tests written before the fixes (relative dates: they never expire) ───────────────── */
+const DAY_MS = 86_400_000;
+const today = () => new Date();
+const daysAgo = (n: number) => new Date(Date.now() - n * DAY_MS).toISOString();
+
+describe("dates carry their precision, and only an event's own date counts", () => {
+  it("a year in a blog title is a YEAR, never a day (found: 'In The US In 2026' became 1 Jan 2026 and made a prospect ready)", () => {
+    const year = new Date().getUTCFullYear();
+    for (const t of [`Top Automotive Digital Marketing Agencies In The US In ${year}`, `The Best SaaS SEO Tools of ${year}`, `What changed during ${year}`, `Since ${year} we have helped B2B brands`])
+      expect(evidenceDate(t, today())?.precision, t).toBe("year");
+  });
+  it("a month and year is a MONTH; a full date, an ISO date or a stated 'N days ago' is a DAY", () => {
+    expect(evidenceDate("Top Lead Generation Agencies - Sep 2026 Rankings", today())).toMatchObject({ precision: "month" });
+    expect(evidenceDate("In March 2026 we opened our Austin office", today())).toMatchObject({ precision: "month" });
+    expect(evidenceDate("September 14, 2026 — we launched PPC", today())).toMatchObject({ precision: "day" });
+    expect(evidenceDate("Posted on 2026-09-30", today())).toMatchObject({ precision: "day" });
+    expect(evidenceDate("posted 3 days ago", today())!.at.toISOString().slice(0, 10)).toBe(daysAgo(3).slice(0, 10));
+    expect(evidenceDate("posted 3 days ago", today())).toMatchObject({ precision: "day" });
+  });
+  it("'Subscribe today' is no date; 'published today' and 'announced yesterday' are, relative to now", () => {
+    for (const t of ["Subscribe today", "Book a call today and grow", "Get started today!"]) expect(evidenceDate(t, today()), t).toBeNull();
+    expect(evidenceDate("Published today", today())).toMatchObject({ precision: "day" });
+    expect(evidenceDate("Published today", today())!.at.toISOString().slice(0, 10)).toBe(daysAgo(0).slice(0, 10));
+    expect(evidenceDate("Announced yesterday: our new office", today())!.at.toISOString().slice(0, 10)).toBe(daysAgo(1).slice(0, 10));
+  });
+  it("an update stamp dates an edit, not an event: it is never the evidence date", () => {
+    for (const t of ["Updated: March 17th, 2026", "Last updated September 30, 2026", "Last modified 2026-09-30", "Page updated on Oct 1, 2026"]) {
+      expect(evidenceDate(t, today()), t).toBeNull();
+      expect(parseEvidenceDate(t, today()), t).toBeNull();
+    }
+    expect(evidenceDate("Published September 30, 2026", today())).toMatchObject({ precision: "day" }); // a publication date is still one
+  });
+  it("parseEvidenceDate stays the date of evidenceDate (one rule)", () => {
+    for (const t of ["Posted on 2026-09-30", "In March 2026 we opened Austin", "Since 2019 we have helped", "We are hiring"])
+      expect(parseEvidenceDate(t, today())?.toISOString() ?? null, t).toBe(evidenceDate(t, today())?.at.toISOString() ?? null);
+  });
+});
+
+describe("revised policy: qualified, ready, strong timing and insufficient evidence are separate", () => {
+  const dm = { id: 2, kind: "decision_maker", type: "Founder", value: "Ana Silva, Founder", status: "confirmed" };
+  const sig = (type: string, days: number, precision?: string, id = 1) => ({ id, kind: "signal", type, value: `${type} value`, status: "confirmed", observedAt: daysAgo(days), meta: precision ? { datePrecision: precision } : {} });
+  const judge = (fs: any[], fitVerdict: string | null = "strong", verified = true) => readiness({ verified, fitVerdict, findings: fs, now: today() });
+
+  it("a qualified company with no recent event: still qualified (not discarded); ready only when a dated reason from the last 12 months exists; never strong timing", () => {
+    const none = judge([dm]); // fits, a person to contact, no signal at all
+    expect(none).toMatchObject({ ready: false, classification: "qualified", timing: "none", strongTiming: false });
+    expect(none.missing).toEqual([MISSING_REASON]);
+    const older = judge([sig("HIRING", 200, "day"), dm]); // a real event, 200 days old: a reason to get in touch, not a timing signal
+    expect(older).toMatchObject({ ready: true, classification: "ready", timing: "context", strongTiming: false });
+    const undated = judge([{ ...sig("HIRING", 5, "day"), observedAt: null, meta: {} }, dm]);
+    expect(undated).toMatchObject({ ready: false, classification: "qualified", timing: "undated" });
+  });
+
+  it("a generic blog post without corroborating evidence is context only: never strong timing, never a timing claim in the score", () => {
+    const blog = judge([sig("CONTENT_ACTIVITY", 2, "day"), dm]);
+    expect(blog).toMatchObject({ timing: "context", strongTiming: false });
+    expect(blog.ready).toBe(true); // a correctly dated post may support a message as context; it is not urgency
+    expect(findingsAsClaims([{ ...sig("CONTENT_ACTIVITY", 2, "day"), sourceUrl: "https://n.com/blog", retrievedAt: today() } as FindingLike], today()).map((c) => c.field)).not.toContain("timing");
+    expect(judge([sig("OTHER", 2, "day"), dm]).timing).toBe("context"); // an unclassified statement is not an event either
+    // Corroborated by an independent concrete event: that event is the strong timing signal, and the blog post is not chosen over it.
+    const both = judge([sig("CONTENT_ACTIVITY", 2, "day", 1), sig("NEW_SERVICE", 20, "day", 3), dm]);
+    expect(both).toMatchObject({ timing: "strong", strongTiming: true, ready: true });
+    expect(timingOf([sig("CONTENT_ACTIVITY", 2, "day", 1), sig("NEW_SERVICE", 20, "day", 3)] as FindingLike[], today()).best!.id).toBe(3);
+  });
+
+  it("a recent concrete event (dated to the day or month, at most 90 days old) is a strong timing signal", () => {
+    for (const t of EVENT_SIGNAL_TYPES) expect(judge([sig(t, 10, "day"), dm]), t).toMatchObject({ ready: true, timing: "strong", strongTiming: true });
+    expect(judge([sig("HIRING", 80, "month"), dm]).timing).toBe("strong");
+    expect(judge([sig("HIRING", 89, "day"), dm]).timing).toBe("strong");
+    expect(judge([sig("HIRING", 91, "day"), dm]).timing).toBe("context");
+    expect(findingsAsClaims([{ ...sig("HIRING", 20, "day"), sourceUrl: "https://n.com/careers", retrievedAt: today() } as FindingLike], today()).map((c) => c.field)).toContain("timing");
+  });
+
+  it("stale, year-only and update-stamped evidence is never described as recent", () => {
+    // Over a year old: not a reason, not timing, not scored as timing, and it is labelled with its real date.
+    const stale = judge([sig("HIRING", 400, "day"), dm]);
+    expect(stale).toMatchObject({ ready: false, classification: "qualified", timing: "stale", strongTiming: false });
+    expect(timingOf([sig("HIRING", 400, "day")] as FindingLike[], today()).best).toBeNull();
+    expect(findingsAsClaims([{ ...sig("HIRING", 120, "day"), sourceUrl: "https://n.com", retrievedAt: today() } as FindingLike], today()).map((c) => c.field)).not.toContain("timing");
+    // A year alone (stored with its date set only so it sorts) is not a date: even this year's never counts as recent.
+    expect(judge([sig("HIRING", 10, "year"), dm])).toMatchObject({ ready: false, timing: "undated" });
+    expect(signalDating(sig("HIRING", 10, "year"), today())).toMatchObject({ usable: false, precision: "year", days: null });
+    expect(dateLabel({ observedAt: null, meta: { datePrecision: "year", dateYear: 2026 } })).toBe("2026 (year only)");
+    expect(dateLabel({ observedAt: "2026-09-01T00:00:00.000Z", meta: { datePrecision: "month" } })).toBe("Sep 2026");
+    expect(dateLabel({ observedAt: "2026-09-14T00:00:00.000Z", meta: { datePrecision: "day" } })).toBe("14 Sep 2026");
+    // An old post whose page was "updated" last week is not dated last week.
+    const d = new Date(Date.now() - 7 * DAY_MS).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+    expect(evidenceDate(`Updated: ${d}`, today())).toBeNull();
+    expect(evidenceDate(`Published March 3, 2024 · Updated: ${d}`, today())).toMatchObject({ precision: "day" });
+    expect(evidenceDate(`Published March 3, 2024 · Updated: ${d}`, today())!.at.toISOString().slice(0, 10)).toBe("2024-03-03");
+  });
+
+  it("not a fit, insufficient evidence, qualified and ready never collapse into each other", () => {
+    expect(judge([sig("HIRING", 10, "day"), dm], "weak").classification).toBe("not_a_fit");
+    expect(judge([sig("HIRING", 10, "day"), dm], "excluded").classification).toBe("not_a_fit");
+    expect(judge([sig("HIRING", 10, "day"), dm], "unclear").classification).toBe("insufficient_evidence");
+    expect(judge([sig("HIRING", 10, "day"), dm], null).classification).toBe("insufficient_evidence");
+    expect(judge([sig("HIRING", 10, "day"), dm], "strong", false).classification).toBe("insufficient_evidence");
+    expect(judge([sig("HIRING", 10, "day")], "partial")).toMatchObject({ classification: "qualified", ready: false, strongTiming: true }); // strong timing, but no way in
+    expect(judge([sig("HIRING", 10, "day"), dm], "partial")).toMatchObject({ classification: "ready", ready: true });
+  });
+
+  it("missing or ambiguous evidence keeps a prospect from ready: no date, inferred, no contact, a weak fit", () => {
+    expect(judge([{ ...sig("HIRING", 5, "day"), observedAt: null }, dm]).ready).toBe(false);
+    expect(judge([{ ...sig("HIRING", 5, "day"), status: "inferred" }, dm]).ready).toBe(false);
+    expect(judge([sig("HIRING", 5, "day")]).ready).toBe(false);
+    expect(judge([sig("HIRING", 5, "day"), dm], "weak").ready).toBe(false);
+  });
+
+  it("older signals still score as context (not hidden), they just are not timing", () => {
+    const old = { ...sig("HIRING", 200, "day"), sourceUrl: "https://n.com", retrievedAt: today() } as FindingLike;
+    expect(findingsAsClaims([old], today()).map((c) => c.field)).toContain("hiring");
+  });
+});
+
+describe("research reads a dedicated team page before a generic about page", () => {
+  it("DM-2: /about/meet-our-team or /our-team beats /about (found: two companies' named leaders were on a team page never read)", () => {
+    const home = new URL("https://acme.com/");
+    expect(pickResearchLinks(["/about", "/about/meet-our-team", "/careers"], home, 4)).toContain("https://acme.com/about/meet-our-team");
+    expect(pickResearchLinks(["/about", "/about/meet-our-team", "/careers"], home, 4)).not.toContain("https://acme.com/about");
+    expect(pickResearchLinks(["/about", "/our-team"], home, 4)).toEqual(["https://acme.com/our-team"]);
+    expect(pickResearchLinks(["/about", "/blog"], home, 4)).toContain("https://acme.com/about"); // no team page: about is still read
+  });
+});
+
+describe("only a senior decision-maker is one; email and form routes do not depend on seniority", () => {
+  const sig = { id: 1, kind: "signal", type: "HIRING", value: "x", status: "confirmed", observedAt: daysAgo(10), meta: { datePrecision: "day" } };
+  const person = (id: number, title: string, meta: Record<string, unknown> = {}) => ({ id, kind: "decision_maker", type: title.slice(0, 40), value: `Dana Ortiz, ${title}`, status: "confirmed", meta: { name: "Dana Ortiz", title, ...meta } });
+  const fact = (id: number, type: string) => ({ id, kind: "fact", type, value: "v", status: "confirmed" });
+  const judge = (...fs: any[]) => readiness({ verified: true, fitVerdict: "strong", findings: [sig, ...fs], now: today() });
+  it("a senior person named on the site is a way in and a decision-maker", () => {
+    expect(judge(person(2, "Founder & CEO"))).toMatchObject({ ready: true, classification: "ready" });
+    expect(isDecisionMaker(person(2, "Head of Growth"))).toBe(true);
+  });
+  it("a non-senior employee alone is NOT a decision-maker and NOT a way in: the prospect stays qualified, with what is missing", () => {
+    const r = judge(person(2, "Growth Marketing Manager"));
+    expect(r).toMatchObject({ ready: false, classification: "qualified" });
+    expect(r.missing).toEqual([MISSING_CONTACT]);
+    expect(isDecisionMaker(person(2, "SEO Director"))).toBe(false);
+  });
+  it("a business email or a real contact form is a way in whoever the people are", () => {
+    expect(judge(person(2, "Content Strategist"), fact(3, "business_email")).ready).toBe(true);
+    expect(judge(person(2, "Content Strategist"), fact(3, "contact_form")).ready).toBe(true);
+    expect(judge(fact(3, "contact_form")).ready).toBe(true);
+    // A provider-verified email on an employee is an email route: it counts, though the employee is still not a decision-maker.
+    const withEmail = { ...person(4, "Content Strategist", { email: "dana@acme.com", emailStatus: "verified" }), status: "inferred" };
+    expect(judge(withEmail).ready).toBe(true);
+    expect(isDecisionMaker(withEmail)).toBe(false);
+    expect(judge({ ...withEmail, meta: { ...withEmail.meta, emailStatus: "accept_all" } }).ready).toBe(false); // unverified: no route
+    expect(hasVerifiedEmail(withEmail)).toBe(true);
+  });
+  it("the score counts only senior people as decision-makers; a verified email still counts as an email", () => {
+    const fields = (f: any) => findingsAsClaims([{ ...f, sourceUrl: "https://acme.com/team", retrievedAt: today() } as FindingLike], today()).map((c) => c.field);
+    expect(fields(person(2, "Managing Partner"))).toEqual(["decision_maker"]);
+    expect(fields(person(2, "Growth Strategist"))).toEqual([]);
+    expect(fields({ ...person(2, "Growth Strategist", { email: "dana@acme.com", emailStatus: "verified" }) })).toEqual(["business_email"]);
+  });
+  it("a title stored before this rule is judged by the same rule (read from the stored title, not a saved flag)", () => {
+    expect(isDecisionMaker({ kind: "decision_maker", type: "Content Strategist", value: "x", meta: { title: "Content Strategist", senior: true } })).toBe(false);
+    expect(isDecisionMaker({ kind: "decision_maker", type: "Founder", value: "x", meta: {} })).toBe(true);
   });
 });
