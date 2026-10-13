@@ -16,9 +16,10 @@ import { hasProAccess, invoiceDocumentCategories, type BrandInvoice, type Contra
 import { invoiceEligibility, isSignedOnline } from "@shared/agreement-lifecycle";
 import { storage } from "../storage";
 import { getBillingUser, logOrgActivity } from "../entitlements";
-import { isImageKitConfigured, uploadFileToImageKit, deleteFromImageKit } from "../imagekitClient";
+import { isImageKitConfigured, uploadFileToImageKit, deleteFromImageKit, signedImageKitUrl } from "../imagekitClient";
 import {
-  UPLOAD_FILE_NAME, classifyStoredFile, contentMatchesExtension, profileImageRefAllowed, safeDownloadName, uploadNameTag, uploadOwnerKey, uploadOwnerTag,
+  PRIVATE_FILE_NAME, UPLOAD_FILE_NAME, classifyStoredFile, contentMatchesExtension, privateNameTag, profileImageRefAllowed, safeDownloadName,
+  uploadNameTag, uploadOwnerKey, uploadOwnerTag,
   type StoredFileDecision,
 } from "../stored-files";
 
@@ -99,9 +100,11 @@ export async function recordProofUpload(user: User, contractId: number, file: Up
     }
     let proofFilePath = file.path;
     if (isImageKitConfigured()) {
-      const uploaded = await uploadFileToImageKit(file, { folder: "contracts", baseName: `contract-${contractId}-proof` });
+      const ownerTag = uploadTagFor(user);
+      if (!ownerTag) return STORAGE_UNAVAILABLE;
+      const uploaded = await uploadFileToImageKit(file, { folder: "contracts", ownerTag });
       remote = { fileId: uploaded.fileId };
-      proofFilePath = uploaded.url;
+      proofFilePath = uploaded.ref; // "/files/contracts/<name>": a private file, served only through a checked, signed redirect
     }
     const updated = await storage.recordContractProof(contractId, {
       proofFileName: safeDownloadName(file.originalname, "contract-proof"),
@@ -124,6 +127,9 @@ export async function recordProofUpload(user: User, contractId: number, file: Up
 export type DownloadResult = { ok: true; decision: Exclude<StoredFileDecision, { type: "refuse" }>; downloadName: string } | Fail;
 
 function served(decision: StoredFileDecision, what: string, id: number, user: User, downloadName: string): DownloadResult {
+  // A private reference must also carry the requester's own owner tag (defence in depth: the record was already
+  // checked to be in their organization, and only the server writes these references).
+  if (decision.type === "private" && privateNameTag(decision.name) !== uploadTagFor(user)) decision = { type: "refuse", reason: "owner_tag" };
   if (decision.type === "refuse") {
     // The reason code and ids only — never the stored value.
     console.warn(`[stored-file] refused ${what} ${id} for user ${user.id}: ${decision.reason}`);
@@ -149,6 +155,38 @@ export async function attachmentDownload(user: User, attachmentId: number): Prom
   const parentInvoice = await storage.getBrandInvoice(attachment.brandInvoiceId);
   if (!inOrg(parentInvoice, user)) return fail(403, "forbidden", "Access denied");
   return served(classifyStoredFile(attachment.fileUrl, "attachment", storedFileConfig()), "attachment", attachment.id, user, safeDownloadName(attachment.fileName, "document"));
+}
+
+// ── Private ImageKit files: /files/:folder/:name ─────────────────────────
+
+/** Which module a folder's files belong to, for the read check (profile images: any member of the organization). */
+const FOLDER_MODULE: Record<string, "agreements" | "invoices" | null> = {
+  contracts: "agreements", "invoice-documents": "invoices", signatures: null, seals: null, profiles: null, covers: null,
+};
+
+/**
+ * Whether this signed-in user may be issued a link to a private ImageKit file. Checked on EVERY request; the signed
+ * URL it leads to is short-lived and is the only thing that grants delivery. Never public, never trusted from a URL:
+ *   - the folder and name must be exactly a private reference the app writes;
+ *   - the name's owner tag must be the requester's organization (404 otherwise, so existence isn't confirmed);
+ *   - agreement proofs need agreement access and invoice documents invoice access (403);
+ *   - ImageKit must be configured to sign (503).
+ */
+export function privateFileAccess(user: User, folderRaw: unknown, nameRaw: unknown): { ok: true; path: string } | Fail {
+  const folder = typeof folderRaw === "string" ? folderRaw : "";
+  const name = typeof nameRaw === "string" ? nameRaw : "";
+  if (!(folder in FOLDER_MODULE) || !PRIVATE_FILE_NAME.test(name)) return fail(404, "not_found", "File not available");
+  const mine = uploadTagFor(user);
+  if (!mine || privateNameTag(name) !== mine) return fail(404, "not_found", "File not available");
+  const moduleKey = FOLDER_MODULE[folder];
+  if (moduleKey && !canReadModule(user, moduleKey)) return fail(403, "FORBIDDEN", `Your role doesn't include access to ${moduleKey}.`);
+  if (!isImageKitConfigured()) return fail(503, "storage_unavailable", "File storage is temporarily unavailable.");
+  return { ok: true, path: `/dealinsec/${folder}/${name}` };
+}
+
+/** The signed, short-lived URL for an already-authorized decision (a private file, or an older ImageKit URL). */
+export function signedDeliveryUrl(filePath: string): string {
+  return signedImageKitUrl(filePath);
 }
 
 // ── Local uploads: /uploads/:name ────────────────────────────────────────
@@ -215,12 +253,11 @@ export async function recordAttachmentUpload(user: User, invoiceId: number, file
     const category = (invoiceDocumentCategories as readonly string[]).includes(String(categoryRaw)) ? String(categoryRaw) : "Other";
     let fileUrl = `/uploads/${file.filename ?? path.basename(file.path)}`;
     if (isImageKitConfigured()) {
-      const uploaded = await uploadFileToImageKit(file, {
-        folder: "invoice-documents",
-        baseName: `invoice-${check.invoice.id}-${category.replace(/\s+/g, "-").toLowerCase()}`,
-      });
+      const ownerTag = uploadTagFor(user);
+      if (!ownerTag) return STORAGE_UNAVAILABLE;
+      const uploaded = await uploadFileToImageKit(file, { folder: "invoice-documents", ownerTag });
       remote = { fileId: uploaded.fileId };
-      fileUrl = uploaded.url;
+      fileUrl = uploaded.ref;
     }
     try {
       const attachment = await storage.createInvoiceAttachment({

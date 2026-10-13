@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { UPLOAD_FILE_NAME, classifyStoredFile, contentMatchesExtension, profileImageRefAllowed, safeDownloadName, uploadNameTag, uploadOwnerKey, uploadOwnerTag } from "./stored-files";
+import { UPLOAD_FILE_NAME, classifyStoredFile, contentMatchesExtension, parsePrivateRef, privateNameTag, profileImageRefAllowed, safeDownloadName, uploadNameTag, uploadOwnerKey, uploadOwnerTag } from "./stored-files";
 
 const config = { imagekitEndpoint: "https://ik.imagekit.io/acme", uploadDir: "/srv/app/uploads" };
 const NAME = "1791849718123-482910374.pdf";
@@ -21,8 +21,8 @@ describe("stored proof and attachment references are untrusted", () => {
   });
   it("an ImageKit URL is redirected only under the configured endpoint and that kind's folder, rebuilt from its parts", () => {
     const ok = "https://ik.imagekit.io/acme/dealinsec/contracts/contract-12-proof-1791849718123.pdf";
-    expect(proof(ok)).toEqual({ type: "redirect", url: ok });
-    expect(proof("https://IK.ImageKit.io/acme/dealinsec/contracts/a.pdf")).toEqual({ type: "redirect", url: "https://ik.imagekit.io/acme/dealinsec/contracts/a.pdf" });
+    expect(proof(ok)).toEqual({ type: "redirect", url: ok, path: "/dealinsec/contracts/contract-12-proof-1791849718123.pdf" });
+    expect(proof("https://IK.ImageKit.io/acme/dealinsec/contracts/a.pdf")).toEqual({ type: "redirect", url: "https://ik.imagekit.io/acme/dealinsec/contracts/a.pdf", path: "/dealinsec/contracts/a.pdf" });
     expect(classifyStoredFile("https://ik.imagekit.io/acme/dealinsec/invoice-documents/a.pdf", "attachment", config).type).toBe("redirect");
   });
   it("lookalike hosts, credentials, ports, other schemes, queries and path tricks are refused", () => {
@@ -106,11 +106,43 @@ describe("owner-tagged local upload names (F)", () => {
     const ok = (v: unknown, current: string | null = null, kind: any = "signature", tag: string | null = tagA) => profileImageRefAllowed(v, current, kind, tag, config);
     expect(ok(null) && ok("")).toBe(true);
     expect(ok("https://lh3.googleusercontent.com/a/photo", "https://lh3.googleusercontent.com/a/photo", "profile")).toBe(true); // unchanged
-    expect(ok("https://ik.imagekit.io/acme/dealinsec/signatures/u1-sig.png")).toBe(true);
+    expect(ok("https://ik.imagekit.io/acme/dealinsec/signatures/u1-sig.png")).toBe(false); // a raw ImageKit URL is never a new value (I)
+    expect(ok("https://ik.imagekit.io/acme/dealinsec/signatures/u1-sig.png", "https://ik.imagekit.io/acme/dealinsec/signatures/u1-sig.png")).toBe(true); // unchanged: kept
     expect(ok(`/uploads/1791849718123-7-${tagA}.png`)).toBe(true);
     expect(ok(`/uploads/1791849718123-7-${tagB}.png`)).toBe(false); // another organization's file
     expect(ok("/uploads/1791849718123-7.png")).toBe(false); // untagged: can't prove it's theirs
     expect(ok(`/uploads/1791849718123-7-${tagA}.png`, null, "signature", null)).toBe(false); // no server secret
     for (const bad of ["https://ik.imagekit.io/acme/dealinsec/contracts/x.pdf", "https://evil.example/x.png", "javascript:alert(1)", "/etc/passwd", `/srv/app/uploads/1791849718123-7-${tagA}.png`, 7, {}]) expect(ok(bad), String(bad)).toBe(false);
+  });
+});
+
+describe("I: private ImageKit references (/files/<folder>/<name>)", () => {
+  const TAG = "0123456789abcdef", OTHER = "fedcba9876543210";
+  const name = (tag = TAG, ext = "pdf") => `${"a".repeat(32)}-${tag}.${ext}`;
+  it("a reference is exactly /files/<known folder>/<32 hex>-<16 hex tag>.<ext>; its tag is read back", () => {
+    expect(parsePrivateRef(`/files/contracts/${name()}`)).toEqual({ folder: "contracts", name: name(), tag: TAG });
+    expect(privateNameTag(name(OTHER, "png"))).toBe(OTHER);
+    expect(classifyStoredFile(`/files/contracts/${name()}`, "proof", config)).toEqual({ type: "private", folder: "contracts", name: name(), path: `/dealinsec/contracts/${name()}` });
+    expect(classifyStoredFile(`/files/invoice-documents/${name(TAG, "png")}`, "attachment", config).type).toBe("private");
+  });
+  it("manipulated references are refused: wrong folder for the kind, unknown folder, bad names, traversal, extra parts", () => {
+    const bad = [
+      `/files/signatures/${name()}`,                     // a signature's folder is not a proof's
+      `/files/secrets/${name()}`, `/files/${name()}`,
+      `/files/contracts/${"a".repeat(31)}-${TAG}.pdf`, `/files/contracts/${"A".repeat(32)}-${TAG}.pdf`,
+      `/files/contracts/${"a".repeat(32)}.pdf`, `/files/contracts/${name(TAG, "svg")}`, `/files/contracts/${name(TAG, "pdf")}.exe`,
+      `/files/contracts/../contracts/${name()}`, `/files/contracts/x/${name()}`, `/files/contracts/${name()}?x=1`,
+      `/files/contracts/%2e%2e/${name()}`, `files/contracts/${name()}`,
+    ];
+    for (const v of bad) expect(classifyStoredFile(v, "proof", config).type, v).toBe("refuse");
+  });
+  it("profile fields accept the requester's own private reference in the right folder, nothing else new", () => {
+    const ok = (v: unknown, kind: any = "signature", tag: string | null = TAG, current: string | null = null) => profileImageRefAllowed(v, current, kind, tag, config);
+    expect(ok(`/files/signatures/${name(TAG, "png")}`)).toBe(true);
+    expect(ok(`/files/signatures/${name(OTHER, "png")}`)).toBe(false); // another organization's file
+    expect(ok(`/files/seals/${name(TAG, "png")}`)).toBe(false);        // a seal isn't a signature
+    expect(ok(`/files/profiles/${name(TAG, "png")}`, "profile")).toBe(true);
+    expect(ok(`/files/covers/${name(TAG, "png")}`, "cover")).toBe(true);
+    expect(ok(`/files/signatures/${name(TAG, "png")}`, "signature", null)).toBe(false);
   });
 });

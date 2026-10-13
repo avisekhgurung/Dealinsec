@@ -31,14 +31,21 @@ vi.mock("../../llm/trace-store", async () => (await import("./world-mocks")).tra
 vi.mock("../../routes", async () => (await import("./world-mocks")).routesMock());
 vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")).scriptedProviderMock(orig as () => Promise<any>));
 /** ImageKit, faked: off unless a test turns it on; uploads and deletes are recorded. */
-const ik = vi.hoisted(() => ({ on: false, uploads: [] as string[], deleted: [] as string[] }));
+/**
+ * ImageKit, faked at the module boundary (no provider is contacted): uploads, deletes and signing requests are
+ * recorded. It follows the real client's contract — a private upload returns an app reference, never a URL — but it
+ * proves nothing about ImageKit's own enforcement, which needs a real account.
+ */
+const ik = vi.hoisted(() => ({ on: false, uploads: [] as string[], tags: [] as string[], deleted: [] as string[], signed: [] as string[] }));
 vi.mock("../../imagekitClient", () => ({
   isImageKitConfigured: () => ik.on,
-  uploadFileToImageKit: async (file: { path: string }, opts: { folder: string }) => {
-    ik.uploads.push(opts.folder);
+  uploadFileToImageKit: async (file: { path: string; originalname: string }, opts: { folder: string; ownerTag: string }) => {
+    ik.uploads.push(opts.folder); ik.tags.push(opts.ownerTag);
     fs.rmSync(file.path, { force: true }); // the real client removes the temp file after the transfer
-    return { url: `https://ik.imagekit.io/acme/dealinsec/${opts.folder}/proof-${ik.uploads.length}.pdf`, fileId: `f${ik.uploads.length}`, name: "x", size: 1 };
+    const name = `${String(ik.uploads.length).padStart(32, "a")}-${opts.ownerTag}${path.extname(file.originalname).toLowerCase()}`;
+    return { ref: `/files/${opts.folder}/${name}`, fileId: `f${ik.uploads.length}`, name, size: 1 };
   },
+  signedImageKitUrl: (p: string) => { ik.signed.push(p); return `https://ik.imagekit.io/acme${p}?ik-t=1&ik-s=fake`; },
   deleteFromImageKit: async (fileId: string) => { ik.deleted.push(fileId); },
 }));
 
@@ -47,7 +54,7 @@ import { newAgreementLifecycleFields } from "@shared/agreement-lifecycle";
 import { executeCreateAgreement, executeCreateInvoice } from "../../copilot/tools";
 import { createAgreementSignLink } from "../../services/sharing";
 import { applyAgreementRevision } from "../../services/revisions";
-import { attachmentDownload, checkAttachmentUpload, checkProofUpload, invoiceAgreementFor, profileImageUpdateAllowed, proofDownload, recordAttachmentUpload, recordProofUpload, uploadAccess, uploadTagFor, UPLOAD_DIR } from "../../services/agreement-files";
+import { attachmentDownload, checkAttachmentUpload, checkProofUpload, invoiceAgreementFor, privateFileAccess, profileImageUpdateAllowed, proofDownload, recordAttachmentUpload, recordProofUpload, uploadAccess, uploadTagFor, UPLOAD_DIR } from "../../services/agreement-files";
 import { useWorld } from "./world-mocks";
 import { createWorld, seedContract, seedDeal, userRow, ORG2, type Row, type World } from "./world";
 
@@ -62,7 +69,8 @@ const ACCOUNTS = () => userRow({ id: "u4", orgRole: "ACCOUNTS" }) as any;
 let tmp: string;
 beforeEach(() => {
   useWorld(createWorld());
-  ik.on = false; ik.uploads = []; ik.deleted = [];
+  ik.on = false; ik.uploads = []; ik.tags = []; ik.deleted = []; ik.signed = [];
+  process.env.SESSION_SECRET = "test-session-secret"; // owner tags (uploads) need the server secret
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), "agreement-sec-"));
   vi.spyOn(console, "log").mockImplementation(() => {});
 });
@@ -112,7 +120,7 @@ describe("the reported vulnerability, end to end", () => {
     expect(await proofDownload(OWNER(), local.id)).toEqual({ ok: true, decision: { type: "local", name: "1791849718123-48291.pdf" }, downloadName: "signed.pdf" });
     process.env.IMAGEKIT_URL_ENDPOINT = "https://ik.imagekit.io/acme";
     const remote = draft({ proofFilePath: "https://ik.imagekit.io/acme/dealinsec/contracts/contract-1-proof.pdf", proofFileName: "signed.pdf" });
-    expect(await proofDownload(OWNER(), remote.id)).toMatchObject({ ok: true, decision: { type: "redirect", url: "https://ik.imagekit.io/acme/dealinsec/contracts/contract-1-proof.pdf" } });
+    expect(await proofDownload(OWNER(), remote.id)).toMatchObject({ ok: true, decision: { type: "redirect", url: "https://ik.imagekit.io/acme/dealinsec/contracts/contract-1-proof.pdf", path: "/dealinsec/contracts/contract-1-proof.pdf" } });
     const lookalike = draft({ proofFilePath: "https://ik.imagekit.io.evil.com/acme/dealinsec/contracts/a.pdf" });
     vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(await proofDownload(OWNER(), lookalike.id)).toMatchObject({ ok: false, status: 404 });
@@ -267,7 +275,7 @@ describe("proof upload: role, plan, organization, content, cleanup", () => {
     const b = draft();
     expect((await recordProofUpload(OWNER(), b.id, upload())).ok).toBe(true);
     expect(ik.uploads).toEqual(["contracts"]);
-    expect(world().contracts.find((x) => x.id === b.id)!.proofFilePath).toMatch(/^https:\/\/ik\.imagekit\.io\/acme\/dealinsec\/contracts\//);
+    expect(world().contracts.find((x) => x.id === b.id)!.proofFilePath).toBe(`/files/contracts/${"1".padStart(32, "a")}-${uploadTagFor(OWNER())}.pdf`);
   });
   it("a client-sent file name is stored as a download name only", async () => {
     const c = draft();
@@ -648,5 +656,78 @@ describe("H: one agreement per deal, created through one locked method", () => {
     expect(once.indexOf("tx.select()")).toBeLessThan(once.indexOf("tx.insert("));
     const contractsTable = schemaSrc.slice(schemaSrc.indexOf('export const contracts = pgTable("contracts"'), schemaSrc.indexOf("export const insertContractSchema"));
     expect(contractsTable).not.toMatch(/unique\w*\([^)]*deal/i);
+  });
+});
+
+describe("I: private ImageKit files — a link is issued only after the access check", () => {
+  const priv = (user: any, ext = "pdf", n = "a") => `${n.repeat(32)}-${uploadTagFor(user)}.${ext}`;
+  const INVOICES_ONLY = () => userRow({ id: "u6", orgRole: "CUSTOM", customPermissions: ["invoices.create"] }) as any;
+  const DEALS_ONLY = () => userRow({ id: "u7", orgRole: "CUSTOM", customPermissions: ["deals.create"] }) as any;
+  it("own organization: a proof link is issued for members who read agreements; profile images for any member", () => {
+    ik.on = true;
+    expect(privateFileAccess(OWNER(), "contracts", priv(OWNER()))).toEqual({ ok: true, path: `/dealinsec/contracts/${priv(OWNER())}` });
+    expect(privateFileAccess(ACCOUNTS(), "contracts", priv(OWNER()))).toMatchObject({ ok: true }); // same org, reads agreements
+    expect(privateFileAccess(DEALS_ONLY(), "signatures", priv(OWNER(), "png"))).toMatchObject({ ok: true });
+  });
+  it("unauthorized issuance is refused: another org (404), a role without the module (403), no ImageKit (503)", () => {
+    ik.on = true;
+    expect(privateFileAccess(OTHER_ORG(), "contracts", priv(OWNER()))).toMatchObject({ ok: false, status: 404 });
+    expect(privateFileAccess(OTHER_ORG(), "signatures", priv(OWNER(), "png"))).toMatchObject({ ok: false, status: 404 });
+    expect(privateFileAccess(DEALS_ONLY(), "contracts", priv(OWNER()))).toMatchObject({ ok: false, status: 403 });
+    expect(privateFileAccess(DEALS_ONLY(), "invoice-documents", priv(OWNER()))).toMatchObject({ ok: false, status: 403 });
+    expect(privateFileAccess(INVOICES_ONLY(), "invoice-documents", priv(OWNER()))).toMatchObject({ ok: true });
+    ik.on = false;
+    expect(privateFileAccess(OWNER(), "contracts", priv(OWNER()))).toMatchObject({ ok: false, status: 503 });
+  });
+  it("manipulated requests are refused before any signing: unknown folder, bad name, traversal, a forged tag", () => {
+    ik.on = true;
+    for (const [folder, name] of [["secrets", priv(OWNER())], ["contracts", "../.env"], ["contracts", `${"a".repeat(32)}-${"0".repeat(16)}.pdf`], ["contracts", priv(OWNER(), "svg")], ["..", priv(OWNER())], ["contracts", null]] as const) {
+      expect(privateFileAccess(OWNER(), folder, name), `${folder}/${name}`).toMatchObject({ ok: false, status: 404 });
+    }
+    expect(ik.signed).toEqual([]); // nothing was signed for any refused request
+  });
+  it("downloads: a private proof of the requester's org is issued; a reference carrying another org's tag is refused", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const mine = draft({ proofFilePath: `/files/contracts/${priv(OWNER())}`, proofFileName: "signed.pdf" });
+    expect(await proofDownload(OWNER(), mine.id)).toMatchObject({ ok: true, decision: { type: "private", path: `/dealinsec/contracts/${priv(OWNER())}` } });
+    const planted = draft({ proofFilePath: `/files/contracts/${priv(OTHER_ORG())}` }); // in the requester's org, naming another org's file
+    expect(await proofDownload(OWNER(), planted.id)).toMatchObject({ ok: false, status: 404 });
+    expect(await proofDownload(OTHER_ORG(), mine.id)).toMatchObject({ ok: false, status: 403 });
+  });
+  it("existing files keep working: an older public ImageKit proof is served through a SIGNED link of its own path", async () => {
+    process.env.IMAGEKIT_URL_ENDPOINT = "https://ik.imagekit.io/acme";
+    const legacy = draft({ proofFilePath: "https://ik.imagekit.io/acme/dealinsec/contracts/contract-9-proof-1791849718123.pdf" });
+    expect(await proofDownload(OWNER(), legacy.id)).toMatchObject({ ok: true, decision: { type: "redirect", path: "/dealinsec/contracts/contract-9-proof-1791849718123.pdf" } });
+  });
+  it("uploads store private references with the uploader's org tag (proof and invoice document)", async () => {
+    ik.on = true;
+    const c = draft();
+    expect((await recordProofUpload(OWNER(), c.id, upload())).ok).toBe(true);
+    expect(world().contracts[0].proofFilePath).toMatch(new RegExp(`^/files/contracts/[0-9a-f]{32}-${uploadTagFor(OWNER())}\\.pdf$`));
+    const deal = seedDeal(world());
+    const inv = { id: 995, organizationId: "org-1", userId: "u1", dealId: deal.id };
+    world().invoices.push(inv);
+    const rows: Row[] = []; world().storage.createInvoiceAttachment = async (a: Row) => { rows.push(a); return { id: 1, ...a }; };
+    expect((await recordAttachmentUpload(OWNER(), inv.id, upload("r.pdf"), "Other")).ok).toBe(true);
+    expect(rows[0].fileUrl).toMatch(new RegExp(`^/files/invoice-documents/[0-9a-f]{32}-${uploadTagFor(OWNER())}\\.pdf$`));
+    expect(rows[0].fileId).toBe("f2");
+    expect(ik.tags.every((t) => t === uploadTagFor(OWNER()))).toBe(true);
+  });
+  it("profile images: only the requester's own private reference (or unchanged) can be saved", () => {
+    expect(profileImageUpdateAllowed(OWNER(), "digitalSignature", `/files/signatures/${priv(OWNER(), "png")}`)).toBe(true);
+    expect(profileImageUpdateAllowed(OWNER(), "digitalSignature", `/files/signatures/${priv(OTHER_ORG(), "png")}`)).toBe(false);
+    expect(profileImageUpdateAllowed(OWNER(), "digitalSignature", "https://ik.imagekit.io/acme/dealinsec/signatures/someone.png")).toBe(false);
+  });
+  it("wiring: /files needs the app session and the access check; every ImageKit delivery is a signed, uncached redirect", () => {
+    const routes = fs.readFileSync(path.join(__dirname, "../../routes.ts"), "utf8");
+    expect(routes).toMatch(/app\.get\("\/files\/:folder\/:name", isAuthenticated, async/);
+    expect(routes).toContain("privateFileAccess(req.user, req.params.folder, req.params.name)");
+    expect(routes).not.toMatch(/res\.redirect\(r\.decision\.url\)/);       // the old unsigned redirect is gone
+    expect(routes).not.toMatch(/uploaded\.url/);                             // no public URL is stored from an upload
+    expect(routes).toMatch(/Cache-Control", "no-store"/);
+    expect(routes).toMatch(/Referrer-Policy", "no-referrer"/);
+    const client = fs.readFileSync(path.join(__dirname, "../../imagekitClient.ts"), "utf8");
+    expect(client).toMatch(/isPrivateFile: true/);
+    expect(client.match(/client\.upload\(/g)).toHaveLength(1);
   });
 });

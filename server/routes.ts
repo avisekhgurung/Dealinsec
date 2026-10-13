@@ -37,7 +37,7 @@ import crypto from "crypto";
 import { uploadFileToImageKit, isImageKitConfigured, deleteFromImageKit } from "./imagekitClient";
 import { parseContractCreateBody, newAgreementLifecycleFields, canEditEstamp } from "@shared/agreement-lifecycle";
 import { sendInternalError, sendUploadError } from "./http-errors";
-import { UPLOAD_DIR, checkProofUpload, recordProofUpload, proofDownload, attachmentDownload, checkAttachmentUpload, recordAttachmentUpload, invoiceAgreementFor, uploadAccess, uploadTagFor, localUploadsAllowed, STORAGE_UNAVAILABLE, profileImageUpdateAllowed, PROFILE_IMAGE_FIELDS, type DownloadResult } from "./services/agreement-files";
+import { UPLOAD_DIR, checkProofUpload, recordProofUpload, proofDownload, attachmentDownload, checkAttachmentUpload, recordAttachmentUpload, invoiceAgreementFor, uploadAccess, uploadTagFor, privateFileAccess, signedDeliveryUrl, localUploadsAllowed, STORAGE_UNAVAILABLE, profileImageUpdateAllowed, PROFILE_IMAGE_FIELDS, type DownloadResult } from "./services/agreement-files";
 import {
   isRazorpayConfigured,
   getRazorpayKeyId,
@@ -525,11 +525,24 @@ const uploadDir = UPLOAD_DIR;
 /** Serve a checked stored file: a rebuilt ImageKit redirect, or one upload name from the uploads directory (dotfiles denied). */
 function sendStoredFile(res: any, r: DownloadResult) {
   if (!r.ok) return res.status(r.status).json({ error: r.error });
-  if (r.decision.type === "redirect") return res.redirect(r.decision.url);
+  if (r.decision.type === "private" || r.decision.type === "redirect") {
+    // Access was checked by the caller. ImageKit files (private ones, and older
+    // public ones, so they keep working once signatures are required) are
+    // delivered only through a short-lived signed URL issued here.
+    if (!isImageKitConfigured()) return res.status(503).json({ error: "File storage is temporarily unavailable." });
+    return sendSignedRedirect(res, signedDeliveryUrl(r.decision.path));
+  }
   res.download(r.decision.name, r.downloadName, { root: uploadDir, dotfiles: "deny" }, (err: any) => {
     if (err && !res.headersSent) res.status(404).json({ error: "File not available" });
   });
 }
+/** A signed link: never cached (it carries a short-lived capability), never leaked through Referer. */
+function sendSignedRedirect(res: any, url: string) {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.redirect(302, url);
+}
+
 /** Before multer writes anything: in production, uploads need ImageKit (local disk there is ephemeral). */
 const requireDurableUploads = (_req: any, res: any, next: any) => {
   if (localUploadsAllowed()) return next();
@@ -1115,6 +1128,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("e-stamp update error:", error);
       res.status(500).json({ error: "Failed to save the e-stamp details" });
+    }
+  });
+
+  // Private ImageKit files. Every request is checked (session, organization via
+  // the name's owner tag, module permission) before a short-lived signed URL is
+  // issued; the stored reference itself grants nothing.
+  app.get("/files/:folder/:name", isAuthenticated, async (req: any, res) => {
+    try {
+      const r = privateFileAccess(req.user, req.params.folder, req.params.name);
+      if (!r.ok) {
+        console.warn(`[files] refused for user ${req.user.id}: ${r.code}`);
+        return res.status(r.status).json({ error: r.error });
+      }
+      sendSignedRedirect(res, signedDeliveryUrl(r.path));
+    } catch (error) {
+      sendInternalError(res, "files", error, "link_failed", "Failed to open file");
     }
   });
 
@@ -1802,11 +1831,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Prefer ImageKit so files survive Railway redeploys.
       let filePath: string;
       if (isImageKitConfigured()) {
-        const uploaded = await uploadFileToImageKit(req.file, {
-          folder: "profiles",
-          baseName: `user-${req.user.id}-photo`,
-        });
-        filePath = uploaded.url;
+        const ownerTag = uploadTagFor(req.user);
+        if (!ownerTag) return res.status(503).json({ code: "storage_unavailable", error: "File uploads are temporarily unavailable." });
+        // A private file; the app stores "/files/profiles/<name>", served only through GET /files/:folder/:name.
+        const uploaded = await uploadFileToImageKit(req.file, { folder: "profiles", ownerTag });
+        filePath = uploaded.ref;
       } else {
         filePath = `/uploads/${req.file.filename}`;
       }
@@ -1825,11 +1854,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let filePath: string;
       if (isImageKitConfigured()) {
-        const uploaded = await uploadFileToImageKit(req.file, {
-          folder: "covers",
-          baseName: `user-${req.user.id}-cover`,
-        });
-        filePath = uploaded.url;
+        const ownerTag = uploadTagFor(req.user);
+        if (!ownerTag) return res.status(503).json({ code: "storage_unavailable", error: "File uploads are temporarily unavailable." });
+        // A private file; the app stores "/files/covers/<name>", served only through GET /files/:folder/:name.
+        const uploaded = await uploadFileToImageKit(req.file, { folder: "covers", ownerTag });
+        filePath = uploaded.ref;
       } else {
         filePath = `/uploads/${req.file.filename}`;
       }
@@ -1848,11 +1877,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
       let filePath: string;
       if (isImageKitConfigured()) {
-        const uploaded = await uploadFileToImageKit(req.file, {
-          folder: "seals",
-          baseName: `user-${req.user.id}-seal`,
-        });
-        filePath = uploaded.url;
+        const ownerTag = uploadTagFor(req.user);
+        if (!ownerTag) return res.status(503).json({ code: "storage_unavailable", error: "File uploads are temporarily unavailable." });
+        // A private file; the app stores "/files/seals/<name>", served only through GET /files/:folder/:name.
+        const uploaded = await uploadFileToImageKit(req.file, { folder: "seals", ownerTag });
+        filePath = uploaded.ref;
       } else {
         filePath = `/uploads/${req.file.filename}`;
       }
@@ -1871,11 +1900,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let filePath: string;
       if (isImageKitConfigured()) {
-        const uploaded = await uploadFileToImageKit(req.file, {
-          folder: "signatures",
-          baseName: `user-${req.user.id}-signature`,
-        });
-        filePath = uploaded.url;
+        const ownerTag = uploadTagFor(req.user);
+        if (!ownerTag) return res.status(503).json({ code: "storage_unavailable", error: "File uploads are temporarily unavailable." });
+        // A private file; the app stores "/files/signatures/<name>", served only through GET /files/:folder/:name.
+        const uploaded = await uploadFileToImageKit(req.file, { folder: "signatures", ownerTag });
+        filePath = uploaded.ref;
       } else {
         filePath = `/uploads/${req.file.filename}`;
       }

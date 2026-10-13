@@ -55,9 +55,37 @@ export function uploadNameTag(name: string): string | null {
 }
 
 export type StoredFileDecision =
-  | { type: "redirect"; url: string }
+  /** An older ImageKit URL under the endpoint. Served by redirecting to a SIGNED URL for `path` (relative to the
+   *  endpoint), so it keeps working once the file (or the account) requires signatures. */
+  | { type: "redirect"; url: string; path: string }
+  /** A private ImageKit file the app stored as `/files/<folder>/<name>`. Served only via a signed URL. */
+  | { type: "private"; folder: string; name: string; path: string }
   | { type: "local"; name: string }
   | { type: "refuse"; reason: string };
+
+/** `<32 random hex>-<16 hex owner tag>.<ext>`: unguessable, and names the owning organization (uploadOwnerTag). */
+export const PRIVATE_FILE_NAME = /^[0-9a-f]{32}-([0-9a-f]{16})\.(pdf|jpe?g|png|webp)$/;
+/** The app reference for a private ImageKit file, e.g. "/files/contracts/<name>". */
+export const PRIVATE_FILE_REF = /^\/files\/([a-z-]+)\/([^/]+)$/;
+/** The ImageKit folder (without "/dealinsec/") each kind lives in. */
+export const FOLDER_OF_KIND: Record<StoredFileKind, string> = {
+  proof: "contracts", attachment: "invoice-documents", profile: "profiles", cover: "covers", seal: "seals", signature: "signatures",
+};
+/** The owner tag of a private file name, or null when it isn't one. */
+export function privateNameTag(name: string): string | null {
+  const m = PRIVATE_FILE_NAME.exec(name);
+  return m ? m[1] : null;
+}
+/** A private reference's folder and name, when the value is exactly `/files/<known folder>/<private name>`. */
+export function parsePrivateRef(value: unknown): { folder: string; name: string; tag: string } | null {
+  if (typeof value !== "string") return null;
+  const m = PRIVATE_FILE_REF.exec(value);
+  if (!m) return null;
+  const [, folder, name] = m;
+  const tag = privateNameTag(name);
+  if (!tag || !Object.values(FOLDER_OF_KIND).includes(folder)) return null;
+  return { folder, name, tag };
+}
 
 export interface StoredFileConfig {
   /** IMAGEKIT_URL_ENDPOINT, e.g. https://ik.imagekit.io/acme. Missing = no redirect is ever allowed. */
@@ -101,7 +129,7 @@ function imagekitDecision(value: string, kind: StoredFileKind, endpointRaw: stri
   if (rawPath !== u.pathname) return { type: "refuse", reason: "path" };
   const rest = u.pathname.slice(prefix.length).split("/");
   if (!rest.length || rest.some((s) => !SAFE_SEGMENT.test(s) || s === "." || s === "..")) return { type: "refuse", reason: "path" };
-  return { type: "redirect", url: `${endpoint.origin}${u.pathname}` };
+  return { type: "redirect", url: `${endpoint.origin}${u.pathname}`, path: u.pathname.slice(endpoint.basePath.length) };
 }
 
 function localDecision(value: string, uploadDir: string): StoredFileDecision {
@@ -116,23 +144,31 @@ function localDecision(value: string, uploadDir: string): StoredFileDecision {
 
 export function classifyStoredFile(value: unknown, kind: StoredFileKind, config: StoredFileConfig): StoredFileDecision {
   if (typeof value !== "string" || !value) return { type: "refuse", reason: "missing" };
+  if (value.startsWith("/files/")) {
+    const ref = parsePrivateRef(value);
+    if (!ref) return { type: "refuse", reason: "not_a_private_ref" };
+    if (ref.folder !== FOLDER_OF_KIND[kind]) return { type: "refuse", reason: "folder" };
+    return { type: "private", folder: ref.folder, name: ref.name, path: `/dealinsec/${ref.folder}/${ref.name}` };
+  }
   if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return imagekitDecision(value, kind, config.imagekitEndpoint);
   return localDecision(value, config.uploadDir);
 }
 
 /**
  * May a profile image field (signature, seal, photo, cover) be set to this value? A client sends these after an
- * upload, so the value is untrusted: it must be a clear (null or ""), the value already stored, an ImageKit URL in
- * that kind's folder, or a local upload carrying the requester's own owner tag. Anything else could point at
- * another organization's file (which the /uploads handler would then treat as referenced) or at a remote URL.
+ * upload, so the value is untrusted: it must be a clear (null or ""), the value already stored, or one of the
+ * requester's OWN uploads in that kind's folder — a private ImageKit reference or a local upload, each carrying the
+ * requester's owner tag. A raw ImageKit URL is never accepted as a new value: it would bypass the access check (and
+ * could name another organization's file).
  */
 export function profileImageRefAllowed(value: unknown, current: string | null | undefined, kind: StoredFileKind, ownerTag: string | null, config: StoredFileConfig): boolean {
   if (value === null || value === "") return true;
   if (typeof value !== "string") return false;
   if (current && value === current) return true;
+  if (!ownerTag) return false;
   const d = classifyStoredFile(value, kind, config);
-  if (d.type === "redirect") return true;
-  if (d.type === "local" && value === `/uploads/${d.name}`) return !!ownerTag && uploadNameTag(d.name) === ownerTag;
+  if (d.type === "private") return privateNameTag(d.name) === ownerTag;
+  if (d.type === "local" && value === `/uploads/${d.name}`) return uploadNameTag(d.name) === ownerTag;
   return false;
 }
 
