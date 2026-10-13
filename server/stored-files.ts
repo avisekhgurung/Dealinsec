@@ -16,18 +16,43 @@
  * Anything else is refused with a reason code (logged without the value).
  * Pure apart from reading nothing at all: the endpoint and directory are passed in.
  */
+import crypto from "crypto";
 import path from "path";
 
-export type StoredFileKind = "proof" | "attachment";
+export type StoredFileKind = "proof" | "attachment" | "profile" | "cover" | "seal" | "signature";
 
 /** The folder each kind is uploaded to (uploadFileToImageKit prefixes "/dealinsec/"). */
 const IMAGEKIT_FOLDER: Record<StoredFileKind, string> = {
   proof: "/dealinsec/contracts/",
   attachment: "/dealinsec/invoice-documents/",
+  profile: "/dealinsec/profiles/",
+  cover: "/dealinsec/covers/",
+  seal: "/dealinsec/seals/",
+  signature: "/dealinsec/signatures/",
 };
 
-/** server/routes.ts multer: `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`, ext from the upload filter. */
-export const UPLOAD_FILE_NAME = /^\d{13}-\d{1,10}\.(pdf|jpe?g|png|webp)$/i;
+/**
+ * server/routes.ts multer: `${Date.now()}-${random}[-${ownerTag}]${ext}`, ext from the upload filter. Names written
+ * before owner tags existed have no tag; they are only served when a server-written record references them.
+ */
+export const UPLOAD_FILE_NAME = /^\d{13}-\d{1,10}(?:-[0-9a-f]{16})?\.(pdf|jpe?g|png|webp)$/i;
+
+/**
+ * The owner tag in a local upload's name: an HMAC of the owning organization (or, for a user with none, the user)
+ * under the server's secret, so a name can't be forged to claim another organization's file. 16 hex characters.
+ */
+export function uploadOwnerTag(secret: string | undefined | null, ownerKey: string): string | null {
+  if (!secret || !ownerKey) return null;
+  return crypto.createHmac("sha256", secret).update(`dealinsec-upload:${ownerKey}`).digest("hex").slice(0, 16);
+}
+/** Whose files these are: the organization, or the user when there is none. */
+export const uploadOwnerKey = (user: { id: string; organizationId?: string | null }): string =>
+  user.organizationId ? `org:${user.organizationId}` : `user:${user.id}`;
+/** The owner tag carried by an upload name, or null for an untagged (older) name. Assumes UPLOAD_FILE_NAME matched. */
+export function uploadNameTag(name: string): string | null {
+  const m = /^\d{13}-\d{1,10}-([0-9a-f]{16})\./i.exec(name);
+  return m ? m[1].toLowerCase() : null;
+}
 
 export type StoredFileDecision =
   | { type: "redirect"; url: string }
@@ -93,6 +118,22 @@ export function classifyStoredFile(value: unknown, kind: StoredFileKind, config:
   if (typeof value !== "string" || !value) return { type: "refuse", reason: "missing" };
   if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return imagekitDecision(value, kind, config.imagekitEndpoint);
   return localDecision(value, config.uploadDir);
+}
+
+/**
+ * May a profile image field (signature, seal, photo, cover) be set to this value? A client sends these after an
+ * upload, so the value is untrusted: it must be a clear (null or ""), the value already stored, an ImageKit URL in
+ * that kind's folder, or a local upload carrying the requester's own owner tag. Anything else could point at
+ * another organization's file (which the /uploads handler would then treat as referenced) or at a remote URL.
+ */
+export function profileImageRefAllowed(value: unknown, current: string | null | undefined, kind: StoredFileKind, ownerTag: string | null, config: StoredFileConfig): boolean {
+  if (value === null || value === "") return true;
+  if (typeof value !== "string") return false;
+  if (current && value === current) return true;
+  const d = classifyStoredFile(value, kind, config);
+  if (d.type === "redirect") return true;
+  if (d.type === "local" && value === `/uploads/${d.name}`) return !!ownerTag && uploadNameTag(d.name) === ownerTag;
+  return false;
 }
 
 // ── Content checks for an upload (the extension alone is the client's word) ──

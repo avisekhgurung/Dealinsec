@@ -17,7 +17,10 @@ import { invoiceEligibility, isSignedOnline } from "@shared/agreement-lifecycle"
 import { storage } from "../storage";
 import { getBillingUser, logOrgActivity } from "../entitlements";
 import { isImageKitConfigured, uploadFileToImageKit, deleteFromImageKit } from "../imagekitClient";
-import { classifyStoredFile, contentMatchesExtension, safeDownloadName, type StoredFileDecision } from "../stored-files";
+import {
+  UPLOAD_FILE_NAME, classifyStoredFile, contentMatchesExtension, profileImageRefAllowed, safeDownloadName, uploadNameTag, uploadOwnerKey, uploadOwnerTag,
+  type StoredFileDecision,
+} from "../stored-files";
 
 export type Fail = { ok: false; status: number; code: string; error: string };
 const fail = (status: number, code: string, error: string): Fail => ({ ok: false, status, code, error });
@@ -30,6 +33,18 @@ export const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 const storedFileConfig = () => ({ imagekitEndpoint: process.env.IMAGEKIT_URL_ENDPOINT ?? null, uploadDir: UPLOAD_DIR });
 
 /** Remove a temporary upload, awaited so the request doesn't finish with the file still on disk. Never throws. */
+/**
+ * Local disk is ephemeral on the production host, so a production upload without ImageKit would be lost on the next
+ * deploy (and was once the source of files served to any signed-in user). Refuse instead; development keeps the local
+ * fallback.
+ */
+export const localUploadsAllowed = (): boolean => process.env.NODE_ENV !== "production" || isImageKitConfigured();
+export const STORAGE_UNAVAILABLE: Fail = { ok: false, status: 503, code: "storage_unavailable", error: "File uploads are temporarily unavailable. Please try again later." };
+
+/** The owner tag new local uploads by this user carry (null without a server secret). */
+export const uploadTagFor = (user: { id: string; organizationId?: string | null }): string | null =>
+  uploadOwnerTag(process.env.SESSION_SECRET, uploadOwnerKey(user));
+
 const removeTemp = async (p: string | undefined) => { if (p) await fs.promises.unlink(p).catch(() => {}); };
 
 async function firstBytes(file: string, n = 16): Promise<Uint8Array> {
@@ -78,6 +93,7 @@ export async function recordProofUpload(user: User, contractId: number, file: Up
   try {
     const check = await checkProofUpload(user, contractId);
     if (!check.ok) return check;
+    if (!localUploadsAllowed()) return STORAGE_UNAVAILABLE;
     if (!contentMatchesExtension(await firstBytes(file.path), file.originalname)) {
       return fail(400, "file_content", "That file isn't a real PDF, JPG, PNG or WEBP. Upload the signed agreement itself.");
     }
@@ -135,6 +151,36 @@ export async function attachmentDownload(user: User, attachmentId: number): Prom
   return served(classifyStoredFile(attachment.fileUrl, "attachment", storedFileConfig()), "attachment", attachment.id, user, safeDownloadName(attachment.fileName, "document"));
 }
 
+// ── Local uploads: /uploads/:name ────────────────────────────────────────
+
+/**
+ * Whether this signed-in user may read a local upload by name. Organization-scoped, never public:
+ *   - a tagged name is served only to the organization (or user) whose tag it carries;
+ *   - an older, untagged name only when a record the server wrote for the requester's organization references it
+ *     (an agreement's proof, an invoice document). Profile fields are client-written, so they never count.
+ * Everything else is 404 (not 403), so a name's existence isn't confirmed to another organization.
+ */
+export async function uploadAccess(user: User, nameRaw: unknown): Promise<{ ok: true; name: string } | Fail> {
+  const name = typeof nameRaw === "string" ? nameRaw : "";
+  if (!UPLOAD_FILE_NAME.test(name)) return fail(404, "not_found", "File not available");
+  const tag = uploadNameTag(name);
+  if (tag) {
+    const mine = uploadTagFor(user);
+    return mine && tag === mine ? { ok: true, name } : fail(404, "not_found", "File not available");
+  }
+  const referenced = await storage.hasOwnerUploadReference({ organizationId: user.organizationId, userId: user.id }, name);
+  return referenced ? { ok: true, name } : fail(404, "not_found", "File not available");
+}
+
+const PROFILE_IMAGE_KIND = { digitalSignature: "signature", companySeal: "seal", profileImageUrl: "profile", coverImageUrl: "cover" } as const;
+export type ProfileImageField = keyof typeof PROFILE_IMAGE_KIND;
+export const PROFILE_IMAGE_FIELDS = Object.keys(PROFILE_IMAGE_KIND) as ProfileImageField[];
+
+/** May PATCH /api/profile set this image field to this value? See profileImageRefAllowed. */
+export function profileImageUpdateAllowed(user: User, field: ProfileImageField, value: unknown): boolean {
+  return profileImageRefAllowed(value, (user as any)[field] ?? null, PROFILE_IMAGE_KIND[field], uploadTagFor(user), storedFileConfig());
+}
+
 // ── Invoice attachment upload ────────────────────────────────────────────
 
 /** Before multer accepts the file: the invoice exists and is in this organization (role and plan are route middleware). */
@@ -162,6 +208,7 @@ export async function recordAttachmentUpload(user: User, invoiceId: number, file
   try {
     const check = await checkAttachmentUpload(user, invoiceId);
     if (!check.ok) return check;
+    if (!localUploadsAllowed()) return STORAGE_UNAVAILABLE;
     if (!contentMatchesExtension(await firstBytes(file.path), file.originalname)) {
       return fail(400, "file_content", "That file isn't a real PDF, JPG, PNG or WEBP.");
     }

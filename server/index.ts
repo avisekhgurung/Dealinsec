@@ -211,18 +211,10 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
     next();
   });
 
-  // Serve legacy uploaded files (signatures, payment proofs). New uploads go to
-  // ImageKit; this path only exists for pre-ImageKit files. These are customer
-  // documents, so require a logged-in session — an unguessable filename is not
-  // an access control.
-  app.use(
-    "/uploads",
-    (req, res, next) => {
-      if (req.isAuthenticated?.()) return next();
-      res.status(401).json({ error: "Authentication required" });
-    },
-    express.static(path.join(process.cwd(), "uploads")),
-  );
+  // Local uploads are served by GET /uploads/:name in server/routes.ts: the
+  // app's own session plus an organization check. (This used to be a static
+  // mount behind Passport's login flag, which email/password sessions never set
+  // and which never checked the organization.)
 
   // Boot migration: brand_invoices.paid_at. Idempotent and additive, so it is
   // safe to run on every start. Done here rather than as a pre-push script

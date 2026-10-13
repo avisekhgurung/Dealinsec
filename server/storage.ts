@@ -57,6 +57,12 @@ export interface IStorage {
   /** Revise the terms of an agreement nobody has signed (optionally revoking its link). undefined = refused (409). */
   reviseUnsignedContract(id: number, updates: Partial<Contract>, opts: { revokeLink: boolean }): Promise<Contract | undefined>;
   getContractsForBrand(brandUserId: string): Promise<Contract[]>;
+  /**
+   * Whether a local upload name (already validated against UPLOAD_FILE_NAME) is referenced by a record the SERVER
+   * wrote for this owner: an agreement's proof or an invoice document. Profile image fields are client-written and
+   * never count. Used only for older, untagged names.
+   */
+  hasOwnerUploadReference(owner: { organizationId?: string | null; userId: string }, name: string): Promise<boolean>;
 
   getInvoices(userId: string): Promise<Invoice[]>;
   getInvoice(id: number): Promise<Invoice | undefined>;
@@ -325,6 +331,24 @@ export class DatabaseStorage implements IStorage {
       ))
       .returning();
     return updated;
+  }
+
+  async hasOwnerUploadReference(owner: { organizationId?: string | null; userId: string }, name: string): Promise<boolean> {
+    const contractOwner = owner.organizationId
+      ? sql`${contracts.organizationId} = ${owner.organizationId}`
+      : sql`(${contracts.organizationId} IS NULL AND ${contracts.userId} = ${owner.userId})`;
+    const invoiceOwner = owner.organizationId
+      ? sql`${brandInvoices.organizationId} = ${owner.organizationId}`
+      : sql`(${brandInvoices.organizationId} IS NULL AND ${brandInvoices.userId} = ${owner.userId})`;
+    const proof = await db.select({ id: contracts.id }).from(contracts)
+      .where(sql`${contractOwner} AND (${contracts.proofFilePath} = ${"/uploads/" + name} OR ${contracts.proofFilePath} LIKE ${"%/" + name})`)
+      .limit(1);
+    if (proof.length) return true;
+    const doc = await db.select({ id: invoiceAttachments.id }).from(invoiceAttachments)
+      .innerJoin(brandInvoices, eq(invoiceAttachments.brandInvoiceId, brandInvoices.id))
+      .where(sql`${invoiceOwner} AND ${invoiceAttachments.fileUrl} = ${"/uploads/" + name}`)
+      .limit(1);
+    return doc.length > 0;
   }
 
   async getContractsForBrand(brandUserId: string): Promise<Contract[]> {

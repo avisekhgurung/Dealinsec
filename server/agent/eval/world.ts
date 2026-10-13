@@ -155,6 +155,13 @@ export function createWorld(): World {
       return copy(c);
     }),
 
+    // Same rule as server/storage.ts: only server-written references (an agreement's proof, an invoice document) count.
+    hasOwnerUploadReference: async (owner: { organizationId?: string | null; userId: string }, name: string) => {
+      const mine = (r: Row) => (owner.organizationId ? r.organizationId === owner.organizationId : !r.organizationId && r.userId === owner.userId);
+      if (w.contracts.some((c) => mine(c) && typeof c.proofFilePath === "string" && (c.proofFilePath === `/uploads/${name}` || c.proofFilePath.endsWith(`/${name}`)))) return true;
+      const docs: Row[] = (w as any).attachments ?? [];
+      return docs.some((a) => a.fileUrl === `/uploads/${name}` && w.invoices.some((i) => i.id === a.brandInvoiceId && mine(i)));
+    },
     getBrandInvoice: async (id: number) => copy(w.invoices.find((i) => i.id === id)),
     getBrandInvoicesByOrg: async (orgId: string, userId?: string) => w.invoices.filter((i) => visible(i, orgId, userId)).map(copy),
     getBrandInvoicesByDealIdForOrg: async (dealId: number, orgId: string, userId?: string) => w.invoices.filter((i) => i.dealId === dealId && visible(i, orgId, userId)).map(copy),

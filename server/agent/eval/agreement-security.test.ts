@@ -46,7 +46,7 @@ import { computeDocumentHash, verifyDocumentHash } from "@shared/contractSign";
 import { executeCreateAgreement, executeCreateInvoice } from "../../copilot/tools";
 import { createAgreementSignLink } from "../../services/sharing";
 import { applyAgreementRevision } from "../../services/revisions";
-import { attachmentDownload, checkAttachmentUpload, checkProofUpload, invoiceAgreementFor, proofDownload, recordAttachmentUpload, recordProofUpload, UPLOAD_DIR } from "../../services/agreement-files";
+import { attachmentDownload, checkAttachmentUpload, checkProofUpload, invoiceAgreementFor, profileImageUpdateAllowed, proofDownload, recordAttachmentUpload, recordProofUpload, uploadAccess, uploadTagFor, UPLOAD_DIR } from "../../services/agreement-files";
 import { useWorld } from "./world-mocks";
 import { createWorld, seedContract, seedDeal, userRow, ORG2, type Row, type World } from "./world";
 
@@ -335,7 +335,7 @@ describe("route wiring (source check: the routes call the guarded services)", ()
     expect(create).not.toMatch(/\.\.\.req\.body|\.\.\.contractBody/);
   });
   it("proof upload: Pro and permission, then the pre-check, BEFORE multer accepts the file", () => {
-    expect(line('app.post("/api/contracts/:id/proof"')).toMatch(/requirePro\("agreements"\), requireOrgPermission\("agreements.create"\), proofUploadPrecheck, upload\.single\("proof"\)/);
+    expect(line('app.post("/api/contracts/:id/proof"')).toMatch(/requirePro\("agreements"\), requireOrgPermission\("agreements.create"\), proofUploadPrecheck, requireDurableUploads, upload\.single\("proof"\)/);
   });
   it("downloads go through the stored-file check; the proof needs agreement access; nothing serves a stored path directly", () => {
     expect(line('app.get("/api/contracts/:id/proof"')).toContain('requireModuleRead("agreements")');
@@ -514,5 +514,72 @@ describe("follow-up: the deal page uses the server's signed rule", () => {
       expect(src, f).toContain("isAgreementSigned(");
       expect(src, f).not.toMatch(/hasProof|status (!==|===) "Signed"/);
     }
+  });
+});
+
+describe("F: local uploads are organization-scoped, never public", () => {
+  const SECRET = "test-session-secret";
+  beforeEach(() => { process.env.SESSION_SECRET = SECRET; });
+  afterEach(() => { delete process.env.SESSION_SECRET; delete (process.env as any).NODE_ENV_OVERRIDE; });
+  const named = (user: any) => `1791849718123-42-${uploadTagFor(user)}.png`;
+  it("a tagged upload is served to its own organization only (404 for another, so existence isn't confirmed)", async () => {
+    const mine = named(OWNER());
+    expect(await uploadAccess(OWNER(), mine)).toEqual({ ok: true, name: mine });
+    expect(await uploadAccess(ACCOUNTS(), mine)).toMatchObject({ ok: true }); // same organization, other member
+    expect(await uploadAccess(OTHER_ORG(), mine)).toMatchObject({ ok: false, status: 404 });
+    expect(await uploadAccess(OWNER(), named(OTHER_ORG()))).toMatchObject({ ok: false, status: 404 });
+  });
+  it("an older untagged name: only when a server-written record of the requester's organization references it", async () => {
+    const legacy = "1700000000000-555.pdf";
+    expect(await uploadAccess(OWNER(), legacy)).toMatchObject({ ok: false, status: 404 });
+    draft({ proofFilePath: `/old/host/uploads/${legacy}` });
+    expect(await uploadAccess(OWNER(), legacy)).toMatchObject({ ok: true });
+    expect(await uploadAccess(OTHER_ORG(), legacy)).toMatchObject({ ok: false, status: 404 });
+    const doc = "1700000000000-777.png";
+    const inv = { id: 990, organizationId: "org-1", userId: "u1", dealId: seedDeal(world()).id };
+    world().invoices.push(inv);
+    (world() as any).attachments = [{ id: 1, brandInvoiceId: inv.id, fileUrl: `/uploads/${doc}` }];
+    expect(await uploadAccess(OWNER(), doc)).toMatchObject({ ok: true });
+    expect(await uploadAccess(OTHER_ORG(), doc)).toMatchObject({ ok: false, status: 404 });
+  });
+  it("a client-written profile field never makes another organization's file readable", async () => {
+    const victim = "1700000000000-999.png";
+    draft({ organizationId: "org-2", userId: "u2", proofFilePath: `/uploads/${victim}` }); // the other org's own file
+    world().users.get("u1")!.digitalSignature = `/uploads/${victim}`; // planted on the attacker's own profile
+    expect(await uploadAccess(OWNER(), victim)).toMatchObject({ ok: false, status: 404 });
+    expect(profileImageUpdateAllowed(OWNER(), "digitalSignature", `/uploads/${victim}`)).toBe(true); // only because it's already stored...
+    world().users.get("u1")!.digitalSignature = null;
+    expect(profileImageUpdateAllowed(OWNER(), "digitalSignature", `/uploads/${victim}`)).toBe(false); // ...it can't be set now
+    expect(profileImageUpdateAllowed(OWNER(), "digitalSignature", `/uploads/${named(OWNER())}`)).toBe(true);
+    expect(profileImageUpdateAllowed(OWNER(), "companySeal", `/uploads/${named(OTHER_ORG())}`)).toBe(false);
+  });
+  it("names that aren't upload names (traversal, dotfiles, encodings) are refused before any lookup", async () => {
+    for (const bad of ["../.env", ".env", "%2e%2e%2fpackage.json", "1791849718123-1.pdf/..", "", null, "1791849718123-1.svg"]) {
+      expect(await uploadAccess(OWNER(), bad), String(bad)).toMatchObject({ ok: false, status: 404 });
+    }
+  });
+  it("production without ImageKit refuses uploads instead of writing to local disk, and removes the temporary file", async () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    try {
+      const c = draft();
+      const file = upload();
+      expect(await recordProofUpload(OWNER(), c.id, file)).toMatchObject({ ok: false, status: 503, code: "storage_unavailable" });
+      expect(fs.existsSync(file.path)).toBe(false);
+      expect(world().contracts[0]).toMatchObject({ status: "Draft", signedByBrand: false });
+      ik.on = true; // with ImageKit configured, production uploads proceed
+      expect((await recordProofUpload(OWNER(), c.id, upload())).ok).toBe(true);
+    } finally { process.env.NODE_ENV = prev; }
+  });
+  it("wiring: no static mount; every upload route refuses before multer; /uploads/:name needs the app session; profile image fields are checked", () => {
+    const routes = fs.readFileSync(path.join(__dirname, "../../routes.ts"), "utf8");
+    const index = fs.readFileSync(path.join(__dirname, "../../index.ts"), "utf8");
+    expect(index).not.toMatch(/express\.static\([^)]*uploads/);
+    expect(routes).not.toMatch(/express\.static\([^)]*uploads/);
+    const singles = routes.match(/[^,\s]+, upload\.single\(/g) ?? [];
+    expect(singles.length).toBe(6);
+    for (const s of singles) expect(s).toMatch(/^requireDurableUploads, upload\.single\(/);
+    expect(routes).toMatch(/app\.get\("\/uploads\/:name", isAuthenticated, async/);
+    expect(routes).toContain("profileImageUpdateAllowed(req.user, field, req.body[field])");
   });
 });

@@ -36,7 +36,7 @@ import fs from "fs";
 import crypto from "crypto";
 import { uploadFileToImageKit, isImageKitConfigured, deleteFromImageKit } from "./imagekitClient";
 import { parseContractCreateBody, newAgreementLifecycleFields, canEditEstamp } from "@shared/agreement-lifecycle";
-import { UPLOAD_DIR, checkProofUpload, recordProofUpload, proofDownload, attachmentDownload, checkAttachmentUpload, recordAttachmentUpload, invoiceAgreementFor, type DownloadResult } from "./services/agreement-files";
+import { UPLOAD_DIR, checkProofUpload, recordProofUpload, proofDownload, attachmentDownload, checkAttachmentUpload, recordAttachmentUpload, invoiceAgreementFor, uploadAccess, uploadTagFor, localUploadsAllowed, STORAGE_UNAVAILABLE, profileImageUpdateAllowed, PROFILE_IMAGE_FIELDS, type DownloadResult } from "./services/agreement-files";
 import {
   isRazorpayConfigured,
   getRazorpayKeyId,
@@ -529,6 +529,13 @@ function sendStoredFile(res: any, r: DownloadResult) {
     if (err && !res.headersSent) res.status(404).json({ error: "File not available" });
   });
 }
+/** Before multer writes anything: in production, uploads need ImageKit (local disk there is ephemeral). */
+const requireDurableUploads = (_req: any, res: any, next: any) => {
+  if (localUploadsAllowed()) return next();
+  console.error("[uploads] refused: ImageKit is not configured in production");
+  return res.status(STORAGE_UNAVAILABLE.status).json({ code: STORAGE_UNAVAILABLE.code, error: STORAGE_UNAVAILABLE.error });
+};
+
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -536,9 +543,12 @@ if (!fs.existsSync(uploadDir)) {
 const upload = multer({
   storage: multer.diskStorage({
     destination: uploadDir,
-    filename: (req, file, cb) => {
+    filename: (req: any, file, cb) => {
+      // The owner tag (an HMAC of the uploader's organization) is what lets GET /uploads/:name serve this file to
+      // that organization only. Every upload route authenticates before multer runs, so req.user is set.
       const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-      cb(null, uniqueSuffix + path.extname(file.originalname));
+      const tag = req.user ? uploadTagFor(req.user) : null;
+      cb(null, uniqueSuffix + (tag ? `-${tag}` : "") + path.extname(file.originalname));
     },
   }),
   limits: { fileSize: 5 * 1024 * 1024 },
@@ -1024,7 +1034,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to upload proof" });
     }
   };
-  app.post("/api/contracts/:id/proof", isAuthenticated, requirePro("agreements"), requireOrgPermission("agreements.create"), proofUploadPrecheck, upload.single("proof"), async (req: any, res) => {
+  app.post("/api/contracts/:id/proof", isAuthenticated, requirePro("agreements"), requireOrgPermission("agreements.create"), proofUploadPrecheck, requireDurableUploads, upload.single("proof"), async (req: any, res) => {
     try {
       const r = await recordProofUpload(req.user, parseInt(req.params.id, 10), req.file);
       if (!r.ok) return res.status(r.status).json({ code: r.code, error: r.error });
@@ -1092,6 +1102,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("e-stamp update error:", error);
       res.status(500).json({ error: "Failed to save the e-stamp details" });
+    }
+  });
+
+  // Local uploads (development, and files written before ImageKit). Never public:
+  // the app's own session is required, and a file is served only to the
+  // organization that owns it (see uploadAccess). Replaces the old static mount,
+  // which checked a login flag email/password sessions never set.
+  app.get("/uploads/:name", isAuthenticated, async (req: any, res) => {
+    try {
+      const r = await uploadAccess(req.user, req.params.name);
+      if (!r.ok) {
+        console.warn(`[uploads] refused for user ${req.user.id}: ${r.code}`);
+        return res.status(r.status).json({ error: r.error });
+      }
+      res.setHeader("Cache-Control", "private, max-age=300");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.sendFile(r.name, { root: uploadDir, dotfiles: "deny" }, (err: any) => {
+        if (err && !res.headersSent) res.status(404).json({ error: "File not available" });
+      });
+    } catch (error) {
+      console.error("Upload read error:", error);
+      res.status(500).json({ error: "Failed to read file" });
     }
   });
 
@@ -1513,7 +1545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to upload document" });
     }
   };
-  app.post("/api/brand-invoices/:id/attachments", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.create"), attachmentUploadPrecheck, upload.single("file"), async (req: any, res) => {
+  app.post("/api/brand-invoices/:id/attachments", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.create"), attachmentUploadPrecheck, requireDurableUploads, upload.single("file"), async (req: any, res) => {
     try {
       const r = await recordAttachmentUpload(req.user, parseInt(req.params.id, 10), req.file, req.body?.category);
       if (!r.ok) return res.status(r.status).json({ code: r.code, error: r.error });
@@ -1687,6 +1719,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bankName,
       } = req.body;
 
+      // Image fields hold a path or URL the client got back from an upload. They
+      // are untrusted: a value that isn't this user's own upload (or ImageKit
+      // file, or the value already stored) could claim another organization's
+      // file for GET /uploads/:name, or point documents at a remote URL.
+      for (const field of PROFILE_IMAGE_FIELDS) {
+        if (req.body?.[field] !== undefined && !profileImageUpdateAllowed(req.user, field, req.body[field])) {
+          return res.status(400).json({ code: "invalid_image_reference", field, error: "That image isn't one of your uploads. Upload it again." });
+        }
+      }
+
       const updates: any = {};
       if (firstName !== undefined) updates.firstName = firstName;
       if (lastName !== undefined) updates.lastName = lastName;
@@ -1750,7 +1792,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/profile/photo", isAuthenticated, upload.single("photo"), async (req: any, res) => {
+  app.post("/api/profile/photo", isAuthenticated, requireDurableUploads, upload.single("photo"), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
@@ -1774,7 +1816,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/profile/cover", isAuthenticated, upload.single("cover"), async (req: any, res) => {
+  app.post("/api/profile/cover", isAuthenticated, requireDurableUploads, upload.single("cover"), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
@@ -1798,7 +1840,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Business rubber stamp / seal. Presentational only — this is NOT stamp duty.
-  app.post("/api/profile/seal", isAuthenticated, upload.single("seal"), async (req: any, res) => {
+  app.post("/api/profile/seal", isAuthenticated, requireDurableUploads, upload.single("seal"), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
       let filePath: string;
@@ -1818,7 +1860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/profile/signature", isAuthenticated, upload.single("signature"), async (req: any, res) => {
+  app.post("/api/profile/signature", isAuthenticated, requireDurableUploads, upload.single("signature"), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
