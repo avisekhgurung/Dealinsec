@@ -166,7 +166,11 @@ export default function ContractDetailsPage() {
         body: formData,
       });
 
-      if (!response.ok) throw new Error("Upload failed");
+      if (!response.ok) {
+        // Standard "STATUS: json" shape so parseApiError can read the server's reason.
+        const text = await response.text().catch(() => "");
+        throw new Error(`${response.status}: ${text}`);
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -177,10 +181,19 @@ export default function ContractDetailsPage() {
         description: "Contract proof has been uploaded successfully.",
       });
     },
-    onError: () => {
+    onError: (err: unknown) => {
+      // The server says why (signed online already, not a real PDF, too large,
+      // storage unavailable); "try again" only fits a failure that may pass on
+      // retry. A server error shows its reference, never its internals.
+      const parsed = parseApiError(err);
+      if (isUpgradeError(parsed)) {
+        openUpgradeModal({ feature: "agreements" });
+        return;
+      }
+      const reference = parsed.errorId ? ` (Reference: ${parsed.errorId})` : "";
       toast({
         title: "Upload failed",
-        description: "Failed to upload proof. Please try again.",
+        description: (parsed.error || "Use a PDF or image under 5 MB and try again.") + reference,
         variant: "destructive",
       });
     },

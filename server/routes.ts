@@ -36,6 +36,7 @@ import fs from "fs";
 import crypto from "crypto";
 import { uploadFileToImageKit, isImageKitConfigured, deleteFromImageKit } from "./imagekitClient";
 import { parseContractCreateBody, newAgreementLifecycleFields, canEditEstamp } from "@shared/agreement-lifecycle";
+import { sendInternalError, sendUploadError } from "./http-errors";
 import { UPLOAD_DIR, checkProofUpload, recordProofUpload, proofDownload, attachmentDownload, checkAttachmentUpload, recordAttachmentUpload, invoiceAgreementFor, uploadAccess, uploadTagFor, localUploadsAllowed, STORAGE_UNAVAILABLE, profileImageUpdateAllowed, PROFILE_IMAGE_FIELDS, type DownloadResult } from "./services/agreement-files";
 import {
   isRazorpayConfigured,
@@ -563,6 +564,10 @@ const upload = multer({
   },
 });
 
+/** upload.single, with multer's own errors answered safely (see sendUploadError) instead of by the app-wide handler. */
+const uploadSingle = (field: string) => (req: any, res: any, next: any) =>
+  upload.single(field)(req, res, (err: any) => (err ? sendUploadError(res, err) : next()));
+
 /**
  * Rupee-era READ compatibility, for the release that moves money to minor
  * units. Remove once that release has been live for a few days.
@@ -1030,18 +1035,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!r.ok) return res.status(r.status).json({ code: r.code, error: r.error });
       next();
     } catch (error) {
-      console.error("Proof upload check error:", error);
-      res.status(500).json({ error: "Failed to upload proof" });
+      sendInternalError(res, "proof", error, "upload_failed", "Failed to upload proof");
     }
   };
-  app.post("/api/contracts/:id/proof", isAuthenticated, requirePro("agreements"), requireOrgPermission("agreements.create"), proofUploadPrecheck, requireDurableUploads, upload.single("proof"), async (req: any, res) => {
+  app.post("/api/contracts/:id/proof", isAuthenticated, requirePro("agreements"), requireOrgPermission("agreements.create"), proofUploadPrecheck, requireDurableUploads, uploadSingle("proof"), async (req: any, res) => {
     try {
       const r = await recordProofUpload(req.user, parseInt(req.params.id, 10), req.file);
       if (!r.ok) return res.status(r.status).json({ code: r.code, error: r.error });
       res.json(r.contract);
     } catch (error) {
-      console.error("Proof upload error:", error);
-      res.status(500).json({ error: "Failed to upload proof" });
+      sendInternalError(res, "proof", error, "upload_failed", "Failed to upload proof");
     }
   });
 
@@ -1135,8 +1138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       sendStoredFile(res, await proofDownload(req.user, parseInt(req.params.id, 10)));
     } catch (error) {
-      console.error("Proof download error:", error);
-      res.status(500).json({ error: "Failed to download proof" });
+      sendInternalError(res, "proof", error, "download_failed", "Failed to download proof");
     }
   });
 
@@ -1528,8 +1530,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const attachments = await storage.getInvoiceAttachments(invoice.id);
       res.json(attachments);
     } catch (error) {
-      console.error("List attachments error:", error);
-      res.status(500).json({ error: "Failed to fetch documents" });
+      sendInternalError(res, "attachments", error, "fetch_failed", "Failed to fetch documents");
     }
   });
 
@@ -1541,28 +1542,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!r.ok) return res.status(r.status).json({ code: r.code, error: r.error });
       next();
     } catch (error) {
-      console.error("Attachment upload check error:", error);
-      res.status(500).json({ error: "Failed to upload document" });
+      sendInternalError(res, "attachments", error, "upload_failed", "Failed to upload document");
     }
   };
-  app.post("/api/brand-invoices/:id/attachments", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.create"), attachmentUploadPrecheck, requireDurableUploads, upload.single("file"), async (req: any, res) => {
+  app.post("/api/brand-invoices/:id/attachments", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.create"), attachmentUploadPrecheck, requireDurableUploads, uploadSingle("file"), async (req: any, res) => {
     try {
       const r = await recordAttachmentUpload(req.user, parseInt(req.params.id, 10), req.file, req.body?.category);
       if (!r.ok) return res.status(r.status).json({ code: r.code, error: r.error });
       const attachment = r.attachment;
       res.status(201).json(attachment);
     } catch (error: any) {
-      console.error("Attachment upload error:", error);
-      const msg = String(error?.message || "");
-      // Most common cause: the invoice_attachments table hasn't been created
-      // yet (db:push not run). Surface a clear, actionable reason.
-      const missingTable = /relation .*invoice_attachments.* does not exist|no such table/i.test(msg);
-      res.status(500).json({
-        error: missingTable
-          ? "Document storage isn't set up yet. Run the database migration (npm run db:push)."
-          : "Failed to upload document",
-        reason: msg || undefined,
-      });
+      // The driver's message (table names, SQL) stays in the server log. A
+      // missing table is still told apart, as a code, so support can act on it.
+      const missingTable = /relation .*invoice_attachments.* does not exist|no such table/i.test(String(error?.message || ""));
+      sendInternalError(res, "attachments", error,
+        missingTable ? "storage_not_ready" : "upload_failed",
+        missingTable ? "Document storage isn't available yet. Please contact support." : "Failed to upload document");
     }
   });
 
@@ -1572,8 +1567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Same rule as the proof download: only this app's own upload shapes are served.
       sendStoredFile(res, await attachmentDownload(req.user, parseInt(req.params.id, 10)));
     } catch (error) {
-      console.error("Attachment download error:", error);
-      res.status(500).json({ error: "Failed to download document" });
+      sendInternalError(res, "attachments", error, "download_failed", "Failed to download document");
     }
   });
 
@@ -1587,8 +1581,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.deleteInvoiceAttachment(attachment.id);
       res.status(204).end();
     } catch (error) {
-      console.error("Attachment delete error:", error);
-      res.status(500).json({ error: "Failed to delete document" });
+      sendInternalError(res, "attachments", error, "delete_failed", "Failed to delete document");
     }
   });
 
@@ -1792,7 +1785,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/profile/photo", isAuthenticated, requireDurableUploads, upload.single("photo"), async (req: any, res) => {
+  app.post("/api/profile/photo", isAuthenticated, requireDurableUploads, uploadSingle("photo"), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
@@ -1816,7 +1809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/profile/cover", isAuthenticated, requireDurableUploads, upload.single("cover"), async (req: any, res) => {
+  app.post("/api/profile/cover", isAuthenticated, requireDurableUploads, uploadSingle("cover"), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
@@ -1840,7 +1833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Business rubber stamp / seal. Presentational only — this is NOT stamp duty.
-  app.post("/api/profile/seal", isAuthenticated, requireDurableUploads, upload.single("seal"), async (req: any, res) => {
+  app.post("/api/profile/seal", isAuthenticated, requireDurableUploads, uploadSingle("seal"), async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
       let filePath: string;
@@ -1860,7 +1853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/profile/signature", isAuthenticated, requireDurableUploads, upload.single("signature"), async (req: any, res) => {
+  app.post("/api/profile/signature", isAuthenticated, requireDurableUploads, uploadSingle("signature"), async (req: any, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });

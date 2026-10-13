@@ -335,7 +335,7 @@ describe("route wiring (source check: the routes call the guarded services)", ()
     expect(create).not.toMatch(/\.\.\.req\.body|\.\.\.contractBody/);
   });
   it("proof upload: Pro and permission, then the pre-check, BEFORE multer accepts the file", () => {
-    expect(line('app.post("/api/contracts/:id/proof"')).toMatch(/requirePro\("agreements"\), requireOrgPermission\("agreements.create"\), proofUploadPrecheck, requireDurableUploads, upload\.single\("proof"\)/);
+    expect(line('app.post("/api/contracts/:id/proof"')).toMatch(/requirePro\("agreements"\), requireOrgPermission\("agreements.create"\), proofUploadPrecheck, requireDurableUploads, uploadSingle\("proof"\)/);
   });
   it("downloads go through the stored-file check; the proof needs agreement access; nothing serves a stored path directly", () => {
     expect(line('app.get("/api/contracts/:id/proof"')).toContain('requireModuleRead("agreements")');
@@ -576,10 +576,32 @@ describe("F: local uploads are organization-scoped, never public", () => {
     const index = fs.readFileSync(path.join(__dirname, "../../index.ts"), "utf8");
     expect(index).not.toMatch(/express\.static\([^)]*uploads/);
     expect(routes).not.toMatch(/express\.static\([^)]*uploads/);
-    const singles = routes.match(/[^,\s]+, upload\.single\(/g) ?? [];
+    const singles = routes.match(/[^,\s]+, uploadSingle\(/g) ?? [];
     expect(singles.length).toBe(6);
-    for (const s of singles) expect(s).toMatch(/^requireDurableUploads, upload\.single\(/);
+    for (const s of singles) expect(s).toMatch(/^requireDurableUploads, uploadSingle\(/);
+    expect(routes.match(/upload\.single\(/g)).toHaveLength(1); // only inside uploadSingle
     expect(routes).toMatch(/app\.get\("\/uploads\/:name", isAuthenticated, async/);
     expect(routes).toContain("profileImageUpdateAllowed(req.user, field, req.body[field])");
+  });
+});
+
+describe("G: attachment and proof routes answer errors safely", () => {
+  const routes = fs.readFileSync(path.join(__dirname, "../../routes.ts"), "utf8");
+  const section = (from: string, to: string) => routes.slice(routes.indexOf(from), routes.indexOf(to, routes.indexOf(from)));
+  it("no route returns a raw error message; the attachment and proof routes log with an error id", () => {
+    expect(routes).not.toMatch(/reason:\s*msg/);
+    // From the document list route to the end of the document delete route.
+    const del = routes.indexOf('app.delete("/api/attachments/:id"');
+    const docs = routes.slice(routes.indexOf('app.get("/api/brand-invoices/:id/attachments"'), routes.indexOf("\n  app.", del + 1));
+    expect(docs.match(/sendInternalError\(res, "attachments"/g)).toHaveLength(5); // list, upload pre-check, upload, download, delete
+    expect(docs).not.toMatch(/res\.status\(500\)/);
+    expect(routes.match(/sendInternalError\(res, "proof"/g)).toHaveLength(3);
+  });
+  it("the proof upload page shows the server's reason (and a reference), not a blanket 'try again'", () => {
+    const page = fs.readFileSync(path.join(__dirname, "../../../client/src/pages/contract-details.tsx"), "utf8");
+    const mutation = page.slice(page.indexOf("const uploadProof = useMutation"), page.indexOf("const deleteBrandInvoice"));
+    expect(mutation).toContain("parseApiError(err)");
+    expect(mutation).toContain("parsed.errorId");
+    expect(mutation).not.toContain('"Failed to upload proof. Please try again."');
   });
 });

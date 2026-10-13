@@ -17,6 +17,8 @@ export interface ParsedApiError {
   code: "NO_CREDITS" | "UPGRADE_REQUIRED" | "CURRENCY_CHANGED" | null;
   feature?: string;
   error?: string;
+  /** A server error's reference (sendInternalError): safe to show, so support can find the logged details. */
+  errorId?: string;
   credits?: { monthly: number; purchased: number; resetsAt: string | null };
 }
 
@@ -34,6 +36,7 @@ export function parseApiError(err: unknown): ParsedApiError {
         : null,
       feature: body?.feature,
       error: body?.error,
+      errorId: typeof body?.errorId === "string" ? body.errorId : undefined,
       credits: body?.credits,
     };
   } catch {
