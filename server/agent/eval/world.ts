@@ -10,6 +10,10 @@
  */
 
 import { FakeLeadsStore } from "./leads-fake";
+import {
+  assertNewAgreementRow, assertNoProtectedContractFields, assertRevisableOnly,
+  canClaimSignature, canRecordProof, canRevise, canShare, statusAfterRevoke, statusAfterShare,
+} from "@shared/agreement-lifecycle";
 
 export interface Row { [k: string]: any }
 
@@ -112,8 +116,38 @@ export function createWorld(): World {
     getContract: async (id: number) => copy(w.contracts.find((c) => c.id === id)),
     getContractByDealId: async (dealId: number) => copy(w.contracts.find((c) => c.dealId === dealId)),
     getContractsByOrg: async (orgId: string, userId?: string) => w.contracts.filter((c) => visible(c, orgId, userId)),
-    createContract: guard(async (c: Row) => { const row = { id: nextId(), status: "Active", signedByBrand: false, clientShareToken: null, clientShareRevokedAt: null, createdAt: new Date(), ...c }; w.contracts.push(row); return row; }),
-    updateContract: guard(async (id: number, u: Row) => { const c = w.contracts.find((x) => x.id === id); if (!c) return undefined; Object.assign(c, u); return copy(c); }),
+    // The same rules as server/storage.ts: a new row must be a blank Draft, a general update can't touch a
+    // protected field, and each dedicated writer applies its predicate to the row as it is at write time.
+    createContract: guard(async (c: Row) => { assertNewAgreementRow(c); const row = { id: nextId(), signedByBrand: false, clientShareToken: null, clientShareRevokedAt: null, clientSignedAt: null, createdAt: new Date(), ...c }; w.contracts.push(row); return row; }),
+    updateContract: guard(async (id: number, u: Row) => { assertNoProtectedContractFields(u); const c = w.contracts.find((x) => x.id === id); if (!c) return undefined; Object.assign(c, u); return copy(c); }),
+    shareContract: guard(async (id: number, token: string, snapshot: unknown) => {
+      const c = w.contracts.find((x) => x.id === id); if (!c || !canShare(c)) return undefined;
+      Object.assign(c, { clientShareToken: token, clientSignShareSnapshot: snapshot, clientSharedAt: new Date(), clientShareRevokedAt: null, status: statusAfterShare(c) });
+      return copy(c);
+    }),
+    revokeContractShare: guard(async (id: number) => {
+      const c = w.contracts.find((x) => x.id === id); if (!c) return undefined;
+      Object.assign(c, { clientShareRevokedAt: new Date(), status: statusAfterRevoke(c) });
+      return copy(c);
+    }),
+    claimContractSignatureOnce: guard(async (id: number, token: string, u: Row) => {
+      const c = w.contracts.find((x) => x.id === id); if (!c || !canClaimSignature(c, token)) return undefined;
+      Object.assign(c, u, { signedByBrand: true });
+      return copy(c);
+    }),
+    recordContractProof: guard(async (id: number, p: { proofFileName: string; proofFilePath: string }) => {
+      const c = w.contracts.find((x) => x.id === id); if (!c || !canRecordProof(c)) return undefined;
+      Object.assign(c, { ...p, status: "Signed", signedByBrand: true, signedDate: new Date().toISOString() });
+      return copy(c);
+    }),
+    reviseUnsignedContract: guard(async (id: number, u: Row, opts: { revokeLink: boolean }) => {
+      assertRevisableOnly(u);
+      const c = w.contracts.find((x) => x.id === id); if (!c || !canRevise(c)) return undefined;
+      const now = new Date();
+      Object.assign(c, u, { signedByInfluencerDate: now.toISOString() });
+      if (opts.revokeLink) Object.assign(c, { clientShareRevokedAt: now, status: c.status === "Pending" ? "Draft" : c.status });
+      return copy(c);
+    }),
 
     getBrandInvoice: async (id: number) => copy(w.invoices.find((i) => i.id === id)),
     getBrandInvoicesByOrg: async (orgId: string, userId?: string) => w.invoices.filter((i) => visible(i, orgId, userId)).map(copy),

@@ -164,7 +164,7 @@ export function computeDealHealth(deal: Deal, data: OrgData): DealHealth {
       score -= 30;
     }
   } else if (!signed(contract)) {
-    signals.push({ label: "Agreement", state: "warn", detail: "Created — awaiting signed proof" });
+    signals.push({ label: "Agreement", state: "warn", detail: "Created — awaiting the client's signature" });
     score -= 12;
   } else {
     signals.push({ label: "Agreement", state: "good", detail: "Signed" });
@@ -226,7 +226,7 @@ export function computeNextBestAction(deal: Deal, data: OrgData): NextBestAction
     return { ...base, action: "Get the agreement signed", route: `/deals/${deal.id}/contract`, urgency: "yellow" };
   }
   if (!signed(contract)) {
-    return { ...base, action: "Upload the signed proof", route: `/contracts/${contract.id}`, urgency: "yellow" };
+    return { ...base, action: "Get the agreement signed: send the signing link or upload a signed copy", route: `/contracts/${contract.id}`, urgency: "yellow" };
   }
   const invoicedTotal = dealInvoices.reduce((s, i) => s + invAmountMinor(i), 0);
   if (invoicedTotal < contract.contractValueMinor) {

@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import { db } from "./db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and, isNull } from "drizzle-orm";
+import { assertNoProtectedContractFields, assertNewAgreementRow, assertRevisableOnly } from "@shared/agreement-lifecycle";
 import { canonicalEmail } from "@shared/email";
 import { DEFAULT_ROLE_SEEDS } from "@shared/permissions";
 import {
@@ -41,8 +42,18 @@ export interface IStorage {
   getContractByDealId(dealId: number): Promise<Contract | undefined>;
   getContractByShareToken(token: string): Promise<Contract | undefined>;
   createContract(contract: InsertContract): Promise<Contract>;
+  /** General edits only: throws on any PROTECTED_CONTRACT_FIELDS key (status, signature, link, proof, identity). */
   updateContract(id: number, updates: Partial<Contract>): Promise<Contract | undefined>;
-  claimContractSignatureOnce(id: number, updates: Partial<Contract>): Promise<Contract | undefined>;
+  /** The client's signature, once, and only through the link that is live now. undefined = refused (409). */
+  claimContractSignatureOnce(id: number, token: string, updates: Partial<Contract>): Promise<Contract | undefined>;
+  /** A new signing link, only while nobody has signed; Draft becomes Pending. undefined = refused (409). */
+  shareContract(id: number, token: string, snapshot: unknown): Promise<Contract | undefined>;
+  /** Revoke the link; an unsigned Pending agreement goes back to Draft. */
+  revokeContractShare(id: number): Promise<Contract | undefined>;
+  /** The owner-attested signed copy: Signed, unless the client signed online. undefined = refused (409). */
+  recordContractProof(id: number, proof: { proofFileName: string; proofFilePath: string }): Promise<Contract | undefined>;
+  /** Revise the terms of an agreement nobody has signed (optionally revoking its link). undefined = refused (409). */
+  reviseUnsignedContract(id: number, updates: Partial<Contract>, opts: { revokeLink: boolean }): Promise<Contract | undefined>;
   getContractsForBrand(brandUserId: string): Promise<Contract[]>;
 
   getInvoices(userId: string): Promise<Invoice[]>;
@@ -212,16 +223,74 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createContract(contract: InsertContract): Promise<Contract> {
+    // Every new agreement starts Draft, unsigned, with no link and no proof — whoever the caller is.
+    assertNewAgreementRow(contract as Record<string, unknown>);
     const [created] = await db.insert(contracts).values(contract as any).returning();
     return created;
   }
 
   async updateContract(id: number, updates: Partial<Contract>): Promise<Contract | undefined> {
+    assertNoProtectedContractFields(updates);
     const [updated] = await db.update(contracts).set(updates).where(eq(contracts.id, id)).returning();
     return updated;
   }
 
-  async claimContractSignatureOnce(id: number, updates: Partial<Contract>): Promise<Contract | undefined> {
+  // The dedicated writers below carry their rule in the WHERE clause, so it is
+  // decided by the row as it is when the UPDATE runs, not by an earlier read
+  // (under READ COMMITTED a concurrent UPDATE re-checks the WHERE against the
+  // row it waited for). Each mirrors a predicate in shared/agreement-lifecycle.ts.
+
+  async shareContract(id: number, token: string, snapshot: unknown): Promise<Contract | undefined> {
+    const [updated] = await db.update(contracts)
+      .set({
+        clientShareToken: token,
+        clientSignShareSnapshot: snapshot as any,
+        clientSharedAt: new Date(),
+        clientShareRevokedAt: null,
+        status: sql`CASE WHEN ${contracts.status} = 'Draft' THEN 'Pending' ELSE ${contracts.status} END`,
+      })
+      .where(and(eq(contracts.id, id), eq(contracts.signedByBrand, false), isNull(contracts.clientSignedAt)))
+      .returning();
+    return updated;
+  }
+
+  async revokeContractShare(id: number): Promise<Contract | undefined> {
+    const [updated] = await db.update(contracts)
+      .set({
+        clientShareRevokedAt: new Date(),
+        status: sql`CASE WHEN ${contracts.status} = 'Pending' AND ${contracts.signedByBrand} = false AND ${contracts.clientSignedAt} IS NULL THEN 'Draft' ELSE ${contracts.status} END`,
+      })
+      .where(eq(contracts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async recordContractProof(id: number, proof: { proofFileName: string; proofFilePath: string }): Promise<Contract | undefined> {
+    const [updated] = await db.update(contracts)
+      .set({ proofFileName: proof.proofFileName, proofFilePath: proof.proofFilePath, status: "Signed", signedByBrand: true, signedDate: new Date().toISOString() })
+      .where(and(eq(contracts.id, id), isNull(contracts.clientSignedAt)))
+      .returning();
+    return updated;
+  }
+
+  async reviseUnsignedContract(id: number, updates: Partial<Contract>, opts: { revokeLink: boolean }): Promise<Contract | undefined> {
+    assertRevisableOnly(updates);
+    const now = new Date();
+    const [updated] = await db.update(contracts)
+      .set({
+        ...updates,
+        // The issuer's own signature stays; it is re-dated to the moment they confirmed the revised terms.
+        signedByInfluencerDate: now.toISOString(),
+        ...(opts.revokeLink
+          ? { clientShareRevokedAt: now, status: sql`CASE WHEN ${contracts.status} = 'Pending' THEN 'Draft' ELSE ${contracts.status} END` }
+          : {}),
+      })
+      .where(and(eq(contracts.id, id), eq(contracts.signedByBrand, false), isNull(contracts.clientSignedAt)))
+      .returning();
+    return updated;
+  }
+
+  async claimContractSignatureOnce(id: number, token: string, updates: Partial<Contract>): Promise<Contract | undefined> {
     // Atomic claim, same pattern as completePayuOrderOnce: the "not already
     // signed" guard lives in the WHERE clause, not in a read-then-write in
     // the route. Of two concurrent sign requests for the same contract,
@@ -229,7 +298,16 @@ export class DatabaseStorage implements IStorage {
     // reports 409, never a stomped or duplicated signature.
     const [updated] = await db.update(contracts)
       .set({ ...updates, signedByBrand: true })
-      .where(sql`${contracts.id} = ${id} AND ${contracts.signedByBrand} = false`)
+      // Also: still unsigned online, and signed through the link that is live NOW. A link
+      // re-made (new token, new snapshot) or revoked after the signer loaded the page can't
+      // be signed: the hash the route computed covers the snapshot that signer saw.
+      .where(and(
+        eq(contracts.id, id),
+        eq(contracts.signedByBrand, false),
+        isNull(contracts.clientSignedAt),
+        eq(contracts.clientShareToken, token),
+        isNull(contracts.clientShareRevokedAt),
+      ))
       .returning();
     return updated;
   }

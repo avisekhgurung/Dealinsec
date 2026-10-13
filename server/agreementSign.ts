@@ -18,7 +18,7 @@ import type { Express } from "express";
 import crypto from "crypto";
 import { storage } from "./storage";
 import { isAuthenticated } from "./auth";
-import { memberCan } from "@shared/permissions";
+import { memberCan, canReadModule } from "@shared/permissions";
 import { documentLocaleSettings } from "@shared/money";
 import { computeDocumentHash, verifyDocumentHash } from "@shared/contractSign";
 import { sendEmail, agreementSignedByClientEmail } from "./emails";
@@ -68,6 +68,8 @@ export function registerAgreementSignRoutes(app: Express) {
 
   app.get("/api/contracts/:id/sign-share", isAuthenticated, async (req: any, res) => {
     try {
+      // The signer's name and email are agreement data: the same module-read rule as the agreement itself.
+      if (!canReadModule(req.user, "agreements")) return res.status(403).json({ code: "FORBIDDEN", error: "Your role doesn't include access to agreements." });
       const contract = await storage.getContract(parseInt(req.params.id, 10));
       if (!contract || !inOrg(contract, req.user)) return res.status(404).json({ error: "Agreement not found" });
       if (!contract.clientShareToken || contract.clientShareRevokedAt) return res.json({ active: false, signed: contract.signedByBrand });
@@ -106,7 +108,8 @@ export function registerAgreementSignRoutes(app: Express) {
       }
       const contract = await storage.getContract(parseInt(req.params.id, 10));
       if (!contract || !inOrg(contract, req.user)) return res.status(404).json({ error: "Agreement not found" });
-      await storage.updateContract(contract.id, { clientShareRevokedAt: new Date() });
+      // Dedicated writer: an unsigned Pending agreement goes back to Draft; a signed one keeps its status.
+      await storage.revokeContractShare(contract.id);
       res.json({ active: false });
     } catch (err) {
       console.error("[agreement-sign] revoke error:", err);
@@ -191,7 +194,7 @@ export function registerAgreementSignRoutes(app: Express) {
         clientSignatureDataUrl: req.body.signatureDataUrl,
         clientSignedAt: now,
       });
-      const updated = await storage.claimContractSignatureOnce(contract.id, {
+      const updated = await storage.claimContractSignatureOnce(contract.id, token, {
         status: "Signed",
         signedDate: now.toISOString().slice(0, 10),
         clientSignedAt: now,
@@ -203,9 +206,10 @@ export function registerAgreementSignRoutes(app: Express) {
       });
       if (!updated) {
         // Someone else's request won the atomic claim between our read above
-        // and this write — the same outcome as the early check, just caught
-        // at the point that actually matters.
-        return res.status(409).json({ error: "This agreement has already been signed." });
+        // and this write — or the link was re-made or revoked in between, so
+        // what this signer saw is no longer what the agreement shows. Either
+        // way nothing was written.
+        return res.status(409).json({ error: "This agreement has already been signed, or this link is no longer current." });
       }
 
       // Best-effort notification — never blocks the client's confirmation.

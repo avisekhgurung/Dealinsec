@@ -26,6 +26,7 @@ import {
   type User, type Deliverable, type LocaleSettings, type Contract,
 } from "@shared/schema";
 import { brandDealTypeOptions } from "@shared/dealTypeTaxonomy";
+import { invoiceEligibility, newAgreementLifecycleFields, parseContractCreateBody } from "@shared/agreement-lifecycle";
 import { brandTermsForDeal, defaultExclusive } from "@shared/audience";
 import { formatMoney, formatDate } from "@shared/money";
 import { getBillingUser, logOrgActivity } from "../entitlements";
@@ -116,7 +117,7 @@ export const toolDefs = (settings: LocaleSettings) => [
     type: "function",
     function: {
       name: "search_agreements",
-      description: "List/search the organization's agreements (by client or name), optional status Signed|Active|Completed. Returns id, name, value, status, route.",
+      description: "List/search the organization's agreements (by client or name), optional status Draft|Pending|Signed|Active|Completed. Returns id, name, value, status, route.",
       parameters: {
         type: "object",
         properties: { query: { type: "string" }, status: { type: "string" } },
@@ -317,7 +318,7 @@ export async function runTool(name: string, args: any, user: User, settings?: Lo
       if (pendingDeals.length)
         parts.push(`Pending deals (${pendingDeals.length}): ` + cap(pendingDeals, 5).map((d) => `#${d.id} ${d.dealTitle} route:/deals/${d.id}`).join("; "));
       if (awaitingProof.length)
-        parts.push(`Agreements awaiting signed proof (${awaitingProof.length}): ` + cap(awaitingProof, 5).map((c) => `#${c.id} ${c.contractName} route:/contracts/${c.id}`).join("; "));
+        parts.push(`Agreements awaiting the client's signature (${awaitingProof.length}): ` + cap(awaitingProof, 5).map((c) => `#${c.id} ${c.contractName} route:/contracts/${c.id}`).join("; "));
       if (unpaid.length)
         parts.push(`Unpaid invoices (${unpaid.length}, ${formatMoney(unpaid.reduce((s, i) => s + (i.dealAmountMinor || 0), 0), currency, locale)} outstanding): ` + cap(unpaid, 5).map((i) => `${i.invoiceNumber} ${i.brandName} route:/brand-invoices/${i.id}`).join("; "));
       return parts.length ? parts.join("\n") : "Nothing pending — all deals, agreements and invoices are up to date. 🎉";
@@ -618,8 +619,11 @@ export async function executeCreateAgreement(rawArgs: any, user: User) {
   if (!built.ok) return built;
 
   const signerName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || null;
+  // The same allowlist as POST /api/contracts, though these fields are built from the deal, not the model.
+  const body = parseContractCreateBody(built.data);
+  if (!body.ok) return { ok: false as const, message: "Those details don't form a valid agreement — try creating it from the deal page." };
   const parsed = insertContractSchema.safeParse({
-    ...built.data,
+    ...body.data,
     signerUserId: user.id,
     signerName,
     signatureUrl: user.digitalSignature ?? null,
@@ -641,6 +645,8 @@ export async function executeCreateAgreement(rawArgs: any, user: User) {
     ...issued,
     signedByInfluencer: true,
     signedByInfluencerDate: new Date().toISOString(),
+    // Server-owned, last: a new agreement is a Draft until the client signs it or the owner uploads a signed copy.
+    ...newAgreementLifecycleFields(),
   } as any);
   logOrgActivity(user, "created", "agreement", contract.id, `Agreement: ${contract.brandName} (via Copilot)`);
   await storage.updateDeal(contract.dealId, { status: "Active" });
@@ -677,6 +683,9 @@ export async function buildInvoiceCandidate(rawArgs: any, user: User) {
   if (rawArgs?.contractId && (!contract || contract.id !== Number(rawArgs.contractId))) {
     return { ok: false as const, message: "That agreement isn't linked to this deal." };
   }
+  // The same server-side rule as POST /api/brand-invoices: an agreement must be signed before it is invoiced.
+  const eligible = invoiceEligibility(contract, dealId);
+  if (!eligible.ok) return { ok: false as const, message: eligible.message, route: contract ? `/contracts/${contract.id}` : undefined };
 
   const invoiceType = brandInvoiceTypeOptions.includes(rawArgs?.invoiceType) ? rawArgs.invoiceType : "full";
   const { settings } = await issuingContext(user);

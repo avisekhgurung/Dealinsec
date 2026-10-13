@@ -178,7 +178,8 @@ export default function ContractConfirmationPage() {
         endDate: deal.endDate,
         contractValueMinor: deal.dealAmountMinor,
         currency: fmt.currency,
-        status: "Signed" as const,
+        // No status: the server starts every agreement as a Draft. It becomes
+        // Signed only when the client signs online or a signed copy is uploaded.
         // Exclusive for every deal type as it always was; a brand collaboration
         // is exclusive only if the deal states an exclusivity term.
         exclusive: defaultExclusive(deal.dealType, deal.brandTerms),

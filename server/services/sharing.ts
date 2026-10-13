@@ -13,6 +13,7 @@ import { memberCan } from "@shared/permissions";
 import { hasProAccess, type User } from "@shared/schema";
 import { buildQuoteShareSnapshot } from "@shared/quoteShare";
 import { buildAgreementShareSnapshot } from "@shared/contractSign";
+import { canShare } from "@shared/agreement-lifecycle";
 import { storage } from "../storage";
 import { getBillingUser } from "../entitlements";
 import { documentLocaleFor } from "../routes";
@@ -59,7 +60,7 @@ export async function createAgreementSignLink(
   if (!memberCan(user, "agreements.create")) return { ok: false, status: 403, error: "Your role doesn't allow sending this for signature." };
   const contract = await storage.getContract(contractId);
   if (!contract || !inOrg(contract, user)) return { ok: false, status: 404, error: "Agreement not found" };
-  if (contract.signedByBrand) return { ok: false, status: 409, error: "This agreement is already signed." };
+  if (!canShare(contract)) return { ok: false, status: 409, error: "This agreement is already signed." };
 
   const billing = await getBillingUser(user);
   if (!hasProAccess(billing)) return { ok: false, status: 403, error: "Agreements are a Pro feature." };
@@ -78,13 +79,12 @@ export async function createAgreementSignLink(
     settings,
   });
 
+  // Atomic: written only if nobody has signed by the time the UPDATE runs. A client
+  // signing between the check above and this write would otherwise get their signed
+  // snapshot replaced (the integrity hash would then read "mismatch") and their link
+  // swapped. Draft becomes Pending here; nothing else changes the status.
   const token = newToken();
-  const updated = await storage.updateContract(contract.id, {
-    clientShareToken: token,
-    clientSignShareSnapshot: snapshot as any,
-    clientSharedAt: new Date(),
-    clientShareRevokedAt: null,
-  });
-  if (!updated) return { ok: false, status: 500, error: "Couldn't create the signing link." };
+  const updated = await storage.shareContract(contract.id, token, snapshot);
+  if (!updated) return { ok: false, status: 409, error: "This agreement was just signed, so a new link wasn't made." };
   return { ok: true, url: `/s/${token}`, sharedAt: updated.clientSharedAt ?? null };
 }

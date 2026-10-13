@@ -377,16 +377,16 @@ export function contractSignedEmail(args: {
 }): { subject: string; html: string } {
   const subject = `Agreement created — ${args.brandName}`;
   const html = layout({
-    preview: `Your agreement with ${args.brandName} is signed and ready.`,
+    preview: `Your agreement with ${args.brandName} is ready to send for signature.`,
     bodyHtml: `
       ${heading("Agreement created ✍️")}
-      ${para(`Your contract with <strong>${args.brandName}</strong> has been generated and signed.`)}
+      ${para(`Your agreement with <strong>${args.brandName}</strong> has been created and signed by you. It's a draft until your client signs it.`)}
       ${infoCard(
         infoRow("Client / Brand", args.brandName) +
         infoRow("Contract value", money(args.contractValueMinor, args.locale)),
       )}
       ${button("View agreement", `${appUrl()}/contracts/${args.contractId}`)}
-      ${para("You can download the signed PDF and upload a counter-signed proof anytime.")}
+      ${para("Send it to your client for signature from the agreement page, or upload a copy they've signed. You can invoice once it's signed.")}
     `,
   });
   return { subject, html };

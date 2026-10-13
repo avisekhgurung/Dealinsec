@@ -35,6 +35,8 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import { uploadFileToImageKit, isImageKitConfigured, deleteFromImageKit } from "./imagekitClient";
+import { parseContractCreateBody, newAgreementLifecycleFields } from "@shared/agreement-lifecycle";
+import { UPLOAD_DIR, checkProofUpload, recordProofUpload, proofDownload, attachmentDownload, invoiceAgreementFor, type DownloadResult } from "./services/agreement-files";
 import {
   isRazorpayConfigured,
   getRazorpayKeyId,
@@ -515,7 +517,16 @@ export async function invoiceableRemainingMinor(
   return Number(contract.contractValueMinor) - alreadyInvoiced;
 }
 
-const uploadDir = path.join(process.cwd(), "uploads");
+const uploadDir = UPLOAD_DIR;
+
+/** Serve a checked stored file: a rebuilt ImageKit redirect, or one upload name from the uploads directory (dotfiles denied). */
+function sendStoredFile(res: any, r: DownloadResult) {
+  if (!r.ok) return res.status(r.status).json({ error: r.error });
+  if (r.decision.type === "redirect") return res.redirect(r.decision.url);
+  res.download(r.decision.name, r.downloadName, { root: uploadDir, dotfiles: "deny" }, (err: any) => {
+    if (err && !res.headersSent) res.status(404).json({ error: "File not available" });
+  });
+}
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -926,11 +937,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // never render the current viewer's profile signature (see
       // migrate-document-authenticity.ts).
       const signerName = [req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || req.user.email || null;
-      // The issued currency is the org's, stamped below; a client-sent one is
-      // dropped before validation so it can neither set it nor fail the request.
-      const { currency: _clientCurrency, ...contractBody } = req.body ?? {};
+      // Strict allowlist: the client chooses only the agreement's terms. Any
+      // other key (status, a signature, a proof path, a signing link, ...)
+      // refuses the request. `currency` and `status` from an older web client
+      // are dropped, never used: the issued currency is the org's (stamped
+      // below) and every new agreement starts as a Draft.
+      const body = parseContractCreateBody(req.body);
+      if (!body.ok && body.code === "unexpected_field") {
+        console.warn(`[agreements] create refused for user ${userId}: unexpected field(s) ${body.fields.join(", ")}`);
+        return res.status(400).json({ code: "unexpected_field", fields: body.fields, error: "That request includes fields an agreement can't be created with." });
+      }
+      if (!body.ok) return res.status(400).json({ error: body.code === "invalid" ? body.issues : "Invalid agreement" });
       const parsed = insertContractSchema.safeParse({
-        ...contractBody,
+        ...body.data,
         signerUserId: req.user.id,
         signerName,
         signatureUrl: req.user.digitalSignature ?? null,
@@ -970,6 +989,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...issued,
         signedByInfluencer: true,
         signedByInfluencerDate: new Date().toISOString(),
+        // Server-owned, last: Draft, unsigned, no link, no proof. Only the
+        // online signing claim or an owner-attested proof upload makes it Signed.
+        ...newAgreementLifecycleFields(),
       };
       const contract = await storage.createContract(contractData);
       logOrgActivity(req.user, "created", "agreement", contract.id, `Agreement: ${contract.brandName}`);
@@ -986,40 +1008,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/contracts/:id/proof", isAuthenticated, requireOrgPermission("agreements.create"), upload.single("proof"), async (req: any, res) => {
+  // Upload the OWNER-ATTESTED signed copy. Everything decidable before the
+  // file is accepted (role, plan, organization, not already signed online)
+  // is checked BEFORE multer writes it; the content check, the transfer and
+  // the atomic "not signed online" write follow (server/services/agreement-files.ts).
+  const proofUploadPrecheck = async (req: any, res: any, next: any) => {
     try {
-      const contract = await storage.getContract(parseInt(req.params.id));
-      if (!contract) {
-        return res.status(404).json({ error: "Contract not found" });
-      }
-      if (!inOrg(contract, req.user)) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-      }
-
-      // Upload to ImageKit (or fall back to local path if not configured)
-      let proofFilePath = req.file.path;
-      if (isImageKitConfigured()) {
-        const uploaded = await uploadFileToImageKit(req.file, {
-          folder: "contracts",
-          baseName: `contract-${req.params.id}-proof`,
-        });
-        proofFilePath = uploaded.url; // store the public CDN URL
-      }
-
-      const updated = await storage.updateContract(parseInt(req.params.id), {
-        proofFileName: req.file.originalname,
-        proofFilePath,
-        status: "Signed",
-        signedByBrand: true,
-        signedDate: new Date().toISOString(),
-      });
-
-      logOrgActivity(req.user, "uploaded signed proof for", "agreement", req.params.id, contract.brandName);
-      res.json(updated);
+      const r = await checkProofUpload(req.user, parseInt(req.params.id, 10));
+      if (!r.ok) return res.status(r.status).json({ code: r.code, error: r.error });
+      next();
+    } catch (error) {
+      console.error("Proof upload check error:", error);
+      res.status(500).json({ error: "Failed to upload proof" });
+    }
+  };
+  app.post("/api/contracts/:id/proof", isAuthenticated, requirePro("agreements"), requireOrgPermission("agreements.create"), proofUploadPrecheck, upload.single("proof"), async (req: any, res) => {
+    try {
+      const r = await recordProofUpload(req.user, parseInt(req.params.id, 10), req.file);
+      if (!r.ok) return res.status(r.status).json({ code: r.code, error: r.error });
+      res.json(r.contract);
     } catch (error) {
       console.error("Proof upload error:", error);
       res.status(500).json({ error: "Failed to upload proof" });
@@ -1082,20 +1089,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Download the uploaded Contract Proof.
-  // If the stored path is an external URL (ImageKit), redirect; if it's a
-  // local file (legacy uploads), stream from disk.
-  app.get("/api/contracts/:id/proof", isAuthenticated, async (req: any, res) => {
+  // Download the uploaded Contract Proof. The stored value is untrusted: it is
+  // served only as an ImageKit URL under the configured endpoint (redirect,
+  // rebuilt from its parsed parts) or as one of this app's own upload names
+  // from the uploads directory — see server/stored-files.ts.
+  app.get("/api/contracts/:id/proof", isAuthenticated, requireModuleRead("agreements"), async (req: any, res) => {
     try {
-      const contract = await storage.getContract(parseInt(req.params.id));
-      if (!contract) return res.status(404).json({ error: "Contract not found" });
-      if (!inOrg(contract, req.user)) return res.status(403).json({ error: "Access denied" });
-      if (!contract.proofFilePath) return res.status(404).json({ error: "No proof uploaded" });
-
-      if (/^https?:\/\//.test(contract.proofFilePath)) {
-        return res.redirect(contract.proofFilePath);
-      }
-      res.download(contract.proofFilePath, contract.proofFileName || "contract-proof");
+      sendStoredFile(res, await proofDownload(req.user, parseInt(req.params.id, 10)));
     } catch (error) {
       console.error("Proof download error:", error);
       res.status(500).json({ error: "Failed to download proof" });
@@ -1245,19 +1245,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!parentDeal || !inOrg(parentDeal, req.user)) {
         return res.status(403).json({ error: "Not authorized for this deal" });
       }
-      let parentContract: Contract | undefined;
-      if (req.body?.contractId) {
-        parentContract = await storage.getContract(parseInt(req.body.contractId, 10));
-        if (!parentContract || !inOrg(parentContract, req.user)) {
-          return res.status(403).json({ error: "Not authorized for this agreement" });
-        }
-        // The ceiling below counts invoices on the agreement's own deal. An
-        // agreement paired with a different dealId would be measured against
-        // the wrong invoice list and could be billed past its value.
-        if (parentContract.dealId !== parentDealId) {
-          return res.status(400).json({ error: "This agreement belongs to a different deal" });
-        }
-      }
+      // Server-side eligibility, not the screen's: the agreement (the one named,
+      // or the deal's own when none is named) must be in this org, on this deal
+      // (the ceiling below counts that deal's invoices), and signed. A deal with
+      // no agreement keeps its existing deal-only invoice.
+      const eligible = await invoiceAgreementFor(req.user, parentDealId, req.body?.contractId);
+      if (!eligible.ok) return res.status(eligible.status).json({ code: eligible.code, error: eligible.error });
+      const parentContract: Contract | undefined = eligible.contract;
 
       if (rejectStaleMoneyBody(req.body, res)) return;
 
@@ -1553,14 +1547,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Download a document — redirect to CDN URL or stream a legacy local file.
   app.get("/api/attachments/:id/download", isAuthenticated, async (req: any, res) => {
     try {
-      const attachment = await storage.getInvoiceAttachment(parseInt(req.params.id));
-      if (!attachment) return res.status(404).json({ error: "Document not found" });
-      const parentInvoice = await storage.getBrandInvoice(attachment.brandInvoiceId);
-      if (!inOrg(parentInvoice, req.user)) return res.status(403).json({ error: "Access denied" });
-      if (/^https?:\/\//.test(attachment.fileUrl)) {
-        return res.redirect(attachment.fileUrl);
-      }
-      res.download(attachment.fileUrl, attachment.fileName);
+      // Same rule as the proof download: only this app's own upload shapes are served.
+      sendStoredFile(res, await attachmentDownload(req.user, parseInt(req.params.id, 10)));
     } catch (error) {
       console.error("Attachment download error:", error);
       res.status(500).json({ error: "Failed to download document" });
@@ -1623,8 +1611,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const influencerName =
         [issuer.firstName, issuer.lastName].filter(Boolean).join(" ") || issuer.email || "Influencer";
 
-      // Find contractId for this deal (org-wide — a teammate may have signed it)
-      const contract = await storage.getContractByDealId(dealId);
+      // The deal's agreement (org-wide — a teammate may have signed it), which
+      // must be signed before it is invoiced — the same server-side rule as
+      // the single-invoice route.
+      const eligible = await invoiceAgreementFor(req.user, dealId, undefined);
+      if (!eligible.ok) return res.status(eligible.status).json({ code: eligible.code, error: eligible.error });
+      const contract = eligible.contract;
       // Same refusal as the single-invoice route: these invoices are stamped
       // in the org's current currency, and an agreement issued in another one
       // cannot be billed in it. Unreachable while the region locks at the first

@@ -198,14 +198,11 @@ export async function planAgreementRevision(user: Who, dealId: number, raw: unkn
 export async function applyAgreementRevision(user: Who, dealId: number, raw: unknown): Promise<Result<{ contract: Contract; route: string; linkRevoked: boolean }>> {
   const plan = await planAgreementRevision(user, dealId, raw);
   if (!plan.ok) return plan;
-  const now = new Date();
-  const updated = await storage.updateContract(plan.contract.id, {
-    ...plan.contractUpdates,
-    // The issuer's own signature stays; it is re-dated to the moment they confirmed the revised terms.
-    signedByInfluencerDate: now.toISOString(),
-    ...(plan.linkActive ? { clientShareRevokedAt: now } : {}),
-  });
-  if (!updated) return fail(500, "failed", "Couldn't update the agreement.");
+  // Atomic: applied only if nobody has signed by the time the UPDATE runs (the plan's
+  // check is an earlier read). The issuer's signature is re-dated there; an active link
+  // is revoked, which puts a Pending agreement back to Draft.
+  const updated = await storage.reviseUnsignedContract(plan.contract.id, plan.contractUpdates, { revokeLink: plan.linkActive });
+  if (!updated) return fail(409, "locked", AGREEMENT_LOCKED);
   if (Object.keys(plan.dealUpdates).length) await storage.updateDeal(dealId, plan.dealUpdates);
   await reviseDraftQuote(dealId);
   logOrgActivity(asUser(user), "revised", "agreement", updated.id, `Agreement revised: ${updated.brandName} — ${plan.lines.map((l) => l.label).join(", ")} (via Agent)`);

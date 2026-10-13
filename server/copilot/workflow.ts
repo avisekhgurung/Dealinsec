@@ -93,7 +93,7 @@ export async function getDealJourney(dealId: number, user: User, settings?: Loca
   } else if (!contract) {
     nextAction = { stage: "agreement", description: "Create the agreement (Pro feature)", route: `/deals/${dealId}/contract` };
   } else if (!signed) {
-    nextAction = { stage: "agreement", description: "Upload the signed proof to mark the agreement Signed", route: `/contracts/${contract.id}` };
+    nextAction = { stage: "agreement", description: "Get the agreement signed: send the client the signing link, or upload a copy they signed", route: `/contracts/${contract.id}` };
   } else if (dealInvoices.length === 0) {
     nextAction = { stage: "invoice", description: "Generate the invoice from the signed agreement", route: `/contracts/${contract.id}` };
   } else if (!paid) {

@@ -309,7 +309,8 @@ describe("15-16. authorization and confirmation", () => {
         useWorld(createWorld()); // a fresh world per case, so each is independent
         const deal = seedDeal(world());
         seedQuote(world(), deal.id);
-        const contract = tool === "create_agreement" ? null : seedContract(world(), deal.id);
+        // An invoice needs a signed agreement (server-side rule); the signing link needs an unsigned one.
+        const contract = tool === "create_agreement" ? null : seedContract(world(), deal.id, tool === "create_invoice" ? { signedByBrand: true, status: "Signed" } : {});
         const inv = seedInvoice(world(), deal.id);
         const args = { share_quotation: { dealId: deal.id }, create_agreement: { dealId: deal.id }, create_signing_link: { dealId: deal.id }, create_invoice: { dealId: deal.id, contractId: contract?.id }, mark_paid: { invoiceId: inv.id } }[tool]!;
         const r = await run({ text: `do ${tool}`, autonomy, steps: [call(tool, args), say("Needs your OK.")] });

@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { hasProAccess, hasLapsedTrial } from "@shared/schema";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
+import { isAgreementSigned } from "@shared/agreement-lifecycle";
 import { useAuth } from "@/hooks/useAuth";
 import { useMoney } from "@/hooks/use-locale";
 import { useUpgradeModal } from "@/components/upgrade-modal";
@@ -88,7 +89,7 @@ export function PickParentDialog({
   const { rows, excludedNote } = useMemo(() => {
     const quotedDealIds = new Set(quotes.map((q) => q.dealId));
     const contractByDeal = new Map(contracts.map((c) => [c.dealId, c]));
-    const isSigned = (c: Contract) => c.status === "Signed" || !!c.signedByBrand;
+    const isSigned = isAgreementSigned;
 
     if (kind === "quotation") {
       const eligible = deals.filter((d) => !quotedDealIds.has(d.id));
@@ -142,7 +143,7 @@ export function PickParentDialog({
         subtitle: c.contractName,
         amountLabel: `${money(remaining)} remaining`,
         group: isSigned(c) ? "ready" : "second",
-        warn: isSigned(c) ? undefined : "Signed proof not uploaded yet",
+        warn: isSigned(c) ? undefined : "Not signed yet — open it to send for signature",
       });
     }
     return {
@@ -170,6 +171,13 @@ export function PickParentDialog({
   const pick = (row: Row) => {
     if (kind === "invoice") {
       const c = contracts.find((x) => x.id === row.id)!;
+      // The server refuses to invoice an unsigned agreement, so open the
+      // agreement instead, where it can be sent for signature.
+      if (!isAgreementSigned(c)) {
+        close();
+        setLocation(row.route);
+        return;
+      }
       const invoiced = invoices
         .filter((i) => i.contractId === c.id || i.dealId === c.dealId)
         .reduce((s, i) => s + (i.dealAmountMinor || 0), 0);
@@ -191,7 +199,7 @@ export function PickParentDialog({
   };
 
   const secondLabel =
-    kind === "agreement" ? "Not quoted yet — most people send the quotation first" : "Waiting for signed proof — safer to upload it first";
+    kind === "agreement" ? "Not quoted yet — most people send the quotation first" : "Waiting for the client's signature — invoicing opens once it's signed";
 
   return (
     <Dialog open={open} onOpenChange={(v) => (v ? onOpenChange(true) : close())}>

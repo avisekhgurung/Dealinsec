@@ -704,7 +704,7 @@ export default function ContractDetailsPage() {
                     <p className="font-medium text-sm">{hasInvoice ? "Generate another invoice" : `Generate Invoice for ${party}`}</p>
                     <p className="text-xs text-muted-foreground">
                       {contract.status !== "Signed"
-                        ? "Upload signed contract proof to enable billing"
+                        ? "Send it for signature or upload a signed copy to enable billing"
                         : hasInvoice
                         ? "Invoice amounts or terms changed? Create a new one anytime."
                         : `Create a professional invoice to send to ${contract.brandName}`}
