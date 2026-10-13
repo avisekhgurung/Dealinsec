@@ -10,7 +10,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocale, useMoney } from "@/hooks/use-locale";
 import { memberCan } from "@shared/permissions";
-import { isAgreementSigned } from "@shared/agreement-lifecycle";
+import { canEditEstamp, isAgreementSigned } from "@shared/agreement-lifecycle";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -787,6 +787,11 @@ export default function ContractDetailsPage() {
                   </a>{" "}
                   (the government-authorised e-stamping portal) or your state portal.
                 </p>
+                {!canEditEstamp(contract) && (
+                  <p className="text-xs text-muted-foreground mb-3" data-testid="text-estamp-locked">
+                    Signed by the client — the stamp details are now fixed.
+                  </p>
+                )}
                 <div className="space-y-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="estamp-no" className="text-xs">Certificate number</Label>
@@ -820,7 +825,7 @@ export default function ContractDetailsPage() {
                   <Button
                     className="w-full h-9 text-sm gradient-btn text-white"
                     onClick={() => saveEstamp.mutate()}
-                    disabled={saveEstamp.isPending || !fmt.ready}
+                    disabled={saveEstamp.isPending || !fmt.ready || !canEditEstamp(contract)}
                     data-testid="button-save-estamp"
                   >
                     {saveEstamp.isPending

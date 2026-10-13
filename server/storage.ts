@@ -52,6 +52,8 @@ export interface IStorage {
   revokeContractShare(id: number): Promise<Contract | undefined>;
   /** The owner-attested signed copy: Signed, unless the client signed online. undefined = refused (409). */
   recordContractProof(id: number, proof: { proofFileName: string; proofFilePath: string }): Promise<Contract | undefined>;
+  /** Record or clear the e-stamp reference while the client hasn't signed. undefined = refused (409). */
+  setContractEstamp(id: number, estamp: Pick<Contract, "estampCertificateNo" | "estampDate" | "estampAmountMinor" | "estampAuthority">): Promise<Contract | undefined>;
   /** Revise the terms of an agreement nobody has signed (optionally revoking its link). undefined = refused (409). */
   reviseUnsignedContract(id: number, updates: Partial<Contract>, opts: { revokeLink: boolean }): Promise<Contract | undefined>;
   getContractsForBrand(brandUserId: string): Promise<Contract[]>;
@@ -269,6 +271,19 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(contracts)
       .set({ proofFileName: proof.proofFileName, proofFilePath: proof.proofFilePath, status: "Signed", signedByBrand: true, signedDate: new Date().toISOString() })
       .where(and(eq(contracts.id, id), isNull(contracts.clientSignedAt)))
+      .returning();
+    return updated;
+  }
+
+  async setContractEstamp(id: number, estamp: Pick<Contract, "estampCertificateNo" | "estampDate" | "estampAmountMinor" | "estampAuthority">): Promise<Contract | undefined> {
+    const [updated] = await db.update(contracts)
+      .set({
+        estampCertificateNo: estamp.estampCertificateNo,
+        estampDate: estamp.estampDate,
+        estampAmountMinor: estamp.estampAmountMinor,
+        estampAuthority: estamp.estampAuthority,
+      })
+      .where(and(eq(contracts.id, id), eq(contracts.signedByBrand, false), isNull(contracts.clientSignedAt)))
       .returning();
     return updated;
   }

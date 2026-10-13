@@ -35,7 +35,7 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import { uploadFileToImageKit, isImageKitConfigured, deleteFromImageKit } from "./imagekitClient";
-import { parseContractCreateBody, newAgreementLifecycleFields } from "@shared/agreement-lifecycle";
+import { parseContractCreateBody, newAgreementLifecycleFields, canEditEstamp } from "@shared/agreement-lifecycle";
 import { UPLOAD_DIR, checkProofUpload, recordProofUpload, proofDownload, attachmentDownload, checkAttachmentUpload, recordAttachmentUpload, invoiceAgreementFor, type DownloadResult } from "./services/agreement-files";
 import {
   isRazorpayConfigured,
@@ -516,6 +516,8 @@ export async function invoiceableRemainingMinor(
     .reduce((sum, i) => sum + (i.dealAmountMinor || 0), 0);
   return Number(contract.contractValueMinor) - alreadyInvoiced;
 }
+
+const ESTAMP_LOCKED = "The client has signed this agreement, so its stamp details can't change. Record stamp details before sending it for signature.";
 
 const uploadDir = UPLOAD_DIR;
 
@@ -1046,6 +1048,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const contract = await storage.getContract(parseInt(req.params.id));
       if (!contract) return res.status(404).json({ error: "Agreement not found" });
       if (!inOrg(contract, req.user)) return res.status(403).json({ error: "Access denied" });
+      // The stamp reference prints on the agreement but isn't in what the client
+      // signed, so it is frozen once they have (rechecked atomically below).
+      if (!canEditEstamp(contract)) return res.status(409).json({ code: "signed", error: ESTAMP_LOCKED });
 
       const certificateNo = String(req.body?.estampCertificateNo ?? "").trim();
       const clear = certificateNo === "";
@@ -1073,12 +1078,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Typed, not `as any`: the cast is what let the rupee-era key keep
       // compiling after the column was renamed.
-      const updated = await storage.updateContract(parseInt(req.params.id), {
+      const updated = await storage.setContractEstamp(contract.id, {
         estampCertificateNo: clear ? null : certificateNo,
-        estampDate: clear ? null : (String(req.body?.estampDate ?? "").trim() || null),
+        estampDate: clear ? null : (String(req.body?.estampDate ?? "").trim().slice(0, 30) || null),
         estampAmountMinor: clear ? null : amount,
         estampAuthority: clear ? null : (String(req.body?.estampAuthority ?? "").trim().slice(0, 120) || null),
       });
+      if (!updated) return res.status(409).json({ code: "signed", error: ESTAMP_LOCKED });
 
       logOrgActivity(req.user, clear ? "removed the e-stamp reference from" : "recorded an e-stamp certificate on",
         "agreement", contract.id, clear ? contract.brandName : `${certificateNo} · ${contract.brandName}`);

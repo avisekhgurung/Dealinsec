@@ -12,7 +12,7 @@
 import { FakeLeadsStore } from "./leads-fake";
 import {
   assertNewAgreementRow, assertNoProtectedContractFields, assertRevisableOnly,
-  canClaimSignature, canRecordProof, canRevise, canShare, statusAfterRevoke, statusAfterShare,
+  canClaimSignature, canEditEstamp, canRecordProof, canRevise, canShare, statusAfterRevoke, statusAfterShare,
 } from "@shared/agreement-lifecycle";
 
 export interface Row { [k: string]: any }
@@ -138,6 +138,12 @@ export function createWorld(): World {
     recordContractProof: guard(async (id: number, p: { proofFileName: string; proofFilePath: string }) => {
       const c = w.contracts.find((x) => x.id === id); if (!c || !canRecordProof(c)) return undefined;
       Object.assign(c, { ...p, status: "Signed", signedByBrand: true, signedDate: new Date().toISOString() });
+      return copy(c);
+    }),
+    setContractEstamp: guard(async (id: number, e: Row) => {
+      const c = w.contracts.find((x) => x.id === id); if (!c || !canEditEstamp(c)) return undefined;
+      const { estampCertificateNo, estampDate, estampAmountMinor, estampAuthority } = e;
+      Object.assign(c, { estampCertificateNo, estampDate, estampAmountMinor, estampAuthority });
       return copy(c);
     }),
     reviseUnsignedContract: guard(async (id: number, u: Row, opts: { revokeLink: boolean }) => {

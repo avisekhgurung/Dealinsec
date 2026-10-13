@@ -124,6 +124,7 @@ describe("the reported vulnerability, end to end", () => {
     expect(world().contracts[0]).toMatchObject({ status: "Draft", signedByBrand: false });
     expect(world().contracts[0].proofFilePath).toBeUndefined();
     await expect(world().storage.updateContract(c.id, { clientShareViewCount: 2 })).resolves.toMatchObject({ clientShareViewCount: 2 });
+    await expect(world().storage.updateContract(c.id, { estampCertificateNo: "IN-DL1" })).rejects.toThrow(/protected agreement field/);
   });
 });
 
@@ -347,11 +348,12 @@ describe("route wiring (source check: the routes call the guarded services)", ()
 });
 
 describe("existing records are read exactly as before (no migration)", () => {
-  it("an older web agreement stored as \"Signed\" without a client signature: still invoiceable, still shareable, still signable online", async () => {
+  it("an older web agreement stored as \"Signed\" without a client signature: still invoiceable, still shareable, still signable online, stamp still editable", async () => {
     const c = draft({ status: "Signed" });
     expect(await invoiceAgreementFor(OWNER(), c.dealId, undefined)).toMatchObject({ ok: true });
     const token = ((await createAgreementSignLink(OWNER(), c.id)) as any).url.slice(3);
     expect(world().contracts[0].status).toBe("Signed"); // never rewritten to Pending
+    expect(await world().storage.setContractEstamp(c.id, { estampCertificateNo: "IN-DL1", estampDate: null, estampAmountMinor: null, estampAuthority: null })).toBeTruthy();
     expect(await signOnline(c.id, token)).toBeTruthy();
     expect(integrity(c.id)).toBe("verified");
   });
@@ -364,9 +366,10 @@ describe("existing records are read exactly as before (no migration)", () => {
       expect(world().contracts[0].status, status).toBe(status === "Active" ? "Active" : "Pending");
     }
   });
-  it("an older proof-signed row: invoiceable, and its proof can be replaced by another owner-attested copy", async () => {
+  it("an older proof-signed row: invoiceable, stamp frozen, its proof can be replaced by another owner-attested copy", async () => {
     const c = draft({ status: "Signed", signedByBrand: true, proofFilePath: path.join(UPLOAD_DIR, "1700000000000-1.pdf"), proofFileName: "old.pdf" });
     expect(await invoiceAgreementFor(OWNER(), c.dealId, undefined)).toMatchObject({ ok: true });
+    expect(await world().storage.setContractEstamp(c.id, { estampCertificateNo: "X", estampDate: null, estampAmountMinor: null, estampAuthority: null })).toBeUndefined();
     expect((await recordProofUpload(OWNER(), c.id, upload("newer.pdf"))).ok).toBe(true);
     expect(world().contracts[0].proofFileName).toBe("newer.pdf");
   });
@@ -377,6 +380,7 @@ describe("existing records are read exactly as before (no migration)", () => {
     expect(await invoiceAgreementFor(OWNER(), c.dealId, undefined)).toMatchObject({ ok: true });
     expect(await checkProofUpload(OWNER(), c.id)).toMatchObject({ ok: false, code: "signed_online" });
     expect(await createAgreementSignLink(OWNER(), c.id)).toMatchObject({ ok: false, status: 409 });
+    expect(await world().storage.setContractEstamp(c.id, { estampCertificateNo: "X", estampDate: null, estampAmountMinor: null, estampAuthority: null })).toBeUndefined();
     expect(integrity(c.id)).toBe("verified");
   });
 });
@@ -478,6 +482,28 @@ describe("follow-up: invoice documents (attachments)", () => {
     expect(await checkAttachmentUpload(OTHER_ORG(), inv.id)).toMatchObject({ ok: false, status: 403 });
     world().billing.set("org-1", { id: "u1", plan: "free" });
     expect(await checkAttachmentUpload(OWNER(), inv.id)).toMatchObject({ ok: false, code: "UPGRADE_REQUIRED" });
+  });
+});
+
+describe("follow-up: e-stamp details are frozen once the client has signed", () => {
+  const stamp = { estampCertificateNo: "IN-DL12345", estampDate: "2026-10-01", estampAmountMinor: 50_000, estampAuthority: "SHCIL" };
+  it("editable on a Draft; refused after an online signature or an owner-attested copy", async () => {
+    const a = draft();
+    expect(await world().storage.setContractEstamp(a.id, stamp)).toMatchObject(stamp);
+    const token = ((await createAgreementSignLink(OWNER(), a.id)) as any).url.slice(3);
+    await signOnline(a.id, token);
+    expect(await world().storage.setContractEstamp(a.id, { ...stamp, estampCertificateNo: "IN-DL99999" })).toBeUndefined();
+    expect(world().contracts.find((x) => x.id === a.id)!.estampCertificateNo).toBe("IN-DL12345");
+    const b = draft();
+    await recordProofUpload(OWNER(), b.id, upload());
+    expect(await world().storage.setContractEstamp(b.id, stamp)).toBeUndefined();
+  });
+  it("the route checks first and storage decides at write time (an edit that read the row before signing is refused)", () => {
+    const src = fs.readFileSync(path.join(__dirname, "../../routes.ts"), "utf8");
+    const route = src.slice(src.indexOf('app.patch("/api/contracts/:id/estamp"'), src.indexOf('app.get("/api/contracts/:id/proof"'));
+    expect(route).toContain("if (!canEditEstamp(contract))");
+    expect(route).toContain("await storage.setContractEstamp(");
+    expect(route).not.toContain("storage.updateContract(");
   });
 });
 

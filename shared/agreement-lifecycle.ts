@@ -88,6 +88,8 @@ export const PROTECTED_CONTRACT_FIELDS = [
   "clientShareToken", "clientSignShareSnapshot", "clientSharedAt", "clientShareRevokedAt",
   // the owner-attested proof
   "proofFilePath", "proofFileName",
+  // the e-stamp reference: it prints on the agreement, so it is frozen once the client has signed
+  "estampCertificateNo", "estampDate", "estampAmountMinor", "estampAuthority",
   // identity and issue
   "id", "userId", "organizationId", "dealId", "currency", "issuerSnapshot",
   // the issuer's own signature
@@ -160,6 +162,14 @@ export const canClaimSignature = (c: LifecycleRow, token: string): boolean =>
 export const canRecordProof = (c: LifecycleRow): boolean => !c.clientSignedAt;
 /** A revision may change only an agreement nobody has signed. */
 export const canRevise = (c: LifecycleRow): boolean => !c.signedByBrand && !c.clientSignedAt;
+/**
+ * The e-stamp reference prints on the agreement but is not part of the signed
+ * snapshot or its hash, so once the client has signed (online, or by an
+ * owner-attested copy) it is frozen: otherwise a "signed" document could show a
+ * stamp the client never saw. An older row stored as "Signed" that no client
+ * ever signed stays editable.
+ */
+export const canEditEstamp = (c: LifecycleRow): boolean => !c.signedByBrand && !c.clientSignedAt;
 
 // ── Invoicing ────────────────────────────────────────────────────────────
 

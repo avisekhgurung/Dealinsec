@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   PROTECTED_CONTRACT_FIELDS, ProtectedContractFieldError, assertNewAgreementRow, assertNoProtectedContractFields, assertRevisableOnly,
-  canClaimSignature, canRecordProof, canRevise, canShare, invoiceEligibility, isAgreementSigned, newAgreementLifecycleFields,
+  canClaimSignature, canEditEstamp, canRecordProof, canRevise, canShare, invoiceEligibility, isAgreementSigned, newAgreementLifecycleFields,
   parseContractCreateBody, statusAfterRevoke, statusAfterShare,
 } from "./agreement-lifecycle";
 
@@ -37,7 +37,9 @@ describe("agreement create: a strict allowlist", () => {
 describe("protected fields: only the dedicated writers change them", () => {
   it("a general update with any protected field throws, naming the fields; ordinary fields pass", () => {
     for (const k of PROTECTED_CONTRACT_FIELDS) expect(() => assertNoProtectedContractFields({ [k]: null }), k).toThrow(ProtectedContractFieldError);
-    expect(() => assertNoProtectedContractFields({ estampCertificateNo: "IN-DL1", estampAmountMinor: 50000, clientShareViewCount: 3 })).not.toThrow();
+    expect(() => assertNoProtectedContractFields({ clientShareViewCount: 3 })).not.toThrow();
+    // The e-stamp reference changes only through its own writer (frozen once the client has signed).
+    expect(() => assertNoProtectedContractFields({ estampCertificateNo: "IN-DL1" })).toThrow(ProtectedContractFieldError);
     try { assertNoProtectedContractFields({ status: "Signed", proofFilePath: "/x" }); } catch (e: any) { expect(e.fields).toEqual(["status", "proofFilePath"]); }
   });
   it("a revision may change only the terms", () => {
@@ -87,6 +89,10 @@ describe("lifecycle: Draft → Pending → Signed, and nothing else reaches Sign
   it("revisions: only while nobody has signed", () => {
     expect(canRevise(draft) && canRevise(pending)).toBe(true);
     expect(canRevise(signedOnline) || canRevise(signedByProof)).toBe(false);
+  });
+  it("e-stamp: editable until the client signs (online or by an uploaded copy); an older status-only Signed row stays editable", () => {
+    expect(canEditEstamp(draft) && canEditEstamp(pending) && canEditEstamp({ ...draft, status: "Signed" })).toBe(true);
+    expect(canEditEstamp(signedOnline) || canEditEstamp(signedByProof)).toBe(false);
   });
 });
 
