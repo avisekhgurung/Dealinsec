@@ -1,6 +1,6 @@
 import { randomBytes } from "crypto";
 import { db } from "./db";
-import { eq, desc, sql, and, isNull } from "drizzle-orm";
+import { eq, asc, desc, sql, and, isNull } from "drizzle-orm";
 import { assertNoProtectedContractFields, assertNewAgreementRow, assertRevisableOnly } from "@shared/agreement-lifecycle";
 import { canonicalEmail } from "@shared/email";
 import { DEFAULT_ROLE_SEEDS } from "@shared/permissions";
@@ -23,6 +23,9 @@ import {
 } from "@shared/schema";
 import { formatInvoiceNumber, invoiceSeriesPeriod, resolveInvoiceSeries } from "@shared/invoice-numbering";
 
+/** Advisory lock key for agreement creation, per deal: pg_advisory_xact_lock(AGREEMENT_CREATE_LOCK, dealId). */
+export const AGREEMENT_CREATE_LOCK = 7_310_010;
+
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -42,6 +45,11 @@ export interface IStorage {
   getContractByDealId(dealId: number): Promise<Contract | undefined>;
   getContractByShareToken(token: string): Promise<Contract | undefined>;
   createContract(contract: InsertContract): Promise<Contract>;
+  /**
+   * The one way the app creates an agreement: under a per-deal lock, inside a transaction, it re-checks for an
+   * existing agreement and inserts only if there is none. Concurrent requests for one deal can't both insert.
+   */
+  createContractOnce(contract: InsertContract): Promise<{ created: true; contract: Contract } | { created: false; existing: Contract }>;
   /** General edits only: throws on any PROTECTED_CONTRACT_FIELDS key (status, signature, link, proof, identity). */
   updateContract(id: number, updates: Partial<Contract>): Promise<Contract | undefined>;
   /** The client's signature, once, and only through the link that is live now. undefined = refused (409). */
@@ -220,7 +228,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getContractByDealId(dealId: number): Promise<Contract | undefined> {
-    const [contract] = await db.select().from(contracts).where(eq(contracts.dealId, dealId));
+    // Deterministic even where an older race left two agreements on one deal:
+    // the signed one first, then the oldest.
+    const [contract] = await db.select().from(contracts).where(eq(contracts.dealId, dealId))
+      .orderBy(desc(contracts.signedByBrand), asc(contracts.id)).limit(1);
     return contract;
   }
 
@@ -235,6 +246,19 @@ export class DatabaseStorage implements IStorage {
     assertNewAgreementRow(contract as Record<string, unknown>);
     const [created] = await db.insert(contracts).values(contract as any).returning();
     return created;
+  }
+
+  async createContractOnce(contract: InsertContract): Promise<{ created: true; contract: Contract } | { created: false; existing: Contract }> {
+    assertNewAgreementRow(contract as Record<string, unknown>);
+    return db.transaction(async (tx) => {
+      // Two-int advisory lock (its own key space, apart from the bigint budget locks), released at commit.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${AGREEMENT_CREATE_LOCK}::int, ${contract.dealId}::int)`);
+      const [existing] = await tx.select().from(contracts).where(eq(contracts.dealId, contract.dealId))
+        .orderBy(desc(contracts.signedByBrand), asc(contracts.id)).limit(1);
+      if (existing) return { created: false as const, existing };
+      const [created] = await tx.insert(contracts).values(contract as any).returning();
+      return { created: true as const, contract: created };
+    });
   }
 
   async updateContract(id: number, updates: Partial<Contract>): Promise<Contract | undefined> {

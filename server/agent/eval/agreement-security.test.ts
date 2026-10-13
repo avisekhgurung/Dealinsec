@@ -43,6 +43,7 @@ vi.mock("../../imagekitClient", () => ({
 }));
 
 import { computeDocumentHash, verifyDocumentHash } from "@shared/contractSign";
+import { newAgreementLifecycleFields } from "@shared/agreement-lifecycle";
 import { executeCreateAgreement, executeCreateInvoice } from "../../copilot/tools";
 import { createAgreementSignLink } from "../../services/sharing";
 import { applyAgreementRevision } from "../../services/revisions";
@@ -603,5 +604,49 @@ describe("G: attachment and proof routes answer errors safely", () => {
     expect(mutation).toContain("parseApiError(err)");
     expect(mutation).toContain("parsed.errorId");
     expect(mutation).not.toContain('"Failed to upload proof. Please try again."');
+  });
+});
+
+describe("H: one agreement per deal, created through one locked method", () => {
+  it("five concurrent Copilot creates for one deal: exactly one agreement, the rest told it exists", async () => {
+    const deal = seedDeal(world());
+    const results = await Promise.all(Array.from({ length: 5 }, () => executeCreateAgreement({ dealId: deal.id }, OWNER())));
+    expect(world().contracts.filter((c) => c.dealId === deal.id)).toHaveLength(1);
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    for (const r of results.filter((x) => !x.ok)) expect((r as any).message).toMatch(/already exists/);
+  });
+  it("the shared create refuses when an agreement already exists and returns it; a new one is a blank Draft", async () => {
+    const deal = seedDeal(world());
+    const row = { userId: "u1", organizationId: "org-1", dealId: deal.id, contractName: "x", brandName: "x", startDate: "2026-10-01", endDate: "2026-11-01", contractValueMinor: 100, currency: "INR", ...newAgreementLifecycleFields() };
+    const first = await world().storage.createContractOnce(row);
+    expect(first).toMatchObject({ created: true, contract: { status: "Draft" } });
+    expect(await world().storage.createContractOnce(row)).toMatchObject({ created: false, existing: { id: first.contract.id } });
+    await expect(world().storage.createContractOnce({ ...row, dealId: seedDeal(world()).id, status: "Signed" })).rejects.toThrow(/protected agreement field/);
+  });
+  it("lookup is deterministic where an older race left duplicates: the signed one, else the oldest", async () => {
+    const deal = seedDeal(world());
+    const older = seedContract(world(), deal.id, { status: "Draft", signedByBrand: false });
+    const signed = seedContract(world(), deal.id, { status: "Signed", signedByBrand: true });
+    expect((await world().storage.getContractByDealId(deal.id)).id).toBe(signed.id);
+    expect(await invoiceAgreementFor(OWNER(), deal.id, undefined)).toMatchObject({ ok: true, contract: { id: signed.id } });
+    const deal2 = seedDeal(world());
+    const a = seedContract(world(), deal2.id, { status: "Draft" });
+    seedContract(world(), deal2.id, { status: "Draft" });
+    expect((await world().storage.getContractByDealId(deal2.id)).id).toBe(a.id);
+    expect(older.id).toBeLessThan(signed.id);
+  });
+  it("wiring: both paths use the locked create; storage locks per deal inside a transaction; no unique index yet", () => {
+    const routes = fs.readFileSync(path.join(__dirname, "../../routes.ts"), "utf8");
+    const tools = fs.readFileSync(path.join(__dirname, "../../copilot/tools.ts"), "utf8");
+    const storageSrc = fs.readFileSync(path.join(__dirname, "../../storage.ts"), "utf8");
+    const schemaSrc = fs.readFileSync(path.join(__dirname, "../../../shared/schema.ts"), "utf8");
+    for (const src of [routes, tools]) { expect(src).toContain("storage.createContractOnce("); expect(src).not.toContain("storage.createContract("); }
+    const once = storageSrc.slice(storageSrc.indexOf("async createContractOnce("), storageSrc.indexOf("async updateContract("));
+    expect(once).toMatch(/db\.transaction\(/);
+    expect(once).toMatch(/pg_advisory_xact_lock\(\$\{AGREEMENT_CREATE_LOCK\}::int, \$\{contract\.dealId\}::int\)/);
+    expect(once.indexOf("pg_advisory_xact_lock")).toBeLessThan(once.indexOf("tx.select()"));
+    expect(once.indexOf("tx.select()")).toBeLessThan(once.indexOf("tx.insert("));
+    const contractsTable = schemaSrc.slice(schemaSrc.indexOf('export const contracts = pgTable("contracts"'), schemaSrc.indexOf("export const insertContractSchema"));
+    expect(contractsTable).not.toMatch(/unique\w*\([^)]*deal/i);
   });
 });

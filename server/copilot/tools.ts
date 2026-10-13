@@ -633,14 +633,11 @@ export async function executeCreateAgreement(rawArgs: any, user: User) {
   });
   if (!parsed.success) return { ok: false as const, message: "Those details don't form a valid agreement — try creating it from the deal page." };
 
-  // Re-check just before writing: two confirms racing on the same deal must
-  // not both pass the one-per-deal rule (registerProposal doesn't lock across
-  // proposal ids the way it locks a single id's own repeat).
-  const stillNone = !(await storage.getContractByDealId(built.dealId));
-  if (!stillNone) return { ok: false as const, message: "An agreement already exists for this deal now." };
-
+  // Two confirms racing on the same deal (or this and the REST route) must not
+  // both create: the shared create re-checks under a per-deal lock and inserts
+  // only if there is still no agreement.
   const { settings, issued } = await issuingContext(user);
-  const contract = await storage.createContract({
+  const once = await storage.createContractOnce({
     ...parsed.data,
     ...issued,
     signedByInfluencer: true,
@@ -648,6 +645,8 @@ export async function executeCreateAgreement(rawArgs: any, user: User) {
     // Server-owned, last: a new agreement is a Draft until the client signs it or the owner uploads a signed copy.
     ...newAgreementLifecycleFields(),
   } as any);
+  if (!once.created) return { ok: false as const, message: "An agreement already exists for this deal now." };
+  const contract = once.contract;
   logOrgActivity(user, "created", "agreement", contract.id, `Agreement: ${contract.brandName} (via Copilot)`);
   await storage.updateDeal(contract.dealId, { status: "Active" });
   // The same contract-signed email POST /api/contracts sends the creator.

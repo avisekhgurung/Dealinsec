@@ -1010,7 +1010,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // online signing claim or an owner-attested proof upload makes it Signed.
         ...newAgreementLifecycleFields(),
       };
-      const contract = await storage.createContract(contractData);
+      // The check above is only a fast path. Two requests can both pass it, so
+      // the insert itself runs under a per-deal lock that re-checks (shared with
+      // Copilot's create, so neither path can race the other).
+      const once = await storage.createContractOnce(contractData);
+      if (!once.created) {
+        return res.status(409).json({
+          error: "An agreement already exists for this deal.",
+          contractId: once.existing.id,
+        });
+      }
+      const contract = once.contract;
       logOrgActivity(req.user, "created", "agreement", contract.id, `Agreement: ${contract.brandName}`);
 
       await storage.updateDeal(contract.dealId, { status: "Active" });

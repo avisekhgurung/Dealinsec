@@ -62,6 +62,8 @@ export function userRow(over: Row = {}): Row {
 
 /** Rows come back as copies, like rows from a database: a caller's snapshot doesn't change under it. */
 const copy = <T extends object | undefined>(r: T): T => (r ? ({ ...r } as T) : r);
+/** Several agreements on one deal (an older race): signed first, then the oldest — server/storage.ts's ORDER BY. */
+const byDealPreference = (rows: Row[]) => [...rows].sort((a, b) => Number(!!b.signedByBrand) - Number(!!a.signedByBrand) || a.id - b.id);
 
 export function createWorld(): World {
   const w: World = {
@@ -114,11 +116,21 @@ export function createWorld(): World {
     updateQuote: guard(async (id: number, u: Row) => { const q = w.quotes.find((x) => x.id === id); if (!q) return undefined; Object.assign(q, u); return copy(q); }),
 
     getContract: async (id: number) => copy(w.contracts.find((c) => c.id === id)),
-    getContractByDealId: async (dealId: number) => copy(w.contracts.find((c) => c.dealId === dealId)),
+    // Deterministic, as in server/storage.ts: the signed agreement first, then the oldest.
+    getContractByDealId: async (dealId: number) => copy(byDealPreference(w.contracts.filter((c) => c.dealId === dealId))[0]),
     getContractsByOrg: async (orgId: string, userId?: string) => w.contracts.filter((c) => visible(c, orgId, userId)),
     // The same rules as server/storage.ts: a new row must be a blank Draft, a general update can't touch a
     // protected field, and each dedicated writer applies its predicate to the row as it is at write time.
     createContract: guard(async (c: Row) => { assertNewAgreementRow(c); const row = { id: nextId(), signedByBrand: false, clientShareToken: null, clientShareRevokedAt: null, clientSignedAt: null, createdAt: new Date(), ...c }; w.contracts.push(row); return row; }),
+    // The shared create: the re-check and the insert happen in one step (the database does this under a per-deal lock).
+    createContractOnce: guard(async (c: Row) => {
+      assertNewAgreementRow(c);
+      const existing = byDealPreference(w.contracts.filter((x) => x.dealId === c.dealId))[0];
+      if (existing) return { created: false, existing: copy(existing) };
+      const row = { id: nextId(), signedByBrand: false, clientShareToken: null, clientShareRevokedAt: null, clientSignedAt: null, createdAt: new Date(), ...c };
+      w.contracts.push(row);
+      return { created: true, contract: copy(row) };
+    }),
     updateContract: guard(async (id: number, u: Row) => { assertNoProtectedContractFields(u); const c = w.contracts.find((x) => x.id === id); if (!c) return undefined; Object.assign(c, u); return copy(c); }),
     shareContract: guard(async (id: number, token: string, snapshot: unknown) => {
       const c = w.contracts.find((x) => x.id === id); if (!c || !canShare(c)) return undefined;
