@@ -12,7 +12,7 @@
 import fs from "fs";
 import path from "path";
 import { canReadModule, memberCan } from "@shared/permissions";
-import { hasProAccess, type Contract, type User } from "@shared/schema";
+import { hasProAccess, invoiceDocumentCategories, type BrandInvoice, type Contract, type InvoiceAttachment, type User } from "@shared/schema";
 import { invoiceEligibility, isSignedOnline } from "@shared/agreement-lifecycle";
 import { storage } from "../storage";
 import { getBillingUser, logOrgActivity } from "../entitlements";
@@ -126,11 +126,75 @@ export async function proofDownload(user: User, contractId: number): Promise<Dow
 }
 
 export async function attachmentDownload(user: User, attachmentId: number): Promise<DownloadResult> {
+  // An invoice's documents are invoice data: the same module-read rule as the invoice itself.
+  if (!canReadModule(user, "invoices")) return fail(403, "FORBIDDEN", "Your role doesn't include access to invoices.");
   const attachment = Number.isFinite(attachmentId) ? await storage.getInvoiceAttachment(attachmentId) : undefined;
   if (!attachment) return fail(404, "not_found", "Document not found");
   const parentInvoice = await storage.getBrandInvoice(attachment.brandInvoiceId);
   if (!inOrg(parentInvoice, user)) return fail(403, "forbidden", "Access denied");
   return served(classifyStoredFile(attachment.fileUrl, "attachment", storedFileConfig()), "attachment", attachment.id, user, safeDownloadName(attachment.fileName, "document"));
+}
+
+// ── Invoice attachment upload ────────────────────────────────────────────
+
+/** Before multer accepts the file: the invoice exists and is in this organization (role and plan are route middleware). */
+export async function checkAttachmentUpload(user: User, invoiceId: number): Promise<{ ok: true; invoice: BrandInvoice } | Fail> {
+  if (!memberCan(user, "invoices.create")) return fail(403, "FORBIDDEN", "Your role doesn't allow adding invoice documents.");
+  if (!hasProAccess(await getBillingUser(user))) return fail(403, "UPGRADE_REQUIRED", "Generating invoices requires DealInSec Pro");
+  const invoice = Number.isFinite(invoiceId) ? await storage.getBrandInvoice(invoiceId) : undefined;
+  if (!invoice) return fail(404, "not_found", "Invoice not found");
+  if (!inOrg(invoice, user)) return fail(403, "forbidden", "Access denied");
+  return { ok: true, invoice };
+}
+
+const MIME_BY_EXT: Record<string, string> = { ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" };
+
+/**
+ * Store an invoice document. Same discipline as the proof: content must match
+ * the extension, the stored name is a download name only, the type is the
+ * checked one (not the client's), and the temporary upload is removed on every
+ * refusal or failure (with ImageKit, after the transfer).
+ */
+export async function recordAttachmentUpload(user: User, invoiceId: number, file: (UploadedFile & { filename?: string }) | undefined, categoryRaw: unknown): Promise<{ ok: true; attachment: InvoiceAttachment } | Fail> {
+  if (!file) return fail(400, "no_file", "No file uploaded");
+  let kept = false;
+  let remote: { fileId: string } | null = null;
+  try {
+    const check = await checkAttachmentUpload(user, invoiceId);
+    if (!check.ok) return check;
+    if (!contentMatchesExtension(await firstBytes(file.path), file.originalname)) {
+      return fail(400, "file_content", "That file isn't a real PDF, JPG, PNG or WEBP.");
+    }
+    const category = (invoiceDocumentCategories as readonly string[]).includes(String(categoryRaw)) ? String(categoryRaw) : "Other";
+    let fileUrl = `/uploads/${file.filename ?? path.basename(file.path)}`;
+    if (isImageKitConfigured()) {
+      const uploaded = await uploadFileToImageKit(file, {
+        folder: "invoice-documents",
+        baseName: `invoice-${check.invoice.id}-${category.replace(/\s+/g, "-").toLowerCase()}`,
+      });
+      remote = { fileId: uploaded.fileId };
+      fileUrl = uploaded.url;
+    }
+    try {
+      const attachment = await storage.createInvoiceAttachment({
+        userId: user.id,
+        brandInvoiceId: check.invoice.id,
+        category,
+        fileName: safeDownloadName(file.originalname, "document"),
+        fileUrl,
+        fileId: remote?.fileId ?? null,
+        fileSize: file.size,
+        mimeType: MIME_BY_EXT[path.extname(file.originalname).toLowerCase()] ?? "application/octet-stream",
+      } as any);
+      kept = !remote;
+      return { ok: true, attachment };
+    } catch (err) {
+      if (remote) deleteFromImageKit(remote.fileId).catch(() => {});
+      throw err;
+    }
+  } finally {
+    if (!kept) await removeTemp(file.path);
+  }
 }
 
 // ── Invoice eligibility ──────────────────────────────────────────────────

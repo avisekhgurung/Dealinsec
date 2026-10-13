@@ -46,7 +46,7 @@ import { computeDocumentHash, verifyDocumentHash } from "@shared/contractSign";
 import { executeCreateAgreement, executeCreateInvoice } from "../../copilot/tools";
 import { createAgreementSignLink } from "../../services/sharing";
 import { applyAgreementRevision } from "../../services/revisions";
-import { attachmentDownload, checkProofUpload, invoiceAgreementFor, proofDownload, recordProofUpload, UPLOAD_DIR } from "../../services/agreement-files";
+import { attachmentDownload, checkAttachmentUpload, checkProofUpload, invoiceAgreementFor, proofDownload, recordAttachmentUpload, recordProofUpload, UPLOAD_DIR } from "../../services/agreement-files";
 import { useWorld } from "./world-mocks";
 import { createWorld, seedContract, seedDeal, userRow, ORG2, type Row, type World } from "./world";
 
@@ -436,5 +436,47 @@ describe("proof upload versus online signature: whichever lands first wins, neve
       if (sig) { expect(row.proofFilePath).toBeUndefined(); expect(integrity(c.id)).toBe("verified"); }
       else { expect(row.clientSignedAt).toBeNull(); expect(row.proofFileName).toBe("signed.pdf"); }
     }
+  });
+});
+
+describe("follow-up: invoice documents (attachments)", () => {
+  const seedInvoiceRow = (org = "org-1") => { const deal = seedDeal(world()); const inv = { id: 960 + world().invoices.length, organizationId: org, userId: org === "org-1" ? "u1" : "u2", dealId: deal.id }; world().invoices.push(inv); return inv; };
+  const store = () => { const rows: Row[] = []; world().storage.createInvoiceAttachment = async (a: Row) => { const r = { id: rows.length + 1, ...a }; rows.push(r); return r; }; world().storage.getInvoiceAttachment = async (id: number) => rows.find((r) => r.id === id); return rows; };
+  it("download needs invoice access: a custom role without it is refused; ACCOUNTS may", async () => {
+    const rows = store(); const inv = seedInvoiceRow();
+    rows.push({ id: 1, brandInvoiceId: inv.id, fileUrl: "/uploads/1791849718123-7.pdf", fileName: "r.pdf" });
+    expect(await attachmentDownload(CUSTOM_NO_AGREEMENTS(), 1)).toMatchObject({ ok: false, status: 403 });
+    expect(await attachmentDownload(ACCOUNTS(), 1)).toMatchObject({ ok: true });
+  });
+  it("upload: content must match the extension; the stored type is the checked one; refusals and failures remove the temporary file", async () => {
+    const rows = store(); const inv = seedInvoiceRow();
+    const fake = upload("receipt.png", "%PDF-1.7 not a png");
+    expect(await recordAttachmentUpload(OWNER(), inv.id, fake, "Other")).toMatchObject({ ok: false, status: 400, code: "file_content" });
+    expect(fs.existsSync(fake.path)).toBe(false);
+    const foreign = upload("r.pdf");
+    expect(await recordAttachmentUpload(OTHER_ORG(), inv.id, foreign, "Other")).toMatchObject({ ok: false, status: 403 });
+    expect(fs.existsSync(foreign.path)).toBe(false);
+    world().storage.createInvoiceAttachment = async () => { throw new Error("db down"); };
+    const failing = upload("r.pdf");
+    await expect(recordAttachmentUpload(OWNER(), inv.id, failing, "Other")).rejects.toThrow("db down");
+    expect(fs.existsSync(failing.path)).toBe(false);
+    expect(rows).toHaveLength(0);
+  });
+  it("upload: a good file is stored with a safe name and the checked type; with ImageKit the remote copy is deleted if saving fails", async () => {
+    const rows = store(); const inv = seedInvoiceRow();
+    const good = { ...upload("../x/My \"receipt\".pdf"), filename: "1791849718123-5.pdf" };
+    expect(await recordAttachmentUpload(OWNER(), inv.id, good, "nonsense")).toMatchObject({ ok: true });
+    expect(rows[0]).toMatchObject({ fileName: "My receipt.pdf", mimeType: "application/pdf", category: "Other", fileUrl: "/uploads/1791849718123-5.pdf" });
+    expect(fs.existsSync(good.path)).toBe(true); // a local upload is the stored document
+    ik.on = true;
+    world().storage.createInvoiceAttachment = async () => { throw new Error("db down"); };
+    await expect(recordAttachmentUpload(OWNER(), inv.id, upload("r.pdf"), "Other")).rejects.toThrow();
+    expect(ik.deleted).toEqual(["f1"]);
+  });
+  it("upload is refused before the file is accepted for another org or a lapsed plan", async () => {
+    const inv = seedInvoiceRow();
+    expect(await checkAttachmentUpload(OTHER_ORG(), inv.id)).toMatchObject({ ok: false, status: 403 });
+    world().billing.set("org-1", { id: "u1", plan: "free" });
+    expect(await checkAttachmentUpload(OWNER(), inv.id)).toMatchObject({ ok: false, code: "UPGRADE_REQUIRED" });
   });
 });

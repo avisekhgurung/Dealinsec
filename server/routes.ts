@@ -36,7 +36,7 @@ import fs from "fs";
 import crypto from "crypto";
 import { uploadFileToImageKit, isImageKitConfigured, deleteFromImageKit } from "./imagekitClient";
 import { parseContractCreateBody, newAgreementLifecycleFields } from "@shared/agreement-lifecycle";
-import { UPLOAD_DIR, checkProofUpload, recordProofUpload, proofDownload, attachmentDownload, invoiceAgreementFor, type DownloadResult } from "./services/agreement-files";
+import { UPLOAD_DIR, checkProofUpload, recordProofUpload, proofDownload, attachmentDownload, checkAttachmentUpload, recordAttachmentUpload, invoiceAgreementFor, type DownloadResult } from "./services/agreement-files";
 import {
   isRazorpayConfigured,
   getRazorpayKeyId,
@@ -1495,39 +1495,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/brand-invoices/:id/attachments", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.create"), upload.single("file"), async (req: any, res) => {
+  // Invoice documents: the invoice is checked BEFORE multer writes the file;
+  // content check, transfer and cleanup follow (server/services/agreement-files.ts).
+  const attachmentUploadPrecheck = async (req: any, res: any, next: any) => {
     try {
-      const invoice = await storage.getBrandInvoice(parseInt(req.params.id));
-      if (!invoice) return res.status(404).json({ error: "Invoice not found" });
-      if (!inOrg(invoice, req.user)) return res.status(403).json({ error: "Access denied" });
-      if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-
-      const category = invoiceDocumentCategories.includes(req.body.category)
-        ? req.body.category
-        : "Other";
-
-      // Store on ImageKit so files survive redeploys; fall back to local path.
-      let fileUrl = `/uploads/${req.file.filename}`;
-      let fileId: string | null = null;
-      if (isImageKitConfigured()) {
-        const uploaded = await uploadFileToImageKit(req.file, {
-          folder: "invoice-documents",
-          baseName: `invoice-${invoice.id}-${String(category).replace(/\s+/g, "-").toLowerCase()}`,
-        });
-        fileUrl = uploaded.url;
-        fileId = uploaded.fileId;
-      }
-
-      const attachment = await storage.createInvoiceAttachment({
-        userId: req.user.id,
-        brandInvoiceId: invoice.id,
-        category,
-        fileName: req.file.originalname,
-        fileUrl,
-        fileId,
-        fileSize: req.file.size,
-        mimeType: req.file.mimetype,
-      });
+      const r = await checkAttachmentUpload(req.user, parseInt(req.params.id, 10));
+      if (!r.ok) return res.status(r.status).json({ code: r.code, error: r.error });
+      next();
+    } catch (error) {
+      console.error("Attachment upload check error:", error);
+      res.status(500).json({ error: "Failed to upload document" });
+    }
+  };
+  app.post("/api/brand-invoices/:id/attachments", isAuthenticated, requirePro("invoices"), requireOrgPermission("invoices.create"), attachmentUploadPrecheck, upload.single("file"), async (req: any, res) => {
+    try {
+      const r = await recordAttachmentUpload(req.user, parseInt(req.params.id, 10), req.file, req.body?.category);
+      if (!r.ok) return res.status(r.status).json({ code: r.code, error: r.error });
+      const attachment = r.attachment;
       res.status(201).json(attachment);
     } catch (error: any) {
       console.error("Attachment upload error:", error);
@@ -1545,7 +1529,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Download a document — redirect to CDN URL or stream a legacy local file.
-  app.get("/api/attachments/:id/download", isAuthenticated, async (req: any, res) => {
+  app.get("/api/attachments/:id/download", isAuthenticated, requireModuleRead("invoices"), async (req: any, res) => {
     try {
       // Same rule as the proof download: only this app's own upload shapes are served.
       sendStoredFile(res, await attachmentDownload(req.user, parseInt(req.params.id, 10)));
