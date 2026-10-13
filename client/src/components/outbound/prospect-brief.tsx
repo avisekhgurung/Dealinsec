@@ -1,12 +1,14 @@
 /**
- * The AI brief for one prospect: the score and why, then what is KNOWN (facts and signals, each with its quote and
+ * The AI brief for one prospect: where it stands (ICP fit, research readiness, contact readiness and outreach
+ * eligibility, kept apart, each with what blocks it and a safe next step), the score and why, then what is KNOWN (facts and signals, each with its quote and
  * page), who to reach, and what is only INFERRED (pain points, opportunities), kept visibly apart. Actions: research
  * again, find contacts (when a data provider is connected), generate the outreach angle, add to Leads.
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "wouter";
-import { CircleHelp, ExternalLink, Flame, Lightbulb, Loader2, RefreshCw, Sparkles, UserRound, UserSearch } from "lucide-react";
+import { CheckCircle2, CircleDashed, CircleHelp, ExternalLink, Flame, Lightbulb, Loader2, RefreshCw, Sparkles, UserRound, UserSearch, XCircle } from "lucide-react";
+import { MISSING_CONTACT, MISSING_REASON } from "@shared/prospect";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +20,71 @@ import { cn } from "@/lib/utils";
 import { ScoreBadge } from "./prospect-card";
 
 const CONF: Record<string, string> = { low: "Mostly unknown", medium: "Partly known", high: "Well measured" };
+const SOURCE: Record<string, string> = { website: "their website", provider: "a data provider", search: "a search result", derived: "worked out from other findings" };
+const STATUS: Record<string, string> = { confirmed: "confirmed", inferred: "inferred, not confirmed", unknown: "unknown", conflicting: "sources disagree" };
+const day = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : null);
+
+/** Where a finding came from and how sure it is: source type, validation status, confidence. Never more than is stored. */
+function Provenance({ e }: { e: Evidence }) {
+  const bits = [`From ${SOURCE[e.source] ?? e.source}`, STATUS[e.status] ?? e.status, e.confidence ? `${e.confidence} confidence` : null].filter(Boolean);
+  return <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{bits.join(" · ")}</p>;
+}
+
+type State = "ok" | "partial" | "blocked" | "unknown";
+function StateRow({ title, state, label, children }: { title: string; state: State; label: string; children?: React.ReactNode }) {
+  const Icon = state === "ok" ? CheckCircle2 : state === "blocked" ? XCircle : state === "partial" ? CircleDashed : CircleHelp;
+  return (
+    <div className="rounded-lg border px-3 py-2" data-testid={`qual-${title.toLowerCase().replace(/\W+/g, "-")}`}>
+      <p className="flex items-center gap-1.5 text-sm"><Icon className={cn("h-4 w-4 shrink-0", state === "ok" ? "text-emerald-600" : state === "blocked" ? "text-red-600" : state === "partial" ? "text-amber-600" : "text-muted-foreground")} /><span className="font-medium">{title}:</span> {label}</p>
+      {children && <div className="mt-1 space-y-0.5 pl-5 text-xs text-muted-foreground">{children}</div>}
+    </div>
+  );
+}
+
+/** The four states, never merged: a verified email doesn't make a prospect ready, and a ready one doesn't make its contact verified. */
+function Qualification({ b }: { b: Brief }) {
+  const p = b.prospect;
+  const blockers = p.blockers ?? p.score?.readyMissing ?? [];
+  const research = blockers.filter((m) => m !== MISSING_CONTACT);
+  const fit = p.fit?.verdict;
+  const fitState: State = fit === "strong" ? "ok" : fit === "partial" ? "partial" : fit === "weak" || fit === "excluded" ? "blocked" : "unknown";
+  const fitLabel = fit === "strong" ? "Match" : fit === "partial" ? "Partial match" : fit === "weak" || fit === "excluded" ? "Not qualified" : "Not known";
+  const cls = p.classification;
+  const researchState: State = p.rejectReason ? "blocked" : cls === "ready" ? "ok" : cls === "not_a_fit" ? "blocked" : research.length ? "partial" : "ok";
+  const senior = b.people.filter((e) => e.senior && e.status === "confirmed");
+  const verified = b.people.filter((e) => e.meta?.email && e.meta?.emailStatus === "verified");
+  const unverified = b.people.filter((e) => e.meta?.email && e.meta?.emailStatus !== "verified");
+  const companyEmail = b.facts.find((e) => e.type === "business_email");
+  const form = b.facts.find((e) => e.type === "contact_form" && e.label === "Contact page");
+  const phone = b.facts.find((e) => e.type === "business_phone");
+  const contactOk = !blockers.includes(MISSING_CONTACT);
+  return (
+    <Section title="Where it stands" hint="four separate checks">
+      <StateRow title="ICP fit" state={fitState} label={fitLabel}>
+        {p.fit?.headline && <p>{p.fit.headline}</p>}
+        {(p.fit?.signals ?? []).map((sg) => <p key={sg.key} className={sg.status === "match" ? "text-emerald-700 dark:text-emerald-400" : undefined}>{sg.status === "match" ? "✓" : sg.status === "mismatch" ? "✗" : "?"} {sg.detail}</p>)}
+      </StateRow>
+      <StateRow title="Research readiness" state={researchState} label={`${p.rejectLabel ? `Set aside · ${p.rejectLabel}` : p.classificationLabel ?? (p.ready ? "Ready" : "Not ready")}${p.timingLabel ? ` · ${p.timingLabel}` : ""}`}>
+        {research.map((m) => <p key={m}>Missing: {m}</p>)}
+        {research.includes(MISSING_REASON) && <p className="font-medium text-foreground">Next: research again to look for a recent, dated reason. Old or year-only dates don't count.</p>}
+        {research.includes("a verified website") && <p className="font-medium text-foreground">Next: open their website and check it yourself.</p>}
+      </StateRow>
+      <StateRow title="Contact readiness" state={contactOk ? (verified.length ? "ok" : "partial") : "blocked"} label={contactOk ? (verified.length ? "A provider-verified email" : "A way in, not a verified email") : "No way to reach a person yet"}>
+        {senior.length > 0 && <p>Decision maker named on their site: {senior.map((e) => e.meta?.name ?? e.value).join(", ")}</p>}
+        {verified.length > 0 && <p>Verified by {String(verified[0].meta?.provider ?? "the provider")}: {verified.map((e) => e.meta?.email).join(", ")}</p>}
+        {unverified.length > 0 && <p>Not verified: {unverified.map((e) => e.meta?.email).join(", ")}</p>}
+        {companyEmail && <p>Company email on their site: {companyEmail.value}</p>}
+        {phone && <p>Company phone on their site: {phone.value}</p>}
+        {form && <p>Contact form on their site</p>}
+        {!contactOk && <p className="font-medium text-foreground">Next: {b.providers.contact ? "look a contact up with the connected provider, or " : ""}add them to Leads and enter the contact by hand.</p>}
+        <p>A verified email alone doesn't make a prospect ready, and readiness doesn't mean the contact is verified.</p>
+      </StateRow>
+      <StateRow title="Outreach eligibility" state={p.leadId ? "partial" : "unknown"} label={p.leadId ? "Decided on the lead" : "Not assessed here"}>
+        <p>{p.leadId ? "Outreach is drafted and approved on the lead, where do-not-contact and approval rules apply." : "Nothing is sent from AI Outbound. Add it to Leads to draft outreach for your approval; consent and do-not-contact are checked there."}</p>
+      </StateRow>
+    </Section>
+  );
+}
 
 function Section({ title, tone, children, hint }: { title: string; tone?: "fact" | "signal" | "inference"; hint?: string; children: React.ReactNode }) {
   return (
@@ -41,7 +108,7 @@ function Quote({ e }: { e: Evidence }) {
   );
 }
 
-export function ProspectBrief({ id, runId, open, onOpenChange, canEdit }: { id: number | null; runId: string; open: boolean; onOpenChange: (o: boolean) => void; canEdit: boolean }) {
+export function ProspectBrief({ id, runId, open, onOpenChange, canEdit }: { id: number | null; runId: string | null; open: boolean; onOpenChange: (o: boolean) => void; canEdit: boolean }) {
   const { toast } = useToast();
   const q = useQuery<{ brief: Brief }>({ queryKey: [id ? prospectUrl(id) : "none"], enabled: !!id && open });
   const [contact, setContact] = useState<number | null>(null);
@@ -63,7 +130,12 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit }: { id: 
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl" data-testid="prospect-brief-sheet">
         {!b || !p ? (
-          <div className="space-y-3 pt-8">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}</div>
+          <div className="space-y-3 pt-8" aria-busy="true">
+            {/* The dialog needs a title for screen readers while the brief loads. */}
+            <SheetTitle className="sr-only">Loading the prospect's details</SheetTitle>
+            <SheetDescription className="sr-only">The company, its contact, evidence and where it stands.</SheetDescription>
+            {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
+          </div>
         ) : (
           <div className="space-y-5 pb-8">
             <SheetHeader className="space-y-1 text-left">
@@ -84,8 +156,8 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit }: { id: 
 
             {canEdit && (
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={() => research.mutate()} disabled={busy} data-testid="brief-research">{research.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}Research again</Button>
-                <Button size="sm" variant="outline" onClick={() => contacts.mutate()} disabled={busy || !b.providers.contact} title={b.providers.contact ? undefined : "Connect a contact data provider (Hunter) to look people up"} data-testid="brief-contacts">{contacts.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <UserSearch className="mr-1.5 h-4 w-4" />}Find contact</Button>
+                <Button size="sm" variant="outline" onClick={() => research.mutate()} disabled={busy || !runId} title={runId ? undefined : "No search found this company, so it can't be researched again here"} data-testid="brief-research">{research.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}Research again</Button>
+                <Button size="sm" variant="outline" onClick={() => contacts.mutate()} disabled={busy || !b.providers.contact || !runId} title={!b.providers.contact ? "Connect a contact data provider (Hunter) to look people up" : !runId ? "No search found this company, so contacts can't be looked up here" : undefined} data-testid="brief-contacts">{contacts.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <UserSearch className="mr-1.5 h-4 w-4" />}Find contact</Button>
                 <Button size="sm" variant="outline" onClick={() => angle.mutate()} disabled={busy} data-testid="brief-angle">{angle.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}{b.angle ? "New angle" : "Generate angle"}</Button>
                 {p.leadId ? (
                   <Button size="sm" asChild><Link href={`/leads/${p.leadId}`}>Open lead · draft outreach</Link></Button>
@@ -95,6 +167,8 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit }: { id: 
               </div>
             )}
             {!b.providers.contact && <p className="-mt-3 text-[11px] text-muted-foreground">People shown come from the company's own website. Connect a contact data provider to look up business emails.</p>}
+
+            <Qualification b={b} />
 
             {b.angle && (
               <Section title="Outreach angle" tone="inference" hint={`${b.angle.confidence} confidence · from ${b.angle.evidenceIds.length} finding${b.angle.evidenceIds.length === 1 ? "" : "s"}`}>
@@ -126,7 +200,7 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit }: { id: 
               {b.signals.length ? b.signals.map((e) => (
                 <div key={e.id} className={cn("rounded-lg px-3 py-2 text-sm", e.timing === "strong" ? "bg-orange-50/70 dark:bg-orange-950/20" : "border")}>
                   <p className={cn("flex items-center gap-1.5 text-[11px] font-semibold", e.timing === "strong" ? "text-orange-700 dark:text-orange-400" : "text-muted-foreground")}>{e.timing === "strong" && <Flame className="h-3 w-3" />}{e.label} · {e.date ?? e.freshness}{e.freshness && e.date && e.freshness !== "Undated" ? ` (${e.freshness.toLowerCase()})` : ""} · {e.timing === "strong" ? "strong timing" : e.timing === "context" ? "context, not urgency" : e.timing === "stale" ? "over a year old" : "no usable date"}</p>
-                  <p className="break-words">{e.value}</p><Quote e={e} />
+                  <p className="break-words">{e.value}</p><Quote e={e} /><Provenance e={e} />
                 </div>
               )) : <p className="text-sm text-muted-foreground">No dated change found on their site{p.researched ? "." : " yet. Research it to look."}</p>}
             </Section>
@@ -139,8 +213,11 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit }: { id: 
                   <span className="min-w-0">
                     <span className="block break-words font-medium">{e.value}</span>
                     <span className={cn("block text-[11px]", e.senior ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>{e.senior ? "Decision maker" : "Employee · not a senior decision-maker"}</span>
+                    {e.meta?.title && <span className="block text-xs">{String(e.meta.title)}</span>}
                     {e.meta?.email && <span className="block text-xs">{e.meta.email} · <span className={e.meta.emailStatus === "verified" ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}>{e.meta.emailStatus === "verified" ? "verified by provider" : e.meta.emailStatus === "accept_all" ? "domain accepts all (unverified)" : "not verified"}</span></span>}
                     <Quote e={e} />
+                    {/* The person's own provenance, apart from any research evidence about the company. */}
+                    <span className="block text-[10px] uppercase tracking-wide text-muted-foreground">{e.source === "provider" ? `Contact from ${String(e.meta?.provider ?? "a data provider")}` : "Named on their website"}{e.retrievedAt ? ` · checked ${day(e.retrievedAt)}` : ""} · no phone or LinkedIn stored</span>
                   </span>
                 </label>
               )) : <p className="text-sm text-muted-foreground">No one named with a role on their website.</p>}
@@ -149,7 +226,7 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit }: { id: 
 
             <Section title="Facts" tone="fact" hint="each with the words from their site">
               {b.facts.length ? b.facts.map((e) => (
-                <div key={e.id} className="text-sm"><span className="text-xs text-muted-foreground">{e.label}:</span> <span className="break-words">{e.value}</span><Quote e={e} /></div>
+                <div key={e.id} className="text-sm"><span className="text-xs text-muted-foreground">{e.label}:</span> <span className="break-words">{e.value}</span><Quote e={e} /><Provenance e={e} /></div>
               )) : <p className="text-sm text-muted-foreground">Nothing confirmed yet.</p>}
             </Section>
 
@@ -160,7 +237,7 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit }: { id: 
                     <p className="flex items-center gap-1.5 text-[11px] font-semibold text-violet-700 dark:text-violet-400"><Lightbulb className="h-3 w-3" />{e.label}{e.source === "provider" ? " · data provider" : ""}</p>
                     <p className="break-words">{e.value}</p>
                     {!!e.supports?.length && <p className="text-[11px] text-muted-foreground">Based on {e.supports.length} finding{e.supports.length === 1 ? "" : "s"} above.</p>}
-                    <Quote e={e} />
+                    <Quote e={e} /><Provenance e={e} />
                   </div>
                 ))}
               </Section>

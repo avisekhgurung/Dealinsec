@@ -245,6 +245,10 @@ export const outboundStoreMock = () => {
       async prospectMatching(orgId: string, m: { domain: string | null; name: string }) { return copy(o().prospects.find((x) => x.organizationId === orgId && (m.domain ? x.domain === m.domain : x.name.toLowerCase() === m.name.toLowerCase())) ?? null); },
       async prospectsLike(orgId: string, text: string, limit: number) { const t = text.toLowerCase(); return o().prospects.filter((x) => x.organizationId === orgId && (x.name.toLowerCase().includes(t) || x.domain.includes(t))).sort((a, b) => b.id - a.id).slice(0, limit).map(copy); },
       async prospectByLead(orgId: string, leadId: number) { return copy(o().prospects.find((x) => x.organizationId === orgId && x.leadId === leadId) ?? null); },
+      async listProspects(orgId: string, limit: number) {
+        const latest = (id: number) => o().items.filter((i) => i.organizationId === orgId && i.prospectId === id).sort((a, b) => b.updatedAt - a.updatedAt || b.id - a.id)[0]?.runId ?? null;
+        return o().prospects.filter((x) => x.organizationId === orgId).sort((a, b) => b.id - a.id).slice(0, limit).map((p) => ({ ...copy(p), latestRunId: latest(p.id) }));
+      },
       async addRunItem(i: any) {
         ro();
         if (o().items.some((x) => x.runId === i.runId && x.prospectId === i.prospectId)) return;

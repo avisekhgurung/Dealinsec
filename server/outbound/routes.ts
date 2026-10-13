@@ -7,6 +7,8 @@
  *   GET  /api/outbound/runs                      recent runs
  *   GET  /api/outbound/runs/:id                  a run's funnel and its prospect cards
  *   POST /api/outbound/runs/:id/cancel           stop a run
+ *   GET  /api/outbound/prospects                 the workspace table: one page of the organization's prospects (filters, sort, page in the query)
+ *   POST /api/outbound/prospects/export          a CSV or XLSX file of selected or filter-matched prospects
  *   GET  /api/outbound/prospects/:id             the brief: facts, signals, people, inferences, opportunities, angle
  *   POST /api/outbound/prospects/:id/research    research again now   ({ runId })
  *   POST /api/outbound/prospects/:id/contacts    named people from the connected contact provider ({ runId })
@@ -17,6 +19,7 @@ import type { Express, Response } from "express";
 import { isAuthenticated } from "../auth";
 import { agentLog } from "../agent/log";
 import * as svc from "./service";
+import { exportProspects, listWorkspace } from "./workspace";
 
 export function registerOutboundRoutes(app: Express) {
   const send = (res: Response, r: any, ok: (r: any) => Record<string, unknown>, status = 200) => {
@@ -41,6 +44,17 @@ export function registerOutboundRoutes(app: Express) {
   app.get("/api/outbound/runs", isAuthenticated, guarded("outbound_runs", async (req, res) => send(res, await svc.listRuns(req.user), (r) => ({ runs: r.runs }))));
   app.get("/api/outbound/runs/:id", isAuthenticated, guarded("outbound_run", async (req, res) => send(res, await svc.getRun(req.user, String(req.params.id).slice(0, 40)), (r) => ({ run: r.run, prospects: r.prospects }))));
   app.post("/api/outbound/runs/:id/cancel", isAuthenticated, guarded("outbound_cancel", async (req, res) => send(res, await svc.cancelRun(req.user, String(req.params.id).slice(0, 40)), (r) => ({ run: r.run }))));
+  app.get("/api/outbound/prospects", isAuthenticated, guarded("outbound_workspace", async (req, res) => send(res, await listWorkspace(req.user, req.query ?? {}), (r) => ({ rows: r.rows, page: r.page, pageCount: r.pageCount, pageSize: r.pageSize, sort: r.sort, dir: r.dir, summary: r.summary, facets: r.facets, asOf: r.asOf, truncated: r.truncated }))));
+  app.post("/api/outbound/prospects/export", isAuthenticated, guarded("outbound_export", async (req, res) => {
+    const r = await exportProspects(req.user, req.body);
+    if (!r.ok) return res.status(r.status).json({ code: r.code, error: r.message, ...(typeof (r as any).count === "number" ? { count: (r as any).count } : {}) });
+    res.setHeader("Content-Type", r.contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${r.filename}"`);
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Export-Count", String(r.count));
+    res.status(200).end(r.body);
+  }));
   app.get("/api/outbound/prospects/:id", isAuthenticated, guarded("outbound_prospect", async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); send(res, await svc.getProspect(req.user, id), (r) => ({ brief: r.brief })); }));
   app.post("/api/outbound/prospects/:id/research", isAuthenticated, guarded("outbound_research", async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); send(res, await svc.researchProspect(req.user, id, req.body?.runId), (r) => ({ brief: r.brief })); }));
   app.post("/api/outbound/prospects/:id/contacts", isAuthenticated, guarded("outbound_contacts", async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); send(res, await svc.findContacts(req.user, id, req.body?.runId), (r) => ({ brief: r.brief, found: r.found })); }));

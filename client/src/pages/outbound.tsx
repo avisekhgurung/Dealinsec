@@ -5,11 +5,13 @@
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { useLocation, useSearch } from "wouter";
 import { ArrowRight, CheckCircle2, Loader2, Radar, Search, Square, X } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { ProspectBrief } from "@/components/outbound/prospect-brief";
 import { ProspectCard } from "@/components/outbound/prospect-card";
+import { ProspectWorkspace } from "@/components/outbound/prospect-workspace";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -112,7 +114,12 @@ export default function OutboundPage() {
   const [text, setText] = useState("");
   const [parsed, setParsed] = useState<ParsedIcp | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
-  const [open, setOpen] = useState<Card_ | null>(null);
+  // The drawer: a prospect, and the search it belongs to (research and contact lookups are tied to a run).
+  const [open, setOpen] = useState<{ id: number; runId: string | null } | null>(null);
+  const search = useSearch();
+  const [location, navigate] = useLocation();
+  const view = new URLSearchParams(search).get("view") === "prospects" ? "prospects" : "searches";
+  const setView = (v: "prospects" | "searches") => navigate(v === "prospects" ? `${location}?view=prospects` : location, { replace: true });
   const runs = useQuery<{ runs: RunView[] }>({ queryKey: [OUTBOUND_RUNS_URL], retry: false, refetchInterval: (q) => (q.state.data?.runs.some((r) => r.status === "running") ? 5000 : false) });
   // Open the most recent run on arrival, once.
   useEffect(() => { if (!runId && runs.data?.runs.length) setRunId(runs.data.runs[0].id); }, [runs.data, runId]);
@@ -124,7 +131,7 @@ export default function OutboundPage() {
   });
   const start = useMutation({
     mutationFn: () => leadCall<{ run: RunView; existing: boolean }>("POST", OUTBOUND_RUNS_URL, { request: text, icp: parsed!.icp, searches: parsed!.searches }),
-    onSuccess: (r) => { setRunId(r.run.id); setParsed(null); setText(""); if (r.existing) toast({ title: "That search is already running" }); void queryClient.invalidateQueries({ queryKey: [OUTBOUND_RUNS_URL] }); },
+    onSuccess: (r) => { setRunId(r.run.id); setParsed(null); setText(""); if (view === "prospects") setView("searches"); if (r.existing) toast({ title: "That search is already running" }); void queryClient.invalidateQueries({ queryKey: [OUTBOUND_RUNS_URL] }); },
     onError: (e) => toast({ title: "Couldn't start the search", description: leadError(e), variant: "destructive" }),
   });
   const icp = parsed?.icp;
@@ -184,6 +191,13 @@ export default function OutboundPage() {
               <p className="text-sm text-muted-foreground">You can see searches your team ran. Ask your owner for permission to start one.</p>
             )}
 
+            <div className="flex gap-1 rounded-xl border bg-muted/40 p-1 sm:w-fit" role="tablist" aria-label="AI Outbound views">
+              {([["searches", "Searches"], ["prospects", "All prospects"]] as const).map(([v, label]) => (
+                <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={cn("flex-1 rounded-lg px-4 py-1.5 text-sm font-medium sm:flex-none", view === v ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground")} data-testid={`view-${v}`}>{label}</button>
+              ))}
+            </div>
+
+            {view === "prospects" ? <ProspectWorkspace canExport={canEdit} onOpen={(r) => setOpen({ id: r.id, runId: r.latestRunId })} /> : <>
             {runs.data && runs.data.runs.length > 1 && (
               <div className="-mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:flex-wrap lg:px-0" role="tablist" aria-label="Recent searches">
                 {runs.data.runs.slice(0, 8).map((r) => (
@@ -192,13 +206,14 @@ export default function OutboundPage() {
               </div>
             )}
 
-            {runId ? <RunPanel key={runId} id={runId} canEdit={canEdit} onOpen={setOpen} />
+            {runId ? <RunPanel key={runId} id={runId} canEdit={canEdit} onOpen={(p) => setOpen({ id: p.id, runId })} />
               : runs.isLoading ? <Skeleton className="h-40 w-full rounded-2xl" />
               : <p className="rounded-2xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">Your searches will show up here, with who to contact and why now.</p>}
+            </>}
           </>
         )}
       </main>
-      {runId && <ProspectBrief id={open?.id ?? null} runId={runId} open={!!open} onOpenChange={(o) => !o && setOpen(null)} canEdit={canEdit} />}
+      <ProspectBrief id={open?.id ?? null} runId={open?.runId ?? null} open={!!open} onOpenChange={(o) => !o && setOpen(null)} canEdit={canEdit} />
       <BottomNav />
     </div>
   );

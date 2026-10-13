@@ -61,6 +61,8 @@ export interface OutboundStore {
   prospectMatching(orgId: string, m: { domain: string | null; name: string }): Promise<ProspectRow | null>;
   /** Prospects whose name or domain contains the text (case-insensitive), newest first. */
   prospectsLike(orgId: string, text: string, limit: number): Promise<ProspectRow[]>;
+  /** The organization's prospects for the workspace table, newest first (at most `limit`), each with the run that last touched it. */
+  listProspects(orgId: string, limit: number): Promise<(ProspectRow & { latestRunId: string | null })[]>;
 
   addRunItem(i: { runId: string; orgId: string; prospectId: number; stage: string; now: Date }): Promise<void>;
   /** Items of a run in a stage, due now, best rank first. */
@@ -200,6 +202,17 @@ export const outboundStore: OutboundStore = {
   async prospectsLike(orgId, text, limit) {
     const t = `%${text.toLowerCase().replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
     return db.select().from(prospects).where(and(eq(prospects.organizationId, orgId), sql`(lower(${prospects.name}) LIKE ${t} OR ${prospects.domain} LIKE ${t})`)).orderBy(desc(prospects.id)).limit(limit);
+  },
+
+  async listProspects(orgId, limit) {
+    const ps = await db.select().from(prospects).where(eq(prospects.organizationId, orgId)).orderBy(desc(prospects.id)).limit(limit);
+    if (!ps.length) return [];
+    // One row per prospect (DISTINCT ON), so a prospect found by several runs is never listed twice.
+    const latest = await db.selectDistinctOn([prospectRunItems.prospectId], { prospectId: prospectRunItems.prospectId, runId: prospectRunItems.runId })
+      .from(prospectRunItems).where(and(eq(prospectRunItems.organizationId, orgId), inArray(prospectRunItems.prospectId, ps.map((p) => p.id))))
+      .orderBy(prospectRunItems.prospectId, desc(prospectRunItems.updatedAt), desc(prospectRunItems.id));
+    const run = new Map(latest.map((r) => [r.prospectId, r.runId]));
+    return ps.map((p) => ({ ...p, latestRunId: run.get(p.id) ?? null }));
   },
 
   async addRunItem(i) {

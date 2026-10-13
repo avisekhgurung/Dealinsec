@@ -3,6 +3,8 @@ export const OUTBOUND_RUNS_URL = "/api/outbound/runs";
 export const runUrl = (id: string) => `/api/outbound/runs/${id}`;
 export const prospectUrl = (id: number, action = "") => `/api/outbound/prospects/${id}${action ? `/${action}` : ""}`;
 export const ICP_URL = "/api/outbound/icp";
+export const WORKSPACE_URL = "/api/outbound/prospects";
+export const EXPORT_URL = "/api/outbound/prospects/export";
 
 export interface Icp {
   industry: string; keywords: string[]; countries: string[]; locations: string[]; employeeMin: number | null; employeeMax: number | null;
@@ -22,13 +24,14 @@ export interface RunView {
 export interface Evidence {
   id: number; kind: "fact" | "signal" | "decision_maker" | "opportunity"; type: string; label: string; value: string; status: string;
   source: string; url: string | null; quote: string | null; observedAt: string | null; freshness?: string; date?: string; datePrecision?: "day" | "month" | "year" | null; timing?: "strong" | "context" | "stale" | "undated" | "none"; senior?: boolean; supports?: number[]; meta?: Record<string, any>;
+  confidence?: "high" | "medium" | "low"; retrievedAt?: string | null;
 }
 export interface ScoreComponent { key: string; label: string; max: number; points: number | null; reason: string }
 export interface ProspectCard {
   id: number; runItemId?: number; name: string; domain: string; website: string; status: string; stage?: string; rejectReason: string | null; rejectLabel: string | null;
   score: { total: number; knownMax: number; unknownPoints: number; confidence: "low" | "medium" | "high"; components: ScoreComponent[]; missing: string[]; readyMissing?: string[] } | null;
   ready: boolean; fit: { verdict: string; headline: string; signals: { key: string; label: string; status: string; detail: string }[] } | null;
-  classification?: "ready" | "qualified" | "insufficient_evidence" | "not_a_fit"; classificationLabel?: string; timing?: "strong" | "context" | "stale" | "undated" | "none"; timingLabel?: string;
+  classification?: "ready" | "qualified" | "insufficient_evidence" | "not_a_fit"; classificationLabel?: string; timing?: "strong" | "context" | "stale" | "undated" | "none"; timingLabel?: string; blockers?: string[];
   profile: { industry: string | null; location: string | null; country: string | null; employees: string | null; serves: string | null };
   whyNow: Evidence | null; opportunity: Evidence | null; decisionMaker: Evidence | null; contactPerson?: Evidence | null; evidenceCount: number; leadId: number | null; researched: boolean;
 }

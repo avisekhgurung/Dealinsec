@@ -152,13 +152,15 @@ export async function cancelRun(user: Who, id: string, d: Partial<PipelineDeps> 
 /* ── 3. prospects: the card and the brief ───────────────────────────────── */
 
 /** For a signal: `date` is the date at the precision the page gave ("14 Sep 2026", "Sep 2026", "2026 (year only)", "Undated"); `freshness` its age band, or "Undated" when no usable date. */
-export interface Evidence { id: number; kind: string; type: string; label: string; value: string; status: string; source: string; url: string | null; quote: string | null; observedAt: string | null; freshness?: string; date?: string; datePrecision?: string | null; timing?: Timing; senior?: boolean; supports?: number[]; meta?: Record<string, unknown> }
+export interface Evidence { id: number; kind: string; type: string; label: string; value: string; status: string; source: string; url: string | null; quote: string | null; observedAt: string | null; freshness?: string; date?: string; datePrecision?: string | null; timing?: Timing; senior?: boolean; supports?: number[]; meta?: Record<string, unknown>; confidence: string; retrievedAt: string | null }
 export interface ProspectCard {
   id: number; runItemId?: number; name: string; domain: string; website: string; status: string; stage?: string; rejectReason: string | null; rejectLabel: string | null;
   score: { total: number; knownMax: number; unknownPoints: number; confidence: string; components: { key: string; label: string; max: number; points: number | null; reason: string }[]; missing: string[]; readyMissing?: string[] } | null;
   ready: boolean; fit: { verdict: string; headline: string; signals: { key: string; label: string; status: string; detail: string }[] } | null;
   /** Where it stands (shared/prospect.ts readiness): ready / qualified / insufficient evidence / not a fit, and the timing of its best signal. */
   classification: ProspectClass; classificationLabel: string; timing: Timing; timingLabel: string;
+  /** What the readiness rule says is still missing today (shared/prospect.ts readiness `missing`), worked out from the stored evidence. */
+  blockers: string[];
   profile: { industry: string | null; location: string | null; country: string | null; employees: string | null; serves: string | null };
   /** The best signal: a strong timing signal when there is one, otherwise context (see `timing`). Never a stale one. */
   /** decisionMaker: a SENIOR decision-maker only. contactPerson: when there is none, the best other named employee (a real person, not a decision-maker). */
@@ -169,7 +171,7 @@ const LABEL: Record<string, string> = { description: "What it does", services: "
 
 const likeOf = (f: ProspectFindingRow): FindingLike => ({ id: f.id, kind: f.kind, type: f.type, value: f.value, status: f.status, sourceUrl: f.sourceUrl, observedAt: f.observedAt, retrievedAt: f.retrievedAt, meta: f.meta as Record<string, unknown> });
 
-function evidenceOf(f: ProspectFindingRow, now: Date): Evidence {
+export function evidenceOf(f: ProspectFindingRow, now: Date): Evidence {
   const d = f.kind === "signal" ? signalDating(likeOf(f), now) : null;
   const fr = d ? (d.usable ? { band: d.band } : { band: "unknown" as const }) : null;
   // A named employee who is not a senior decision-maker is labelled for what they are.
@@ -177,6 +179,7 @@ function evidenceOf(f: ProspectFindingRow, now: Date): Evidence {
   return {
     id: f.id, kind: f.kind, type: f.type, label, value: f.value, status: f.status, source: f.sourceType, url: f.sourceUrl, quote: f.quote, observedAt: iso(f.observedAt),
     freshness: fr ? FRESHNESS_LABEL[fr.band] : undefined, date: d ? dateLabel(likeOf(f)) : undefined, datePrecision: d ? d.precision : undefined, timing: d ? timingOf([{ ...likeOf(f), status: "confirmed" }], now).timing : undefined, supports: (f.supportingIds as number[]) ?? [], meta: f.kind === "decision_maker" ? (f.meta as Record<string, unknown>) : undefined, senior: f.kind === "decision_maker" ? senior(f) : undefined,
+    confidence: f.confidence, retrievedAt: iso(f.retrievedAt),
   };
 }
 
@@ -214,7 +217,7 @@ export function prospectCard(p: ProspectRow, fs: ProspectFindingRow[], now: Date
   return {
     id: p.id, runItemId: item?.id, name: p.name, domain: p.domain, website: p.website, status: p.status, stage: item?.stage, rejectReason: reason, rejectLabel: reason ? REJECT_LABEL[reason] ?? reason : null,
     score: (p.score as any) ?? null, ready: p.ready, fit: fit ? { verdict: fit.verdict, headline: fit.headline, signals: fit.signals ?? [] } : null,
-    classification, classificationLabel: PROSPECT_CLASS_LABEL[classification], timing: r.timing, timingLabel: TIMING_LABEL[r.timing],
+    classification, classificationLabel: PROSPECT_CLASS_LABEL[classification], timing: r.timing, timingLabel: TIMING_LABEL[r.timing], blockers: r.missing,
     profile: { industry: prof.industry?.value ?? null, location: prof.location?.value ?? null, country: prof.country?.value ?? null, employees: prof.team_size?.value ?? null, serves: prof.target_customers?.value ?? null },
     whyNow: sig ? evidenceOf(sig, now) : null, opportunity: opp ? evidenceOf(opp, now) : null, decisionMaker: person && senior(person) ? evidenceOf(person, now) : null, contactPerson: person && !senior(person) ? evidenceOf(person, now) : null,
     evidenceCount: fs.filter((f) => f.kind !== "opportunity").length, leadId: p.leadId, researched: fs.some((f) => f.batch === "research"),
