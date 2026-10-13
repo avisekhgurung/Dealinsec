@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { countryFromDomain, describeIcp, isSeniorDecisionMaker, icpSchema, industryMatched, mergeIcp, parseHeadcount, parseIcpFallback, prospectFit, roleRank, searchStrategies, singular, withSavedExclusions, MAX_QUANTITY, type Icp } from "./icp";
+import { countryFromDomain, describeIcp, isSeniorDecisionMaker, icpSchema, industryMatched, marketWord, mergeIcp, parseHeadcount, parseIcpFallback, prospectFit, queryKey, roleRank, searchStrategies, singular, withSavedExclusions, MAX_QUANTITY, type Icp } from "./icp";
+import { sanitizeQuery } from "./discovery";
 
 const DOD = "Find 30 US digital marketing agencies with 5–30 employees that serve SaaS companies.";
 const icp = (over: Partial<Icp> = {}): Icp => icpSchema.parse({ industry: "digital marketing agency", countries: ["US"], employeeMin: 5, employeeMax: 30, targetMarket: ["SaaS"], quantity: 30, ...over });
@@ -78,6 +79,116 @@ describe("search strategies", () => {
     expect(new Set(qs.map((q) => q.toLowerCase())).size).toBe(qs.length);
     expect(qs.some((q) => /SaaS/.test(q))).toBe(true);
     expect(qs.some((q) => /United States/.test(q))).toBe(true);
+  });
+  // The plan the code built before market-led phrasings, for an ICP with no market (that behaviour must not change).
+  const NO_MARKET_BEFORE = ["digital marketing agency United States", "SEO agency United States", "boutique digital marketing agency United States", "growth marketing agency United States", "PPC agency United States"];
+  it("with a market, every phrasing names it: the two phrasings that left it out are now market-led (A, B and C)", () => {
+    const qs = searchStrategies(icp({ targetMarket: ["SaaS companies"], keywords: ["SEO agency", "growth marketing agency", "PPC agency"] }));
+    expect(qs).toEqual([
+      "digital marketing agency for SaaS companies United States",  // A
+      "SaaS digital marketing agency United States",                // C (was "digital marketing agency United States")
+      "SEO agency for SaaS companies United States",                // A
+      "SaaS SEO agency United States",                              // C (was "SEO agency United States")
+      "digital marketing agency SaaS companies clients case study", // B, unchanged
+      "boutique SaaS digital marketing agency United States",
+      "growth marketing agency SaaS companies United States",
+      "PPC agency SaaS companies United States",
+    ]);
+    expect(qs.every((q) => /\bSaaS\b/.test(q))).toBe(true);
+  });
+  it("another market is named the same way, by the word a company would put in front ('healthcare brands' -> 'healthcare')", () => {
+    expect(marketWord("healthcare brands")).toBe("healthcare");
+    expect(marketWord("SaaS companies")).toBe("SaaS");
+    expect(marketWord("SaaS")).toBe("SaaS");
+    expect(marketWord("early stage B2B fintech software companies")).toBe(""); // too long to lead a phrase: the whole market is used
+    const qs = searchStrategies(icp({ industry: "SEO agency", targetMarket: ["healthcare brands"], keywords: ["content marketing agency"] }));
+    expect(qs.slice(0, 4)).toEqual(["SEO agency for healthcare brands United States", "healthcare SEO agency United States", "content marketing agency for healthcare brands United States", "healthcare content marketing agency United States"]);
+    expect(qs.every((q) => /healthcare/.test(q))).toBe(true);
+    expect(searchStrategies(icp({ targetMarket: ["early stage B2B fintech software companies"] })).every((q) => /fintech/.test(q))).toBe(true);
+  });
+  it("a keyword that already names the market is never doubled ('SaaS marketing agency SaaS case studies' can't happen)", () => {
+    const qs = searchStrategies(icp({ industry: "SaaS marketing agency", targetMarket: ["SaaS companies"], keywords: ["SaaS SEO agency", "growth marketing agency"] }));
+    for (const q of qs) expect(q.match(/\bsaas\b/gi)?.length ?? 0).toBeLessThanOrEqual(1);
+    expect(qs).toContain("SaaS marketing agency United States");
+    expect(qs).toContain("SaaS marketing agency clients case study");
+    expect(qs).not.toContain("SaaS marketing agency for SaaS companies United States");
+  });
+  it("no market stated: exactly the plain phrasings it built before", () => {
+    expect(searchStrategies(icp({ targetMarket: [], keywords: ["SEO agency", "growth marketing agency", "PPC agency"] }))).toEqual(NO_MARKET_BEFORE);
+  });
+  it("model phrasings keep up to 3 slots, but one that repeats a template in other words doesn't take one", () => {
+    const base = icp({ targetMarket: ["SaaS companies"], keywords: ["SEO agency", "growth marketing agency", "PPC agency"] });
+    const qs = searchStrategies(base, ["Digital Marketing Agencies for SaaS companies US", "SaaS-focused marketing studio", "B2B SaaS demand generation agency", "SaaS fractional CMO firm"]);
+    expect(qs).toHaveLength(8);
+    expect(qs.filter((q) => ["SaaS-focused marketing studio", "B2B SaaS demand generation agency", "SaaS fractional CMO firm"].includes(q))).toHaveLength(2); // 3 slots, one used by the duplicate
+    expect(qs).not.toContain("Digital Marketing Agencies for SaaS companies US"); // the same search as template A
+    expect(qs.slice(0, 5)).toEqual(searchStrategies(base).slice(0, 5)); // the templates keep the first slots
+    expect(searchStrategies(base, ["SaaS digital marketing agency United States"])).toEqual(searchStrategies(base)); // an exact repeat changes nothing
+  });
+  it("at most 8 queries (and the smaller cap a run asks for), every one accepted by the existing sanitiser", () => {
+    const many = icp({ targetMarket: ["SaaS companies"], keywords: ["SEO agency", "growth marketing agency", "PPC agency"] });
+    const qs = searchStrategies(many, ["one SaaS agency", "two SaaS agency", "three SaaS agency", "four SaaS agency", "five SaaS agency"]);
+    expect(qs.length).toBe(8);
+    expect(searchStrategies(many, [], 3)).toHaveLength(3);
+    for (const q of qs) expect(sanitizeQuery(q)).toEqual({ ok: true, query: q });
+  });
+  it("one search per meaning: case, plurals, little words, US/USA/United States and word order don't make a new query", () => {
+    expect(queryKey("Digital Marketing Agencies for SaaS companies US")).toBe(queryKey("digital marketing agency for SaaS company United States"));
+    expect(queryKey("SaaS SEO agency USA")).toBe(queryKey("SEO agency SaaS united states"));
+    expect(queryKey("SaaS SEO agency")).not.toBe(queryKey("SaaS SEO agency United States")); // a place is a different search
+    expect(queryKey("SaaS SEO agency")).not.toBe(queryKey("SaaS PPC agency"));
+    expect(queryKey("SaaS businesses")).toBe(queryKey("saas business")); // "SaaS" is not a plural
+    const qs = searchStrategies(icp({ targetMarket: ["SaaS"], keywords: ["SaaS agency", "SaaS agencies"] }));
+    expect(new Set(qs.map(queryKey)).size).toBe(qs.length);
+  });
+  it("a kind that says PART of the market gets only the missing words ('B2B SaaS SaaS marketing agency' can't happen)", () => {
+    const qs = searchStrategies(icp({ targetMarket: ["B2B SaaS companies"], keywords: ["SaaS marketing agency", "SEO agency"] }));
+    expect(qs).toContain("B2B SaaS marketing agency United States");
+    expect(qs).not.toContain("B2B SaaS SaaS marketing agency United States");
+    expect(qs).not.toContain("SaaS marketing agency for B2B SaaS companies United States");
+    for (const q of qs) {
+      expect(q.match(/\bsaas\b/gi)?.length ?? 0, q).toBe(1);
+      expect(q.match(/\bb2b\b/gi)?.length ?? 0, q).toBe(1);
+    }
+  });
+  it("a market that already names the place doesn't get the place again ('US healthcare … United States' can't happen)", () => {
+    const qs = searchStrategies(icp({ targetMarket: ["US healthcare brands"], keywords: ["PPC agency"] }));
+    expect(qs).toContain("US healthcare PPC agency");
+    for (const q of qs) expect(/\bUS\b/.test(q) && /United States/.test(q), q).toBe(false);
+    expect(qs.every((q) => /healthcare/.test(q))).toBe(true);
+    // A place the market doesn't name is still added.
+    expect(searchStrategies(icp({ targetMarket: ["UK healthcare brands"], keywords: ["PPC agency"] }))).toContain("UK healthcare PPC agency United States");
+  });
+  it("no place at all: well-formed phrasings that still name the market (no trailing or doubled spaces)", () => {
+    const qs = searchStrategies(icp({ countries: [], locations: [], targetMarket: ["SaaS companies"], keywords: ["SEO agency"] }));
+    expect(qs.length).toBeGreaterThan(0);
+    for (const q of qs) { expect(q).toBe(q.trim()); expect(q).not.toMatch(/\s{2,}/); expect(q).toMatch(/\bSaaS\b/); }
+  });
+  it("with a market, every phrasing names each market word exactly once (several shapes of ICP)", () => {
+    const shapes: [string[], string, string[]][] = [
+      [["SaaS companies"], "digital marketing agency", ["SEO agency", "growth marketing agency", "PPC agency"]],
+      [["B2B SaaS companies"], "SaaS marketing agency", ["SEO agency", "B2B content agency"]],
+      [["healthcare brands"], "SEO agency", ["healthcare PR agency"]],
+      [["ecommerce brands"], "ecommerce agency", ["Shopify agency"]],
+    ];
+    for (const [market, industry, keywords] of shapes) {
+      const lead = marketWord(market[0]) || market[0];
+      for (const q of searchStrategies(icp({ industry, targetMarket: market, keywords }))) {
+        for (const w of lead.split(" ")) expect(q.match(new RegExp(`\\b${w}\\b`, "gi"))?.length ?? 0, `${q} / ${w}`).toBe(1);
+      }
+    }
+  });
+  it("matches the 30-credit experiment: the phrasings that found target agencies stay; the market-less ones never come back", () => {
+    // Queries as run in the experiment (same ICP shape). Case study (q5) found target agencies as company sites in BOTH
+    // baseline runs; the market-led q1 found them in some runs; the market-less q2/q4 found none in any variant.
+    const qs = searchStrategies(icp({ targetMarket: ["SaaS companies"], keywords: ["SEO agency", "growth marketing agency"], employeeMax: 30 }));
+    expect(qs).toContain("digital marketing agency for SaaS companies United States");   // q1
+    expect(qs).toContain("SEO agency for SaaS companies United States");                 // q3
+    expect(qs).toContain("digital marketing agency SaaS companies clients case study");  // q5
+    expect(qs).not.toContain("digital marketing agency United States");                  // q2
+    expect(qs).not.toContain("SEO agency United States");                                // q4
+    // Nothing here adds search operators or exclusions: the experiment's exclusion variant lost every target.
+    for (const q of qs) expect(q).not.toMatch(/(^|\s)-|site:|\bOR\b|"/);
   });
   it("model-proposed phrasings pass the same checks: no emails, phones or links reach a search engine", () => {
     const qs = searchStrategies(icp(), ["agency contact john@x.com", "call +1 415 555 0100 agencies", "https://evil.example agencies", "SaaS-focused marketing studio"]);

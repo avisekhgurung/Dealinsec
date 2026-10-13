@@ -27,3 +27,6 @@ GST_COMPLIANCE_NOTES.md
 
 # Live model evaluation results (local, regenerable)
 eval-results/
+
+# Opt-in local diagnostics (AI Outbound search traces): never committed
+.diagnostics/

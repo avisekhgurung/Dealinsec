@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { contactFormFinding, dateBesideClaim, normalizeAngle, normalizeEnrichment, normalizeResearch } from "./prospect-intel";
 import type { ResearchPage } from "./research";
+import { QUOTED_BLOCK, STAFF_BLOCK } from "./staff";
 
 const RETRIEVED = new Date("2026-10-08T00:00:00Z");
 const HOME = "Northwind Digital is a digital marketing agency in Austin, Texas, United States. We are a team of 18 specialists helping B2B SaaS companies grow. Email hello@northwind.com or call +1 512 555 0142.";
@@ -79,6 +80,26 @@ describe("research: signals, people, pains, opportunities", () => {
     expect(find({ employer: "" }).people).toHaveLength(0);
     expect(find({ employer: "Southwind Partners" }).people).toHaveLength(0); // a lookalike name is not the company
     expect(find({ employer: 42 as any }).people).toHaveLength(0);
+  });
+  it("the live failure: four testimonial clients the model called staff are refused, the real leaders are kept", () => {
+    // A team page as the reader returns it (names invented): the leadership grid, then quoted clients with their companies.
+    const team: ResearchPage = { index: 1, url: "https://www.brighttiger.com/team", text: [
+      "Meet the BrightTiger Leadership. The best marketing team in SaaS.", "",
+      STAFF_BLOCK, "Mara Quill, CEO", "Owen Vance, CSO", "Lena Brook, Chief of Staff", "",
+      QUOTED_BLOCK, "Owen Vance, BrightTiger Co-founder", "Priya Holt, CEO at StandupHive", "Gil Navarro, Cofounder at VolunteerNest", "Rosa Kemp, VP of Ops at Outpost.ai", "Hugo Lane, Founder",
+    ].join("\n") };
+    const person = (name: string, title: string, quote = `${name}, ${title}`) => ({ kind: "person", name, title, employer: "BrightTiger", quote, page: 1 }); // the model claims every one works here
+    const r = normalizeResearch({ findings: [
+      person("Gil Navarro", "Cofounder"), person("Priya Holt", "CEO"), person("Rosa Kemp", "VP of Ops"), person("Hugo Lane", "Founder"),
+      person("Mara Quill", "CEO"), person("Owen Vance", "Co-founder", "Owen Vance, BrightTiger Co-founder"), person("Lena Brook", "Chief of Staff"),
+    ] }, [team], "brighttiger.com", { retrievedAt: RETRIEVED, icp: { roles: ["Founder", "CEO"] }, knownFactIds: [], companyName: "BrightTiger" });
+    expect(r.people.map((p) => [p.name, p.staffEvidence])).toEqual([["Owen Vance", "explicit"], ["Mara Quill", "team_listing"], ["Lena Brook", "team_listing"]]);
+    expect(r.rejected).toEqual({ not_staff: 4 });
+    // with nothing on the pages tying a person to the company, the decision maker stays unknown
+    const home: ResearchPage = { index: 1, url: "https://brighttiger.com/", text: "We grow SaaS brands. Strategy sessions with Nora Fell, Founder, every quarter." };
+    const none = normalizeResearch({ findings: [{ kind: "person", name: "Nora Fell", title: "Founder", employer: "BrightTiger", quote: "Nora Fell, Founder", page: 1 }] }, [home], "brighttiger.com", { retrievedAt: RETRIEVED, icp, knownFactIds: [], companyName: "BrightTiger" });
+    expect(none.people).toEqual([]);
+    expect(none.rejected).toEqual({ staff_unverified: 1 });
   });
   it("a date elsewhere on the page does not date a statement: it has to sit beside it", () => {
     const filler = "Our team plans campaigns and reports on results every month for each client. ".repeat(12); // ~900 characters

@@ -8,7 +8,8 @@
  */
 import { createHash } from "node:crypto";
 import { sameSite, siteHost, type PageLink } from "@shared/research";
-import { extractContactBlock, extractHtml, extractLinks, extractPeopleBlock, hasContactForm } from "../knowledge/extract";
+import { extractContactBlock, extractHtml, extractLinks, extractPeople, hasContactForm } from "../knowledge/extract";
+import { QUOTED_BLOCK, STAFF_BLOCK } from "@shared/staff";
 import { fetchPublicPage, realPageIO, validatePublicUrl } from "../knowledge/net-guard";
 import { callJson, str } from "../discovery/http";
 import { DiscoveryError } from "../discovery/types";
@@ -44,8 +45,9 @@ export const builtinReader: PageReader = {
     // The article reader drops footers (a company's address and contact details live there) and card grids (where a team
     // page lists its people). Each is added back as a separate, labelled block; people only on a team or about page.
     const block = await extractContactBlock(r.bytes);
-    const people = TEAM_PATH.test(r.url.pathname) ? await extractPeopleBlock(r.bytes) : "";
-    const extra = [people ? `[People on this page]\n${people}` : "", block ? `[Footer and contact details]\n${block}` : ""].filter(Boolean).join("\n\n");
+    // Quoted people (testimonials, reviews, case studies) get their own block: shared/staff.ts reads them as clients, not staff.
+    const people = TEAM_PATH.test(r.url.pathname) ? await extractPeople(r.bytes) : { staff: [], quoted: [] };
+    const extra = [people.staff.length ? `${STAFF_BLOCK}\n${people.staff.join("\n")}` : "", people.quoted.length ? `${QUOTED_BLOCK}\n${people.quoted.join("\n")}` : "", block ? `[Footer and contact details]\n${block}` : ""].filter(Boolean).join("\n\n");
     const text = extra ? `${ex.text.slice(0, Math.max(2000, PAGE_TEXT_CHARS - extra.length - 4))}\n\n${extra}` : ex.text.slice(0, PAGE_TEXT_CHARS);
     return { ok: true, url: r.url.toString(), title: ex.title ?? "", text, links: await extractLinks(r.bytes), hash: hashOf(text), hasForm: hasContactForm(r.bytes) };
   },

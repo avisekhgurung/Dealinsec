@@ -82,12 +82,15 @@ export interface SearchHit extends SearchResult { provider: string; query: strin
  * Turns the hits from every query into one candidate per registrable domain, keeping every source as provenance.
  * The name comes from the home-page result when there is one (a deep page's title is usually about the page).
  */
-export function collectCandidates(hits: SearchHit[], icp: Pick<Icp, "exclusions">): { candidates: Candidate[]; rejected: Rejected[] } {
+/** What happened to one search result: a new candidate, another page of a candidate already found (merged), or a rejection. */
+export type HitDecision = "candidate" | "merged" | RejectReason;
+export function collectCandidates(hits: SearchHit[], icp: Pick<Icp, "exclusions">): { candidates: Candidate[]; rejected: Rejected[]; decisions: HitDecision[] } {
   const by = new Map<string, Candidate>();
   const rejected: Rejected[] = [];
+  const decisions: HitDecision[] = []; // one per hit, in order (search diagnostics read them; the run does not)
   for (const h of hits) {
     const why = junkReason(h, icp.exclusions);
-    if (why) { rejected.push({ url: String(h.url).slice(0, 300), reason: why }); continue; }
+    if (why) { rejected.push({ url: String(h.url).slice(0, 300), reason: why }); decisions.push(why); continue; }
     const url = canonicalUrl(h.url)!;
     const domain = domainOf(url)!;
     const src: Provenance = { provider: h.provider, query: h.query, url, title: String(h.title ?? "").slice(0, 200), snippet: h.snippet?.slice(0, 300), at: h.at };
@@ -95,13 +98,14 @@ export function collectCandidates(hits: SearchHit[], icp: Pick<Icp, "exclusions"
     const prev = by.get(domain);
     if (!prev) {
       by.set(domain, { domain, name: cleanName(h.title, domain), website: `https://${domain}`, sources: [src], rank: 0 });
+      decisions.push("candidate");
     } else {
-      if (!prev.sources.some((s) => s.url === url && s.query === h.query)) prev.sources.push(src);
-      else rejected.push({ url: url.slice(0, 300), reason: "duplicate" });
+      if (!prev.sources.some((s) => s.url === url && s.query === h.query)) { prev.sources.push(src); decisions.push("merged"); }
+      else { rejected.push({ url: url.slice(0, 300), reason: "duplicate" }); decisions.push("duplicate"); }
       if (isHome) prev.name = cleanName(h.title, domain);
     }
   }
-  return { candidates: Array.from(by.values()), rejected };
+  return { candidates: Array.from(by.values()), rejected, decisions };
 }
 
 /**
@@ -189,6 +193,8 @@ const MONTHS: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4,
 /** A month's name or its usual short form, nothing else ("mayor" and "marching" are not months). */
 const MON = "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\\.?";
 const mon = (s: string) => MONTHS[s.slice(0, 3)];
+/** The same month pattern, for code that looks for dates the way evidenceDate reads them (shared/research-diagnostics.ts). */
+export const MONTH_PATTERN = MON;
 
 /** How exactly the page states a date. A year alone ("Top agencies in 2026") never dates an event to a day. */
 export type DatePrecision = "day" | "month" | "year";
@@ -418,6 +424,51 @@ export function runBudget(quantity: number): RunBudget {
   const enrich = Math.min(80, 2 * q + 10);
   const research = Math.min(60, Math.ceil(1.5 * q) + 5);
   return { queries: 8, resultsPerQuery: 20, verify, enrich, research, llmCalls: 2 + enrich + research };
+}
+
+/**
+ * Which found candidates are checked (fetched), in order: best pre-rank first (ties by `order`, the order they were found).
+ * An existing lead is never a prospect; a result that says too little about the ICP is off topic; beyond the run's
+ * verify budget the rest are set aside. Pure: the run and the search diagnostics both use it, so they can't disagree.
+ */
+export type RankOutcome = "keep" | "already_lead" | "off_topic" | "budget";
+export function rankCandidates<T extends { order: number; candidate: Candidate; isLead: boolean }>(found: T[], icp: Icp, verify: number): (T & { score: number; rel: number; outcome: RankOutcome })[] {
+  const ranked = found.map((f) => ({ ...f, score: preRank(f.candidate, icp), rel: relevance(f.candidate, icp) })).sort((a, b) => b.score - a.score || a.order - b.order);
+  let kept = 0;
+  return ranked.map((r) => {
+    const outcome: RankOutcome = r.isLead ? "already_lead" : r.rel < MIN_RELEVANCE ? "off_topic" : kept >= verify ? "budget" : (kept++, "keep");
+    return { ...r, outcome };
+  });
+}
+
+/**
+ * The order to research qualified companies in, when the run (or today's budget) may stop before all of them are done.
+ * Ordering only: who qualifies is decided elsewhere and is unchanged. An explicit mismatch (a stated size or country
+ * outside the ICP) goes last; then the fit verdict; then how many ICP points the site EXPLICITLY matches (an unknown
+ * counts as nothing, never as a match); then the search rank. Measured: with every qualified company "partial", search
+ * rank alone decided, and a company matching industry, country and market (3 points) was left behind ones matching 1.
+ */
+type FitLike = { verdict?: string; signals?: { status?: string }[] } | null | undefined;
+const VERDICT_ORDER: Record<string, number> = { strong: 0, partial: 1, unclear: 2 };
+export const fitEvidence = (fit: FitLike) => ({ matches: (fit?.signals ?? []).filter((x) => x.status === "match").length, mismatches: (fit?.signals ?? []).filter((x) => x.status === "mismatch").length });
+export function byResearchPriority(a: { rank: number; fit: FitLike }, b: { rank: number; fit: FitLike }): number {
+  const ea = fitEvidence(a.fit), eb = fitEvidence(b.fit);
+  return Number(ea.mismatches > 0) - Number(eb.mismatches > 0)
+    || (VERDICT_ORDER[a.fit?.verdict ?? ""] ?? 3) - (VERDICT_ORDER[b.fit?.verdict ?? ""] ?? 3)
+    || eb.matches - ea.matches
+    || b.rank - a.rank;
+}
+
+/**
+ * Worth researching before the remaining sites are examined: no stated mismatch, and the site states the ICP clearly
+ * (a "strong" fit, or at least `minMatches` points matched explicitly; an unknown counts as nothing). Everyone else waits
+ * until every site is examined, then goes in byResearchPriority order. It decides WHEN, never whether: qualification
+ * and what makes a company Ready are unchanged.
+ */
+export const EARLY_RESEARCH_MIN_MATCHES = 3;
+export function worthResearchingEarly(fit: FitLike, minMatches = EARLY_RESEARCH_MIN_MATCHES): boolean {
+  const e = fitEvidence(fit);
+  return e.mismatches === 0 && (fit?.verdict === "strong" || (fit?.verdict === "partial" && e.matches >= minMatches));
 }
 
 /** The funnel a run reports (and the UI draws). */

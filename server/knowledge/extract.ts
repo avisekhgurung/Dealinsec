@@ -138,18 +138,26 @@ export function hasContactForm(bytes: Uint8Array): boolean {
  * The people a team page names, as "Name, Role" lines in the page's own words. The article reader keeps a page's prose
  * and drops its card grids, which is where a team page lists people ("<h3>Dana Ortiz</h3><p>Founder</p>"). A name and a
  * role are joined only when they sit in the same card (the smallest container holding both), in the order the card
- * uses. Navigation, header, footer and forms are skipped. A "Name, Role, Company" line (often a client under a
- * testimonial) is kept as written: whether that person works HERE is decided later by the staff check, not here.
- * Plain text only, bounded (20 lines, about 1,500 characters), never throws.
+ * uses. Navigation, header, footer and forms are skipped. A card's employer is kept when the card splits it off
+ * ("CEO" "at" "Orchard Labs"). People in a testimonial, review, quote or case-study context go to `quoted`, not `staff`
+ * (on one live team page, client testimonials filled the whole list before the real leaders). Whether a person works
+ * HERE is still decided later, from these lines, by shared/staff.ts. Plain text only, bounded (staff 20 lines / about
+ * 1,500 characters, quoted 10 / 600), never throws.
  */
+const QUOTE_ATTR = /testimonial|review|quot(?:e|ation)|case[-_ ]?stud|success[-_ ]?stor|client|customer|endorse|kudos/i;
+const QUOTE_HEADING = /testimonial|review|what (?:our )?(?:clients|customers)|clients? (?:say|love|stories)|customers? (?:say|love|stories)|case stud|success stor|trusted by|kind words|hear from/i;
+const LOGO = /logo/i;
+const SOCIAL = /linkedin|twitter|facebook|instagram|github|youtube|tiktok|threads|e-?mail|\bx\b/i;
+const TEAM_HEADING = /\b(team|leadership|our people|founders?|who we are)\b/i;
 const BLOCK_TAGS = new Set(["DIV", "P", "H1", "H2", "H3", "H4", "H5", "H6", "LI", "UL", "OL", "SECTION", "ARTICLE", "MAIN", "ASIDE", "FIGURE", "FIGCAPTION", "BLOCKQUOTE", "DL", "DT", "DD", "TABLE", "TBODY", "TR", "TD", "TH", "HEADER", "FOOTER"]);
-const ROLE_WORD = /\b(founder|co-?founder|owner|ceo|cto|coo|cmo|cfo|cro|president|partner|principal|director|head|vp|vice president|manager|lead|chief|officer|strategist|specialist|consultant|designer|developer|engineer|marketer|executive|coordinator|analyst|associate|editor|writer|producer|architect|advisor|chair(?:man|woman)?)\b/i;
+const BLOCK_SELECTOR = Array.from(BLOCK_TAGS).map((t) => t.toLowerCase()).join(",");
+const ROLE_WORD = /\b(founder|co-?founder|owner|ceo|cto|coo|cmo|cfo|cro|cso|cpo|cio|president|partner|principal|director|head|vp|vice president|manager|lead|chief|officer|strategist|specialist|consultant|designer|developer|engineer|marketer|executive|coordinator|analyst|associate|editor|writer|producer|architect|advisor|chair(?:man|woman)?)\b/i;
 const NOT_A_NAME = /\b(our|the|and|for|with|meet|team|about|contact|services?|marketing|agency|digital|business|growth|sales|careers?|clients?|work|blog|home|learn|more|read|view|book|call|get|free|new|all|news|company|studio|group|solutions|media|partners?)\b/i;
 /** 2 to 4 capitalised words, letters in any script ("Inês Duarte", "Seán Doyle"). */
 const PERSON_NAME = new RegExp("^\\p{Lu}[\\p{L}'’.-]+(?:\\s+\\p{Lu}[\\p{L}'’.-]+){1,3}$", "u");
-export async function extractPeopleBlock(bytes: Uint8Array): Promise<string> {
+export async function extractPeople(bytes: Uint8Array): Promise<{ staff: string[]; quoted: string[] }> {
   try {
-    if (!bytes.length) return "";
+    if (!bytes.length) return { staff: [], quoted: [] };
     const { parseHTML } = await import("linkedom");
     const source = decode(bytes).slice(0, 1_500_000);
     const { document } = parseHTML(/<html[\s>]/i.test(source) ? source : `<!doctype html><html><body>${source}</body></html>`);
@@ -161,7 +169,8 @@ export async function extractPeopleBlock(bytes: Uint8Array): Promise<string> {
     const leaves: Element[] = [];
     const leafSet = new Set<Element>();
     for (const el of all) {
-      if (!isLeaf(el) || Array.from(el.children).some((c) => BLOCK_TAGS.has((c as Element).tagName))) continue;
+      // Any block inside, not only a direct child: a card wrapped in a link (<li><a><div>Name</div><div>Role</div></a></li>) is not one leaf.
+      if (!isLeaf(el) || el.querySelector(BLOCK_SELECTOR)) continue;
       // A card built from inline pieces (<div><a>Dana Ortiz</a><span>Founder</span></div>): the pieces are the leaves, not the run-together whole.
       const own = Array.from(el.childNodes).filter((n: any) => n.nodeType === 3).map((n: any) => String(n.textContent ?? "")).join("").trim();
       if (BLOCK_TAGS.has(el.tagName) && !own && Array.from(el.children).filter((c) => text(c as Element)).length >= 2) continue;
@@ -174,13 +183,42 @@ export async function extractPeopleBlock(bytes: Uint8Array): Promise<string> {
     }
     const isName = (t: string) => t.length <= 40 && PERSON_NAME.test(t) && !NOT_A_NAME.test(t) && !ROLE_WORD.test(t);
     const isRole = (t: string) => t.length <= 80 && t.split(" ").length <= 8 && ROLE_WORD.test(t) && !/[.!?]$/.test(t);
-    const lines: string[] = [];
-    const add = (l: string) => { if (!lines.includes(l) && lines.length < 20 && lines.join("\n").length + l.length + 1 <= 1500) lines.push(l); };
+    const staff: string[] = [], quoted: string[] = [];
+    const add = (l: string, inQuote: boolean) => {
+      const [list, max, chars] = inQuote ? [quoted, 10, 600] : [staff, 20, 1500];
+      if (!staff.includes(l) && !quoted.includes(l) && list.length < max && list.join("\n").length + l.length + 1 <= chars) list.push(l);
+    };
+    // A testimonial, review or case-study card is not a staff card. Its signs: a quote, a testimonial/review/client
+    // marker on the card or on what holds it, or a heading above it such as "What our clients say".
+    // An employer after "at" ("at" "Harbor Logistics") reads like a name but is a company: it doesn't end a person's card.
+    const nameLeaves = leaves.filter((x, i) => isName(text(x)) && !/^(?:at|@)$/i.test(i ? text(leaves[i - 1]) : ""));
+    const headingBefore: string[] = [];
+    leaves.forEach((x, i) => { headingBefore[i] = /^H[1-4]$/.test(x.tagName) ? text(x) : i ? headingBefore[i - 1] : ""; });
+    const marked = (x: Element) => QUOTE_ATTR.test(["class", "id", "aria-label", "title", "alt", "role"].map((a) => x.getAttribute?.(a) ?? "").join(" "));
+    const inQuote = (el: Element, i: number): boolean => {
+      // The person's own card: the largest container around the name that names nobody else.
+      let own: Element = el;
+      for (let k = 0; k < 8 && own.parentElement && own.parentElement.tagName !== "BODY"; k++) {
+        const up = own.parentElement;
+        if (nameLeaves.some((x) => x !== el && up.contains(x) && text(x) !== text(el))) break;
+        own = up;
+      }
+      if (own.querySelector("blockquote, q") || [own, ...Array.from(own.querySelectorAll("*"))].some(marked)) return true;
+      if (leaves.some((x) => own.contains(x) && /^["“‘]/.test(text(x)) && text(x).length > 20)) return true;
+      // A company's logo on the person's card (a client's, beside their quote). A social icon or the person's own photo is not one.
+      if (Array.from(own.querySelectorAll("img")).some((img) => {
+        const alt = String(img.getAttribute("alt") ?? "").trim();
+        return LOGO.test(["class", "id", "src"].map((a) => img.getAttribute(a) ?? "").join(" ")) && !!alt && alt !== text(el) && !SOCIAL.test(alt);
+      })) return true;
+      for (let up = own.parentElement; up && up.tagName !== "BODY"; up = up.parentElement) if (marked(up)) return true;
+      const heading = headingBefore[i - 1] ?? "";
+      return QUOTE_HEADING.test(heading) && !TEAM_HEADING.test(heading);
+    };
     leaves.forEach((el, i) => {
       const t = text(el);
       // Already one line: "Tess Harlow, Head of Marketing, Brightline" / "Dana Ortiz – Founder".
       const one = t.match(/^(.{3,40}?)\s*(?:,|\s[–—|-]\s)\s*(.{2,80})$/);
-      if (one && isName(one[1].trim()) && isRole(one[2].split(/,|\s[–—|-]\s/)[0].trim())) { add(`${one[1].trim()}, ${one[2].trim()}`); return; }
+      if (one && isName(one[1].trim()) && isRole(one[2].split(/,|\s[–—|-]\s/)[0].trim())) { add(`${one[1].trim()}, ${one[2].trim()}`, inQuote(el, i)); return; }
       if (!isName(t)) return;
       // The card: the nearest ancestor holding more than this one leaf (at most 3 levels up).
       let card: Element | null = el.parentElement;
@@ -192,12 +230,22 @@ export async function extractPeopleBlock(bytes: Uint8Array): Promise<string> {
       const first = inCard.find((x) => isName(text(x)) || isRole(text(x)));
       const roleFirst = !!first && isRole(text(first));
       const role = roleFirst ? inCard[at - 1] : inCard[at + 1];
-      if (role && isRole(text(role)) && leaves.indexOf(role) === (roleFirst ? i - 1 : i + 1)) add(`${t}, ${text(role)}`);
+      if (role && isRole(text(role)) && leaves.indexOf(role) === (roleFirst ? i - 1 : i + 1)) {
+        // The employer, when the card splits it off: "CEO" "at" "Orchard Labs" is one role, at another company.
+        const r = inCard.indexOf(role), next = inCard[r + 1] ? text(inCard[r + 1]) : "", after = inCard[r + 2] ? text(inCard[r + 2]) : "";
+        const employer = /^(?:at|@)$/i.test(next) && after && after.length <= 60 ? ` at ${after}` : /^(?:at|@)\s+\S/i.test(next) && next.length <= 64 ? ` ${next}` : "";
+        add(`${t}, ${text(role)}${employer}`, inQuote(el, i));
+      }
     });
-    return lines.join("\n");
+    return { staff, quoted };
   } catch {
-    return "";
+    return { staff: [], quoted: [] };
   }
+}
+
+/** The staff lines only, one per line (what extractPeople calls `staff`). */
+export async function extractPeopleBlock(bytes: Uint8Array): Promise<string> {
+  return (await extractPeople(bytes)).staff.join("\n");
 }
 
 export async function extractContactBlock(bytes: Uint8Array): Promise<string> {

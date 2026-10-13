@@ -12,7 +12,7 @@
  * crash redoes at most the slice in flight. The model only ever proposes; shared/prospect-intel.ts decides.
  */
 import { randomUUID } from "node:crypto";
-import { collectCandidates, checkSite, emptyCounters, findingsAsClaims, preRank, relevance, MIN_RELEVANCE, readiness, runBudget, pickResearchLinks, SIGNAL_LABEL, timingOf, isDecisionMaker, type RejectReason, type RunCounters, type SearchHit, type FindingLike } from "@shared/prospect";
+import { byResearchPriority, worthResearchingEarly, rankCandidates, collectCandidates, checkSite, emptyCounters, findingsAsClaims, readiness, runBudget, pickResearchLinks, SIGNAL_LABEL, timingOf, isDecisionMaker, type RejectReason, type RunCounters, type SearchHit, type FindingLike } from "@shared/prospect";
 import { contactFormFinding, normalizeEnrichment, normalizeResearch, type FactDraft } from "@shared/prospect-intel";
 import { industryMatched, isSeniorDecisionMaker, prospectFit, type Icp, type ProspectProfile } from "@shared/icp";
 import { scoreLead } from "@shared/lead-score";
@@ -31,6 +31,9 @@ import { outboundStore, type ItemWithProspect, type NewFinding, type OutboundSto
 import { dailyCompanyLimit, dailySearchLimit, globalSearchLimit } from "./limits";
 import { utcDayStart } from "@shared/llm-cost";
 import { failureCode, retryCode } from "./diagnostics";
+import { researchDiagnosticsDir, searchDiagnosticsDir, writeSearchDiagnostic } from "./search-diagnostics";
+import { researchDateDiagnostics } from "@shared/research-diagnostics";
+import { queryRecord, rankRecord } from "@shared/search-diagnostics";
 import type { StepResult } from "../workflow/runner";
 
 export const CACHE_DAYS = 14;
@@ -54,6 +57,12 @@ export interface PipelineDeps {
   kick?: () => void;
   /** False once this worker's lease was lost (a renewal found the run taken over): work stops at the next slice. */
   leaseHeld?: () => boolean;
+  /** Explicit ICP points a "partial" company needs to be researched before every site is examined (default 3). */
+  earlyResearchMinMatches?: number;
+  /** Opt-in search diagnostics: the local directory to write them to (OUTBOUND_SEARCH_DIAGNOSTICS=1), or null (the default, off). */
+  searchDiagnostics?: string | null;
+  /** Opt-in research date diagnostics: the local directory to write them to (OUTBOUND_RESEARCH_DIAGNOSTICS=1), or null (off). */
+  researchDiagnostics?: string | null;
 }
 
 /** This worker no longer holds the run (another claimed it, or it was cancelled): stop, write nothing more. */
@@ -68,7 +77,7 @@ async function writeRun(deps: PipelineDeps, run: ProspectRunRow, set: Partial<Pr
 export const pipelineDeps = (): PipelineDeps => ({
   store: outboundStore, chat: tracedChat, reader: pageReader(), sitemap: (s) => readSitemap(s), searchProviders: () => outboundSearchProviders(),
   company: companyProvider(), contact: contactProvider(), leadByDomain: (o, d) => leadsStore.findByDomain(o, d), now: () => new Date(), concurrency: 3,
-  allowance: (task, orgId) => remainingToday(task, orgId),
+  allowance: (task, orgId) => remainingToday(task, orgId), searchDiagnostics: searchDiagnosticsDir(), researchDiagnostics: researchDiagnosticsDir(),
 });
 
 /* ── small helpers ──────────────────────────────────────────────────────── */
@@ -95,7 +104,11 @@ async function inSlices<T>(items: T[], n: number, deadline: number, now: () => n
   for (let i = 0; i < items.length; i += n) {
     if (!held()) throw new LeaseLost(runId);
     if (now() >= deadline) return;
-    await Promise.all(items.slice(i, i + n).map(fn));
+    // Every call in the slice is waited for, even when one stops the run (a budget refusal): the others are already paid for,
+    // and what they save must land before the run is finished, never after (measured: 2 researched companies went uncounted).
+    const settled = await Promise.allSettled(items.slice(i, i + n).map(fn));
+    const failed = settled.find((x): x is PromiseRejectedResult => x.status === "rejected");
+    if (failed) throw failed.reason;
   }
 }
 
@@ -230,7 +243,8 @@ async function searchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps:
           provider.search(next.q, { count: budget.resultsPerQuery, country: provider.supportsCountry ? icp.countries[0] : undefined }));
         const at = deps.now().toISOString();
         const hits: SearchHit[] = results.map((r) => ({ ...r, provider: provider.name, query: next.q, at }));
-        const { candidates, rejected } = collectCandidates(hits, icp);
+        const { candidates, rejected, decisions } = collectCandidates(hits, icp);
+        if (deps.searchDiagnostics) await writeSearchDiagnostic(deps.searchDiagnostics, run.id, queryRecord(plan.indexOf(next), next.q, provider.name, results, decisions));
         for (const c of candidates) {
           const p = await deps.store.upsertProspect(run.organizationId, c, deps.now());
           await deps.store.addRunItem({ runId: run.id, orgId: run.organizationId, prospectId: p.id, stage: "found", now: deps.now() });
@@ -243,6 +257,7 @@ async function searchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps:
         // Billed searches are not retried; a failed query is recorded and the run carries on with the others. A failure that
         // is not the provider's own answer keeps its type (never its message, which could hold page text) so it is visible.
         next.done = true; next.ok = false; next.error = e instanceof DiscoveryError ? e.code : `error:${String((e as Error)?.name ?? "unknown").slice(0, 20)}`;
+        if (deps.searchDiagnostics) await writeSearchDiagnostic(deps.searchDiagnostics, run.id, queryRecord(plan.indexOf(next), next.q, provider.name, [], [], next.error));
         console.log(JSON.stringify({ kind: "outbound_search_failed", provider: provider.name, errorType: e instanceof DiscoveryError ? e.code : (e as Error)?.name ?? "unknown" }));
       }
     }
@@ -261,17 +276,17 @@ async function rankStep(run: ProspectRunRow, icp: Icp, deps: PipelineDeps): Prom
     return finalize(run, icp, deps, code);
   }
   const budget = runBudget(run.quantity);
-  const ranked = items.filter((i) => i.stage === "found").map((i) => { const c = { domain: i.prospect.domain, name: i.prospect.name, website: i.prospect.website, sources: (i.prospect.sources as any[]) ?? [], rank: 0 }; return { i, score: preRank(c, icp), rel: relevance(c, icp) }; })
-    .sort((a, b) => b.score - a.score || a.i.id - b.i.id);
-  let kept = 0;
-  for (const { i, score, rel } of ranked) {
-    const lead = i.prospect.leadId ? { id: i.prospect.leadId } : await deps.leadByDomain(run.organizationId, i.prospect.domain);
-    if (lead) { await deps.store.setItem(i.id, { rank: score, stage: "rejected", errorCode: "already_lead", updatedAt: deps.now() }); continue; }
-    if (rel < MIN_RELEVANCE) { await deps.store.setItem(i.id, { rank: score, stage: "rejected", errorCode: "off_topic", updatedAt: deps.now() }); continue; }
-    if (kept >= budget.verify) { await deps.store.setItem(i.id, { rank: score, stage: "rejected", errorCode: "budget", updatedAt: deps.now() }); continue; }
-    kept++;
-    await deps.store.setItem(i.id, { rank: score, updatedAt: deps.now() });
+  const found = [];
+  for (const i of items.filter((x) => x.stage === "found")) {
+    const candidate = { domain: i.prospect.domain, name: i.prospect.name, website: i.prospect.website, sources: (i.prospect.sources as any[]) ?? [], rank: 0 };
+    found.push({ i, order: i.id, candidate, isLead: !!i.prospect.leadId || !!(await deps.leadByDomain(run.organizationId, i.prospect.domain)) });
   }
+  const ranked = rankCandidates(found, icp, budget.verify);
+  for (const r of ranked) {
+    if (r.outcome === "keep") await deps.store.setItem(r.i.id, { rank: r.score, updatedAt: deps.now() });
+    else await deps.store.setItem(r.i.id, { rank: r.score, stage: "rejected", errorCode: r.outcome, updatedAt: deps.now() });
+  }
+  if (deps.searchDiagnostics) await writeSearchDiagnostic(deps.searchDiagnostics, run.id, rankRecord(ranked.map((r) => ({ domain: r.candidate.domain, sources: r.candidate.sources, score: r.score, rel: r.rel, outcome: r.outcome })), plan));
   await setStage(deps, run, "verify");
   return "more";
 }
@@ -333,8 +348,12 @@ export const flatProfile = (name: string, profile: Record<string, { value: strin
 async function enrichStep(run: ProspectRunRow, icp: Icp, deadline: number, deps: PipelineDeps): Promise<StepResult> {
   const budget = runBudget(run.quantity);
   const all = await deps.store.runItems(run.organizationId, run.id);
+  // Interleaving: a company its site shows to be a clear match is researched now, before the remaining sites are examined
+  // (measured: examining all 16 sites first took $0.059 of a $0.10 budget, and any budget under $0.075 researched nothing).
+  if (await researchEarly(run, icp, deadline, deps, all)) return "more";
   const done = all.filter((i) => ["enriched", "done"].includes(i.stage) || (i.stage === "rejected" && ["poor_fit", "unclear", "not_a_company"].includes(i.errorCode ?? ""))).length;
-  const batch = await deps.store.itemsAt(run.id, "verified", deps.concurrency * 2, deps.now());
+  // One slice per step (not two): after every few sites the step above can research what they turned up.
+  const batch = await deps.store.itemsAt(run.id, "verified", deps.concurrency, deps.now());
   if (!batch.length) {
     if ((await deps.store.itemsAt(run.id, "verified", 1, new Date(deps.now().getTime() + 365 * DAY))).length) return waitFor(run, "verified", deps);
     await setStage(deps, run, "research");
@@ -348,6 +367,25 @@ async function enrichStep(run: ProspectRunRow, icp: Icp, deadline: number, deps:
   if (left <= 0) throw new StopRun("daily_limit");
   await inSlices(todo.slice(0, left), Math.min(deps.concurrency, left), deadline, () => Date.now(), holds(deps), run.id, (item) => enrichOne(run, icp, item, deps));
   return "more";
+}
+
+/**
+ * Researches the clearest matches examined so far (worthResearchingEarly), best first (byResearchPriority), within the
+ * run's research budget and today's allowance. False when there is nothing to do now, so the step examines more sites
+ * instead: no clear match yet, a retry not yet due, no research room left, or no research allowance today (the sites
+ * are still examined, as before; the research stage then stops the run as it always has).
+ */
+async function researchEarly(run: ProspectRunRow, icp: Icp, deadline: number, deps: PipelineDeps, all: ItemWithProspect[]): Promise<boolean> {
+  const room = Math.max(0, runBudget(run.quantity).research - all.filter((i) => i.stage === "done").length);
+  if (room === 0) return false;
+  const now = deps.now();
+  const ready = all.filter((i) => i.stage === "enriched" && (!i.nextAttemptAt || new Date(i.nextAttemptAt) <= now) && worthResearchingEarly(i.prospect.fit as any, deps.earlyResearchMinMatches))
+    .sort((a, b) => byResearchPriority({ rank: a.rank, fit: a.prospect.fit as any }, { rank: b.rank, fit: b.prospect.fit as any }));
+  if (!ready.length) return false;
+  const left = await allowanceOrStop(deps, "signals", run.organizationId);
+  if (left <= 0) return false;
+  await inSlices(ready.slice(0, Math.min(room, deps.concurrency, left)), deps.concurrency, deadline, () => Date.now(), holds(deps), run.id, async (item) => { await researchOne(run, icp, item, deps); });
+  return true;
 }
 
 export async function enrichOne(run: Pick<ProspectRunRow, "id" | "organizationId" | "createdByUser">, icp: Icp, item: ItemWithProspect | null, deps: PipelineDeps, p0?: ProspectRow): Promise<void> {
@@ -435,15 +473,13 @@ export async function confirmForm(deps: Pick<PipelineDeps, "reader" | "now">, ur
 
 /* ── research: why now, who, what ───────────────────────────────────────── */
 
-const FIT_ORDER: Record<string, number> = { strong: 0, partial: 1, unclear: 2 };
-
 async function researchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps: PipelineDeps): Promise<StepResult> {
   const budget = runBudget(run.quantity);
   const all = await deps.store.runItems(run.organizationId, run.id);
   const researched = all.filter((i) => i.stage === "done").length;
   const waiting = all.filter((i) => i.stage === "enriched");
   const dueNow = waiting.filter((i) => !i.nextAttemptAt || new Date(i.nextAttemptAt) <= deps.now())
-    .sort((a, b) => (FIT_ORDER[(a.prospect.fit as any)?.verdict] ?? 3) - (FIT_ORDER[(b.prospect.fit as any)?.verdict] ?? 3) || b.rank - a.rank);
+    .sort((a, b) => byResearchPriority({ rank: a.rank, fit: a.prospect.fit as any }, { rank: b.rank, fit: b.prospect.fit as any }));
   if (!waiting.length) return finalize(run, icp, deps, null);
   if (!dueNow.length) return waitFor(run, "enriched", deps);
   const room = Math.max(0, budget.research - researched);
@@ -476,6 +512,11 @@ export async function researchOne(run: Pick<ProspectRunRow, "id" | "organization
       [{ role: "system", content: signalsSystemPrompt() }, { role: "user", content: signalsUserMessage(p.name, icp, opts.offer ?? null, known.map((k) => ({ id: k.id, label: LABELS[k.type] ?? k.type, value: k.value })), pages) }], MAX_TOKENS.signals);
     if (raw === null) throw new ProviderError("invalid_response", "empty_output");
     const r = normalizeResearch(raw, pages, p.domain, { retrievedAt: now, icp, knownFactIds: known.map((k) => k.id), companyName: p.name });
+    // Opt-in: why signals did or didn't end up dated. It reads the model's output, the pages and the result above and
+    // changes none of them; a problem here never affects the research.
+    if (deps.researchDiagnostics) {
+      try { await writeSearchDiagnostic(deps.researchDiagnostics, run.id, { prospect: p.domain, ...researchDateDiagnostics(raw, pages, r, now) }); } catch { /* diagnostics only */ }
+    }
 
     const list: NewFinding[] = [];
     const localOf = new Map<number, number>();
@@ -485,7 +526,7 @@ export async function researchOne(run: Pick<ProspectRunRow, "id" | "organization
     }
     for (const m of r.people) {
       localOf.set(m.index, list.length);
-      list.push({ kind: "decision_maker", type: m.title.slice(0, 40), value: `${m.name}, ${m.title}`.slice(0, 400), status: "confirmed", sourceUrl: m.url, sourceType: "website", quote: m.quote, confidence: "high", meta: { name: m.name, title: m.title, rank: m.rank, senior: isSeniorDecisionMaker(m.title), email: null, emailStatus: null } });
+      list.push({ kind: "decision_maker", type: m.title.slice(0, 40), value: `${m.name}, ${m.title}`.slice(0, 400), status: "confirmed", sourceUrl: m.url, sourceType: "website", quote: m.quote, confidence: "high", meta: { name: m.name, title: m.title, rank: m.rank, senior: isSeniorDecisionMaker(m.title), staffEvidence: m.staffEvidence, email: null, emailStatus: null } });
     }
     for (const x of r.pains) {
       localOf.set(x.index, list.length);

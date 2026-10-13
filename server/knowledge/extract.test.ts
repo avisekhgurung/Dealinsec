@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LIMITS } from "@shared/knowledge";
-import { extractContactBlock, extractHtml, extractLinks, extractPdf, extractPlainText, extractPeopleBlock, hasContactForm } from "./extract";
+import { extractContactBlock, extractHtml, extractLinks, extractPdf, extractPlainText, extractPeople, extractPeopleBlock, hasContactForm } from "./extract";
 
 /** A hand-built two-page PDF: page 1 "We design logos...Berlin", page 2 "Our ideal client...Portugal". */
 const PDF = Uint8Array.from(Buffer.from("JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUiA1IDAgUl0gL0NvdW50IDIgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA2MTIgNzkyXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNyAwIFIgPj4gPj4gPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCA5MyA+PgpzdHJlYW0KQlQgL0YxIDEyIFRmIDcyIDcyMCBUZCAoV2UgZGVzaWduIGxvZ29zIGFuZCBicmFuZCBzeXN0ZW1zIGZvciBzbWFsbCBzdHVkaW9zIGluIEJlcmxpbi4pIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKNSAwIG9iago8PCAvVHlwZSAvUGFnZSAvUGFyZW50IDIgMCBSIC9NZWRpYUJveCBbMCAwIDYxMiA3OTJdIC9Db250ZW50cyA2IDAgUiAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA3IDAgUiA+PiA+PiA+PgplbmRvYmoKNiAwIG9iago8PCAvTGVuZ3RoIDk2ID4+CnN0cmVhbQpCVCAvRjEgMTIgVGYgNzIgNzIwIFRkIChPdXIgaWRlYWwgY2xpZW50IGlzIGEgYm91dGlxdWUgaG90ZWwgZ3JvdXAgZXhwYW5kaW5nIGluIFBvcnR1Z2FsLikgVGogRVQKZW5kc3RyZWFtCmVuZG9iago3IDAgb2JqCjw8IC9UeXBlIC9Gb250IC9TdWJ0eXBlIC9UeXBlMSAvQmFzZUZvbnQgL0hlbHZldGljYSA+PgplbmRvYmoKeHJlZgowIDgKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNTggMDAwMDAgbiAKMDAwMDAwMDEyMSAwMDAwMCBuIAowMDAwMDAwMjQ3IDAwMDAwIG4gCjAwMDAwMDAzOTAgMDAwMDAgbiAKMDAwMDAwMDUxNiAwMDAwMCBuIAowMDAwMDAwNjYyIDAwMDAwIG4gCnRyYWlsZXIKPDwgL1NpemUgOCAvUm9vdCAxIDAgUiA+PgpzdGFydHhyZWYKNzMyCiUlRU9GCg==", "base64"));
@@ -163,7 +163,8 @@ describe("extractPeopleBlock (team grids the article reader drops)", () => {
     const b = await extractPeopleBlock(enc(grid));
     expect(b).toContain("Mara Whitfield, Founder");
     expect(b).toContain("Ana Silva, Head of Growth");
-    expect(b).toContain("Tess Harlow, Head of Marketing, Brightline"); // a client: kept as text; the staff check (employer) decides later
+    expect(b).not.toContain("Tess Harlow"); // a client under a quote: not a staff line…
+    expect((await extractPeople(enc(grid))).quoted).toEqual(["Tess Harlow, Head of Marketing, Brightline"]); // …but kept, as quoted, for the staff check
     expect(b).not.toMatch(/Business Owner|Performance Partner|Jordan Blake/); // a menu is never read for people
   });
   it("a card that puts the role first is read in its own order: a name is never paired with the next person's role", async () => {
@@ -176,6 +177,40 @@ describe("extractPeopleBlock (team grids the article reader drops)", () => {
     expect(await extractPeopleBlock(enc(flat))).toBe("Dana Ortiz, Founder\nLee Park, Head of Growth");
     const inline = `<html><body><div class="card"><a href="/team/dana">Dana Ortiz</a><span>Founder</span></div></body></html>`;
     expect(await extractPeopleBlock(enc(inline))).toBe("Dana Ortiz, Founder");
+  });
+  // The markup of one live team page (names invented): client testimonial cards ("Name" "Role" "at" "Client", a video
+  // marked testimonial, a quote), the agency's co-founder quoted, then the leadership grid, each card wrapped in a link.
+  const testimonial = (name: string, role: string, client: string) => `<div role="listitem" class="c-wrap w-dyn-item"><div class="c-card"><div class="c-wrap"><div class="c-test_top">
+    <div aria-label="testimonial-video" class="c-wrap"><img alt="${name}" class="c-test_img"></div>
+    <div class="c-wrap"><div class="c-wrap"><div class="c-text_s">${name}</div><div class="c-wrap cc-horizontal"><div class="c-text_s">${role}</div><div class="c-text_s">at</div><div class="c-text_s">${client}</div></div></div><img alt="${client}" class="c-test_logo"></div></div>
+    <div class="c-wrap"><p class="c-paragraph_m">The benefit of working with them is fast-forwarding through the learning curve.</p></div></div></div></div>`;
+  const member = (name: string, role: string) => `<div role="listitem" class="c-team_member"><a href="/team/${name.split(" ")[0].toLowerCase()}" class="c-wrap"><img alt="${name}" class="c-team_img"><div class="c-wrap"><div class="c-text">${name}</div><div class="c-text_s">${role}</div></div></a></div>`;
+  const clients = [["Priya Holt", "CEO", "StandupHive"], ["Gil Navarro", "Cofounder", "VolunteerNest"], ["Rosa Kemp", "VP of Ops", "Outpost.ai"], ["Ivan Petrov", "Head of Marketing", "Harbor Logistics"], ["Hugo Lane", "Founder", "Bidwell"]];
+  const tigerPage = (n: number) => `<html><body><main>
+    <div class="c-section"><div class="c-wrap"><p class="c-paragraph_m">An agency partner is only as good as the results they produce.</p><img alt="Opening quotation marks" class="c-quotes"></div>
+      <div class="c-wrap"><img alt="Owen Vance" class="c-headshot"><div class="c-wrap"><div class="c-text_s">Owen Vance</div><div class="c-text_s">BrightTiger Co-founder</div></div></div></div>
+    <div role="list" class="c-slider">${Array.from({ length: n }, (_, i) => { const [name, role, client] = clients[i % clients.length]; return testimonial(i < clients.length ? name : `${name}${String.fromCharCode(97 + i)}`, role, client); }).join("")}</div>
+    <div id="team" class="c-section"><h2>Meet the <span>BrightTiger</span> Leadership</h2>
+      <div role="list" class="c-team">${member("Mara Quill", "CEO")}${member("Owen Vance", "CSO")}${member("Lena Brook", "Chief of Staff")}${member("Tom Reyes", "SEO Manager")}</div></div>
+  </main></body></html>`;
+  it("client testimonials are not staff: each keeps its company, goes to `quoted`, and never crowds out the team", async () => {
+    const p = await extractPeople(enc(tigerPage(5)));
+    expect(p.staff).toEqual(["Mara Quill, CEO", "Owen Vance, CSO", "Lena Brook, Chief of Staff", "Tom Reyes, SEO Manager"]); // the grid, link-wrapped cards included
+    expect(p.quoted).toEqual(["Owen Vance, BrightTiger Co-founder", "Priya Holt, CEO at StandupHive", "Gil Navarro, Cofounder at VolunteerNest", "Rosa Kemp, VP of Ops at Outpost.ai", "Ivan Petrov, Head of Marketing at Harbor Logistics", "Hugo Lane, Founder at Bidwell"]);
+    const crowded = await extractPeople(enc(tigerPage(25))); // more testimonials than both lists hold
+    expect(crowded.staff).toEqual(p.staff);
+    expect(crowded.quoted.length).toBeLessThanOrEqual(10);
+  });
+  it("a client's logo on a person's card is client context; a LinkedIn icon or the person's photo is not", async () => {
+    const card = (name: string, role: string, img: string) => `<div class="card"><img alt="${name}" class="photo">${img}<h3>${name}</h3><p>${role}</p></div>`;
+    const page = `<html><body><section>${card("Dana Ortiz", "Founder", `<img alt="Orchard Labs" class="company-logo" src="/img/orchard-logo.svg">`)}
+      ${card("Lee Park", "Head of Growth", `<a href="https://linkedin.com/in/x"><img alt="LinkedIn" class="social-logo" src="/img/linkedin-logo.svg"></a>`)}</section></body></html>`;
+    expect(await extractPeople(enc(page))).toEqual({ staff: ["Lee Park, Head of Growth"], quoted: ["Dana Ortiz, Founder"] });
+  });
+  it("a heading decides a plain card's context: \"What our clients say\" is quoted, \"Meet the team\" is staff", async () => {
+    const page = `<html><body><section><h2>What our clients say</h2><div><h3>Dana Ortiz</h3><p>Founder</p></div></section>
+      <section><h2>Meet the team</h2><div><h3>Lee Park</h3><p>Head of Growth</p></div></section></body></html>`;
+    expect(await extractPeople(enc(page))).toEqual({ staff: ["Lee Park, Head of Growth"], quoted: ["Dana Ortiz, Founder"] });
   });
   it("is bounded and never throws: at most 20 people, about 1,500 characters, garbage gives ''", async () => {
     const many = `<html><body>${Array.from({ length: 40 }, (_, i) => `<div><h3>Person Number${String.fromCharCode(65 + (i % 26))}x</h3><p>Director of Marketing</p></div>`).join("")}</body></html>`;

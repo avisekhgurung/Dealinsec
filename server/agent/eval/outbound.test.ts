@@ -24,6 +24,11 @@ vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")
 
 import { DiscoveryError, type DiscoveryProvider } from "../../discovery/types";
 import { ProviderError } from "../../copilot/provider";
+import { GlobalCapExceeded, tracedChat } from "../../llm/traced";
+import { searchDiagnosticsDir } from "../../outbound/search-diagnostics";
+import { mkdtempSync, readFileSync, existsSync, readdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { addToLeads, cancelRun, findContacts, generateAngle, getProspect, getRun, listRuns, parseIcp, prospectCard, researchProspect, startRun } from "../../outbound/service";
 import { LeaseLost, MAX_TOKENS, clearPageCache, enrichOne, pipelineDeps, researchOne, stepRun, type PipelineDeps } from "../../outbound/pipeline";
 import { outboundWorkflow } from "../../outbound/runner";
@@ -956,6 +961,207 @@ describe("the platform-wide search and model budgets", () => {
     expect(calls.enrich + calls.signals).toBe(before);
     expect(run).toMatchObject({ status: "done", errorCode: "global_limit" });
     expect((run!.counters as any).discovered).toBeGreaterThan(0);
+  });
+});
+
+describe("research allocation when the budget runs out", () => {
+  // Acme without a stated team size: "partial", but matching 3 ICP points explicitly (industry, country, market). Hostile Ads
+  // matches 2 (industry, country) and ranks higher in search. Northwind matches all 4 ("strong").
+  const acmeWithoutSize = () => { script.enrich = (m) => { const c = companyOf(m); const e = ENRICH[c] as any; return c === "Acme Growth" ? { facts: e.facts.filter((f: any) => f.field !== "team_size") } : e ?? { facts: [] }; }; };
+  // The model budget refuses the Nth research call at once; the others take a moment, like real calls.
+  const refuseResearch = (n: number, slowMs = 0): Partial<PipelineDeps> => {
+    let k = 0;
+    return deps({ chat: (async (ctx: any, m: any, o: any) => {
+      if (ctx.task === "signals" && ++k >= n) throw new GlobalCapExceeded("signals", 1);
+      if (ctx.task === "signals" && slowMs) await new Promise((r) => setTimeout(r, slowMs));
+      return tracedChat(ctx, m, o);
+    }) as any });
+  };
+  const researchedCompanies = () => world().outbound.prospects.filter((p: any) => world().outbound.findings.some((f: any) => f.prospectId === p.id && f.batch === "research")).map((p: any) => p.domain).sort();
+
+  it("researches the companies with the most explicit ICP evidence first, not the best search rank; unknown evidence never counts as a match", async () => {
+    acmeWithoutSize();
+    const d = { ...refuseResearch(3), concurrency: 1 };
+    const id = await start(d); const run = await drive(id, d);
+    const fit = (dom: string) => (world().outbound.prospects.find((p: any) => p.domain === dom)!.fit as any);
+    const rank = (dom: string) => world().outbound.items.find((i: any) => world().outbound.prospects.find((p: any) => p.id === i.prospectId)?.domain === dom)!.rank;
+    expect([fit("acmegrowth.io").verdict, fit("hostileads.com").verdict]).toEqual(["partial", "partial"]);
+    expect(rank("hostileads.com")).toBeGreaterThan(rank("acmegrowth.io")); // search preferred Hostile Ads…
+    expect(researchedCompanies()).toEqual(["acmegrowth.io", "northwind.com"]); // …the evidence prefers Acme
+    expect(run).toMatchObject({ status: "done", errorCode: "global_limit" });
+    expect((run!.counters as any).researched).toBe(2);
+  });
+  it("a budget stop mid-batch waits for the research already under way: it is saved and counted before the run finishes, and nothing is left open", async () => {
+    const d = { ...refuseResearch(3, 40), concurrency: 3 }; // three qualified companies, one batch: the third call is refused while two are running
+    const id = await start(d); const run = await drive(id, d);
+    expect(run).toMatchObject({ status: "done", errorCode: "global_limit" });
+    expect(researchedCompanies()).toHaveLength(2);
+    expect((run!.counters as any).researched).toBe(2);   // the run's own count includes them (it said 0 before)
+    expect(world().outbound.items.every((i: any) => ["done", "rejected"].includes(i.stage))).toBe(true); // nothing left mid-stage
+    expect(world().llmCalls.filter((c: any) => c.errorCode === "reserved")).toEqual([]); // every reservation settled
+    const after = world().outbound.findings.length;
+    await new Promise((r) => setTimeout(r, 80));
+    expect(world().outbound.findings.length).toBe(after); // and nothing is written after the run finished
+  });
+});
+
+describe("interleaved: clear matches are researched before every site is examined", () => {
+  // Every pipeline model call in order ("enrich:Northwind Digital"); optionally the budget refuses calls after the first n.
+  let seq: string[] = [];
+  const tracked = (refuseAfter = Infinity, over: Partial<PipelineDeps> = {}): Partial<PipelineDeps> => deps({ concurrency: 1, ...over, chat: (async (ctx: any, m: any, o: any) => {
+    if (ctx.task === "enrich" || ctx.task === "signals") {
+      if (seq.length >= refuseAfter) throw new GlobalCapExceeded(ctx.task, 1);
+      seq.push(`${ctx.task}:${companyOf(m)}`);
+    }
+    return tracedChat(ctx, m, o);
+  }) as any });
+  const prospect = (d: string) => world().outbound.prospects.find((p: any) => p.domain === d)!;
+  const item = (d: string) => world().outbound.items.find((i: any) => i.prospectId === prospect(d).id)!;
+  const researchRows = (d: string) => world().outbound.findings.filter((f: any) => f.prospectId === prospect(d).id && f.batch === "research");
+  const settled = () => {
+    expect(world().outbound.items.every((i: any) => ["done", "rejected", "failed"].includes(i.stage))).toBe(true); // nothing left mid-stage
+    expect(world().llmCalls.filter((c: any) => c.errorCode === "reserved")).toEqual([]);                    // every reservation settled
+  };
+  beforeEach(() => { seq = []; });
+
+  it("budget runs out partway through examining: the clear match found first was already researched; the sites never examined are closed, not left waiting", async () => {
+    const d = tracked(2); // room for two model calls after the request is read
+    const id = await start(d); const run = await drive(id, d);
+    expect(seq).toEqual(["enrich:Northwind Digital", "signals:Northwind Digital"]); // before: a second site would have been examined instead
+    expect(run).toMatchObject({ status: "done", errorCode: "global_limit" });
+    expect(prospect("northwind.com").ready).toBe(true); // Ready on its own evidence, the same as in a full run
+    expect(world().outbound.prospects.filter((p: any) => p.ready).map((p: any) => p.domain)).toEqual(["northwind.com"]);
+    const unexamined = world().outbound.items.filter((i: any) => i.stage === "rejected" && i.errorCode === "global_limit");
+    expect(unexamined.length).toBeGreaterThan(0);
+    expect((run!.counters as any).researched).toBe(1);
+    settled();
+  });
+  it("only clear matches go early: a company matching 2 ICP points waits until every site is examined, and the outcome equals a full run's", async () => {
+    const d = tracked();
+    const id = await start(d); const run = await drive(id, d);
+    const lastExamined = seq.map((x) => x.startsWith("enrich:")).lastIndexOf(true);
+    expect(seq.indexOf("signals:Northwind Digital")).toBeLessThan(lastExamined); // strong: early
+    expect(seq.indexOf("signals:Hostile Ads")).toBeGreaterThan(lastExamined);    // 2 points, size and market unknown: waits
+    expect((run!.counters as any)).toMatchObject({ enriched: 6, icpMatch: 3, researched: 3, ready: 1 });          // same as the definition-of-done run
+    settled();
+  });
+  it("restart recovery: a crash while saving early research is retried, written once, and the run completes", async () => {
+    script.signals = (m) => { if (companyOf(m) === "Northwind Digital" && !(globalThis as any).__crashed) { (globalThis as any).__crashed = true; world().outboundFailNextSave = true; } return researchFor(companyOf(m), m[1].content); };
+    const d = tracked();
+    try {
+      const id = await start(d); const run = await drive(id, d);
+      expect(seq.filter((x) => x === "signals:Northwind Digital")).toHaveLength(2); // the crashed attempt, then the retry
+      expect(item("northwind.com")).toMatchObject({ stage: "done", attempts: 1 });
+      const keys = researchRows("northwind.com").map((f: any) => `${f.kind}:${f.quote}`);
+      expect(new Set(keys).size).toBe(keys.length); // no finding saved twice
+      expect(prospect("northwind.com").ready).toBe(true);
+      expect(run!.status).toBe("done");
+      settled();
+    } finally { delete (globalThis as any).__crashed; }
+  });
+  it("duplicate companies: two results for one company are one prospect researched once, and a second run reuses that research", async () => {
+    const d = tracked();
+    const id = await start(d); await drive(id, d);
+    expect(world().outbound.prospects.filter((p: any) => p.domain === "northwind.com")).toHaveLength(1);
+    expect(world().outbound.items.filter((i: any) => i.prospectId === prospect("northwind.com").id)).toHaveLength(1);
+    expect(seq.filter((x) => x === "signals:Northwind Digital")).toHaveLength(1);
+    const again = await start(d); await drive(again, d);
+    expect(seq.filter((x) => x === "signals:Northwind Digital")).toHaveLength(1); // fresh research is reused, not bought twice
+    settled();
+  });
+  it("research failures: a clear match whose research keeps failing ends failed with its code; examining the other sites goes on in between", async () => {
+    script.signals = (m) => (companyOf(m) === "Northwind Digital" ? new ProviderError("upstream", "busy") : researchFor(companyOf(m), m[1].content));
+    const d = tracked();
+    const id = await start(d);
+    // Step without fast-forwarding the retry back-off: while Northwind's retry waits, the other sites are examined.
+    const full = { ...pipelineDeps(), ...d } as PipelineDeps;
+    for (let i = 0; i < 60; i++) { const r = await outboundStore.getRun(ORG1, id); if (!r || !["search", "verify", "enrich"].includes(r.stage)) break; await stepRun(r, Date.now() + 60_000, full); for (const it of world().outbound.items) if (it.stage === "found" && it.nextAttemptAt) it.nextAttemptAt = new Date(0); }
+    expect(seq.filter((x) => x === "signals:Northwind Digital")).toHaveLength(1);
+    expect(seq.slice(seq.indexOf("signals:Northwind Digital")).filter((x) => x.startsWith("enrich:")).length).toBeGreaterThan(0);
+    expect(item("northwind.com")).toMatchObject({ stage: "enriched", attempts: 1 }); // waiting for its retry, not lost
+    const run = await drive(id, d); // then retries come due
+    expect(seq.filter((x) => x === "signals:Northwind Digital")).toHaveLength(3);
+    expect(item("northwind.com")).toMatchObject({ stage: "failed", errorCode: "research:upstream" });
+    expect(researchRows("acmegrowth.io").length).toBeGreaterThan(0); // the others are still researched
+    expect(run!.status).toBe("done");
+    settled();
+  });
+});
+
+describe("search diagnostics (opt-in, local, redacted)", () => {
+  const OUTCOME = { discovered: 11, verified: 6, enriched: 6, icpMatch: 3, researched: 3, ready: 1 }; // the definition-of-done run
+  it("off unless OUTBOUND_SEARCH_DIAGNOSTICS=1, and a normal run writes nothing", async () => {
+    expect(searchDiagnosticsDir({})).toBeNull();
+    expect(searchDiagnosticsDir({ OUTBOUND_SEARCH_DIAGNOSTICS: "true" })).toBeNull();
+    expect(searchDiagnosticsDir({ OUTBOUND_SEARCH_DIAGNOSTICS: "1" })).toBe(".diagnostics/outbound-search");
+    expect(searchDiagnosticsDir({ OUTBOUND_SEARCH_DIAGNOSTICS: "1", OUTBOUND_SEARCH_DIAGNOSTICS_DIR: "/tmp/x" })).toBe("/tmp/x");
+    expect(pipelineDeps().searchDiagnostics).toBeNull();
+    const id = await start(); const run = await drive(id);
+    expect(run!.counters).toMatchObject(OUTCOME);
+  });
+  it("on: every query and the ranking are traced by number, rank, domain and decision; the run's outcome is unchanged; nothing private is written", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ob-diag-"));
+    const d = deps({ searchDiagnostics: dir });
+    const id = await start(d); const run = await drive(id, d);
+    expect(run!.counters).toMatchObject(OUTCOME);
+    const text = readFileSync(join(dir, `${id}.jsonl`), "utf8");
+    const lines = text.trim().split("\n").map((l) => JSON.parse(l));
+    const queries = lines.filter((l) => l.type === "query"), rank = lines.find((l) => l.type === "rank");
+    expect(queries.map((q) => q.query)).toEqual((run!.queries as any[]).map((_, i) => `q${i + 1}`));
+    expect(queries.every((q) => q.results.length === RESULTS.length)).toBe(true);
+    expect(queries[0].results.find((r: any) => r.domain === "clutch.co")).toMatchObject({ decision: "blocked_site" });
+    expect(queries[0].results.find((r: any) => r.domain === "bestlists.com")).toMatchObject({ decision: "listing_page" });
+    expect(rank.summary).toMatchObject({ candidates: 11 });
+    expect(rank.candidates.find((c: any) => c.domain === "leadco.com")).toMatchObject({ outcome: "already_lead" });
+    expect(rank.candidates.find((c: any) => c.domain === "ipinfo.io")).toMatchObject({ outcome: "off_topic" });
+    expect(rank.candidates.find((c: any) => c.domain === "northwind.com")).toMatchObject({ outcome: "keep", queries: expect.arrayContaining(["q1"]) });
+    // No titles, snippets, paths, query strings or query text: only numbers, domains and codes.
+    for (const r of RESULTS) { expect(text).not.toContain(r.title); expect(text).not.toContain(r.snippet); }
+    for (const q of (run!.queries as any[])) expect(text).not.toContain(q.q);
+    for (const bad of ["utm_source", "/services", "/saas-agencies", "@"]) expect(text).not.toContain(bad);
+  });
+  it("a diagnostics write that fails never fails the run", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ob-diag-")); const blocker = join(dir, "not-a-dir"); writeFileSync(blocker, "x");
+    const d = deps({ searchDiagnostics: join(blocker, "sub") }); // a directory can't be made under a file
+    const id = await start(d); const run = await drive(id, d);
+    expect(run).toMatchObject({ status: "done" });
+    expect(run!.counters).toMatchObject(OUTCOME);
+    expect(existsSync(join(blocker, "sub"))).toBe(false);
+    expect(readdirSync(dir)).toEqual(["not-a-dir"]);
+  });
+});
+
+describe("research date diagnostics (opt-in): they never change what research keeps or who is Ready", () => {
+  const fresh = () => { useWorld(createWorld()); fakeWeb(); seedLead(world(), { companyName: "LeadCo", website: "https://leadco.com", domain: "leadco.com" }); searches = []; calls = { icp: 0, enrich: 0, signals: 0, angle: 0 }; script = {}; model(); clearPageCache(); };
+  /** Everything a person could see change: the run's counts, each prospect's state and score, and every saved finding. */
+  const snapshot = (run: any) => {
+    const dom = (id: number) => world().outbound.prospects.find((p: any) => p.id === id)?.domain;
+    return {
+      counters: run.counters, status: run.status, errorCode: run.errorCode,
+      prospects: world().outbound.prospects.map((p: any) => ({ domain: p.domain, status: p.status, ready: p.ready, score: p.score?.total ?? null, fit: p.fit?.verdict ?? null, reject: p.rejectReason })).sort((a: any, b: any) => a.domain.localeCompare(b.domain)),
+      findings: world().outbound.findings.map((f: any) => `${dom(f.prospectId)}|${f.batch}|${f.kind}|${f.type}|${f.status}|${f.quote}|${f.observedAt ? new Date(f.observedAt).toISOString() : ""}|${f.meta?.datePrecision ?? ""}`).sort(),
+    };
+  };
+  it("the same run with them off, on, and on but unable to write: identical results", async () => {
+    expect(pipelineDeps().researchDiagnostics).toBeNull(); // off by default
+    const off = snapshot(await drive(await start(), deps()));
+    fresh();
+    const dir = mkdtempSync(join(tmpdir(), "ob-rdiag-"));
+    const d = deps({ researchDiagnostics: dir });
+    const id = await start(d);
+    const on = snapshot(await drive(id, d));
+    expect(on).toEqual(off);
+    fresh();
+    const blocker = join(dir, "a-file"); writeFileSync(blocker, "x");
+    const broken = deps({ researchDiagnostics: join(blocker, "sub") });
+    expect(snapshot(await drive(await start(broken), broken))).toEqual(off);
+    // What was written: one record per researched company, numbers and codes only.
+    const text = readFileSync(join(dir, `${id}.jsonl`), "utf8");
+    const recs = text.trim().split("\n").map((l) => JSON.parse(l));
+    expect(recs.map((r) => r.type)).toEqual(Array(off.counters.researched).fill("research_dates"));
+    const nw = recs.find((r) => r.prospect === "northwind.com");
+    expect(nw.signals.find((x: any) => x.type === "HIRING")).toMatchObject({ dateQuote: "given", dateQuoteBeside: true, keptPrecision: "day", outcome: "dated" });
+    for (const bad of ["Senior SEO Strategist", "Ana Silva", "Posted September 30", "/careers", "PPC practice", "@"]) expect(text).not.toContain(bad);
   });
 });
 

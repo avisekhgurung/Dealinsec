@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EVENT_SIGNAL_TYPES, MIN_RELEVANCE, MISSING_CONTACT, isContactFormRoute, MISSING_REASON, hasVerifiedEmail, isDecisionMaker, relevance, canonicalUrl, checkSite, collectCandidates, dateLabel, domainOf, evidenceDate, findingsAsClaims, freshness, junkReason, parseEvidenceDate, pickResearchLinks, preRank, readiness, runBudget, signalDating, timingOf, type FindingLike, type SearchHit } from "./prospect";
+import { EVENT_SIGNAL_TYPES, MIN_RELEVANCE, MISSING_CONTACT, isContactFormRoute, MISSING_REASON, hasVerifiedEmail, isDecisionMaker, relevance, canonicalUrl, checkSite, collectCandidates, dateLabel, domainOf, evidenceDate, findingsAsClaims, freshness, junkReason, parseEvidenceDate, pickResearchLinks, preRank, readiness, runBudget, signalDating, timingOf, type FindingLike, type SearchHit, byResearchPriority, fitEvidence, worthResearchingEarly } from "./prospect";
 import { icpSchema } from "./icp";
 import { scoreLead } from "./lead-score";
 
@@ -383,5 +383,55 @@ describe("R1: a contact form is a way in only when the page reader confirmed a r
     const claim = (f: any) => findingsAsClaims([{ ...f, sourceUrl: "https://acme.com/contact", retrievedAt: today() } as FindingLike], today())[0];
     expect(claim(form({ detectedBy: "form" }))).toMatchObject({ field: "contact_form", status: "confirmed" });
     expect(claim(form({}))).toMatchObject({ field: "contact_form", status: "inferred" });
+  });
+});
+
+describe("research priority (ordering only: who qualifies is unchanged)", () => {
+  // The research queue of one live run (names replaced): ten qualified companies, all "partial", with their search rank and
+  // which ICP points each site stated. The $0.10 test budget admitted 5 research calls.
+  const sig = (...st: string[]) => ["industry", "location", "size", "market"].map((key, i) => ({ key, status: st[i] }));
+  const queue = [
+    { name: "a-positive", rank: 10, fit: { verdict: "partial", signals: sig("match", "match", "unknown", "unknown") } },
+    { name: "b-positive", rank: 10, fit: { verdict: "partial", signals: sig("match", "unknown", "unknown", "match") } },
+    { name: "c", rank: 9, fit: { verdict: "partial", signals: sig("match", "unknown", "unknown", "unknown") } },
+    { name: "d", rank: 9, fit: { verdict: "partial", signals: sig("match", "unknown", "unknown", "match") } },
+    { name: "e", rank: 7, fit: { verdict: "partial", signals: sig("match", "match", "unknown", "match") } },
+    { name: "f-negative", rank: 7, fit: { verdict: "partial", signals: sig("match", "unknown", "unknown", "match") } },
+    { name: "g-positive", rank: 6, fit: { verdict: "partial", signals: sig("match", "match", "unknown", "match") } },
+    { name: "h", rank: 6, fit: { verdict: "partial", signals: sig("match", "match", "unknown", "unknown") } },
+    { name: "i-size-750", rank: 5, fit: { verdict: "partial", signals: sig("match", "match", "mismatch", "unknown") } },
+    { name: "j", rank: 4, fit: { verdict: "partial", signals: sig("match", "unknown", "unknown", "unknown") } },
+  ];
+  it("on the saved queue: the 3-point matches go first, the known size mismatch last, and all three known targets fit in the 5 calls", () => {
+    const order = [...queue].sort(byResearchPriority).map((x) => x.name);
+    expect(order).toEqual(["e", "g-positive", "a-positive", "b-positive", "d", "f-negative", "h", "c", "j", "i-size-750"]);
+    expect(order.slice(0, 5).filter((n) => n.endsWith("positive"))).toHaveLength(3);
+    const before = [...queue].sort((a, b) => b.rank - a.rank).map((x) => x.name); // what the old order did here: rank alone
+    expect(before.slice(0, 5).filter((n) => n.endsWith("positive"))).toHaveLength(2); // g-positive (rank 6) was 7th
+  });
+  it("an unknown is never a match, a mismatch outweighs any number of matches, and the verdict still comes before the count", () => {
+    expect(fitEvidence({ verdict: "partial", signals: sig("unknown", "unknown", "unknown", "unknown") })).toEqual({ matches: 0, mismatches: 0 });
+    expect(fitEvidence(null)).toEqual({ matches: 0, mismatches: 0 });
+    const strong2 = { rank: 1, fit: { verdict: "strong", signals: sig("match", "match", "unknown", "unknown") } };
+    const partial3 = { rank: 9, fit: { verdict: "partial", signals: sig("match", "match", "unknown", "match") } };
+    const mismatch3 = { rank: 99, fit: { verdict: "partial", signals: sig("match", "match", "mismatch", "match") } };
+    const unknown = { rank: 50, fit: { verdict: "partial", signals: sig("unknown", "unknown", "unknown", "unknown") } };
+    expect([mismatch3, unknown, partial3, strong2].sort(byResearchPriority)).toEqual([strong2, partial3, unknown, mismatch3]);
+    const tie = (rank: number) => ({ rank, fit: { verdict: "partial", signals: sig("match", "unknown", "unknown", "unknown") } });
+    expect([tie(2), tie(8)].sort(byResearchPriority).map((x) => x.rank)).toEqual([8, 2]); // equal evidence: search rank decides
+  });
+});
+
+describe("worth researching before every site is examined", () => {
+  const sig = (...st: string[]) => ["industry", "location", "size", "market"].map((key, i) => ({ key, status: st[i] }));
+  it("a strong fit, or 3 points stated explicitly, with no stated mismatch; unknowns never count", () => {
+    expect(worthResearchingEarly({ verdict: "strong", signals: sig("match", "match", "match", "match") })).toBe(true);
+    expect(worthResearchingEarly({ verdict: "partial", signals: sig("match", "match", "unknown", "match") })).toBe(true);
+    expect(worthResearchingEarly({ verdict: "partial", signals: sig("match", "match", "unknown", "unknown") })).toBe(false); // waits
+    expect(worthResearchingEarly({ verdict: "partial", signals: sig("match", "match", "mismatch", "match") })).toBe(false);  // a stated mismatch
+    expect(worthResearchingEarly({ verdict: "partial", signals: sig("unknown", "unknown", "unknown", "unknown") })).toBe(false);
+    expect(worthResearchingEarly({ verdict: "weak", signals: sig("match", "match", "match", "mismatch") })).toBe(false);
+    expect(worthResearchingEarly(null)).toBe(false);
+    expect(worthResearchingEarly({ verdict: "partial", signals: sig("match", "match", "unknown", "unknown") }, 2)).toBe(true); // the threshold is a setting
   });
 });

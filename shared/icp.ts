@@ -6,7 +6,7 @@
  */
 import { z } from "zod";
 import { sanitizeQuery } from "./discovery";
-import { assessFit, textMatches, verdictFrom, type FitResult, type FitSignal, type IdealClient } from "./fit";
+import { assessFit, normText, textMatches, verdictFrom, type FitResult, type FitSignal, type IdealClient } from "./fit";
 
 export const MAX_QUANTITY = 50;
 export const DEFAULT_QUANTITY = 20;
@@ -148,6 +148,25 @@ export function describeIcp(i: Icp): string {
 
 export const MAX_QUERIES = 8;
 
+/** The market as the word a company puts before what it is: "SaaS companies" -> "SaaS", "healthcare brands" -> "healthcare". */
+export function marketWord(market: string): string {
+  const m = String(market ?? "").replace(/\s+/g, " ").trim();
+  const core = m.replace(/\s+(companies|company|businesses|business|brands|startups|start-ups|firms|clients|teams|organi[sz]ations|founders|providers|vendors)$/i, "").trim();
+  return core && core.split(" ").length <= 3 ? core : "";
+}
+/** True when `text` already names `word` as whole words, any case ("SaaS marketing agency" names "SaaS"). */
+const names = (text: string, word: string) => !!normText(word) && ` ${normText(text)} `.includes(` ${normText(word)} `);
+const KEY_STOP = new Set(["for", "the", "in", "a", "an", "of", "and", "to", "with"]);
+const keyWord = (w: string) => (/ies$/.test(w) ? w.replace(/ies$/, "y") : /(ss|us|is|as)$/.test(w) || w.length <= 3 ? w : /(sses|ches|shes|xes)$/.test(w) ? w.replace(/es$/, "") : w.replace(/s$/, ""));
+/**
+ * What a query asks for, ignoring wording that doesn't change the search: case, punctuation, plurals, little words,
+ * "US"/"USA" for "United States", and word order. Two queries with the same key are one search.
+ */
+export function queryKey(q: string): string {
+  const words = normText(String(q ?? "").replace(/\b(usa|u\.s\.a?\.?|us)\b/gi, "united states")).split(" ").filter((w) => w && !KEY_STOP.has(w)).map(keyWord);
+  return Array.from(new Set(words)).sort().join(" ");
+}
+
 /**
  * Several phrasings, not one giant search: the ways such a company describes itself, with the place and the market.
  * Deterministic templates first; `extra` (model-proposed phrasings) only fill the remaining slots and pass the same
@@ -159,19 +178,43 @@ export function searchStrategies(i: Icp, extra: string[] = [], max = MAX_QUERIES
   const kinds = [i.industry, ...i.keywords].slice(0, 4);
   const small = i.employeeMax !== null && i.employeeMax <= 50;
   const t: string[] = [];
-  for (const k of kinds.slice(0, 2)) {
-    if (market) t.push(`${k} for ${market} ${place}`);
-    t.push(`${k} ${place}`);
+  if (market) {
+    // With a market, every phrasing names it, once. Measured on saved searches: phrasings without the market
+    // ("SEO agency United States") returned about three times the directory and platform results and never a target
+    // agency; market-led ones ("SaaS SEO agency United States") are the way such companies describe themselves.
+    const lead = marketWord(market) || market;
+    // Each market word once: a kind that already says part of the market gets only the missing words
+    // ("B2B SaaS" + "SaaS marketing agency" -> "B2B SaaS marketing agency", not "B2B SaaS SaaS marketing agency").
+    const leadWords = lead.split(" ").filter((w) => normText(w));
+    const missing = (k: string) => leadWords.filter((w) => !names(k, w));
+    const overlaps = (k: string) => missing(k).length < leadWords.length;                  // says some of the market
+    const led = (k: string) => (missing(k).length ? `${missing(k).join(" ")} ${k}` : k);   // "SaaS marketing agency" already says it
+    // And the place once: a market that already names it ("US healthcare brands") doesn't get "United States" again.
+    const placeKey = queryKey(place).split(" ").filter(Boolean);
+    const marketKey = new Set(queryKey(market).split(" "));
+    const at = (q: string) => (placeKey.length && placeKey.every((w) => marketKey.has(w)) ? q : `${q} ${place}`);
+    const forMarket = (k: string) => (overlaps(k) ? at(led(k)) : at(`${k} for ${market}`));
+    for (const k of kinds.slice(0, 2)) {
+      t.push(forMarket(k));                                                                 // A
+      t.push(at(led(k)));                                                                   // C (was "${k} ${place}")
+    }
+    t.push(overlaps(i.industry) ? `${led(i.industry)} clients case study` : `${i.industry} ${market} clients case study`); // B
+    if (small) t.push(at(`boutique ${led(i.industry)}`));
+    for (const k of kinds.slice(2)) t.push(overlaps(k) ? at(led(k)) : at(`${k} ${market}`));
+  } else {
+    // No market stated: the plain phrasings, unchanged.
+    for (const k of kinds.slice(0, 2)) t.push(`${k} ${place}`);
+    if (small) t.push(`boutique ${i.industry} ${place}`);
+    for (const k of kinds.slice(2)) t.push(`${k} ${place}`);
   }
-  if (market) t.push(`${i.industry} ${market} clients case study`);
-  if (small) t.push(`boutique ${i.industry} ${place}`);
-  for (const k of kinds.slice(2)) t.push(`${k} ${market} ${place}`);
   const out: string[] = [];
   const seen = new Set<string>();
+  // One search per meaning: "digital marketing agencies for SaaS companies US" and "digital marketing agency for SaaS
+  // companies United States" are the same search, so the second one never takes a slot (queryKey).
   const take = (q: string) => {
-    const c = sanitizeQuery(q.replace(/\s+/g, " "));
-    if (!c.ok || seen.has(c.query.toLowerCase()) || out.length >= max) return false;
-    seen.add(c.query.toLowerCase()); out.push(c.query); return true;
+    const c = sanitizeQuery(q.replace(/\s+/g, " ").trim());
+    if (!c.ok || seen.has(queryKey(c.query)) || out.length >= max) return false;
+    seen.add(queryKey(c.query)); out.push(c.query); return true;
   };
   // Model phrasings get up to 3 reserved slots (they find wordings the templates don't); templates take the rest.
   const okExtra = extra.filter((q) => sanitizeQuery(q).ok).slice(0, 3);

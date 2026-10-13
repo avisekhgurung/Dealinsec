@@ -15,9 +15,10 @@ import { COUNTRIES, roleRank, type Icp } from "./icp";
 import { nameFromDomain, nameResemblesDomain } from "./discovery";
 import { normText } from "./fit";
 import { evidenceDate, isSignalType, type DatePrecision, type EvidenceDate, type SignalType } from "./prospect";
+import { employmentOf } from "./staff";
 import { checkContact, cleanLine, injectionLike, normalizeForQuote, onSite, quoteInPage, LIMITS as QUOTE, type ResearchPage } from "./research";
 
-export type Reason = "not_an_object" | "bad_field" | "bad_page" | "bad_value" | "bad_quote" | "quote_not_found" | "suspicious" | "invalid_contact" | "duplicate" | "bad_type" | "bad_person" | "not_staff" | "bad_support" | "bad_text";
+export type Reason = "not_an_object" | "bad_field" | "bad_page" | "bad_value" | "bad_quote" | "quote_not_found" | "suspicious" | "invalid_contact" | "duplicate" | "bad_type" | "bad_person" | "not_staff" | "staff_unverified" | "bad_support" | "bad_text";
 export interface Rejection { reason: Reason; what?: string }
 const tally = (rs: Rejection[]) => rs.reduce<Record<string, number>>((m, r) => ((m[r.reason] = (m[r.reason] ?? 0) + 1), m), {});
 
@@ -84,7 +85,8 @@ export function normalizeEnrichment(raw: unknown, pages: ResearchPage[], site: s
  * dateYear with precision "year" and no observedAt, so nothing downstream can read it as a day.
  */
 export interface SignalDraft { index: number; type: SignalType; value: string; quote: string; url: string; observedAt: Date | null; datePrecision: DatePrecision | null; dateYear: number | null; dateQuote: string | null }
-export interface PersonDraft { index: number; name: string; title: string; quote: string; url: string; rank: number }
+/** staffEvidence: why the pages show this person works here (shared/staff.ts). */
+export interface PersonDraft { index: number; name: string; title: string; quote: string; url: string; rank: number; staffEvidence: "explicit" | "team_listing" }
 export interface PainDraft { index: number; value: string; quote: string; url: string }
 export interface OpportunityDraft { text: string; supports: { newIndex?: number; findingId?: number }[]; confidence: "low" | "medium" }
 export interface ResearchResult { signals: SignalDraft[]; people: PersonDraft[]; pains: PainDraft[]; opportunities: OpportunityDraft[]; rejected: Record<string, number> }
@@ -157,10 +159,13 @@ export function normalizeResearch(raw: unknown, pages: ResearchPage[], site: str
       const employer = typeof f.employer === "string" ? cleanLine(f.employer).slice(0, 80) : "";
       const sameCompany = !!employer && (nameResemblesDomain(employer, site) || nameFromDomain(employer, site) || (!!opts.companyName && normText(employer) === normText(opts.companyName)));
       if (!sameCompany) { rejected.push({ reason: "not_staff", what: "person" }); return; }
+      // The model's word is not enough (it called four testimonial clients "staff" on one live page): the pages must show it.
+      const job = employmentOf({ name, title }, pages, { site, companyName: opts.companyName });
+      if (job.verdict !== "staff") { rejected.push({ reason: job.verdict === "unknown" ? "staff_unverified" : "not_staff", what: "person" }); return; }
       const key = `person:${name.toLowerCase()}`;
       if (seen.has(key)) { rejected.push({ reason: "duplicate", what: "person" }); return; }
       seen.add(key); kept.set(idx, true);
-      people.push({ index: idx, name, title, quote: q.quote, url: q.page.url, rank: roleRank(opts.icp, title) });
+      people.push({ index: idx, name, title, quote: q.quote, url: q.page.url, rank: roleRank(opts.icp, title), staffEvidence: job.why });
     } else if (f.kind === "pain") {
       if (typeof f.value !== "string" || cleanLine(f.value).length < 5) { rejected.push({ reason: "bad_value", what: "pain" }); return; }
       const value = cleanLine(f.value).slice(0, 300);
