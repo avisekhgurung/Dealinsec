@@ -480,3 +480,13 @@ describe("follow-up: invoice documents (attachments)", () => {
     expect(await checkAttachmentUpload(OWNER(), inv.id)).toMatchObject({ ok: false, code: "UPGRADE_REQUIRED" });
   });
 });
+
+describe("follow-up: the deal page uses the server's signed rule", () => {
+  it("no screen gates invoicing on an uploaded proof file or on status alone", () => {
+    for (const f of ["client/src/pages/deal-details.tsx", "client/src/pages/contract-details.tsx"]) {
+      const src = fs.readFileSync(path.join(__dirname, "../../..", f), "utf8");
+      expect(src, f).toContain("isAgreementSigned(");
+      expect(src, f).not.toMatch(/hasProof|status (!==|===) "Signed"/);
+    }
+  });
+});

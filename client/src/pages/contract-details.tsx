@@ -10,6 +10,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocale, useMoney } from "@/hooks/use-locale";
 import { memberCan } from "@shared/permissions";
+import { isAgreementSigned } from "@shared/agreement-lifecycle";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -147,10 +148,11 @@ export default function ContractDetailsPage() {
   });
 
   const hasInvoice = dealBrandInvoices.length > 0;
-  const hasProof = !!contract?.proofFileName;
+  // Signed online or by an uploaded copy — the server's rule, not "has a proof file".
+  const isSigned = isAgreementSigned(contract);
 
   // Timeline step: 1=Deal done, 2=Quote done, 3=Agreement active/done, 4=Invoice
-  const timelineStep = hasInvoice ? 4 : hasProof ? 4 : 3;
+  const timelineStep = hasInvoice ? 4 : isSigned ? 4 : 3;
 
   const backPath = "/contracts";
 
@@ -372,7 +374,7 @@ export default function ContractDetailsPage() {
               step: 4,
               href: dealBrandInvoices.length
                 ? `/brand-invoices/${dealBrandInvoices[0].id}`
-                : canInvoice && contract.status === "Signed"
+                : canInvoice && isAgreementSigned(contract)
                 ? `/brand-invoices/new?contractId=${contract.id}&mode=full`
                 : null,
             },
@@ -703,7 +705,7 @@ export default function ContractDetailsPage() {
                   <div className="flex-1">
                     <p className="font-medium text-sm">{hasInvoice ? "Generate another invoice" : `Generate Invoice for ${party}`}</p>
                     <p className="text-xs text-muted-foreground">
-                      {contract.status !== "Signed"
+                      {!isAgreementSigned(contract)
                         ? "Send it for signature or upload a signed copy to enable billing"
                         : hasInvoice
                         ? "Invoice amounts or terms changed? Create a new one anytime."
@@ -725,7 +727,7 @@ export default function ContractDetailsPage() {
                 <Button
                   className="w-full gradient-btn text-white mb-2"
                   onClick={() => setLocation(`/brand-invoices/new?contractId=${contract.id}&mode=full`)}
-                  disabled={contract.status !== "Signed"}
+                  disabled={!isAgreementSigned(contract)}
                   data-testid="button-generate-brand-invoice"
                 >
                   <FileText className="w-4 h-4 mr-2" />
@@ -735,7 +737,7 @@ export default function ContractDetailsPage() {
                   <Button
                     variant="outline"
                     onClick={() => setLocation(`/brand-invoices/new?contractId=${contract.id}&mode=split`)}
-                    disabled={contract.status !== "Signed"}
+                    disabled={!isAgreementSigned(contract)}
                     data-testid="button-split-invoice"
                   >
                     <Scissors className="w-4 h-4 mr-2" />
@@ -744,7 +746,7 @@ export default function ContractDetailsPage() {
                   <Button
                     variant="outline"
                     onClick={() => setLocation(`/brand-invoices/new?contractId=${contract.id}&mode=custom`)}
-                    disabled={contract.status !== "Signed"}
+                    disabled={!isAgreementSigned(contract)}
                     data-testid="button-show-custom-invoice"
                   >
                     <MoneyIcon className="w-4 h-4 mr-2" />

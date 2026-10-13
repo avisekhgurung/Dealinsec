@@ -20,6 +20,7 @@ import { trackEvent } from "@/lib/analytics";
 import { ArrowLeft, Calendar, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle, ChevronRight, Crown, Briefcase, ScrollText, ListChecks, Copy, Zap, Sparkles } from "lucide-react";
 import { hasProAccess, STANDARD_TERMS } from "@shared/schema";
 import { memberCan } from "@shared/permissions";
+import { isAgreementSigned } from "@shared/agreement-lifecycle";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { parseApiError, isUpgradeError } from "@/lib/api-error";
@@ -157,13 +158,16 @@ export default function DealDetailsPage() {
   const dealId = parseInt(params.id || "0");
   const hasContract = contracts.some(c => c.dealId === dealId);
   const contract = contracts.find(c => c.dealId === dealId);
-  const hasProof = !!contract?.proofFileName;
+  // Signed online by the client OR by an owner-attested uploaded copy (or an older
+  // row stored as Signed) — the same rule the server uses to allow invoicing.
+  // An uploaded proof file alone was the old test, which missed online signatures.
+  const isSigned = isAgreementSigned(contract);
   const hasInvoice = dealBrandInvoices.length > 0;
   const hasQuote = !!quote && quote.status === "draft";
   const stepsReady = !quoteLoading;
 
   // Determine current step (1=Deal, 2=Quote, 3=Agreement, 4=Invoice)
-  const currentStep = hasInvoice ? 4 : hasContract ? (hasProof ? 4 : 3) : hasQuote ? 3 : 2;
+  const currentStep = hasInvoice ? 4 : hasContract ? (isSigned ? 4 : 3) : hasQuote ? 3 : 2;
 
   const backPath = "/deals";
 
@@ -308,7 +312,7 @@ export default function DealDetailsPage() {
                     // invoice itself, or to the composer when one can be raised.
                     href: dealBrandInvoices.length
                       ? `/brand-invoices/${dealBrandInvoices[0].id}`
-                      : contract && contract.status === "Signed" && canInvoice
+                      : contract && isAgreementSigned(contract) && canInvoice
                       ? `/brand-invoices/new?contractId=${contract.id}&mode=full`
                       : null,
                   },
@@ -380,7 +384,7 @@ export default function DealDetailsPage() {
                 )}
 
                 {/* Step 3: Agreement created — tappable to open it, plus upload-proof action */}
-                {hasContract && !hasProof && (
+                {hasContract && !isSigned && (
                   <div className="flex items-center gap-2">
                     {contract ? (
                       <Link href={`/contracts/${contract.id}`} className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 flex-1 rounded-lg -m-1 p-1 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors cursor-pointer" data-testid="link-view-agreement">
@@ -397,7 +401,7 @@ export default function DealDetailsPage() {
                     {contract && (
                       <Link href={`/contracts/${contract.id}`}>
                         <Button variant="outline" size="sm" className="rounded-lg text-xs font-medium">
-                          Upload Proof
+                          Get it signed
                         </Button>
                       </Link>
                     )}
@@ -405,7 +409,7 @@ export default function DealDetailsPage() {
                 )}
 
                 {/* Step 3 → 4: Generate Invoice for Brand (Pro feature) */}
-                {hasContract && hasProof && !hasInvoice && canInvoice && !hasProAccess(user) && (
+                {hasContract && isSigned && !hasInvoice && canInvoice && !hasProAccess(user) && (
                   <div className="space-y-2">
                     <Button
                       className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
@@ -420,7 +424,7 @@ export default function DealDetailsPage() {
                     </Button>
                   </div>
                 )}
-                {hasContract && hasProof && !hasInvoice && canInvoice && hasProAccess(user) && (
+                {hasContract && isSigned && !hasInvoice && canInvoice && hasProAccess(user) && (
                   <div className="space-y-2">
                     <Link href={contract ? `/contracts/${contract.id}` : "/contracts"}>
                       <Button
