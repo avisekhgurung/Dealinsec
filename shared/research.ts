@@ -40,6 +40,9 @@ export interface ResearchPage {
   dateOrder?: "mdy" | "dmy" | null;
   /** The page's dated entries (a blog index's cards): each date belongs to its own entry's title only. */
   entries?: { title: string; date: string }[];
+  /** Built-in reader only: each date shown on the page (as written) and the text of the block it belongs to. When present, a date
+   * quoted beside a claim must own that claim (server/outbound/page-dates.ts); `multi` = a block showing two dates (ambiguous). */
+  dateRegions?: { leaf: string; text: string; multi: boolean }[];
   /** The text was cut at the reader's limit: what lies past the cut was not read. */
   truncated?: boolean;
 }

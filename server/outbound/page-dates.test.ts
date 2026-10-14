@@ -130,3 +130,59 @@ describe("provenance and readiness", () => {
     expect(r.parts?.body).not.toMatch(/September 14, 2026|August 28, 2026/);
   });
 });
+
+describe("publication dates come only from sources that mean this post (14 Oct live diagnostic)", () => {
+  it("a CMS's generic Article markup on careers and results pages is no publication date, and says why", async () => {
+    for (const [f, p] of [["cms-careers.html", "/careers/"], ["cms-results.html", "/results/"]] as const) {
+      const r = await read(f, p);
+      expect(r.dates?.published, f).toBeNull();
+      expect(r.dates?.discarded, f).toEqual(["not_article"]);
+      expect(r.text.startsWith(PAGE_DATES_BLOCK), f).toBe(false);
+    }
+  });
+  it("without the fix the careers page would have looked Ready: undated it stays blocked", async () => {
+    const sig = (await run(DATED_PAGE_CASES.find((c) => c.file === "cms-careers.html")!)).sig;
+    const person: FindingLike = { id: 2, kind: "decision_maker", type: "Founder", value: "Ana Silva, Founder and CEO", status: "confirmed", sourceUrl: null, observedAt: null, retrievedAt: READ_AT, meta: { name: "Ana Silva", title: "Founder and CEO" } };
+    const signal: FindingLike = { id: 1, kind: "signal", type: "HIRING", value: "x", status: "confirmed", sourceUrl: null, observedAt: sig.observedAt, retrievedAt: READ_AT, meta: { datePrecision: sig.datePrecision } };
+    expect(readiness({ verified: true, fitVerdict: "strong", findings: [signal, person], now: READ_AT }).missing).toEqual([MISSING_REASON]);
+  });
+  it("an index is not one post; a post's address, or a specific type, is", async () => {
+    expect((await read("blog-index-yoast.html", "/blog/")).dates?.published).toBeNull();
+    expect((await read("cms-blog-post.html", "/blog/new-attribution-service")).dates?.published).toMatchObject({ date: "2026-09-18", source: "json_ld" });
+    expect((await read("job-posting.html", "/careers/senior-ppc-manager")).dates?.published).toMatchObject({ date: "2026-09-28", source: "json_ld" });
+  });
+});
+
+describe("a date belongs to its own block (14 Oct live diagnostic)", () => {
+  const regionsOf = async (f: string, p: string) => (await read(f, p)).dates?.regions ?? [];
+  it("plain-text card dates: each card's region holds its own title and no other card's", async () => {
+    const rs = await regionsOf("plain-date-cards.html", "/");
+    const own = rs.find((r) => r.leaf === "05.14.2026")!;
+    expect(own.text).toContain("ChatGPT Ads Management");
+    expect(own.text).not.toContain("How to Build a B2B Paid Social Plan");
+  });
+  it("a date closing a card stops before the next card's title", async () => {
+    const rs = await regionsOf("end-of-card-dates.html", "/blog/");
+    const first = rs.find((r) => r.leaf === "October 5, 2026")!;
+    expect(first.text).toContain("first acquisition adds HubSpot");
+    expect(first.text).not.toContain("How we plan pipeline for SaaS");
+  });
+  it("page-builder cards are a list again (a builder's 'widget' class isn't a sidebar)", async () => {
+    const r = await read("builder-cards.html", "/blog/");
+    expect(r.dates?.list).toBe(true);
+    expect(r.dates?.items.map((i) => i.date)).toEqual(["July 25, 2026", "July 11, 2026", "June 30, 2026"]);
+  });
+  it("a footer's date stays in the footer; two dates in one block are ambiguous", async () => {
+    const footer = (await regionsOf("plain-wrapper.html", "/about/")).find((r) => r.leaf === "March 3, 2026")!;
+    expect(footer.text).not.toContain("We opened a new office in Austin");
+    const two = await regionsOf("two-dates-paragraph.html", "/blog/milestones");
+    expect(two.find((r) => r.leaf === "June 2, 2026")).toMatchObject({ multi: true });
+  });
+  it("a date split over tags is found in its smallest element; an edit stamp labelled in another element dates nothing", async () => {
+    const html = `<html lang="en-US"><body><main><div class="card"><h3>We launched a podcast for SaaS founders</h3><p class="d"><b>Sep</b> 14, 2026</p></div><div class="card"><h3>We redesigned our website</h3><p><span>Updated:</span> <time>October 1, 2026</time></p></div></main></body></html>`;
+    const r = await readHtml(new TextEncoder().encode(html), new URL(`https://${SITE}/blog/`), READ_AT);
+    const rs = r.ok ? r.dates?.regions ?? [] : [];
+    expect(rs.find((x) => x.leaf === "Sep 14, 2026")?.text).toContain("We launched a podcast for SaaS founders");
+    expect(rs.some((x) => x.leaf.includes("October 1, 2026"))).toBe(false);
+  });
+});

@@ -142,6 +142,21 @@ function dateOwnedElsewhere(page: ResearchPage, quote: string, date: EvidenceDat
   const q = normalizeForQuote(quote).toLowerCase();
   return !owners.some((e) => { const t = normalizeForQuote(e.title).toLowerCase(); return t.length >= 6 && (q.includes(t) || t.includes(q)); });
 }
+/**
+ * The date's ownership, from the page's structure (built-in reader): the date must be shown in a block that also holds the
+ * statement, with no other date in it (its card, its paragraph). A neighbouring card's date, a footer's or a sidebar's never
+ * owns the statement. A page read without structure (another reader) keeps the nearness and boundary rules alone.
+ */
+const squash = (s: string) => normalizeForQuote(s).replace(/\s+/g, "").toLowerCase();
+function regionOwns(page: ResearchPage, quote: string, date: EvidenceDate, retrievedAt: Date): boolean {
+  if (page.dateRegions === undefined) return true;
+  const q = squash(quote);
+  return page.dateRegions.some((r) => {
+    if (r.multi) return false;
+    const d = evidenceDate(r.leaf, retrievedAt, { order: page.dateOrder ?? null });
+    return !!d && d.precision === date.precision && d.at.getTime() === date.at.getTime() && squash(r.text).includes(q);
+  });
+}
 /** A statement from the page's own text (the article), not from one of the blocks the reader added around it. */
 const inBody = (page: ResearchPage, quote: string) => page.body === undefined || normalizeForQuote(page.body).includes(normalizeForQuote(quote));
 
@@ -173,7 +188,7 @@ export function normalizeResearch(raw: unknown, pages: ResearchPage[], site: str
       let dateSource: SignalDraft["dateSource"] = date ? "quote" : null;
       if ((!date || date.precision === "year") && typeof f.date_quote === "string" && cleanLine(f.date_quote).length >= 4 && cleanLine(f.date_quote).length <= 120 && dateBesideClaim(q.page.text, q.quote, f.date_quote)) {
         const beside = notFuture(evidenceDate(f.date_quote, opts.retrievedAt, order));
-        if (beside && (!date || beside.precision !== "year") && !dateOwnedElsewhere(q.page, q.quote, beside, opts.retrievedAt)) { date = beside; dateQuote = cleanLine(f.date_quote); dateSource = "date_quote"; }
+        if (beside && (!date || beside.precision !== "year") && !dateOwnedElsewhere(q.page, q.quote, beside, opts.retrievedAt) && (beside.precision === "year" || regionOwns(q.page, q.quote, beside, opts.retrievedAt))) { date = beside; dateQuote = cleanLine(f.date_quote); dateSource = "date_quote"; }
       }
       // Still no day or month: a statement in the article's own text is dated by the article's publication date (from the
       // page's markup or its one byline, never the retrieval time), unless the statement names a different year itself.

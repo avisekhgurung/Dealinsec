@@ -76,7 +76,7 @@ export async function readHtml(bytes: Uint8Array, url: URL, now: Date): Promise<
 export function researchPage(x: Extract<PageRead, { ok: true }>, index: number, budget: number): ResearchPage {
   if (!x.parts) return { index, url: x.url, text: x.text.slice(0, budget), truncated: x.text.length > budget };
   const c = composePageText(x.parts, budget);
-  return { index, url: x.url, text: c.text, body: c.body, published: x.dates?.published ?? null, dateOrder: x.dates?.order ?? null, entries: x.dates?.list ? x.dates.items : [], truncated: c.truncated || !!x.truncated };
+  return { index, url: x.url, text: c.text, body: c.body, published: x.dates?.published ?? null, dateOrder: x.dates?.order ?? null, entries: x.dates?.list ? x.dates.items : [], dateRegions: x.dates?.regions ?? [], truncated: c.truncated || !!x.truncated };
 }
 
 /** A sitemap's page addresses on the same site (built-in reader only; XML is allowed for this call and no other). */

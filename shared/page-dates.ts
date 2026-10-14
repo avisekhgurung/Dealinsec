@@ -22,12 +22,14 @@ export interface PageDate { date: string; at: string; precision: CalendarPrecisi
 export interface PageDates {
   lang: string | null; order: DateOrder | null;
   published: PageDate | null; modified: string | null;
-  /** Why a stated publication date was not used: two sources disagree, or it is in the future. */
-  discarded: ("conflict" | "future" | "ambiguous")[];
+  /** Why a stated publication date was not used: sources disagree, it is in the future, several bylines, or only a CMS's generic markup on an ordinary page. */
+  discarded: ("conflict" | "future" | "ambiguous" | "not_article")[];
   /** Dated entries of a list (a blog index, news cards): each entry's own title with its own date, as the page shows it. */
   items: { title: string; date: string }[];
   /** The page lists several dated entries of its own (an index), so it is not one article. */
   list?: boolean;
+  /** Each date shown on the page (as written) and the text of the part of the page it belongs to (server/outbound/page-dates.ts). */
+  regions?: { leaf: string; text: string; multi: boolean }[];
 }
 
 /** A page dated a day or so after the moment it was read is a time zone, not the future. */
