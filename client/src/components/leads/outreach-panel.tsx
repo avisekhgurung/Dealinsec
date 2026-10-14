@@ -15,7 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { draftUrl, leadCall, leadError, messageUrl, messagesUrl, refreshLeads } from "@/lib/leads";
 import { memberCan } from "@shared/permissions";
-import { GmailSendState, SendFromGmailButton } from "./gmail-send";
+import { GmailSendState, SendFromGmailButton, useGmailCanSend } from "./gmail-send";
 import { LIMITS } from "@shared/outreach-check";
 
 interface Message {
@@ -33,6 +33,7 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
   const { user } = useAuth();
   const { toast } = useToast();
   const canRun = memberCan(user as any, "deals.create");
+  const gmail = useGmailCanSend(); // only offered (and mentioned) where this person can really send from Gmail
   const q = useQuery<{ messages: Message[] }>({ queryKey: [messagesUrl(leadId)], retry: false });
   const current = q.data?.messages.find((m) => m.status === "draft" || m.status === "approved" || m.status === "sending") ?? null;
   const lastSent = q.data?.messages.find((m) => m.status === "sent") ?? null;
@@ -80,7 +81,11 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
               </p>
             )}
             {current?.status === "draft" && <p className="text-sm" data-testid="outreach-draft-note">Written by AI. Read it and change anything before you approve it.</p>}
-            {current?.status === "approved" && <p className="text-sm" data-testid="outreach-approved-note">Approved. Send it from your connected Gmail, or open it in your email app, send it, then tell me here.</p>}
+            {current?.status === "approved" && (
+              <p className="text-sm" data-testid="outreach-approved-note">
+                {gmail.ready ? "Approved. Send it from your connected Gmail, or open it in your email app, send it, then tell me here." : "Approved. Open it in your email app, send it, then tell me here."}
+              </p>
+            )}
           </div>
           {!current && !lastSent && canRun && (
             <Button size="sm" className="shrink-0" onClick={() => draft.mutate()} disabled={busy} data-testid="outreach-write">
