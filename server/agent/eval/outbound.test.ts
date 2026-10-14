@@ -785,6 +785,39 @@ describe("what is cached and what is paid for", () => {
     const people = world().outbound.findings.filter((f) => f.prospectId === p0.id && f.kind === "decision_maker").map((f) => f.meta.name);
     expect(people).toEqual(["Dana Ortiz"]);
   });
+  it("dates the page states survive the reader and the limit; publication date and retrieval time stay apart; undated stays undated", async () => {
+    const fx = (f: string) => readFileSync(join(__dirname, "../../outbound/fixtures/dated-pages", f), "utf8").replaceAll("northwind.example", "datedco.com");
+    world().knowledge.dns["datedco.com"] = ["93.184.216.34"];
+    page("datedco.com", "/", html("Datedco", `<p>Datedco is a digital marketing agency in Austin, United States serving SaaS companies. ${filler}</p>`, ["/blog", "/blog/linkedin-ads", "/blog/uk-expansion", "/careers"]));
+    page("datedco.com", "/blog", fx("blog-index-time.html"));
+    page("datedco.com", "/blog/linkedin-ads", fx("article-jsonld.html"));
+    page("datedco.com", "/blog/uk-expansion", fx("article-long.html"));
+    page("datedco.com", "/careers", fx("careers-undated.html"));
+    let prompt = "";
+    const pageOf = (m: { content: string }[], path: string) => Number(m[1].content.match(new RegExp(`Page (\\d+):\\n<untrusted[^>]*>\\nURL: https://datedco\\.com${path.replace(/\//g, "\\/")}\\n`))?.[1] ?? 0);
+    script.signals = (m) => { prompt = m[1].content; return { findings: [
+      { kind: "signal", type: "NEW_SERVICE", value: "LinkedIn Ads practice", quote: "Northwind launches a LinkedIn Ads practice for SaaS", page: pageOf(m, "/blog"), date_quote: "September 14, 2026" },
+      { kind: "signal", type: "NEW_SERVICE", value: "LinkedIn Ads launch", quote: "We are excited to launch our new LinkedIn Ads practice for B2B SaaS teams.", page: pageOf(m, "/blog/linkedin-ads") },
+      { kind: "signal", type: "EXPANSION", value: "UK expansion", quote: "Northwind Digital is expanding into the UK market with a new London team.", page: pageOf(m, "/blog/uk-expansion") },
+      { kind: "signal", type: "HIRING", value: "Hiring a Paid Search Manager", quote: "We are hiring a Paid Search Manager to lead campaigns for SaaS clients.", page: pageOf(m, "/careers") },
+    ], opportunities: [] }; };
+    const p0 = await outboundStore.upsertProspect(ORG1, { domain: "datedco.com", name: "Datedco", website: "https://datedco.com", sources: [] }, NOW);
+    await researchOne({ id: "pr_dated", organizationId: ORG1, createdByUser: "u1" }, parseIcpFallback(REQUEST)!, null, deps() as PipelineDeps, { prospect: p0, force: true });
+    expect(prompt).toContain("[Page dates, from this page's markup] Published 2026-10-02 (the visible byline)."); // the long article's date, past the old cut
+    expect(prompt).toContain("[entry] Northwind launches a LinkedIn Ads practice for SaaS — September 14, 2026");
+    const sig = (q: string) => world().outbound.findings.find((f) => f.prospectId === p0.id && f.kind === "signal" && f.quote.startsWith(q));
+    const day = (d: Date | null) => (d ? new Date(d).toISOString().slice(0, 10) : null);
+    expect(sig("Northwind launches")).toMatchObject({ sourceUrl: "https://datedco.com/blog", confidence: "high", meta: { dateSource: "date_quote", datePrecision: "day", dateQuote: "September 14, 2026" } });
+    expect(day(sig("Northwind launches")!.observedAt)).toBe("2026-09-14");
+    expect(sig("We are excited")).toMatchObject({ sourceUrl: "https://datedco.com/blog/linkedin-ads", confidence: "medium", meta: { dateSource: "page_published", pagePublishedSource: "json_ld", datePrecision: "day" } });
+    expect(day(sig("We are excited")!.observedAt)).toBe("2026-09-22");
+    expect(sig("Northwind Digital is expanding")).toMatchObject({ meta: { dateSource: "page_published", pagePublishedSource: "byline", pageTruncated: true } });
+    expect(day(sig("Northwind Digital is expanding")!.observedAt)).toBe("2026-10-02");
+    const undated = sig("We are hiring a Paid Search Manager")!;
+    expect(undated).toMatchObject({ observedAt: null, confidence: "medium", meta: { dateSource: null, datePrecision: null } });
+    // The retrieval time is recorded on every finding and is never the publication date.
+    for (const f of world().outbound.findings.filter((x) => x.prospectId === p0.id && x.kind === "signal")) { expect(new Date(f.retrievedAt).getTime()).toBe(NOW.getTime()); expect(f.observedAt === null || new Date(f.observedAt).getTime() !== NOW.getTime()).toBe(true); }
+  });
   it("the why-now shown is a concrete recent event before a blog post; a blog post alone is shown as context, never as strong timing", async () => {
     const recent = (days: number) => new Date(Date.now() - days * 86_400_000);
     const row = { id: 9, organizationId: ORG1, domain: "acme.com", name: "Acme", website: "https://acme.com", status: "enriched", rejectReason: null, sources: [], profile: {}, fit: null, score: null, angle: null, ready: false, leadId: null } as any;

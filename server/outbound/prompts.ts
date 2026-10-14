@@ -9,7 +9,7 @@ import { ENRICH_FIELDS } from "@shared/prospect-intel";
 import { describeIcp, type Icp } from "@shared/icp";
 import type { ResearchPage } from "@shared/research";
 
-export const PROMPT_VERSIONS = { icp: "icp-v2", enrich: "enrich-v1", signals: "signals-v3", angle: "angle-v2" } as const;
+export const PROMPT_VERSIONS = { icp: "icp-v2", enrich: "enrich-v1", signals: "signals-v4", angle: "angle-v2" } as const;
 
 const clean = (s: string, n: number) => s.replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
 
@@ -65,6 +65,9 @@ Return ONLY a JSON object:
 {"facts":[{"field":"<field>","value":"<short statement>","quote":"<exact words from the page>","page":<number>}]}`;
 }
 
+/** How much of each page the signals model is given. The pipeline composes each page to exactly this (shared/page-dates.ts), so the
+ * text the model reads is the text its quotes are checked against, and the dates line and labelled blocks are never cut off. */
+export const SIGNALS_PAGE_CHARS = 5000;
 const pagesBlock = (pages: ResearchPage[], chars: number) =>
   pages.map((p) => `Page ${p.index}:\n${fenceUntrusted(`page:${p.index}`, `URL: ${p.url}\n\n${p.text.slice(0, chars)}`, chars + 400)}`).join("\n\n");
 
@@ -79,6 +82,7 @@ export function signalsSystemPrompt(): string {
 Rules:
 - Every finding needs a QUOTE copied exactly from the page it comes from (8 to 300 characters, word for word), and that page's number. If you cannot quote it, leave it out.
 - Signals: something that happened or is happening at the company, typed as one of: ${SIGNAL_TYPES.join(", ")}. If the page states WHEN (a date, "posted 3 days ago", "in March 2026"), put those exact words in date_quote. Never guess a date.
+- Page dates: a first line "[Page dates, from this page's markup] Published ..." is the page's own publication date; it is applied to the article's statements for you, so don't copy it into date_quote. In "[Dated entries on this page ...]" each "[entry]" line is one post with its own date: quote that entry's title and put the date written on THAT SAME line in date_quote; a date never belongs to another entry or to text outside the list.
 - People: only a person who WORKS AT THIS COMPANY, named TOGETHER with their role on the company's own team, leadership, about, bio, author or press page ("Ana Silva, Founder and CEO"). name and title must both be in the quote. employer is the company the page says that person works for. NOT a person quoted in a testimonial, review, case study or client logo wall ("Sam Rivera, CEO, Orchard Labs" under a customer's praise works at Orchard Labs, not here): either leave them out or give their real employer. A line under "[People quoted on this page ...]" is a client, not staff, unless the line itself names this company. A role at another company ("CEO at Orchard Labs") or a past role ("former CEO") is not someone here now. If the pages do not show that a person works here, leave them out. Never guess an email or a person.
 - Pains: a problem the company's own words point to (your reading of it, kept short).
 - Opportunities: at most 3 short ideas of what the company might need from the salesperson, each citing what supports it: "#n" for your finding number n (counting from 0 in your findings list) or "F<id>" for a known fact listed below. An idea with nothing to cite is not allowed. Never mention prices, discounts or guarantees. confidence is "low" or "medium".
@@ -99,7 +103,7 @@ ${fenceUntrusted("offer", offer ? clean(offer, 400) : "(not stated)", 500)}
 Known facts about the company (cite as F<id>):
 ${fenceUntrusted("facts", facts, 2500)}
 
-${pagesBlock(pages, 5000)}
+${pagesBlock(pages, SIGNALS_PAGE_CHARS)}
 
 Return the JSON object now.`;
 }

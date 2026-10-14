@@ -31,7 +31,18 @@ export const ROLE_LOCALS = ["info", "sales", "hello", "contact", "enquiries", "e
 
 export const LIMITS = { findings: 40, value: 300, quoteMin: 8, quoteMax: 300 } as const;
 
-export interface ResearchPage { /** 1-based, as the model cites it. */ index: number; url: string; text: string }
+export interface ResearchPage {
+  /** 1-based, as the model cites it. */ index: number; url: string; text: string;
+  /** The page's readable text as included in `text` (outside its labelled blocks): where a statement of the page itself sits. */
+  body?: string;
+  /** The page's own publication date (shared/page-dates.ts), and the order it writes numeric dates in. */
+  published?: { date: string; at: string; precision: "day" | "month"; source: string } | null;
+  dateOrder?: "mdy" | "dmy" | null;
+  /** The page's dated entries (a blog index's cards): each date belongs to its own entry's title only. */
+  entries?: { title: string; date: string }[];
+  /** The text was cut at the reader's limit: what lies past the cut was not read. */
+  truncated?: boolean;
+}
 export interface ClaimDraft { field: ResearchField; value: string; status: ClaimStatus; evidenceUrl: string; evidenceSnippet: string }
 export type RejectReason = "not_an_object" | "bad_field" | "bad_page" | "bad_value" | "bad_quote" | "quote_not_found" | "suspicious" | "invalid_contact" | "duplicate";
 export interface Rejection { reason: RejectReason; field?: string }

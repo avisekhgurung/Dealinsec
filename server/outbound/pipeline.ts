@@ -25,8 +25,8 @@ import { outboundSearchProviders } from "../discovery/provider";
 import { leadsStore } from "../leads/store";
 import { CapExceeded, CapUnavailable, GlobalCapExceeded, remainingToday, tracedChat, type TraceCtx } from "../llm/traced";
 import type { ChatMessage } from "../copilot/provider";
-import { PROMPT_VERSIONS, enrichSystemPrompt, enrichUserMessage, signalsSystemPrompt, signalsUserMessage } from "./prompts";
-import { companyProvider, contactProvider, costMicroUsd, pageReader, readSitemap, type CompanyEnrichmentProvider, type ContactEnrichmentProvider, type PageRead, type PageReader } from "./providers";
+import { PROMPT_VERSIONS, SIGNALS_PAGE_CHARS, enrichSystemPrompt, enrichUserMessage, signalsSystemPrompt, signalsUserMessage } from "./prompts";
+import { companyProvider, contactProvider, costMicroUsd, pageReader, readSitemap, researchPage, type CompanyEnrichmentProvider, type ContactEnrichmentProvider, type PageRead, type PageReader } from "./providers";
 import { outboundStore, type ItemWithProspect, type NewFinding, type OutboundStore } from "./store";
 import { dailyCompanyLimit, dailySearchLimit, globalSearchLimit } from "./limits";
 import { utcDayStart } from "@shared/llm-cost";
@@ -506,7 +506,8 @@ export async function researchOne(run: Pick<ProspectRunRow, "id" | "organization
     let picked = pickResearchLinks(links, homeUrl, 4);
     if (picked.length < 3) { links = [...links, ...(await deps.sitemap(p.domain).catch(() => []))]; picked = pickResearchLinks(links, homeUrl, 4); }
     const reads = await Promise.all(picked.map((u) => readPage(deps, u)));
-    const pages: ResearchPage[] = [home, ...reads].filter((x): x is Extract<PageRead, { ok: true }> => x.ok && sameSite(new URL(x.url).hostname, p.domain)).slice(0, 5).map((x, i) => ({ index: i + 1, url: x.url, text: x.text }));
+    // Each page as the model will see it (SIGNALS_PAGE_CHARS): its dates line, as much of its text as fits, its labelled blocks.
+    const pages: ResearchPage[] = [home, ...reads].filter((x): x is Extract<PageRead, { ok: true }> => x.ok && sameSite(new URL(x.url).hostname, p.domain)).slice(0, 5).map((x, i) => researchPage(x, i + 1, SIGNALS_PAGE_CHARS));
     const known = (await deps.store.findings(orgId, p.id)).filter((f) => f.kind === "fact" && (f.batch === "enrich" || f.batch === "company"));
     const raw = await askJson(deps, { task: "signals", orgId, userId: run.createdByUser, runId: run.id, promptVersion: PROMPT_VERSIONS.signals },
       [{ role: "system", content: signalsSystemPrompt() }, { role: "user", content: signalsUserMessage(p.name, icp, opts.offer ?? null, known.map((k) => ({ id: k.id, label: LABELS[k.type] ?? k.type, value: k.value })), pages) }], MAX_TOKENS.signals);
@@ -520,9 +521,11 @@ export async function researchOne(run: Pick<ProspectRunRow, "id" | "organization
 
     const list: NewFinding[] = [];
     const localOf = new Map<number, number>();
+    // A date stated in or beside the claim is "high"; one inherited from the article's publication date is "medium" (the article dates the
+    // statement, not necessarily the event it describes). Confidence is provenance only: readiness reads the date and its precision.
     for (const s of r.signals) {
       localOf.set(s.index, list.length);
-      list.push({ kind: "signal", type: s.type, value: s.value, status: "confirmed", sourceUrl: s.url, sourceType: "website", quote: s.quote, observedAt: s.observedAt, confidence: s.observedAt ? "high" : "medium", meta: { dateQuote: s.dateQuote, datePrecision: s.datePrecision, dateYear: s.dateYear, label: SIGNAL_LABEL[s.type] } });
+      list.push({ kind: "signal", type: s.type, value: s.value, status: "confirmed", sourceUrl: s.url, sourceType: "website", quote: s.quote, observedAt: s.observedAt, confidence: s.observedAt && s.dateSource !== "page_published" ? "high" : "medium", meta: { dateQuote: s.dateQuote, datePrecision: s.datePrecision, dateYear: s.dateYear, dateSource: s.dateSource, dateIssue: s.dateIssue, pageTruncated: s.pageTruncated, pagePublishedSource: s.dateSource === "page_published" ? pages.find((pg) => pg.url === s.url)?.published?.source ?? null : null, label: SIGNAL_LABEL[s.type] } });
     }
     for (const m of r.people) {
       localOf.set(m.index, list.length);

@@ -7,9 +7,11 @@
  * implementation, so tests run against fakes. Whatever comes back is untrusted data: it is validated and fenced later.
  */
 import { createHash } from "node:crypto";
-import { sameSite, siteHost, type PageLink } from "@shared/research";
+import { sameSite, siteHost, type PageLink, type ResearchPage } from "@shared/research";
 import { extractContactBlock, extractHtml, extractLinks, extractPeople, hasContactForm } from "../knowledge/extract";
 import { QUOTED_BLOCK, STAFF_BLOCK } from "@shared/staff";
+import { composePageText, datedItemsBlock, pageDatesLine, type PageDates, type PageParts } from "@shared/page-dates";
+import { pageDatesFromHtml } from "./page-dates";
 import { fetchPublicPage, realPageIO, validatePublicUrl } from "../knowledge/net-guard";
 import { callJson, str } from "../discovery/http";
 import { DiscoveryError } from "../discovery/types";
@@ -17,9 +19,16 @@ import { DiscoveryError } from "../discovery/types";
 export const PROSPECT_USER_AGENT = "DealInSec/1.0 (reads public company websites for B2B prospect research; https://dealinsec.com)";
 const PAGE_BYTES = 1_500_000;
 export const PAGE_TEXT_CHARS = 8000;
+/** The most of a page's readable text kept for composing (shared/page-dates.ts composePageText cuts it to each use's budget). */
+const PAGE_BODY_KEEP = 20_000;
 
 export type PageRead =
-  | { ok: true; url: string; title: string; text: string; links: PageLink[]; hash: string; hasForm?: boolean }
+  | {
+    ok: true; url: string; title: string; text: string; links: PageLink[]; hash: string; hasForm?: boolean;
+    /** The page in parts (built-in reader): its dates line, its readable text and its labelled blocks, for composing
+     * the text a model sees within that model's budget. `text` is the same composed at PAGE_TEXT_CHARS. */
+    parts?: PageParts; dates?: PageDates; truncated?: boolean;
+  }
   | { ok: false; code: "blocked" | "unreachable" | "bad_response" | "too_big" | "unsupported" | "not_html" | "unreadable" | "provider" };
 
 export interface PageReader {
@@ -40,18 +49,35 @@ export const builtinReader: PageReader = {
     const r = await fetchPublicPage(url, realPageIO, PAGE_BYTES, { userAgent: PROSPECT_USER_AGENT });
     if (!r.ok) return { ok: false, code: r.code };
     if (r.contentType !== "html") return { ok: false, code: "not_html" };
-    const ex = await extractHtml(r.bytes);
-    if (!ex.ok) return { ok: false, code: "unreadable" };
-    // The article reader drops footers (a company's address and contact details live there) and card grids (where a team
-    // page lists its people). Each is added back as a separate, labelled block; people only on a team or about page.
-    const block = await extractContactBlock(r.bytes);
-    // Quoted people (testimonials, reviews, case studies) get their own block: shared/staff.ts reads them as clients, not staff.
-    const people = TEAM_PATH.test(r.url.pathname) ? await extractPeople(r.bytes) : { staff: [], quoted: [] };
-    const extra = [people.staff.length ? `${STAFF_BLOCK}\n${people.staff.join("\n")}` : "", people.quoted.length ? `${QUOTED_BLOCK}\n${people.quoted.join("\n")}` : "", block ? `[Footer and contact details]\n${block}` : ""].filter(Boolean).join("\n\n");
-    const text = extra ? `${ex.text.slice(0, Math.max(2000, PAGE_TEXT_CHARS - extra.length - 4))}\n\n${extra}` : ex.text.slice(0, PAGE_TEXT_CHARS);
-    return { ok: true, url: r.url.toString(), title: ex.title ?? "", text, links: await extractLinks(r.bytes), hash: hashOf(text), hasForm: hasContactForm(r.bytes) };
+    return readHtml(r.bytes, r.url, new Date());
   },
 };
+
+/** One fetched HTML page as the built-in reader returns it (no network here: fixtures run through exactly this). */
+export async function readHtml(bytes: Uint8Array, url: URL, now: Date): Promise<PageRead> {
+  const r = { bytes, url };
+  const ex = await extractHtml(r.bytes);
+  if (!ex.ok) return { ok: false, code: "unreadable" };
+  // The article reader drops footers (a company's address and contact details live there) and card grids (where a team
+  // page lists its people). Each is added back as a separate, labelled block; people only on a team or about page.
+  const block = await extractContactBlock(r.bytes);
+  // Quoted people (testimonials, reviews, case studies) get their own block: shared/staff.ts reads them as clients, not staff.
+  const people = TEAM_PATH.test(r.url.pathname) ? await extractPeople(r.bytes) : { staff: [], quoted: [] };
+  // The page's own dates, read from the whole document first: the article reader drops bylines, <time> elements and
+  // structured data, and a text limit can cut a date off. They go in a first line and a dated-entries block (shared/page-dates.ts).
+  const dates = await pageDatesFromHtml(r.bytes, r.url.toString(), now);
+  const tail = [people.staff.length ? `${STAFF_BLOCK}\n${people.staff.join("\n")}` : "", people.quoted.length ? `${QUOTED_BLOCK}\n${people.quoted.join("\n")}` : "", block ? `[Footer and contact details]\n${block}` : "", datedItemsBlock(dates.items)];
+  const parts: PageParts = { head: pageDatesLine(dates), body: ex.text.slice(0, PAGE_BODY_KEEP), tail };
+  const composed = composePageText(parts, PAGE_TEXT_CHARS);
+  return { ok: true, url: r.url.toString(), title: ex.title ?? "", text: composed.text, links: await extractLinks(r.bytes), hash: hashOf(composed.text), hasForm: hasContactForm(r.bytes), parts, dates, truncated: composed.truncated || ex.truncated };
+}
+
+/** A page as a model is given it, within `budget` characters: the text it reads is exactly the text its quotes are checked against. */
+export function researchPage(x: Extract<PageRead, { ok: true }>, index: number, budget: number): ResearchPage {
+  if (!x.parts) return { index, url: x.url, text: x.text.slice(0, budget), truncated: x.text.length > budget };
+  const c = composePageText(x.parts, budget);
+  return { index, url: x.url, text: c.text, body: c.body, published: x.dates?.published ?? null, dateOrder: x.dates?.order ?? null, entries: x.dates?.list ? x.dates.items : [], truncated: c.truncated || !!x.truncated };
+}
 
 /** A sitemap's page addresses on the same site (built-in reader only; XML is allowed for this call and no other). */
 export async function readSitemap(site: string, max = 200): Promise<string[]> {

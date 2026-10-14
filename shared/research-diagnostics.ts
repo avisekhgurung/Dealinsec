@@ -6,12 +6,13 @@
  * Privacy-safe by construction: numbers, booleans and short codes only. Never page text, a quotation, a date as written,
  * a URL path, an email, a phone number or a name. Bounded: at most 40 signals and 5 pages per record.
  *
- * What "visible" means here: present in the text the page reader gave the model (Readability text plus the people and
- * footer blocks, at most PAGE_TEXT_CHARS per page). A date that exists only in markup (a datetime attribute), in an image,
+ * What "visible" means here: present in the text the model was given for the page (its dates line, its readable text and
+ * its labelled blocks, composed to SIGNALS_PAGE_CHARS: server/outbound/pipeline.ts). A date that exists only in markup (a datetime attribute), in an image,
  * in script-rendered content or past the text limit is invisible to the model too, so it is (correctly) not counted.
  */
 import { DATE_NEAR_CHARS, dateBesideClaim, type ResearchResult } from "./prospect-intel";
-import { MONTH_PATTERN, evidenceDate, type DatePrecision } from "./prospect";
+import { MONTH_PATTERN, NUMERIC_DATE_PATTERNS, evidenceDate, type DatePrecision } from "./prospect";
+import type { DateOrder } from "./page-dates";
 import { normalizeForQuote, quoteInPage, type ResearchPage } from "./research";
 
 export type PageKind = "home" | "blog" | "news" | "careers" | "work" | "about" | "team" | "other";
@@ -43,13 +44,14 @@ export function pageKind(url: string): PageKind {
 }
 
 /** Every date in `text` that evidenceDate itself accepts (update stamps excluded), with its place and precision. Bounded. */
-export function findDates(text: string, retrievedAt: Date): { at: number; end: number; precision: DatePrecision; date: Date }[] {
+export function findDates(text: string, retrievedAt: Date, order: DateOrder | null = null): { at: number; end: number; precision: DatePrecision; date: Date }[] {
   const t = String(text ?? "").slice(0, 20_000);
   const lower = t.toLowerCase();
   const res = [
     /\b20\d\d-\d{1,2}-\d{1,2}\b/g,
     new RegExp(`\\b${MONTH_PATTERN}\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+20\\d\\d\\b`, "g"),
     new RegExp(`\\b\\d{1,2}(?:st|nd|rd|th)?\\s+${MONTH_PATTERN},?\\s+20\\d\\d\\b`, "g"),
+    ...NUMERIC_DATE_PATTERNS.map((r) => new RegExp(r.source, "g")),
     new RegExp(`\\b${MONTH_PATTERN}\\s+20\\d\\d\\b`, "g"),
     /\b\d{1,3}\s+(?:day|week|month|year)s?\s+ago\b/g,
     /\b(?:posted|published|announced)\s+(?:today|yesterday)\b|\bjust posted\b/g,
@@ -63,7 +65,7 @@ export function findDates(text: string, retrievedAt: Date): { at: number; end: n
       // The same reading as validation: the 30 characters before it decide whether it is an update stamp. Their digits are
       // blanked so another date in them ("Published Sep 12, 2026 · Updated …") can't be read in place of this one.
       const before = lower.slice(Math.max(0, at - 30), at).replace(/\d/g, " ");
-      const d = evidenceDate(before + lower.slice(at, end), retrievedAt);
+      const d = evidenceDate(before + lower.slice(at, end), retrievedAt, { order });
       if (d) found.push({ at, end, precision: d.precision, date: d.at });
     }
   }
@@ -82,7 +84,7 @@ export function researchDateDiagnostics(raw: unknown, pages: ResearchPage[], res
   const keptByIndex = new Map(result.signals.map((s) => [s.index, s]));
   const datesOf = new Map<number, ReturnType<typeof findDates>>();
   const textOf = (p: ResearchPage) => normalizeForQuote(p.text);
-  const dated = (p: ResearchPage) => { if (!datesOf.has(p.index)) datesOf.set(p.index, findDates(textOf(p), retrievedAt)); return datesOf.get(p.index)!; };
+  const dated = (p: ResearchPage) => { if (!datesOf.has(p.index)) datesOf.set(p.index, findDates(textOf(p), retrievedAt, p.dateOrder ?? null)); return datesOf.get(p.index)!; };
   const signals: SignalDateTrace[] = [];
   list.forEach((item, idx) => {
     const f = item && typeof item === "object" ? (item as Record<string, unknown>) : null;

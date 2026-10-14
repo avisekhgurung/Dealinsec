@@ -9,6 +9,7 @@ import { JUNK_PATH, JUNK_TITLE, cleanName, hostOf, isBlockedSite, looksLikeCompa
 import { normText } from "./fit";
 import { countryLabel, isSeniorDecisionMaker, type Icp } from "./icp";
 import type { ScoreClaim } from "./lead-score";
+import { numericDate, type DateOrder } from "./page-dates";
 
 /* ── URLs and domains ───────────────────────────────────────────────────── */
 
@@ -200,6 +201,11 @@ export const MONTH_PATTERN = MON;
 export type DatePrecision = "day" | "month" | "year";
 export interface EvidenceDate { at: Date; precision: DatePrecision }
 
+/** Numeric dates with a 4-digit year and the same separator twice: 2026/09/12, and 25/09/2026 or 12.09.2026 or 25-09-2026. */
+const NUMERIC_YMD = /\b(20\d\d)([/.])(\d{1,2})\2(\d{1,2})\b/g;
+const NUMERIC_DMY = /\b(\d{1,2})([/.\-])(\d{1,2})\2(20\d\d)\b/g;
+export const NUMERIC_DATE_PATTERNS = [NUMERIC_YMD, NUMERIC_DMY] as const;
+
 /** Words that make the date after them an edit stamp ("Updated: March 17th, 2026"): the day a page changed, not the day something happened. */
 const UPDATE_STAMP = /\b(?:updated|modified|revised|reviewed|edited)\b\s*(?:on|at)?\s*[:\-–—]?\s*$/;
 
@@ -209,11 +215,12 @@ const UPDATE_STAMP = /\b(?:updated|modified|revised|reviewed|edited)\b\s*(?:on|a
  * it sorts; it never counts as a day); "3 days ago" counts from when the page was read. An update stamp is not a date of
  * anything. Returns null when nothing in the text is a date. Never infers one.
  */
-export function evidenceDate(text: string, retrievedAt: Date): EvidenceDate | null {
+export function evidenceDate(text: string, retrievedAt: Date, opts: { order?: DateOrder | null } = {}): EvidenceDate | null {
   let t = String(text ?? "").toLowerCase().slice(0, 600);
   const utc = (y: number, m: number, d: number) => { const x = new Date(Date.UTC(y, m, d)); return x.getUTCMonth() === m && x.getUTCDate() === d ? x : null; };
   const patterns = [
     /\b(20\d\d)-(\d{1,2})-(\d{1,2})\b/g,
+    NUMERIC_YMD, NUMERIC_DMY,
     new RegExp(`\\b${MON}\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(20\\d\\d)\\b`, "g"),
     new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+${MON},?\\s+(20\\d\\d)\\b`, "g"),
     new RegExp(`\\b${MON}\\s+(20\\d\\d)\\b`, "g"),
@@ -227,6 +234,13 @@ export function evidenceDate(text: string, retrievedAt: Date): EvidenceDate | nu
   if (m) return day(utc(+m[3], mon(m[1]), +m[2]));
   m = t.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+${MON},?\\s+(20\\d\\d)\\b`));
   if (m) return day(utc(+m[3], mon(m[2]), +m[1]));
+  // Numeric dates: 2026/09/12, then 25/09/2026, 09.12.2026... read only when their order is certain (shared/page-dates.ts).
+  m = t.match(new RegExp(NUMERIC_YMD.source));
+  if (m) return day(utc(+m[1], +m[3] - 1, +m[4]));
+  for (const n of Array.from(t.matchAll(new RegExp(NUMERIC_DMY.source, "g")))) {
+    const x = numericDate(n[1], n[2], n[3], n[4], opts.order ?? null);
+    if (x instanceof Date) return day(x);
+  }
   m = t.match(new RegExp(`\\b${MON}\\s+(20\\d\\d)\\b`));
   if (m) { const x = utc(+m[2], mon(m[1]), 1); return x ? { at: x, precision: "month" } : null; }
   m = t.match(/\b(\d{1,3})\s+(day|week|month|year)s?\s+ago\b/);

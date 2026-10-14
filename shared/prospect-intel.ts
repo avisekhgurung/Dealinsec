@@ -15,6 +15,7 @@ import { COUNTRIES, roleRank, type Icp } from "./icp";
 import { nameFromDomain, nameResemblesDomain } from "./discovery";
 import { normText } from "./fit";
 import { evidenceDate, isSignalType, type DatePrecision, type EvidenceDate, type SignalType } from "./prospect";
+import { BOUNDARY_MARKS, isFuture } from "./page-dates";
 import { employmentOf } from "./staff";
 import { checkContact, cleanLine, injectionLike, normalizeForQuote, onSite, quoteInPage, LIMITS as QUOTE, type ResearchPage } from "./research";
 
@@ -84,7 +85,15 @@ export function normalizeEnrichment(raw: unknown, pages: ResearchPage[], site: s
  * observedAt is set only for a date stated to the day or month; a year alone ("Top agencies in 2026") keeps its year in
  * dateYear with precision "year" and no observedAt, so nothing downstream can read it as a day.
  */
-export interface SignalDraft { index: number; type: SignalType; value: string; quote: string; url: string; observedAt: Date | null; datePrecision: DatePrecision | null; dateYear: number | null; dateQuote: string | null }
+export interface SignalDraft {
+  index: number; type: SignalType; value: string; quote: string; url: string; observedAt: Date | null; datePrecision: DatePrecision | null; dateYear: number | null; dateQuote: string | null;
+  /** Where the date came from: the quote itself, a date quoted beside it, or the publication date of the article it is from. */
+  dateSource: "quote" | "date_quote" | "page_published" | null;
+  /** A stated date that was not used, and why (it is in the future). */
+  dateIssue: "future" | null;
+  /** The page's text was cut at the reader's limit (what lay past it was not read). */
+  pageTruncated: boolean;
+}
 /** staffEvidence: why the pages show this person works here (shared/staff.ts). */
 export interface PersonDraft { index: number; name: string; title: string; quote: string; url: string; rank: number; staffEvidence: "explicit" | "team_listing" }
 export interface PainDraft { index: number; value: string; quote: string; url: string }
@@ -100,17 +109,41 @@ const GENERIC_PERSON = /^(our|the|meet|team|about|contact|founder|ceo|staff|lead
  */
 /** How close (in characters of the page's text) a date has to be to the statement it dates. A post's date and its title or excerpt sit this near on a blog or news page. */
 export const DATE_NEAR_CHARS = 400;
-/** True when the date text appears on the page within DATE_NEAR_CHARS before or after the claim's quote. */
+/**
+ * True when the date text appears on the page within DATE_NEAR_CHARS before or after the claim's quote, with no block or
+ * entry boundary between them (shared/page-dates.ts): a date on one dated entry, in the footer, or in the page-dates line
+ * never dates a statement somewhere else.
+ */
 export function dateBesideClaim(pageText: string, claimQuote: string, dateQuote: string): boolean {
   const page = normalizeForQuote(pageText), claim = normalizeForQuote(claimQuote), date = normalizeForQuote(dateQuote);
   if (!claim || !date) return false;
-  const c = page.indexOf(claim);
-  if (c < 0) return false;
-  for (let i = page.indexOf(date); i >= 0; i = page.indexOf(date, i + 1)) {
-    if (i + date.length >= c - DATE_NEAR_CHARS && i <= c + claim.length + DATE_NEAR_CHARS) return true;
+  const marks = BOUNDARY_MARKS.map(normalizeForQuote);
+  // Every place the statement appears (a card's title is both in the page's text and on its own entry line).
+  for (let c = page.indexOf(claim); c >= 0; c = page.indexOf(claim, c + 1)) {
+    for (let i = page.indexOf(date); i >= 0; i = page.indexOf(date, i + 1)) {
+      if (i + date.length >= c - DATE_NEAR_CHARS && i <= c + claim.length + DATE_NEAR_CHARS) {
+        const between = i < c ? page.slice(i + date.length, c) : page.slice(c + claim.length, i);
+        if (!marks.some((m) => between.includes(m))) return true;
+      }
+    }
   }
   return false;
 }
+/**
+ * A date that is one dated entry's own date (a card on a blog index) dates that entry only: the statement must be that
+ * entry's title (or contain it). Cards sit close together, so nearness alone can't tell whose date it is.
+ */
+function dateOwnedElsewhere(page: ResearchPage, quote: string, date: EvidenceDate, retrievedAt: Date): boolean {
+  const owners = (page.entries ?? []).filter((e) => {
+    const d = evidenceDate(e.date, retrievedAt, { order: page.dateOrder ?? null });
+    return !!d && d.precision === date.precision && d.at.getTime() === date.at.getTime();
+  });
+  if (!owners.length) return false;
+  const q = normalizeForQuote(quote).toLowerCase();
+  return !owners.some((e) => { const t = normalizeForQuote(e.title).toLowerCase(); return t.length >= 6 && (q.includes(t) || t.includes(q)); });
+}
+/** A statement from the page's own text (the article), not from one of the blocks the reader added around it. */
+const inBody = (page: ResearchPage, quote: string) => page.body === undefined || normalizeForQuote(page.body).includes(normalizeForQuote(quote));
 
 export function normalizeResearch(raw: unknown, pages: ResearchPage[], site: string, opts: { retrievedAt: Date; icp: Pick<Icp, "roles">; knownFactIds: number[]; companyName?: string }): ResearchResult {
   const rejected: Rejection[] = [];
@@ -132,16 +165,28 @@ export function normalizeResearch(raw: unknown, pages: ResearchPage[], site: str
       // The date: from the quote itself, or from a second exact quote on the SAME page that states it AND sits right beside the
       // claim (a date elsewhere on the page, such as another post's, says nothing about THIS statement). Never the model's say-so.
       // A year alone in the quote (often a title: "...In The US In 2026") is the weakest date: a day or month beside the claim replaces it.
-      let date: EvidenceDate | null = evidenceDate(q.quote, opts.retrievedAt), dateQuote: string | null = null;
+      const order = { order: q.page.dateOrder ?? null };
+      let dateIssue: SignalDraft["dateIssue"] = null;
+      // A date after the page was read (beyond a time zone's worth) is a plan or a mistake, not when something happened.
+      const notFuture = (d: EvidenceDate | null) => { if (d && isFuture(d.at, opts.retrievedAt)) { dateIssue = "future"; return null; } return d; };
+      let date: EvidenceDate | null = notFuture(evidenceDate(q.quote, opts.retrievedAt, order)), dateQuote: string | null = null;
+      let dateSource: SignalDraft["dateSource"] = date ? "quote" : null;
       if ((!date || date.precision === "year") && typeof f.date_quote === "string" && cleanLine(f.date_quote).length >= 4 && cleanLine(f.date_quote).length <= 120 && dateBesideClaim(q.page.text, q.quote, f.date_quote)) {
-        const beside = evidenceDate(f.date_quote, opts.retrievedAt);
-        if (beside && (!date || beside.precision !== "year")) { date = beside; dateQuote = cleanLine(f.date_quote); }
+        const beside = notFuture(evidenceDate(f.date_quote, opts.retrievedAt, order));
+        if (beside && (!date || beside.precision !== "year") && !dateOwnedElsewhere(q.page, q.quote, beside, opts.retrievedAt)) { date = beside; dateQuote = cleanLine(f.date_quote); dateSource = "date_quote"; }
+      }
+      // Still no day or month: a statement in the article's own text is dated by the article's publication date (from the
+      // page's markup or its one byline, never the retrieval time), unless the statement names a different year itself.
+      const pub = q.page.published;
+      if ((!date || date.precision === "year") && pub && inBody(q.page, q.quote)) {
+        const at = new Date(pub.at);
+        if (Number.isFinite(at.getTime()) && !isFuture(at, opts.retrievedAt) && (!date || date.at.getUTCFullYear() === at.getUTCFullYear())) { date = { at, precision: pub.precision }; dateSource = "page_published"; }
       }
       const observedAt = date && date.precision !== "year" ? date.at : null;
       const key = `signal:${f.type}:${normalizeForQuote(q.quote).toLowerCase()}`;
       if (seen.has(key)) { rejected.push({ reason: "duplicate", what: "signal" }); return; }
       seen.add(key); kept.set(idx, true);
-      signals.push({ index: idx, type: f.type, value, quote: q.quote, url: q.page.url, observedAt, datePrecision: date?.precision ?? null, dateYear: date?.precision === "year" ? date.at.getUTCFullYear() : null, dateQuote });
+      signals.push({ index: idx, type: f.type, value, quote: q.quote, url: q.page.url, observedAt, datePrecision: date?.precision ?? null, dateYear: date?.precision === "year" ? date.at.getUTCFullYear() : null, dateQuote, dateSource, dateIssue, pageTruncated: !!q.page.truncated });
     } else if (f.kind === "person") {
       const name = typeof f.name === "string" ? cleanLine(f.name).slice(0, 80) : "";
       const title = typeof f.title === "string" ? cleanLine(f.title).slice(0, 100) : "";
