@@ -21,7 +21,7 @@ import { agentLog } from "../agent/log";
 import { leadsTablesReady } from "../leads/store";
 import * as sales from "../services/sales";
 import { getResearch, startResearch } from "./research";
-import { approveMessage, cancelMessage, draftOutreach, editDraft, listMessages, markSent } from "./outreach";
+import { addSuppression, approveMessage, cancelMessage, draftOutreach, editDraft, listMessages, listOutreachQueue, listSuppressions, markSent, openApproved, recordOutcome, removeSuppression } from "./outreach";
 import { messagesTablesReady } from "./message-store";
 import { salesTablesReady } from "./research-store";
 
@@ -119,6 +119,27 @@ export function registerSalesRoutes(app: Express) {
   app.post("/api/sales/leads/:id/draft", isAuthenticated, gate, messagesGate, guarded("sales_draft", async (req, res, id) => reply(res, await draftOutreach(req.user, id), (r) => ({ message: r.message, retried: r.retried }), 201)));
   app.patch("/api/sales/messages/:id", isAuthenticated, gate, messagesGate, guarded("sales_message_edit", async (req, res, id) => reply(res, await editDraft(req.user, id, req.body), (r) => ({ message: r.message }))));
   app.post("/api/sales/messages/:id/approve", isAuthenticated, gate, messagesGate, guarded("sales_message_approve", async (req, res, id) => reply(res, await approveMessage(req.user, id, req.body?.bodyHash), (r) => ({ message: r.message, already: r.already }))));
+  app.post("/api/sales/messages/:id/open", isAuthenticated, gate, messagesGate, guarded("sales_message_open", async (req, res, id) => { res.setHeader("Cache-Control", "no-store"); return reply(res, await openApproved(req.user, id, req.body?.bodyHash), (r) => ({ to: r.to, subject: r.subject, body: r.body })); }));
   app.post("/api/sales/messages/:id/sent", isAuthenticated, gate, messagesGate, guarded("sales_message_sent", async (req, res, id) => reply(res, await markSent(req.user, id), (r) => ({ message: r.message, already: r.already, movedTo: r.movedTo }))));
   app.post("/api/sales/messages/:id/cancel", isAuthenticated, gate, messagesGate, guarded("sales_message_cancel", async (req, res, id) => reply(res, await cancelMessage(req.user, id), (r) => ({ message: r.message }))));
+
+  // Outreach review queue, outcomes and the do-not-contact list (server/sales/outreach.ts).
+  const plain = (where: string, fn: (req: any, res: Response) => Promise<unknown>) => async (req: any, res: Response) => {
+    try { await fn(req, res); }
+    catch (err) {
+      agentLog("error", { errorType: (err as Error)?.name ?? "Error", where });
+      res.status(500).json({ code: "internal", error: "Something went wrong on our side." });
+    }
+  };
+  /** At most 60 hand-made list entries an hour per person (in this process): enough for real use, not for a script. */
+  const addsByUser = new Map<string, number[]>();
+  const addAllowed = (userId: string) => { const now = Date.now(), recent = (addsByUser.get(userId) ?? []).filter((t) => now - t < 3_600_000); if (recent.length >= 60) return false; recent.push(now); addsByUser.set(userId, recent); return true; };
+  app.get("/api/sales/outreach", isAuthenticated, gate, messagesGate, plain("sales_outreach_queue", async (req, res) => reply(res, await listOutreachQueue(req.user, { status: req.query?.status }), (r) => ({ items: r.items }))));
+  app.post("/api/sales/messages/:id/outcome", isAuthenticated, gate, messagesGate, guarded("sales_message_outcome", async (req, res, id) => reply(res, await recordOutcome(req.user, id, req.body), (r) => ({ outcome: r.outcome, already: r.already, suppressed: r.suppressed, cancelled: r.cancelled, movedTo: r.movedTo }))));
+  app.get("/api/sales/suppressions", isAuthenticated, gate, plain("sales_suppressions", async (req, res) => reply(res, await listSuppressions(req.user), (r) => ({ entries: r.entries }))));
+  app.post("/api/sales/suppressions", isAuthenticated, gate, plain("sales_suppression_add", async (req, res) => {
+    if (!addAllowed(req.user.id)) return res.status(429).json({ code: "rate_limited", error: "That's a lot of entries at once. Try again in a while." });
+    return reply(res, await addSuppression(req.user, req.body), (r) => ({ entry: r.entry, created: r.created, cancelled: r.cancelled }), 201);
+  }));
+  app.delete("/api/sales/suppressions/:id", isAuthenticated, gate, guarded("sales_suppression_remove", async (req, res, id) => reply(res, await removeSuppression(req.user, id), () => ({ removed: true }))));
 }

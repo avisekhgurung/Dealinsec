@@ -178,7 +178,7 @@ export async function getLead(user: Who, id: number): Promise<Result<{ detail: L
 
 const patchSchema = leadFieldsSchema.partial().extend({ doNotContact: z.boolean().optional() });
 
-export async function updateLead(user: Who, id: number, raw: unknown, opts: { actor?: Actor } = {}): Promise<Result<{ lead: Lead }>> {
+export async function updateLead(user: Who, id: number, raw: unknown, opts: { actor?: Actor } = {}): Promise<Result<{ lead: Lead; discarded?: number }>> {
   const gate = writeGate(user);
   if (gate) return gate;
   const parsed = patchSchema.safeParse(raw);
@@ -211,7 +211,15 @@ export async function updateLead(user: Who, id: number, raw: unknown, opts: { ac
     const lead = await store.update(orgId, id, patch);
     if (!lead) return notFound();
     await store.addEvent(orgId, id, { kind: "updated", data: { fields: Object.keys(patch) }, actor: opts.actor ?? "user", actorUserId: user.id });
-    return { ok: true, lead };
+    // Just marked do-not-contact: its unsent outreach is discarded, so an earlier approval can't be used. (Loaded here, not
+    // at the top: outreach imports this module.) If this fails, opening and recording a send still refuse: they check the
+    // flag themselves.
+    let discarded: number | undefined;
+    if (patch.doNotContact === true && !current.doNotContact) {
+      try { const { discardUnsentForLead } = await import("../sales/outreach"); discarded = await discardUnsentForLead(orgId, id, user.id); }
+      catch (err) { agentLog("error", { errorType: (err as Error)?.name ?? "Error", where: "lead_dnc_discard" }); }
+    }
+    return { ok: true, lead, ...(discarded !== undefined ? { discarded } : {}) };
   } catch (e) {
     if (e instanceof LeadConflictError) return fail(409, "duplicate", "You already have a lead for that website.", { existingId: e.existingId });
     throw e;

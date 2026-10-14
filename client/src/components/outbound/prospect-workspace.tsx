@@ -21,7 +21,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { EXPORT_URL, WORKSPACE_URL, countryName } from "@/lib/outbound";
+import { EXPORT_URL, PREPARE_OUTREACH_URL, WORKSPACE_URL, countryName } from "@/lib/outbound";
+import { leadCall, leadError, refreshLeads } from "@/lib/leads";
+import { PREPARE_MAX, type PrepareOutcome } from "@shared/outreach-safety";
 import { cn } from "@/lib/utils";
 import {
   CONTACT_LABEL, CONTACT_LEVEL, EMAIL_LABEL, EMAIL_STATUS, ICP_FIT, ICP_FIT_LABEL, MAX_EXPORT_ROWS, NO_SELECTION, PAGE_SIZES, PHONE_LABEL, PHONE_STATUS,
@@ -98,7 +100,7 @@ function DateRange({ label, from, to, onChange, testId }: { label: string; from?
 
 const SORTABLE: Partial<Record<string, SortField>> = { company: "name", domain: "domain", country: "country", fit: "icpFit", readiness: "readiness", evidence: "evidence", count: "evidenceCount", created: "created" };
 
-export function ProspectWorkspace({ canExport, onOpen }: { canExport: boolean; onOpen: (row: WorkspaceRow) => void }) {
+export function ProspectWorkspace({ canExport, onOpen, onPrepared }: { canExport: boolean; onOpen: (row: WorkspaceRow) => void; onPrepared?: () => void }) {
   const { toast } = useToast();
   const search = useSearch();
   const [location, navigate] = useLocation();
@@ -151,6 +153,26 @@ export function ProspectWorkspace({ canExport, onOpen }: { canExport: boolean; o
   const [preset, setPreset] = useState<ExportPreset>("full");
   const [busy, setBusy] = useState(false);
   const askExport = (selection: Selection, label: string) => setDialog({ selection, label });
+
+  // Prepare drafts: ticked prospects only (never "all matching"), at most PREPARE_MAX, confirmed first. Nothing is sent.
+  const names = useRef(new Map<number, string>());
+  for (const r of data?.rows ?? []) names.current.set(r.id, r.name);
+  const [prepareOpen, setPrepareOpen] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [prepared, setPrepared] = useState<PrepareOutcome[] | null>(null);
+  const runPrepare = async () => {
+    if (sel.mode !== "ids") return;
+    setPreparing(true);
+    try {
+      const r = await leadCall<{ results: PrepareOutcome[] }>("POST", PREPARE_OUTREACH_URL, { prospectIds: sel.ids });
+      setPrepared(r.results); setPrepareOpen(false); setSel(NO_SELECTION);
+      void refreshLeads(); void q.refetch();
+    } catch (e) {
+      toast({ title: "Drafts weren't prepared", description: leadError(e), variant: "destructive" });
+    } finally {
+      setPreparing(false);
+    }
+  };
   const runExport = async () => {
     if (!dialog) return;
     const scope = exportScopeOf(dialog.selection);
@@ -299,6 +321,7 @@ export function ProspectWorkspace({ canExport, onOpen }: { canExport: boolean; o
             <Button variant="ghost" size="sm" className="h-auto p-0 underline underline-offset-2" onClick={() => setSel(selectAllMatching(query.filters, data.asOf, filtered))} data-testid="select-all-matching">Select all {filtered} matching {active ? "these filters" : "prospects"}</Button>
           )}
           <span className="ml-auto flex gap-2">
+ {canExport && sel.mode === "ids" && <Button size="sm" variant="outline" onClick={() => setPrepareOpen(true)} disabled={count > PREPARE_MAX} title={count > PREPARE_MAX ? `Prepare drafts for up to ${PREPARE_MAX} prospects at a time` : undefined} data-testid="prepare-drafts">Prepare drafts</Button>}
             {canExport && <Button size="sm" onClick={() => askExport(sel, sel.mode === "filter" ? `All ${count} prospects matching ${hasActiveFilters(sel.filters) ? "your filters" : "the workspace"}` : `${count} selected prospect${count === 1 ? "" : "s"}`)} disabled={count > MAX_EXPORT_ROWS} data-testid="export-selected"><Download className="mr-1.5 h-4 w-4" />Export selected</Button>}
             <Button size="sm" variant="outline" onClick={() => setSel(NO_SELECTION)} data-testid="selection-clear">Clear selection</Button>
           </span>
@@ -399,6 +422,46 @@ export function ProspectWorkspace({ canExport, onOpen }: { canExport: boolean; o
           </div>
         </nav>
       )}
+
+      <AlertDialog open={prepareOpen} onOpenChange={(o) => !o && !preparing && setPrepareOpen(false)}>
+        <AlertDialogContent data-testid="prepare-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Prepare outreach drafts</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-1 text-sm">
+                <p>For each of the <span className="font-medium text-foreground">{count} selected prospect{count === 1 ? "" : "s"}</span> that is Ready and has an email address, DealInSec adds it to Leads with its evidence and writes one first-message draft from its confirmed facts.</p>
+                <p>Nothing is sent or approved. Each draft waits under Outreach for you to read, edit and approve, and you send it from your own email app. Prospects on your do-not-contact list are skipped.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={preparing}>Cancel</AlertDialogCancel>
+            <Button onClick={() => void runPrepare()} disabled={preparing} data-testid="prepare-confirm">{preparing && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}Prepare drafts</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!prepared} onOpenChange={(o) => !o && setPrepared(null)}>
+        <AlertDialogContent data-testid="prepare-results">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{prepared?.filter((r) => r.outcome === "drafted").length ?? 0} draft{prepared?.filter((r) => r.outcome === "drafted").length === 1 ? "" : "s"} ready for review</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <ul className="max-h-72 space-y-1.5 overflow-y-auto text-sm">
+                {(prepared ?? []).map((r) => (
+                  <li key={r.prospectId} className="flex items-start gap-2">
+                    <span className={cn("mt-0.5 shrink-0 rounded-full border px-1.5 text-[10px] font-semibold uppercase", r.outcome === "drafted" ? "border-emerald-300 text-emerald-700 dark:text-emerald-400" : r.outcome === "failed" ? "border-red-300 text-red-700 dark:text-red-400" : "border-border text-muted-foreground")}>{r.outcome}</span>
+                    <span className="min-w-0"><span className="font-medium text-foreground">{names.current.get(r.prospectId) ?? `Prospect ${r.prospectId}`}</span>{r.outcome !== "drafted" && <span className="block text-xs">{r.message}</span>}</span>
+                  </li>
+                ))}
+              </ul>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Close</AlertDialogCancel>
+            {onPrepared && (prepared ?? []).some((r) => r.outcome === "drafted") && <Button onClick={() => { setPrepared(null); onPrepared(); }} data-testid="prepare-review">Review drafts</Button>}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!dialog} onOpenChange={(o) => !o && !busy && setDialog(null)}>
         <AlertDialogContent data-testid="export-dialog">

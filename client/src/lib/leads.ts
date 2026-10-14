@@ -86,6 +86,8 @@ export const researchUrl = (id: number | string) => `/api/sales/leads/${id}/rese
 export const messagesUrl = (leadId: number | string) => `/api/sales/leads/${leadId}/messages`;
 export const draftUrl = (leadId: number | string) => `/api/sales/leads/${leadId}/draft`;
 export const messageUrl = (id: number | string, action = "") => `/api/sales/messages/${id}${action ? `/${action}` : ""}`;
+export const OUTREACH_QUEUE_URL = "/api/sales/outreach";
+export const SUPPRESSIONS_URL = "/api/sales/suppressions";
 export const hasCriteria = (p: IdealClientView | undefined) => !!p && (p.targetIndustries.length > 0 || p.targetLocations.length > 0 || p.exclusions.length > 0 || p.minDealMinor !== null);
 /** Anything under /api/ideal-client or a lead's fit changes when the profile does. */
 export const refreshProfile = () =>

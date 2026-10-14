@@ -42,6 +42,8 @@ export interface World {
   research: Row[]; llmCalls: Row[]; salesReady: boolean;
   /** Outreach messages, and whether their table exists. */
   messages: Row[]; messagesReady: boolean;
+  /** The do-not-contact list and outcome events; outreachSafetyFail makes the list unreadable (a database error). */
+  suppressions: Row[]; outreachEvents: Row[]; outreachSafetyReady: boolean; outreachSafetyFail?: boolean;
   /** AI Outbound: runs, prospects, run items, findings, provider calls, and whether the tables exist. */
   /** failReserve: the platform-wide budget can't be counted (the database is down for that query). */
   outbound: { runs: Row[]; prospects: Row[]; items: Row[]; findings: Row[]; providerCalls: Row[]; ready: boolean; failReserve?: boolean };
@@ -81,7 +83,7 @@ export function createWorld(): World {
     leads: new FakeLeadsStore(() => w.readOnly),
     profiles: new Map(),
     documentStyles: new Map(),
-    research: [], llmCalls: [], salesReady: true, messages: [], messagesReady: true,
+    research: [], llmCalls: [], salesReady: true, messages: [], messagesReady: true, suppressions: [], outreachEvents: [], outreachSafetyReady: true,
     outbound: { runs: [], prospects: [], items: [], findings: [], providerCalls: [], ready: true },
     knowledge: { sources: [], chunks: [], files: new Map(), web: {}, dns: {} },
     discovery: { configured: true, results: [], queries: [], countries: [], error: null, usedDay: 0, usedMonth: 0, provider: { label: "Brave Search", paid: true, supportsCountry: true } },

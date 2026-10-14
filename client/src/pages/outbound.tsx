@@ -12,6 +12,7 @@ import { NotificationBell } from "@/components/notification-bell";
 import { ProspectBrief } from "@/components/outbound/prospect-brief";
 import { ProspectCard } from "@/components/outbound/prospect-card";
 import { ProspectWorkspace } from "@/components/outbound/prospect-workspace";
+import { OutreachQueue } from "@/components/outbound/outreach-queue";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -118,8 +119,9 @@ export default function OutboundPage() {
   const [open, setOpen] = useState<{ id: number; runId: string | null } | null>(null);
   const search = useSearch();
   const [location, navigate] = useLocation();
-  const view = new URLSearchParams(search).get("view") === "prospects" ? "prospects" : "searches";
-  const setView = (v: "prospects" | "searches") => navigate(v === "prospects" ? `${location}?view=prospects` : location, { replace: true });
+  const viewParam = new URLSearchParams(search).get("view");
+  const view = viewParam === "prospects" || viewParam === "outreach" ? viewParam : "searches";
+  const setView = (v: "prospects" | "searches" | "outreach") => navigate(v === "searches" ? location : `${location}?view=${v}`, { replace: true });
   const runs = useQuery<{ runs: RunView[] }>({ queryKey: [OUTBOUND_RUNS_URL], retry: false, refetchInterval: (q) => (q.state.data?.runs.some((r) => r.status === "running") ? 5000 : false) });
   // Open the most recent run on arrival, once.
   useEffect(() => { if (!runId && runs.data?.runs.length) setRunId(runs.data.runs[0].id); }, [runs.data, runId]);
@@ -192,12 +194,12 @@ export default function OutboundPage() {
             )}
 
             <div className="flex gap-1 rounded-xl border bg-muted/40 p-1 sm:w-fit" role="tablist" aria-label="AI Outbound views">
-              {([["searches", "Searches"], ["prospects", "All prospects"]] as const).map(([v, label]) => (
+              {([["searches", "Searches"], ["prospects", "All prospects"], ["outreach", "Outreach"]] as const).map(([v, label]) => (
                 <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={cn("flex-1 rounded-lg px-4 py-1.5 text-sm font-medium sm:flex-none", view === v ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground")} data-testid={`view-${v}`}>{label}</button>
               ))}
             </div>
 
-            {view === "prospects" ? <ProspectWorkspace canExport={canEdit} onOpen={(r) => setOpen({ id: r.id, runId: r.latestRunId })} /> : <>
+            {view === "outreach" ? <OutreachQueue canEdit={canEdit} /> : view === "prospects" ? <ProspectWorkspace canExport={canEdit} onOpen={(r) => setOpen({ id: r.id, runId: r.latestRunId })} onPrepared={() => setView("outreach")} /> : <>
             {runs.data && runs.data.runs.length > 1 && (
               <div className="-mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:flex-wrap lg:px-0" role="tablist" aria-label="Recent searches">
                 {runs.data.runs.slice(0, 8).map((r) => (

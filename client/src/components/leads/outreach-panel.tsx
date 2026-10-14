@@ -48,16 +48,23 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
   const approve = useMutation({ mutationFn: () => leadCall("POST", messageUrl(current!.id, "approve"), { bodyHash: current!.bodyHash }), onSuccess: done, onError: fail("Couldn't approve it") });
   const sent = useMutation({ mutationFn: () => leadCall("POST", messageUrl(current!.id, "sent"), {}), onSuccess: () => { done(); toast({ title: "Recorded as sent", description: "A follow-up is set for four days from now." }); }, onError: fail("Couldn't record it") });
   const cancel = useMutation({ mutationFn: () => leadCall("POST", messageUrl(current!.id, "cancel"), {}), onSuccess: done, onError: fail("Couldn't discard it") });
-  const busy = draft.isPending || save.isPending || approve.isPending || sent.isPending || cancel.isPending;
+  // The approved text leaves the app only through the server, checked at that moment (the lead's do-not-contact flag, the
+  // organization's list, the exact text approved): never from what this page happens to hold.
+  const handOut = useMutation({
+    mutationFn: (how: "open" | "copy") => leadCall<{ to: string; subject: string; body: string }>("POST", messageUrl(current!.id, "open"), { bodyHash: current!.bodyHash }).then((r) => ({ r, how })),
+    onSuccess: async ({ r, how }) => {
+      if (how === "open") { window.location.href = mailtoFor(r); return; }
+      try { await navigator.clipboard.writeText(`Subject: ${r.subject}\n\n${r.body}`); toast({ title: "Copied" }); }
+      catch { toast({ title: "Couldn't copy", description: "Select the text and copy it yourself.", variant: "destructive" }); }
+    },
+    onError: (e) => { done(); fail("Couldn't hand it over")(e); },
+  });
+  const busy = draft.isPending || save.isPending || approve.isPending || sent.isPending || cancel.isPending || handOut.isPending;
 
   if (q.error) return null; // not set up on this server: the card simply has no outreach section
   if (q.isLoading) return null;
 
   const dirty = !!current && (subject !== current.subject || body !== current.body);
-  const copy = async () => {
-    try { await navigator.clipboard.writeText(`Subject: ${current!.subject}\n\n${current!.body}`); toast({ title: "Copied" }); }
-    catch { toast({ title: "Couldn't copy", description: "Select the text and copy it yourself.", variant: "destructive" }); }
-  };
 
   return (
     <Card className="glass-card" data-testid="outreach-panel">
@@ -105,8 +112,8 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
                 )}
                 {current.status === "approved" && !editing && (
                   <>
-                    <Button size="sm" asChild data-testid="outreach-open"><a href={mailtoFor(current)}><Mail className="mr-1.5 h-4 w-4" />Open in my email app</a></Button>
-                    <Button size="sm" variant="outline" onClick={copy} data-testid="outreach-copy"><Copy className="mr-1.5 h-4 w-4" />Copy</Button>
+                    <Button size="sm" onClick={() => handOut.mutate("open")} disabled={busy} data-testid="outreach-open">{handOut.isPending && handOut.variables === "open" ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Mail className="mr-1.5 h-4 w-4" />}Open in my email app</Button>
+                    <Button size="sm" variant="outline" onClick={() => handOut.mutate("copy")} disabled={busy} data-testid="outreach-copy"><Copy className="mr-1.5 h-4 w-4" />Copy</Button>
                     <Button size="sm" variant="outline" onClick={() => sent.mutate()} disabled={busy} data-testid="outreach-sent">{sent.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}I sent it</Button>
                     <Button size="sm" variant="ghost" onClick={() => setEditing(true)} disabled={busy} data-testid="outreach-edit"><Pencil className="mr-1.5 h-4 w-4" />Edit</Button>
                   </>

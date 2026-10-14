@@ -151,9 +151,14 @@ export const messageStoreMock = () => {
   let seq = 0;
   const w = () => world();
   const mine = (orgId: string, id: number) => w().messages.find((m) => m.organizationId === orgId && m.id === id);
+  const outboxEvent = (orgId: string, m: any, kind: string, e: { source: string; provider: string | null; actorUserId: string | null; now: Date }) => {
+    if (w().outreachEvents.some((x) => x.organizationId === orgId && x.messageId === m.id && x.kind === kind)) return;
+    w().outreachEvents.push({ id: w().outreachEvents.length + 1, organizationId: orgId, leadId: m.leadId, messageId: m.id, kind, source: e.source, provider: e.provider, providerMessageId: null, actorUserId: e.actorUserId, createdAt: e.now });
+  };
   return {
     DraftExists,
     messagesTablesReady: async () => w().messagesReady,
+    outreachSafetyReady: async () => w().outreachSafetyReady,
     messageStore: {
       create: async (m: Record<string, any>) => {
         if (w().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL");
@@ -172,6 +177,81 @@ export const messageStoreMock = () => {
         Object.assign(r, o.set ?? {}, { status: o.to, updatedAt: o.now });
         return { ...r };
       },
+      recordSentIfAllowed: async (o: { orgId: string; id: number; now: Date; keys: { kind: string; value: string }[]; hold?: () => Promise<void>; outbox?: { userId: string } | null }) => {
+        if (w().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL");
+        const r = mine(o.orgId, o.id);
+        if (!r || r.status !== "approved") return { result: "not_approved", row: r ? { ...r } : null };
+        const lead = w().leads.leads.find((l: any) => l.organizationId === o.orgId && l.id === r.leadId);
+        if (!lead || lead.doNotContact) return { result: "do_not_contact" };
+        if (o.keys.length && w().outreachSafetyFail) throw new Error("db down");
+        const hit = w().suppressions.find((x) => x.organizationId === o.orgId && o.keys.some((k) => k.kind === x.kind && k.value === x.value));
+        if (hit) return { result: "suppressed", entry: { ...hit } };
+        Object.assign(r, { status: "sent", sentAt: o.now, updatedAt: o.now });
+        if (o.outbox) for (const kind of ["sent", "follow_due"]) outboxEvent(o.orgId, r, kind, { source: "manual", provider: null, actorUserId: o.outbox.userId, now: o.now });
+        return { result: "sent", row: { ...r } };
+      },
+      // The same follow-up work as message-store.ts completeAfterSend, against the fake lead store (each call runs to the end
+      // before another starts, as the real one does under its row lock).
+      completeAfterSend: async (o: { orgId: string; messageId: number; now: Date }) => {
+        const m = mine(o.orgId, o.messageId);
+        if (!m || m.status !== "sent") return { result: "not_sent" };
+        const marks = w().outreachEvents.filter((x) => x.organizationId === o.orgId && x.messageId === o.messageId);
+        const due = marks.find((x) => x.kind === "follow_due");
+        if (!due) return { result: "not_due" };
+        if (marks.some((x) => x.kind === "follow_done")) return { result: "already" };
+        outboxEvent(o.orgId, m, "follow_done", { source: due.source, provider: due.provider, actorUserId: due.actorUserId, now: o.now });
+        const store = w().leads as any, actor = due.actorUserId;
+        const channel = due.provider === "gmail" ? (due.source === "provider" ? "gmail" : "gmail_confirmed") : "manual";
+        await store.addEvent(o.orgId, m.leadId, { kind: "message_sent", data: { messageId: o.messageId, channel }, actor: "user", actorUserId: actor });
+        const lead = store.leads.find((l: any) => l.organizationId === o.orgId && l.id === m.leadId);
+        let movedTo: string | null = null, ticketId: number | null = null;
+        if (lead && !lead.archivedAt && !lead.converting) {
+          const { canMove, isOpen } = await import("@shared/leads");
+          const { pathToContacted, FOLLOW_UP_DAYS } = await import("@shared/outreach-safety");
+          let status = lead.status;
+          for (const step of pathToContacted(status)) {
+            if (!canMove(status, step) || !(await store.setStatus(o.orgId, lead.id, status, step))) break;
+            await store.addEvent(o.orgId, lead.id, { kind: "status_changed", data: { from: status, to: step }, actor: "user", actorUserId: actor });
+            status = step; movedTo = step;
+          }
+          if (isOpen(status)) {
+            const t = await store.addTicket(o.orgId, lead.id, { title: `Follow up with ${lead.companyName}`, kind: "follow_up", dueAt: new Date(o.now.getTime() + FOLLOW_UP_DAYS * 86_400_000), createdBy: "user" });
+            ticketId = t.id;
+            await store.addEvent(o.orgId, lead.id, { kind: "ticket_created", data: { ticketId, kind: "follow_up" }, actor: "user", actorUserId: actor });
+          }
+        }
+        return { result: "done", movedTo, ticketId };
+      },
+      pendingAfterSend: async (o: { orgId?: string; limit: number }) => w().outreachEvents
+        .filter((x) => x.kind === "follow_due" && (!o.orgId || x.organizationId === o.orgId) && !w().outreachEvents.some((y) => y.organizationId === x.organizationId && y.messageId === x.messageId && y.kind === "follow_done"))
+        .slice(0, o.limit).map((x) => ({ orgId: x.organizationId, messageId: x.messageId })),
+      listForOrg: async (orgId: string, statuses: string[], limit: number) => w().messages.filter((m) => m.organizationId === orgId && m.direction === "out" && statuses.includes(m.status)).sort((a, b) => b.updatedAt - a.updatedAt || b.id - a.id).slice(0, limit).map((m) => ({ ...m })),
+      suppressedMatch: async (orgId: string, keys: { kind: string; value: string }[]) => {
+        if (w().outreachSafetyFail) throw new Error("db down");
+        const r = w().suppressions.find((x) => x.organizationId === orgId && keys.some((k) => k.kind === x.kind && k.value === x.value));
+        return r ? { ...r } : null;
+      },
+      listSuppressions: async (orgId: string, limit: number) => w().suppressions.filter((x) => x.organizationId === orgId).sort((a, b) => b.id - a.id).slice(0, limit).map((x) => ({ ...x })),
+      addSuppression: async (orgId: string, e: Record<string, any>) => {
+        if (w().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL");
+        const cur = w().suppressions.find((x) => x.organizationId === orgId && x.kind === e.kind && x.value === e.value);
+        if (cur) return { row: { ...cur }, created: false };
+        const row = { id: w().suppressions.length + 1, organizationId: orgId, kind: e.kind, value: e.value, reason: e.reason, sourceMessageId: e.sourceMessageId, note: e.note, createdBy: e.userId, createdAt: e.now };
+        w().suppressions.push(row);
+        return { row: { ...row }, created: true };
+      },
+      removeManualSuppression: async (orgId: string, id: number) => {
+        const i = w().suppressions.findIndex((x) => x.organizationId === orgId && x.id === id && x.reason === "manual");
+        if (i < 0) return null;
+        const [r] = w().suppressions.splice(i, 1);
+        return r;
+      },
+      recordEvent: async (orgId: string, e: Record<string, any>) => {
+        if (w().outreachEvents.some((x) => x.organizationId === orgId && x.messageId === e.messageId && x.kind === e.kind)) return { created: false };
+        w().outreachEvents.push({ id: w().outreachEvents.length + 1, organizationId: orgId, leadId: e.leadId, messageId: e.messageId, kind: e.kind, source: e.source, provider: e.provider, providerMessageId: e.providerMessageId, actorUserId: e.userId, createdAt: e.now });
+        return { created: true };
+      },
+      eventsFor: async (orgId: string, ids: number[]) => w().outreachEvents.filter((x) => x.organizationId === orgId && ids.includes(x.messageId)).map((x) => ({ ...x })),
     },
   };
 };

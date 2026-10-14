@@ -9,6 +9,7 @@
  *   POST /api/outbound/runs/:id/cancel           stop a run
  *   GET  /api/outbound/prospects                 the workspace table: one page of the organization's prospects (filters, sort, page in the query)
  *   POST /api/outbound/prospects/export          a CSV or XLSX file of selected or filter-matched prospects
+ *   POST /api/outbound/outreach/prepare          add selected Ready prospects to Leads and write one draft each, for review ({ prospectIds })
  *   GET  /api/outbound/prospects/:id             the brief: facts, signals, people, inferences, opportunities, angle
  *   POST /api/outbound/prospects/:id/research    research again now   ({ runId })
  *   POST /api/outbound/prospects/:id/contacts    named people from the connected contact provider ({ runId })
@@ -20,6 +21,7 @@ import { isAuthenticated } from "../auth";
 import { agentLog } from "../agent/log";
 import * as svc from "./service";
 import { exportProspects, listWorkspace } from "./workspace";
+import { prepareOutreach } from "./outreach-prepare";
 
 export function registerOutboundRoutes(app: Express) {
   const send = (res: Response, r: any, ok: (r: any) => Record<string, unknown>, status = 200) => {
@@ -55,6 +57,7 @@ export function registerOutboundRoutes(app: Express) {
     res.setHeader("X-Export-Count", String(r.count));
     res.status(200).end(r.body);
   }));
+  app.post("/api/outbound/outreach/prepare", isAuthenticated, guarded("outbound_outreach_prepare", async (req, res) => send(res, await prepareOutreach(req.user, req.body), (r) => ({ results: r.results }))));
   app.get("/api/outbound/prospects/:id", isAuthenticated, guarded("outbound_prospect", async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); send(res, await svc.getProspect(req.user, id), (r) => ({ brief: r.brief })); }));
   app.post("/api/outbound/prospects/:id/research", isAuthenticated, guarded("outbound_research", async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); send(res, await svc.researchProspect(req.user, id, req.body?.runId), (r) => ({ brief: r.brief })); }));
   app.post("/api/outbound/prospects/:id/contacts", isAuthenticated, guarded("outbound_contacts", async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); send(res, await svc.findContacts(req.user, id, req.body?.runId), (r) => ({ brief: r.brief, found: r.found })); }));

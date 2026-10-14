@@ -5,6 +5,7 @@ export const prospectUrl = (id: number, action = "") => `/api/outbound/prospects
 export const ICP_URL = "/api/outbound/icp";
 export const WORKSPACE_URL = "/api/outbound/prospects";
 export const EXPORT_URL = "/api/outbound/prospects/export";
+export const PREPARE_OUTREACH_URL = "/api/outbound/outreach/prepare";
 
 export interface Icp {
   industry: string; keywords: string[]; countries: string[]; locations: string[]; employeeMin: number | null; employeeMax: number | null;

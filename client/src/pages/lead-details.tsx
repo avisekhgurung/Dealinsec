@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -106,6 +107,17 @@ export default function LeadDetailsPage() {
     }),
     onSuccess: () => { setClaim({ field: "", value: "", status: "inferred", evidenceUrl: "", evidenceSnippet: "" }); setClaimError(null); done("Fact recorded"); },
     onError: (e) => setClaimError(leadError(e, "Couldn't record that fact.")),
+  });
+  // Do not contact: the server discards every unsent message to this lead when it is switched on (their approvals can't be used again).
+  const contactPermission = useMutation({
+    mutationFn: (on: boolean) => leadCall<{ discarded?: number }>("PATCH", `/api/leads/${id}`, { doNotContact: on }),
+    onSuccess: (r, on) => {
+      refreshLeads();
+      toast(on
+        ? { title: "Marked do not contact", description: r?.discarded ? `${r.discarded} unsent message${r.discarded === 1 ? " was" : "s were"} discarded. Nothing can be approved, opened or recorded as sent to this lead.` : "Nothing can be drafted, approved, opened or recorded as sent to this lead." }
+        : { title: "Contact allowed again", description: "Messages discarded earlier stay discarded. Write and approve a new one if you need to." });
+    },
+    onError: (e) => { refreshLeads(); fail(e); },
   });
   const archive = useMutation({ mutationFn: () => leadCall("POST", `/api/leads/${id}/archive`), onSuccess: () => { refreshLeads(); toast({ title: "Lead archived" }); setLocation("/leads"); }, onError: fail });
   const convert = useMutation({
@@ -205,9 +217,27 @@ export default function LeadDetailsPage() {
               <Fact label="Size">{lead.sizeHint || "—"}</Fact>
               <Fact label="Source">{lead.source}</Fact>
               <Fact label="Contact">{[lead.contactName, lead.contactRole].filter(Boolean).join(", ") || "—"}</Fact>
-              <Fact label="Contact email">{lead.contactEmail ? <a className="text-primary hover:underline" href={`mailto:${lead.contactEmail}`}>{lead.contactEmail}</a> : "—"}</Fact>
+              {/* No one-click email link to a lead marked do-not-contact. */}
+              <Fact label="Contact email">{lead.contactEmail ? (lead.doNotContact ? <span>{lead.contactEmail} <span className="text-xs text-muted-foreground">(do not contact)</span></span> : <a className="text-primary hover:underline" href={`mailto:${lead.contactEmail}`}>{lead.contactEmail}</a>) : "—"}</Fact>
               {lead.fitSummary && <div className="sm:col-span-2"><Fact label="Why they may need you">{lead.fitSummary}</Fact></div>}
               {lead.lostReason && <div className="sm:col-span-2"><Fact label="Lost because">{lead.lostReason}</Fact></div>}
+            </CardContent></Card>
+            <Card className="glass-card"><CardContent className="flex items-start justify-between gap-4 p-4" data-testid="contact-permission">
+              <div className="min-w-0">
+                <Label htmlFor="lead-do-not-contact" className="text-sm font-semibold">Do not contact</Label>
+                <p id="lead-do-not-contact-help" className="mt-0.5 text-xs text-muted-foreground">
+                  {lead.doNotContact ? "On: nothing can be drafted, approved, opened or recorded as sent to this lead." : "Off. Switch on when the company or contact asks not to be contacted: unsent messages to it are discarded."}
+                </p>
+              </div>
+              {canEdit && !lead.archivedAt ? (
+                <Switch id="lead-do-not-contact" aria-describedby="lead-do-not-contact-help" checked={!!lead.doNotContact} disabled={contactPermission.isPending} data-testid="switch-do-not-contact"
+                  onCheckedChange={async (on) => {
+                    if (on && !(await confirm({ title: "Mark this lead do not contact?", description: "Any draft or approved message to it is discarded, and its approval can't be used again. You can switch this off later, but a new message would need a new approval.", confirmText: "Mark do not contact" }))) return;
+                    contactPermission.mutate(on);
+                  }} />
+              ) : (
+                <span className="shrink-0 text-sm font-medium" data-testid="do-not-contact-state">{lead.doNotContact ? "On" : "Off"}</span>
+              )}
             </CardContent></Card>
             {canEdit && !lead.archivedAt && (
               <Button variant="ghost" size="sm" className="mt-3 text-muted-foreground" data-testid="button-archive-lead"
