@@ -1,7 +1,8 @@
 /**
  * The first message to a lead: written by the AI from verified facts, read and edited by a person, approved, then sent
- * by the person from their own email app. DealInSec never sends it: "Open in my email app" hands the approved text to
- * the person's own mail program, and "I sent it" records that they did. Nothing about the lead changes before that.
+ * by the person: from their own email app ("Open in my email app" hands the approved text over, "I sent it" records
+ * it), or from their connected Gmail ("Send from my Gmail", gmail-send.tsx), which sends exactly the approved text once.
+ * While a Gmail send is in flight or uncertain ("sending"), nothing else can send, change or discard the message.
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -14,10 +15,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { draftUrl, leadCall, leadError, messageUrl, messagesUrl, refreshLeads } from "@/lib/leads";
 import { memberCan } from "@shared/permissions";
+import { GmailSendState, SendFromGmailButton } from "./gmail-send";
 import { LIMITS } from "@shared/outreach-check";
 
 interface Message {
-  id: number; status: "draft" | "approved" | "sent" | "cancelled"; subject: string; body: string; bodyHash: string;
+  id: number; status: "draft" | "approved" | "sending" | "sent" | "cancelled"; subject: string; body: string; bodyHash: string;
   to: string | null; toSource: "lead" | "site" | null; edited: boolean; createdBy: string; createdAt: string; approvedAt: string | null; sentAt: string | null;
 }
 const when = (iso: string | null) => { try { return iso ? new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""; } catch { return ""; } };
@@ -32,7 +34,7 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
   const { toast } = useToast();
   const canRun = memberCan(user as any, "deals.create");
   const q = useQuery<{ messages: Message[] }>({ queryKey: [messagesUrl(leadId)], retry: false });
-  const current = q.data?.messages.find((m) => m.status === "draft" || m.status === "approved") ?? null;
+  const current = q.data?.messages.find((m) => m.status === "draft" || m.status === "approved" || m.status === "sending") ?? null;
   const lastSent = q.data?.messages.find((m) => m.status === "sent") ?? null;
 
   const [subject, setSubject] = useState("");
@@ -78,7 +80,7 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
               </p>
             )}
             {current?.status === "draft" && <p className="text-sm" data-testid="outreach-draft-note">Written by AI. Read it and change anything before you approve it.</p>}
-            {current?.status === "approved" && <p className="text-sm" data-testid="outreach-approved-note">Approved. DealInSec doesn't send this: open it in your email app, send it, then tell me here.</p>}
+            {current?.status === "approved" && <p className="text-sm" data-testid="outreach-approved-note">Approved. Send it from your connected Gmail, or open it in your email app, send it, then tell me here.</p>}
           </div>
           {!current && !lastSent && canRun && (
             <Button size="sm" className="shrink-0" onClick={() => draft.mutate()} disabled={busy} data-testid="outreach-write">
@@ -102,7 +104,8 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
                 <p className="mt-2 whitespace-pre-wrap break-words" data-testid="outreach-body-text">{current.body}</p>
               </div>
             )}
-            {canRun && (
+            {(current.status === "sending" || current.status === "approved") && <GmailSendState messageId={current.id} messageStatus={current.status} />}
+            {canRun && current.status !== "sending" && (
               <div className="flex flex-wrap items-center gap-2">
                 {current.status === "draft" && dirty && (
                   <Button size="sm" onClick={() => save.mutate()} disabled={busy} data-testid="outreach-save">{save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="mr-1.5 h-4 w-4" />}Save changes</Button>
@@ -112,6 +115,7 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
                 )}
                 {current.status === "approved" && !editing && (
                   <>
+                    <SendFromGmailButton messageId={current.id} bodyHash={current.bodyHash} to={current.to} disabled={busy} />
                     <Button size="sm" onClick={() => handOut.mutate("open")} disabled={busy} data-testid="outreach-open">{handOut.isPending && handOut.variables === "open" ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Mail className="mr-1.5 h-4 w-4" />}Open in my email app</Button>
                     <Button size="sm" variant="outline" onClick={() => handOut.mutate("copy")} disabled={busy} data-testid="outreach-copy"><Copy className="mr-1.5 h-4 w-4" />Copy</Button>
                     <Button size="sm" variant="outline" onClick={() => sent.mutate()} disabled={busy} data-testid="outreach-sent">{sent.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}I sent it</Button>

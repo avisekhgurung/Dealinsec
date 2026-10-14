@@ -20,6 +20,7 @@ import { registerKnowledgeRoutes } from "./knowledge/routes";
 import { registerVoiceRoutes } from "./voice/routes";
 import { registerSalesRoutes } from "./sales/routes";
 import { registerOutboundRoutes } from "./outbound/routes";
+import { disconnectMailboxesOf, registerGmail } from "./mail/register";
 import { reviseDraftQuote } from "./services/deals";
 import { notifyAgreementCreated } from "./services/agreements";
 import { afterInvoiceStatusChange, paidAtFor } from "./services/payments";
@@ -641,6 +642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerVoiceRoutes(app);
   registerSalesRoutes(app);
   registerOutboundRoutes(app);
+  registerGmail(app);
   registerQuoteShareRoutes(app);
   registerAgreementSignRoutes(app);
 
@@ -2081,6 +2083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
+      if (orgId) await disconnectMailboxesOf(req.user, orgId, uid, "account_deleted");
       await storage.anonymizeUser(uid);
       req.logout?.(() => {});
       req.session?.destroy?.(() => {});
@@ -2349,6 +2352,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (member.id === req.user.id) return res.status(403).json({ error: "You can't remove yourself" });
       await storage.updateUser(member.id, { memberStatus: "removed" } as any);
       logOrgActivity(req.user, "removed", "member", member.id, `${member.email}`);
+      // Their connected mailbox goes with them: credentials deleted, grant revoked. An admin never inherits it.
+      await disconnectMailboxesOf(req.user, req.org.id, member.id, "member_removed");
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to remove member" });
