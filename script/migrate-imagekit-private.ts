@@ -48,7 +48,9 @@ async function main() {
       const journal = await applyMigration(plan, {
         uploadPrivateFromUrl: async (sourceUrl, folder, fileName) => {
           const r: any = await ik.upload({ file: sourceUrl, fileName, folder, useUniqueFileName: false, overwriteFile: false, isPrivateFile: true });
-          return { fileId: r.fileId, isPrivateFile: r.isPrivateFile === true, name: r.name };
+          // The upload response has no isPrivateFile: read the stored file's own record (unreadable = not private).
+          const stored: any = await ik.getFileDetails(r.fileId).catch(() => null);
+          return { fileId: r.fileId, isPrivateFile: stored?.isPrivateFile === true, name: r.name };
         },
         signedSourceUrl: (p) => ik.url({ path: p, signed: true, expireSeconds: 600 }),
         repoint: (rows, oldValue, newRef) => store.repoint(rows, oldValue, newRef),

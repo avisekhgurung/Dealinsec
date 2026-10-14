@@ -72,7 +72,10 @@ export interface UploadResult {
 /**
  * Upload a multer-handled file to ImageKit as a PRIVATE file with an
  * unguessable, owner-tagged name, and delete the local temp file afterwards.
- * Refuses (and deletes the upload) if ImageKit reports it as not private.
+ * Refuses (and deletes the upload) unless ImageKit's record of the stored file
+ * says it is private. The upload response itself carries no `isPrivateFile`
+ * (the SDK's UploadResponse has no such field; verified against the real
+ * account on 14 Oct 2026), so privacy is read back with getFileDetails.
  */
 export async function uploadFileToImageKit(
   multerFile: { path: string; originalname: string; size: number },
@@ -92,7 +95,9 @@ export async function uploadFileToImageKit(
       overwriteFile: false,
       isPrivateFile: true,
     });
-    if (res.isPrivateFile !== true || res.name !== name) {
+    // The stored file's own record decides; if it can't be read, the upload is not trusted (fail closed).
+    const stored = res.name === name ? await client.getFileDetails(res.fileId).catch(() => null) : null;
+    if (!stored || (stored as { isPrivateFile?: unknown }).isPrivateFile !== true) {
       await client.deleteFile(res.fileId).catch(() => {});
       throw new Error("ImageKit did not store the upload as the expected private file");
     }

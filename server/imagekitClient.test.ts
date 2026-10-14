@@ -12,10 +12,14 @@ import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Shaped like the REAL SDK: upload() answers with no isPrivateFile at all (UploadResponse has no such field, as the real
+// account showed); only getFileDetails() says whether the stored file is private.
 const sdk = vi.hoisted(() => ({
   uploads: [] as any[],
   deleted: [] as string[],
-  respond: (o: any): any => ({ fileId: "fid-1", name: o.fileName, isPrivateFile: o.isPrivateFile === true }),
+  respond: (o: any): any => ({ fileId: `fid-${Math.random().toString(36).slice(2)}`, name: o.fileName, url: `https://ik.imagekit.io/acme${o.folder}/${o.fileName}`, filePath: `${o.folder}/${o.fileName}`, size: 8, fileType: "non-image" }),
+  stored: new Map<string, any>(),
+  details: (id: string): any => sdk.stored.get(id) ?? null,
 }));
 vi.mock("imagekit", async (orig) => {
   const Real = ((await (orig as any)()) as any).default;
@@ -24,7 +28,8 @@ vi.mock("imagekit", async (orig) => {
       private real: any;
       constructor(cfg: any) { this.real = new Real(cfg); }
       url(o: any) { return this.real.url(o); } // signing: the real SDK
-      async upload(o: any) { sdk.uploads.push(o); return sdk.respond(o); }
+      async upload(o: any) { sdk.uploads.push(o); const r = sdk.respond(o); sdk.stored.set(r.fileId, { fileId: r.fileId, name: r.name, isPrivateFile: o.isPrivateFile === true }); return r; }
+      async getFileDetails(id: string) { const d = sdk.details(id); if (!d) throw new Error("not found"); return d; }
       async deleteFile(id: string) { sdk.deleted.push(id); }
     },
   };
@@ -33,7 +38,7 @@ vi.mock("imagekit", async (orig) => {
 const ENV = { IMAGEKIT_PUBLIC_KEY: "public_local_test", IMAGEKIT_PRIVATE_KEY: "private_local_test_key", IMAGEKIT_URL_ENDPOINT: "https://ik.imagekit.io/acme" };
 const TAG = "0123456789abcdef";
 let tmp: string;
-beforeEach(() => { Object.assign(process.env, ENV); sdk.uploads = []; sdk.deleted = []; tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ik-")); });
+beforeEach(() => { Object.assign(process.env, ENV); sdk.uploads = []; sdk.deleted = []; sdk.stored.clear(); tmp = fs.mkdtempSync(path.join(os.tmpdir(), "ik-")); });
 afterEach(() => { for (const k of Object.keys(ENV)) delete (process.env as any)[k]; fs.rmSync(tmp, { recursive: true, force: true }); vi.useRealTimers(); });
 const file = (name = "Signed Copy.PDF") => { const p = path.join(tmp, `t-${Math.random()}`); fs.writeFileSync(p, "%PDF-1.4"); return { path: p, originalname: name, size: 8 }; };
 
@@ -56,14 +61,24 @@ describe("I: private uploads (mocked SDK — what the app asks for)", () => {
     const again = await uploadFileToImageKit(file(), { folder: "contracts", ownerTag: TAG });
     expect(again.name).not.toBe(r.name); // 128 random bits per name
   });
-  it("refuses (and deletes the upload) if ImageKit doesn't report a private file; refuses without a valid owner tag", async () => {
+  it("accepts the real SDK's upload response, which has no isPrivateFile, by reading the stored file's record (14 Oct regression)", async () => {
     const { uploadFileToImageKit } = await import("./imagekitClient");
-    const prev = sdk.respond;
-    sdk.respond = (o: any) => ({ fileId: "fid-public", name: o.fileName, isPrivateFile: false });
+    const r = await uploadFileToImageKit(file(), { folder: "invoice-documents", ownerTag: TAG });
+    expect(Object.keys(sdk.respond({ fileName: "x.pdf", folder: "/dealinsec/x" }))).not.toContain("isPrivateFile"); // the real response shape
+    expect(r.ref).toMatch(new RegExp(`^/files/invoice-documents/[0-9a-f]{32}-${TAG}\\.pdf$`));
+    expect(sdk.deleted).toEqual([]);
+  });
+  it("refuses (and deletes the upload) if the stored file isn't private, or its record can't be read; refuses without a valid owner tag", async () => {
+    const { uploadFileToImageKit } = await import("./imagekitClient");
+    const prev = sdk.details;
+    sdk.details = (id: string) => ({ fileId: id, isPrivateFile: false });
     try {
       await expect(uploadFileToImageKit(file(), { folder: "signatures", ownerTag: TAG })).rejects.toThrow(/private/);
-      expect(sdk.deleted).toEqual(["fid-public"]);
-    } finally { sdk.respond = prev; }
+      expect(sdk.deleted).toHaveLength(1);
+      sdk.details = () => null; // the record can't be read: not trusted
+      await expect(uploadFileToImageKit(file(), { folder: "signatures", ownerTag: TAG })).rejects.toThrow(/private/);
+      expect(sdk.deleted).toHaveLength(2);
+    } finally { sdk.details = prev; }
     await expect(uploadFileToImageKit(file(), { folder: "signatures", ownerTag: "" })).rejects.toThrow(/owner tag/);
     await expect(uploadFileToImageKit(file(), { folder: "signatures", ownerTag: "not-hex-tag-0000" })).rejects.toThrow(/owner tag/);
   });
