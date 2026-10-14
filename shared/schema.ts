@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { pgTable, text, integer, bigint, boolean, json, serial, varchar, timestamp, index, uniqueIndex, jsonb, unique, primaryKey, customType } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, bigint, smallint, boolean, json, serial, varchar, timestamp, index, uniqueIndex, jsonb, unique, primaryKey, customType, check } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { dealTypeOptions as TAXONOMY_DEAL_TYPES } from "./dealTypeTaxonomy";
@@ -1389,7 +1389,7 @@ export const leadMessages = pgTable("lead_messages", {
   bodyHash: varchar("body_hash", { length: 64 }).notNull(),
   toAddress: varchar("to_address", { length: 254 }),
   toSource: varchar("to_source", { length: 8 }), // lead | site
-  status: varchar("status", { length: 12 }).notNull(), // draft | approved | sent | cancelled
+  status: varchar("status", { length: 12 }).notNull(), // draft | approved | sending (a connected-mailbox send not yet settled) | sent | cancelled
   researchId: integer("research_id"),
   claimIds: jsonb("claim_ids").notNull().default(sql`'[]'::jsonb`), // the facts the draft was written from
   promptVersion: varchar("prompt_version", { length: 20 }),
@@ -1406,6 +1406,47 @@ export const leadMessages = pgTable("lead_messages", {
   orgIdx: index("lead_messages_org_idx").on(t.organizationId, t.createdAt),
 }));
 export type LeadMessageRow = typeof leadMessages.$inferSelect;
+
+/**
+ * Outreach safety (script/migrate-outreach-safety.ts). An organization's do-not-contact list, by address or by domain:
+ * nothing is drafted, approved or recorded as sent to a match. An opt-out or a bounce is never removable in the app.
+ */
+export const outreachSuppressions = pgTable("outreach_suppressions", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  kind: varchar("kind", { length: 8 }).notNull(), // email | domain
+  value: varchar("value", { length: 254 }).notNull(), // lower case
+  reason: varchar("reason", { length: 12 }).notNull(), // opt_out | bounce | complaint | manual
+  sourceMessageId: integer("source_message_id"),
+  note: varchar("note", { length: 200 }),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").notNull(),
+}, (t) => ({
+  uniq: uniqueIndex("outreach_suppressions_org_kind_value_uq").on(t.organizationId, t.kind, t.value),
+}));
+export type OutreachSuppressionRow = typeof outreachSuppressions.$inferSelect;
+
+/**
+ * What happened to a sent message: recorded by a person (source "manual") or, later, a provider's webhook (source
+ * "provider" with its message id). One row per message and kind, so a repeated click or a replayed webhook counts once.
+ * Ids and kinds only, never message text.
+ */
+export const outreachEvents = pgTable("outreach_events", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  leadId: integer("lead_id").notNull(),
+  messageId: integer("message_id").notNull(),
+  kind: varchar("kind", { length: 12 }).notNull(), // sent | delivered | replied | bounced | opted_out | complaint | failed
+  source: varchar("source", { length: 8 }).notNull(), // manual | provider
+  provider: varchar("provider", { length: 24 }),
+  providerMessageId: varchar("provider_message_id", { length: 200 }),
+  actorUserId: varchar("actor_user_id"),
+  createdAt: timestamp("created_at").notNull(),
+}, (t) => ({
+  once: uniqueIndex("outreach_events_org_message_kind_uq").on(t.organizationId, t.messageId, t.kind),
+  byMessage: index("outreach_events_message_idx").on(t.organizationId, t.messageId),
+}));
+export type OutreachEventRow = typeof outreachEvents.$inferSelect;
 
 
 // ── AI Outbound: prospect discovery and intelligence (docs/ai-outbound-engine-architecture.md) ──
@@ -1525,3 +1566,69 @@ export const providerCalls = pgTable("provider_calls", {
   orgDayIdx: index("provider_calls_org_created_idx").on(t.organizationId, t.createdAt),
 }));
 export type ProviderCallRow = typeof providerCalls.$inferSelect;
+
+/**
+ * Connected mailboxes (Gmail Release A, send-only; script/migrate-mailbox.ts, server/mail/mailbox-schema.ts holds the
+ * authoritative DDL and the two are tested to agree). A person's own mailbox, sending only the messages they approved.
+ * The refresh token is sealed by server/mail/token-crypto and removed when the mailbox is revoked or disconnected.
+ */
+export const mailboxConnections = pgTable("mailbox_connections", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  provider: varchar("provider", { length: 16 }).notNull(), // gmail
+  accountEmail: varchar("account_email", { length: 254 }).notNull(),
+  accountSub: varchar("account_sub", { length: 255 }).notNull(),
+  status: varchar("status", { length: 16 }).notNull(), // active | needs_reconnect | revoked | disconnected
+  scopes: jsonb("scopes").notNull().default(sql`'[]'::jsonb`),
+  refreshTokenEnc: text("refresh_token_enc"),
+  tokenKeyVersion: smallint("token_key_version"),
+  lastErrorCode: varchar("last_error_code", { length: 40 }),
+  lastErrorAt: timestamp("last_error_at"),
+  connectedAt: timestamp("connected_at").notNull(),
+  disconnectedAt: timestamp("disconnected_at"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  statusCk: check("mailbox_connections_status_ck", sql`status IN ('active', 'needs_reconnect', 'revoked', 'disconnected')`),
+  tokenPairCk: check("mailbox_connections_token_pair_ck", sql`(refresh_token_enc IS NULL) = (token_key_version IS NULL)`),
+  tokenStateCk: check("mailbox_connections_token_state_ck", sql`(status = 'active' AND refresh_token_enc IS NOT NULL) OR status = 'needs_reconnect' OR (status IN ('revoked', 'disconnected') AND refresh_token_enc IS NULL)`),
+  liveUserUq: uniqueIndex("mailbox_connections_live_user_uq").on(t.organizationId, t.userId, t.provider).where(sql`status IN ('active', 'needs_reconnect')`),
+  liveAccountUq: uniqueIndex("mailbox_connections_live_account_uq").on(t.provider, t.accountSub).where(sql`status IN ('active', 'needs_reconnect')`),
+  orgIdx: index("mailbox_connections_org_idx").on(t.organizationId, t.status),
+}));
+export type MailboxConnectionRow = typeof mailboxConnections.$inferSelect;
+
+/** One row per approved message ever handed to a mailbox provider: the guard against sending it twice. */
+export const mailSendJobs = pgTable("mail_send_jobs", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  connectionId: integer("connection_id").notNull(),
+  leadId: integer("lead_id").notNull(),
+  messageId: integer("message_id").notNull(), // lead_messages.id
+  requestedBy: varchar("requested_by").notNull(),
+  bodyHash: varchar("body_hash", { length: 64 }).notNull(),
+  toAddress: varchar("to_address", { length: 254 }).notNull(),
+  rfcMessageId: varchar("rfc_message_id", { length: 255 }).notNull(),
+  status: varchar("status", { length: 12 }).notNull(), // sending | sent | uncertain | failed | blocked
+  attempts: integer("attempts").notNull().default(0),
+  leaseUntil: timestamp("lease_until"),
+  providerMessageId: varchar("provider_message_id", { length: 200 }),
+  providerThreadId: varchar("provider_thread_id", { length: 200 }),
+  errorCode: varchar("error_code", { length: 40 }),
+  resolvedBy: varchar("resolved_by"),
+  resolvedAt: timestamp("resolved_at"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  statusCk: check("mail_send_jobs_status_ck", sql`status IN ('sending', 'sent', 'uncertain', 'failed', 'blocked')`),
+  sentCk: check("mail_send_jobs_sent_ck", sql`status <> 'sent' OR (sent_at IS NOT NULL AND (provider_message_id IS NOT NULL OR resolved_by IS NOT NULL))`),
+  attemptsCk: check("mail_send_jobs_attempts_ck", sql`attempts >= 0`),
+  messageUq: uniqueIndex("mail_send_jobs_message_uq").on(t.messageId),
+  rfcUq: uniqueIndex("mail_send_jobs_rfc_uq").on(t.rfcMessageId),
+  providerUq: uniqueIndex("mail_send_jobs_provider_uq").on(t.connectionId, t.providerMessageId).where(sql`provider_message_id IS NOT NULL`),
+  orgStatusIdx: index("mail_send_jobs_org_status_idx").on(t.organizationId, t.status),
+  connectionIdx: index("mail_send_jobs_connection_idx").on(t.connectionId, t.createdAt),
+}));
+export type MailSendJobRow = typeof mailSendJobs.$inferSelect;
