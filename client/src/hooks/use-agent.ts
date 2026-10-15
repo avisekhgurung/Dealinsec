@@ -11,6 +11,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { AgentHttpError, postStream } from "@/lib/agent-stream";
 import { trackEvent } from "@/lib/analytics";
+import { toast } from "@/hooks/use-toast";
+import { rejectOutcome } from "@shared/agent-mode";
 import {
   FUNNEL_EVENT, approvalStatusFromServer, reduceSteps,
   type ActivityStep, type AgentCard, type AgentEvent, type ApprovalStatus,
@@ -159,6 +161,7 @@ export function useAgent(opts: UseAgentOptions = {}) {
     append({ role: "user", content: text, cards: [] });
     trackEvent("agent_message_sent", { has_deal_context: !!ctxRef.current?.dealId, long_message: text.length >= 200 });
     const ac = new AbortController();
+    stoppedByUser.current = false;
     abortRef.current = ac;
     stepsRef.current = [];
     setSteps([]);
@@ -199,8 +202,13 @@ export function useAgent(opts: UseAgentOptions = {}) {
       await postStream(`/api/agent/sessions/${sid}/messages`, { text, context: ctxRef.current, channel: channelRef.current }, { signal: ac.signal, onEvent });
       if (!finished) throw new Error("stream ended early");
     } catch (err) {
-      if (ac.signal.aborted) {
-        // The user pressed Stop. The server records the run as cancelled.
+      if (ac.signal.aborted && stoppedByUser.current) {
+        // The person pressed Stop. Say so now; then show the server's own record, which says whether anything
+        // finished before the stop (it is saved as the run ends, a moment after the connection closes).
+        append({ role: "assistant", content: "Stopped.", cards: [] });
+        if (sid) { const id = sid; setTimeout(() => { if (abortRef.current === null) void loadTranscript(id); }, 900); }
+      } else if (ac.signal.aborted) {
+        // Closed for another reason (opening another conversation, leaving the page): nothing to show here.
       } else if (err instanceof AgentHttpError) {
         trackEvent("agent_run_failed", { code: `http_${err.status}` });
         append({ role: "assistant", content: describeHttpError(err), cards: [], error: { retryText: text } });
@@ -221,7 +229,8 @@ export function useAgent(opts: UseAgentOptions = {}) {
     }
   }, [sessionId, onSessionChange, loadTranscript]);
 
-  const stop = useCallback(() => abortRef.current?.abort(), []);
+  const stoppedByUser = useRef(false);
+  const stop = useCallback(() => { stoppedByUser.current = true; abortRef.current?.abort(); }, []);
 
   const retry = useCallback(() => {
     if (!lastText.current) return;
@@ -273,14 +282,22 @@ export function useAgent(opts: UseAgentOptions = {}) {
     if (sessionId) void queryClient.invalidateQueries({ queryKey: ["/api/agent/sessions"] });
   }, [sessionId]);
 
+  const rejecting = useRef(new Set<string>());
   const reject = useCallback(async (approvalId: string, tool: string) => {
+    if (rejecting.current.has(approvalId)) return; // a second click while the first is on its way
+    rejecting.current.add(approvalId);
+    let status: number | null = null;
     try {
-      await apiRequest("POST", `/api/agent/approvals/${approvalId}/reject`);
-      trackEvent("agent_approval_rejected", { tool });
-      setApproval(approvalId, { status: "declined" });
-    } catch {
-      setApproval(approvalId, { status: "expired", message: "That request isn't available any more." });
-    }
+      status = (await apiRequest("POST", `/api/agent/approvals/${approvalId}/reject`)).status;
+    } catch (e) {
+      const m = /^(\d{3}):/.exec(String((e as Error)?.message ?? "")); // the request helper's "404: …"; none for a network failure
+      status = m ? Number(m[1]) : null;
+    } finally { rejecting.current.delete(approvalId); }
+    // Only what the server confirmed: a network failure is not "expired", and nothing is assumed declined.
+    const outcome = rejectOutcome(status);
+    if (outcome === "declined") { trackEvent("agent_approval_rejected", { tool }); setApproval(approvalId, { status: "declined" }); }
+    else if (outcome === "expired") setApproval(approvalId, { status: "expired", message: "That request isn't available any more." });
+    else toast({ title: "Couldn't decline it", description: "Nothing was changed, and it still needs your decision. Try again.", variant: "destructive" });
   }, []);
 
   // ── conversations ────────────────────────────────────────────────────────

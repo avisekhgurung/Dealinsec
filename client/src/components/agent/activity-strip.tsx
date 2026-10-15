@@ -3,7 +3,9 @@
  * server emitted (see shared/agent.ts), so there is no step here that didn't
  * happen and no timer pretending to be progress.
  */
+import { AnimatePresence, motion } from "framer-motion";
 import { Check, Loader2, X } from "lucide-react";
+import { fadeUp } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { ActivityStep } from "@shared/agent";
 
@@ -12,18 +14,21 @@ export function ActivityStrip({ steps, onStop }: { steps: ActivityStep[]; onStop
   const shown = steps.slice(-5);
   return (
     <div className="rounded-2xl border border-border/70 bg-muted/30 px-3.5 py-3" role="status" aria-live="polite" data-testid="activity-strip">
+      {/* Each real step slides in as its event arrives; the oldest leave as the list stays at five. */}
       <ul className="space-y-1.5">
         {shown.length === 0 && (
           <li className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Getting started</li>
         )}
+        <AnimatePresence initial={false}>
         {shown.map((s) => (
-          <li key={s.id} className={cn("flex items-start gap-2 text-xs", s.state === "active" ? "font-medium text-foreground" : s.state === "failed" ? "text-rose-700 dark:text-rose-400" : "text-muted-foreground")}>
+          <motion.li key={s.id} layout="position" initial="hidden" animate="visible" exit="exit" variants={fadeUp} className={cn("flex items-start gap-2 text-xs", s.state === "active" ? "font-medium text-foreground" : s.state === "failed" ? "text-rose-700 dark:text-rose-400" : "text-muted-foreground")}>
             {s.state === "active" ? <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-emerald-600" />
               : s.state === "failed" ? <X className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               : <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />}
             <span className="min-w-0 break-words">{s.label}</span>
-          </li>
+          </motion.li>
         ))}
+        </AnimatePresence>
       </ul>
       {onStop && (
         <button type="button" onClick={onStop} className="mt-2.5 text-[11px] font-semibold text-muted-foreground underline-offset-2 hover:text-foreground hover:underline" data-testid="agent-stop-link">

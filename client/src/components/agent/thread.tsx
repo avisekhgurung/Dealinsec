@@ -1,3 +1,5 @@
+import { motion } from "framer-motion";
+import { fadeUp, useCalmMotion } from "@/lib/motion";
 import { useEffect, useRef } from "react";
 import { Bot, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,11 +34,22 @@ export function Thread({
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
 
-  // Follow the conversation, unless the person has scrolled up to read.
+  // Follow the conversation, unless the person has scrolled up to read. No smooth scroll for reduced motion.
+  const calm = useCalmMotion();
   useEffect(() => {
     const el = scroller.current;
-    if (el && stick.current) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages, steps, running]);
+    if (el && stick.current) el.scrollTo({ top: el.scrollHeight, behavior: calm ? "auto" : "smooth" });
+  }, [messages, steps, running, calm]);
+
+  // Only messages that arrive during the conversation animate in; a loaded history (many at once) appears as it is.
+  const seen = useRef<Set<string> | null>(null);
+  const fresh = new Set<string>();
+  if (seen.current) {
+    const added = messages.filter((m) => !seen.current!.has(m.key));
+    if (added.length <= 2) for (const m of added) fresh.add(m.key);
+  }
+  useEffect(() => { seen.current = new Set(messages.map((m) => m.key)); }, [messages]);
+  const enter = (key: string) => (fresh.has(key) ? { initial: "hidden" as const, animate: "visible" as const, variants: fadeUp } : {});
 
   return (
     <div
@@ -52,13 +65,13 @@ export function Thread({
         {header}
         {messages.map((m) =>
           m.role === "user" ? (
-            <div key={m.key} className="flex justify-end">
+            <motion.div key={m.key} className="flex justify-end" {...enter(m.key)}>
               <div className="max-w-[88%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-emerald-600 px-3.5 py-2.5 text-sm leading-relaxed text-white sm:max-w-[80%]" data-testid="user-message">
                 {m.content.length > 1400 ? `${m.content.slice(0, 1400)}…` : m.content}
               </div>
-            </div>
+            </motion.div>
           ) : (
-            <div key={m.key} className="flex items-start gap-2.5" data-testid="agent-message">
+            <motion.div key={m.key} className="flex items-start gap-2.5" data-testid="agent-message" {...enter(m.key)}>
               <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-600/10 text-emerald-700 dark:text-emerald-400" aria-hidden>
                 <Bot className="h-4 w-4" />
               </span>
@@ -78,7 +91,7 @@ export function Thread({
                 )}
                 {m.steps && <StepsSummary steps={m.steps} />}
               </div>
-            </div>
+            </motion.div>
           ),
         )}
         {running && (

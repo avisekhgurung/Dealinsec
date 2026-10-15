@@ -10,15 +10,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, History, LayoutDashboard, Phone, Plus, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, History, Phone, Plus, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { AgentConversation } from "@/components/agent/agent-conversation";
 import { BriefingStart } from "@/components/agent/briefing-start";
 import { AutonomyControl } from "@/components/agent/autonomy-control";
+import { ModeSwitcher } from "@/components/mode-switch";
+import { rememberConversation } from "@/lib/agent-session";
 import { HistoryList } from "@/components/agent/history-list";
 import { useAgent } from "@/hooks/use-agent";
 import { useMoney } from "@/hooks/use-locale";
-import { setUiMode, useUiMode } from "@/hooks/use-ui-mode";
+import { useUiMode } from "@/hooks/use-ui-mode";
 import { useSpeechOutput } from "@/hooks/use-voice";
 import { voiceCallSupported } from "@/hooks/use-voice-call";
 import { VoiceCall } from "@/components/agent/voice-call";
@@ -40,7 +42,6 @@ export default function AgentPage() {
   const { user } = useAuth();
   const [callOpen, setCallOpen] = useState(false);
   const canCall = voiceCallSupported();
-  const toDashboard = () => { setUiMode("app"); navigate("/dashboard"); };
 
   // Where the person was when they opened the agent (a deal, an invoice): it starts with that in mind.
   const [origin] = useState(() => peekAgentOrigin());
@@ -53,6 +54,8 @@ export default function AgentPage() {
     // The URL follows the conversation, so a reload or a shared tab reopens it.
     onSessionChange: (id) => navigate(id ? `/agent/${id}` : "/agent", { replace: true }),
   });
+  // The conversation on screen is the one "Back to chat" and the switcher reopen.
+  useEffect(() => { rememberConversation(user?.id, agent.sessionId); }, [user?.id, agent.sessionId]);
 
   const { data: status } = useQuery<AgentStatus>({ queryKey: ["/api/agent/status"], staleTime: 60_000 });
   const unavailable = status && !status.enabled
@@ -96,10 +99,8 @@ export default function AgentPage() {
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex shrink-0 items-center gap-2 border-b border-border/70 px-3 py-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] sm:px-5 lg:pt-2.5">
           {focus ? (
-            <button type="button" onClick={toDashboard} aria-label="Open the dashboard" data-testid="agent-to-dashboard"
-              className="flex h-9 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-semibold text-foreground/80 transition hover:bg-muted/60">
-              <LayoutDashboard className="h-4 w-4" /><span className="hidden sm:inline">Dashboard</span>
-            </button>
+            // Workspace | Agent: back to the screen you came from, with this conversation kept for later.
+            <ModeSwitcher labelsFrom="sm" />
           ) : (
             <Link href="/dashboard" aria-label="Back to the dashboard" className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted lg:hidden">
               <ArrowLeft className="h-5 w-5" />
@@ -110,7 +111,7 @@ export default function AgentPage() {
             <h1 className="truncate text-base font-bold leading-tight">DealInSec Agent</h1>
             <p className="hidden truncate text-xs text-muted-foreground sm:block">Your deals, handled in one conversation</p>
           </div>
-          {canCall && (
+          {canCall && !unavailable && (
             <button type="button" onClick={() => setCallOpen(true)} aria-label="Start a voice call" data-testid="agent-call"
               className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700">
               <Phone className="h-4 w-4" /><span className="hidden sm:inline">Call</span>
@@ -134,7 +135,7 @@ export default function AgentPage() {
         </header>
 
         <AgentConversation
-          agent={agent} disabledReason={unavailable} voiceLang={locale} onCall={canCall ? () => setCallOpen(true) : undefined}
+          agent={agent} disabledReason={unavailable} voiceLang={locale} onCall={canCall && !unavailable ? () => setCallOpen(true) : undefined}
           extraPrompts={ctx ? contextPrompts(ctx) : undefined}
           beforeEmpty={unavailable ? undefined : <BriefingStart onFollowUp={(n) => void agent.send(`Prepare a professional payment follow-up for invoice ${n}`)} />}
         />

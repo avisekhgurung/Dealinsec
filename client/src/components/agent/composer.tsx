@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowUp, Mic, Square } from "lucide-react";
 import { useSpeechInput } from "@/hooks/use-voice";
 import { cn } from "@/lib/utils";
+import { AnimatePresence, motion } from "framer-motion";
+import { DURATION } from "@/lib/motion";
+import { loadDraft, saveDraft } from "@/lib/agent-session";
 
 const MAX_LEN = 4000;
 
@@ -11,7 +14,7 @@ const MAX_LEN = 4000;
  * the send button becomes Stop. Text-base keeps iOS from zooming on focus.
  */
 export function Composer({
-  onSend, onStop, running, disabled, placeholder, autoFocus, seed, voiceLang,
+  onSend, onStop, running, disabled, placeholder, autoFocus, seed, voiceLang, draftFor,
 }: {
   onSend: (text: string) => void;
   onStop: () => void;
@@ -23,8 +26,18 @@ export function Composer({
   seed?: { text: string; n: number };
   /** BCP-47 language for dictation. When set (and the browser can do it) a microphone button appears. */
   voiceLang?: string;
+  /** The conversation this box belongs to: an unsent message is kept for it when the person switches screens or modes. */
+  draftFor?: string | null;
 }) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() => (draftFor !== undefined ? loadDraft(draftFor) : ""));
+  // Kept as it's typed; cleared when sent; never sent by itself. Opening another conversation shows that one's draft
+  // (the box's text must not follow the person into a different conversation).
+  const draftKey = useRef(draftFor);
+  useEffect(() => {
+    if (draftFor === undefined) return;
+    if (draftKey.current !== draftFor) { draftKey.current = draftFor; setText(loadDraft(draftFor)); return; }
+    saveDraft(draftFor, text);
+  }, [draftFor, text]);
   // Dictation fills the box; the person reads it and presses send themselves.
   const base = useRef("");
   const voice = useSpeechInput({ lang: voiceLang ?? "en-US", onTranscript: (t) => setText(`${base.current}${base.current && t ? " " : ""}${t}`.slice(0, MAX_LEN)) });
@@ -83,17 +96,22 @@ export function Composer({
           <Mic className="h-[18px] w-[18px]" />
         </button>
       )}
-      {running ? (
-        <button type="button" onClick={onStop} aria-label="Stop" data-testid="agent-stop"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-white transition hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900">
-          <Square className="h-3.5 w-3.5 fill-current" />
-        </button>
-      ) : (
-        <button type="submit" disabled={!canSend} aria-label="Send" data-testid="agent-send"
-          className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white transition", canSend ? "gradient-btn" : "bg-neutral-300 dark:bg-neutral-700")}>
-          <ArrowUp className="h-[18px] w-[18px]" />
-        </button>
-      )}
+      {/* Send becomes Stop while the agent works: a quick cross-fade so the change is noticed, never a delay. */}
+      <AnimatePresence mode="popLayout" initial={false}>
+        {running ? (
+          <motion.button key="stop" type="button" onClick={onStop} aria-label="Stop" data-testid="agent-stop"
+            initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }} transition={{ duration: DURATION.fast }}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-white transition-colors hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900">
+            <Square className="h-3.5 w-3.5 fill-current" />
+          </motion.button>
+        ) : (
+          <motion.button key="send" type="submit" disabled={!canSend} aria-label="Send" data-testid="agent-send"
+            initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }} transition={{ duration: DURATION.fast }}
+            className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white transition-colors", canSend ? "gradient-btn" : "bg-neutral-300 dark:bg-neutral-700")}>
+            <ArrowUp className="h-[18px] w-[18px]" />
+          </motion.button>
+        )}
+      </AnimatePresence>
       {voice.error && <p role="alert" className="sr-only">{voice.error}</p>}
     </form>
   );

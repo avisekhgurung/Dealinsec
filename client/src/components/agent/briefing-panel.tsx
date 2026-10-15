@@ -3,7 +3,6 @@
  * best actions) computed server-side from real rows — the model never invents
  * a number here. Shown in the drawer before a conversation starts.
  */
-import { useEffect, useState } from "react";
 import { AlertTriangle, ArrowRight, Clock, Loader2, Receipt, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -20,27 +19,24 @@ export interface Briefing {
   nextActions: { dealId: number; dealTitle: string; brandName: string; action: string; route: string; urgency: "red" | "yellow" | "green" }[];
 }
 
-const LOADING_STAGES = [
-  "Reviewing your active deals…",
-  "Checking payment status…",
-  "Totalling what's collectible…",
-];
 
 function greeting(): string {
   const h = new Date().getHours();
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 }
 
-/** Rotating staged loading line while the briefing is computed. */
+/**
+ * While the briefing is computed: its shape, and one honest line. (It used to rotate "Reviewing your deals…",
+ * "Checking payments…" on a timer, which claimed steps nobody was reporting.)
+ */
 function StagedLoading() {
-  const [i, setI] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setI((x) => (x + 1) % LOADING_STAGES.length), 900);
-    return () => clearInterval(id);
-  }, []);
   return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground py-6 justify-center">
-      <Loader2 className="w-3.5 h-3.5 animate-spin" /> {LOADING_STAGES[i]}
+    <div className="space-y-3 py-4" role="status" aria-live="polite" data-testid="briefing-loading">
+      <p className="flex items-center justify-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />Preparing your briefing…</p>
+      <div className="grid grid-cols-3 gap-2" aria-hidden="true">
+        {[0, 1, 2].map((i) => <div key={i} className="h-14 animate-pulse rounded-xl bg-muted" />)}
+      </div>
+      <div className="h-4 w-2/3 animate-pulse rounded bg-muted" aria-hidden="true" />
     </div>
   );
 }

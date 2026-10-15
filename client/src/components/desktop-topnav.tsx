@@ -16,6 +16,7 @@
  */
 import { motion } from "framer-motion";
 import { tSpring } from "@/lib/motion";
+import { ModeSwitcher } from "@/components/mode-switch";
 import { Fragment, useEffect, useReducer } from "react";
 import { useLocation, Link } from "wouter";
 import { Settings, LogOut, Sparkles, Crown, Users, Zap } from "lucide-react";
@@ -250,6 +251,7 @@ export function DesktopTopNav() {
 
           {/* ── Account ── */}
           <div className="ml-auto flex shrink-0 items-center gap-1.5 xl:gap-2 pl-3">
+            <ModeSwitcher tone="dark" labelsFrom="xl" />
             {planChip()}
 
             <span aria-hidden="true" className="mx-1 h-6 w-px bg-white/15" />
