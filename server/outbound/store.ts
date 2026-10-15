@@ -19,6 +19,7 @@ export const prospectsTablesReady = tablesReadyCheck(["prospect_runs", "prospect
 /** A run as its worker claimed it. `fence` is the claim number: every fenced write must still match it, so a worker whose lease was taken over can no longer change the run. It is kept apart from `attempts` on purpose (a refreshed row would otherwise adopt the new holder's value). */
 export type ClaimedRun = ProspectRunRow & { fence: number };
 
+
 export class RunActive extends Error { constructor(public runId: string) { super("a run with this ICP is already in progress"); } }
 
 export interface NewRun {
@@ -37,6 +38,8 @@ export interface OutboundStore {
   createRun(r: NewRun): Promise<ProspectRunRow>; // throws RunActive (the same ICP is already running)
   getRun(orgId: string, id: string): Promise<ProspectRunRow | null>;
   listRuns(orgId: string, limit: number): Promise<ProspectRunRow[]>;
+  /** Runs started since `since`, newest first, at most `limit` (the usage view's rolling window). */
+  listRunsSince(orgId: string, since: Date, limit: number): Promise<ProspectRunRow[]>;
   countRunsSince(orgId: string, since: Date): Promise<number>;
   /** One atomic claim of a running run whose lease is free (or expired). */
   claimRun(now: Date, leaseMs: number): Promise<ClaimedRun | null>;
@@ -125,8 +128,14 @@ export const outboundStore: OutboundStore = {
   async listRuns(orgId, limit) {
     return db.select().from(prospectRuns).where(eq(prospectRuns.organizationId, orgId)).orderBy(desc(prospectRuns.createdAt)).limit(limit);
   },
+  async listRunsSince(orgId, since, limit) {
+    return db.select().from(prospectRuns).where(and(eq(prospectRuns.organizationId, orgId), gte(prospectRuns.createdAt, since))).orderBy(desc(prospectRuns.createdAt)).limit(limit);
+  },
   async countRunsSince(orgId, since) {
-    const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(prospectRuns).where(and(eq(prospectRuns.organizationId, orgId), gte(prospectRuns.createdAt, since)));
+    // runCountsTowardLimit (shared/outbound-usage.ts), in SQL: a finished run that made no web search doesn't count.
+    const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(prospectRuns).where(and(
+      eq(prospectRuns.organizationId, orgId), gte(prospectRuns.createdAt, since),
+      sql`(${prospectRuns.status} = 'running' OR COALESCE((${prospectRuns.counters}->>'searched')::int, 0) > 0)`));
     return r?.n ?? 0;
   },
   async claimRun(now, leaseMs) {

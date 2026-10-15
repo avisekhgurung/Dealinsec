@@ -5,6 +5,7 @@
  *   POST /api/outbound/icp                       read a sentence into a structured ICP (the person confirms it)
  *   POST /api/outbound/runs                      start a discovery run (or get the one already running for that ICP)
  *   GET  /api/outbound/runs                      recent runs
+ *   GET  /api/outbound/usage                     this workspace's allowances and the platform's state, before a search
  *   GET  /api/outbound/runs/:id                  a run's funnel and its prospect cards
  *   POST /api/outbound/runs/:id/cancel           stop a run
  *   GET  /api/outbound/prospects                 the workspace table: one page of the organization's prospects (filters, sort, page in the query)
@@ -22,6 +23,7 @@ import { agentLog } from "../agent/log";
 import * as svc from "./service";
 import { exportProspects, listWorkspace } from "./workspace";
 import { prepareOutreach } from "./outreach-prepare";
+import { outboundUsage } from "./usage";
 
 export function registerOutboundRoutes(app: Express) {
   const send = (res: Response, r: any, ok: (r: any) => Record<string, unknown>, status = 200) => {
@@ -43,6 +45,7 @@ export function registerOutboundRoutes(app: Express) {
 
   app.post("/api/outbound/icp", isAuthenticated, guarded("outbound_icp", async (req, res) => send(res, await svc.parseIcp(req.user, req.body?.request), (r) => ({ icp: r.icp, searches: r.searches, description: r.description, source: r.source }))));
   app.post("/api/outbound/runs", isAuthenticated, guarded("outbound_start", async (req, res) => send(res, await svc.startRun(req.user, { request: req.body?.request, icp: req.body?.icp, searches: req.body?.searches }), (r) => ({ run: r.run, existing: r.existing }), 201)));
+  app.get("/api/outbound/usage", isAuthenticated, guarded("outbound_usage", async (req, res) => { res.setHeader("Cache-Control", "no-store"); send(res, await outboundUsage(req.user), (r) => ({ usage: r.usage })); }));
   app.get("/api/outbound/runs", isAuthenticated, guarded("outbound_runs", async (req, res) => send(res, await svc.listRuns(req.user), (r) => ({ runs: r.runs }))));
   app.get("/api/outbound/runs/:id", isAuthenticated, guarded("outbound_run", async (req, res) => send(res, await svc.getRun(req.user, String(req.params.id).slice(0, 40)), (r) => ({ run: r.run, prospects: r.prospects }))));
   app.post("/api/outbound/runs/:id/cancel", isAuthenticated, guarded("outbound_cancel", async (req, res) => send(res, await svc.cancelRun(req.user, String(req.params.id).slice(0, 40)), (r) => ({ run: r.run }))));

@@ -13,6 +13,7 @@
  * before each run. Test-only: never imported by server code.
  */
 import type { World } from "./world";
+import { runCountsTowardLimit } from "@shared/outbound-usage";
 
 const world = () => (globalThis as any).__world as World;
 
@@ -285,7 +286,8 @@ export const outboundStoreMock = () => {
       },
       async getRun(orgId: string, id: string) { return copy(o().runs.find((x) => x.organizationId === orgId && x.id === id) ?? null); },
       async listRuns(orgId: string, limit: number) { return o().runs.filter((x) => x.organizationId === orgId).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit).map(copy); },
-      async countRunsSince(orgId: string, since: Date) { return o().runs.filter((x) => x.organizationId === orgId && x.createdAt >= since).length; },
+      async countRunsSince(orgId: string, since: Date) { return o().runs.filter((x) => x.organizationId === orgId && x.createdAt >= since && runCountsTowardLimit(x as any)).length; },
+      async listRunsSince(orgId: string, since: Date, limit: number) { return o().runs.filter((x) => x.organizationId === orgId && x.createdAt >= since).sort((a, b) => +b.createdAt - +a.createdAt).slice(0, limit) as any; },
       async claimRun(now: Date, leaseMs: number) {
         const r = o().runs.filter((x) => x.status === "running" && (!x.leaseUntil || x.leaseUntil < now)).sort((a, b) => a.updatedAt - b.updatedAt)[0];
         if (!r) return null;

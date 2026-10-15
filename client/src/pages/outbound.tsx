@@ -13,6 +13,8 @@ import { ProspectBrief } from "@/components/outbound/prospect-brief";
 import { ProspectCard } from "@/components/outbound/prospect-card";
 import { ProspectWorkspace } from "@/components/outbound/prospect-workspace";
 import { OutreachQueue } from "@/components/outbound/outreach-queue";
+import { OUTBOUND_USAGE_URL, UsageNote, searchBlockedReason, useOutboundUsage } from "@/components/outbound/usage-note";
+import { LoadError } from "@/components/load-error";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -68,6 +70,7 @@ function RunPanel({ id, canEdit, onOpen }: { id: string; canEdit: boolean; onOpe
     const ps = data?.prospects ?? [];
     return [ps.filter((p) => !p.rejectReason), ps.filter((p) => p.rejectReason)] as const;
   }, [data]);
+  if (!data && q.isError) return <Card className="glass-card"><CardContent className="p-0"><LoadError compact what="this search" onRetry={() => void q.refetch()} retrying={q.isFetching} /></CardContent></Card>;
   if (!data) return <div className="space-y-3">{[0, 1].map((i) => <Skeleton key={i} className="h-40 w-full rounded-2xl" />)}</div>;
   const run = data.run;
   const running = run.status === "running";
@@ -79,7 +82,7 @@ function RunPanel({ id, canEdit, onOpen }: { id: string; canEdit: boolean; onOpe
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Search</p>
             <p className="break-words text-sm font-semibold">{run.description}</p>
             <p className={cn("mt-1 flex items-center gap-1.5 text-sm", running ? "" : "text-muted-foreground")} data-testid="run-status">
-              {running ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />{RUN_STAGE_LABEL[run.stage] ?? "Working"}…</> : run.status === "done" ? <><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />Done · ${run.costUsd.toFixed(2)} of AI and data</> : run.status === "cancelled" ? "Stopped" : "Couldn't finish"}
+              {running ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />{RUN_STAGE_LABEL[run.stage] ?? "Working"}…</> : run.status === "done" ? <><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />Done · included in your plan</> : run.status === "cancelled" ? "Stopped" : "Couldn't finish"}
             </p>
             {run.errorCode && RUN_ERROR[run.errorCode] && <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">{RUN_ERROR[run.errorCode]}</p>}
           </div>
@@ -133,14 +136,17 @@ export default function OutboundPage() {
   });
   const start = useMutation({
     mutationFn: () => leadCall<{ run: RunView; existing: boolean }>("POST", OUTBOUND_RUNS_URL, { request: text, icp: parsed!.icp, searches: parsed!.searches }),
-    onSuccess: (r) => { setRunId(r.run.id); setParsed(null); setText(""); if (view === "prospects") setView("searches"); if (r.existing) toast({ title: "That search is already running" }); void queryClient.invalidateQueries({ queryKey: [OUTBOUND_RUNS_URL] }); },
-    onError: (e) => toast({ title: "Couldn't start the search", description: leadError(e), variant: "destructive" }),
+    onSuccess: (r) => { setRunId(r.run.id); setParsed(null); setText(""); if (view === "prospects") setView("searches"); if (r.existing) toast({ title: "That search is already running" }); void queryClient.invalidateQueries({ queryKey: [OUTBOUND_RUNS_URL] }); void queryClient.invalidateQueries({ queryKey: [OUTBOUND_USAGE_URL] }); },
+    // A refusal (a limit reached meanwhile) refreshes the allowance shown, so the page and the server agree again.
+    onError: (e) => { toast({ title: "Couldn't start the search", description: leadError(e), variant: "destructive" }); void queryClient.invalidateQueries({ queryKey: [OUTBOUND_USAGE_URL] }); },
   });
   const icp = parsed?.icp;
   const setQty = (n: number) => setParsed((p) => (p ? { ...p, icp: { ...p.icp, quantity: Math.max(1, Math.min(50, n || 1)) } } : p));
   const chip = (label: string, onRemove?: () => void) => <span key={label} className="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-1 text-xs">{label}{onRemove && <button onClick={onRemove} aria-label={`Remove ${label}`}><X className="h-3 w-3" /></button>}</span>;
 
   const off = notSetUp(runs.error);
+  const usage = useOutboundUsage(canEdit && !off);
+  const blocked = searchBlockedReason(usage.data?.usage);
 
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-12">
@@ -165,8 +171,9 @@ export default function OutboundPage() {
                 <Textarea id="outbound-request" value={text} onChange={(e) => { setText(e.target.value); setParsed(null); }} rows={2} maxLength={500}
                   placeholder="US SEO agencies with 5–30 employees serving SaaS companies" disabled={parse.isPending || start.isPending} data-testid="outbound-input" />
                 {!text && <div className="flex flex-wrap gap-2">{EXAMPLES.map((x) => <button key={x} onClick={() => setText(x)} className="rounded-full border px-3 py-1 text-left text-xs text-muted-foreground hover:bg-muted">{x}</button>)}</div>}
+                <UsageNote usage={usage.data?.usage} />
                 {!parsed ? (
-                  <Button onClick={() => parse.mutate()} disabled={text.trim().length < 3 || parse.isPending} className="gradient-btn text-white" data-testid="outbound-find">
+                  <Button onClick={() => parse.mutate()} disabled={text.trim().length < 3 || parse.isPending || !!blocked} className="gradient-btn text-white" data-testid="outbound-find">
                     {parse.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Search className="mr-1.5 h-4 w-4" />}Find prospects
                   </Button>
                 ) : icp && (
@@ -183,7 +190,7 @@ export default function OutboundPage() {
                     <p className="text-xs text-muted-foreground">Reaching: {icp.roles.slice(0, 4).join(", ") || "decision makers"} · {parsed.searches.length} searches planned{parsed.source === "rules" ? " · read by simple rules (the AI was unavailable)" : ""}</p>
                     <div className="flex flex-wrap items-center gap-3">
                       <label className="flex items-center gap-2 text-sm">How many <input type="number" min={1} max={50} value={icp.quantity} onChange={(e) => setQty(Number(e.target.value))} className="w-16 rounded-md border bg-background px-2 py-1 text-sm" data-testid="outbound-quantity" /></label>
-                      <Button onClick={() => start.mutate()} disabled={start.isPending} className="gradient-btn text-white" data-testid="outbound-start">{start.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-1.5 h-4 w-4" />}Start search</Button>
+                      <Button onClick={() => start.mutate()} disabled={start.isPending || !!blocked} className="gradient-btn text-white" data-testid="outbound-start">{start.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-1.5 h-4 w-4" />}Start search</Button>
                       <Button variant="ghost" onClick={() => setParsed(null)}>Change</Button>
                     </div>
                   </div>
@@ -210,6 +217,7 @@ export default function OutboundPage() {
 
             {runId ? <RunPanel key={runId} id={runId} canEdit={canEdit} onOpen={(p) => setOpen({ id: p.id, runId })} />
               : runs.isLoading ? <Skeleton className="h-40 w-full rounded-2xl" />
+              : runs.isError && !runs.data ? <Card className="glass-card"><CardContent className="p-0"><LoadError what="your searches" onRetry={() => void runs.refetch()} retrying={runs.isFetching} /></CardContent></Card>
               : <p className="rounded-2xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">Your searches will show up here, with who to contact and why now.</p>}
             </>}
           </>
