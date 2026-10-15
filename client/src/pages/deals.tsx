@@ -294,6 +294,8 @@ export default function DealsPage() {
                   ],
                 }]}
                 onRowClick={(deal) => setLocation(`/deals/${deal.id}`)}
+                rowHref={(deal) => `/deals/${deal.id}`}
+                rowLabel={(deal) => `Deal: ${deal.dealTitle}, ${deal.brandName}`}
                 exportFileName="deals"
                 onImportClick={canCreateDeal ? () => setLocation("/deals/import") : undefined}
                 toolbarExtra={<DateRangeFilter value={dateRange} onChange={setDateRange} />}

@@ -242,6 +242,8 @@ export default function BillingPage() {
                   ],
                 }]}
                 onRowClick={(inv) => setLocation(`/brand-invoices/${inv.id}`)}
+                rowHref={(inv) => `/brand-invoices/${inv.id}`}
+                rowLabel={(inv) => `Invoice ${inv.invoiceNumber}, ${inv.brandName}`}
                 exportFileName="invoices"
                 emptyMessage="No invoices match your filters."
               />

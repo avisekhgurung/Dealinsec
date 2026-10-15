@@ -20,6 +20,7 @@ import { audienceForDealType, defaultExclusive } from "@shared/audience";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { parseApiError, isUpgradeError, currencyChangedToast } from "@/lib/api-error";
 import { taxIdLabel } from "@shared/invoice-tax";
+import { DURATION, useCalmMotion } from "@/lib/motion";
 
 type Phase = "reserving" | "creating" | "done";
 
@@ -39,6 +40,7 @@ export default function ContractConfirmationPage() {
   const signatureInputRef = useRef<HTMLInputElement>(null);
   const [overlayPhase, setOverlayPhase] = useState<Phase>("reserving");
   const [showOverlay, setShowOverlay] = useState(false);
+  const calm = useCalmMotion();
   const [contractId, setContractId] = useState<number | null>(null);
 
   // Terms & Conditions — seeded from the deal, editable before the agreement is
@@ -164,9 +166,6 @@ export default function ContractConfirmationPage() {
         console.warn("Failed to save agreement terms to deal (continuing):", err);
       }
 
-      // Brief pause so user sees the "Reserving" phase
-      await new Promise(r => setTimeout(r, 900));
-
       // Phase 2: creating agreement
       setOverlayPhase("creating");
 
@@ -231,16 +230,18 @@ export default function ContractConfirmationPage() {
     },
   });
 
-  // Auto-navigate after "done" phase is shown for ~1.5s
+  // Open the new agreement as soon as the server has confirmed it. The "done"
+  // state gets one short beat to register (none at all for reduced motion);
+  // nobody waits on an animation for work that is already finished.
   useEffect(() => {
     if (overlayPhase === "done" && contractId !== null) {
       const t = setTimeout(() => {
         setShowOverlay(false);
-        setTimeout(() => setLocation(`/contracts/${contractId}`), 300);
-      }, 1600);
+        setLocation(`/contracts/${contractId}`);
+      }, calm ? 0 : DURATION.slow * 1000);
       return () => clearTimeout(t);
     }
-  }, [overlayPhase, contractId]);
+  }, [overlayPhase, contractId, calm]);
 
   // The consent line names exclusivity only when this agreement has it.
   const exclusiveDeal = deal ? defaultExclusive(deal.dealType, deal.brandTerms) : true;

@@ -36,6 +36,8 @@ import {
   detectPaymentConflicts, deriveSchedule, validateDocData,
 } from "@/components/document/checks";
 import { DocLocalePending } from "@/components/document/locale-pending";
+import { DetailSkeleton, DetailUnavailable } from "@/components/document/detail-states";
+import { httpErrorKind } from "@shared/http-error-kind";
 import { QuoteSharePanel } from "@/components/quote-share-panel";
 import { formatTaxRegistration, invoiceTaxProfile, taxRegistrations } from "@shared/invoice-tax";
 
@@ -59,16 +61,20 @@ export default function QuotePreviewPage() {
   const fmt = useMoney();
   const loc = fmt.settings;
 
-  const { data: deal, isLoading: dealLoading } = useQuery<Deal>({
+  const { data: deal, isLoading: dealLoading, isError: dealError, error: dealErr, refetch: refetchDeal, isFetching: dealFetching } = useQuery<Deal>({
     queryKey: ["/api/deals", params.id],
   });
   const dLabels = getDeliverableLabels(deal?.dealType);
 
-  const { data: quote } = useQuery<Quote | null>({
+  const { data: quote, isLoading: quoteLoading, isError: quoteError, refetch: refetchQuote, isFetching: quoteFetching } = useQuery<Quote | null>({
     queryKey: ["/api/deals", params.id, "quote"],
     queryFn: async () => {
       const res = await fetch(`/api/deals/${params.id}/quote`, { credentials: "include", headers: { "X-DealInSec-Money": "minor" } });
-      if (!res.ok) return null;
+      // 404 is "no quote row yet" (the legacy number below). Anything else is a
+      // failure: printing the fallback number then would put a wrong number
+      // on a document the client receives.
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`${res.status}: ${await res.text().catch(() => "")}`);
       return res.json();
     },
   });
@@ -314,19 +320,40 @@ export default function QuotePreviewPage() {
   if (!dealLoading && deal && !fmt.ready) {
     return <DocLocalePending failed={fmt.failed} onRetry={fmt.retry} />;
   }
-  if (dealLoading) {
-    return (
-      <div className="min-h-screen bg-background pb-20 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-      </div>
-    );
-  }
-  if (!deal) {
+  if (dealLoading || !deal || quoteLoading || quoteError) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <main className="px-4 py-12 text-center">
-          <p className="text-muted-foreground">Deal not found</p>
-          <Link href="/deals"><Button variant="outline" className="mt-4">Back to Deals</Button></Link>
+        <header className="glass-header sticky top-0 z-40 print:hidden">
+          <div className="flex items-center gap-3 px-4 py-4">
+            <Link href={`/deals/${params.id}`}>
+              <Button variant="ghost" size="icon" aria-label="Back to the deal"><ArrowLeft className="w-5 h-5" /></Button>
+            </Link>
+            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Quote Preview</h1>
+          </div>
+        </header>
+        <main className="px-4 py-4 lg:max-w-4xl lg:mx-auto lg:px-8 lg:py-6">
+          {dealLoading || (deal && quoteLoading) ? (
+            <DetailSkeleton what="quotation" layout="document" />
+          ) : deal ? (
+            <DetailUnavailable
+              kind="failed"
+              what="quotation"
+              backHref={`/deals/${params.id}`}
+              backLabel="Back to the deal"
+              onRetry={() => refetchQuote()}
+              retrying={quoteFetching}
+            />
+          ) : (
+            <DetailUnavailable
+              // The quotation is read through its deal: no deal, no quotation.
+              kind={dealError ? httpErrorKind(dealErr) : "not_found"}
+              what="quotation"
+              backHref="/deals"
+              backLabel="Back to Deals"
+              onRetry={() => refetchDeal()}
+              retrying={dealFetching}
+            />
+          )}
         </main>
         <BottomNav />
       </div>

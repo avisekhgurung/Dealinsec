@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useIssuer } from "@/hooks/useIssuer";
@@ -24,6 +23,8 @@ import {
 } from "@/components/document/primitives";
 import { validateDocData } from "@/components/document/checks";
 import { DocLocalePending } from "@/components/document/locale-pending";
+import { DetailSkeleton, DetailUnavailable } from "@/components/document/detail-states";
+import { httpErrorKind } from "@shared/http-error-kind";
 import { recordNo } from "@shared/schema";
 import {
   bankRoutingLabel, formatTaxRegistration, invoiceTaxProfile, invoiceTaxTotalMinor, readInvoiceTaxLines, taxLineLabel,
@@ -50,7 +51,7 @@ export default function BrandInvoiceDetailsPage() {
   const fmt = useMoney();
   const canRecordPayment = memberCan(user as any, "payments.manage");
 
-  const { data: invoice, isLoading } = useQuery<BrandInvoice>({
+  const { data: invoice, isLoading, isError, error, refetch, isFetching } = useQuery<BrandInvoice>({
     queryKey: ["/api/brand-invoices", id],
   });
   // ...in the currency STAMPED on the invoice when it was issued, not the org's
@@ -139,36 +140,32 @@ export default function BrandInvoiceDetailsPage() {
     return () => { document.title = previous; };
   }, [invoice]);
 
-  /* ── Loading ────────────────────────────────────── */
-  if (isLoading) {
+  /* ── Loading · not found · no access · failed ──── */
+  if (isLoading || !invoice) {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="glass-header sticky top-0 z-40 print:hidden">
           <div className="flex items-center gap-3 px-4 py-4 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-3.5">
-            <Skeleton className="h-9 w-9" />
-            <Skeleton className="h-6 w-32" />
-          </div>
-        </header>
-        <div className="px-4 py-6 space-y-4">
-          <Skeleton className="h-48 w-full rounded-xl" />
-          <Skeleton className="h-32 w-full rounded-xl" />
-        </div>
-      </div>
-    );
-  }
-
-  /* ── Not found ──────────────────────────────────── */
-  if (!invoice) {
-    return (
-      <div className="min-h-screen bg-background pb-20">
-        <header className="glass-header sticky top-0 z-40 print:hidden">
-          <div className="flex items-center gap-3 px-4 py-4 lg:max-w-6xl lg:mx-auto lg:px-8 lg:py-3.5">
-            <Button variant="ghost" size="icon" onClick={() => setLocation("/invoices")}>
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/invoices")} aria-label="Back to invoices">
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Invoice Not Found</h1>
+            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Invoice</h1>
           </div>
         </header>
+        <main className="px-4 py-6 max-w-2xl lg:max-w-4xl mx-auto">
+          {isLoading ? (
+            <DetailSkeleton what="invoice" layout="document" stepper={false} />
+          ) : (
+            <DetailUnavailable
+              kind={isError ? httpErrorKind(error) : "not_found"}
+              what="invoice"
+              backHref="/invoices"
+              backLabel="Back to Invoices"
+              onRetry={() => refetch()}
+              retrying={isFetching}
+            />
+          )}
+        </main>
         <BottomNav />
       </div>
     );

@@ -8,7 +8,7 @@
  */
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Check, Download, FileSignature, Loader2, ShieldCheck } from "lucide-react";
+import { Check, Download, FileSignature, Loader2, RotateCw, ShieldCheck } from "lucide-react";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { trackEvent } from "@/lib/analytics";
 import { SignatureInput } from "@/components/signature-input";
@@ -16,6 +16,7 @@ import { PublicDocFooter } from "@/components/public-doc-footer";
 import { PublicAgreementDoc, type PublicAgreementSnapshot } from "@/components/document/public-agreement-doc";
 import { notADscPhrase } from "@shared/agreementClauses";
 import { audienceForDealType } from "@shared/audience";
+import { httpErrorStatus } from "@shared/http-error-kind";
 
 /** Everything the compact summary cards read, plus everything
  *  PublicAgreementDoc needs to render the full official document — one
@@ -43,7 +44,7 @@ export default function PublicSignPage() {
   const [agree, setAgree] = useState(false);
   const [justSigned, setJustSigned] = useState(false);
 
-  const { data, isLoading, isError, refetch } = useQuery<{
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery<{
     snapshot: Snapshot;
     signed: boolean;
     signedAt: string | null;
@@ -58,7 +59,9 @@ export default function PublicSignPage() {
     queryKey: ["/api/public/agreements", token],
     queryFn: async () => {
       const res = await fetch(`/api/public/agreements/${token}`);
-      if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || "Not found");
+      // "STATUS: body", like the app's own queries, so the screen can tell a
+      // dead link (404) from a rate limit (429) from a failure to load.
+      if (!res.ok) throw new Error(`${res.status}: ${await res.text().catch(() => "")}`);
       return res.json();
     },
     retry: false,
@@ -94,13 +97,46 @@ export default function PublicSignPage() {
   }
 
   if (isError || !data) {
+    // Three different situations, three different next steps. Only a 404 means
+    // the link itself is gone; a rate limit or an outage says nothing about it.
+    const status = isError ? httpErrorStatus(error) : 404;
+    const copy =
+      status === 404
+        ? {
+            title: "This signing link isn't available",
+            body: "It may have been revoked, or the agreement may already be signed another way. Ask the sender for a new link.",
+            retry: false,
+          }
+        : status === 429
+        ? {
+            title: "Too many attempts",
+            body: "Wait a minute, then reload this page. Nothing was signed.",
+            retry: true,
+          }
+        : {
+            title: "Couldn't load this agreement right now",
+            body: "Nothing was signed. Check your connection, then try again.",
+            retry: true,
+          };
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-neutral-50 dark:bg-neutral-950 px-4 text-center">
         <DealinsecLogo size="md" withText />
-        <p className="text-lg font-semibold mt-2">This signing link isn&apos;t available</p>
-        <p className="text-sm text-neutral-500 max-w-sm">
-          It may have been revoked, or the agreement may already be signed another way. Ask the sender for a fresh link.
-        </p>
+        <div role="alert" className="space-y-1 mt-2" data-testid={`public-sign-error-${status === 404 ? "unavailable" : status === 429 ? "rate-limited" : "failed"}`}>
+          <p className="text-lg font-semibold">{copy.title}</p>
+          <p className="text-sm text-neutral-500 max-w-sm">{copy.body}</p>
+        </div>
+        {copy.retry && (
+          <button
+            type="button"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            data-testid="button-public-sign-retry"
+            className="mt-1 h-10 px-4 rounded-md border border-neutral-300 dark:border-neutral-700 text-sm font-semibold inline-flex items-center gap-2 hover:bg-white dark:hover:bg-neutral-900 transition-colors disabled:opacity-50"
+          >
+            {isFetching ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCw className="w-4 h-4" />}
+            {status === 429 ? "Reload" : "Try again"}
+          </button>
+        )}
         <PublicDocFooter />
       </div>
     );

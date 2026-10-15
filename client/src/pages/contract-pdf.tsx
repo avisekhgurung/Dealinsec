@@ -166,7 +166,8 @@ export default function ContractPdfPage() {
           brand={signerLabel !== "—" ? signerLabel : undefined}
           docType="Agreement"
           docNo={agreementNo}
-          status={c.status === "Signed" ? "Signed" : "Pending"}
+          // A Draft has not been sent to anyone, so it must not print as "Pending".
+          status={c.status === "Signed" ? "Signed" : c.status === "Draft" ? "Draft" : "Pending"}
           meta={[
             { label: "Effective", value: docDate(c.startDate, loc) },
             { label: "Ends", value: docDate(c.endDate, loc) },

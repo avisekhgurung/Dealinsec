@@ -6,6 +6,7 @@ import {
   Shield,
   CreditCard,
   AlertCircle,
+  FilePen,
 } from "lucide-react";
 
 type StatusType = "Pending" | "Active" | "Completed" | "Signed" | "Paid" | "Unpaid" | "Draft" | "Sent" | "Due soon" | "Overdue";
@@ -55,7 +56,8 @@ const statusConfig: Record<StatusType, { style: string; icon: React.ElementType;
   },
   Draft: {
     style: "bg-slate-50 text-slate-600 border border-slate-200 dark:bg-slate-900/20 dark:text-slate-400 dark:border-slate-700/50",
-    icon: Clock,
+    // Its own icon: Draft and Pending must not differ by colour alone.
+    icon: FilePen,
     dot: "bg-slate-400",
   },
   Sent: {

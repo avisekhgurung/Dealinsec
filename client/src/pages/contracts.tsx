@@ -22,8 +22,14 @@ import { LoadError } from "@/components/load-error";
 import { FileText, Calendar, Shield, ChevronRight, FileCheck, Search, X, Plus } from "lucide-react";
 import type { Contract, Deal } from "@shared/schema";
 import { useAudience } from "@/hooks/use-audience";
+import type { AgreementStatus } from "@shared/agreement-lifecycle";
 
-type FilterType = "all" | "active" | "completed";
+type FilterType = "all" | "draft" | "pending" | "active" | "completed";
+
+// The lifecycle's own states first (Draft → Pending → Signed, shared/agreement-lifecycle.ts),
+// then the statuses older rows may still carry.
+const LIFECYCLE_STATUSES: AgreementStatus[] = ["Draft", "Pending", "Signed"];
+const STATUS_FILTER_OPTIONS = [...LIFECYCLE_STATUSES, "Active", "Completed"].map((s) => ({ label: s, value: s }));
 
 const fmtDate = (s: string, locale: string) =>
   new Date(s).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" });
@@ -122,6 +128,8 @@ export default function ContractsPage() {
   const filteredContracts = useMemo(() => {
     return contracts.filter((contract) => {
       if (!inRange(contract.startDate, dateRange)) return false;
+      if (filter === "draft" && contract.status !== "Draft") return false;
+      if (filter === "pending" && contract.status !== "Pending") return false;
       if (filter === "active" && contract.status !== "Active" && contract.status !== "Signed") return false;
       if (filter === "completed" && contract.status !== "Completed") return false;
       if (search.trim()) {
@@ -139,6 +147,8 @@ export default function ContractsPage() {
 
   const filters: { value: FilterType; label: string }[] = [
     { value: "all", label: "All" },
+    { value: "draft", label: "Draft" },
+    { value: "pending", label: "Pending" },
     { value: "active", label: "Active" },
     { value: "completed", label: "Completed" },
   ];
@@ -222,13 +232,11 @@ export default function ContractsPage() {
                 facetedFilters={[{
                   columnId: "status",
                   title: "Status",
-                  options: [
-                    { label: "Signed", value: "Signed" },
-                    { label: "Active", value: "Active" },
-                    { label: "Completed", value: "Completed" },
-                  ],
+                  options: STATUS_FILTER_OPTIONS,
                 }]}
                 onRowClick={(c) => setLocation(`/contracts/${c.id}`)}
+                rowHref={(c) => `/contracts/${c.id}`}
+                rowLabel={(c) => `Agreement ${recordNo("agreement", c.id)}: ${c.contractName}, ${c.brandName}`}
                 exportFileName="agreements"
                 emptyMessage="No agreements match your filters."
               />

@@ -201,6 +201,8 @@ export default function QuotationsPage() {
               searchPlaceholder="Search quotations..."
               searchKeys={["clientName", "dealName", "quoteNo"]}
               onRowClick={(r) => setLocation(r.deal ? `/deals/${r.deal.id}/quote` : "/deals")}
+              rowHref={(r) => (r.deal ? `/deals/${r.deal.id}/quote` : null)}
+              rowLabel={(r) => `Quotation ${r.quoteNo}${r.clientName ? `, ${r.clientName}` : ""}`}
               exportFileName="quotations"
               toolbarExtra={<DateRangeFilter value={dateRange} onChange={setDateRange} />}
               emptyMessage="No quotations match your filters."

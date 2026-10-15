@@ -58,6 +58,8 @@ export function RowActions({ viewHref, deal }: { viewHref?: string; deal?: Deal 
           <Tooltip>
             <TooltipTrigger asChild>
               <span
+                // Not a way into the deal: the row's own click must not fire from the lock.
+                onClick={(e) => e.stopPropagation()}
                 className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground/40 cursor-not-allowed"
                 aria-label="Locked — this deal has moved past Pending"
               >

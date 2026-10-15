@@ -5,6 +5,7 @@ import {
   type ColumnFiltersState,
   type VisibilityState,
   type RowData,
+  type Row,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -62,6 +63,12 @@ interface DataTableProps<TData> {
   searchKeys?: (keyof TData)[];
   facetedFilters?: FacetedFilter[];
   onRowClick?: (row: TData) => void;
+  /** Where a row leads. With it, ctrl/cmd-click, middle-click and ctrl/cmd+Enter
+   *  open the row in a new tab; a plain click still goes through onRowClick. */
+  rowHref?: (row: TData) => string | null | undefined;
+  /** What a screen reader announces for a clickable row. Defaults to the first
+   *  data column's text. */
+  rowLabel?: (row: TData) => string;
   exportFileName?: string;
   /** Enables the Import button; receives parsed CSV rows. */
   onImport?: (rows: Record<string, string>[]) => void | Promise<void>;
@@ -107,6 +114,8 @@ export function DataTable<TData>({
   searchKeys,
   facetedFilters = [],
   onRowClick,
+  rowHref,
+  rowLabel,
   exportFileName,
   onImport,
   onImportClick,
@@ -358,8 +367,11 @@ export function DataTable<TData>({
                 table.getRowModel().rows.map((row) => (
                   <TableRow
                     key={row.id}
-                    className={cn("border-border/60", onRowClick && "cursor-pointer")}
-                    onClick={onRowClick ? () => onRowClick(row.original) : undefined}
+                    className={cn(
+                      "border-border/60",
+                      onRowClick && "cursor-pointer active:bg-muted/70 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
+                    )}
+                    {...(onRowClick ? rowLinkProps(row, onRowClick, rowHref, rowLabel) : {})}
                     data-testid={`datatable-row`}
                   >
                     {row.getVisibleCells().map((cell) => {
@@ -432,6 +444,56 @@ export function DataTable<TData>({
       </div>
     </div>
   );
+}
+
+/** Anything inside a row that handles its own click (the Actions column's links, a checkbox). */
+const OWN_CLICK = "a,button,input,select,textarea,label,[role=button],[role=menuitem]";
+
+/**
+ * A clickable row behaves like a link: it can be reached with Tab, opened with
+ * Enter or Space, and (when it has an href) opened in a new tab with
+ * ctrl/cmd-click or a middle click. Clicks on controls inside the row are left
+ * to those controls.
+ */
+function rowLinkProps<TData>(
+  row: Row<TData>,
+  onRowClick: (row: TData) => void,
+  rowHref: DataTableProps<TData>["rowHref"],
+  rowLabel: DataTableProps<TData>["rowLabel"],
+): React.HTMLAttributes<HTMLTableRowElement> {
+  const href = rowHref?.(row.original) || null;
+  const openInNewTab = () => { if (href) window.open(href, "_blank", "noopener"); };
+  const fromInnerControl = (e: React.SyntheticEvent) =>
+    e.target !== e.currentTarget && !!(e.target as HTMLElement).closest?.(OWN_CLICK);
+  const firstText = () => {
+    const cell = row.getVisibleCells().find((c) => c.column.id !== "__sr");
+    const v = cell?.getValue();
+    return v == null ? "" : String(v);
+  };
+  return {
+    role: "link",
+    tabIndex: 0,
+    "aria-label": (rowLabel?.(row.original) ?? firstText()) || undefined,
+    onClick: (e) => {
+      if (fromInnerControl(e)) return;
+      if (href && (e.metaKey || e.ctrlKey)) { openInNewTab(); return; }
+      onRowClick(row.original);
+    },
+    // Middle click: stop the browser's autoscroll, then open on release.
+    onMouseDown: (e) => { if (href && e.button === 1) e.preventDefault(); },
+    onAuxClick: (e) => {
+      if (!href || e.button !== 1 || fromInnerControl(e)) return;
+      e.preventDefault();
+      openInNewTab();
+    },
+    onKeyDown: (e) => {
+      if (e.target !== e.currentTarget) return; // a focused control inside the row keeps its own keys
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault(); // Space would otherwise scroll the page
+      if (href && e.key === "Enter" && (e.metaKey || e.ctrlKey)) { openInNewTab(); return; }
+      onRowClick(row.original);
+    },
+  };
 }
 
 function FacetedFilterMenu<TData>({ table, filter }: { table: any; filter: FacetedFilter }) {

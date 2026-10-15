@@ -1,4 +1,5 @@
 import { useState, useRef , useEffect} from "react";
+import { motion } from "framer-motion";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useParams, Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,6 +32,7 @@ import {
   Receipt,
   Trash2,
   Pencil,
+  ArrowRight,
 } from "lucide-react";
 import { moneyIcon } from "@/components/money-icon";
 import { Input } from "@/components/ui/input";
@@ -43,6 +45,9 @@ import { AgreementSignPanel } from "@/components/agreement-sign-panel";
 import { recordNo } from "@shared/schema";
 import { executionRecordDisclosure } from "@shared/agreementClauses";
 import { dealAudienceLabels } from "@shared/audience";
+import { httpErrorKind } from "@shared/http-error-kind";
+import { DetailSkeleton, DetailUnavailable } from "@/components/document/detail-states";
+import { fadeUp, stagger, tBase, useCalmMotion } from "@/lib/motion";
 
 export default function ContractDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -64,9 +69,14 @@ export default function ContractDetailsPage() {
   const [editingInvoiceId, setEditingInvoiceId] = useState<number | null>(null);
   const [editAmount, setEditAmount] = useState("");
 
-  const { data: contract, isLoading } = useQuery<Contract>({
+  const { data: contract, isLoading, isError, error, refetch, isFetching } = useQuery<Contract>({
     queryKey: ["/api/contracts", params.id],
   });
+  // The entrance plays once, and only when the page actually had to wait for
+  // the agreement: a cached one (back from the PDF view) is simply there, and
+  // a refetch never replays it.
+  const calm = useCalmMotion();
+  const [enter] = useState(() => isLoading && !calm);
 
   const { data: deal } = useQuery<Deal>({
     queryKey: ["/api/deals", contract?.dealId],
@@ -77,7 +87,7 @@ export default function ContractDetailsPage() {
   // collaboration, "Client" for everything else.
   const party = dealAudienceLabels(deal?.dealType).party;
 
-  const { data: dealBrandInvoices = [] } = useQuery<BrandInvoice[]>({
+  const { data: dealBrandInvoices = [], isLoading: invoicesLoading } = useQuery<BrandInvoice[]>({
     queryKey: ["/api/deals", contract?.dealId, "brand-invoices"],
     queryFn: async () => {
       const res = await fetch(`/api/deals/${contract?.dealId}/brand-invoices`, { credentials: "include", headers: { "X-DealInSec-Money": "minor" } });
@@ -300,24 +310,32 @@ export default function ContractDetailsPage() {
     });
   };
 
+  const header = (actions?: React.ReactNode) => (
+    <header className="glass-header sticky top-0 z-40">
+      <div className="flex items-center justify-between gap-3 px-4 py-4 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-3.5">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setLocation(backPath)}
+            aria-label="Back to agreements"
+            data-testid="button-back-contracts"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <h1 className="text-xl lg:text-lg font-bold lg:font-semibold truncate">Agreement Details</h1>
+        </div>
+        {actions}
+      </div>
+    </header>
+  );
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="glass-header sticky top-0 z-40">
-          <div className="flex items-center gap-3 px-4 py-4 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-3.5">
-            <Button variant="ghost" size="icon" onClick={() => setLocation(backPath)}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <Skeleton className="h-6 w-32" />
-          </div>
-        </header>
-        <main className="px-4 py-6 space-y-4">
-          <Card className="glass-card border-0">
-            <CardContent className="p-6 space-y-4">
-              <Skeleton className="h-8 w-3/4" />
-              <Skeleton className="h-5 w-1/2" />
-            </CardContent>
-          </Card>
+        {header()}
+        <main className="px-4 py-6 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8">
+          <DetailSkeleton what="agreement" mainBlocks={2} railBlocks={2} />
         </main>
         <BottomNav />
       </div>
@@ -327,19 +345,17 @@ export default function ContractDetailsPage() {
   if (!contract) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="glass-header sticky top-0 z-40">
-          <div className="flex items-center gap-3 px-4 py-4 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-3.5">
-            <Button variant="ghost" size="icon" onClick={() => setLocation(backPath)}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Agreement Details</h1>
-          </div>
-        </header>
-        <main className="px-4 py-12 text-center">
-          <p className="text-muted-foreground">Agreement not found</p>
-          <Link href={backPath}>
-            <Button variant="outline" className="mt-4">Back to Agreements</Button>
-          </Link>
+        {header()}
+        <main className="px-4 py-6 lg:max-w-3xl lg:mx-auto lg:px-8 lg:py-8">
+          <DetailUnavailable
+            // No error and no row is the server saying "nothing here".
+            kind={isError ? httpErrorKind(error) : "not_found"}
+            what="agreement"
+            backHref={backPath}
+            backLabel="Back to Agreements"
+            onRetry={() => refetch()}
+            retrying={isFetching}
+          />
         </main>
         <BottomNav />
       </div>
@@ -348,34 +364,27 @@ export default function ContractDetailsPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="glass-header sticky top-0 z-40">
-        <div className="flex items-center justify-between gap-3 px-4 py-4">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setLocation(backPath)}
-              data-testid="button-back-contracts"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h1 className="text-xl font-bold truncate">Agreement Details</h1>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setLocation(`/contracts/${params.id}/export`)}
-            data-testid="button-export-contract-pdf"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>
-        </div>
-      </header>
+      {header(
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setLocation(`/contracts/${params.id}/export`)}
+          data-testid="button-export-contract-pdf"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Export
+        </Button>,
+      )}
 
-      <main className="px-4 py-6 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8 lg:space-y-8">
+      <motion.main
+        variants={stagger}
+        initial={enter ? "hidden" : false}
+        animate="visible"
+        className="px-4 py-6 space-y-6 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8 lg:space-y-8"
+      >
 
         {/* 4-step workflow timeline — every step that has a record is a link. */}
+        <motion.div variants={fadeUp}>
         <WorkflowStepper
           currentStep={timelineStep}
           steps={[
@@ -393,9 +402,32 @@ export default function ContractDetailsPage() {
             },
           ]}
         />
+        </motion.div>
 
         <div className="lg:grid lg:grid-cols-3 lg:gap-6 lg:items-start">
         <div className="lg:col-span-2 space-y-6">
+        {/* The one thing to do next, by where the agreement is in its life:
+            Draft → send it for signature; Pending → wait, and share the link;
+            Signed → invoice it. Each is an action the page already had. */}
+        <motion.div variants={fadeUp}>
+          {isSigned ? (
+            <SignedNextStep
+              contractId={contract.id}
+              invoices={dealBrandInvoices}
+              invoicesLoading={invoicesLoading}
+              canInvoice={canInvoice}
+              brandName={contract.brandName}
+            />
+          ) : (
+            <AgreementSignPanel
+              contractId={contract.id}
+              party={party.toLowerCase()}
+              proofAnchor={canAgree ? "#files-proof" : undefined}
+            />
+          )}
+        </motion.div>
+
+        <motion.div variants={fadeUp}>
         <Card className="glass-card border-0">
           <CardContent className="p-6">
             <div className="flex items-start justify-between gap-3 mb-4">
@@ -516,8 +548,10 @@ export default function ContractDetailsPage() {
             </div>
           </CardContent>
         </Card>
+        </motion.div>
 
         {/* ── Download Agreement PDF — prominent CTA ── */}
+        <motion.div variants={fadeUp}>
         <Card className="glass-card border-0 overflow-hidden">
           <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-4">
             <div className="flex items-center gap-3">
@@ -537,14 +571,7 @@ export default function ContractDetailsPage() {
           <CardContent className="p-4 space-y-3">
             {/* Live preview — same-origin full-bleed export route; printing
                 only happens from the full view's own button. */}
-            <div className="rounded-xl border border-border/60 overflow-hidden bg-white">
-              <iframe
-                src={`/contracts/${params.id}/export`}
-                title="Agreement preview"
-                className="w-full h-[380px] lg:h-[440px]"
-                loading="lazy"
-              />
-            </div>
+            <PreviewFrame src={`/contracts/${params.id}/export`} />
             <Button
               className="w-full h-12 font-semibold rounded-xl gradient-btn text-white"
               onClick={() => setLocation(`/contracts/${params.id}/export`)}
@@ -555,10 +582,11 @@ export default function ContractDetailsPage() {
             </Button>
           </CardContent>
         </Card>
+        </motion.div>
 
 {/* Contract proof moved to the Files & Proof rail card */}
 
-        <section className="space-y-3">
+        <motion.section variants={fadeUp} className="space-y-3">
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
               Invoice for {party}
             </h3>
@@ -769,11 +797,11 @@ export default function ContractDetailsPage() {
               </CardContent>
             </Card>
             )}
-          </section>
+          </motion.section>
         </div>
 
         {/* ── Right rail: summary · files & proof · activity ── */}
-        <div className="lg:col-span-1 space-y-6 mt-6 lg:mt-0">
+        <motion.div variants={fadeUp} className="lg:col-span-1 space-y-6 mt-6 lg:mt-0">
           {/* e-Stamp certificate. We record the certificate the user bought;
               we do not issue, sell or verify stamp duty — and the copy says so,
               because an uploaded picture of stamp paper is not stamping.
@@ -888,11 +916,15 @@ export default function ContractDetailsPage() {
             </CardContent>
           </Card>
 
-          <section className="space-y-3">
-            <AgreementSignPanel contractId={contract.id} party={party.toLowerCase()} />
-          </section>
+          {/* Once signed, the signing record (who, when, how) lives here; before
+              that, the signing panel is the page's next step, at the top. */}
+          {isSigned && (
+            <section className="space-y-3">
+              <AgreementSignPanel contractId={contract.id} party={party.toLowerCase()} />
+            </section>
+          )}
 
-          <section className="space-y-3">
+          <section id="files-proof" className="space-y-3 scroll-mt-20">
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
               Files &amp; Proof
             </h3>
@@ -921,16 +953,23 @@ export default function ContractDetailsPage() {
                         <Download className="w-4 h-4 mr-2" />
                         Download
                       </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploading}
-                        data-testid="button-replace-proof"
-                      >
-                        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Replace"}
-                      </Button>
+                      {canAgree && (
+                        <Button
+                          variant="outline"
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={uploading}
+                          data-testid="button-replace-proof"
+                        >
+                          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Replace"}
+                        </Button>
+                      )}
                     </div>
                   </>
+                ) : !canAgree ? (
+                  // The server's rule for POST /api/contracts/:id/proof (agreements.create), mirrored.
+                  <p className="text-sm text-muted-foreground py-2" data-testid="text-proof-role">
+                    No signed copy on file. Your role can't upload one — ask your workspace owner.
+                  </p>
                 ) : (
                   <button
                     onClick={() => fileInputRef.current?.click()}
@@ -965,9 +1004,9 @@ export default function ContractDetailsPage() {
           </section>
 
           <ActivityRail contractId={contract.id} />
+        </motion.div>
         </div>
-        </div>
-      </main>
+      </motion.main>
 
 
       <BottomNav />
@@ -975,6 +1014,94 @@ export default function ContractDetailsPage() {
   );
 }
 
+
+// ─── Next step once signed: invoice it ──────────────────────────────────────
+// The same composer link the invoice card below already offers; this only puts
+// it first. While the deal's invoices are still loading it shows neither
+// "Raise" nor "View", so it never offers the wrong one for a moment.
+function SignedNextStep({
+  contractId, invoices, invoicesLoading, canInvoice, brandName,
+}: {
+  contractId: number;
+  invoices: BrandInvoice[];
+  invoicesLoading: boolean;
+  canInvoice: boolean;
+  brandName: string;
+}) {
+  const invoiced = invoices.length > 0;
+  return (
+    <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 p-4" data-testid="agreement-next-step">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+            <CheckCircle2 className="w-4 h-4" aria-hidden /> Signed{invoiced ? " and invoiced" : " — next, invoice it"}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {invoicesLoading
+              ? "Checking for invoices…"
+              : invoiced
+              ? `${invoices.length} invoice${invoices.length > 1 ? "s" : ""} raised for ${brandName}.`
+              : canInvoice
+              ? `Raise the invoice for ${brandName} from this agreement.`
+              : "Your role can't raise invoices. Ask someone with invoice access."}
+          </p>
+        </div>
+        {invoicesLoading ? (
+          <Skeleton className="h-9 w-32" aria-hidden />
+        ) : invoiced ? (
+          <Link href={`/brand-invoices/${invoices[0].id}`}>
+            <Button size="sm" variant="outline" data-testid="button-next-view-invoice">
+              <Receipt className="w-4 h-4 mr-1.5" /> View invoice
+            </Button>
+          </Link>
+        ) : canInvoice ? (
+          <Link href={`/brand-invoices/new?contractId=${contractId}&mode=full`}>
+            <Button size="sm" className="gradient-btn text-white" data-testid="button-next-raise-invoice">
+              <Receipt className="w-4 h-4 mr-1.5" /> Raise invoice <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          </Link>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// ─── Live preview of the printable agreement ────────────────────────────────
+// The frame stays invisible until its document has loaded, with a sheet-shaped
+// placeholder underneath, then fades in (opacity only, so nothing readable
+// moves). Printing only happens from the full view's own button.
+function PreviewFrame({ src }: { src: string }) {
+  const calm = useCalmMotion();
+  const [loaded, setLoaded] = useState(false);
+  const [settled, setSettled] = useState(false);
+  return (
+    <div className="relative rounded-xl border border-border/60 overflow-hidden bg-white h-[380px] lg:h-[440px]">
+      {!settled && (
+        <div className="absolute inset-0 p-6 space-y-4" role="status" aria-busy={!loaded} data-testid="agreement-preview-loading">
+          <span className="sr-only">Loading the agreement preview…</span>
+          <div className="flex justify-between gap-6" aria-hidden>
+            <div className="space-y-2"><Skeleton className="h-6 w-36 bg-neutral-200" /><Skeleton className="h-3 w-24 bg-neutral-200" /></div>
+            <div className="space-y-2 flex flex-col items-end"><Skeleton className="h-4 w-16 rounded-full bg-neutral-200" /><Skeleton className="h-3 w-28 bg-neutral-200" /></div>
+          </div>
+          {[100, 92, 96, 70, 100, 88, 60].map((w, i) => (
+            <Skeleton key={i} className="h-3 bg-neutral-200" style={{ width: `${w}%` }} aria-hidden />
+          ))}
+        </div>
+      )}
+      <motion.iframe
+        src={src}
+        title="Agreement preview"
+        className="relative w-full h-full"
+        loading="lazy"
+        initial={false}
+        animate={{ opacity: loaded ? 1 : 0 }}
+        transition={calm ? { duration: 0 } : tBase}
+        onLoad={() => { setLoaded(true); if (calm) setSettled(true); }}
+        onAnimationComplete={() => { if (loaded) setSettled(true); }}
+      />
+    </div>
+  );
+}
 
 // ─── Activity timeline rail ──────────────────────────────────────────────────
 // Agreement-scoped slice of the org activity log. Hidden entirely for members
