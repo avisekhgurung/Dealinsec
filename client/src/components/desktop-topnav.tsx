@@ -1,32 +1,22 @@
 /**
  * Desktop top navigation — a raised, lit bar across the top of the workspace.
  *
- * Replaced the left sidebar (Sep 2026, founder's call): the five workspace
- * sections sit in the bar as tabs, and the account controls sit on the right —
- * plan chip, notifications, settings, the avatar (→ profile) and a Sign out
- * button that is one click, never tucked in a menu (an earlier explicit ask).
+ * Replaced the left sidebar (Sep 2026, founder's call): the product's five
+ * areas — Home · AI Outbound · Pipeline (Leads, Deals) · Documents
+ * (Quotations, Agreements) · Money (Invoices) — sit in the bar as one-click
+ * tabs, grouped by thin dividers (items, groups and active rules come from
+ * @shared/nav-model, shared with the mobile bar). The account controls sit on
+ * the right — plan chip, notifications, settings, the avatar (→ profile) and a
+ * Sign out button that is one click, never tucked in a menu (an earlier
+ * explicit ask).
  *
  * Height lives in --dis-topnav-h, shared with .app-shell's top padding and the
  * offset every page's own sticky title bar takes (see index.css). Hidden below
  * lg, where the bottom tab bar does this job.
  */
-import { useEffect, useReducer } from "react";
+import { Fragment, useEffect, useReducer } from "react";
 import { useLocation, Link } from "wouter";
-import {
-  Home,
-  Briefcase,
-  FileCheck,
-  Receipt,
-  FileText,
-  Settings,
-  LogOut,
-  Sparkles,
-  Crown,
-  Users,
-  Zap,
-  Target,
-  Radar,
-} from "lucide-react";
+import { Settings, LogOut, Sparkles, Crown, Users, Zap } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -41,26 +31,8 @@ import {
   hasLapsedTrial,
   getTrialDaysLeft,
 } from "@shared/schema";
-import { canSeeModule } from "@shared/permissions";
+import { NAV_ICONS, desktopNavSections, navItem } from "@/lib/nav";
 import { usePlanPrices, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
-
-interface NavItem {
-  path: string;
-  label: string;
-  icon: typeof Home;
-  /** Module key — hidden for custom roles with no permission in it. */
-  module?: "deals" | "quotations" | "agreements" | "invoices";
-}
-
-const NAV: NavItem[] = [
-  { path: "/dashboard", label: "Dashboard", icon: Home },
-  { path: "/outbound", label: "AI Outbound", icon: Radar, module: "deals" },
-  { path: "/leads", label: "Leads", icon: Target, module: "deals" },
-  { path: "/deals", label: "Deals", icon: Briefcase, module: "deals" },
-  { path: "/quotations", label: "Quotations", icon: FileText, module: "quotations" },
-  { path: "/contracts", label: "Agreements", icon: FileCheck, module: "agreements" },
-  { path: "/invoices", label: "Invoices", icon: Receipt, module: "invoices" },
-];
 
 /** Plan lifecycle states, resolved strictly in this order. */
 type PlanState =
@@ -126,13 +98,10 @@ export function DesktopTopNav() {
     : hasLapsedTrial(user) ? "TRIAL_ENDED"
     : "FREE";
 
-  const isActive = (path: string) => {
-    // Quotation documents live at /deals/:id/quote but BELONG to Quotations.
-    if (/^\/deals\/[^/]+\/quote/.test(location)) return path === "/quotations";
-    // Invoice documents and the composer live under /brand-invoices.
-    if (location.startsWith("/brand-invoices")) return path === "/invoices";
-    return location === path || location.startsWith(path + "/");
-  };
+  // Route ownership (/deals/:id/quote → Quotations, /brand-invoices → Invoices)
+  // lives in @shared/nav-model.
+  const settingsActive = navItem("settings").isActive(location);
+  const profileActive = navItem("profile").isActive(location);
 
   const handleLogout = async () => {
     try {
@@ -247,23 +216,33 @@ export function DesktopTopNav() {
 
           {/* ── Workspace tabs ── */}
           <nav aria-label="Workspace" className="flex items-stretch min-w-0 pl-1">
-            {NAV.filter((i) => !i.module || canSeeModule(user as any, i.module)).map((item) => {
-              const active = isActive(item.path);
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.path}
-                  href={item.path}
-                  data-testid={`topnav-${item.label.toLowerCase()}`}
-                  aria-current={active ? "page" : undefined}
-                  className="dis-topnav-tab relative flex items-center gap-2 px-3 xl:px-4 text-[14px] font-semibold whitespace-nowrap outline-none focus-visible:bg-white/10"
-                >
-                  {/* Seven tabs plus the plan chip need the room below 2xl; the label carries the meaning. */}
-                  <Icon className="hidden 2xl:block w-[17px] h-[17px]" strokeWidth={active ? 2.3 : 1.9} />
-                  {item.label}
-                </Link>
-              );
-            })}
+            {desktopNavSections(user as any).map((section, i) => (
+              <Fragment key={section.group}>
+                {/* Group divider: costs 5px, so the bar is no wider than the old flat one. */}
+                {i > 0 && <span aria-hidden="true" className="self-center h-6 w-px mx-0.5 bg-white/15" />}
+                <div role="group" aria-label={section.label} className="flex items-stretch">
+                  {section.items.map((item) => {
+                    const active = item.isActive(location);
+                    const Icon = NAV_ICONS[item.key];
+                    return (
+                      <Link
+                        key={item.key}
+                        href={item.href}
+                        data-testid={`topnav-${item.key}`}
+                        aria-current={active ? "page" : undefined}
+                        className="dis-topnav-tab relative flex items-center gap-2 px-2.5 xl:px-4 text-[14px] font-semibold whitespace-nowrap outline-none focus-visible:bg-white/10"
+                      >
+                        {/* Seven tabs plus the plan chip need the room below 2xl; the label carries the meaning. */}
+                        <Icon className="hidden 2xl:block w-[17px] h-[17px]" strokeWidth={active ? 2.3 : 1.9} />
+                        {/* Short labels at lg ("Outbound", "Quotes") keep 1024px from overflowing. */}
+                        <span className="xl:hidden">{item.shortLabel}</span>
+                        <span className="hidden xl:inline">{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </Fragment>
+            ))}
           </nav>
 
           {/* ── Account ── */}
@@ -279,7 +258,7 @@ export function DesktopTopNav() {
                 href="/settings"
                 aria-label="Settings"
                 data-testid="topnav-settings"
-                aria-current={isActive("/settings") ? "page" : undefined}
+                aria-current={settingsActive ? "page" : undefined}
                 className={iconButton}
               >
                 <Settings className="w-[18px] h-[18px]" />
@@ -292,7 +271,7 @@ export function DesktopTopNav() {
               <Link
                 href="/profile"
                 data-testid="topnav-profile"
-                aria-current={isActive("/profile") ? "page" : undefined}
+                aria-current={profileActive ? "page" : undefined}
                 className="dis-topnav-user flex items-center gap-2.5 h-10 pl-1 pr-1 min-[1400px]:pr-3 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60"
               >
                 <span className="dis-topnav-avatar flex items-center justify-center w-8 h-8 rounded-full text-[12px] font-bold text-white">
