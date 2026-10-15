@@ -21,8 +21,11 @@ import { mailboxSchemaPresent } from "./mailbox-schema";
 
 export const GMAIL_CALLBACK_PATH = "/api/integrations/gmail/callback";
 /**
- * Sending through the REAL Gmail adapter stays off in this build, whatever any setting says: the adapter's own send
- * refuses too. Only the fake provider (never allowed in production) can complete a send, for local runs and tests.
+ * Sending through the REAL Gmail adapter stays off in this build, whatever any setting says. Two independent locks:
+ * sendingAvailability() refuses before anything is reserved, and the adapter is built with this value as its
+ * `sendingEnabled`, so its send refuses without calling Google. Turning it on is a deliberate code change, made only
+ * once real sending is verified and authorised. Only the fake provider (never allowed in production) can complete a
+ * send meanwhile, for local runs and tests.
  */
 export const GMAIL_SENDING_ENABLED = false;
 export const DEFAULT_SEND_DAILY_CAP = 50;
@@ -141,7 +144,7 @@ export function createMailProvider(config: GmailConfig, env: Env = process.env):
   }
   if (!config.oauth) throw new Error("the Gmail provider needs its OAuth settings");
   const key = `${config.oauth.clientId}|${config.oauth.clientSecret}`;
-  if (gmailInstance?.key !== key) gmailInstance = { key, provider: new GmailProvider({ clientId: config.oauth.clientId, clientSecret: config.oauth.clientSecret }) };
+  if (gmailInstance?.key !== key) gmailInstance = { key, provider: new GmailProvider({ clientId: config.oauth.clientId, clientSecret: config.oauth.clientSecret, sendingEnabled: GMAIL_SENDING_ENABLED }) };
   return gmailInstance.provider;
 }
 

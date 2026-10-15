@@ -277,6 +277,93 @@ describe.skipIf(!URL_ || !loopback(URL_))("Gmail send reservation (real Postgres
     ]);
   });
 
+  /**
+   * The real Gmail adapter on Postgres, with Google stubbed (no request leaves the machine): `answer(n)` is Google's
+   * reply to the n-th send, after `delayMs`. Returns the deps for sendApproved and the sends Google received.
+   */
+  async function gmailPipeline(s: Seed, answer: (n: number) => Response | Promise<Response>, opts: { delayMs?: number; cap?: string } = {}) {
+    const { GmailProvider, GOOGLE_TOKEN_URL, GMAIL_SEND_URL } = await import("./gmail-provider");
+    const { resolveGmailConfig } = await import("./config");
+    const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+    const received: string[] = [];
+    const fetchImpl = (async (url: any, init: any) => {
+      if (String(url) === GOOGLE_TOKEN_URL) return json(200, { access_token: "ya29.pg", expires_in: 3599, token_type: "Bearer", scope: "openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/gmail.send" });
+      if (String(url) !== GMAIL_SEND_URL) throw new Error(`unexpected request to ${url}`);
+      received.push(JSON.parse(init.body).raw);
+      const n = received.length;
+      return new Promise<Response>((resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(init.signal.reason));
+        setTimeout(() => Promise.resolve().then(() => answer(n)).then(resolve, reject), opts.delayMs ?? 0);
+      });
+    }) as unknown as typeof fetch;
+    const gmail = new GmailProvider({ clientId: "1-a.apps.googleusercontent.com", clientSecret: "s", fetchImpl, sendingEnabled: true, sendTimeoutMs: 100 });
+    const saved = await mailbox.save({ orgId: s.org, userId: s.user, provider: "gmail", account: { sub: `gsub-${s.user}`, email: `${s.user}@agency.test` }, scopes: ["email", "openid", "https://www.googleapis.com/auth/gmail.send"], refreshToken: "1//rt", keyring, now: now() });
+    if (!saved.ok) throw new Error(saved.code);
+    const config = resolveGmailConfig({ GMAIL_INTEGRATION_ENABLED: "true", MAIL_PROVIDER: "fake", NODE_ENV: "test", GMAIL_OAUTH_REDIRECT_URI: "http://localhost:5072/api/integrations/gmail/callback", MAILBOX_TOKEN_KEYS: `1:${randomBytes(32).toString("base64")}`, MAILBOX_TOKEN_KEY_CURRENT: "1", MAIL_SEND_DAILY_CAP: opts.cap });
+    if (!config.enabled) throw new Error("config");
+    const after: number[] = [];
+    const deps = {
+      status: async () => ({ enabled: true as const, config: { ...config.config, keyring } }), provider: () => gmail, mailbox, sends, now, sleep: async () => {}, random: () => 0.5,
+      listReady: async () => true, afterSent: async (_a: any, i: any) => { after.push(i.messageId); }, leadEvent: async () => {}, isActiveMember: async () => true, log: () => {},
+    };
+    const member = { id: s.user, organizationId: s.org, memberStatus: "active", orgRole: "SALES" };
+    return { deps, member, received, after, connId: saved.connection.id };
+  }
+  const outcomes = (rs: any[]) => rs.map((r) => (r.ok ? r.outcome : r.code)).sort();
+
+  it("real adapter: six simultaneous sends of one message while Gmail is slow reach Gmail once; recorded once, follow-up once", async () => {
+    const { sendApproved } = await import("./send-service");
+    const s = await seed(1);
+    const g = await gmailPipeline(s, () => new Response(JSON.stringify({ id: "pg1", threadId: "pg1" }), { status: 200 }), { delayMs: 40 });
+    const rs = await Promise.all(Array.from({ length: 6 }, () => sendApproved(g.member, s.m.id, s.m.hash, g.deps)));
+    expect(outcomes(rs)).toEqual(["in_flight", "in_flight", "in_flight", "in_flight", "in_flight", "sent"]);
+    expect(g.received).toHaveLength(1);
+    const [job] = await jobs(s.org);
+    expect(job).toMatchObject({ status: "sent", provider_message_id: "pg1", attempts: 1, connection_id: g.connId });
+    expect(await msgStatus(s.m.id)).toBe("sent");
+    expect(g.after).toEqual([s.m.id]);
+    expect((await q.query(`SELECT kind FROM outreach_events WHERE organization_id = $1 ORDER BY id`, [s.org])).rows.map((r: any) => r.kind)).toEqual(["sent", "follow_due"]);
+    expect(Buffer.from(g.received[0], "base64url").toString("utf8")).toContain(`Message-ID: ${job.rfc_message_id}`);
+  });
+
+  it("real adapter: a 5xx or a timeout is stored as uncertain; later sends (even all at once, even after the lease) never reach Gmail", async () => {
+    const { sendApproved, resolveSend, SEND_LEASE_MS } = await import("./send-service");
+    for (const answer of [() => new Response("{}", { status: 500 }), () => new Promise<Response>(() => {})]) {
+      const s = await seed(1);
+      const g = await gmailPipeline(s, answer);
+      expect(await sendApproved(g.member, s.m.id, s.m.hash, g.deps)).toMatchObject({ ok: true, outcome: "uncertain" });
+      expect((await jobs(s.org))[0]).toMatchObject({ status: "uncertain", error_code: "provider_uncertain" });
+      expect(await msgStatus(s.m.id)).toBe("sending");
+      const later = { ...g.deps, now: () => new Date(Date.now() + SEND_LEASE_MS * 2) };
+      expect(outcomes(await Promise.all([1, 2, 3].map(() => sendApproved(g.member, s.m.id, s.m.hash, later))))).toEqual(["in_flight", "in_flight", "in_flight"]);
+      expect(g.received).toHaveLength(1);
+      expect(g.after).toEqual([]);
+      expect(await resolveSend(g.member, s.m.id, { decision: "not_sent" }, g.deps)).toMatchObject({ ok: true, messageStatus: "approved" });
+    }
+  });
+
+  it("real adapter: Gmail refuses (400): approved again; the deliberate retry is attempt 2 with the same Message-ID", async () => {
+    const { sendApproved } = await import("./send-service");
+    const s = await seed(1);
+    const g = await gmailPipeline(s, (n) => (n === 1 ? new Response(JSON.stringify({ error: { code: 400, errors: [{ reason: "invalidArgument" }] } }), { status: 400 }) : new Response(JSON.stringify({ id: "pg2" }), { status: 200 })));
+    expect(await sendApproved(g.member, s.m.id, s.m.hash, g.deps)).toMatchObject({ ok: true, outcome: "failed" });
+    expect(await msgStatus(s.m.id)).toBe("approved");
+    expect(await sendApproved(g.member, s.m.id, s.m.hash, g.deps)).toMatchObject({ ok: true, outcome: "sent" });
+    const [job] = await jobs(s.org);
+    expect(job).toMatchObject({ status: "sent", attempts: 2, provider_message_id: "pg2" });
+    const ids = g.received.map((raw) => /Message-ID: (\S+)/.exec(Buffer.from(raw, "base64url").toString("utf8"))![1]);
+    expect(ids).toEqual([job.rfc_message_id, job.rfc_message_id]);
+  });
+
+  it("real adapter: three messages racing for the mailbox's last daily slot: Gmail is asked once", async () => {
+    const { sendApproved } = await import("./send-service");
+    const s = await seed(3);
+    const g = await gmailPipeline(s, (n) => new Response(JSON.stringify({ id: `cap${n}` }), { status: 200 }), { delayMs: 30, cap: "1" });
+    const rs = await Promise.all(s.msgs.map((m) => sendApproved(g.member, m.id, m.hash, g.deps)));
+    expect(outcomes(rs)).toEqual(["daily_cap", "daily_cap", "sent"]);
+    expect(g.received).toHaveLength(1);
+  });
+
   it("a storm of competing operations on the same messages never deadlocks", async () => {
     for (let i = 0; i < 12; i++) {
       const s = await seed(2);

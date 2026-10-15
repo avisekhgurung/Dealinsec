@@ -1,6 +1,8 @@
 /**
- * The Google adapter for Release A: OAuth (authorization code + PKCE + nonce), refresh and revoke. Sending is not
- * enabled in this build; `send` refuses without calling Google.
+ * The Google adapter for Release A: OAuth (authorization code + PKCE + nonce), refresh, revoke, and sending one
+ * approved message through Gmail's users.messages.send. Sending is off unless the adapter is constructed with
+ * `sendingEnabled: true`; config.ts passes GMAIL_SENDING_ENABLED (false in this build), so a production adapter
+ * refuses without calling Google, independently of the config gate in front of it.
  *
  * No Google SDK: three form posts to Google's documented endpoints. The identity token arrives in the token
  * endpoint's own TLS response to this server, so its claims are validated (issuer, audience, authorized party,
@@ -10,6 +12,7 @@
  * Nothing from Google's responses (tokens, codes, error descriptions) is ever put in an error message or a log:
  * errors carry only a MailProviderError kind and a fixed sentence.
  */
+import { buildMime, toBase64Url } from "./mime";
 import {
   MailProviderError, normalizeScopes, RELEASE_A_SCOPES,
   type AccessGrant, type AuthorizationRequest, type MailAccount, type MailProvider, type OutgoingMail, type SentMail, type TokenGrant,
@@ -18,6 +21,12 @@ import {
 export const GOOGLE_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 export const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 export const GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke";
+export const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
+const GMAIL_ID = /^[A-Za-z0-9_-]{1,128}$/;
+/** Gmail's reasons for refusing for quota or rate: nothing was sent, so asking again later is safe. */
+const RATE_REASONS = new Set(["rateLimitExceeded", "userRateLimitExceeded", "dailyLimitExceeded", "quotaExceeded", "RATE_LIMIT_EXCEEDED", "RESOURCE_EXHAUSTED"]);
+/** Gmail's reasons for a token that lacks the send permission. */
+const SCOPE_REASONS = new Set(["insufficientPermissions", "ACCESS_TOKEN_SCOPE_INSUFFICIENT"]);
 const ISSUERS = new Set(["https://accounts.google.com", "accounts.google.com"]);
 const CLOCK_SKEW_S = 120;
 
@@ -27,6 +36,10 @@ export interface GmailProviderOptions {
   fetchImpl?: typeof fetch;
   now?: () => Date;
   timeoutMs?: number;
+  /** How long to wait for Gmail to answer a send before calling it uncertain. Longer than other calls: an unanswered send can't be retried. */
+  sendTimeoutMs?: number;
+  /** Off unless set: the adapter refuses to send without calling Google. */
+  sendingEnabled?: boolean;
 }
 
 /** Validates the identity token's claims and returns the account. Throws identity_invalid; never echoes the token. */
@@ -59,12 +72,14 @@ export class GmailProvider implements MailProvider {
   private fetchImpl: typeof fetch;
   private now: () => Date;
   private timeoutMs: number;
+  private sendTimeoutMs: number;
 
   constructor(private opts: GmailProviderOptions) {
     if (!opts.clientId || !opts.clientSecret) throw new Error("the Gmail provider needs a client id and secret");
     this.fetchImpl = opts.fetchImpl ?? ((...a) => fetch(...a));
     this.now = opts.now ?? (() => new Date());
     this.timeoutMs = opts.timeoutMs ?? 10_000;
+    this.sendTimeoutMs = opts.sendTimeoutMs ?? 30_000;
   }
 
   authorizationUrl(req: AuthorizationRequest): string {
@@ -121,8 +136,44 @@ export class GmailProvider implements MailProvider {
     }
   }
 
-  async send(_accessToken: string, _mail: OutgoingMail): Promise<SentMail> {
-    throw new MailProviderError("rejected", "Sending through Gmail is not enabled yet.");
+  /**
+   * Sends one message, exactly as built from `mail` (buildMime validates every header first), as Gmail's `raw`.
+   * Classification, from what the answer proves:
+   *  - 2xx with Gmail's message id: sent. A 2xx without a usable id is uncertain (Gmail said yes; we can't tell to what).
+   *  - 4xx: Gmail refused before sending. 429 and quota reasons are rate_limited; a missing send permission is
+   *    insufficient_scope; anything else (a bad token, a malformed message, the API switched off) is rejected.
+   *  - 5xx, a timeout, a dropped connection, a redirect, an unreadable answer: uncertain. It may have gone out.
+   * The access token, the message and Gmail's answer never appear in an error.
+   */
+  async send(accessToken: string, mail: OutgoingMail): Promise<SentMail> {
+    if (this.opts.sendingEnabled !== true) throw new MailProviderError("rejected", "Sending through Gmail is not enabled yet.");
+    if (typeof accessToken !== "string" || !accessToken) throw new MailProviderError("rejected", "there is no access token");
+    const raw = toBase64Url(buildMime(mail)); // throws "rejected" for anything unsafe, before any request
+    let res: Response;
+    try {
+      res = await this.fetchImpl(GMAIL_SEND_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ raw }),
+        redirect: "error",
+        signal: AbortSignal.timeout(this.sendTimeoutMs),
+      });
+    } catch {
+      throw new MailProviderError("uncertain", "Gmail's answer didn't arrive, so the message may or may not have gone out");
+    }
+    let body: Record<string, any> = {};
+    let readable = true;
+    try { body = (await res.json()) ?? {}; } catch { readable = false; }
+    if (res.ok) {
+      const id = readable && typeof body.id === "string" && GMAIL_ID.test(body.id) ? body.id : null;
+      if (!id) throw new MailProviderError("uncertain", "Gmail accepted the request but didn't identify the message it sent");
+      return { providerMessageId: id, providerThreadId: typeof body.threadId === "string" && GMAIL_ID.test(body.threadId) ? body.threadId : null };
+    }
+    if (res.status >= 500 || res.status < 400) throw new MailProviderError("uncertain", "Gmail had a problem while sending, so the message may or may not have gone out");
+    const reasons = gmailReasons(body);
+    if (res.status === 429 || reasons.some((r) => RATE_REASONS.has(r))) throw new MailProviderError("rate_limited", "Gmail asked us to slow down; nothing was sent", retryAfter(res));
+    if (res.status === 403 && reasons.some((r) => SCOPE_REASONS.has(r))) throw new MailProviderError("insufficient_scope", "the Gmail connection can't send email");
+    throw new MailProviderError("rejected", "Gmail refused the message; nothing was sent");
   }
 
   private expiry(expiresIn: unknown): Date {
@@ -154,6 +205,16 @@ export class GmailProvider implements MailProvider {
     if (err === "insufficient_scope") throw new MailProviderError("insufficient_scope", "the Google authorization lacks a needed permission");
     throw new MailProviderError("rejected", "Google refused the request");
   }
+}
+
+/** The machine-readable reasons in a Google API error (both its older and newer shapes). Never their text. */
+function gmailReasons(body: Record<string, any>): string[] {
+  const e = body && typeof body.error === "object" && body.error ? body.error : {};
+  const out: string[] = [];
+  if (typeof e.status === "string") out.push(e.status);
+  for (const x of Array.isArray(e.errors) ? e.errors : []) if (typeof x?.reason === "string") out.push(x.reason);
+  for (const x of Array.isArray(e.details) ? e.details : []) if (typeof x?.reason === "string") out.push(x.reason);
+  return out;
 }
 
 function retryAfter(res: Response): number | undefined {

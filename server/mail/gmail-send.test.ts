@@ -6,10 +6,11 @@
 import { describe, expect, it } from "vitest";
 import { SEND_MESSAGES } from "@shared/gmail-connect";
 import { hashDraft } from "@shared/outreach-hash";
-import { GmailProvider } from "./gmail-provider";
-import { MailProviderError } from "./provider";
+import { GMAIL_SEND_URL, GmailProvider, GOOGLE_TOKEN_URL } from "./gmail-provider";
+import { GMAIL_SEND_SCOPE, MailProviderError, normalizeScopes } from "./provider";
 import { resolveSend, sendApproved, sendStateFor, SEND_LEASE_MS, TRANSIENT_TRIES } from "./send-service";
-import { BODY, makeWorld, SUBJECT } from "./send-world";
+import { BODY, KEYS, makeWorld, SUBJECT } from "./send-world";
+import { loadKeyring } from "./token-crypto";
 
 const ok = <T,>(r: T) => { if (!(r as any).ok) throw new Error(`expected ok, got ${JSON.stringify(r)}`); return r as Extract<T, { ok: true }>; };
 const failed = <T,>(r: T) => { if ((r as any).ok) throw new Error(`expected a refusal, got ${JSON.stringify(r)}`); return r as Extract<T, { ok: false }>; };
@@ -604,5 +605,120 @@ describe("sending: only for organizations the integration is switched on for", (
     await listed.connect("ana");
     const n = listed.approved();
     expect(ok(await sendApproved(listed.members.ana, n.id, n.bodyHash, listed.deps)).outcome).toBe("sent");
+  });
+});
+
+describe("sending through the real Gmail adapter, with Google stubbed (failure injection)", () => {
+  const ACCESS = "ya29.PIPELINE-ACCESS-TOKEN";
+  const REFRESH = "1//PIPELINE-REFRESH-TOKEN";
+  const gjson = (status: number, body: unknown, headers: Record<string, string> = {}) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
+  const gErr = (code: number, reason: string) => gjson(code, { error: { code, message: "x", errors: [{ reason }] } });
+
+  /** Ana's Gmail connected (as the real adapter's mailbox), and Google answering each send with `answer(n)`. */
+  async function gmailWorld(answer: (n: number) => Response | Promise<Response>, opts: { delayMs?: number } = {}) {
+    const w = makeWorld();
+    const sends: { auth: string; raw: string }[] = [];
+    const fetchImpl = (async (url: any, init: any) => {
+      if (String(url) === GOOGLE_TOKEN_URL) return gjson(200, { access_token: ACCESS, expires_in: 3599, token_type: "Bearer", scope: `openid https://www.googleapis.com/auth/userinfo.email ${GMAIL_SEND_SCOPE}` });
+      if (String(url) !== GMAIL_SEND_URL) throw new Error(`unexpected request to ${url}`);
+      sends.push({ auth: init.headers.Authorization, raw: JSON.parse(init.body).raw });
+      const n = sends.length;
+      if (opts.delayMs) await new Promise((r) => setTimeout(r, opts.delayMs));
+      // like a real fetch: the request's timeout signal aborts it
+      return new Promise<Response>((resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(init.signal.reason));
+        Promise.resolve().then(() => answer(n)).then(resolve, reject);
+      });
+    }) as unknown as typeof fetch;
+    const gmail = new GmailProvider({ clientId: "1-a.apps.googleusercontent.com", clientSecret: "s", fetchImpl, now: () => w.clock, sendingEnabled: true, sendTimeoutMs: 50 });
+    w.deps.provider = () => gmail;
+    const saved = await w.mailbox.save({ orgId: "org-a", userId: "ana", provider: "gmail", account: { sub: "g-ana", email: "ana@agency.test" }, scopes: normalizeScopes(["openid", "email", GMAIL_SEND_SCOPE]), refreshToken: REFRESH, keyring: loadKeyring(KEYS), now: w.clock });
+    if (!saved.ok) throw new Error(saved.code);
+    return { ...w, sends, connection: saved.connection };
+  }
+  const decode = (raw: string) => Buffer.from(raw, "base64url").toString("utf8");
+
+  it("Gmail accepts: exactly the approved text leaves once, with the fresh access token; recorded with Gmail's ids; follow-up once", async () => {
+    const w = await gmailWorld(() => gjson(200, { id: "18f2aa", threadId: "18f2aa" }));
+    const m = w.approved();
+    const r = ok(await sendApproved(w.members.ana, m.id, m.bodyHash, w.deps));
+    expect(r.outcome).toBe("sent");
+    expect(w.sends).toHaveLength(1);
+    expect(w.sends[0].auth).toBe(`Bearer ${ACCESS}`);
+    const { headers, body } = parse(decode(w.sends[0].raw));
+    expect([headers.From, headers.To, headers.Subject]).toEqual(['"Ana Silva" <ana@agency.test>', m.toAddress, SUBJECT]);
+    expect(hashDraft(headers.Subject, body.replace(/\r\n/g, "\n"))).toBe(m.bodyHash);
+    expect(w.world.jobs[0]).toMatchObject({ status: "sent", providerMessageId: "18f2aa", providerThreadId: "18f2aa", attempts: 1 });
+    expect(headers["Message-ID"]).toBe(w.world.jobs[0].rfcMessageId);
+    expect(w.world.events.map((e) => e.kind)).toEqual(["sent", "follow_due"]);
+    expect(w.afterSent).toHaveLength(1);
+    expect(ok(await sendApproved(w.members.ana, m.id, m.bodyHash, w.deps)).outcome).toBe("already_sent");
+    expect(w.sends).toHaveLength(1);
+    const logged = JSON.stringify(w.logs);
+    for (const secret of [ACCESS, REFRESH, SUBJECT, m.toAddress!]) expect(logged).not.toContain(secret);
+  });
+
+  it.each([
+    ["a 500", () => gErr(500, "backendError")],
+    ["a 503 with no body", () => new Response("", { status: 503 })],
+    ["a dropped connection", () => { throw new TypeError("socket hang up"); }],
+    ["no answer before the send timeout", () => new Promise<Response>(() => {})],
+    ["a 200 that names no message", () => gjson(200, {})],
+  ])("%s: uncertain, sent once and never again; the message stays held for the sender to settle", async (_label, answer) => {
+    const w = await gmailWorld(answer as () => Response);
+    const m = w.approved();
+    const r = ok(await sendApproved(w.members.ana, m.id, m.bodyHash, w.deps));
+    expect(r.outcome).toBe("uncertain");
+    expect(r.send).toMatchObject({ status: "uncertain", canResolve: true, canRetry: false });
+    expect(w.sends).toHaveLength(1);
+    expect(w.world.messages.get(m.id)!.status).toBe("sending");
+    expect(w.afterSent).toHaveLength(0);
+    expect(w.leadEvents.map((e) => e.kind)).toEqual(["message_send_uncertain"]);
+    // a second click, a stale tab, a later visit: nothing is sent again until a person settles it
+    expect(failed(await sendApproved(w.members.ana, m.id, m.bodyHash, w.deps)).code).toBe("in_flight");
+    w.tick(SEND_LEASE_MS * 3);
+    expect(failed(await sendApproved(w.members.ana, m.id, m.bodyHash, w.deps)).code).toBe("in_flight");
+    expect(w.sends).toHaveLength(1);
+    expect(ok(await resolveSend(w.members.ana, m.id, { decision: "sent" }, w.deps)).messageStatus).toBe("sent");
+    expect(w.afterSent).toHaveLength(1);
+  });
+
+  it("rate limited (proven not sent): retried with bounded backoff honouring Retry-After, then sent once", async () => {
+    const w = await gmailWorld((n) => (n < TRANSIENT_TRIES ? gjson(429, { error: { code: 429, errors: [{ reason: "rateLimitExceeded" }] } }, { "retry-after": "2" }) : gjson(200, { id: "r1", threadId: "r1" })));
+    const m = w.approved();
+    expect(ok(await sendApproved(w.members.ana, m.id, m.bodyHash, w.deps)).outcome).toBe("sent");
+    expect(w.sends).toHaveLength(TRANSIENT_TRIES);
+    expect(new Set(w.sends.map((s) => parse(decode(s.raw)).headers["Message-ID"])).size).toBe(1); // the same message each time
+    expect(w.sleeps.every((ms) => ms >= 1_000 && ms <= 4_000)).toBe(true);
+  });
+
+  it("Gmail refuses (bad request, expired token, API switched off): failed, nothing sent, approved again for a deliberate retry", async () => {
+    for (const answer of [() => gErr(400, "invalidArgument"), () => gErr(401, "authError"), () => gErr(403, "accessNotConfigured")]) {
+      const w = await gmailWorld(answer);
+      const m = w.approved();
+      const r = ok(await sendApproved(w.members.ana, m.id, m.bodyHash, w.deps));
+      expect(r.outcome).toBe("failed");
+      expect(r.send).toMatchObject({ status: "failed", canRetry: true });
+      expect(w.sends).toHaveLength(1);
+      expect(w.world.messages.get(m.id)!.status).toBe("approved");
+      expect(w.mailbox.rows[0].status).toBe("active"); // a refusal of one send doesn't condemn the mailbox
+    }
+  });
+
+  it("the connection lacks the send permission at Gmail: blocked, and the mailbox is marked for reconnecting", async () => {
+    const w = await gmailWorld(() => gErr(403, "insufficientPermissions"));
+    const m = w.approved();
+    const r = ok(await sendApproved(w.members.ana, m.id, m.bodyHash, w.deps));
+    expect(r).toMatchObject({ outcome: "failed", reconnect: true, send: { status: "blocked", code: "missing_send_scope" } });
+    expect(w.mailbox.rows[0]).toMatchObject({ status: "needs_reconnect", lastErrorCode: "missing_send_scope" });
+    expect(w.world.messages.get(m.id)!.status).toBe("approved");
+  });
+
+  it("a double click while Gmail is slow: one request reaches Gmail", async () => {
+    const w = await gmailWorld(() => gjson(200, { id: "d1" }), { delayMs: 20 });
+    const m = w.approved();
+    const rs = await Promise.all([1, 2, 3].map(() => sendApproved(w.members.ana, m.id, m.bodyHash, w.deps)));
+    expect(rs.map((x) => (x.ok ? x.outcome : x.code)).sort()).toEqual(["in_flight", "in_flight", "sent"]);
+    expect(w.sends).toHaveLength(1);
   });
 });

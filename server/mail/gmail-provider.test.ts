@@ -3,8 +3,10 @@
  * how it validates the identity token, and that nothing Google returns can leak into an error message.
  */
 import { describe, expect, it, vi } from "vitest";
-import { GmailProvider, GOOGLE_AUTHORIZE_URL, GOOGLE_REVOKE_URL, GOOGLE_TOKEN_URL, verifyIdTokenClaims } from "./gmail-provider";
-import { GMAIL_SEND_SCOPE, MailProviderError, capabilitiesOf, normalizeScopes } from "./provider";
+import { createMailProvider, resolveGmailConfig } from "./config";
+import { GMAIL_SEND_URL, GmailProvider, GOOGLE_AUTHORIZE_URL, GOOGLE_REVOKE_URL, GOOGLE_TOKEN_URL, verifyIdTokenClaims } from "./gmail-provider";
+import { buildMime } from "./mime";
+import { GMAIL_SEND_SCOPE, MailProviderError, capabilitiesOf, normalizeScopes, type OutgoingMail } from "./provider";
 
 const CLIENT = "123-abc.apps.googleusercontent.com";
 const NOW = new Date("2026-10-14T12:00:00Z");
@@ -61,11 +63,103 @@ describe("GmailProvider: what it asks Google for", () => {
     expect(capabilitiesOf(g.scopes).send).toBe(false);
   });
 
-  it("send is not enabled: refuses without calling Google", async () => {
-    const { p, calls } = provider(() => json(200, {}));
+  it("send is off unless the adapter is built with sending on: refuses without calling Google (and so does the one the app builds)", async () => {
+    const { p, calls } = provider(() => json(200, { id: "m1" }));
     const e = await failure(p.send("ya29", { from: "a@b.test", to: "c@d.test", subject: "s", text: "t", rfcMessageId: "<a@b>" }));
     expect(e?.kind).toBe("rejected");
     expect(calls).toHaveLength(0);
+    const cfg = resolveGmailConfig({ GMAIL_INTEGRATION_ENABLED: "true", MAIL_PROVIDER: "gmail", NODE_ENV: "production", GMAIL_OAUTH_CLIENT_ID: "9-z.apps.googleusercontent.com", GMAIL_OAUTH_CLIENT_SECRET: "s", GMAIL_OAUTH_REDIRECT_URI: "https://www.dealinsec.com/api/integrations/gmail/callback", MAILBOX_TOKEN_KEYS: `1:${Buffer.alloc(32, 7).fill(9, 0, 1).toString("base64")}`, MAILBOX_TOKEN_KEY_CURRENT: "1", GMAIL_SENDING_ENABLED: "true" });
+    if (!cfg.enabled) throw new Error(JSON.stringify(cfg));
+    const built = createMailProvider(cfg.config, { NODE_ENV: "production" });
+    const spy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => { throw new Error("no request may leave the machine"); });
+    expect((await failure(built.send("ya29", { from: "a@b.test", to: "c@d.test", subject: "s", text: "t", rfcMessageId: "<a@b>" })))?.kind).toBe("rejected");
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+});
+
+describe("GmailProvider: sending (users.messages.send, stubbed)", () => {
+  const ACCESS = "ya29.ACCESS-TOKEN-DO-NOT-LEAK";
+  const MAIL: OutgoingMail = { from: "ana@agency.test", fromName: "Ana Silva", to: "jo@acme-foods.test", subject: "A quick idea for Acme — spring menu", text: "Hi Jo,\n\nOne idea:\tseasonal menus.\n\nAna", rfcMessageId: "<dis-0123abcd@dealinsec.com>", date: NOW };
+  function sender(respond: () => Response | Promise<Response>, opts: { sendTimeoutMs?: number; fetchImpl?: typeof fetch } = {}) {
+    const calls: { url: string; init: RequestInit; json: any }[] = [];
+    const fetchImpl = opts.fetchImpl ?? (vi.fn(async (url: any, init: any) => { calls.push({ url: String(url), init, json: JSON.parse(String(init.body)) }); return respond(); }) as unknown as typeof fetch);
+    return { p: new GmailProvider({ clientId: CLIENT, clientSecret: "client-secret-xyz", fetchImpl, now: () => NOW, sendingEnabled: true, sendTimeoutMs: opts.sendTimeoutMs }), calls };
+  }
+
+  it("posts exactly the approved message as base64url `raw`, with the access token as a bearer token, and returns Gmail's ids", async () => {
+    const { p, calls } = sender(() => json(200, { id: "18f2a0b1c2d3e4f5", threadId: "18f2a0b1c2d3e4f5", labelIds: ["SENT"] }));
+    expect(await p.send(ACCESS, MAIL)).toEqual({ providerMessageId: "18f2a0b1c2d3e4f5", providerThreadId: "18f2a0b1c2d3e4f5" });
+    expect(calls).toHaveLength(1);
+    const c = calls[0];
+    expect(c.url).toBe(GMAIL_SEND_URL);
+    expect(c.init.method).toBe("POST");
+    expect(c.init.redirect).toBe("error");
+    expect(c.init.signal).toBeInstanceOf(AbortSignal);
+    expect(c.init.headers).toEqual({ Authorization: `Bearer ${ACCESS}`, "Content-Type": "application/json", Accept: "application/json" });
+    expect(Object.keys(c.json)).toEqual(["raw"]); // no threadId, no labels: a new message, nothing else
+    expect(c.json.raw).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(Buffer.from(c.json.raw, "base64url").toString("utf8")).toBe(buildMime(MAIL));
+  });
+
+  it("refuses an unsafe message before any request: header injection, two recipients, no token", async () => {
+    const { p, calls } = sender(() => json(200, { id: "m1" }));
+    for (const bad of [{ subject: "Hi\r\nBcc: everyone@x.test" }, { to: "a@x.test, b@x.test" }, { fromName: "Ana\nBcc: x@y.test" }, { rfcMessageId: "<a@b>\r\nX: y" }, { text: "" }]) {
+      expect((await failure(p.send(ACCESS, { ...MAIL, ...bad })))?.kind, JSON.stringify(bad)).toBe("rejected");
+    }
+    expect((await failure(p.send("", MAIL)))?.kind).toBe("rejected");
+    expect(calls).toHaveLength(0);
+  });
+
+  it("classifies Gmail's answers by what they prove, and never puts the token, the message or the answer in the error", async () => {
+    const leak = `${ACCESS} ${MAIL.to} ${MAIL.subject}`;
+    const gErr = (code: number, reason: string, status = "") => ({ error: { code, message: leak, status, errors: [{ reason, message: leak, domain: "global" }] } });
+    const cases: [() => Response | Promise<Response>, string, number?][] = [
+      // proven not sent: refused before sending
+      [() => json(400, gErr(400, "invalidArgument", "INVALID_ARGUMENT")), "rejected"],
+      [() => json(401, gErr(401, "authError", "UNAUTHENTICATED")), "rejected"],
+      [() => json(403, gErr(403, "accessNotConfigured", "PERMISSION_DENIED")), "rejected"], // the Gmail API switched off for the project
+      [() => json(403, gErr(403, "domainPolicy", "PERMISSION_DENIED")), "rejected"],
+      [() => json(404, gErr(404, "notFound")), "rejected"],
+      [() => json(403, gErr(403, "insufficientPermissions", "PERMISSION_DENIED")), "insufficient_scope"],
+      [() => json(403, { error: { code: 403, message: leak, status: "PERMISSION_DENIED", details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "ACCESS_TOKEN_SCOPE_INSUFFICIENT" }] } }), "insufficient_scope"],
+      [() => json(429, gErr(429, "rateLimitExceeded", "RESOURCE_EXHAUSTED"), { "retry-after": "20" }), "rate_limited", 20_000],
+      [() => json(403, gErr(403, "userRateLimitExceeded")), "rate_limited"],
+      [() => json(403, gErr(403, "dailyLimitExceeded")), "rate_limited"],
+      // may have gone out
+      [() => json(500, gErr(500, "backendError")), "uncertain"],
+      [() => new Response("<html>bad gateway</html>", { status: 502 }), "uncertain"],
+      [() => json(503, {}), "uncertain"],
+      [() => { throw new TypeError("fetch failed " + leak); }, "uncertain"],
+      [() => { throw new DOMException("The operation was aborted due to timeout", "TimeoutError"); }, "uncertain"],
+      [() => json(200, {}), "uncertain"], // "yes" without saying to what
+      [() => json(200, { id: "../../etc" }), "uncertain"],
+      [() => new Response("not json", { status: 200 }), "uncertain"],
+    ];
+    for (const [respond, kind, retry] of cases) {
+      const { p, calls } = sender(respond);
+      const e = await failure(p.send(ACCESS, MAIL));
+      expect(e, kind).toBeInstanceOf(MailProviderError);
+      expect(e!.kind, `${kind} ${respond.toString().slice(0, 80)}`).toBe(kind);
+      expect(e!.mayHaveSent).toBe(kind === "uncertain");
+      if (retry) expect(e!.retryAfterMs).toBe(retry);
+      for (const secret of [ACCESS, MAIL.to, MAIL.subject, "client-secret-xyz"]) expect(e!.message).not.toContain(secret);
+      expect(calls.length).toBeLessThanOrEqual(1); // the adapter never retries a send itself
+    }
+  });
+
+  it("a Gmail that never answers: given up on after the send timeout, as uncertain (not as 'failed')", async () => {
+    const hang = (async (_u: any, init: any) => new Promise<Response>((_r, reject) => init.signal.addEventListener("abort", () => reject(init.signal.reason)))) as unknown as typeof fetch;
+    const { p } = sender(() => json(200, { id: "x" }), { sendTimeoutMs: 25, fetchImpl: hang });
+    const started = Date.now();
+    expect((await failure(p.send(ACCESS, MAIL)))?.kind).toBe("uncertain");
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
+
+  it("a body that stops arriving after Gmail's 200 is uncertain too", async () => {
+    const stream = new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode('{"id":"m')); c.error(new Error("connection reset")); } });
+    const { p } = sender(() => new Response(stream, { status: 200, headers: { "content-type": "application/json" } }));
+    expect((await failure(p.send(ACCESS, MAIL)))?.kind).toBe("uncertain");
   });
 });
 

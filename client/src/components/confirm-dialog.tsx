@@ -71,8 +71,9 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               {opts.title || "Are you sure?"}
             </AlertDialogTitle>
             {opts.description && (
-              <AlertDialogDescription className="pt-1">
-                {opts.description}
+              // a div, not the default <p>: a description may hold a list (the Gmail disclosure)
+              <AlertDialogDescription asChild className="pt-1">
+                <div>{opts.description}</div>
               </AlertDialogDescription>
             )}
           </AlertDialogHeader>
