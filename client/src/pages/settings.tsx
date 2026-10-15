@@ -5,7 +5,7 @@
  * member can DO is role-gated with the shared permission map; the server is
  * the authority, this only hides what would 403 anyway.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,7 @@ import { normalizeAudience, type Audience } from "@shared/audience";
 import { getLocaleSettings, type LocaleFields, type LocaleSettings } from "@shared/schema";
 import { sameRegion } from "@shared/region";
 import { trackEvent } from "@/lib/analytics";
+import { consentChoice, openConsentSettings, OPEN_CONSENT_EVENT } from "@/lib/consent";
 
 /** Entity tints for the activity table — money events read green, documents
  *  blue/teal, people violet; everything else stays neutral. */
@@ -964,6 +965,8 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
 
+                <AnalyticsConsentCard />
+
                 <FeedbackCard />
               </>
             )}
@@ -1251,5 +1254,35 @@ export default function SettingsPage() {
 
       <BottomNav />
     </div>
+  );
+}
+
+/** Cookies and analytics on this device: the current choice, and a way to change it (reopens the cookie banner). */
+function AnalyticsConsentCard() {
+  const [choice, setChoice] = useState(consentChoice());
+  useEffect(() => {
+    const refresh = () => setChoice(consentChoice());
+    window.addEventListener("dis:consent", refresh);
+    window.addEventListener(OPEN_CONSENT_EVENT, refresh);
+    return () => { window.removeEventListener("dis:consent", refresh); window.removeEventListener(OPEN_CONSENT_EVENT, refresh); };
+  }, []);
+  return (
+    <Card className="glass-card">
+      <CardContent className="p-5 lg:p-6 space-y-3">
+        <div>
+          <h2 className="font-bold text-lg">Cookies and analytics</h2>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Google Analytics helps us see how DealInSec is used. It only runs if you allow it. Saved on this device.
+          </p>
+        </div>
+        <p className="text-sm" data-testid="settings-consent-state">
+          Analytics: <span className="font-semibold">{choice === "granted" ? "allowed" : choice === "denied" ? "off" : "not chosen (off)"}</span>
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="outline" size="sm" onClick={openConsentSettings} data-testid="settings-cookie-settings">Change cookie settings</Button>
+          <a href="/cookies" className="text-sm text-muted-foreground underline-offset-2 hover:underline">Cookie policy</a>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

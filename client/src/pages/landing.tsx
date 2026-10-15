@@ -57,6 +57,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { trackEvent } from "@/lib/analytics";
+import { openConsentSettings } from "@/lib/consent";
 import { LandingCopilot } from "@/components/landing-copilot";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { BRAND_GRADIENT, GradientText, SectionHeader, fadeUp, stagger } from "@/components/landing-shared";
@@ -1426,6 +1427,7 @@ function Footer() {
               { label: "Free Tools", href: "/tools" },
               { label: "Blog", href: "/blog" },
               { label: "Cookies", href: "/cookies" },
+              { label: "Cookie settings", href: "/cookies", onClick: openConsentSettings },
               { label: "Contact", href: "mailto:support@dealinsec.com" },
             ]}
           />
@@ -1527,12 +1529,21 @@ function NewsletterStrip() {
   );
 }
 
-function FooterColumn({ title, links }: { title: string; links: { label: string; href: string }[] }) {
+function FooterColumn({ title, links }: { title: string; links: { label: string; href: string; onClick?: () => void }[] }) {
   return (
     <div>
       <p className="text-xs uppercase tracking-widest font-semibold text-neutral-900 dark:text-white mb-4">{title}</p>
       <ul className="space-y-2.5">
         {links.map((l) => {
+          if (l.onClick) {
+            return (
+              <li key={l.label}>
+                <button type="button" onClick={l.onClick} className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors" data-testid="footer-cookie-settings">
+                  {l.label}
+                </button>
+              </li>
+            );
+          }
           const isHashOrExternal =
             l.href.startsWith("#") || l.href.startsWith("mailto:") || isServerRoute(l.href);
           if (isHashOrExternal) {

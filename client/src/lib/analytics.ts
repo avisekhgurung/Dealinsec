@@ -1,13 +1,14 @@
 /**
  * Google Analytics (GA4) helpers.
  *
- * The gtag script + config is loaded once in `client/index.html`. We disable
- * the automatic first page_view there and fire all page_view events from React
- * instead, so SPA route changes are tracked accurately (one event per route).
+ * gtag is loaded by the consent script in `client/index.html` ONLY after the visitor accepts analytics
+ * (shared/consent-script.ts). Its automatic first page_view is off; React sends one per route instead. Nothing is
+ * sent unless the choice is "granted", even if gtag happens to exist.
  */
 
 import { sanitizeEventParams } from "@shared/analyticsParams";
 import { analyticsPath } from "@shared/analyticsPath";
+import { analyticsAllowed } from "@/lib/consent";
 import type { Audience } from "@shared/audience";
 
 export const GA_MEASUREMENT_ID = "G-W3VTLRH79B";
@@ -19,7 +20,7 @@ let currentAudience: Audience | undefined;
 
 export function setAnalyticsAudience(audience: Audience | undefined): void {
   currentAudience = audience;
-  if (typeof window !== "undefined" && typeof window.gtag === "function" && audience) {
+  if (typeof window !== "undefined" && typeof window.gtag === "function" && audience && analyticsAllowed()) {
     // A user property, so GA4 can segment reports by audience as well.
     window.gtag("set", "user_properties", { audience });
   }
@@ -70,7 +71,7 @@ function routeTitle(path: string): string {
 
 /** Fire a `page_view` for the given SPA path. */
 export function trackPageView(path: string): void {
-  if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+  if (typeof window === "undefined" || typeof window.gtag !== "function" || !analyticsAllowed()) return;
   // The route's shape only (shared/analyticsPath.ts): no document tokens, record ids or query strings. Set as the page
   // for every later event too, so no hit falls back to the real address; page_title is route-derived as well.
   const safePath = analyticsPath(path);
@@ -81,7 +82,7 @@ export function trackPageView(path: string): void {
 
 /** Fire a custom GA4 event (e.g. trackEvent("create_deal", { dealType: "Creator" })). */
 export function trackEvent(name: string, params?: Record<string, unknown>): void {
-  if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+  if (typeof window === "undefined" || typeof window.gtag !== "function" || !analyticsAllowed()) return;
   // Sanitised first: nothing a person typed or pasted may reach analytics (see
   // shared/analyticsParams.ts). Then the audience, unless the caller gave one.
   const safe = sanitizeEventParams(params) ?? {};

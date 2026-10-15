@@ -73,24 +73,10 @@
     <!-- Google Analytics (GA4) -->
     <!-- SPA route changes are tracked from the React side (see lib/analytics.ts),
          so we disable the automatic first-load page_view to avoid double-counting. -->
-    <!-- Analytics loads ONLY on the real domain: localhost dev sessions and
-         automated browser tests were polluting GA with page_views and even
-         create_deal events, which corrupts every conversion number. On other
-         hosts gtag stays undefined and lib/analytics.ts no-ops safely. -->
-    <script>
-      (function () {
-        var h = location.hostname;
-        if (h === "localhost" || h === "127.0.0.1" || h.endsWith(".local")) return;
-        var s = document.createElement("script");
-        s.async = true;
-        s.src = "https://www.googletagmanager.com/gtag/js?id=G-W3VTLRH79B";
-        document.head.appendChild(s);
-        window.dataLayer = window.dataLayer || [];
-        window.gtag = function () { dataLayer.push(arguments); };
-        gtag("js", new Date());
-        gtag("config", "G-W3VTLRH79B", { send_page_view: false });
-      })();
-    </script>
+    <!-- Analytics consent (option a): Google Analytics is NOT loaded until the visitor accepts, and never on
+         localhost. Generated from shared/consent-script.ts consentScript("spa"); server/seo.test.ts fails if this
+         copy differs. Page views are sent by React (lib/analytics.ts); the banner is components/cookie-banner.tsx. -->
+    <script>(function(){var ID='G-W3VTLRH79B',KEY='dis_consent',V=1,MAX=365*864e5;function read(){try{var v=JSON.parse(localStorage.getItem(KEY)||'null');if(!v||v.v!==V||(v.analytics!=='granted'&&v.analytics!=='denied'))return null;if(!(Date.now()-Date.parse(v.at)<MAX))return null;return v.analytics}catch(e){return null}}function local(){var h=location.hostname;return h==='localhost'||h==='127.0.0.1'||h==='[::1]'||/\.local$/.test(h)}function load(){if(window.__disGa||local())return;window.__disGa=true;window['ga-disable-'+ID]=false;var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+ID;document.head.appendChild(s);window.dataLayer=window.dataLayer||[];window.gtag=function(){window.dataLayer.push(arguments)};window.gtag('js',new Date());window.gtag('config',ID,{send_page_view:false});}function wipe(){var d=location.hostname.replace(/^www\./,'');document.cookie.split(';').forEach(function(c){var n=c.split('=')[0].trim();if(!/^_ga/.test(n))return;['',';domain='+d,';domain=.'+d].forEach(function(x){document.cookie=n+'=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/'+x})})}window.disConsent={get:read,load:load,set:function(a){if(a!=='granted'&&a!=='denied')return;try{localStorage.setItem(KEY,JSON.stringify({v:V,analytics:a,at:new Date().toISOString()}))}catch(e){}if(a==='granted'){load()}else{window['ga-disable-'+ID]=true;wipe()}try{window.dispatchEvent(new CustomEvent('dis:consent',{detail:a}))}catch(e){}}};if(read()==='granted')load()})();</script>
     <!-- Pre-paint bootstrap: theme, applied before first style resolution so
          it never flashes. Theme default is LIGHT —
          "system" only applies when the user chose it in Settings. -->

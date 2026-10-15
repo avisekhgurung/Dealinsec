@@ -19,7 +19,8 @@
  * country, `region: "IN"`; posts with no region are global.
  */
 import type { Express } from "express";
-import { esc, SITE_ORIGIN, LOGO_SVG, gaSnippet } from "./tools/layout";
+import { esc, SITE_ORIGIN, LOGO_SVG, gaSnippet, COOKIE_FOOTER_LINKS } from "./tools/layout";
+import { consentBanner } from "@shared/consent-script";
 
 // ?ref=, not utm_*: an internal UTM would overwrite the organic session source in GA4.
 const SIGNUP = "/auth?mode=signup&ref=blog";
@@ -225,7 +226,9 @@ function footer(): string {
       <a href="/about">About</a>
       <a href="/terms">Terms</a>
       <a href="/privacy">Privacy</a>
+      ${COOKIE_FOOTER_LINKS}
     </div>
+    ${consentBanner()}
     <div class="muted">© 2026 DealInSec — quotations, e-signed agreements and invoices for freelancers and creators worldwide. Articles are general information, not legal or tax advice.</div>
   </div></footer>`;
 }

@@ -20,6 +20,7 @@ import { useLocation } from "wouter";
 // Eagerly loaded — always needed for first render
 import LandingPage from "@/pages/landing";
 import NotFound from "@/pages/not-found";
+import { CookieBanner } from "@/components/cookie-banner";
 
 // Lazy-loaded — only fetched when the user navigates to that route
 const PublicQuotePage         = lazy(() => import("@/pages/public-quote"));
@@ -310,6 +311,7 @@ function App() {
               </CrashGuard>
             </div>
             <InstallPrompt />
+            <CookieBanner />
             <Toaster />
           </UpgradeModalProvider>
         </ConfirmProvider>

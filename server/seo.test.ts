@@ -11,6 +11,7 @@ import fs from "fs";
 import path from "path";
 import { SSR_PATH_PATTERN, swNavigationMatcher } from "@shared/ssr-paths";
 import { GA_MEASUREMENT_ID, esc, gaSnippet } from "./tools/layout";
+import { consentBanner, consentScript } from "@shared/consent-script";
 import { COPY_SCRIPT, POSTS, blogSitemapPaths, guidesHtml, registerBlogPages, relatedSlugs, tpl } from "./blog";
 import { PAGES, registerCategoryPages } from "./category-pages";
 import { COMPARISON_PAGES, VENDORS, registerComparisonPages, comparisonSitemapPaths } from "./comparison-pages";
@@ -178,15 +179,31 @@ describe("structured data matches visible content", () => {
 });
 
 describe("analytics", () => {
-  it("the server-page GA4 id is the one the SPA uses", () => {
+  it("the SPA carries exactly the shared consent script, so both sides gate GA the same way", () => {
     const spa = fs.readFileSync(path.join(process.cwd(), "client/index.html"), "utf8");
-    expect(spa).toContain(`"${GA_MEASUREMENT_ID}"`);
+    expect(spa).toContain(consentScript("spa"));
+    expect(consentScript("spa")).toContain(`'${GA_MEASUREMENT_ID}'`);
+  });
+
+  it("option a: no page loads Google Analytics before consent (no static gtag script anywhere)", () => {
+    const spa = fs.readFileSync(path.join(process.cwd(), "client/index.html"), "utf8");
+    const staticTag = /<script[^>]+src=["']https:\/\/www\.googletagmanager\.com/;
+    expect(spa).not.toMatch(staticTag);
+    for (const [page, html] of htmlPages) expect(html, page).not.toMatch(staticTag);
+  });
+
+  it("every server-rendered page has the consent banner once and a way back to the choice", () => {
+    for (const [page, html] of htmlPages) {
+      expect(html.split('id="dis-consent"').length - 1, page).toBe(1);
+      expect(html, page).toContain("data-consent-open");
+      expect(html, page).toContain('href="/cookies"');
+    }
   });
 
   it("the injected scripts are syntactically valid JavaScript", () => {
     // A TS template literal silently turns "\/" into "/", which once produced a
     // malformed regex that only threw in the browser. Compile, don't execute.
-    for (const snippet of [gaSnippet(), COPY_SCRIPT]) {
+    for (const snippet of [gaSnippet(), COPY_SCRIPT, ...consentBanner().match(/<script>[\s\S]*?<\/script>/g)!]) {
       const js = snippet.replace(/^<script>/, "").replace(/<\/script>$/, "");
       expect(() => new Function(js)).not.toThrow();
     }
@@ -525,8 +542,11 @@ describe("deal risk checker page", () => {
 
   it("keeps no draft: the page never writes the pasted message to storage", () => {
     // sessionStorage is used for the sign-up handoff only (the AI draft and the work type),
-    // never for the message text.
-    expect(html).not.toMatch(/localStorage/);
+    // never for the message text. The page's own code never touches localStorage; the shared consent script (tested
+    // in shared/consent-script.test.ts) stores only the analytics choice there.
+    const own = html.replace(gaSnippet(), "").replace(consentBanner(), "");
+    expect(own).not.toMatch(/localStorage/);
+    expect([...gaSnippet().matchAll(/localStorage\.setItem\(([^,]+),/g)].map((m) => m[1])).toEqual(["KEY"]);
     const stores = [...html.matchAll(/(?:sessionStorage)\.setItem\('([^']+)'/g)].map((m) => m[1]);
     expect(stores.sort()).toEqual(["dis_audience_intent", "dis_deal_prefill"]);
   });

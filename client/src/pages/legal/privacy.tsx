@@ -15,7 +15,7 @@ export default function PrivacyPolicy() {
       </header>
 
       <main className="px-4 py-8 max-w-2xl mx-auto prose prose-sm dark:prose-invert animate-fade-in">
-        <p className="text-muted-foreground text-xs">Last updated: 10 August 2026</p>
+        <p className="text-muted-foreground text-xs">Last updated: 16 October 2026</p>
 
         <p>
           This Privacy Policy explains how DealInSec, a sole proprietorship of Avisekh Gurung ("we", "us")
@@ -36,9 +36,9 @@ export default function PrivacyPolicy() {
 
         <h3>b) Information Collected Automatically</h3>
         <ul>
-          <li><strong>Usage data:</strong> Pages visited, features used, timestamps.</li>
-          <li><strong>Device data:</strong> Browser type, operating system, screen resolution.</li>
-          <li><strong>Cookies:</strong> Session cookies for authentication (see our <Link href="/cookies" className="text-primary underline">Cookie Policy</Link>).</li>
+          <li><strong>Usage data (only if you allow analytics):</strong> pages visited and steps completed, through Google Analytics. It is not loaded until you accept, and page addresses are sent without document links or record numbers.</li>
+          <li><strong>Device data:</strong> Browser type and operating system, in our server logs and, if you allow analytics, in Google Analytics.</li>
+          <li><strong>Cookies and local storage:</strong> a session cookie that keeps you signed in, your preferences on your device, and analytics cookies only with your consent (see our <Link href="/cookies" className="text-primary underline">Cookie Policy</Link>).</li>
         </ul>
 
         <h2>2. Purpose of Data Collection</h2>
@@ -52,7 +52,7 @@ export default function PrivacyPolicy() {
             <tr><td>Generating agreements, quotes, and invoices</td><td>Contract performance</td></tr>
             <tr><td>Processing subscription payments via Razorpay</td><td>Contract performance</td></tr>
             <tr><td>Displaying your profile data on documents</td><td>Consent</td></tr>
-            <tr><td>Platform analytics and improvement</td><td>Legitimate interest</td></tr>
+            <tr><td>Platform analytics and improvement (Google Analytics)</td><td>Consent, which you can withdraw at any time</td></tr>
             <tr><td>Communication (transactional emails)</td><td>Consent</td></tr>
             <tr><td>Answering your questions and drafting text in DealInSec Copilot (AI)</td><td>Contract performance</td></tr>
           </tbody>
@@ -82,6 +82,8 @@ export default function PrivacyPolicy() {
             <tr><td>Neon</td><td>Managed PostgreSQL database</td><td>All account and deal data at rest</td></tr>
             <tr><td>Render</td><td>Application hosting</td><td>All data in transit through the application, server logs</td></tr>
             <tr><td>Resend</td><td>Transactional email delivery</td><td>Recipient name, email address, message content</td></tr>
+            <tr><td>Google (Analytics)</td><td>Usage analytics, only if you accept analytics cookies</td><td>Page addresses (without document links or record numbers), events such as "signed up" or "created a deal" without names or content, browser and device details, IP address</td></tr>
+            <tr><td>Google (Fonts)</td><td>Web fonts</td><td>IP address and browser details when a page loads its fonts</td></tr>
             <tr><td>DeepSeek</td><td>AI model powering DealInSec Copilot</td><td>Your prompt plus the specific deal, invoice and payment records needed to answer it — sent only when you use the Copilot. See Section 5.</td></tr>
           </tbody>
         </table>

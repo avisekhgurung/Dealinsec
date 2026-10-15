@@ -191,12 +191,8 @@ export default function ContractConfirmationPage() {
     onSuccess: (contract) => {
       // Key conversion event: an agreement was signed (a core Pro action).
       trackEvent("agreement_created", { audience: audienceForDealType(deal?.dealType) });
-      trackEvent("sign_agreement", {
-        // Major units plus the currency, the way analytics tools expect a
-        // monetary value — reporting paise as `value` would show 100x revenue.
-        contract_value: fmt.major(contract?.contractValueMinor ?? 0),
-        currency: fmt.currency,
-      });
+      // The currency only: a client's deal amount is their business, not analytics data (see the cookie policy).
+      trackEvent("sign_agreement", { currency: fmt.currency });
       queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoices"] });

@@ -34,25 +34,24 @@ export const SITE_ORIGIN = "https://www.dealinsec.com";
 const APP_LINK = "/?ref=tools";
 const APP_SIGNUP = "/?ref=tools_remove_brand";
 
+import { consentBanner, consentScript, GA_ID } from "@shared/consent-script";
+
 /** Same property as client/index.html; server/seo.test.ts asserts they match. */
-export const GA_MEASUREMENT_ID = "G-W3VTLRH79B";
+export const GA_MEASUREMENT_ID = GA_ID;
 
 /**
- * GA4 for the server-rendered pages (tools, blog, category, comparison).
- *
- * The SPA loads GA from client/index.html with send_page_view:false and sends
- * page views itself; these pages have no React, so they must send their own —
- * otherwise an organic landing on a blog post is invisible and the funnel
- * "organic landing → CTA click → sign_up" has no first step. Same host gate as
- * the SPA snippet, so localhost dev/test traffic never reaches GA.
- *
- * `seo_cta_click` fires for anchors marked data-cta and for links into the
- * product (/auth, /pricing, /?…). Tool-to-tool navigation is deliberately NOT
- * counted: it is browsing, not conversion intent.
+ * GA4 for the server-rendered pages (tools, blog, category, comparison), loaded ONLY after the visitor accepts
+ * analytics (shared/consent-script.ts, option a: nothing from Google Analytics before that). Once accepted, GA's own
+ * page_view fires (these pages have no React) and `seo_cta_click` fires for anchors marked data-cta and links into
+ * the product (/auth, /pricing, /?…); tool-to-tool navigation is not counted. Never on localhost.
  */
 export function gaSnippet(): string {
-  return `<script>(function(){var h=location.hostname;if(h==='localhost'||h==='127.0.0.1'||h.endsWith('.local'))return;var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}';document.head.appendChild(s);window.dataLayer=window.dataLayer||[];window.gtag=function(){dataLayer.push(arguments)};gtag('js',new Date());gtag('config','${GA_MEASUREMENT_ID}');document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('a[href]');if(!a)return;var u=a.getAttribute('href')||'';if(a.hasAttribute('data-cta')||/^\\/auth|^\\/pricing|^\\/\\?/.test(u)){gtag('event','seo_cta_click',{page:location.pathname,target:u,transport_type:'beacon'})}})})();</script>`;
+  return consentScript("server");
 }
+
+/** The footer's cookie links: the policy, and a button that reopens the choice (handled by consentBanner()). */
+export const COOKIE_FOOTER_LINKS = `<a href="/cookies">Cookies</a>
+        <a href="/cookies" data-consent-open>Cookie settings</a>`;
 
 /** HTML-escape untrusted/dynamic text before it goes into markup. */
 export function esc(s: unknown): string {
@@ -640,9 +639,11 @@ function footer(): string {
         <a href="/terms">Terms</a>
         <a href="/privacy">Privacy</a>
         <a href="/refund">Refund</a>
+        ${COOKIE_FOOTER_LINKS}
       </div>
       ${SOCIALS}
     </div>
+    ${consentBanner()}
     <div class="muted">© ${y} DealInSec — quotation, agreement and invoice software for freelancers and creators. These free tools run in your browser; nothing you enter is stored on our servers.</div>
   </div></footer>`;
 }
