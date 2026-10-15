@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, Link } from "wouter";
 import { MoreHorizontal } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,7 +18,16 @@ import { NAV_ICONS, isMoreActive, mobileBarItems, moreSheetSections } from "@/li
  * Rendered per page (not in the shell), so navigating away unmounts the sheet
  * with the page; the location effect below covers routes that keep the page.
  */
+/**
+ * Rendered into <body>, not inside the page: pages fade in on navigation (RouteTransition), and the navigation bar
+ * must stay perfectly still while they do.
+ */
 export function BottomNav() {
+  if (typeof document === "undefined") return null;
+  return createPortal(<BottomNavBar />, document.body);
+}
+
+function BottomNavBar() {
   const [location] = useLocation();
   const { user } = useAuth();
   const [moreOpen, setMoreOpen] = useState(false);

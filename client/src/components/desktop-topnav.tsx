@@ -14,6 +14,8 @@
  * offset every page's own sticky title bar takes (see index.css). Hidden below
  * lg, where the bottom tab bar does this job.
  */
+import { motion } from "framer-motion";
+import { tSpring } from "@/lib/motion";
 import { Fragment, useEffect, useReducer } from "react";
 import { useLocation, Link } from "wouter";
 import { Settings, LogOut, Sparkles, Crown, Users, Zap } from "lucide-react";
@@ -237,6 +239,7 @@ export function DesktopTopNav() {
                         {/* Short labels at lg ("Outbound", "Quotes") keep 1024px from overflowing. */}
                         <span className="xl:hidden">{item.shortLabel}</span>
                         <span className="hidden xl:inline">{item.label}</span>
+                        {active && <motion.span layoutId="topnav-underline" className="dis-topnav-underline" transition={tSpring} aria-hidden="true" />}
                       </Link>
                     );
                   })}

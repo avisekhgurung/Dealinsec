@@ -353,9 +353,6 @@
   animation: shimmer 3s ease-in-out infinite;
 }
 
-.animate-fade-in {
-  animation: fade-in 0.5s ease-out forwards;
-}
 
 /**
  * Using the elevate system.
@@ -616,12 +613,11 @@ button:not(:disabled):active,
 
 /* ── Gradient button enhanced press ────────────────────────────────────────── */
 .gradient-btn {
-  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
-  will-change: transform;
+  transition: transform 0.12s ease, box-shadow 0.15s ease, filter 0.15s ease, opacity 0.15s ease !important;
 }
 
 .gradient-btn:not(:disabled):active {
-  transform: scale(0.96) !important;
+  transform: scale(0.98) !important;
   box-shadow: 0 2px 8px -2px rgba(5, 150, 105, 0.3) !important;
 }
 
@@ -662,9 +658,27 @@ button:not(:disabled):active,
   animation: credit-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* ── Animate the fade-in (override default for spring feel) ─────────────────── */
+/* ── Page content fade-in: short and settled, no overshoot (lib/motion.ts uses the same curve) ── */
 .animate-fade-in {
-  animation: spring-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation: fade-in 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Route change: a quick fade of the new screen (components/motion/route-transition.tsx). CSS, so it completes
+   even where no animation frames run; opacity only, so fixed elements inside pages are unaffected. ── */
+@keyframes dis-route-in { from { opacity: 0; } to { opacity: 1; } }
+.dis-route-in { animation: dis-route-in 0.18s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ── Reduced motion: people who ask for less movement get none of the decorative kind. Spinners stay (they say
+   "working"); fades, slides, pulses, presses and smooth scrolling go. framer-motion follows the same setting
+   through <MotionConfig reducedMotion="user"> in App.tsx. ── */
+@media (prefers-reduced-motion: reduce) {
+  .dis-route-in, .animate-fade-in, .animate-shimmer, .animate-credit-pop, .animate-pulse, .animate-ping, .animate-bounce,
+  .stagger-children > *, .dis-shimmer { animation: none !important; }
+  .gradient-btn, .card-interactive, .pill-press, .glass-card, .hover-elevate, .active-elevate-2 { transition: none !important; }
+  .gradient-btn:not(:disabled):active, .card-interactive:active, .pill-press:active { transform: none !important; }
+  html { scroll-behavior: auto !important; }
+  /* Dialogs, sheets and menus (tailwindcss-animate): appear and disappear without sliding or zooming. */
+  .animate-in, .animate-out { animation: none !important; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -730,8 +744,8 @@ button:not(:disabled):active,
     inset 1px 0 0 hsl(0 0% 100% / 0.06),
     inset -1px 0 0 hsl(0 0% 100% / 0.06);
 }
-.dis-topnav-tab[aria-current="page"]::after {
-  content: "";
+/* The active underline is a shared framer-motion element (desktop-topnav.tsx) so it slides between tabs. */
+.dis-topnav-underline {
   position: absolute;
   left: 12px;
   right: 12px;

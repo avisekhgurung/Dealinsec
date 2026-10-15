@@ -21,6 +21,8 @@ import { useLocation } from "wouter";
 import LandingPage from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 import { CookieBanner } from "@/components/cookie-banner";
+import { RouteTransition } from "@/components/motion/route-transition";
+import { MotionConfig } from "framer-motion";
 
 // Lazy-loaded — only fetched when the user navigates to that route
 const PublicQuotePage         = lazy(() => import("@/pages/public-quote"));
@@ -135,9 +137,10 @@ function Router() {
     );
   }
 
-  // Initial app load (auth check) → full branded splash, shown once per session
+  // Initial app load (auth check) → full branded splash, shown once per session. Not inside an embedded preview
+  // (the agreement page shows its export in an iframe): a splash inside a document preview is noise.
   if (isLoading) {
-    return <AppLoader />;
+    return isEmbedded() ? null : <AppLoader />;
   }
 
   const needsOnboarding = isAuthenticated && user && !user.onboardingComplete;
@@ -201,6 +204,7 @@ function Router() {
           (see .app-shell in index.css). */}
       <div className={showShell ? "app-shell" : ""}>
         <Suspense fallback={<RouteLoader />}>
+          <RouteTransition location={location} disabled={!showShell}>
           <Switch>
             {/* Authenticated users hitting `/` go straight to the dashboard
                 — the marketing landing page is for logged-out visitors only. */}
@@ -240,6 +244,7 @@ function Router() {
             <Route path="/refund" component={RefundPage} />
             <Route component={NotFound} />
           </Switch>
+          </RouteTransition>
         </Suspense>
       </div>
     </>
@@ -279,6 +284,11 @@ class CrashGuard extends Component<{ children: ReactNode }, { crashed: boolean }
   }
 }
 
+/** True inside an iframe (the agreement page's PDF preview embeds the export route). */
+function isEmbedded(): boolean {
+  try { return typeof window !== "undefined" && window.self !== window.top; } catch { return true; }
+}
+
 function App() {
   // Documents must print on white whatever theme the screen uses. Overriding
   // 128 CSS variables in @media print would drift; stripping the dark class
@@ -301,6 +311,7 @@ function App() {
   }, []);
 
   return (
+    <MotionConfig reducedMotion="user">
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ConfirmProvider>
@@ -310,13 +321,14 @@ function App() {
                 <Router />
               </CrashGuard>
             </div>
-            <InstallPrompt />
-            <CookieBanner />
+            {!isEmbedded() && <InstallPrompt />}
+            {!isEmbedded() && <CookieBanner />}
             <Toaster />
           </UpgradeModalProvider>
         </ConfirmProvider>
       </TooltipProvider>
     </QueryClientProvider>
+    </MotionConfig>
   );
 }
 

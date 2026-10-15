@@ -203,9 +203,11 @@ function PipelineConnector({ delay }: { delay: number }) {
  * non-blocking, unobtrusive, used by apps like Linear & Notion.
  */
 export function RouteLoader() {
+  // Shown while a screen's code loads. It appears only after 150 ms, so a fast load never flashes a bar, it tells
+  // screen readers what is happening, and it holds still for people who prefer reduced motion.
   return (
     <>
-      <div className="fixed top-0 left-0 right-0 z-[9999] h-0.5 overflow-hidden pointer-events-none">
+      <div className="dis-route-loader fixed top-0 left-0 right-0 z-[9999] h-0.5 overflow-hidden pointer-events-none" role="status" aria-label="Loading">
         <div
           className="h-full w-full origin-left animate-route-progress"
           style={{
@@ -220,8 +222,14 @@ export function RouteLoader() {
           50%  { transform: translateX(0%); }
           100% { transform: translateX(100%); }
         }
+        @keyframes route-loader-in { from { opacity: 0; } to { opacity: 1; } }
+        .dis-route-loader { opacity: 0; animation: route-loader-in 0.12s ease-out 0.15s forwards; }
         .animate-route-progress {
           animation: route-progress 1.1s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .dis-route-loader { animation: none; opacity: 1; }
+          .animate-route-progress { animation: none; transform: scaleX(0.4); }
         }
       `}</style>
     </>
