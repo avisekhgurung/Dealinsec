@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { AudiencePicker, DESCRIBES_YOU } from "@/components/audience-picker";
+import { FirstGoalPicker } from "@/components/first-goal-picker";
 import type { Audience } from "@shared/audience";
 import { cn } from "@/lib/utils";
 import { readAudienceIntent } from "@/lib/audience-intent";
@@ -21,6 +22,8 @@ import { sameRegion } from "@shared/region";
 import { useLocation } from "wouter";
 import { postAuthDestination, hasPendingDealPrefill } from "@/lib/deal-prefill";
 import { trackEvent } from "@/lib/analytics";
+import { setFirstGoal } from "@/lib/first-goal";
+import { destinationFor, type FirstGoal } from "@shared/getting-started";
 
 /**
  * What the chosen country changes on this screen. Data, not a branch: a country
@@ -115,8 +118,15 @@ export default function OnboardingPage() {
   // or the Deal Risk Checker), which they can still change here.
   const [audience, setAudience] = useState<Audience | null>(readAudienceIntent);
   const [describes, setDescribes] = useState<string | null>(null);
-  const [fullName, setFullName] = useState("");
+  // Optional: shapes where they land and the dashboard's "Get started" order.
+  const [goal, setGoal] = useState<FirstGoal | null>(null);
+  // Signup already asked for the name: start from it rather than asking twice.
+  const [fullName, setFullName] = useState(() => [user?.firstName, user?.lastName].filter(Boolean).join(" "));
   const [businessName, setBusinessName] = useState("");
+  useEffect(() => {
+    if (!user) return;
+    setFullName((cur) => cur || [user.firstName, user.lastName].filter(Boolean).join(" "));
+  }, [user]);
   const [phone, setPhone] = useState("");
   const [billingAddress, setBillingAddress] = useState("");
   // Pre-filled from the browser, so an Indian signup is already on India / INR
@@ -144,7 +154,8 @@ export default function OnboardingPage() {
     if (which >= 0 && !audience) e.audience = "Choose the kind of work you do";
     if (which >= 1) {
       if (!fullName.trim()) e.name = "Full name is required";
-      if (!rules.phonePattern.test(rules.normalizePhone(phone, dialCode))) e.phone = rules.phoneInvalid;
+      // Optional, but a number that IS typed must be one the country can dial.
+      if (phone.trim() && !rules.phonePattern.test(rules.normalizePhone(phone, dialCode))) e.phone = rules.phoneInvalid;
     }
     return e;
   };
@@ -235,7 +246,8 @@ export default function OnboardingPage() {
       const profileRes = await apiRequest("PATCH", "/api/profile", {
         firstName,
         lastName,
-        phone: rules.normalizePhone(phone, dialCode),
+        // Left out when blank, so nothing is written for a skipped field.
+        phone: rules.normalizePhone(phone, dialCode) || undefined,
         billingAddress: billingAddress.trim() || undefined,
         // The person's own row drives their personal screens (dates in their
         // activity feed) and is the issuer profile, so it records the same
@@ -253,6 +265,8 @@ export default function OnboardingPage() {
         if (updated?.trialStartedAt) trackEvent("pro_trial_started");
       }
       trackEvent("onboarding_step_completed", { step: 3 });
+      setFirstGoal(user?.id, goal);
+      trackEvent("onboarding_goal_selected", { goal: goal ?? "none" });
 
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       const restoring = hasPendingDealPrefill();
@@ -262,7 +276,9 @@ export default function OnboardingPage() {
           ? "Picking up right where you left off."
           : `We'll ask for ${rules.taxIdLabel}, bank & signature only when you need them.`,
       });
-      setLocation(postAuthDestination());
+      // A demo deal waiting to be finished wins over the goal: it is work the
+      // person already started.
+      setLocation(restoring ? postAuthDestination() : destinationFor(goal));
     } catch (error: any) {
       toast({
         title: "Failed to save profile",
@@ -385,15 +401,25 @@ export default function OnboardingPage() {
                   className="space-y-6"
                 >
                   <motion.div variants={itemVariants} className="text-center">
-                    <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-bold tracking-tight outline-none">
-                      What kind of work do you do?
+                    <h1 id="first-goal-heading" ref={headingRef} tabIndex={-1} className="text-2xl font-bold tracking-tight outline-none">
+                      What do you want to do first?
                     </h1>
-                    <p className="mt-1.5 text-sm text-muted-foreground">
-                      This sets the wording and where you start. You can change it any time in Settings.
+                    <p id="first-goal-hint" className="mt-1.5 text-sm text-muted-foreground">
+                      Optional. We&apos;ll start you there. You can change this later.
                     </p>
                   </motion.div>
 
+                  <motion.div variants={itemVariants}>
+                    <FirstGoalPicker value={goal} onChange={setGoal} labelledBy="first-goal-heading" describedBy="first-goal-hint" idPrefix="onboarding-goal" />
+                  </motion.div>
+
                   <motion.div variants={itemVariants} className="space-y-2">
+                    <div>
+                      <h2 className="text-base font-semibold tracking-tight">What kind of work do you do?</h2>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        This sets the wording across the app and which kind of deal is offered first. You can change it any time in Settings.
+                      </p>
+                    </div>
                     <AudiencePicker value={audience} onChange={(a) => { setAudience(a); setErrors({}); }} idPrefix="onboarding-audience" />
                     {errorText("audience-error", errors.audience)}
                   </motion.div>
@@ -475,7 +501,10 @@ export default function OnboardingPage() {
                   </motion.div>
 
                   <motion.div variants={itemVariants} className="space-y-2">
-                    <Label htmlFor="phone">Phone Number *</Label>
+                    <div className="flex items-baseline justify-between">
+                      <Label htmlFor="phone">Phone Number</Label>
+                      <span className="text-[11px] font-medium text-muted-foreground">Optional</span>
+                    </div>
                     <div className="relative">
                       {dialCode && (
                         <span
@@ -519,7 +548,7 @@ export default function OnboardingPage() {
                       type="text"
                       autoComplete="organization"
                       maxLength={80}
-                      placeholder="e.g. Studio Doe or Freelance Consulting"
+                      placeholder="e.g. Northwind Digital or Doe Consulting"
                       value={businessName}
                       onChange={(e) => setBusinessName(e.target.value)}
                       className="h-11"
@@ -529,7 +558,7 @@ export default function OnboardingPage() {
                   </motion.div>
 
                   <motion.div variants={itemVariants} className="rounded-xl border border-primary/15 bg-primary/5 p-3.5 text-xs leading-relaxed text-muted-foreground">
-                    Your phone number appears on the quotations, agreements and invoices you send. You can change it any time in your profile.
+                    If you add a phone number, it appears on the quotations, agreements and invoices you send. You can add or change it any time in your profile.
                   </motion.div>
 
                   <motion.div variants={itemVariants} className="flex items-center justify-between gap-3">

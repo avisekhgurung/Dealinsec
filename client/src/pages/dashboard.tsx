@@ -1,5 +1,7 @@
 import { FollowUpsPanel } from "@/components/leads/follow-ups";
 import { LeadsStrip } from "@/components/leads/leads-strip";
+import { GettingStarted } from "@/components/getting-started";
+import { LoadError } from "@/components/load-error";
 import { useAuth } from "@/hooks/useAuth";
 import { useAudience } from "@/hooks/use-audience";
 import { useQuery } from "@tanstack/react-query";
@@ -28,7 +30,8 @@ import {
 import { TrialCountdown } from "@/components/trial-countdown";
 import { memberCan } from "@shared/permissions";
 import { useLocale, useMoney, type MoneyFormat } from "@/hooks/use-locale";
-import type { Deal, Contract, Invoice, BrandInvoice, Quote, User } from "@shared/schema";
+import type { Deal, Contract, BrandInvoice, Quote, User } from "@shared/schema";
+import { invoiceStats, paidInvoicesSubline } from "@shared/invoice-stats";
 
 // ─── Team seats strip ────────────────────────────────────────────────────────
 function TeamSeatsCard() {
@@ -464,7 +467,7 @@ const TONE_STYLES: Record<StatTone, { bg: string; text: string }> = {
   slate:   { bg: "bg-slate-100 dark:bg-slate-800/60",     text: "text-slate-600 dark:text-slate-300" },
 };
 
-function StatCard({ title, value, format, icon: Icon, tone, href, loading, sub, trendUp }: {
+function StatCard({ title, value, format, icon: Icon, tone, href, loading, sub, trendUp, unavailable }: {
   title: string;
   value: number;
   /** Optional formatter — pass `fmt.money` for a money tile, and `value` in
@@ -477,6 +480,8 @@ function StatCard({ title, value, format, icon: Icon, tone, href, loading, sub, 
   loading: boolean;
   sub?: string;
   trendUp?: boolean;
+  /** Set when the number can't be known (load failed, or no access): shows "—" and this reason instead of a 0. */
+  unavailable?: string;
 }) {
   const t = TONE_STYLES[tone];
   const animated = useCountUp(loading ? 0 : value);
@@ -497,6 +502,8 @@ function StatCard({ title, value, format, icon: Icon, tone, href, loading, sub, 
         </div>
         {loading ? (
           <Skeleton className="h-7 lg:h-8 w-16 lg:w-24" />
+        ) : unavailable ? (
+          <p className="text-xl sm:text-2xl lg:text-[26px] font-semibold text-neutral-400 leading-none" aria-label={`${title}: unavailable`}>—</p>
         ) : (() => {
           const text = format ? format(animated) : String(animated);
           // Long currency strings step down instead of truncating —
@@ -511,7 +518,10 @@ function StatCard({ title, value, format, icon: Icon, tone, href, loading, sub, 
             </p>
           );
         })()}
-        {!loading && sub && (
+        {!loading && unavailable && (
+          <p className="mt-1.5 text-[11px] lg:text-[11.5px] font-medium text-amber-700 dark:text-amber-400 truncate">{unavailable}</p>
+        )}
+        {!loading && !unavailable && sub && (
           <p className={`mt-1.5 text-[11px] lg:text-[11.5px] font-medium flex items-center gap-1 truncate ${trendUp ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-500 dark:text-neutral-400"}`}>
             {trendUp && <TrendingUp className="w-3 h-3 shrink-0" strokeWidth={2.5} />}
             {sub}
@@ -667,7 +677,9 @@ export default function DashboardPage() {
     weekday: "long", day: "numeric", month: "long",
   });
 
-  const { data: deals = [], isLoading: dealsLoading } = useQuery<Deal[]>({
+  const {
+    data: deals = [], isLoading: dealsLoading, isError: dealsError, refetch: refetchDeals, isFetching: dealsFetching,
+  } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
   });
 
@@ -675,11 +687,8 @@ export default function DashboardPage() {
     queryKey: ["/api/contracts"],
   });
 
-  const { data: invoices = [], isLoading: invoicesLoading } = useQuery<Invoice[]>({
-    queryKey: ["/api/invoices"],
-  });
-
-  const { data: brandInvoices = [] } = useQuery<BrandInvoice[]>({
+  // The invoices DealInSec issues. (The legacy /api/invoices table is never written any more, so it is not read.)
+  const { data: brandInvoices = [], isLoading: invoicesLoading, isError: invoicesFailed, error: invoicesError } = useQuery<BrandInvoice[]>({
     queryKey: ["/api/brand-invoices"],
   });
 
@@ -692,7 +701,10 @@ export default function DashboardPage() {
   // Stat counts — show total deals across all statuses (Pending + Active + Completed)
   const totalDeals = deals.length;
   const signedContracts = contracts.filter(c => c.status === "Signed" || c.status === "Active").length;
-  const paidInvoices = invoices.filter(i => i.status === "Paid").length;
+  // Invoices recorded as paid (never "issued" = paid); see shared/invoice-stats.ts.
+  const invStats = invoiceStats(brandInvoices);
+  // A role without invoice access gets 403; anything else is a load failure. Either way the number is unknown, not 0.
+  const invoicesUnavailable = invoicesFailed ? (String((invoicesError as Error | null)?.message ?? "").startsWith("403") ? "no access" : "couldn't load") : undefined;
   // Minor units throughout; formatted only where they reach the screen.
   const totalRevenueMinor = deals
     .filter(d => d.status === "Completed" || d.status === "Active")
@@ -703,7 +715,6 @@ export default function DashboardPage() {
 
   // Stat-card sub-metrics (trend lines under each number)
   const now = new Date();
-  const weekAgo = new Date(now.getTime() - 7 * 86400000);
   const dealsThisMonth = deals.filter(d => {
     const dt = new Date(d.startDate);
     return dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear();
@@ -713,7 +724,6 @@ export default function DashboardPage() {
     const d = q.createdAt ? new Date(q.createdAt) : null;
     return d && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   }).length;
-  const paidThisWeek = invoices.filter(i => i.status === "Paid" && new Date(i.invoiceDate) >= weekAgo).length;
   const allSigned = contracts.length > 0 && signedContracts === contracts.length;
 
   // Chart data
@@ -767,7 +777,9 @@ export default function DashboardPage() {
   // An account with deals reads analytics first: the numbers, then what needs attention, then the
   // charts, with account and setup last. An account with no deals yet is still setting up, so its
   // order stays as it was: setup first.
-  const firstRun = !dealsLoading && deals.length === 0;
+  // A failed deals read is not "no deals yet": the empty list would put zeros
+  // and the first-run empty state where the real numbers should be.
+  const firstRun = !dealsLoading && !dealsError && deals.length === 0;
   const nudgeEl = (
     <>
 {/* ── Profile completion nudge — top priority before any action ── */}
@@ -927,10 +939,10 @@ export default function DashboardPage() {
           <StatCard title="Agreements" value={signedContracts} icon={FileCheck}
             tone="blue" href="/contracts" loading={isLoading}
             sub={allSigned ? "All signed" : signedContracts > 0 ? `${signedContracts} signed` : "none yet"} />
-          <StatCard title="Paid Invoices" value={paidInvoices} icon={Receipt}
-            tone="emerald" href="/invoices" loading={isLoading}
-            sub={paidThisWeek > 0 ? `${paidThisWeek} this week` : paidInvoices > 0 ? "all settled" : "none yet"}
-            trendUp={paidThisWeek > 0} />
+          <StatCard title="Paid Invoices" value={invStats.paid} icon={Receipt}
+            tone="emerald" href="/invoices" loading={isLoading} unavailable={invoicesUnavailable}
+            sub={paidInvoicesSubline(invStats)}
+            trendUp={invStats.overdue === 0 && invStats.paidThisWeek > 0} />
           <div className="col-span-2 lg:col-span-1">
           <StatCard
             title="Pipeline Value"
@@ -1440,8 +1452,20 @@ export default function DashboardPage() {
       </header>
 
       <main className="px-4 py-5 space-y-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-6 lg:space-y-5 xl:px-10">
-        {firstRun ? (
+        {dealsError ? (
+          // Everything that counts or charts deals is left out until they load.
           <>
+            <Card className="glass-card">
+              <LoadError what="your dashboard" compact onRetry={() => void refetchDeals()} retrying={dealsFetching} />
+            </Card>
+            <GettingStarted />
+            {profileStripEl}
+            {attentionEl}
+            {accountEl}
+          </>
+        ) : firstRun ? (
+          <>
+            <GettingStarted />
             {nudgeEl}
             {accountEl}
             {attentionEl}
@@ -1454,6 +1478,7 @@ export default function DashboardPage() {
           </>
         ) : (
           <>
+            <GettingStarted />
             {profileStripEl}
             {statsEl}
             {attentionEl}

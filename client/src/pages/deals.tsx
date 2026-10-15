@@ -17,6 +17,7 @@ import { memberCan } from "@shared/permissions";
 import { useAuth } from "@/hooks/useAuth";
 import { useMoney, type MoneyFormat } from "@/hooks/use-locale";
 import { DataTable } from "@/components/data-table/data-table";
+import { LoadError } from "@/components/load-error";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { unguardCell } from "@/lib/csv";
 import { useToast } from "@/hooks/use-toast";
@@ -141,7 +142,7 @@ export default function DealsPage() {
   const { toast } = useToast();
   const { openUpgradeModal } = useUpgradeModal();
 
-  const { data: deals = [], isLoading } = useQuery<Deal[]>({
+  const { data: deals = [], isLoading, isError, refetch, isFetching } = useQuery<Deal[]>({
     queryKey: ["/api/deals"],
   });
 
@@ -255,6 +256,12 @@ export default function DealsPage() {
               </Card>
             ))}
           </div>
+        ) : isError && deals.length === 0 ? (
+          <Card className="glass-card border-0">
+            <CardContent className="p-0">
+              <LoadError what="your deals" onRetry={() => refetch()} retrying={isFetching} />
+            </CardContent>
+          </Card>
         ) : deals.length === 0 ? (
           <Card className="glass-card border-0">
             <CardContent className="py-12 text-center">

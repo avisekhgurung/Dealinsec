@@ -6,7 +6,7 @@ const OPTIONS: { value: Audience; title: string; description: string; Icon: type
   {
     value: "client_work",
     title: "I work with clients",
-    description: "Freelancers, consultants and service professionals.",
+    description: "Agencies, consultants, freelancers and other service businesses.",
     Icon: Briefcase,
   },
   {
@@ -89,6 +89,7 @@ export function AudiencePicker({
 /** The optional "what best describes you?" answers. Stored as the workspace's
  *  free-text `industry`, which Settings already shows as "What you do". */
 export const DESCRIBES_YOU = [
+  "Agency",
   "Freelancer",
   "Developer",
   "Designer",

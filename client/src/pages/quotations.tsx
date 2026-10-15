@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { DataTable } from "@/components/data-table/data-table";
+import { LoadError } from "@/components/load-error";
 import { recordNo } from "@shared/schema";
 import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
 import { PickParentDialog } from "@/components/pick-parent-dialog";
@@ -112,7 +113,7 @@ export default function QuotationsPage() {
   const audience = useAudience();
   const columns = useMemo(() => makeColumns(fmt, audience.party), [fmt, audience.party]);
   const canCreate = memberCan(user as any, "quotations.create");
-  const { data: quotes = [], isLoading } = useQuery<QuoteRow[]>({ queryKey: ["/api/quotes"] });
+  const { data: quotes = [], isLoading, isError, refetch, isFetching } = useQuery<QuoteRow[]>({ queryKey: ["/api/quotes"] });
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -214,6 +215,8 @@ export default function QuotationsPage() {
               <div className="p-4 space-y-3">
                 {[0, 1, 2].map((i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}
               </div>
+            ) : isError && quotes.length === 0 ? (
+              <LoadError what="your quotations" onRetry={() => refetch()} retrying={isFetching} />
             ) : rows.length === 0 ? (
               <div className="px-6 py-14 text-center">
                 <div className="w-12 h-12 mx-auto rounded-2xl bg-muted flex items-center justify-center mb-3">

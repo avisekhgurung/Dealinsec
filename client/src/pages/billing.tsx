@@ -18,6 +18,7 @@ import { useMoney, type MoneyFormat } from "@/hooks/use-locale";
 import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table/data-table";
+import { LoadError } from "@/components/load-error";
 import { Receipt, Calendar, ChevronRight, Briefcase, Search, X, Plus } from "lucide-react";
 import type { Deal, BrandInvoice } from "@shared/schema";
 import { PAYMENT_STATE_LABEL, paymentState } from "@shared/paymentState";
@@ -109,7 +110,7 @@ export default function BillingPage() {
   const canCreate = memberCan(user as any, "invoices.create");
   const [, setLocation] = useLocation();
 
-  const { data: brandInvoices = [], isLoading } = useQuery<BrandInvoice[]>({ queryKey: ["/api/brand-invoices"] });
+  const { data: brandInvoices = [], isLoading, isError, refetch, isFetching } = useQuery<BrandInvoice[]>({ queryKey: ["/api/brand-invoices"] });
   const { data: deals = [] } = useQuery<Deal[]>({ queryKey: ["/api/deals"] });
   const getDeal = (dealId: number) => deals.find((d) => d.id === dealId);
 
@@ -208,6 +209,12 @@ export default function BillingPage() {
               <Card key={i} className="glass-card border-0"><CardContent className="p-4 space-y-3"><div className="flex items-start justify-between gap-3"><div className="space-y-2"><Skeleton className="h-5 w-32" /><Skeleton className="h-4 w-24" /></div><Skeleton className="h-6 w-16 rounded-full" /></div><Skeleton className="h-8 w-28" /></CardContent></Card>
             ))}
           </div>
+        ) : isError && brandInvoices.length === 0 ? (
+          <Card className="glass-card border-0">
+            <CardContent className="p-0">
+              <LoadError what="your invoices" onRetry={() => refetch()} retrying={isFetching} />
+            </CardContent>
+          </Card>
         ) : brandInvoices.length === 0 ? (
           <Card className="glass-card border-0">
             <CardContent className="py-12 text-center">

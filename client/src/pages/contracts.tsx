@@ -18,6 +18,7 @@ import { useMoney, type MoneyFormat } from "@/hooks/use-locale";
 import { NotificationBell } from "@/components/notification-bell";
 import { StatusBadge } from "@/components/status-badge";
 import { DataTable } from "@/components/data-table/data-table";
+import { LoadError } from "@/components/load-error";
 import { FileText, Calendar, Shield, ChevronRight, FileCheck, Search, X, Plus } from "lucide-react";
 import type { Contract, Deal } from "@shared/schema";
 import { useAudience } from "@/hooks/use-audience";
@@ -114,7 +115,7 @@ export default function ContractsPage() {
   const canCreate = memberCan(user as any, "agreements.create");
   const [, setLocation] = useLocation();
 
-  const { data: contracts = [], isLoading } = useQuery<Contract[]>({ queryKey: ["/api/contracts"] });
+  const { data: contracts = [], isLoading, isError, refetch, isFetching } = useQuery<Contract[]>({ queryKey: ["/api/contracts"] });
   const { data: deals = [] } = useQuery<Deal[]>({ queryKey: ["/api/deals"] });
   const getDeal = (dealId: number | null) => deals.find((d) => d.id === dealId);
 
@@ -194,6 +195,12 @@ export default function ContractsPage() {
               <Card key={i} className="glass-card border-0"><CardContent className="p-4 space-y-3"><Skeleton className="h-5 w-3/4" /><Skeleton className="h-4 w-1/2" /><div className="flex gap-2 pt-2"><Skeleton className="h-6 w-16 rounded-full" /><Skeleton className="h-6 w-20 rounded-full" /></div></CardContent></Card>
             ))}
           </div>
+        ) : isError && contracts.length === 0 ? (
+          <Card className="glass-card border-0">
+            <CardContent className="p-0">
+              <LoadError what="your agreements" onRetry={() => refetch()} retrying={isFetching} />
+            </CardContent>
+          </Card>
         ) : contracts.length === 0 ? (
           <Card className="glass-card border-0">
             <CardContent className="py-12 text-center">
