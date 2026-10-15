@@ -7,6 +7,7 @@
  */
 
 import { sanitizeEventParams } from "@shared/analyticsParams";
+import { analyticsPath } from "@shared/analyticsPath";
 import type { Audience } from "@shared/audience";
 
 export const GA_MEASUREMENT_ID = "G-W3VTLRH79B";
@@ -70,14 +71,12 @@ function routeTitle(path: string): string {
 /** Fire a `page_view` for the given SPA path. */
 export function trackPageView(path: string): void {
   if (typeof window === "undefined" || typeof window.gtag !== "function") return;
-  // page_path is a route pattern with no ids; page_title is route-derived.
-  // Neither carries a client name or document number.
-  window.gtag("event", "page_view", {
-    page_path: path,
-    page_location: `${window.location.origin}${path}`,
-    page_title: routeTitle(path),
-    send_to: GA_MEASUREMENT_ID,
-  });
+  // The route's shape only (shared/analyticsPath.ts): no document tokens, record ids or query strings. Set as the page
+  // for every later event too, so no hit falls back to the real address; page_title is route-derived as well.
+  const safePath = analyticsPath(path);
+  const page = { page_path: safePath, page_location: `${window.location.origin}${safePath}`, page_title: routeTitle(path) };
+  window.gtag("set", page);
+  window.gtag("event", "page_view", { ...page, send_to: GA_MEASUREMENT_ID });
 }
 
 /** Fire a custom GA4 event (e.g. trackEvent("create_deal", { dealType: "Creator" })). */
