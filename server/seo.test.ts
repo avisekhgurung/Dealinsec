@@ -671,23 +671,36 @@ describe("audience pages: /for-freelancers and /for-creators", () => {
   });
 });
 
-describe("homepage crawler fallback speaks to both audiences", () => {
+describe("homepage crawler fallback: small agencies first, freelancers and creators kept", () => {
   const body = landingSeoBody();
 
-  it("leads with the two-audience headline and the workflow", () => {
-    expect(body).toContain("<h1>Turn client and brand deals into clear, professional agreements — and get paid</h1>");
-    expect(body).toContain("Deal, Protection Check, Quotation, Agreement, Invoice, Payment");
+  it("leads with the agency headline and the whole workflow, from prospects to payment tracking", () => {
+    expect(body).toContain("<h1>Find better clients. Close deals. Get paid.</h1>");
+    expect(body).toContain("Find prospects, Qualify, Deal, Quotation, Agreement, Invoice, Payment tracking");
+    for (const kind of ["SEO agencies", "Digital marketing and growth agencies", "B2B marketing agencies", "AI automation agencies"]) expect(body, kind).toContain(kind);
   });
 
-  it("introduces both audiences and links to their pages and the checker", () => {
+  it("still links the freelancer and creator pages and the checker", () => {
     for (const href of ["/for-freelancers", "/for-creators", "/tools/deal-risk-checker"]) expect(body, href).toContain(`href="${href}"`);
-    expect(body).toContain("For client work: freelancers and independent professionals.");
-    expect(body).toContain("For brand collaborations: creators and UGC professionals.");
   });
 
   it("answers the creator question in its FAQ, without claiming a marketplace", () => {
     expect(body).toContain("Can I use DealInSec for brand deals as a creator?");
     expect(body).toMatch(/not a marketplace and it does not find brand deals/);
+  });
+
+  it("is honest about outreach, payments, signatures and US checkout", () => {
+    expect(body).toMatch(/doesn't send email for you and never contacts anyone on its own/);
+    expect(body).toMatch(/does not process them/);
+    expect(body).toMatch(/isn't a certified digital signature/);
+    expect(body).toMatch(/paid plans can't be bought from the US yet/);
+    // no claims the product can't back
+    expect(body).not.toMatch(/GST-ready|automatically sends|unified inbox|syncs your inbox|collects? (client )?payments/i);
+  });
+
+  it("links pricing where a logged-out visitor can see it", () => {
+    expect(body).not.toContain('href="/pricing"');
+    expect(body).toContain('href="/#pricing"');
   });
 });
 

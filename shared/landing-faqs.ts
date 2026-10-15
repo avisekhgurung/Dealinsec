@@ -12,11 +12,19 @@ export interface LandingFaq {
 export const LANDING_FAQS: LandingFaq[] = [
   {
     q: "What is DealInSec?",
-    a: "DealInSec is a workspace for freelancers and for creators doing paid brand collaborations to manage a client or brand deal from first quote to final payment. You create the deal, check its terms, send a quotation, get the agreement signed, send the invoice and track whether it has been paid. Each document is generated from the same deal, so the scope and the numbers always match.",
+    a: "DealInSec is a sales and deal workspace for small agencies and consultants. It helps you find prospects that fit your ideal client, work them through a pipeline, and turn won work into a quotation, an agreement your client signs and invoices, then track whether you have been paid. Each document is generated from the same deal, so the scope and the numbers always match.",
   },
   {
     q: "Who is DealInSec for?",
-    a: "Freelancers, independent consultants and other solo service professionals who quote, agree terms with and bill their own clients (designers, developers, writers, video editors, photographers, marketers and consultants), and creators, UGC creators and influencers who do paid brand collaborations. It is built for one person running client or brand work, not for large teams.",
+    a: "Founder-led agencies and consultants with one to a handful of people, such as SEO, digital marketing, growth, B2B marketing and AI-automation agencies, in the United States, India and elsewhere. Freelancers use it the same way, and creators use it for paid brand collaborations. Pro includes up to 5 team members; it is not built for large sales teams.",
+  },
+  {
+    q: "Does DealInSec find clients for me?",
+    a: "AI Outbound helps you research them. Describe the clients you want and confirm the profile it builds; it then researches matching companies, checks each one against your profile and shows the evidence, with its source and how recent it is. Guesses are labelled as guesses, and anything it couldn't find is shown as unknown. You decide who goes into your pipeline. Research has daily limits per workspace, and contact details are not always available.",
+  },
+  {
+    q: "Does DealInSec send emails for me?",
+    a: "No. AI drafts a first message from what is known about the prospect, you review and approve the exact text, send it from your own email, and mark it sent in DealInSec, which then adds a follow-up task. Addresses and domains on your do-not-contact list are blocked before anything is drafted or approved. Sending through a connected Gmail account is not available yet.",
   },
   {
     q: "Can I use DealInSec for brand deals as a creator?",
@@ -24,7 +32,7 @@ export const LANDING_FAQS: LandingFaq[] = [
   },
   {
     q: "Can I use DealInSec with international clients?",
-    a: "Yes. You choose your country and billing currency when you sign up, from a list of 50 currencies, and your quotes, agreements and invoices use it. Your client can receive the documents from anywhere and sign the agreement however they prefer; you upload the signed copy. The tax field, bank labels, invoice numbering and agreement wording follow the country you work from.",
+    a: "Yes. You choose your country and billing currency when you sign up, from a list of 50 currencies, and your quotes, agreements and invoices use it. Your client can receive the documents from anywhere and sign the agreement online through a signing link, or on paper, in which case you upload the signed copy. The tax field, bank labels, invoice numbering and agreement wording follow the country you work from.",
   },
   {
     q: "Can I create quotes and agreements?",
@@ -48,7 +56,7 @@ export const LANDING_FAQS: LandingFaq[] = [
   },
   {
     q: "Is there a free plan?",
-    a: "Yes. The free plan is permanent and covers 4 deals a month, each with a professional quotation. Every new account also starts with a 7-day Pro trial with everything unlocked and no card needed. Signed agreements, invoices and payment tracking are part of Pro. In India, Pro is ₹99 a month or ₹999 a year. Outside India, paid plans can't be bought yet; the free plan and the trial are open everywhere. There are no platform fees on your deal value.",
+    a: "Yes. The free plan is permanent and covers 4 deals a month, each with a professional quotation, plus the leads pipeline and AI Outbound research within its daily limits. Every new account also starts with a 7-day Pro trial with everything unlocked and no card needed. Signed agreements, invoices and payment tracking are part of Pro. In India, Pro is ₹99 a month or ₹999 a year. In the United States and other countries outside India, paid plans can't be bought yet; the free plan and the trial are open everywhere. There are no platform fees on your deal value.",
   },
   {
     q: "Can I cancel anytime?",

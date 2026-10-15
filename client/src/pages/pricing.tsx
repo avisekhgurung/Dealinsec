@@ -162,15 +162,13 @@ export default function PricingPage() {
 
   const PRO_FEATURES = [
     "Unlimited deals & quotations",
-    "Unlimited signed agreements with e-signature",
-    // GST is India's tax. Invoices outside India carry their own country's
-    // labels, so they are not described in GST terms there.
-    checkoutAvailable ? "Unlimited GST-ready invoices" : "Unlimited invoices",
+    "Unlimited agreements your client signs online",
+    // In-app invoices carry the country's tax IDs but are not GST tax invoices (see shared/landing-faqs.ts), so they
+    // are never described as "GST-ready".
+    checkoutAvailable ? "Unlimited invoices with your PAN and GSTIN" : "Unlimited invoices",
     "Payment tracking — know who owes you",
-    "Payment reminders (coming soon)",
-    "Custom branding (coming soon)",
+    "Up to 5 team members",
     "Priority email support",
-    "Early access to AI features",
   ];
 
   const successMessage =
@@ -522,7 +520,7 @@ export default function PricingPage() {
             {[
               { step: "1", title: "Create a Deal", desc: "Free plan covers 4 deals every month" },
               { step: "2", title: "Generate its Quotation", desc: "Included with the deal — no extra cost" },
-              { step: "3", title: "Sign the Agreement", desc: "Pro — scope & terms your client or brand accepts with an e-signature" },
+              { step: "3", title: "Sign the Agreement", desc: "Pro — scope & terms your client or brand signs online" },
               {
                 step: "4",
                 title: "Invoice & track payment",

@@ -45,7 +45,11 @@ import {
   Radar,
   Navigation,
   MessageSquare,
-  ChevronDown,
+  Search,
+  Target,
+  Wallet,
+  Bot,
+  TrendingUp,
 } from "lucide-react";
 import { SiGoogle, SiInstagram, SiYoutube, SiX, SiFacebook, SiLinkedin } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
@@ -53,19 +57,18 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { trackEvent } from "@/lib/analytics";
-import { LandingCopilot, LandingCopilotSection } from "@/components/landing-copilot";
+import { LandingCopilot } from "@/components/landing-copilot";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { BRAND_GRADIENT, GradientText, SectionHeader, fadeUp, stagger } from "@/components/landing-shared";
 import { LandingTryDemo } from "@/components/landing-try-demo";
 import {
   ProblemSection,
   HowItWorksSection,
-  ScopeSection,
+  AiOutboundSection,
   PaymentTrackingSection,
   ProfessionalSection,
-  GlobalSection,
-  AiSection,
-  FeatureGroupsSection,
+  CountrySection,
+  TrustSection,
 } from "@/components/landing-sections";
 import { LANDING_FAQS } from "@shared/landing-faqs";
 import { rememberAudienceIntent } from "@/lib/audience-intent";
@@ -102,8 +105,8 @@ const SERVER_ROUTE_PREFIXES = [
 const isServerRoute = (href: string) => SERVER_ROUTE_PREFIXES.some((p) => href.startsWith(p));
 
 const NAV_LINKS = [
-  { label: "Product", href: "#features" },
   { label: "How it works", href: "#how" },
+  { label: "AI Outbound", href: "#outbound" },
   { label: "Pricing", href: "#pricing" },
   { label: "FAQ", href: "#faq" },
 ];
@@ -127,52 +130,6 @@ const DASHBOARD_LINKS = [
 
 const FAQS = LANDING_FAQS;
 
-// The six craft deal types freelancers pick from (shared/dealTypeTaxonomy.ts),
-// in taxonomy order — Custom is intentionally omitted from marketing cards.
-const WHO_WE_SERVE = [
-  {
-    icon: PenTool,
-    title: "Design",
-    tagline: "Brand · UI/UX · Social",
-    desc: "Scope and revision count agreed before the first draft, advance taken in writing, invoice out the day the files go.",
-    accent: "emerald",
-  },
-  {
-    icon: Code2,
-    title: "Development",
-    tagline: "Web · App · No-code",
-    desc: "Quote milestone by milestone, get the scope signed before you write a line, and see exactly which milestone is still unpaid.",
-    accent: "teal",
-  },
-  {
-    icon: PenLine,
-    title: "Writing",
-    tagline: "Content · Copy · Ghostwriting",
-    desc: "Per piece, per word or monthly retainer — the rate, the deadline and the revision limit on record instead of in a chat.",
-    accent: "cyan",
-  },
-  {
-    icon: Megaphone,
-    title: "Marketing",
-    tagline: "Social · Ads · SEO",
-    desc: "Retainers with a written deliverable list, so \"just one more post\" becomes a line item instead of a favour.",
-    accent: "indigo",
-  },
-  {
-    icon: Clapperboard,
-    title: "Video & Photo",
-    tagline: "Editing · Shoots · Reels",
-    desc: "Shoot dates, deliverables and usage in one signed agreement — and a register that shows who still owes for last month's edit.",
-    accent: "amber",
-  },
-  {
-    icon: Lightbulb,
-    title: "Consulting",
-    tagline: "Advisory · Retainers · Coaching",
-    desc: "Hourly, retainer or milestone fees agreed up front, invoiced on time, and followed up without the awkward phone call.",
-    accent: "teal",
-  },
-];
 
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -211,6 +168,15 @@ export default function LandingPage() {
   const [signupPassword, setSignupPassword] = useState("");
   const [signupFirstName, setSignupFirstName] = useState("");
   const [signupLastName, setSignupLastName] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") !== "google_auth_failed") return;
+    toast({ title: "Google sign-in didn't finish", description: "Nothing was created. Try again, or sign up with your email.", variant: "destructive" });
+    params.delete("error");
+    const rest = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}${window.location.hash}`);
+  }, [toast]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -288,24 +254,17 @@ export default function LandingPage() {
           isAuthenticated={isAuthenticated}
           onPrimaryClick={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
         />
-        {!isAuthenticated && <AudienceSection onStart={() => openAuth("signup")} />}
-        {!isAuthenticated && <LandingTryDemo />}
+        <AudienceSection onStart={isAuthenticated ? undefined : () => openAuth("signup")} />
         <ProblemSection />
         <HowItWorksSection />
-        <ScopeSection />
+        <AiOutboundSection />
+        {!isAuthenticated && <LandingTryDemo />}
         <PaymentTrackingSection />
         <ProfessionalSection />
-        <GlobalSection />
-        <AiSection onCta={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))} />
-        <FeatureGroupsSection />
-        <WhoWeServeSection />
-        <FreeToolsSection />
-        {/* A live, no-sign-up product guide — answers from the same knowledge
-            base the app uses, so marketing can't drift from the product. */}
-        <LandingCopilotSection
-          onCta={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
-        />
+        <CountrySection />
         <PricingPreview onCTA={() => (isAuthenticated ? setLocation("/pricing") : openAuth("signup"))} />
+        <TrustSection />
+        <FreeToolsSection />
         <FAQSection />
         <FinalCTA
           isAuthenticated={isAuthenticated}
@@ -584,7 +543,7 @@ function Header({
                   style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
                   data-testid="button-nav-signup"
                 >
-                  Start for free
+                  Start free
                   <ArrowRight className="w-4 h-4 ml-1" />
                 </Button>
               </>
@@ -647,7 +606,7 @@ function Header({
                     className="w-full h-10 text-white border-0"
                     style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
                   >
-                    Start for free
+                    Start free
                   </Button>
                 </div>
               )}
@@ -681,116 +640,86 @@ function NavItem({ href, label }: { href: string; label: string }) {
   );
 }
 
-/** Deal → Protection Check → Quotation → Agreement → Invoice → Payment. Stacked on
- *  a phone, one row from the sm breakpoint. The same six steps for both audiences. */
+/** Find prospects → … → Payment tracking: winning the client and getting paid, one workflow. Compact wrapping
+ *  chips, so a phone doesn't push the product preview off-screen. */
 const WORKFLOW_STEPS: { label: string; Icon: typeof Briefcase }[] = [
+  { label: "Find prospects", Icon: Search },
+  { label: "Qualify", Icon: Target },
   { label: "Deal", Icon: Briefcase },
-  { label: "Protection Check", Icon: ShieldCheck },
   { label: "Quotation", Icon: FileText },
   { label: "Agreement", Icon: FileSignature },
   { label: "Invoice", Icon: Receipt },
-  { label: "Payment", Icon: CreditCard },
+  { label: "Payment tracking", Icon: Wallet },
 ];
 
 function WorkflowStrip() {
   return (
     <ol
       aria-label="The DealInSec workflow"
-      className="mx-auto flex max-w-4xl flex-col items-center gap-1.5 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-2"
+      className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-1 sm:gap-2"
       data-testid="workflow-strip"
     >
       {WORKFLOW_STEPS.map(({ label, Icon }, i) => (
-        <li key={label} className="flex flex-col items-center gap-1.5 sm:flex-row sm:gap-2">
-          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200/80 dark:border-emerald-800/50 bg-white/80 dark:bg-neutral-900/70 px-3.5 py-2 text-sm font-semibold shadow-sm">
-            <Icon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
+        <li key={label} className="flex items-center gap-1 sm:gap-2">
+          <span className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-emerald-200/80 dark:border-emerald-800/50 bg-white/80 dark:bg-neutral-900/70 px-2.5 py-1.5 sm:px-3.5 sm:py-2 text-xs sm:text-sm font-semibold shadow-sm">
+            <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
             {label}
           </span>
-          {i < WORKFLOW_STEPS.length - 1 && (
-            <>
-              <ChevronDown className="h-4 w-4 text-neutral-400 sm:hidden" aria-hidden />
-              <ChevronRight className="hidden h-4 w-4 text-neutral-400 sm:block" aria-hidden />
-            </>
-          )}
+          {i < WORKFLOW_STEPS.length - 1 && <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-neutral-400" aria-hidden />}
         </li>
       ))}
     </ol>
   );
 }
 
-const AUDIENCE_CARDS: {
-  audience: Audience;
-  eyebrow: string;
-  title: string;
-  body: string;
-  cta: string;
-  href: string;
-  learn: string;
-  Icon: typeof Briefcase;
-}[] = [
-  {
-    audience: "client_work",
-    eyebrow: "For client work",
-    title: "Freelancers & independent professionals",
-    body: "Turn project requests into clear scope, professional quotes, agreements and invoices.",
-    cta: "Start a client deal",
-    href: "/for-freelancers",
-    learn: "See how it works for freelancers",
-    Icon: Briefcase,
-  },
-  {
-    audience: "brand_collaboration",
-    eyebrow: "For brand collaborations",
-    title: "Creators & UGC professionals",
-    body: "Turn brand offers into clear deliverables, usage terms, agreements and invoices.",
-    cta: "Start a brand deal",
-    href: "/for-creators",
-    learn: "See how it works for creators",
-    Icon: Clapperboard,
-  },
+/** Who it's for: founder-led agencies first, each with what they'd actually do in DealInSec. Starting from a card
+ *  remembers "client work" so onboarding preselects it. Freelancers and creators keep their own pages. */
+const AGENCY_USE_CASES: { key: string; title: string; body: string; Icon: typeof Briefcase }[] = [
+  { key: "seo", title: "SEO agencies", body: "Build a list of companies in your niche, with the evidence for each, then quote and bill monthly retainers.", Icon: Search },
+  { key: "marketing", title: "Digital marketing & growth", body: "Keep every lead, proposal and campaign in one pipeline, with a clear next step and follow-ups that don't slip.", Icon: TrendingUp },
+  { key: "b2b", title: "B2B marketing", body: "Research accounts before you reach out, then turn won work into an agreement your client signs online.", Icon: Briefcase },
+  { key: "automation", title: "AI automation", body: "Scope builds as milestones, get the terms signed, and invoice each milestone as it's delivered.", Icon: Bot },
 ];
 
-/** Two ways in to the one product. The button remembers the choice so onboarding
- *  can preselect it; the link goes to that audience's own page. */
-function AudienceSection({ onStart }: { onStart: () => void }) {
+function AudienceSection({ onStart }: { onStart?: () => void }) {
   return (
-    <section id="audiences" className="pb-4 sm:pb-8" aria-label="Who it is for">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid gap-4 sm:grid-cols-2 lg:gap-6">
-          {AUDIENCE_CARDS.map(({ audience, eyebrow, title, body, cta, href, learn, Icon }) => (
-            <div
-              key={audience}
-              className="flex flex-col rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 p-6 shadow-sm"
-              data-testid={`audience-card-${audience}`}
-            >
-              <div className="flex items-center gap-2.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/50">
-                  <Icon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                </span>
-                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">{eyebrow}</p>
-              </div>
-              <h3 className="mt-3 text-xl font-bold tracking-tight">{title}</h3>
-              <p className="mt-1.5 flex-1 text-neutral-600 dark:text-neutral-400 leading-relaxed">{body}</p>
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+    <section id="audiences" className="py-16 sm:py-20 scroll-mt-20" aria-labelledby="audiences-title">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center max-w-2xl mx-auto">
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">Who it&apos;s for</p>
+          <h2 id="audiences-title" className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight">Made for founder-led agencies</h2>
+          <p className="mt-2 text-neutral-600 dark:text-neutral-400">One to a handful of people, selling and delivering client work in the US or India.</p>
+        </div>
+        <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {AGENCY_USE_CASES.map(({ key, title, body, Icon }) => (
+            <li key={key} className="flex flex-col rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 p-5 shadow-sm" data-testid={`use-case-${key}`}>
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/50">
+                <Icon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+              </span>
+              <h3 className="mt-3 font-bold tracking-tight">{title}</h3>
+              <p className="mt-1.5 flex-1 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">{body}</p>
+              {onStart && (
                 <button
                   type="button"
                   onClick={() => {
-                    rememberAudienceIntent(audience);
-                    trackEvent("audience_card_click", { audience });
+                    rememberAudienceIntent("client_work" as Audience);
+                    trackEvent("audience_card_click", { audience: "client_work", segment: key });
                     onStart();
                   }}
-                  className="h-11 px-5 inline-flex items-center justify-center gap-2 rounded-md text-sm font-semibold text-white shadow-md shadow-emerald-500/20"
-                  style={{ background: BRAND_GRADIENT }}
-                  data-testid={`audience-cta-${audience}`}
+                  className="mt-4 inline-flex items-center gap-1.5 self-start text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
+                  data-testid={`use-case-cta-${key}`}
                 >
-                  {cta} <ArrowRight className="h-4 w-4" aria-hidden />
+                  Start free <ArrowRight className="h-4 w-4" aria-hidden />
                 </button>
-                <a href={href} className="text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">
-                  {learn} →
-                </a>
-              </div>
-            </div>
+              )}
+            </li>
           ))}
-        </div>
+        </ul>
+        <p className="mt-8 text-center text-sm text-neutral-600 dark:text-neutral-400">
+          Working solo? <a href="/for-freelancers" className="font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">DealInSec for freelancers and consultants</a>
+          <span aria-hidden> · </span>
+          Doing brand deals? <a href="/for-creators" className="font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">DealInSec for creators</a>
+        </p>
       </div>
     </section>
   );
@@ -816,15 +745,15 @@ function Hero({
               variants={heroFadeUp}
               className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm border border-emerald-200/70 dark:border-emerald-800/40 shadow-sm text-[11px] font-bold tracking-[0.14em] text-emerald-700 dark:text-emerald-300"
             >
-              <Globe className="w-3.5 h-3.5" />
-              FOR FREELANCERS &amp; CREATORS WORLDWIDE
+              <Briefcase className="w-3.5 h-3.5" aria-hidden />
+              FOR SMALL AGENCIES &amp; CONSULTANTS
             </motion.p>
 
             <motion.h1
               variants={heroFadeUp}
               className="text-[2.35rem] sm:text-5xl lg:text-[3.75rem] font-bold tracking-tight leading-[1.06] text-balance"
             >
-              Turn client and brand deals into
+              Find better clients.
               <br />
               <span
                 className="relative inline-block"
@@ -835,7 +764,7 @@ function Hero({
                   backgroundClip: "text",
                 }}
               >
-                clear, professional agreements — and get paid.
+                Close deals. Get paid.
                 <motion.span
                   className="absolute -bottom-1 left-0 right-0 h-[6px] rounded-full opacity-40"
                   style={{ background: "linear-gradient(90deg, transparent, #10B981, transparent)" }}
@@ -850,7 +779,7 @@ function Hero({
               variants={heroFadeUp}
               className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed text-pretty"
             >
-              Create the deal, spot missing terms, send a professional quote, get the agreement signed, invoice your client or brand, and track payment — all in one workflow.
+              DealInSec helps small SEO, marketing, growth and AI-automation agencies find prospects that fit, run a clear pipeline, and turn won work into quotations, signed agreements and invoices, in one connected workspace.
             </motion.p>
 
             <motion.div variants={heroFadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
@@ -868,30 +797,30 @@ function Hero({
                 <button
                   type="button"
                   onClick={() => {
-                    trackEvent("hero_cta_click", { label: "create_first_deal" });
+                    trackEvent("hero_cta_click", { label: "start_free" });
                     onPrimaryClick();
                   }}
                   className="h-12 px-7 inline-flex items-center justify-center text-[15px] font-semibold rounded-md text-white border-0 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all w-full sm:w-auto"
                   style={{ background: BRAND_GRADIENT }}
                   data-testid="button-hero-cta"
                 >
-                  Create your first deal
+                  Start free
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </button>
               )}
               <a
-                href="#try"
-                onClick={() => trackEvent("hero_cta_click", { label: "check_deal_free" })}
+                href="#how"
+                onClick={() => trackEvent("hero_cta_click", { label: "see_how" })}
                 className="h-12 px-7 inline-flex items-center justify-center text-[15px] font-semibold rounded-md border border-neutral-300 dark:border-neutral-700 bg-white/60 dark:bg-neutral-900/60 backdrop-blur-sm hover:bg-white dark:hover:bg-neutral-900 w-full sm:w-auto transition-colors"
                 data-testid="link-hero-check"
               >
-                Check a deal for free
+                See how it works
                 <ChevronRight className="w-4 h-4 ml-1" />
               </a>
             </motion.div>
 
             <motion.p variants={heroFadeUp} className="text-xs sm:text-sm text-neutral-500">
-              Professional documents · Multiple currencies
+              Free plan · 7-day Pro trial · No card needed
             </motion.p>
 
             <motion.div variants={heroFadeUp} className="pt-4">
@@ -909,6 +838,7 @@ function Hero({
           className="mt-12 lg:mt-16 relative"
         >
           <ProductPreview />
+          <p className="mt-8 text-center text-xs text-neutral-500">Illustration with example data.</p>
         </motion.div>
       </div>
     </section>
@@ -1027,68 +957,6 @@ function ProductPreview() {
   );
 }
 
-function WhoWeServeSection() {
-  return (
-    <section id="who" className="py-20 sm:py-28 relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionHeader
-          eyebrow="Who it's for"
-          title={
-            <>
-              Built for <GradientText>independent professionals &amp; creators</GradientText>
-            </>
-          }
-          subtitle="If you quote, agree terms with and bill your own clients or brands, the workflow fits. Pick the kind of work you do; it works the same way."
-        />
-
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-80px" }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5 mt-14"
-        >
-          {WHO_WE_SERVE.map((p) => (
-            <motion.div
-              key={p.title}
-              variants={fadeUp}
-              whileHover={{ y: -4 }}
-              className="group relative rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-6 hover:border-emerald-300 dark:hover:border-emerald-700/70 hover:shadow-xl hover:shadow-emerald-500/10 transition-all duration-300 overflow-hidden"
-            >
-              <div
-                className="absolute top-0 left-0 right-0 h-1"
-                style={{ background: "linear-gradient(90deg, #059669, #0D9488)" }}
-              />
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 bg-emerald-50 dark:bg-emerald-950/40 group-hover:scale-110 transition-transform">
-                <p.icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <h3 className="text-base font-semibold">{p.title}</h3>
-                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">
-                  {p.tagline}
-                </span>
-              </div>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">{p.desc}</p>
-            </motion.div>
-          ))}
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="mt-12 max-w-3xl mx-auto rounded-2xl border border-neutral-900/90 dark:border-neutral-700 bg-neutral-950 dark:bg-neutral-900 p-5 sm:p-6 text-center"
-        >
-          <p className="text-sm sm:text-base text-neutral-200 font-medium leading-relaxed">
-            <span className="text-emerald-400 font-semibold">One workflow.</span>{" "}
-            A fixed-fee project, an hourly engagement or a monthly retainer: the quote, the signed scope, the invoice and the payment tracking work the same way each time, in the currency you charge in.
-          </p>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
 const FREE_TOOLS = [
   { name: "Quotation Maker", href: "/tools/quotation-maker", desc: "Professional quotations with line items, tax and terms.", icon: FileText },
   { name: "Service Agreement", href: "/tools/service-agreement-template", desc: "A ready-to-sign contract with scope, fees and editable clauses.", icon: FileSignature },
@@ -1174,16 +1042,17 @@ function FreeToolsSection() {
 
 function PricingPreview({ onCTA }: { onCTA: () => void }) {
   const freePerks = [
-    "4 deals every month",
-    "A professional quotation with each deal",
-    "Dashboard & payment overview",
-    "Professional quotation PDFs",
+    "4 deals every month, each with a quotation",
+    "Leads pipeline with follow-ups",
+    "AI Outbound prospect research (daily limits)",
+    "Quotation PDFs and share links",
   ];
   const proMonthlyPerks = [
     "Unlimited deals & quotations",
-    "Unlimited agreements with your signature and signed-copy tracking",
-    "Unlimited professional invoices",
+    "Agreements your client signs online",
+    "Invoices: advance, milestone or final",
     "Payment tracking: paid, pending and overdue",
+    "Up to 5 team members",
     "Priority email support",
   ];
   const proAnnualPerks = [
@@ -1199,7 +1068,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
         <SectionHeader
           eyebrow="Pricing"
           title="Start simple. Grow when you need to."
-          subtitle="Try DealInSec free and manage your first client deals without adding another expensive tool to your stack."
+          subtitle="Start free in any country. Upgrade when agreements, invoices and payment tracking are worth it to you."
         />
 
         {/* Honest currency note: only Indian accounts can be charged today. */}
@@ -1210,10 +1079,10 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
           className="mt-10 max-w-3xl mx-auto rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-5 sm:p-6"
         >
           <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-400 mb-2.5">
-            <Globe className="w-3.5 h-3.5" /> Pricing around the world
+            <Globe className="w-3.5 h-3.5" /> United States, India and everywhere else
           </p>
           <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            New accounts start with a 7-day Pro trial, and the free plan stays free after it. Both are open everywhere, with no card. The prices below are in rupees and can be paid from India today. Paid plans can&apos;t be bought from other countries yet, and we won&apos;t take a foreign card until they can.
+            Every new account starts with a 7-day Pro trial, and the free plan stays free after it. Both are open in every country, with no card. <strong className="font-semibold text-neutral-800 dark:text-neutral-200">In India</strong>, Pro is paid in rupees at the prices below. <strong className="font-semibold text-neutral-800 dark:text-neutral-200">In the US and other countries</strong>, paid plans can&apos;t be bought yet, and we won&apos;t take a foreign card until they can.
           </p>
         </motion.div>
 
@@ -1465,10 +1334,10 @@ function FinalCTA({ isAuthenticated, onCTA }: { isAuthenticated: boolean; onCTA:
 
           <div className="relative">
             <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-4 text-balance">
-              Ready to make your next deal easier?
+              Find your next client. Get paid for the last one.
             </h2>
             <p className="text-base sm:text-lg text-emerald-100/90 max-w-xl mx-auto mb-8">
-              Create your quote, agreement and invoice in one connected workflow.
+              Prospects, pipeline, quotations, agreements and invoices in one connected workspace.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <Button
@@ -1476,7 +1345,7 @@ function FinalCTA({ isAuthenticated, onCTA }: { isAuthenticated: boolean; onCTA:
                 className="h-12 px-6 text-sm font-semibold bg-white text-emerald-700 hover:bg-neutral-100 border-0 shadow-xl"
                 data-testid="button-final-cta"
               >
-                {isAuthenticated ? "Go to Dashboard" : "Start for free"}
+                {isAuthenticated ? "Go to Dashboard" : "Start free"}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
               <a
@@ -1486,7 +1355,7 @@ function FinalCTA({ isAuthenticated, onCTA }: { isAuthenticated: boolean; onCTA:
                 See how it works
               </a>
             </div>
-            <p className="text-xs text-emerald-100/70 mt-6">Built for freelancers and creators worldwide.</p>
+            <p className="text-xs text-emerald-100/70 mt-6">Free plan · 7-day Pro trial · No card needed</p>
           </div>
         </motion.div>
       </div>

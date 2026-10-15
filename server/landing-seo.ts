@@ -45,48 +45,55 @@ export function landingSeoBody(): string {
   ).join("");
 
   return `<div id="seo-fallback">
-<h1>Turn client and brand deals into clear, professional agreements — and get paid</h1>
-<p>Create the deal, spot missing terms, send a professional quote, get the agreement signed, invoice your client or brand, and track payment, all in one workflow. DealInSec is for freelancers, independent consultants and solo service professionals, and for creators, UGC creators and influencers doing paid brand collaborations, worldwide, in 50 currencies.</p>
-<p>The workflow: Deal, Protection Check, Quotation, Agreement, Invoice, Payment.</p>
+<h1>Find better clients. Close deals. Get paid.</h1>
+<p>DealInSec helps small SEO, marketing, growth and AI-automation agencies find prospects that fit, run a clear pipeline, and turn won work into quotations, signed agreements and invoices, in one connected workspace. Free plan, 7-day Pro trial, no card needed.</p>
+<p>The workflow: Find prospects, Qualify, Deal, Quotation, Agreement, Invoice, Payment tracking.</p>
 
-<h2>Two ways in, one product</h2>
-<p><strong>For client work: freelancers and independent professionals.</strong> Turn project requests into clear scope, professional quotes, agreements and invoices. <a href="/for-freelancers">DealInSec for freelancers</a>.</p>
-<p><strong>For brand collaborations: creators and UGC professionals.</strong> Turn brand offers into clear deliverables, usage terms, agreements and invoices. <a href="/for-creators">DealInSec for creators</a>.</p>
-<p>Not sure what a message leaves out? The free <a href="/tools/deal-risk-checker">Deal Risk Checker</a> reads a pasted client request or brand offer and lists what is missing, with no account.</p>
+<h2>Made for founder-led agencies</h2>
+<p>One to a handful of people, selling and delivering client work in the US or India.</p>
+<ul>
+<li><strong>SEO agencies</strong>: build a list of companies in your niche, with the evidence for each, then quote and bill monthly retainers.</li>
+<li><strong>Digital marketing and growth agencies</strong>: keep every lead, proposal and campaign in one pipeline, with a clear next step and follow-ups that don't slip.</li>
+<li><strong>B2B marketing agencies</strong>: research accounts before you reach out, then turn won work into an agreement your client signs online.</li>
+<li><strong>AI automation agencies</strong>: scope builds as milestones, get the terms signed, and invoice each milestone as it's delivered.</li>
+</ul>
+<p>Working solo? <a href="/for-freelancers">DealInSec for freelancers and consultants</a>. Doing brand deals? <a href="/for-creators">DealInSec for creators</a>. Not sure what a client's message leaves out? The free <a href="/tools/deal-risk-checker">Deal Risk Checker</a> lists what is missing, with no account.</p>
 
-<h2>Your deals shouldn't live across 7 different apps</h2>
-<p>Client and brand messages in WhatsApp and DMs, scope in Google Docs, quotes in PDFs, invoices in another tool and payment tracking in a spreadsheet. DealInSec replaces the scatter with one connected workflow: quote, agreement, invoice, payment. One client or brand, one deal, one source of truth.</p>
+<h2>Winning and billing clients shouldn't take 7 different apps</h2>
+<p>Prospects in a spreadsheet, conversations in email and WhatsApp, proposals in docs, invoices in another tool, and who has paid lives in someone's head. In DealInSec a prospect becomes a lead, a won lead becomes a deal, and every document is generated from that deal, so the scope and the numbers always match.</p>
 
-<h2>From client or brand conversation to paid</h2>
+<h2>From finding the client to getting paid</h2>
 <ol>
-<li><strong>Create a deal</strong> with the client or brand, scope, timeline and fee.</li>
-<li><strong>Send a quote</strong> generated from the deal, with standard or custom terms.</li>
-<li><strong>Get the agreement signed</strong>: send your client a signing link and they sign online without an account, or download the PDF and upload a signed copy as proof.</li>
-<li><strong>Send the invoice</strong> as an advance, milestone or final invoice drawn from the agreement.</li>
-<li><strong>Track payment</strong> and see what is paid, pending or overdue.</li>
+<li><strong>Find prospects</strong>: describe your ideal client; DealInSec researches companies and shows the evidence for each fit.</li>
+<li><strong>Reach out</strong>: AI drafts a first message; you approve it, send it from your own email and mark it sent.</li>
+<li><strong>Create the deal</strong>: a won lead becomes a deal with the client, scope, timeline and fee.</li>
+<li><strong>Send a quote</strong> generated from the deal, with your terms.</li>
+<li><strong>Get it signed</strong>: send a signing link and your client signs online without an account.</li>
+<li><strong>Invoice and track</strong>: advance, milestone or final invoices, then see what is paid, pending or overdue.</li>
 </ol>
 
-<h2>Get the scope clear before the work begins</h2>
-<p>Define deliverables, timelines, revisions and payment terms before you start, and for a brand deal the usage rights, exclusivity and approval process, so everyone is on the same page. Protection Check reads your terms and flags risky or missing wording such as unlimited revisions, a missing advance or unclear usage rights. It is a written record of what was agreed, not legal advice, and it cannot force a client to pay.</p>
+<h2>AI Outbound: find clients who fit, with the evidence</h2>
+<p>Describe the clients you want, like US dental groups opening new locations. DealInSec researches companies, checks each one against your ideal client and marks it qualified, partial, not a fit or not enough evidence, with the reasons. Evidence shows its source and how recent it is; guesses are labelled as guesses and gaps are shown, not filled in. Add the best prospects to your pipeline. AI drafts a first message; you approve every word, send it from your own email and mark it sent. Your do-not-contact list is checked before anything is drafted or approved. DealInSec doesn't send email for you and never contacts anyone on its own. Research has daily limits per workspace.</p>
 
 <h2>Know exactly what you're owed</h2>
-<p>Track every invoice from sent to paid, so nothing gets lost in your inbox: total invoiced, paid, pending and overdue at a glance. DealInSec tracks payments but does not process them; your client pays you directly and you mark the invoice paid. When something is late, Copilot drafts the follow-up and you review and send it.</p>
+<p>Track every invoice from sent to paid: total invoiced, paid, pending and overdue at a glance. DealInSec tracks payments but does not process them; your client pays you directly and you mark the invoice paid. When something is late, Copilot drafts the follow-up and you review and send it.</p>
 
 <h2>Look professional from the first quote to the final invoice</h2>
 <p>Give every client a clear, consistent experience with a professional quotation, agreement and invoice, all generated from the same deal.</p>
 
-<h2>Built for freelancers and creators, wherever you work</h2>
-<p>Work with clients and brands across borders while keeping your deals, documents and invoices organized in one place. Choose from 50 currencies, including USD, EUR, GBP, CAD, AUD, INR and AED. The tax field, bank labels, invoice numbering and agreement wording follow the country you work from.</p>
+<h2>One workspace, set up for how you bill</h2>
+<p><strong>Agencies in the United States</strong>: quote, agree and invoice in US dollars with your business details on every document; invoice numbers restart each calendar year; DealInSec doesn't calculate sales tax. Use the free plan and the 7-day Pro trial today; paid plans can't be bought from the US yet.</p>
+<p><strong>Agencies in India</strong>: quote, agree and invoice in rupees with your PAN and GSTIN on documents; invoice numbers follow the financial year from 1 April; in-app invoices aren't GST tax invoices, and the free GST invoice generator is built for those. Pro is ₹99 a month or ₹999 a year, paid through Razorpay.</p>
+<p>Clients elsewhere? Bill in any of 50 currencies, including EUR, GBP, CAD, AUD and AED.</p>
 
-<h2>Spend less time turning conversations into paperwork</h2>
-<p>Paste a client's or brand's message into Copilot and it drafts the deal: the client or brand, budget, timeline, deliverables and terms. Anything the message doesn't say is left as Not specified. It is AI-assisted, so you review and edit the draft, and nothing is created until you confirm.</p>
-
-<h2>Everything you need to manage the client deal</h2>
+<h2>Built so you stay in charge</h2>
 <ul>
-<li><strong>Win the deal</strong>: deals, quotes and your own terms.</li>
-<li><strong>Protect the work</strong>: agreements, scope and deliverables, signatures and signed-copy proof.</li>
-<li><strong>Get paid</strong>: invoices, payment tracking and payment reminders.</li>
-<li><strong>Stay organized</strong>: a dashboard, and every document as a PDF.</li>
+<li><strong>Nothing goes out without you</strong>: every outreach message, quotation share and signing link is your decision.</li>
+<li><strong>Do-not-contact, respected</strong>: add an address or a whole domain once and DealInSec won't draft or approve messages to it.</li>
+<li><strong>Your clients' money never touches us</strong>: DealInSec tracks what's paid; your client pays you directly.</li>
+<li><strong>Signatures with an audit record</strong>: who signed, when, from which IP, and a fingerprint of the exact agreement. It isn't a certified digital signature.</li>
+<li><strong>Roles for your team</strong>: Owner, Admin, Sales and Accounts roles, or your own.</li>
+<li><strong>AI you can check</strong>: AI drafts from real records and labels what it inferred; nothing is created until you confirm it.</li>
 </ul>
 
 <h2>Free tools, no sign-up</h2>
@@ -101,12 +108,12 @@ export function landingSeoBody(): string {
 ${guidesHtml()}
 
 <h2>Start simple. Grow when you need to.</h2>
-<p>The free plan is permanent and covers 4 deals a month, each with its quotation. Every new account also starts with a 7-day Pro trial with no card, in every country. Pro adds unlimited deals, agreements with signature, invoices and payment tracking. In India, Pro is ₹99 per month or ₹999 per year. Outside India the free plan and the trial are fully open; paid plans can't be bought from other countries yet. No platform fee on your deal value.</p>
+<p>The free plan is permanent and covers 4 deals a month, each with its quotation, plus the leads pipeline and AI Outbound research within its daily limits. Every new account also starts with a 7-day Pro trial with no card, in every country. Pro adds unlimited deals, agreements your client signs online, invoices, payment tracking and up to 5 team members. In India, Pro is ₹99 per month or ₹999 per year. In the United States and other countries the free plan and the trial are fully open; paid plans can't be bought from outside India yet. No platform fee on your deal value.</p>
 
 <h2>Frequently asked questions</h2>
 ${faqs}
 
-<p><a href="/auth?mode=signup">Start for free</a> · <a href="/pricing">Pricing</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
+<p><a href="/auth?mode=signup">Start for free</a> · <a href="/#pricing">Pricing</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
 </div>`;
 }
 
