@@ -18,7 +18,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { canReadModule, memberCan } from "@shared/permissions";
 import { problemMessage, type ConnectOutcome, type GmailStatusView, type VerifyResult } from "@shared/gmail-connect";
-import { sendingAvailability, type GmailConfig, type GmailStatus } from "./config";
+import { forOrg, sendingAvailability, type GmailConfig, type GmailStatus } from "./config";
 import { FakeMailProvider } from "./fake-provider";
 import type { ConnectionView, MailboxStore } from "./mailbox-store";
 import { capabilitiesOf, MailProviderError, type MailProvider, type TokenGrant } from "./provider";
@@ -94,13 +94,14 @@ function toView(c: ConnectionView | null): GmailStatusView["connection"] {
 }
 
 export async function statusFor(user: Member, deps: MailServiceDeps): Promise<GmailStatusView> {
-  const s = await deps.status();
+  const all = await deps.status();
+  const s = forOrg(all, user.organizationId);
   const provider = s.enabled ? s.config.provider : null;
   let connection: ConnectionView | null = null;
   if (user.organizationId) {
     try {
       // Shown even while connecting is switched off, so a person can still see and disconnect what they connected.
-      for (const p of provider ? [provider] : (["gmail", "fake"] as const)) {
+      for (const p of provider ? [provider] : all.enabled ? [all.config.provider] : (["gmail", "fake"] as const)) {
         connection = await deps.store.live(user.organizationId, user.id, p);
         if (connection) break;
       }
@@ -112,7 +113,7 @@ export async function statusFor(user: Member, deps: MailServiceDeps): Promise<Gm
 export type StartResult = { ok: true; url: string; pending: PendingConnect } | { ok: false; status: number; code: string; message: string };
 
 export async function startConnect(user: Member, deps: MailServiceDeps): Promise<StartResult> {
-  const s = await deps.status();
+  const s = forOrg(await deps.status(), user.organizationId);
   if (!s.enabled) return { ok: false, status: 503, code: "unavailable", message: "Connecting Gmail isn't available right now." };
   if (!mayConnect(user)) return { ok: false, status: 403, code: "not_allowed", message: "Your role doesn't allow connecting a mailbox. Ask your organization owner." };
   const provider = deps.provider(s.config);
@@ -147,7 +148,7 @@ export async function completeConnect(input: CallbackInput, deps: MailServiceDep
   if (deps.now().getTime() > pending.expiresAt) return out("expired");
   if (!user || user.id !== pending.userId || user.organizationId !== pending.orgId) return out("invalid_request", { why: "other_session" });
   if (!mayConnect(user)) return out("not_allowed");
-  const s = await deps.status();
+  const s = forOrg(await deps.status(), pending.orgId);
   if (!s.enabled || s.config.provider !== pending.provider) return out("unavailable");
   if (typeof query.error === "string") return out(query.error === "access_denied" ? "denied" : "failed", { why: "provider_error" });
   const code = typeof query.code === "string" && query.code.length > 0 && query.code.length <= 2048 ? query.code : null;
@@ -195,7 +196,7 @@ async function revokeUnlessLive(provider: MailProvider, grant: TokenGrant, deps:
  * for reconnecting (and deletes a token that can't work); a temporary failure changes nothing.
  */
 export async function verifyConnection(user: Member, deps: MailServiceDeps): Promise<{ result: VerifyResult; status: GmailStatusView }> {
-  const s = await deps.status();
+  const s = forOrg(await deps.status(), user.organizationId);
   if (!s.enabled || !user.organizationId) return { result: "temporarily_unavailable", status: await statusFor(user, deps) };
   const provider = deps.provider(s.config);
   const t = await deps.store.token(user.organizationId, user.id, provider.id, s.config.keyring);

@@ -32,15 +32,20 @@ export interface GmailRouteDeps extends MailServiceDeps {
   send: SendDeps;
 }
 
-/** Same-origin JSON only. Browsers send Sec-Fetch-Site; Origin is checked when present; a form post can't be JSON. */
+/**
+ * Same-origin JSON only. Browsers send Sec-Fetch-Site; Origin is checked when present (against the Host, or the public
+ * host a proxy forwards in X-Forwarded-Host, as the canonical-host redirect reads it: a cross-site page can't set that
+ * header without a CORS preflight the browser refuses); a form post can't be JSON.
+ */
 export const sameOriginJson: RequestHandler = (req, res, next) => {
   const site = req.get("sec-fetch-site");
   if (site && site !== "same-origin") return res.status(403).json({ code: "cross_site", error: "That request didn't come from DealInSec." });
   const origin = req.get("origin");
   if (origin) {
     let host = "";
-    try { host = new URL(origin).host; } catch { host = ""; }
-    if (!host || host !== req.get("host")) return res.status(403).json({ code: "cross_site", error: "That request didn't come from DealInSec." });
+    try { host = new URL(origin).host.toLowerCase(); } catch { host = ""; }
+    const ours = [req.get("host"), (req.get("x-forwarded-host") ?? "").split(",")[0]].map((h) => (h ?? "").trim().toLowerCase()).filter(Boolean);
+    if (!host || !ours.includes(host)) return res.status(403).json({ code: "cross_site", error: "That request didn't come from DealInSec." });
   }
   if (!req.is("application/json")) return res.status(415).json({ code: "json_required", error: "Send this as JSON." });
   next();

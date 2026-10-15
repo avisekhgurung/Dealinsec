@@ -18,7 +18,7 @@
 import { randomBytes } from "node:crypto";
 import { canReadModule, memberCan } from "@shared/permissions";
 import { RESOLVE_DECISIONS, sendMessage, type ResolveDecision, type SendOutcome, type SendView } from "@shared/gmail-connect";
-import { sendingAvailability, type GmailStatus } from "./config";
+import { forOrg, sendingAvailability, type GmailStatus } from "./config";
 import { mayConnect, type Member } from "./connect-service";
 import type { MailboxStore } from "./mailbox-store";
 import { capabilitiesOf, MailProviderError, type MailProvider } from "./provider";
@@ -81,8 +81,8 @@ const outcomeOf = (job: SendJobView | null | undefined, fallback: SendOutcome): 
   !job ? fallback : job.status === "sent" ? "sent" : job.status === "failed" || job.status === "blocked" ? "failed" : "uncertain";
 
 /** Gates every send-related call shares: integration on, sending possible in this build, and the cap valid. */
-async function sendingGate(deps: SendDeps): Promise<Fail | { ok: true; config: GmailConfig; cap: number }> {
-  const s = await deps.status();
+async function sendingGate(deps: SendDeps, orgId: string | null | undefined): Promise<Fail | { ok: true; config: GmailConfig; cap: number }> {
+  const s = forOrg(await deps.status(), orgId);
   if (!s.enabled) return fail(503, "unavailable", "Sending from Gmail isn't available right now.");
   const a = sendingAvailability(s.config);
   if (!a.ok) return fail(503, a.reason, a.reason === "cap_invalid" ? "Sending is switched off until its daily limit is configured correctly." : "Sending from Gmail isn't switched on yet. Open the message in your email app instead.");
@@ -107,7 +107,7 @@ async function withTransientRetry<T>(op: () => Promise<T>, retryable: (e: MailPr
  * Outcomes: sent, uncertain (check your Sent folder), failed (nothing went out), already_sent.
  */
 export async function sendApproved(user: Member, messageId: number, bodyHash: unknown, deps: SendDeps): Promise<Fail | { ok: true; outcome: SendOutcome; send: SendView; reconnect?: boolean }> {
-  const gate = await sendingGate(deps);
+  const gate = await sendingGate(deps, user.organizationId);
   if (!gate.ok) return gate;
   if (!mayConnect(user)) return fail(403, "not_allowed", REFUSALS.not_allowed[1]);
   if (typeof bodyHash !== "string" || !/^[a-f0-9]{64}$/.test(bodyHash)) return fail(400, "invalid", "Send the message you are looking at.");

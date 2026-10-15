@@ -24,6 +24,7 @@ let server: ReturnType<express.Express["listen"]>;
 let fake: FakeMailProvider;
 let store: MemoryMailboxStore;
 let enabled = true;
+let allowedOrgs: string | undefined;
 let clock = new Date("2026-10-14T12:00:00Z");
 let testStart = clock;
 const logs: { event: string; fields: Record<string, unknown> }[] = [];
@@ -31,7 +32,7 @@ const audits: { actor: string; org: string | null; action: string; id: number; d
 const users = new Map<string, Member>();
 
 function env() {
-  return { GMAIL_INTEGRATION_ENABLED: enabled ? "true" : "false", MAIL_PROVIDER: "fake", NODE_ENV: "test", GMAIL_OAUTH_REDIRECT_URI: `${base.replace("127.0.0.1", "localhost")}/api/integrations/gmail/callback`, ...KEYS };
+  return { GMAIL_INTEGRATION_ENABLED: enabled ? "true" : "false", GMAIL_ALLOWED_ORG_IDS: allowedOrgs, MAIL_PROVIDER: "fake", NODE_ENV: "test", GMAIL_OAUTH_REDIRECT_URI: `${base.replace("127.0.0.1", "localhost")}/api/integrations/gmail/callback`, ...KEYS };
 }
 const deps: MailServiceDeps = {
   status: async () => resolveGmailConfig(env()) as GmailStatus,
@@ -66,6 +67,7 @@ beforeEach(() => {
   fake = new FakeMailProvider({ account: { sub: "g-sub-ana", email: "ana@agency.test", emailVerified: true }, now: () => clock });
   store = new MemoryMailboxStore();
   enabled = true;
+  allowedOrgs = undefined;
   // each test starts two hours after the last, so per-person rate limits never carry over
   clock = testStart = new Date(testStart.getTime() + 2 * 3_600_000);
   logs.length = 0; audits.length = 0; users.clear();
@@ -491,5 +493,43 @@ describe("member removal", () => {
     const blind = await disconnectMailboxes({ actor: users.get("admin")!, orgId: "org-a", userId: "ana", reason: "member_removed" }, { ...deps, cleanup: () => ({ keyring: null, provider: null }) });
     expect(blind).toEqual({ disconnected: 1, revoked: false });
     expect(store.rows.every((x) => x.refreshTokenEnc === null)).toBe(true);
+  });
+});
+
+describe("switched on for some organizations only (GMAIL_ALLOWED_ORG_IDS)", () => {
+  it("a listed organization sees and uses it; any other sees it as off and can't start or finish a connect", async () => {
+    allowedOrgs = "org-a";
+    const ana = await browser("ana"), zed = await browser("zed");
+    expect((await ana.status()).available).toBe(true);
+    expect(await zed.status()).toEqual({ available: false, sendingEnabled: false, canConnect: false, connection: null });
+    expect((await zed.req("POST", "/api/integrations/gmail/connect", { json: {} })).status).toBe(503);
+    expect((await (await zed.req("POST", "/api/integrations/gmail/verify", { json: {} })).json()).result).toBe("temporarily_unavailable");
+    // a connect started while org-b was listed, finished after it was taken off the list: refused
+    allowedOrgs = "org-a,org-b";
+    const url = await zed.start();
+    allowedOrgs = "org-a";
+    expect(await zed.callback(url)).toBe("unavailable");
+    expect(store.rows).toHaveLength(0);
+    expect(await ana.callback(await ana.start())).toBe("connected");
+  });
+
+  it("taken off the list after connecting: the connection is still shown and can always be disconnected (credentials removed)", async () => {
+    const ana = await browser("ana");
+    expect(await ana.callback(await ana.start())).toBe("connected");
+    allowedOrgs = "org-b";
+    const s = await ana.status();
+    expect(s).toMatchObject({ available: false, canConnect: false, connection: { status: "active" } });
+    expect(await (await ana.req("POST", "/api/integrations/gmail/disconnect", { json: {} })).json()).toMatchObject({ disconnected: 1, revoked: true });
+    expect(store.rows[0]).toMatchObject({ status: "disconnected", refreshTokenEnc: null });
+  });
+});
+
+describe("the same-origin check behind a proxy", () => {
+  it("accepts the public host the proxy forwards (X-Forwarded-Host), and still refuses any other origin", async () => {
+    const ana = await browser("ana");
+    const forwarded = { origin: "https://www.dealinsec.com", "x-forwarded-host": "www.dealinsec.com", "sec-fetch-site": "same-origin" };
+    expect((await ana.req("POST", "/api/integrations/gmail/connect", { json: {}, headers: forwarded })).status).toBe(200);
+    expect((await ana.req("POST", "/api/integrations/gmail/connect", { json: {}, headers: { ...forwarded, origin: "https://evil.example" } })).status).toBe(403);
+    expect((await ana.req("POST", "/api/integrations/gmail/connect", { json: {}, headers: { origin: "https://www.dealinsec.com" } })).status).toBe(403); // no forwarded host: compared with Host
   });
 });

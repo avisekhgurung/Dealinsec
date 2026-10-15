@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { createMailProvider, DEFAULT_SEND_DAILY_CAP, GMAIL_SENDING_ENABLED, gmailIntegrationGate, MAX_SEND_DAILY_CAP, parseDailyCap, resolveGmailConfig, sendingAvailability } from "./config";
+import { createMailProvider, DEFAULT_SEND_DAILY_CAP, forOrg, parseOrgList, GMAIL_SENDING_ENABLED, gmailIntegrationGate, MAX_SEND_DAILY_CAP, parseDailyCap, resolveGmailConfig, sendingAvailability } from "./config";
 import { FakeMailProvider } from "./fake-provider";
 import { GmailProvider } from "./gmail-provider";
 import { MAILBOX_TABLES, type Exec } from "./mailbox-schema";
@@ -127,5 +127,22 @@ describe("Gmail integration switch", () => {
     };
     const s = await gmailIntegrationGate(() => partial, { env: FAKE_ON })();
     expect(s).toMatchObject({ enabled: false, reason: "not_migrated", missing: ["mail_send_jobs_message_uq"] });
+  });
+});
+
+describe("GMAIL_ALLOWED_ORG_IDS", () => {
+  it("unset means every organization; a list limits it to those; anything malformed keeps the integration off", () => {
+    expect(parseOrgList(undefined)).toBeNull();
+    expect(parseOrgList("  ")).toBeNull();
+    expect(parseOrgList(" org-a , org-b,org-a ")).toEqual(["org-a", "org-b"]);
+    for (const bad of ["org a", "org-a;org-b", ",,,", "x".repeat(65), "<script>"]) expect(parseOrgList(bad), bad).toBe(false);
+    expect(resolveGmailConfig({ ...FAKE_ON, GMAIL_ALLOWED_ORG_IDS: "org a" })).toMatchObject({ enabled: false, reason: "misconfigured" });
+    const all = resolveGmailConfig(FAKE_ON);
+    const some = resolveGmailConfig({ ...FAKE_ON, GMAIL_ALLOWED_ORG_IDS: "org-a" });
+    expect(forOrg(all, "anything")).toBe(all);
+    expect(forOrg(some, "org-a")).toBe(some);
+    expect(forOrg(some, "org-b")).toEqual({ enabled: false, reason: "not_enabled_for_org" });
+    expect(forOrg(some, null)).toEqual({ enabled: false, reason: "not_enabled_for_org" });
+    expect(forOrg({ enabled: false, reason: "disabled" }, "org-a")).toEqual({ enabled: false, reason: "disabled" });
   });
 });

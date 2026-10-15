@@ -8,6 +8,8 @@
  *   MAILBOX_TOKEN_KEYS, MAILBOX_TOKEN_KEY_CURRENT          see token-crypto.ts
  *   GMAIL_OAUTH_REDIRECT_URI                         <origin>/api/integrations/gmail/callback (both providers)
  *   GMAIL_OAUTH_CLIENT_ID, GMAIL_OAUTH_CLIENT_SECRET   (gmail only)
+ *   GMAIL_ALLOWED_ORG_IDS                            optional: comma-separated organization ids; when set, ONLY those
+ *                                                    organizations see or use the integration (others: as if off)
  *   MAIL_SEND_DAILY_CAP                              sends per mailbox per rolling 24 hours (default 50; invalid = no sending)
  */
 import { loadKeyring, TokenCryptoError, type Keyring } from "./token-crypto";
@@ -29,6 +31,8 @@ export const MAX_SEND_DAILY_CAP = 2_000;
 export type GmailConfig = {
   provider: "gmail" | "fake";
   keyring: Keyring;
+  /** GMAIL_ALLOWED_ORG_IDS: the only organizations it is switched on for; null means every organization. */
+  allowedOrgIds: string[] | null;
   /** Per mailbox, rolling 24 hours (MAIL_SEND_DAILY_CAP). Null when the setting is invalid: then nothing may send. */
   sendDailyCap: number | null;
   redirectUri: string; // the one callback URL; never taken from a request
@@ -39,7 +43,8 @@ export type GmailOff =
   | { enabled: false; reason: "disabled" } // the switch is off (the default)
   | { enabled: false; reason: "misconfigured"; problems: string[] }
   | { enabled: false; reason: "provider_unavailable"; detail: string }
-  | { enabled: false; reason: "not_migrated"; missing: string[] };
+  | { enabled: false; reason: "not_migrated"; missing: string[] }
+  | { enabled: false; reason: "not_enabled_for_org" };
 export type GmailStatus = GmailOff | { enabled: true; config: GmailConfig };
 
 type Env = Record<string, string | undefined>;
@@ -73,8 +78,26 @@ export function resolveGmailConfig(env: Env = process.env): GmailOff | { enabled
     oauth = { clientId, clientSecret };
   }
 
-  if (problems.length || !keyring) return { enabled: false, reason: "misconfigured", problems };
-  return { enabled: true, config: { provider: provider as "gmail" | "fake", keyring, sendDailyCap: parseDailyCap(env.MAIL_SEND_DAILY_CAP), redirectUri, oauth } };
+  const allowedOrgIds = parseOrgList(env.GMAIL_ALLOWED_ORG_IDS);
+  if (allowedOrgIds === false) problems.push("GMAIL_ALLOWED_ORG_IDS must be organization ids separated by commas");
+
+  if (problems.length || !keyring || allowedOrgIds === false) return { enabled: false, reason: "misconfigured", problems };
+  return { enabled: true, config: { provider: provider as "gmail" | "fake", keyring, allowedOrgIds, sendDailyCap: parseDailyCap(env.MAIL_SEND_DAILY_CAP), redirectUri, oauth } };
+}
+
+/** GMAIL_ALLOWED_ORG_IDS: unset or blank means every organization; anything malformed is false (the integration stays off). */
+export function parseOrgList(raw: string | undefined): string[] | null | false {
+  const v = (raw ?? "").trim();
+  if (!v) return null;
+  const ids = v.split(",").map((x) => x.trim()).filter(Boolean);
+  if (!ids.length || ids.length > 100 || ids.some((x) => !/^[A-Za-z0-9_-]{1,64}$/.test(x))) return false;
+  return Array.from(new Set(ids));
+}
+
+/** The integration as one organization sees it: off for any organization outside GMAIL_ALLOWED_ORG_IDS. */
+export function forOrg(s: GmailStatus, orgId: string | null | undefined): GmailStatus {
+  if (!s.enabled || !s.config.allowedOrgIds) return s;
+  return orgId && s.config.allowedOrgIds.includes(orgId) ? s : { enabled: false, reason: "not_enabled_for_org" };
 }
 
 /** MAIL_SEND_DAILY_CAP: unset means the default; anything but a whole number from 1 to the maximum is invalid (null). */

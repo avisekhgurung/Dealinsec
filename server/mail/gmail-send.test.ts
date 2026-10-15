@@ -592,3 +592,17 @@ describe("reliability audit (each case reproduced a defect before its fix)", () 
     expect(w.afterSent).toHaveLength(1);
   });
 });
+
+describe("sending: only for organizations the integration is switched on for", () => {
+  it("an organization outside GMAIL_ALLOWED_ORG_IDS can't send, even with a connected mailbox", async () => {
+    const w = makeWorld({ env: { GMAIL_ALLOWED_ORG_IDS: "org-b" } });
+    await w.connect("ana");
+    const m = w.approved();
+    expect(failed(await sendApproved(w.members.ana, m.id, m.bodyHash, w.deps))).toMatchObject({ status: 503, code: "unavailable" });
+    expect(w.fake.calls.filter((c) => c.op === "send")).toHaveLength(0);
+    const listed = makeWorld({ env: { GMAIL_ALLOWED_ORG_IDS: "org-a" } });
+    await listed.connect("ana");
+    const n = listed.approved();
+    expect(ok(await sendApproved(listed.members.ana, n.id, n.bodyHash, listed.deps)).outcome).toBe("sent");
+  });
+});
