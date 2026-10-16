@@ -1,15 +1,16 @@
 /**
- * Settings — Business profile, Team, Invitations, Activity, Plan & billing.
+ * Settings — Business profile, Team, Integrations, Plan & billing, Preferences, Activity log.
  *
- * One page with a left tab rail (desktop) / top tab strip (mobile). What each
- * member can DO is role-gated with the shared permission map; the server is
- * the authority, this only hides what would 403 anyway.
+ * One page with a sticky left tab column (desktop) / scrolling tab strip (mobile). The open tab is in the URL
+ * (?tab=<key>), and the return from Google's Gmail consent (?gmail=<outcome>) opens Integrations; the rules live in
+ * shared/settings-tabs.ts. What each member can DO is role-gated with the shared permission map; the server is the
+ * authority, this only hides what would 403 anyway.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +36,7 @@ import {
 import {
   ArrowLeft, Building2, Users, ScrollText, CreditCard, UserPlus, Crown,
   Mail, RotateCw, Trash2, Loader2, Sparkles, Rocket, Sun, Moon, Monitor, Download,
-  SlidersHorizontal, Check, Shield, Pencil, Plus,
+  SlidersHorizontal, Check, Shield, Pencil, Plus, Plug,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getThemePref, setThemePref, type ThemePref } from "@/lib/theme";
@@ -44,7 +45,14 @@ import { pageNumbers } from "@/components/data-table/data-table";
 import { FeedbackCard } from "@/components/feedback-card";
 import { DocumentStyleCard } from "@/components/settings/document-style-card";
 import { KnowledgeCard } from "@/components/settings/knowledge-card";
-import { GmailCard } from "@/components/settings/gmail-card";
+import { IntegrationsPanel } from "@/components/settings/integrations-panel";
+import { PermissionNote, SectionSkeleton, SettingsSection } from "@/components/settings/section-card";
+import { SettingsTabsNav, settingsPanelId, settingsTabId, type SettingsTabItem } from "@/components/settings/settings-tabs-nav";
+import { LoadError } from "@/components/load-error";
+import {
+  SETTINGS_TAB_META, pickSettingsTab, requestedSettingsTab, settingsTabSearch, visibleSettingsTabs,
+  type SettingsTab,
+} from "@shared/settings-tabs";
 import { RegionFields } from "@/components/region-fields";
 import { AudiencePicker } from "@/components/audience-picker";
 import { normalizeAudience, type Audience } from "@shared/audience";
@@ -70,8 +78,6 @@ const ACTION_TONE = (action: string) => {
   if (/created|generated|invited/i.test(action)) return "bg-primary/10 text-primary";
   return "bg-muted text-muted-foreground";
 };
-
-type Tab = "organization" | "team" | "activity" | "subscription" | "preferences";
 
 interface OrgSummary extends LocaleFields {
   id: string; name: string; slug: string | null; industry: string | null;
@@ -108,7 +114,9 @@ export default function SettingsPage() {
   const { locale, country: accountCountry } = useLocale();
   const { toast } = useToast();
   const confirm = useConfirm();
-  const [tab, setTab] = useState<Tab>("organization");
+  // The tab the URL (or a click) asked for, kept apart from permissions so a role that loads late can still open it.
+  const [requestedTab, setRequestedTab] = useState<SettingsTab | null>(() =>
+    typeof window === "undefined" ? null : requestedSettingsTab(window.location.search));
   // Theme is a per-device preference (localStorage), not an account setting.
   const [activityRange, setActivityRange] = useState<DateRange>(ALL_TIME);
   const [themePref, setThemePrefState] = useState<ThemePref>(() => getThemePref());
@@ -125,21 +133,40 @@ export default function SettingsPage() {
   const canEditOrg = memberCan(me, "org.settings");
   const canBilling = memberCan(me, "billing.manage");
   const canActivity = memberCan(me, "activity.view");
+  const visibleTabs = visibleSettingsTabs({ canViewActivity: canActivity });
+  const tab = pickSettingsTab(requestedTab, visibleTabs);
+  const tabIdBase = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const firstTabRender = useRef(true);
 
-  const { data: org, isLoading: orgLoading } = useQuery<OrgSummary>({ queryKey: ["/api/org"] });
+  // Record the open tab in the URL (replaceState: switching tabs isn't a page to go Back to). Read fresh from
+  // window.location, after GmailCard has tidied away its ?gmail outcome on mount (child effects run first).
+  useEffect(() => {
+    const next = settingsTabSearch(window.location.search, tab);
+    if (next !== window.location.search) {
+      window.history.replaceState(window.history.state, "", `${window.location.pathname}${next}${window.location.hash}`);
+    }
+    // A switch made while scrolled down shows the new tab from its top. Not on first render: the Gmail return
+    // scrolls to its own card.
+    if (firstTabRender.current) { firstTabRender.current = false; return; }
+    // The panel's start can sit under the sticky header well before it leaves the viewport, so any scroll counts.
+    if (panelRef.current && window.scrollY > 0) window.scrollTo({ top: 0 });
+  }, [tab]);
+
+  const { data: org, isLoading: orgLoading, error: orgError, refetch: refetchOrg, isFetching: orgFetching } = useQuery<OrgSummary>({ queryKey: ["/api/org"] });
   const { extraSeatPrice } = usePlanPrices();
   // Seats, like plans, can only be bought from India for now; elsewhere no
   // rupee seat price is quoted (see usePlanCheckoutAvailable). Always true for
   // Indian accounts.
   const checkoutAvailable = usePlanCheckoutAvailable();
-  const { data: members = [] } = useQuery<Member[]>({ queryKey: ["/api/org/members"] });
+  const { data: members = [], isLoading: membersLoading, error: membersError, refetch: refetchMembers, isFetching: membersFetching } = useQuery<Member[]>({ queryKey: ["/api/org/members"] });
   const { data: invites = [] } = useQuery<Invite[]>({
     queryKey: ["/api/org/invitations"],
     enabled: canInvite,
   });
   const [activityPage, setActivityPage] = useState(0);
   const ACTIVITY_PAGE_SIZE = 20;
-  const { data: activity = [] } = useQuery<Activity[]>({
+  const { data: activity = [], isLoading: activityLoading, error: activityError, refetch: refetchActivity, isFetching: activityFetching } = useQuery<Activity[]>({
     queryKey: ["/api/org/activity"],
     enabled: canActivity && tab === "activity",
   });
@@ -344,13 +371,11 @@ export default function SettingsPage() {
     onError: (err) => toast({ title: "Could not remove member", description: parseApiError(err).error, variant: "destructive" }),
   });
 
-  const TABS: { key: Tab; label: string; icon: typeof Building2; show: boolean }[] = [
-    { key: "organization", label: "Business profile", icon: Building2, show: true },
-    { key: "team", label: "Team", icon: Users, show: true },
-    { key: "activity", label: "Activity log", icon: ScrollText, show: canActivity },
-    { key: "subscription", label: "Plan & billing", icon: CreditCard, show: true },
-    { key: "preferences", label: "Preferences", icon: SlidersHorizontal, show: true },
-  ];
+  const TAB_ICONS: Record<SettingsTab, SettingsTabItem["icon"]> = {
+    organization: Building2, team: Users, integrations: Plug, subscription: CreditCard,
+    preferences: SlidersHorizontal, activity: ScrollText,
+  };
+  const TABS: SettingsTabItem[] = visibleTabs.map((key) => ({ key, label: SETTINGS_TAB_META[key].label, icon: TAB_ICONS[key] }));
 
   const seatsFree = org ? Math.max(0, org.seatLimit - org.seatsUsed - org.pendingInvites) : 0;
   // Most accounts are one freelancer. Seat counts, role matrices and "team"
@@ -403,529 +428,507 @@ export default function SettingsPage() {
       </header>
 
       <main className="p-4 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-6">
-        <div className="flex flex-col lg:flex-row gap-5">
-          {/* Tab rail */}
-          <nav className="flex lg:flex-col gap-1.5 lg:w-56 overflow-x-auto pb-1 lg:pb-0">
-            {TABS.filter((t) => t.show).map((t) => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                data-testid={`settings-tab-${t.key}`}
-                className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
-                  tab === t.key
-                    ? "bg-primary/[0.08] text-primary"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                }`}
-              >
-                <t.icon className="w-4 h-4" />
-                {t.label}
-              </button>
-            ))}
+        <div className="flex flex-col lg:flex-row gap-5 lg:gap-8">
+          {/* Tab column (desktop, sticky under the page header) / scrolling strip (phones) */}
+          <nav aria-label="Settings" className="lg:w-56 lg:shrink-0">
+            <div className="lg:sticky lg:top-[calc(var(--dis-topnav-h)+6.5rem)]">
+              <SettingsTabsNav idBase={tabIdBase} tabs={TABS} value={tab} onChange={setRequestedTab} />
+            </div>
           </nav>
 
-          {/* Panel */}
-          <div className="flex-1 min-w-0 space-y-4">
-            {/* ── Organization ── */}
+          {/* Panel. Keyed on the tab so each switch replays a short opacity-only CSS fade (dis-route-in: it
+              completes even where no animation frames run, and is off for reduced motion). */}
+          <div
+            key={tab}
+            ref={panelRef}
+            role="tabpanel"
+            id={settingsPanelId(tabIdBase)}
+            aria-labelledby={settingsTabId(tabIdBase, tab)}
+            className="dis-route-in flex-1 min-w-0 space-y-4 outline-none"
+            data-testid={`settings-panel-${tab}`}
+          >
+            <p className="text-sm text-muted-foreground" data-testid="settings-panel-intro">{SETTINGS_TAB_META[tab].description}</p>
+
+            {/* ── Business profile ── */}
             {tab === "organization" && (
               <>
-              <Card className="glass-card">
-                <CardContent className="p-5 lg:p-6 space-y-5">
-                  <div>
-                    <h2 className="font-bold text-lg">Business profile</h2>
-                    <p className="text-sm text-muted-foreground">
-                      How your business is named inside DealInSec{isSolo ? "" : " and to your team"}. Freelancing under your
-                      own name? Use it here. Your contact, tax and bank details for documents live in your{" "}
-                      <Link href="/profile" className="text-primary font-medium hover:underline">profile</Link>.
-                    </p>
-                  </div>
-                  {orgLoading ? (
-                    <Skeleton className="h-24 w-full rounded-xl" />
-                  ) : (
-                    <div className="space-y-4 max-w-md">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="org-name">Business or trading name</Label>
-                        <Input
-                          id="org-name"
-                          value={orgName ?? org?.name ?? ""}
-                          onChange={(e) => setOrgName(e.target.value)}
-                          disabled={!canEditOrg}
-                          data-testid="input-org-name"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="org-industry">What you do</Label>
-                        <Input
-                          id="org-industry"
-                          placeholder="e.g. Design, Development, Video editing"
-                          value={orgIndustry ?? org?.industry ?? ""}
-                          onChange={(e) => setOrgIndustry(e.target.value)}
-                          disabled={!canEditOrg}
-                        />
-                      </div>
-                      {canEditOrg && (
-                        <Button
-                          onClick={() => saveOrg.mutate()}
-                          disabled={saveOrg.isPending}
-                          className="gradient-btn text-white"
-                          data-testid="button-save-org"
-                        >
-                          {saveOrg.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                          Save changes
-                        </Button>
+                {orgError && !org ? (
+                  <Card className="glass-card">
+                    <LoadError what="your business profile" onRetry={() => void refetchOrg()} retrying={orgFetching} />
+                  </Card>
+                ) : (
+                  <>
+                    <SettingsSection
+                      title="Business profile"
+                      description={<>
+                        How your business is named inside DealInSec{isSolo ? "" : " and to your team"}. Freelancing under your
+                        own name? Use it here. Your contact, tax and bank details for documents live in your{" "}
+                        <Link href="/profile" className="text-primary font-medium hover:underline">profile</Link>.
+                      </>}
+                    >
+                      {orgLoading ? (
+                        <Skeleton className="h-24 w-full rounded-xl" />
+                      ) : (
+                        <div className="space-y-4 max-w-md">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="org-name">Business or trading name</Label>
+                            <Input
+                              id="org-name"
+                              value={orgName ?? org?.name ?? ""}
+                              onChange={(e) => setOrgName(e.target.value)}
+                              disabled={!canEditOrg}
+                              data-testid="input-org-name"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="org-industry">What you do</Label>
+                            <Input
+                              id="org-industry"
+                              placeholder="e.g. Design, Development, Video editing"
+                              value={orgIndustry ?? org?.industry ?? ""}
+                              onChange={(e) => setOrgIndustry(e.target.value)}
+                              disabled={!canEditOrg}
+                            />
+                          </div>
+                          {canEditOrg ? (
+                            <Button
+                              onClick={() => saveOrg.mutate()}
+                              disabled={saveOrg.isPending}
+                              className="gradient-btn text-white"
+                              data-testid="button-save-org"
+                            >
+                              {saveOrg.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                              Save changes
+                            </Button>
+                          ) : (
+                            <PermissionNote>Only the Owner or an Admin can edit the business profile.</PermissionNote>
+                          )}
+                        </div>
                       )}
-                      {!canEditOrg && (
-                        <p className="text-xs text-muted-foreground">Only the Owner or an Admin can edit the business profile.</p>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    </SettingsSection>
 
-              <DocumentStyleCard canEdit={memberCan(user as any, "org.settings")} />
+                    <SettingsSection
+                      title="Work type"
+                      description="What kind of work you do. It changes the wording and which deal type is offered first. Your existing deals, quotations, agreements and invoices are not affected."
+                    >
+                      {orgLoading ? (
+                        <Skeleton className="h-20 w-full rounded-xl" />
+                      ) : (
+                        <>
+                          <AudiencePicker
+                            layout="row"
+                            idPrefix="settings-audience"
+                            value={normalizeAudience(org?.audience)}
+                            onChange={(next) => saveAudience.mutate(next)}
+                            disabled={!canEditOrg || saveAudience.isPending}
+                          />
+                          {!canEditOrg && (
+                            <PermissionNote>Only the Owner or an Admin can change the work type.</PermissionNote>
+                          )}
+                        </>
+                      )}
+                    </SettingsSection>
 
-              <KnowledgeCard canEdit={memberCan(user as any, "deals.create")} />
+                    <SettingsSection
+                      title={<>Country &amp; currency</>}
+                      description="What your quotations, agreements and invoices are issued in."
+                    >
+                      {orgLoading ? (
+                        <Skeleton className="h-32 w-full rounded-xl" />
+                      ) : (
+                        <div className="space-y-4 max-w-md">
+                          {/* Keyed on the org so the currency's "picked by hand"
+                              memory never carries over from another workspace. */}
+                          <RegionFields
+                            key={org?.id}
+                            value={region}
+                            onChange={setRegionDraft}
+                            disabled={!canEditOrg || saveRegion.isPending || regionLock !== null}
+                            showTimeZone
+                            idPrefix="org-region"
+                          />
+                          {regionLock === "has-deals" && (
+                            <p className="text-xs text-muted-foreground" data-testid="region-locked">
+                              Fixed once your first deal exists, so everything already quoted, signed and invoiced keeps
+                              printing exactly as it was issued. Need to change it? Email support@dealinsec.com.
+                            </p>
+                          )}
+                          {regionLock === "unverifiable" && (
+                            <p className="text-xs text-muted-foreground" data-testid="region-locked">
+                              We couldn't check whether this workspace has deals, so the country and currency stay locked. Refresh to try again.
+                            </p>
+                          )}
+                          {canEditOrg && isOwner && regionLock !== null && regionLock !== "checking" && !regionUnchanged && (
+                            <p className="text-xs text-muted-foreground" data-testid="region-owner-drift">
+                              Your own profile doesn't match this workspace's country and currency. Save to bring it back in line —
+                              the workspace itself won't change.
+                            </p>
+                          )}
+                          {canEditOrg ? (
+                            <Button
+                              onClick={() => saveRegion.mutate(region)}
+                              disabled={saveRegion.isPending || regionLock === "checking" || regionUnchanged}
+                              className="gradient-btn text-white"
+                              data-testid="button-save-region"
+                            >
+                              {saveRegion.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                              Save changes
+                            </Button>
+                          ) : (
+                            <PermissionNote>Only the Owner or an Admin can change this.</PermissionNote>
+                          )}
+                        </div>
+                      )}
+                    </SettingsSection>
+                  </>
+                )}
 
-              <GmailCard />
+                <DocumentStyleCard canEdit={memberCan(user as any, "org.settings")} />
 
-              <Card className="glass-card">
-                <CardContent className="p-5 lg:p-6 space-y-4">
-                  <div>
-                    <h2 className="font-bold text-lg">Work type</h2>
-                    <p className="text-sm text-muted-foreground">
-                      What kind of work you do. It changes the wording and which deal type is offered first. Your
-                      existing deals, quotations, agreements and invoices are not affected.
-                    </p>
-                  </div>
-                  {orgLoading ? (
-                    <Skeleton className="h-20 w-full rounded-xl" />
-                  ) : (
-                    <>
-                      <AudiencePicker
-                        layout="row"
-                        idPrefix="settings-audience"
-                        value={normalizeAudience(org?.audience)}
-                        onChange={(next) => saveAudience.mutate(next)}
-                        disabled={!canEditOrg || saveAudience.isPending}
-                      />
-                      {!canEditOrg && (
-                        <p className="text-xs text-muted-foreground">Only the Owner or an Admin can change the work type.</p>
-                      )}
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="glass-card">
-                <CardContent className="p-5 lg:p-6 space-y-5">
-                  <div>
-                    <h2 className="font-bold text-lg">Country &amp; currency</h2>
-                    <p className="text-sm text-muted-foreground">
-                      What your quotations, agreements and invoices are issued in.
-                    </p>
-                  </div>
-                  {orgLoading ? (
-                    <Skeleton className="h-32 w-full rounded-xl" />
-                  ) : (
-                    <div className="space-y-4 max-w-md">
-                      {/* Keyed on the org so the currency's "picked by hand"
-                          memory never carries over from another workspace. */}
-                      <RegionFields
-                        key={org?.id}
-                        value={region}
-                        onChange={setRegionDraft}
-                        disabled={!canEditOrg || saveRegion.isPending || regionLock !== null}
-                        showTimeZone
-                        idPrefix="org-region"
-                      />
-                      {regionLock === "has-deals" && (
-                        <p className="text-xs text-muted-foreground" data-testid="region-locked">
-                          Fixed once your first deal exists, so everything already quoted, signed and invoiced keeps
-                          printing exactly as it was issued. Need to change it? Email support@dealinsec.com.
-                        </p>
-                      )}
-                      {regionLock === "unverifiable" && (
-                        <p className="text-xs text-muted-foreground" data-testid="region-locked">
-                          We couldn't check whether this workspace has deals, so the country and currency stay locked. Refresh to try again.
-                        </p>
-                      )}
-                      {canEditOrg && isOwner && regionLock !== null && regionLock !== "checking" && !regionUnchanged && (
-                        <p className="text-xs text-muted-foreground" data-testid="region-owner-drift">
-                          Your own profile doesn't match this workspace's country and currency. Save to bring it back in line —
-                          the workspace itself won't change.
-                        </p>
-                      )}
-                      {canEditOrg && (
-                        <Button
-                          onClick={() => saveRegion.mutate(region)}
-                          disabled={saveRegion.isPending || regionLock === "checking" || regionUnchanged}
-                          className="gradient-btn text-white"
-                          data-testid="button-save-region"
-                        >
-                          {saveRegion.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                          Save changes
-                        </Button>
-                      )}
-                      {!canEditOrg && (
-                        <p className="text-xs text-muted-foreground">Only the Owner or an Admin can change this.</p>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                <KnowledgeCard canEdit={memberCan(user as any, "deals.create")} />
               </>
             )}
 
             {/* ── Team ── */}
-            {tab === "team" && isSolo && (
-              <Card className="glass-card" data-testid="team-solo">
-                <CardContent className="p-5 lg:p-6 space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                      <Users className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h2 className="font-bold text-lg">Working solo</h2>
-                      <p className="text-sm text-muted-foreground max-w-xl">
-                        You don't need a team to use DealInSec. When you bring someone in — an assistant, a
-                        subcontractor or your accountant — they get their own login and a role that decides what
-                        they can do. Billing and your plan stay with you as the Owner.
-                      </p>
-                    </div>
-                  </div>
-                  <ul className="text-sm text-muted-foreground space-y-1.5 max-w-xl list-disc pl-5">
-                    <li>Give your accountant the <strong className="text-foreground">Accounts</strong> role: they raise invoices and track payments, but can't create or edit deals.</li>
-                    <li>Give an assistant the <strong className="text-foreground">Sales</strong> role: they create deals and quotations, but can't touch invoices.</li>
-                    <li>Pro — and your free trial — includes up to 5 people, you included.</li>
-                  </ul>
-                  {canInvite ? (
-                    <Button className="gradient-btn text-white" onClick={openInvite} data-testid="button-invite-member">
-                      <UserPlus className="w-4 h-4 mr-2" />
-                      Invite someone
-                    </Button>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">Only the Owner or an Admin can invite people.</p>
-                  )}
-                </CardContent>
+            {tab === "team" && orgLoading && <SectionSkeleton testId="team-loading" />}
+
+            {tab === "team" && !org && !orgLoading && (
+              <Card className="glass-card">
+                <LoadError what="your team" onRetry={() => void refetchOrg()} retrying={orgFetching} />
               </Card>
             )}
 
-            {tab === "team" && !isSolo && (
-              <>
-                <Card className="glass-card">
-                  <CardContent className="p-5 lg:p-6">
-                    <div className="flex items-center justify-between gap-3 mb-4">
-                      <div>
-                        <h2 className="font-bold text-lg">Team members</h2>
-                        <p className="text-sm text-muted-foreground">
-                          {org ? `${org.seatsUsed} of ${org.seatLimit} seats used${org.pendingInvites ? ` · ${org.pendingInvites} pending` : ""}` : ""}
-                        </p>
-                      </div>
-                      {canInvite && (
-                        <Button
-                          className="gradient-btn text-white flex-shrink-0"
-                          onClick={openInvite}
-                          data-testid="button-invite-member"
-                        >
-                          <UserPlus className="w-4 h-4 mr-2" />
-                          Invite Member
-                        </Button>
-                      )}
-                    </div>
+            {tab === "team" && org && isSolo && (
+              <SettingsSection
+                title="Working solo"
+                icon={Users}
+                testId="team-solo"
+                description="You don't need a team to use DealInSec. When you bring someone in — an assistant, a subcontractor or your accountant — they get their own login and a role that decides what they can do. Billing and your plan stay with you as the Owner."
+                action={canInvite ? (
+                  <Button className="gradient-btn text-white" onClick={openInvite} data-testid="button-invite-member">
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Invite someone
+                  </Button>
+                ) : undefined}
+              >
+                <ul className="text-sm text-muted-foreground space-y-1.5 max-w-xl list-disc pl-5">
+                  <li>Give your accountant the <strong className="text-foreground">Accounts</strong> role: they raise invoices and track payments, but can't create or edit deals.</li>
+                  <li>Give an assistant the <strong className="text-foreground">Sales</strong> role: they create deals and quotations, but can't touch invoices.</li>
+                  <li>Pro — and your free trial — includes up to 5 people, you included.</li>
+                </ul>
+                {!canInvite && <PermissionNote>Only the Owner or an Admin can invite people.</PermissionNote>}
+              </SettingsSection>
+            )}
 
+            {tab === "team" && org && !isSolo && (
+              <>
+                <SettingsSection
+                  title="Team members"
+                  description={`${org.seatsUsed} of ${org.seatLimit} seats used${org.pendingInvites ? ` · ${org.pendingInvites} pending` : ""}`}
+                  action={canInvite ? (
+                    <Button
+                      className="gradient-btn text-white"
+                      onClick={openInvite}
+                      data-testid="button-invite-member"
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Invite Member
+                    </Button>
+                  ) : undefined}
+                >
+                  {membersLoading ? (
+                    <div className="space-y-3" aria-busy="true">
+                      {[0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
+                    </div>
+                  ) : membersError && members.length === 0 ? (
+                    <div className="-mx-4">
+                      <LoadError compact what="team members" onRetry={() => void refetchMembers()} retrying={membersFetching} />
+                    </div>
+                  ) : (
+                  <div className="divide-y divide-border/60">
+                    {members.map((m) => (
+                      <div key={m.id} className="py-3 flex items-center gap-3" data-testid={`member-${m.email}`}>
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary/70 text-white text-sm font-bold flex items-center justify-center flex-shrink-0 overflow-hidden">
+                          {m.avatar
+                            ? <img src={m.avatar} alt="" className="w-full h-full object-cover" />
+                            : ((m.firstName?.[0] ?? "") + (m.lastName?.[0] ?? "") || m.email[0].toUpperCase())}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold truncate">
+                              {[m.firstName, m.lastName].filter(Boolean).join(" ") || m.email}
+                            </p>
+                            {m.orgRole === "OWNER" && <Crown className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />}
+                            {m.id === (user as any)?.id && <Badge variant="secondary" className="text-[10px] px-1.5">You</Badge>}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">{m.email} · joined {fmtDate(m.joinedAt, locale)}</p>
+                        </div>
+                        {canManageTeam && m.orgRole !== "OWNER" && m.id !== (user as any)?.id ? (
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <Select
+                              value={m.customRoleId ? `custom:${m.customRoleId}` : m.orgRole}
+                              onValueChange={(v) => changeRole.mutate({ id: m.id, value: v })}
+                            >
+                              <SelectTrigger className="h-8 w-[130px] text-xs" data-testid={`role-select-${m.email}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {customRoles.map((r) => (
+                                  <SelectItem key={r.id} value={`custom:${r.id}`} className="text-xs">
+                                    {r.name}
+                                  </SelectItem>
+                                ))}
+                                {/* Legacy literal role (pre-editable-roles member): shown so the
+                                    select reads correctly until the owner reassigns them.
+                                    (This block only renders for non-OWNER rows.) */}
+                                {!m.customRoleId && (
+                                  <SelectItem value={m.orgRole} className="text-xs">
+                                    {ROLE_META[m.orgRole as OrgRole]?.label ?? m.orgRole} (legacy)
+                                  </SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-rose-500"
+                              aria-label={`Remove ${m.email}`}
+                              onClick={async () => {
+                                if (await confirm({ title: `Remove ${m.email}?`, description: "They lose access immediately. Their records stay with the organization.", destructive: true, confirmText: "Remove" })) {
+                                  removeMember.mutate(m.id);
+                                }
+                              }}
+                              data-testid={`remove-${m.email}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Badge variant="outline" className="flex-shrink-0 text-xs">
+                            {m.customRoleName ?? ROLE_META[m.orgRole as OrgRole]?.label ?? m.orgRole}
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  )}
+                  {!canInvite && !canManageTeam && (
+                    <PermissionNote>Only the Owner or an Admin can invite people or change roles.</PermissionNote>
+                  )}
+                </SettingsSection>
+
+                {canInvite && invites.length > 0 && (
+                  <SettingsSection title="Pending invitations" description="Waiting for these people to accept.">
                     <div className="divide-y divide-border/60">
-                      {members.map((m) => (
-                        <div key={m.id} className="py-3 flex items-center gap-3" data-testid={`member-${m.email}`}>
-                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary/70 text-white text-sm font-bold flex items-center justify-center flex-shrink-0 overflow-hidden">
-                            {m.avatar
-                              ? <img src={m.avatar} alt="" className="w-full h-full object-cover" />
-                              : ((m.firstName?.[0] ?? "") + (m.lastName?.[0] ?? "") || m.email[0].toUpperCase())}
+                      {invites.map((inv) => (
+                        <div key={inv.id} className="py-3 flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                            <Mail className="w-4 h-4 text-muted-foreground" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold truncate">
-                                {[m.firstName, m.lastName].filter(Boolean).join(" ") || m.email}
-                              </p>
-                              {m.orgRole === "OWNER" && <Crown className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />}
-                              {m.id === (user as any)?.id && <Badge variant="secondary" className="text-[10px] px-1.5">You</Badge>}
-                            </div>
-                            <p className="text-xs text-muted-foreground truncate">{m.email} · joined {fmtDate(m.joinedAt, locale)}</p>
+                            <p className="text-sm font-semibold truncate">{inv.email}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {ROLE_META[inv.orgRole]?.label
+                                ?? customRoles.find((r) => r.id === (inv as any).customRoleId)?.name
+                                ?? "Custom role"} · invited {fmtDate(inv.createdAt, locale)} · expires {fmtDate(inv.expiresAt, locale)}
+                            </p>
                           </div>
-                          {canManageTeam && m.orgRole !== "OWNER" && m.id !== (user as any)?.id ? (
-                            <div className="flex items-center gap-1.5 flex-shrink-0">
-                              <Select
-                                value={m.customRoleId ? `custom:${m.customRoleId}` : m.orgRole}
-                                onValueChange={(v) => changeRole.mutate({ id: m.id, value: v })}
-                              >
-                                <SelectTrigger className="h-8 w-[130px] text-xs" data-testid={`role-select-${m.email}`}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {customRoles.map((r) => (
-                                    <SelectItem key={r.id} value={`custom:${r.id}`} className="text-xs">
-                                      {r.name}
-                                    </SelectItem>
-                                  ))}
-                                  {/* Legacy literal role (pre-editable-roles member): shown so the
-                                      select reads correctly until the owner reassigns them.
-                                      (This block only renders for non-OWNER rows.) */}
-                                  {!m.customRoleId && (
-                                    <SelectItem value={m.orgRole} className="text-xs">
-                                      {ROLE_META[m.orgRole as OrgRole]?.label ?? m.orgRole} (legacy)
-                                    </SelectItem>
-                                  )}
-                                </SelectContent>
-                              </Select>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-rose-500"
-                                onClick={async () => {
-                                  if (await confirm({ title: `Remove ${m.email}?`, description: "They lose access immediately. Their records stay with the organization.", destructive: true, confirmText: "Remove" })) {
-                                    removeMember.mutate(m.id);
-                                  }
-                                }}
-                                data-testid={`remove-${m.email}`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <Badge variant="outline" className="flex-shrink-0 text-xs">
-                              {m.customRoleName ?? ROLE_META[m.orgRole as OrgRole]?.label ?? m.orgRole}
-                            </Badge>
-                          )}
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Resend" aria-label={`Resend invitation to ${inv.email}`}
+                              onClick={() => resendInvite.mutate(inv.id)} data-testid={`resend-${inv.email}`}>
+                              <RotateCw className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-rose-500" title="Revoke" aria-label={`Revoke invitation to ${inv.email}`}
+                              onClick={() => revokeInvite.mutate(inv.id)}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
-                  </CardContent>
-                </Card>
-
-                {canInvite && invites.length > 0 && (
-                  <Card className="glass-card">
-                    <CardContent className="p-5 lg:p-6">
-                      <h3 className="font-bold mb-3">Pending invitations</h3>
-                      <div className="divide-y divide-border/60">
-                        {invites.map((inv) => (
-                          <div key={inv.id} className="py-3 flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                              <Mail className="w-4 h-4 text-muted-foreground" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold truncate">{inv.email}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {ROLE_META[inv.orgRole]?.label
-                                  ?? customRoles.find((r) => r.id === (inv as any).customRoleId)?.name
-                                  ?? "Custom role"} · invited {fmtDate(inv.createdAt, locale)} · expires {fmtDate(inv.expiresAt, locale)}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-1.5 flex-shrink-0">
-                              <Button variant="ghost" size="icon" className="h-8 w-8" title="Resend"
-                                onClick={() => resendInvite.mutate(inv.id)} data-testid={`resend-${inv.email}`}>
-                                <RotateCw className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-rose-500" title="Revoke"
-                                onClick={() => revokeInvite.mutate(inv.id)}>
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+                  </SettingsSection>
                 )}
 
                 {/* ── Roles & permissions matrix ── */}
                 {canManageTeam && (
-                  <Card className="glass-card">
-                    <CardContent className="p-5 lg:p-6">
-                      <div className="flex items-center justify-between gap-3 mb-1">
-                        <div>
-                          <h3 className="font-bold">Roles &amp; permissions</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Every role is yours to shape — edit the defaults, delete them, or
-                            create your own with the exact permission mix.
+                  <SettingsSection
+                    title={<>Roles &amp; permissions</>}
+                    description="Every role is yours to shape — edit the defaults, delete them, or create your own with the exact permission mix."
+                    action={isOwner ? (
+                      <Button
+                        variant="outline"
+                        className="font-semibold border-primary/40 text-primary"
+                        onClick={() => openRoleEditor()}
+                        data-testid="button-create-role"
+                      >
+                        <Plus className="w-4 h-4 mr-1.5" />
+                        Create Role
+                      </Button>
+                    ) : undefined}
+                  >
+                    <div className="grid sm:grid-cols-2 gap-2.5">
+                      {customRoles.map((r) => (
+                        <div key={r.id} className="rounded-xl border border-primary/30 bg-primary/[0.03] p-3" data-testid={`custom-role-${r.name}`}>
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm font-semibold flex items-center gap-1.5 min-w-0">
+                              <Shield className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+                              <span className="truncate">{r.name}</span>
+                            </p>
+                            {isOwner && (
+                              <span className="flex items-center gap-0.5 flex-shrink-0">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" title="Edit role" aria-label={`Edit role ${r.name}`}
+                                  onClick={() => openRoleEditor(r)} data-testid={`edit-role-${r.name}`}>
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-rose-500" title="Delete role" aria-label={`Delete role ${r.name}`}
+                                  onClick={async () => {
+                                    if (await confirm({ title: `Delete role "${r.name}"?`, description: "Members must be reassigned before a role can be deleted.", destructive: true, confirmText: "Delete" })) {
+                                      deleteRole.mutate(r.id);
+                                    }
+                                  }}>
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {r.permissions.length} permission{r.permissions.length !== 1 ? "s" : ""}
+                            {" · "}{r.usage.members} member{r.usage.members !== 1 ? "s" : ""}
                           </p>
                         </div>
-                        {isOwner && (
-                          <Button
-                            variant="outline"
-                            className="flex-shrink-0 font-semibold border-primary/40 text-primary"
-                            onClick={() => openRoleEditor()}
-                            data-testid="button-create-role"
-                          >
-                            <Plus className="w-4 h-4 mr-1.5" />
-                            Create Role
-                          </Button>
-                        )}
-                      </div>
-
-                      <div className="mt-4 grid sm:grid-cols-2 gap-2.5">
-                        {customRoles.map((r) => (
-                          <div key={r.id} className="rounded-xl border border-primary/30 bg-primary/[0.03] p-3" data-testid={`custom-role-${r.name}`}>
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="text-sm font-semibold flex items-center gap-1.5 min-w-0">
-                                <Shield className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-                                <span className="truncate">{r.name}</span>
-                              </p>
-                              {isOwner && (
-                                <span className="flex items-center gap-0.5 flex-shrink-0">
-                                  <Button variant="ghost" size="icon" className="h-7 w-7" title="Edit role"
-                                    onClick={() => openRoleEditor(r)} data-testid={`edit-role-${r.name}`}>
-                                    <Pencil className="w-3.5 h-3.5" />
-                                  </Button>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-rose-500" title="Delete role"
-                                    onClick={async () => {
-                                      if (await confirm({ title: `Delete role "${r.name}"?`, description: "Members must be reassigned before a role can be deleted.", destructive: true, confirmText: "Delete" })) {
-                                        deleteRole.mutate(r.id);
-                                      }
-                                    }}>
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </Button>
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {r.permissions.length} permission{r.permissions.length !== 1 ? "s" : ""}
-                              {" · "}{r.usage.members} member{r.usage.members !== 1 ? "s" : ""}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+                      ))}
+                    </div>
+                    {!isOwner && <PermissionNote>Only the Owner can create, edit or delete roles.</PermissionNote>}
+                  </SettingsSection>
                 )}
               </>
             )}
 
+            {/* ── Integrations ── */}
+            {tab === "integrations" && <IntegrationsPanel />}
+
             {/* ── Activity ── */}
             {tab === "activity" && (
-              <Card className="glass-card">
-                <CardContent className="p-5 lg:p-6">
-                  <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
-                    <div>
-                      <h2 className="font-bold text-lg">Activity</h2>
-                      <p className="text-sm text-muted-foreground">Everything your team did, newest first.</p>
-                    </div>
-                    <DateRangeFilter value={activityRange} onChange={setActivityRange} />
+              <SettingsSection
+                title="Activity"
+                description="Everything your team did, newest first."
+                action={<DateRangeFilter value={activityRange} onChange={setActivityRange} />}
+              >
+                {activityLoading ? (
+                  <div className="space-y-2" aria-busy="true">
+                    {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-9 w-full rounded-md" />)}
                   </div>
-                  {(() => {
-                    const rows = activity.filter((a) => inRange(a.createdAt, activityRange));
-                    const pageCount = Math.max(1, Math.ceil(rows.length / ACTIVITY_PAGE_SIZE));
-                    const page = Math.min(activityPage, pageCount - 1);
-                    const pageRows = rows.slice(page * ACTIVITY_PAGE_SIZE, (page + 1) * ACTIVITY_PAGE_SIZE);
-                    if (!rows.length) {
-                      return (
-                        <div className="py-10 text-center">
-                          <ScrollText className="w-7 h-7 mx-auto text-muted-foreground/40 mb-2" />
-                          <p className="text-sm font-semibold">
-                            {activity.length ? "Nothing in this date range" : "No activity yet"}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {activity.length ? "Try a wider range." : "It starts recording from today."}
-                          </p>
-                        </div>
-                      );
-                    }
+                ) : activityError && activity.length === 0 ? (
+                  <LoadError what="the activity log" onRetry={() => void refetchActivity()} retrying={activityFetching} />
+                ) : (() => {
+                  const rows = activity.filter((a) => inRange(a.createdAt, activityRange));
+                  const pageCount = Math.max(1, Math.ceil(rows.length / ACTIVITY_PAGE_SIZE));
+                  const page = Math.min(activityPage, pageCount - 1);
+                  const pageRows = rows.slice(page * ACTIVITY_PAGE_SIZE, (page + 1) * ACTIVITY_PAGE_SIZE);
+                  if (!rows.length) {
                     return (
-                      <div className="rounded-xl border border-border/60 overflow-hidden">
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="bg-muted/40 text-left">
-                                {["Sr.", "Who", "Action", "Record", "Detail", "When"].map((h) => (
-                                  <th key={h} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">{h}</th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border/50">
-                              {pageRows.map((a, idx) => {
-                                const tone = ACTIVITY_TONE[a.entityType] ?? ACTIVITY_TONE.default;
-                                return (
-                                  <tr key={a.id} className="hover:bg-muted/30 transition-colors">
-                                    <td className="px-3 py-2.5 text-xs text-muted-foreground tabular-nums w-[44px]">
-                                      {page * ACTIVITY_PAGE_SIZE + idx + 1}
-                                    </td>
-                                    <td className="px-3 py-2.5 whitespace-nowrap">
-                                      <span className="inline-flex items-center gap-2">
-                                        <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center shrink-0">
-                                          {(a.userName ?? "?").slice(0, 1).toUpperCase()}
-                                        </span>
-                                        <span className="font-medium truncate max-w-[140px]">{a.userName || "Someone"}</span>
-                                      </span>
-                                    </td>
-                                    <td className="px-3 py-2.5 whitespace-nowrap">
-                                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${ACTION_TONE(a.action)}`}>
-                                        {a.action}
-                                      </span>
-                                    </td>
-                                    <td className="px-3 py-2.5 whitespace-nowrap">
-                                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-md ${tone}`}>
-                                        {a.entityType}
-                                      </span>
-                                    </td>
-                                    <td className="px-3 py-2.5 text-muted-foreground max-w-[280px] truncate">{a.detail || "—"}</td>
-                                    <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap text-xs">
-                                      {new Date(a.createdAt).toLocaleString(locale, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                        {pageCount > 1 && (
-                          <div className="flex items-center justify-between px-3 py-2 border-t border-border/60 bg-muted/20 text-xs">
-                            <span className="text-muted-foreground tabular-nums">
-                              Showing {page * ACTIVITY_PAGE_SIZE + 1}–{Math.min(rows.length, (page + 1) * ACTIVITY_PAGE_SIZE)} of {rows.length}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Button variant="outline" size="sm" className="h-7 px-2"
-                                onClick={() => setActivityPage(Math.max(0, page - 1))} disabled={page === 0}
-                                data-testid="activity-prev">Prev</Button>
-                              {pageNumbers(page, pageCount).map((p, i) =>
-                                p === "…" ? (
-                                  <span key={`gap-${i}`} className="px-1 text-muted-foreground select-none">…</span>
-                                ) : (
-                                  <Button
-                                    key={p}
-                                    variant={p === page ? "default" : "outline"}
-                                    size="icon"
-                                    className={`h-7 w-7 text-xs tabular-nums ${p === page ? "gradient-btn text-white" : ""}`}
-                                    aria-label={`Page ${p + 1}`}
-                                    aria-current={p === page ? "page" : undefined}
-                                    onClick={() => setActivityPage(p)}
-                                    data-testid={`activity-page-${p + 1}`}
-                                  >
-                                    {p + 1}
-                                  </Button>
-                                ),
-                              )}
-                              <span className="px-2 text-muted-foreground tabular-nums">{page + 1} / {pageCount}</span>
-                              <Button variant="outline" size="sm" className="h-7 px-2"
-                                onClick={() => setActivityPage(Math.min(pageCount - 1, page + 1))} disabled={page >= pageCount - 1}
-                                data-testid="activity-next">Next</Button>
-                            </span>
-                          </div>
-                        )}
+                      <div className="py-10 text-center">
+                        <ScrollText className="w-7 h-7 mx-auto text-muted-foreground/40 mb-2" />
+                        <p className="text-sm font-semibold">
+                          {activity.length ? "Nothing in this date range" : "No activity yet"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {activity.length ? "Try a wider range." : "It starts recording from today."}
+                        </p>
                       </div>
                     );
-                  })()}
-                </CardContent>
-              </Card>
+                  }
+                  return (
+                    <div className="rounded-xl border border-border/60 overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="bg-muted/40 text-left">
+                              {["Sr.", "Who", "Action", "Record", "Detail", "When"].map((h) => (
+                                <th key={h} className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground whitespace-nowrap">{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/50">
+                            {pageRows.map((a, idx) => {
+                              const tone = ACTIVITY_TONE[a.entityType] ?? ACTIVITY_TONE.default;
+                              return (
+                                <tr key={a.id} className="hover:bg-muted/30 transition-colors">
+                                  <td className="px-3 py-2.5 text-xs text-muted-foreground tabular-nums w-[44px]">
+                                    {page * ACTIVITY_PAGE_SIZE + idx + 1}
+                                  </td>
+                                  <td className="px-3 py-2.5 whitespace-nowrap">
+                                    <span className="inline-flex items-center gap-2">
+                                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center shrink-0">
+                                        {(a.userName ?? "?").slice(0, 1).toUpperCase()}
+                                      </span>
+                                      <span className="font-medium truncate max-w-[140px]">{a.userName || "Someone"}</span>
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2.5 whitespace-nowrap">
+                                    <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${ACTION_TONE(a.action)}`}>
+                                      {a.action}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2.5 whitespace-nowrap">
+                                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-md ${tone}`}>
+                                      {a.entityType}
+                                    </span>
+                                  </td>
+                                  <td className="px-3 py-2.5 text-muted-foreground max-w-[280px] truncate">{a.detail || "—"}</td>
+                                  <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap text-xs">
+                                    {new Date(a.createdAt).toLocaleString(locale, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      {pageCount > 1 && (
+                        <div className="flex items-center justify-between px-3 py-2 border-t border-border/60 bg-muted/20 text-xs">
+                          <span className="text-muted-foreground tabular-nums">
+                            Showing {page * ACTIVITY_PAGE_SIZE + 1}–{Math.min(rows.length, (page + 1) * ACTIVITY_PAGE_SIZE)} of {rows.length}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Button variant="outline" size="sm" className="h-7 px-2"
+                              onClick={() => setActivityPage(Math.max(0, page - 1))} disabled={page === 0}
+                              data-testid="activity-prev">Prev</Button>
+                            {pageNumbers(page, pageCount).map((p, i) =>
+                              p === "…" ? (
+                                <span key={`gap-${i}`} className="px-1 text-muted-foreground select-none">…</span>
+                              ) : (
+                                <Button
+                                  key={p}
+                                  variant={p === page ? "default" : "outline"}
+                                  size="icon"
+                                  className={`h-7 w-7 text-xs tabular-nums ${p === page ? "gradient-btn text-white" : ""}`}
+                                  aria-label={`Page ${p + 1}`}
+                                  aria-current={p === page ? "page" : undefined}
+                                  onClick={() => setActivityPage(p)}
+                                  data-testid={`activity-page-${p + 1}`}
+                                >
+                                  {p + 1}
+                                </Button>
+                              ),
+                            )}
+                            <span className="px-2 text-muted-foreground tabular-nums">{page + 1} / {pageCount}</span>
+                            <Button variant="outline" size="sm" className="h-7 px-2"
+                              onClick={() => setActivityPage(Math.min(pageCount - 1, page + 1))} disabled={page >= pageCount - 1}
+                              data-testid="activity-next">Next</Button>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </SettingsSection>
             )}
 
-            {/* ── Preferences (per-device) ── */}
+            {/* ── Preferences (per-device) and your data ── */}
             {tab === "preferences" && (
               <>
-                <Card className="glass-card">
-                <CardContent className="p-5 lg:p-6 space-y-5">
-                  <div>
-                    <h2 className="font-bold text-lg">Appearance</h2>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                      How DealInSec looks on this device.
-                    </p>
-                  </div>
+                <SettingsSection title="Appearance" description="How DealInSec looks on this device.">
                   <div className="grid grid-cols-3 gap-3 max-w-md" role="radiogroup" aria-label="Theme">
                     {([
                       { key: "light" as ThemePref, label: "Light", desc: "Bright & clean", Icon: Sun },
@@ -948,7 +951,7 @@ export default function SettingsPage() {
                           }`}
                         >
                           {active && (
-                            <span className="absolute top-2 right-2 flex items-center justify-center w-4.5 h-4.5 w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground">
+                            <span className="absolute top-2 right-2 flex items-center justify-center w-[18px] h-[18px] rounded-full bg-primary text-primary-foreground">
                               <Check className="w-3 h-3" strokeWidth={3} />
                             </span>
                           )}
@@ -962,149 +965,151 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground">
                     Saved on this device only — teammates and your other devices keep their own choice.
                   </p>
-                </CardContent>
-              </Card>
+                </SettingsSection>
 
                 <AnalyticsConsentCard />
 
                 <FeedbackCard />
+
+                {/* ── Your data (DPDP Act rights) ──────────────────────────────
+                    The privacy policy promises access and erasure. These are the
+                    controls that make those promises real rather than an email
+                    address the user has to trust. */}
+                <SettingsSection
+                  title="Your data"
+                  testId="your-data"
+                  description={accountCountry === "IN"
+                    ? "Your rights under the Digital Personal Data Protection Act, 2023."
+                    : "Your data protection rights."}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between rounded-xl border border-border p-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">Download my data</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Your profile plus every deal, quotation, agreement and invoice your role can see, as JSON.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="shrink-0"
+                      data-testid="button-export-data"
+                      onClick={() => { window.location.href = "/api/account/export"; }}
+                    >
+                      <Download className="w-4 h-4 mr-2" /> Download
+                    </Button>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between rounded-xl border border-destructive/30 bg-destructive/[0.04] p-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-destructive">Delete my account</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Erases your personal details and signs you out for good. Financial records are kept for
+                        the statutory period, with your identity removed from them.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10"
+                      disabled={deleteAccount.isPending}
+                      data-testid="button-delete-account"
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: "Delete your account?",
+                          description:
+                            accountCountry === "IN"
+                              ? "This cannot be undone. Your name, email, PAN, GSTIN, bank details and signature are erased, and you are signed out immediately. Download your data first if you want a copy."
+                              : "This cannot be undone. Your name, email, tax ID, bank details and signature are erased, and you are signed out immediately. Download your data first if you want a copy.",
+                          confirmText: "Delete my account",
+                          cancelText: "Keep my account",
+                          destructive: true,
+                        });
+                        if (ok) deleteAccount.mutate();
+                      }}
+                    >
+                      {deleteAccount.isPending
+                        ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Deleting…</>
+                        : <><Trash2 className="w-4 h-4 mr-2" /> Delete</>}
+                    </Button>
+                  </div>
+                </SettingsSection>
               </>
             )}
 
-            {/* ── Subscription ── */}
-            {tab === "subscription" && org && (
+            {/* ── Plan & billing ── */}
+            {tab === "subscription" && orgLoading && <SectionSkeleton lines={2} testId="plan-loading" />}
+
+            {tab === "subscription" && !org && !orgLoading && (
               <Card className="glass-card">
-                <CardContent className="p-5 lg:p-6 space-y-4">
-                  <h2 className="font-bold text-lg">{isSolo ? "Plan & billing" : "Subscription & seats"}</h2>
-                  <div className={`grid gap-3 max-w-md ${isSolo ? "grid-cols-1" : "grid-cols-2"}`}>
-                    <div className="rounded-xl border border-border/60 p-3.5">
-                      <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">Plan</p>
-                      <p className="text-xl font-bold mt-0.5 flex items-center gap-1.5">
-                        {org.ownerPlan === "pro"
-                          ? <><Crown className="w-4 h-4 text-amber-500" /> Pro</>
-                          : org.ownerOnTrial
-                            ? <><Sparkles className="w-4 h-4 text-emerald-500" /> Pro trial</>
-                            : "Free"}
-                      </p>
-                      {org.ownerPlan === "pro" && org.ownerPlanExpiresAt ? (
-                        <p className="text-[11px] text-muted-foreground">until {fmtDate(org.ownerPlanExpiresAt, locale)}</p>
-                      ) : org.ownerOnTrial && org.ownerTrialEndsAt ? (
-                        <p className="text-[11px] text-muted-foreground">until {fmtDate(org.ownerTrialEndsAt, locale)}</p>
-                      ) : null}
-                    </div>
-                    {!isSolo && (
-                      <div className="rounded-xl border border-border/60 p-3.5">
-                        <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">Seats</p>
-                        <p className="text-xl font-bold mt-0.5">{org.seatsUsed} / {org.seatLimit}</p>
-                        {org.extraSeats > 0 && (
-                          <p className="text-[11px] text-muted-foreground">
-                            incl. {org.extraSeats} extra · until {fmtDate(org.extraSeatsExpiresAt, locale)}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {isSolo ? (
-                    <p className="text-sm text-muted-foreground max-w-md">
-                      The free plan covers 4 deals a month with their quotations. Pro adds signed agreements,
-                      invoices and payment tracking — and room for up to 5 people if you ever need help.
-                    </p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground max-w-md">
-                      Free plan includes 1 user. Pro — and your free trial — includes 5 team members.{" "}
-                      {checkoutAvailable
-                        ? <>Need more? Extra seats are {formatRupees(extraSeatPrice)}/seat per month.</>
-                        : <>Need more? Extra seats aren't available in your country yet.</>}
-                    </p>
-                  )}
-                  {canBilling ? (
-                    <div className="flex flex-wrap gap-2">
-                      <Link href="/pricing">
-                        <Button className="gradient-btn text-white" data-testid="button-manage-plan">
-                          <Sparkles className="w-4 h-4 mr-2" /> Manage plan
-                        </Button>
-                      </Link>
-                      {!isSolo && (
-                        <Link href="/pricing#seats">
-                          <Button variant="outline" data-testid="button-buy-seats">
-                            <Rocket className="w-4 h-4 mr-2" /> Buy extra seats
-                          </Button>
-                        </Link>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">Only the Owner can manage billing{isSolo ? "" : " and seats"}.</p>
-                  )}
-                </CardContent>
+                <LoadError what="your plan" onRetry={() => void refetchOrg()} retrying={orgFetching} />
               </Card>
             )}
 
-            {/* ── Your data (DPDP Act rights) ──────────────────────────────
-                The privacy policy promises access and erasure. These are the
-                controls that make those promises real rather than an email
-                address the user has to trust. */}
-            <Card className="glass-card border-0">
-              <CardContent className="p-5 sm:p-6 space-y-4">
-                <div>
-                  <h2 className="font-semibold">Your data</h2>
-                  <p className="text-sm text-muted-foreground mt-1 max-w-md">
-                    {accountCountry === "IN"
-                      ? "Your rights under the Digital Personal Data Protection Act, 2023."
-                      : "Your data protection rights."}
+            {tab === "subscription" && org && (
+              <SettingsSection
+                title={isSolo ? "Plan & billing" : "Subscription & seats"}
+                action={canBilling ? (
+                  <>
+                    <Link href="/pricing">
+                      <Button className="gradient-btn text-white" data-testid="button-manage-plan">
+                        <Sparkles className="w-4 h-4 mr-2" /> Manage plan
+                      </Button>
+                    </Link>
+                    {!isSolo && (
+                      <Link href="/pricing#seats">
+                        <Button variant="outline" data-testid="button-buy-seats">
+                          <Rocket className="w-4 h-4 mr-2" /> Buy extra seats
+                        </Button>
+                      </Link>
+                    )}
+                  </>
+                ) : undefined}
+              >
+                <div className={`grid gap-3 max-w-md ${isSolo ? "grid-cols-1" : "grid-cols-2"}`}>
+                  <div className="rounded-xl border border-border/60 p-3.5">
+                    <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">Plan</p>
+                    <p className="text-xl font-bold mt-0.5 flex items-center gap-1.5">
+                      {org.ownerPlan === "pro"
+                        ? <><Crown className="w-4 h-4 text-amber-500" /> Pro</>
+                        : org.ownerOnTrial
+                          ? <><Sparkles className="w-4 h-4 text-emerald-500" /> Pro trial</>
+                          : "Free"}
+                    </p>
+                    {org.ownerPlan === "pro" && org.ownerPlanExpiresAt ? (
+                      <p className="text-[11px] text-muted-foreground">until {fmtDate(org.ownerPlanExpiresAt, locale)}</p>
+                    ) : org.ownerOnTrial && org.ownerTrialEndsAt ? (
+                      <p className="text-[11px] text-muted-foreground">until {fmtDate(org.ownerTrialEndsAt, locale)}</p>
+                    ) : null}
+                  </div>
+                  {!isSolo && (
+                    <div className="rounded-xl border border-border/60 p-3.5">
+                      <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">Seats</p>
+                      <p className="text-xl font-bold mt-0.5">{org.seatsUsed} / {org.seatLimit}</p>
+                      {org.extraSeats > 0 && (
+                        <p className="text-[11px] text-muted-foreground">
+                          incl. {org.extraSeats} extra · until {fmtDate(org.extraSeatsExpiresAt, locale)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {isSolo ? (
+                  <p className="text-sm text-muted-foreground max-w-md">
+                    The free plan covers 4 deals a month with their quotations. Pro adds signed agreements,
+                    invoices and payment tracking — and room for up to 5 people if you ever need help.
                   </p>
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between rounded-xl border border-border p-4">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">Download my data</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Your profile plus every deal, quotation, agreement and invoice your role can see, as JSON.
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    className="shrink-0"
-                    data-testid="button-export-data"
-                    onClick={() => { window.location.href = "/api/account/export"; }}
-                  >
-                    <Download className="w-4 h-4 mr-2" /> Download
-                  </Button>
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:justify-between rounded-xl border border-destructive/30 bg-destructive/[0.04] p-4">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-destructive">Delete my account</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Erases your personal details and signs you out for good. Financial records are kept for
-                      the statutory period, with your identity removed from them.
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    className="shrink-0 border-destructive/40 text-destructive hover:bg-destructive/10"
-                    disabled={deleteAccount.isPending}
-                    data-testid="button-delete-account"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        title: "Delete your account?",
-                        description:
-                          accountCountry === "IN"
-                            ? "This cannot be undone. Your name, email, PAN, GSTIN, bank details and signature are erased, and you are signed out immediately. Download your data first if you want a copy."
-                            : "This cannot be undone. Your name, email, tax ID, bank details and signature are erased, and you are signed out immediately. Download your data first if you want a copy.",
-                        confirmText: "Delete my account",
-                        cancelText: "Keep my account",
-                        destructive: true,
-                      });
-                      if (ok) deleteAccount.mutate();
-                    }}
-                  >
-                    {deleteAccount.isPending
-                      ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Deleting…</>
-                      : <><Trash2 className="w-4 h-4 mr-2" /> Delete</>}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                ) : (
+                  <p className="text-sm text-muted-foreground max-w-md">
+                    Free plan includes 1 user. Pro — and your free trial — includes 5 team members.{" "}
+                    {checkoutAvailable
+                      ? <>Need more? Extra seats are {formatRupees(extraSeatPrice)}/seat per month.</>
+                      : <>Need more? Extra seats aren't available in your country yet.</>}
+                  </p>
+                )}
+                {!canBilling && (
+                  <PermissionNote>Only the Owner can manage billing{isSolo ? "" : " and seats"}.</PermissionNote>
+                )}
+              </SettingsSection>
+            )}
           </div>
         </div>
       </main>
@@ -1267,22 +1272,17 @@ function AnalyticsConsentCard() {
     return () => { window.removeEventListener("dis:consent", refresh); window.removeEventListener(OPEN_CONSENT_EVENT, refresh); };
   }, []);
   return (
-    <Card className="glass-card">
-      <CardContent className="p-5 lg:p-6 space-y-3">
-        <div>
-          <h2 className="font-bold text-lg">Cookies and analytics</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Google Analytics helps us see how DealInSec is used. It only runs if you allow it. Saved on this device.
-          </p>
-        </div>
-        <p className="text-sm" data-testid="settings-consent-state">
-          Analytics: <span className="font-semibold">{choice === "granted" ? "allowed" : choice === "denied" ? "off" : "not chosen (off)"}</span>
-        </p>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="outline" size="sm" onClick={openConsentSettings} data-testid="settings-cookie-settings">Change cookie settings</Button>
-          <a href="/cookies" className="text-sm text-muted-foreground underline-offset-2 hover:underline">Cookie policy</a>
-        </div>
-      </CardContent>
-    </Card>
+    <SettingsSection
+      title="Cookies and analytics"
+      description="Google Analytics helps us see how DealInSec is used. It only runs if you allow it. Saved on this device."
+    >
+      <p className="text-sm" data-testid="settings-consent-state">
+        Analytics: <span className="font-semibold">{choice === "granted" ? "allowed" : choice === "denied" ? "off" : "not chosen (off)"}</span>
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button variant="outline" size="sm" onClick={openConsentSettings} data-testid="settings-cookie-settings">Change cookie settings</Button>
+        <a href="/cookies" className="text-sm text-muted-foreground underline-offset-2 hover:underline">Cookie policy</a>
+      </div>
+    </SettingsSection>
   );
 }

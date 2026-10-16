@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useParams, Link } from "wouter";
 import { ProtectionFindings, type Finding } from "@/components/protection-findings";
@@ -8,19 +9,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/status-badge";
+import { AnimatedStatusBadge } from "@/components/animated-status-badge";
+import { DetailSkeleton, DetailUnavailable } from "@/components/document/detail-states";
 import { PlatformIcon } from "@/components/platform-icon";
 import { dealTypeMeta } from "@shared/dealTypeTaxonomy";
 import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useMoney } from "@/hooks/use-locale";
-import { moneyIcon } from "@/components/money-icon";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { trackEvent } from "@/lib/analytics";
-import { ArrowLeft, Calendar, FileCheck, CheckCircle, CheckCircle2, Loader2, FileText, Receipt, CreditCard, Pencil, Scissors, Check, AlertTriangle, ChevronRight, Crown, Briefcase, ScrollText, ListChecks, Copy, Zap, Sparkles } from "lucide-react";
+import { fadeUp, stagger, useCalmMotion } from "@/lib/motion";
+import { ArrowLeft, Calendar, FileCheck, CheckCircle, Loader2, FileText, Receipt, Pencil, Scissors, Check, AlertTriangle, ChevronRight, Crown, Briefcase, ScrollText, ListChecks, Copy, Zap, Sparkles } from "lucide-react";
 import { hasProAccess, STANDARD_TERMS } from "@shared/schema";
 import { memberCan } from "@shared/permissions";
 import { isAgreementSigned } from "@shared/agreement-lifecycle";
+import { httpErrorKind } from "@shared/http-error-kind";
+import { WORKFLOW_STEPS, workflowPosition } from "@shared/deal-view";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { parseApiError, isUpgradeError } from "@/lib/api-error";
@@ -57,11 +62,15 @@ export default function DealDetailsPage() {
   const splitPercentage = Math.min(99, Math.max(1, parseInt(splitPercentageStr) || 50));
   const [showSplitInput, setShowSplitInput] = useState(false);
 
-  const { data: deal, isLoading } = useQuery<Deal>({
+  const { data: deal, isLoading, isError, error, refetch, isFetching } = useQuery<Deal>({
     queryKey: ["/api/deals", params.id],
   });
+  // The entrance plays once, and only when the page had to wait for the deal:
+  // a cached one is simply there, and a refetch never replays it.
+  const calm = useCalmMotion();
+  const [enter] = useState(() => isLoading && !calm);
 
-  const { data: contracts = [] } = useQuery<Contract[]>({
+  const { data: contracts = [], isLoading: contractsLoading, isError: contractsError } = useQuery<Contract[]>({
     queryKey: ["/api/contracts"],
   });
 
@@ -77,7 +86,7 @@ export default function DealDetailsPage() {
   });
 
   // Fetch brand invoices specific to this deal
-  const { data: dealBrandInvoices = [] } = useQuery<BrandInvoice[]>({
+  const { data: dealBrandInvoices = [], isLoading: invoicesLoading } = useQuery<BrandInvoice[]>({
     queryKey: ["/api/deals", params.id, "brand-invoices"],
     queryFn: async () => {
       const res = await fetch(`/api/deals/${params.id}/brand-invoices`, { credentials: "include", headers: { "X-DealInSec-Money": "minor" } });
@@ -114,6 +123,8 @@ export default function DealDetailsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/deals", params.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
+      // The suggested next step reads the deal's status: a completed deal has none.
+      queryClient.invalidateQueries({ queryKey: [`/api/copilot/deal-intel/${params.id}`] });
       toast({
         title: "Deal completed",
         description: "The deal has been marked as completed.",
@@ -166,8 +177,21 @@ export default function DealDetailsPage() {
   const hasQuote = !!quote && quote.status === "draft";
   const stepsReady = !quoteLoading;
 
-  // Determine current step (1=Deal, 2=Quote, 3=Agreement, 4=Invoice)
-  const currentStep = hasInvoice ? 4 : hasContract ? (isSigned ? 4 : 3) : hasQuote ? 3 : 2;
+  // Where the deal is: Deal → Quotation → Agreement → Invoice → Paid, from its
+  // own documents (shared/deal-view.ts — the board and the list use the same
+  // rule). Unknown until all three have loaded; then the stepper marks nothing
+  // rather than a guess. The quotation and invoice reads stay as they were
+  // (a failed read shows as none) — only a failed agreements list is unknown.
+  const docsReady = !quoteLoading && !contractsLoading && !invoicesLoading && !contractsError;
+  const position = deal && docsReady
+    ? workflowPosition({
+        dealAmountMinor: deal.dealAmountMinor,
+        quote: quote ?? null,
+        agreement: contract ?? null,
+        invoices: dealBrandInvoices.map((i) => ({ status: i.status, dueDate: i.dueDate, amountMinor: Number(i.dealAmountMinor || 0) })),
+      })
+    : null;
+  const unpaidInvoice = dealBrandInvoices.find((i) => i.status !== "Paid");
 
   const backPath = "/deals";
 
@@ -179,28 +203,30 @@ export default function DealDetailsPage() {
     });
   };
 
+  const header = (actions?: React.ReactNode) => (
+    <header className="glass-header sticky top-0 z-40">
+      <div className="flex items-center gap-3 px-4 py-4 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-3.5">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setLocation(backPath)}
+          aria-label="Back to deals"
+          data-testid="button-back-deals"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <h1 className="text-xl lg:text-lg font-bold lg:font-semibold truncate flex-1">Deal Details</h1>
+        {actions}
+      </div>
+    </header>
+  );
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="glass-header sticky top-0 z-40">
-          <div className="flex items-center gap-3 px-4 py-4 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-3.5">
-            <Button variant="ghost" size="icon" onClick={() => setLocation(backPath)}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <Skeleton className="h-6 w-32" />
-          </div>
-        </header>
-        <main className="px-4 py-6 space-y-4">
-          <Card className="glass-card border-0">
-            <CardContent className="p-6 space-y-4">
-              <Skeleton className="h-8 w-3/4" />
-              <Skeleton className="h-5 w-1/2" />
-              <div className="flex gap-4 pt-4">
-                <Skeleton className="h-10 w-24" />
-                <Skeleton className="h-10 w-24" />
-              </div>
-            </CardContent>
-          </Card>
+        {header()}
+        <main className="px-4 py-6 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8">
+          <DetailSkeleton what="deal" stepper={false} mainBlocks={2} railBlocks={2} />
         </main>
         <BottomNav />
       </div>
@@ -210,21 +236,17 @@ export default function DealDetailsPage() {
   if (!deal) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="glass-header sticky top-0 z-40">
-          <div className="flex items-center gap-3 px-4 py-4 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-3.5">
-            <Button variant="ghost" size="icon" onClick={() => setLocation(backPath)}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Deal Details</h1>
-          </div>
-        </header>
-        <main className="px-4 py-12 text-center">
-          <p className="text-muted-foreground">Deal not found</p>
-          <Link href={backPath}>
-            <Button variant="outline" className="mt-4">
-              Back to Deals
-            </Button>
-          </Link>
+        {header()}
+        <main className="px-4 py-6 lg:max-w-3xl lg:mx-auto lg:px-8 lg:py-8">
+          <DetailUnavailable
+            // No error and no row is the server saying "nothing here".
+            kind={isError ? httpErrorKind(error) : "not_found"}
+            what="deal"
+            backHref={backPath}
+            backLabel="Back to Deals"
+            onRetry={() => refetch()}
+            retrying={isFetching}
+          />
         </main>
         <BottomNav />
       </div>
@@ -233,39 +255,28 @@ export default function DealDetailsPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="glass-header sticky top-0 z-40">
-        <div className="flex items-center gap-3 px-4 py-4 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-3.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setLocation(backPath)}
-            data-testid="button-back-deals"
-          >
-            <ArrowLeft className="w-5 h-5" />
+      {header(
+        deal.status === "Pending" && (
+          <Button variant="outline" size="icon" aria-label="Edit deal" onClick={() => setLocation(`/deals/${deal.id}/edit`)} data-testid="button-edit-deal">
+            <Pencil className="w-4 h-4" />
           </Button>
-          <h1 className="text-xl font-bold truncate flex-1">Deal Details</h1>
-          {deal.status === "Pending" && (
-            <Button variant="outline" size="icon" onClick={() => setLocation(`/deals/${deal.id}/edit`)} data-testid="button-edit-deal">
-              <Pencil className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-      </header>
+        ),
+      )}
 
-      <main className="px-4 py-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8">
-        {/* Everything captured at creation is visible here: overview +
-            workflow on the left, deliverables + the exact T&Cs on the right. */}
-        <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-5 xl:grid-cols-3 lg:gap-6 xl:gap-8 lg:items-start">
-        <div className="lg:col-span-3 xl:col-span-2 space-y-6">
+      <motion.main
+        variants={stagger}
+        initial={enter ? "hidden" : false}
+        animate="visible"
+        className="px-4 py-6 space-y-6 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8"
+      >
+        {/* ── Who, what, where it stands, what it's worth — and the suggested next step ── */}
+        <motion.div variants={fadeUp}>
         <Card className="glass-card border-0">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between gap-3 mb-4">
+          <CardContent className="p-5 lg:p-6">
+            <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
-                <h2 className="text-xl font-bold truncate" data-testid="text-deal-title">
-                  {deal.dealTitle}
-                </h2>
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <p className="text-muted-foreground" data-testid="text-brand-name">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-semibold text-muted-foreground truncate" data-testid="text-brand-name">
                     {deal.brandName}
                   </p>
                   {(deal as any).dealType && (
@@ -274,55 +285,80 @@ export default function DealDetailsPage() {
                     </span>
                   )}
                 </div>
+                <h2 className="text-xl lg:text-2xl font-bold tracking-tight mt-0.5 break-words" data-testid="text-deal-title">
+                  {deal.dealTitle}
+                </h2>
               </div>
-              <StatusBadge status={deal.status} />
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                <AnimatedStatusBadge status={deal.status} />
+                <p className="text-xl lg:text-2xl font-bold tabular-nums" data-testid="text-deal-amount">
+                  <span className="sr-only">Deal value: </span>{fmt.money(deal.dealAmountMinor)}
+                </p>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 py-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
               {([
-                { label: "Deal Value", icon: moneyIcon(fmt.currency), iconCls: "text-primary", value: fmt.money(deal.dealAmountMinor), big: true, testid: "text-deal-amount" },
-                { label: "Duration", icon: Calendar, iconCls: "text-muted-foreground", value: `${formatDate(deal.startDate)} – ${formatDate(deal.endDate)}` },
-                { label: "Deal Type", icon: Briefcase, iconCls: "text-muted-foreground", value: `${(dealTypeMeta as any)[(deal as any).dealType]?.emoji ?? "·"} ${(deal as any).dealType || "Custom"}` },
-                { label: "Deliverables", icon: ListChecks, iconCls: "text-muted-foreground", value: `${deal.deliverables.length} item${deal.deliverables.length !== 1 ? "s" : ""} · ${(deal as any).deliverableMode === "any_one" ? "any one" : "all required"}` },
+                { label: "Duration", icon: Calendar, value: `${formatDate(deal.startDate)} – ${formatDate(deal.endDate)}` },
+                { label: "Deal Type", icon: Briefcase, value: `${(dealTypeMeta as any)[(deal as any).dealType]?.emoji ?? "·"} ${(deal as any).dealType || "Custom"}` },
+                { label: "Deliverables", icon: ListChecks, value: `${deal.deliverables.length} item${deal.deliverables.length !== 1 ? "s" : ""} · ${(deal as any).deliverableMode === "any_one" ? "any one" : "all required"}` },
               ] as const).map((f) => (
-                <div key={f.label} className="rounded-xl border border-border/60 bg-card/40 p-3.5 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div key={f.label} className="rounded-xl border border-border/60 bg-card/40 px-3.5 py-3 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-1">
                     <p className="text-xs text-muted-foreground">{f.label}</p>
-                    <f.icon className={`w-4 h-4 shrink-0 ${f.iconCls}`} />
+                    <f.icon className="w-4 h-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                   </div>
-                  <p className={(f as any).big ? "font-bold text-xl tabular-nums" : "font-semibold text-sm leading-snug"} data-testid={(f as any).testid}>
-                    {f.value}
-                  </p>
+                  <p className="font-semibold text-sm leading-snug">{f.value}</p>
                 </div>
               ))}
             </div>
 
-            {/* Mini step indicator — shares WorkflowStepper with the agreement page */}
-            <div className="mt-4 mb-2">
-              <WorkflowStepper
-                currentStep={currentStep}
-                steps={[
-                  { label: "Deal", step: 1, href: null },
-                  { label: "Quote", step: 2, href: quote ? `/deals/${deal.id}/quote` : null },
-                  { label: "Agreement", step: 3, href: contract ? `/contracts/${contract.id}` : null },
-                  {
-                    label: "Invoice",
-                    step: 4,
-                    // Was pointing back at this very page. Send them to the
-                    // invoice itself, or to the composer when one can be raised.
-                    href: dealBrandInvoices.length
-                      ? `/brand-invoices/${dealBrandInvoices[0].id}`
-                      : contract && isAgreementSigned(contract) && canInvoice
-                      ? `/brand-invoices/new?contractId=${contract.id}&mode=full`
-                      : null,
-                  },
-                ]}
-              />
-            </div>
+            <NextStepSuggestion dealId={deal.id} selfPath={`/deals/${deal.id}`} />
+          </CardContent>
+        </Card>
+        </motion.div>
 
+        <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-6 xl:gap-8 lg:items-start">
+        <motion.div variants={fadeUp} className="lg:col-span-2 space-y-6">
+        {/* ── Workflow: where the deal is, and the step you can take from here ── */}
+        <Card className="glass-card border-0">
+          <CardContent className="p-5 lg:p-6">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h3 className="font-semibold">Workflow</h3>
+              {position && <span className="text-xs font-medium text-muted-foreground" data-testid="text-workflow-position">{position.label}</span>}
+            </div>
+            {/* Shares WorkflowStepper with the agreement page */}
+            <WorkflowStepper
+              size="large"
+              currentStep={position?.step ?? 0}
+              steps={[
+                { label: WORKFLOW_STEPS[0].label, step: 1, href: null },
+                { label: WORKFLOW_STEPS[1].label, step: 2, href: quote ? `/deals/${deal.id}/quote` : null },
+                { label: WORKFLOW_STEPS[2].label, step: 3, href: contract ? `/contracts/${contract.id}` : null },
+                {
+                  label: WORKFLOW_STEPS[3].label,
+                  step: 4,
+                  // Was pointing back at this very page. Send them to the
+                  // invoice itself, or to the composer when one can be raised.
+                  href: dealBrandInvoices.length
+                    ? `/brand-invoices/${dealBrandInvoices[0].id}`
+                    : contract && isAgreementSigned(contract) && canInvoice
+                    ? `/brand-invoices/new?contractId=${contract.id}&mode=full`
+                    : null,
+                },
+                {
+                  label: WORKFLOW_STEPS[4].label,
+                  step: 5,
+                  // Payment is recorded on the invoice: the first one still unpaid, else the first one.
+                  href: unpaidInvoice ? `/brand-invoices/${unpaidInvoice.id}` : dealBrandInvoices.length ? `/brand-invoices/${dealBrandInvoices[0].id}` : null,
+                },
+              ]}
+            />
+
+            <div className="mt-5">
             {/* 4-step action buttons — only shown once quote query resolves */}
             {stepsReady && (
-              <div className="mt-3 space-y-2">
+              <div className="space-y-2">
                 {/* Revised quote banner */}
                 {quote && quote.status === "revised" && (
                   <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
@@ -536,58 +572,12 @@ export default function DealDetailsPage() {
                 </Button>
               </div>
             )}
+            </div>
           </CardContent>
         </Card>
 
-        {/* ── Deal Information + Financial Summary (mockup parity, real data only) ── */}
+        {/* ── Financial Summary + Deal Information (real data only) ── */}
         <div className="grid sm:grid-cols-2 gap-6">
-          <Card className="glass-card border-0">
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">Deal Information</h3>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard?.writeText(`DL-${deal.id}`).then(
-                      () => toast({ title: "Deal ID copied" }),
-                      () => {},
-                    );
-                  }}
-                  className="inline-flex items-center gap-1.5 text-[11px] font-mono font-semibold text-muted-foreground hover:text-foreground px-2 py-1 rounded-md border border-border/60 transition-colors"
-                  data-testid="copy-deal-id"
-                >
-                  #DL-{deal.id} <Copy className="w-3 h-3" />
-                </button>
-              </div>
-              <dl className="space-y-3 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">Client</dt>
-                  <dd className="font-medium truncate">{deal.brandName}</dd>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">Category</dt>
-                  <dd>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
-                      {(deal as any).dealType || "Custom"}
-                    </span>
-                  </dd>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">Start Date</dt>
-                  <dd className="font-medium">{formatDate(deal.startDate)}</dd>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">End Date</dt>
-                  <dd className="font-medium">{formatDate(deal.endDate)}</dd>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">Status</dt>
-                  <dd><StatusBadge status={deal.status} size="compact" /></dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
-
           <Card className="glass-card border-0">
             <CardContent className="p-5">
               {(() => {
@@ -656,11 +646,55 @@ export default function DealDetailsPage() {
               })()}
             </CardContent>
           </Card>
-        </div>
+
+          <Card className="glass-card border-0">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">Deal Information</h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(`DL-${deal.id}`).then(
+                      () => toast({ title: "Deal ID copied" }),
+                      () => {},
+                    );
+                  }}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-mono font-semibold text-muted-foreground hover:text-foreground px-2 py-1 rounded-md border border-border/60 transition-colors"
+                  data-testid="copy-deal-id"
+                >
+                  #DL-{deal.id} <Copy className="w-3 h-3" />
+                </button>
+              </div>
+              <dl className="space-y-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Client</dt>
+                  <dd className="font-medium truncate">{deal.brandName}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Category</dt>
+                  <dd>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
+                      {(deal as any).dealType || "Custom"}
+                    </span>
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Start Date</dt>
+                  <dd className="font-medium">{formatDate(deal.startDate)}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">End Date</dt>
+                  <dd className="font-medium">{formatDate(deal.endDate)}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">Status</dt>
+                  <dd><AnimatedStatusBadge status={deal.status} size="compact" /></dd>
+                </div>
+              </dl>
+            </CardContent>
+          </Card>
         </div>
 
-        <div className="lg:col-span-2 xl:col-span-1 space-y-6">
-        <DealIntelCards dealId={deal.id} existingTerms={(deal as any).customTerms ?? ""} />
         <section className="space-y-3">
           <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
             Deliverables ({completedIds.size}/{deal.deliverables.length} Completed)
@@ -772,7 +806,9 @@ export default function DealDetailsPage() {
             </section>
           );
         })()}
+        </motion.div>
 
+        <motion.div variants={fadeUp} className="lg:col-span-1 space-y-6">
         {/* ── Quick Actions — contextual, only what's actually available ── */}
         <section className="space-y-3">
           <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
@@ -812,9 +848,11 @@ export default function DealDetailsPage() {
             </CardContent>
           </Card>
         </section>
+
+        <DealIntelCards dealId={deal.id} existingTerms={(deal as any).customTerms ?? ""} />
+        </motion.div>
         </div>
-        </div>
-      </main>
+      </motion.main>
 
       <BottomNav />
     </div>
@@ -822,24 +860,76 @@ export default function DealDetailsPage() {
 }
 
 
-// ─── Deal intelligence rail cards ────────────────────────────────────────────
+// ─── Deal intelligence ───────────────────────────────────────────────────────
 // Health score + next best action from the deterministic server engine
 // (server/copilot/insights.ts) — every point traces to a visible signal.
+interface DealIntel {
+  health: { score: number; grade: string; signals: { label: string; state: "good" | "warn" | "bad"; detail: string }[] };
+  nextAction: { action: string; route: string; urgency: "red" | "yellow" | "green" } | null;
+  protection?: {
+    flags: { id: string; severity: "risk" | "gap"; level: Finding["level"]; title: string; detail: string; why: string; ask: string; suggestedTerm?: string }[];
+    passes: string[];
+    risks: number;
+    gaps: number;
+  };
+  dealStatus?: string;
+}
+
+/** One cached read shared by the header's suggestion and the rail's cards. */
+function useDealIntel(dealId: number) {
+  return useQuery<DealIntel>({ queryKey: [`/api/copilot/deal-intel/${dealId}`], staleTime: 30_000 });
+}
+
+/**
+ * The header's suggested next step: the server's deterministic next best
+ * action, worded as what it is — a suggestion. Nothing shows while it loads
+ * (beyond a placeholder line), when it fails, or when there is nothing to do.
+ * "Mark the deal completed" points at this very page, so it gets no link: the
+ * Mark as Completed button in the workflow card is that action.
+ */
+function NextStepSuggestion({ dealId, selfPath }: { dealId: number; selfPath: string }) {
+  const { data, isLoading } = useDealIntel(dealId);
+  if (isLoading) {
+    return (
+      <div className="mt-4 pt-4 border-t border-border/60 space-y-1.5" aria-hidden="true">
+        <Skeleton className="h-3 w-32" />
+        <Skeleton className="h-4 w-2/3" />
+      </div>
+    );
+  }
+  const next = data?.nextAction;
+  if (!next) return null;
+  const dot = next.urgency === "red" ? "bg-rose-500" : next.urgency === "yellow" ? "bg-amber-500" : "bg-emerald-500";
+  return (
+    <div className="mt-4 pt-4 border-t border-border/60 flex flex-col gap-3 sm:flex-row sm:items-center" data-testid="next-step-suggestion">
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+          <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
+          Suggested next step
+        </p>
+        <p className="mt-1 flex items-start gap-2 text-sm font-semibold">
+          <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} aria-hidden="true" />
+          <span>{next.action}</span>
+        </p>
+        <p className="mt-0.5 pl-3.5 text-xs text-muted-foreground">A suggestion from this deal's records. You decide.</p>
+      </div>
+      {next.route !== selfPath && (
+        <Link href={next.route} className="shrink-0">
+          <Button size="sm" className="h-9 w-full sm:w-auto font-semibold gradient-btn text-white" data-testid="button-next-step">
+            Open <ChevronRight className="w-4 h-4 ml-1" aria-hidden="true" />
+          </Button>
+        </Link>
+      )}
+    </div>
+  );
+}
+
+/** The rail: Deal health and the Protection Check. */
 function DealIntelCards({ dealId, existingTerms }: { dealId: number; existingTerms: string }) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [suggested, setSuggested] = useState<string | null>(null);
-  const { data } = useQuery<{
-    health: { score: number; grade: string; signals: { label: string; state: "good" | "warn" | "bad"; detail: string }[] };
-    nextAction: { action: string; route: string; urgency: "red" | "yellow" | "green" } | null;
-    protection?: {
-      flags: { id: string; severity: "risk" | "gap"; level: Finding["level"]; title: string; detail: string; why: string; ask: string; suggestedTerm?: string }[];
-      passes: string[];
-      risks: number;
-      gaps: number;
-    };
-    dealStatus?: string;
-  }>({ queryKey: [`/api/copilot/deal-intel/${dealId}`], staleTime: 30_000 });
+  const { data } = useDealIntel(dealId);
 
   const suggest = useMutation({
     mutationFn: async () => {
@@ -859,7 +949,9 @@ function DealIntelCards({ dealId, existingTerms }: { dealId: number; existingTer
     onSuccess: () => {
       toast({ title: "Protections added to the deal's terms" });
       setSuggested(null);
-      queryClient.invalidateQueries({ queryKey: [`/api/deals/${dealId}`] });
+      // The deal's own query is ["/api/deals", id] — a prefix covers it, the
+      // list, and the quotation (editing terms marks a draft quote revised).
+      queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
       queryClient.invalidateQueries({ queryKey: [`/api/copilot/deal-intel/${dealId}`] });
     },
     onError: () => toast({ title: "Couldn't update the terms", description: "Only pending deals can be edited.", variant: "destructive" }),
@@ -885,19 +977,6 @@ function DealIntelCards({ dealId, existingTerms }: { dealId: number; existingTer
   const ringCls = health.score >= 80 ? "border-emerald-500/50" : health.score >= 55 ? "border-amber-500/50" : "border-rose-500/50";
   return (
     <>
-      {nextAction && (
-        <Card className={`glass-card border ${nextAction.urgency === "red" ? "border-rose-300/50 dark:border-rose-900/50" : nextAction.urgency === "yellow" ? "border-amber-300/50 dark:border-amber-900/50" : "border-emerald-300/50 dark:border-emerald-800/50"}`}>
-          <CardContent className="p-4">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Next best action</p>
-            <p className="text-sm font-semibold mb-2.5">{nextAction.action}</p>
-            <Link href={nextAction.route}>
-              <Button size="sm" className="h-8 text-xs font-bold gradient-btn text-white w-full">
-                Do it now <ChevronRight className="w-3.5 h-3.5 ml-1" />
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      )}
       <Card className="glass-card border-0">
         <CardContent className="p-4">
           <div className="flex items-center gap-3.5 mb-3">

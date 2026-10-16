@@ -1,25 +1,28 @@
 /**
- * One lead: its details, the stage it is in and where it can go next, the
- * next-step tickets, the evidence behind what we believe about the company,
+ * One lead: who it is and where it came from, the stage it is in (a lifecycle
+ * picture plus the moves the server allows from here), the next best action,
+ * the next-step tickets, the evidence behind what we believe about the company,
  * and the timeline. "Create deal" is the closing step: it creates the deal
  * through the same service as the Deals page and marks the lead Won.
  */
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useRoute } from "wouter";
-import { ArrowLeft, Archive, Check, ExternalLink, Handshake, Pencil } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Archive, ArrowRight, Check, CircleHelp, ExternalLink, Handshake, Lightbulb, Pencil, Sparkles } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
+import { DetailSkeleton, DetailUnavailable } from "@/components/document/detail-states";
 import { FitCard } from "@/components/leads/fit-card";
 import { SalesCard } from "@/components/leads/sales-card";
 import { LeadFormDialog } from "@/components/leads/lead-form-dialog";
+import { SourceChip } from "@/components/leads/source-chip";
 import { StageBadge } from "@/components/leads/stage-badge";
+import { StageProgress } from "@/components/leads/stage-progress";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,8 +32,12 @@ import { useMoney } from "@/hooks/use-locale";
 import { useToast } from "@/hooks/use-toast";
 import { trackEvent } from "@/lib/analytics";
 import { formatMoney } from "@/lib/format";
+import { useCalmMotion } from "@/lib/motion";
 import { cn } from "@/lib/utils";
-import { dateLabel, detailUrl, isOverdue, leadCall, leadError, refreshLeads, stageLabel, type LeadDetailView, type LeadStatus } from "@/lib/leads";
+import { dateLabel, detailUrl, isOverdue, leadCall, leadError, nextActionUrl, refreshLeads, stageLabel, type LeadDetailView, type LeadStatus } from "@/lib/leads";
+import { httpErrorKind } from "@shared/http-error-kind";
+import { CLAIM_STATUS_HINT, CLAIM_STATUS_LABEL, claimProvenance, leadSource, lostFromEvents } from "@shared/lead-view";
+import type { ActionKey, NextAction } from "@shared/next-action";
 import { memberCan } from "@shared/permissions";
 import { CLAIM_STATUSES, TICKET_KINDS } from "@shared/leads";
 
@@ -44,7 +51,20 @@ const CLAIM_STYLE: Record<string, string> = {
   conflicting: "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300",
   unknown: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
 };
+const CLAIM_ICON: Record<string, typeof Check> = { confirmed: Check, inferred: Sparkles, conflicting: AlertTriangle, unknown: CircleHelp };
 const safeHref = (u: string | null) => (u && /^https?:\/\//i.test(u) ? u : undefined);
+
+/**
+ * Where the next best action is done on this page, so the top card can take the person there. Only a pointer:
+ * the action itself is still the existing control (the outreach panel, research, the edit form, the deal dialog).
+ */
+const ACTION_TARGET: Partial<Record<ActionKey, { label: string; to: "outreach" | "research" | "edit" }>> = {
+  send_message: { label: "Open the message", to: "outreach" },
+  review_draft: { label: "Review the draft", to: "outreach" },
+  draft_outreach: { label: "Write the message", to: "outreach" },
+  research: { label: "Go to research", to: "research" },
+  find_contact: { label: "Add a contact", to: "edit" },
+};
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -63,11 +83,15 @@ export default function LeadDetailsPage() {
   const { locale, input } = useMoney();
   const { toast } = useToast();
   const confirm = useConfirm();
+  const calm = useCalmMotion();
   const canEdit = memberCan(user as any, "deals.create");
 
-  const { data, isLoading, error } = useQuery<LeadDetailView>({ queryKey: [detailUrl(id)], enabled: !!id });
+  const { data, isLoading, error, isError, refetch, isFetching } = useQuery<LeadDetailView>({ queryKey: [detailUrl(id)], enabled: !!id });
   const lead = data?.lead;
   const open = !!lead && !lead.archivedAt && lead.status !== "won" && lead.status !== "lost";
+  // The same next best action the sales card reads (same query, fetched once); absent where the sales agent isn't set up.
+  const next = useQuery<{ next: NextAction }>({ queryKey: [nextActionUrl(id)], retry: false, enabled: !!lead });
+  const [tab, setTab] = useState("overview");
 
   const [editOpen, setEditOpen] = useState(false);
   const [lostFor, setLostFor] = useState(false);
@@ -129,13 +153,39 @@ export default function LeadDetailsPage() {
     onError: (e) => setDealError(leadError(e, "Couldn't create the deal.")),
   });
 
-  if (isLoading) return <div className="space-y-4 p-4 lg:mx-auto lg:max-w-4xl lg:p-8"><Skeleton className="h-10 w-2/3" /><Skeleton className="h-40 w-full" /></div>;
-  if (error || !data || !lead) {
+  const backBar = (
+    <header className="glass-header sticky top-0 z-40 lg:border-b lg:border-neutral-200/60 dark:lg:border-neutral-800/60">
+      <div className="px-4 py-3 lg:mx-auto lg:max-w-4xl lg:px-8 lg:py-4">
+        <Link href="/leads" className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" />Leads</Link>
+      </div>
+    </header>
+  );
+  if (isLoading || (!!id && !data && !isError)) {
     return (
-      <div className="min-h-screen px-4 py-16 text-center">
-        <p className="font-semibold">That lead isn't here</p>
-        <p className="mt-1 text-sm text-muted-foreground">It may have been removed, or it belongs to another workspace.</p>
-        <Button asChild className="mt-4" variant="outline"><Link href="/leads">Back to leads</Link></Button>
+      <div className="min-h-screen bg-background pb-24 lg:pb-12">
+        {backBar}
+        <main className="px-4 py-5 lg:mx-auto lg:max-w-4xl lg:px-8 lg:py-6">
+          <DetailSkeleton what="lead" railBlocks={0} mainBlocks={2} />
+        </main>
+        <BottomNav />
+      </div>
+    );
+  }
+  if (!data || !lead) {
+    return (
+      <div className="min-h-screen bg-background pb-24 lg:pb-12">
+        {backBar}
+        <main className="px-4 py-5 lg:mx-auto lg:max-w-3xl lg:px-8 lg:py-6">
+          <DetailUnavailable
+            // No error and no row is the server saying "nothing here"; a lead in another workspace answers 404 too.
+            kind={isError ? httpErrorKind(error) : "not_found"}
+            what="lead"
+            backHref="/leads"
+            backLabel="Back to leads"
+            onRetry={() => void refetch()}
+            retrying={isFetching}
+          />
+        </main>
         <BottomNav />
       </div>
     );
@@ -144,6 +194,18 @@ export default function LeadDetailsPage() {
   const openTickets = data.tickets.filter((t) => t.status === "open");
   const closedTickets = data.tickets.filter((t) => t.status !== "open");
   const value = lead.estValueMinor && lead.currency ? formatMoney(lead.estValueMinor, lead.currency, locale) : null;
+  const mine = !!user && lead.ownerUserId === (user as any).id;
+  const source = leadSource(lead.source, { mine });
+  const nextAction = next.data?.next ?? null;
+  const target = nextAction && canEdit && !lead.archivedAt ? ACTION_TARGET[nextAction.action] : undefined;
+  /** Take the person to where the next best action is done; the controls there do the work. */
+  const goTo = (to: "outreach" | "research" | "edit") => {
+    if (to === "edit") { setEditOpen(true); return; }
+    setTab("overview");
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(`[data-testid="${to}-panel"]`)?.scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "center" });
+    }));
+  };
 
   return (
     <div className="min-h-screen bg-background pb-24 lg:pb-12">
@@ -155,9 +217,12 @@ export default function LeadDetailsPage() {
               <h1 className="break-words text-xl font-bold tracking-tight lg:text-2xl" data-testid="lead-title">{lead.companyName}</h1>
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <StageBadge status={lead.status} />
+                <SourceChip source={lead.source} mine={mine} />
                 {lead.archivedAt && <span className="text-xs text-muted-foreground">Archived</span>}
                 {lead.doNotContact && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">Do not contact</span>}
               </div>
+              {/* The lead's own source and the day it was added: nothing here is inferred. */}
+              <p className="mt-1 text-xs text-muted-foreground" data-testid="lead-origin">{source.origin} on {dateLabel(lead.createdAt, locale)}</p>
             </div>
             {canEdit && !lead.archivedAt && (
               <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} data-testid="button-edit-lead"><Pencil className="mr-1.5 h-3.5 w-3.5" />Edit</Button>
@@ -176,38 +241,63 @@ export default function LeadDetailsPage() {
           </Card>
         )}
 
-        {canEdit && open && (
-          <Card className="glass-card">
-            <CardContent className="space-y-3 p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Move to</span>
-                {data.moves.filter((m) => m !== "lost").map((m) => (
-                  <Button key={m} size="sm" variant="outline" disabled={move.isPending} onClick={() => move.mutate({ status: m })} data-testid={`move-${m}`}>{stageLabel(m)}</Button>
-                ))}
-                {data.moves.includes("lost") && <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => setLostFor(true)} data-testid="move-lost">Mark lost</Button>}
+        {/* Where it is and what to do next. The stage only changes through the moves below, which the server allows. */}
+        <Card className="glass-card" data-testid="lead-summary">
+          <CardContent className="space-y-4 p-4">
+            {nextAction && (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start" data-testid="next-action">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" aria-hidden><Lightbulb className="h-4 w-4" /></span>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Next best action</p>
+                    <p className="text-sm font-semibold" data-testid="next-action-label">{nextAction.label}</p>
+                    <p className="mt-0.5 text-sm text-muted-foreground" data-testid="next-action-reason">{nextAction.reason}</p>
+                  </div>
+                </div>
+                {target && (
+                  <Button size="sm" variant="outline" className="self-start sm:shrink-0" onClick={() => goTo(target.to)} data-testid="next-action-go">
+                    {target.label}<ArrowRight className="ml-1.5 h-3.5 w-3.5" aria-hidden />
+                  </Button>
+                )}
               </div>
-              {data.canConvert && (
-                <Button className="gradient-btn w-full text-white sm:w-auto" onClick={() => { setDealError(null); setDealOpen(true); }} data-testid="button-create-deal">
-                  <Handshake className="mr-1.5 h-4 w-4" />Won it: create the deal
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        )}
-        {canEdit && lead.status === "lost" && !lead.archivedAt && data.moves.includes("new") && (
-          <Button variant="outline" size="sm" onClick={() => move.mutate({ status: "new" })} data-testid="move-reopen">Reopen this lead</Button>
-        )}
+            )}
+            <div className={cn(nextAction && "border-t border-border/60 pt-4")}>
+              <StageProgress status={lead.status} lostFrom={lead.status === "lost" ? lostFromEvents(data.events) : null} />
+            </div>
+            {canEdit && open && (
+              <div className="space-y-3 border-t border-border/60 pt-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Move to</span>
+                  {data.moves.filter((m) => m !== "lost").map((m) => (
+                    <Button key={m} size="sm" variant="outline" disabled={move.isPending} onClick={() => move.mutate({ status: m })} data-testid={`move-${m}`}>{stageLabel(m)}</Button>
+                  ))}
+                  {data.moves.includes("lost") && <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => setLostFor(true)} data-testid="move-lost">Mark lost</Button>}
+                </div>
+                {data.canConvert && (
+                  <Button className="gradient-btn w-full text-white sm:w-auto" onClick={() => { setDealError(null); setDealOpen(true); }} data-testid="button-create-deal">
+                    <Handshake className="mr-1.5 h-4 w-4" />Won it: create the deal
+                  </Button>
+                )}
+              </div>
+            )}
+            {canEdit && lead.status === "lost" && !lead.archivedAt && data.moves.includes("new") && (
+              <div className="border-t border-border/60 pt-4">
+                <Button variant="outline" size="sm" onClick={() => move.mutate({ status: "new" })} data-testid="move-reopen">Reopen this lead</Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-        <Tabs defaultValue="overview">
+        <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="tickets" data-testid="tab-tickets">Steps{openTickets.length ? ` (${openTickets.length})` : ""}</TabsTrigger>
-            <TabsTrigger value="evidence" data-testid="tab-evidence">Facts</TabsTrigger>
+            <TabsTrigger value="evidence" data-testid="tab-evidence">Facts{data.claims.length ? ` (${data.claims.length})` : ""}</TabsTrigger>
             <TabsTrigger value="timeline" data-testid="tab-timeline">Timeline</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-4 space-y-3">
-            <SalesCard leadId={lead.id} hasWebsite={!!lead.website} />
+            <SalesCard leadId={lead.id} hasWebsite={!!lead.website} showNextAction={false} />
             <FitCard leadId={lead.id} />
             <Card className="glass-card"><CardContent className="grid gap-x-4 gap-y-3 p-4 sm:grid-cols-2">
               <Fact label="Website">{lead.website ? <a className="inline-flex items-center gap-1 text-primary hover:underline" href={safeHref(lead.website) ?? `https://${lead.website}`} target="_blank" rel="noopener noreferrer">{lead.website}<ExternalLink className="h-3 w-3" /></a> : "—"}</Fact>
@@ -215,7 +305,7 @@ export default function LeadDetailsPage() {
               <Fact label="Industry">{lead.industry || "—"}</Fact>
               <Fact label="Location">{lead.location || "—"}</Fact>
               <Fact label="Size">{lead.sizeHint || "—"}</Fact>
-              <Fact label="Source">{lead.source}</Fact>
+              <Fact label="Source">{source.label}</Fact>
               <Fact label="Contact">{[lead.contactName, lead.contactRole].filter(Boolean).join(", ") || "—"}</Fact>
               {/* No one-click email link to a lead marked do-not-contact. */}
               <Fact label="Contact email">{lead.contactEmail ? (lead.doNotContact ? <span>{lead.contactEmail} <span className="text-xs text-muted-foreground">(do not contact)</span></span> : <a className="text-primary hover:underline" href={`mailto:${lead.contactEmail}`}>{lead.contactEmail}</a>) : "—"}</Fact>
@@ -285,20 +375,36 @@ export default function LeadDetailsPage() {
           </TabsContent>
 
           <TabsContent value="evidence" className="mt-4 space-y-3">
-            <p className="px-1 text-xs text-muted-foreground">What we believe about this company, and how we know. A fact is only <b>confirmed</b> with the page it came from and the words on it.</p>
-            {data.claims.length === 0 && <p className="px-1 text-sm text-muted-foreground">Nothing recorded yet.</p>}
+            <p className="px-1 text-xs text-muted-foreground">What we believe about this company, and how we know. A fact is only <b>confirmed</b> with the page it came from and the words on it; anything else is labelled as a reading or unknown.</p>
+            {data.claims.length === 0 && <p className="px-1 text-sm text-muted-foreground">Nothing recorded yet.{lead.website ? " Research the company from the Overview tab, or record a fact below." : ""}</p>}
             <ul className="space-y-2">
-              {data.claims.map((c) => (
-                <li key={c.id} className="rounded-xl border bg-background p-3" data-testid={`claim-${c.id}`}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{c.field}</p><p className="break-words text-sm font-medium">{c.value}</p></div>
-                    <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold", CLAIM_STYLE[c.status])}>{c.status}</span>
-                  </div>
-                  {c.evidenceSnippet && <p className="mt-1.5 break-words border-l-2 border-border pl-2 text-xs italic text-muted-foreground">“{c.evidenceSnippet}”</p>}
-                  {safeHref(c.evidenceUrl) && <a href={safeHref(c.evidenceUrl)} target="_blank" rel="noopener noreferrer nofollow" className="mt-1 inline-flex max-w-full items-center gap-1 text-xs text-primary hover:underline"><span className="truncate">{c.evidenceUrl}</span><ExternalLink className="h-3 w-3 shrink-0" /></a>}
-                  <p className="mt-1 text-[11px] text-muted-foreground">Added by {c.source === "agent" ? "the agent" : "you"} · {dateLabel(c.createdAt, locale)}</p>
-                </li>
-              ))}
+              {data.claims.map((c) => {
+                const prov = claimProvenance(c);
+                const Icon = CLAIM_ICON[c.status] ?? CircleHelp;
+                return (
+                  <li key={c.id} className="rounded-xl border bg-background p-3" data-testid={`claim-${c.id}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{c.field.replace(/_/g, " ")}</p><p className="break-words text-sm font-medium">{c.value}</p></div>
+                      <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold", CLAIM_STYLE[c.status])} title={CLAIM_STATUS_HINT[c.status]} data-testid={`claim-status-${c.status}`}>
+                        <Icon className="h-3 w-3" aria-hidden />{CLAIM_STATUS_LABEL[c.status] ?? c.status}
+                      </span>
+                    </div>
+                    {c.evidenceSnippet && (
+                      <blockquote className="mt-1.5 break-words border-l-2 border-border pl-2 text-xs italic text-muted-foreground">
+                        <span className="sr-only">Words on the page: </span>“{c.evidenceSnippet}”
+                      </blockquote>
+                    )}
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-muted-foreground" data-testid={`claim-provenance-${c.id}`}>
+                      <span>Source:</span>
+                      {prov.href
+                        ? <a href={prov.href} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex min-w-0 max-w-full items-center gap-1 font-medium text-primary hover:underline"><span className="truncate">{prov.site}</span><ExternalLink className="h-3 w-3 shrink-0" aria-hidden /><span className="sr-only">(opens in a new tab)</span></a>
+                        : <span className="font-medium text-foreground/80">no web page</span>}
+                      <span aria-hidden>·</span>
+                      <span>{prov.by} on {dateLabel(c.createdAt, locale)}</span>
+                    </p>
+                  </li>
+                );
+              })}
             </ul>
             {canEdit && !lead.archivedAt && (
               <Card className="glass-card"><CardContent className="p-4">

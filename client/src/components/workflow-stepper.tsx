@@ -24,34 +24,39 @@ export function WorkflowStepper({
   steps,
   currentStep,
   className = "",
+  size = "default",
 }: {
   steps: WorkflowStep[];
-  /** The furthest step reached. Steps below it render as done. */
+  /** The furthest step reached. Steps below it render as done; 0 while it isn't known yet (nothing is marked). */
   currentStep: number;
   className?: string;
+  /** "large" is the deal page's main stepper: bigger dots and labels. */
+  size?: "default" | "large";
 }) {
+  const large = size === "large";
   return (
-    <nav aria-label="Deal progress" className={`flex items-center justify-between px-1 ${className}`}>
+    <nav aria-label="Deal progress" aria-busy={currentStep === 0 || undefined} className={`flex items-center justify-between px-1 ${className}`}>
       {steps.map((s, idx, arr) => {
         const isDone = s.step < currentStep;
         const isActive = s.step === currentStep;
 
         const dot = (
           <span
-            className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-all
+            className={`flex items-center justify-center ${large ? "w-8 h-8 sm:w-9 sm:h-9" : "w-7 h-7"} rounded-full text-xs font-bold transition-all
               ${isDone
                 ? "bg-emerald-500 text-white shadow-sm shadow-emerald-200 dark:shadow-emerald-900"
                 : isActive
                 ? "bg-amber-400 text-white shadow-sm shadow-amber-200 dark:shadow-amber-900 ring-2 ring-amber-300/50"
                 : "bg-muted text-muted-foreground"}`}
           >
-            {isDone ? <CheckCircle2 className="w-3.5 h-3.5" /> : s.step}
+            {isDone ? <CheckCircle2 className={large ? "w-4 h-4" : "w-3.5 h-3.5"} /> : s.step}
+            {isDone && <span className="sr-only"> (done)</span>}
           </span>
         );
 
         const label = (
           <span
-            className={`text-[10px] font-semibold whitespace-nowrap
+            className={`${large ? "text-[10px] sm:text-xs" : "text-[10px]"} font-semibold whitespace-nowrap
               ${isDone ? "text-emerald-600 dark:text-emerald-400"
                 : isActive ? "text-amber-600 dark:text-amber-400"
                 : "text-muted-foreground"}`}
@@ -65,7 +70,8 @@ export function WorkflowStepper({
             {s.href ? (
               <Link
                 href={s.href}
-                aria-label={`Go to ${s.label}`}
+                aria-label={`Go to ${s.label}${isDone ? " (done)" : ""}`}
+                aria-current={isActive ? "step" : undefined}
                 data-testid={`step-link-${s.label.toLowerCase()}`}
                 className="flex flex-col items-center gap-0.5 rounded-lg px-1 py-0.5 -mx-1 cursor-pointer transition-transform hover:-translate-y-0.5 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               >

@@ -6,6 +6,7 @@
  * in batches; duplicates already in the pipeline are skipped and reported.
  */
 import { useRef, useState } from "react";
+import { Link } from "wouter";
 import { FileUp, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -15,7 +16,7 @@ import { downloadCsv, parseCsv, toCsv } from "@/lib/csv";
 import { leadCall, leadError, refreshLeads } from "@/lib/leads";
 import { FIELD_LABEL, MAX_IMPORT_ROWS, TEMPLATE_HEADERS, TEMPLATE_ROWS, buildImportPlan, chunk, type ImportPlan } from "@shared/leads-import";
 
-interface Outcome { added: number; skipped: { name: string; message: string }[]; stopped: string | null }
+interface Outcome { added: number; skipped: { name: string; message: string; existingId?: number }[]; stopped: string | null }
 
 export function LeadImportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const { toast } = useToast();
@@ -53,9 +54,9 @@ export function LeadImportDialog({ open, onOpenChange }: { open: boolean; onOpen
     let sent = 0;
     for (const part of chunk(ready)) {
       try {
-        const r = await leadCall<{ created: unknown[]; skipped: { companyName: string; message: string }[] }>("POST", "/api/leads/batch", { leads: part.map((p) => p.lead) });
+        const r = await leadCall<{ created: unknown[]; skipped: { companyName: string; message: string; existingId?: number }[] }>("POST", "/api/leads/batch", { leads: part.map((p) => p.lead) });
         out.added += r.created.length;
-        out.skipped.push(...r.skipped.map((s) => ({ name: s.companyName, message: s.message })));
+        out.skipped.push(...r.skipped.map((s) => ({ name: s.companyName, message: s.message, ...(typeof s.existingId === "number" ? { existingId: s.existingId } : {}) })));
       } catch (e) {
         out.stopped = leadError(e, "The import stopped part-way.");
         break;
@@ -129,7 +130,13 @@ export function LeadImportDialog({ open, onOpenChange }: { open: boolean; onOpen
             {outcome.stopped && <p role="alert" className="text-sm text-rose-600 dark:text-rose-400">{outcome.stopped} Nothing after that point was added; the leads before it are saved.</p>}
             {outcome.skipped.length > 0 && (
               <ul className="space-y-1 text-xs text-muted-foreground">
-                {outcome.skipped.slice(0, 8).map((s, i) => <li key={i} className="break-words"><span className="font-semibold text-foreground">{s.name}</span>: {s.message}</li>)}
+                {outcome.skipped.slice(0, 8).map((s, i) => (
+                  <li key={i} className="break-words">
+                    <span className="font-semibold text-foreground">{s.name}</span>: {s.message}
+                    {/* A duplicate names the lead that already exists: open it rather than add it twice. */}
+                    {s.existingId && <> <Link href={`/leads/${s.existingId}`} onClick={() => close(false)} className="font-semibold text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400">Open it</Link></>}
+                  </li>
+                ))}
                 {outcome.skipped.length > 8 && <li>and {outcome.skipped.length - 8} more</li>}
               </ul>
             )}

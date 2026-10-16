@@ -13,7 +13,7 @@ import { recordNo } from "@shared/schema";
 import { RowActions } from "@/components/row-actions";
 import { DateRangeFilter, ALL_TIME, inRange, type DateRange } from "@/components/date-range-filter";
 import { PickParentDialog } from "@/components/pick-parent-dialog";
-import { memberCan } from "@shared/permissions";
+import { memberCan, canReadModule } from "@shared/permissions";
 import { useAuth } from "@/hooks/useAuth";
 import { useMoney, type MoneyFormat } from "@/hooks/use-locale";
 import { DataTable } from "@/components/data-table/data-table";
@@ -23,10 +23,16 @@ import { unguardCell } from "@/lib/csv";
 import { useToast } from "@/hooks/use-toast";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { parseApiError, isUpgradeError } from "@/lib/api-error";
-import { Plus, Briefcase, ChevronRight, Calendar, Search, X } from "lucide-react";
+import { Plus, Briefcase, ChevronRight, Calendar, Search, X, LayoutList, Columns3 } from "lucide-react";
 import { dealTypeMeta } from "@shared/dealTypeTaxonomy";
-import type { Deal } from "@shared/schema";
+import type { Deal, Quote, Contract, BrandInvoice } from "@shared/schema";
+import { DEALS_VIEW_KEY, parseDealsView, workflowPositions, type DealsView, type WorkflowPosition } from "@shared/deal-view";
 import { useAudience } from "@/hooks/use-audience";
+import { SegmentedControl } from "@/components/segmented-control";
+import { motion } from "framer-motion";
+import { fadeIn, useCalmMotion } from "@/lib/motion";
+import { DealsBoard } from "@/components/deals/deals-board";
+import { WorkflowChip } from "@/components/deals/workflow-chip";
 
 type FilterType = "all" | "pending" | "active" | "completed";
 
@@ -41,11 +47,28 @@ function uuid(): string {
  *  matches raw row keys, and the stored key is minor units — searching
  *  "650000" would find a ₹6,500 deal (650000 paise). This key is what the
  *  search looks at instead. */
-type DealRow = Deal & { amountMajor: string };
+type DealRow = Deal & { amountMajor: string; workflow: WorkflowPosition | null };
+
+const VIEW_OPTIONS = [
+  { value: "list", label: "List", Icon: LayoutList, testId: "view-list" },
+  { value: "board", label: "Board", Icon: Columns3, testId: "view-board" },
+] as const;
+
+/** The List | Board choice, remembered on this device. Storage can be missing or blocked: then it's just the list. */
+function useDealsView(): [DealsView, (v: DealsView) => void] {
+  const [view, setView] = useState<DealsView>(() => {
+    try { return parseDealsView(localStorage.getItem(DEALS_VIEW_KEY)); } catch { return "list"; }
+  });
+  const choose = (v: DealsView) => {
+    setView(v);
+    try { localStorage.setItem(DEALS_VIEW_KEY, v); } catch { /* remembered for this visit only */ }
+  };
+  return [view, choose];
+}
 
 // Desktop table columns. A factory rather than a constant because money and
 // dates now need the org's currency and locale, which only a hook can supply.
-const makeColumns = (fmt: MoneyFormat, party = "Client"): ColumnDef<DealRow>[] => [
+const makeColumns = (fmt: MoneyFormat, party = "Client", withWorkflow = false): ColumnDef<DealRow>[] => [
   {
     id: "dealNo",
     header: "Deal No.",
@@ -108,6 +131,17 @@ const makeColumns = (fmt: MoneyFormat, party = "Client"): ColumnDef<DealRow>[] =
     enableGlobalFilter: false,
     cell: ({ row }) => <span className="tabular-nums">{row.original.deliverables.length}</span>,
   },
+  // Where each deal is in Deal → Quotation → Agreement → Invoice → Paid. Only
+  // when every source could be read: a guessed "No quote yet" would mislead.
+  ...(withWorkflow ? [{
+    id: "workflow",
+    header: "Stage",
+    accessorFn: (d: DealRow) => d.workflow?.step ?? 0,
+    enableGlobalFilter: false,
+    meta: { label: "Stage", exportValue: (d: DealRow) => d.workflow?.label ?? "" },
+    cell: ({ row }: { row: { original: DealRow } }) =>
+      row.original.workflow ? <WorkflowChip position={row.original.workflow} /> : <span className="text-muted-foreground">—</span>,
+  } satisfies ColumnDef<DealRow>] : []),
   {
     accessorKey: "status",
     header: "Status",
@@ -132,7 +166,11 @@ export default function DealsPage() {
   const { user } = useAuth();
   const fmt = useMoney();
   const audience = useAudience();
-  const columns = useMemo(() => makeColumns(fmt, audience.party), [fmt, audience.party]);
+  const [view, setView] = useDealsView();
+  // The view fades in only after the person switches it, never on first load.
+  const [switched, setSwitched] = useState(false);
+  const calm = useCalmMotion();
+  const chooseView = (v: DealsView) => { if (v !== view) setSwitched(true); setView(v); };
   const canCreateDeal = memberCan(user as any, "deals.create");
   // ?pick=agreement — arrived from the invoice picker's "create an agreement".
   const [pickAgreement, setPickAgreement] = useState(
@@ -146,12 +184,34 @@ export default function DealsPage() {
     queryKey: ["/api/deals"],
   });
 
-  const filteredDeals = useMemo(() => {
+  // Where each deal is in its workflow, from the three org-wide lists (the same
+  // cached queries the dashboard uses): one request each, never one per deal.
+  // A list this member may not read is not fetched, and a list that failed is
+  // unknown, not empty — either way no position is shown rather than a guess.
+  const readQuotes = canReadModule(user as any, "quotations");
+  const readAgreements = canReadModule(user as any, "agreements");
+  const readInvoices = canReadModule(user as any, "invoices");
+  const quotesQ = useQuery<Quote[]>({ queryKey: ["/api/quotes"], enabled: !!user && readQuotes });
+  const contractsQ = useQuery<Contract[]>({ queryKey: ["/api/contracts"], enabled: !!user && readAgreements });
+  const invoicesQ = useQuery<BrandInvoice[]>({ queryKey: ["/api/brand-invoices"], enabled: !!user && readInvoices });
+  const known = <T,>(q: { isError: boolean; data?: T }, readable: boolean): T | null => (readable && !q.isError && q.data != null ? q.data : null);
+  const positions = useMemo(
+    () => workflowPositions(deals, {
+      quotes: known(quotesQ, readQuotes),
+      agreements: known(contractsQ, readAgreements),
+      invoices: known(invoicesQ, readInvoices),
+    }),
+    [deals, quotesQ.data, quotesQ.isError, contractsQ.data, contractsQ.isError, invoicesQ.data, invoicesQ.isError, readQuotes, readAgreements, readInvoices], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  // Keyed on whether positions are known, not on their identity: a refetch must not rebuild the table's columns.
+  const hasPositions = !!positions;
+  const columns = useMemo(() => makeColumns(fmt, audience.party, hasPositions), [fmt, audience.party, hasPositions]);
+
+  // Search and dates narrow both views. The status filter is the list's only:
+  // the board's columns ARE the statuses, so it would just empty two of them.
+  const searchedDeals = useMemo(() => {
     return deals.filter((deal) => {
       if (!inRange(deal.startDate, dateRange)) return false;
-      if (filter === "pending" && deal.status !== "Pending") return false;
-      if (filter === "active" && deal.status !== "Active") return false;
-      if (filter === "completed" && deal.status !== "Completed") return false;
       if (search.trim()) {
         const q = search.toLowerCase().trim();
         return (
@@ -164,11 +224,22 @@ export default function DealsPage() {
       }
       return true;
     });
-  }, [deals, filter, search, dateRange, fmt]);
+  }, [deals, search, dateRange, fmt]);
 
+  const filteredDeals = useMemo(() => searchedDeals.filter((deal) => {
+    if (filter === "pending" && deal.status !== "Pending") return false;
+    if (filter === "active" && deal.status !== "Active") return false;
+    if (filter === "completed" && deal.status !== "Completed") return false;
+    return true;
+  }), [searchedDeals, filter]);
+
+  // The desktop table does its own search and status filtering, so it gets
+  // every deal in the date range (as before), not the mobile-filtered list.
   const tableRows = useMemo<DealRow[]>(
-    () => filteredDeals.map((d) => ({ ...d, amountMajor: String(fmt.major(d.dealAmountMinor)) })),
-    [filteredDeals, fmt],
+    () => deals
+      .filter((d) => inRange(d.startDate, dateRange))
+      .map((d) => ({ ...d, amountMajor: String(fmt.major(d.dealAmountMinor)), workflow: positions?.get(d.id) ?? null })),
+    [deals, dateRange, fmt, positions],
   );
 
   const filters: { value: FilterType; label: string }[] = [
@@ -204,7 +275,8 @@ export default function DealsPage() {
             </div>
           </div>
 
-          {/* Mobile-only search + status chips (desktop uses the table toolbar) */}
+          {/* Mobile-only search + status chips (desktop uses the table toolbar).
+              The board has no status chips: its columns are the statuses. */}
           <div className="flex flex-col gap-3 lg:hidden">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -220,7 +292,7 @@ export default function DealsPage() {
                 </button>
               )}
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+            {view === "list" && <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
               {filters.map((f) => (
                 <Button
                   key={f.value}
@@ -233,14 +305,40 @@ export default function DealsPage() {
                   {f.label}
                 </Button>
               ))}
-            </div>
+            </div>}
           </div>
         </div>
       </header>
 
       <main className="px-4 py-6 animate-fade-in lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-8">
-        <div className="flex items-center justify-end lg:hidden pt-1 pb-4">
-          <DateRangeFilter value={dateRange} onChange={setDateRange} />
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1 pb-4 lg:pt-0 lg:pb-5">
+          {(isLoading || deals.length > 0) ? (
+            <SegmentedControl label="View" value={view} onChange={chooseView} options={VIEW_OPTIONS} />
+          ) : <span />}
+          <div className="flex items-center gap-2">
+            {/* The desktop table has its own search; the board needs one. */}
+            {view === "board" && deals.length > 0 && (
+              <div className="relative hidden lg:block">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+                <Input
+                  placeholder="Search deals..."
+                  aria-label="Search deals"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 pr-8 h-9 w-64 text-sm"
+                  data-testid="board-search"
+                />
+                {search && (
+                  <button type="button" aria-label="Clear search" onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <X className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
+                )}
+              </div>
+            )}
+            <div className={view === "board" ? "" : "lg:hidden"}>
+              <DateRangeFilter value={dateRange} onChange={setDateRange} />
+            </div>
+          </div>
         </div>
         {isLoading ? (
           <div className="space-y-4">
@@ -275,8 +373,12 @@ export default function DealsPage() {
               )}
             </CardContent>
           </Card>
+        ) : view === "board" ? (
+          <motion.div key="board" variants={fadeIn} initial={switched && !calm ? "hidden" : false} animate="visible">
+            <DealsBoard deals={searchedDeals} positions={positions} fmt={fmt} filtered={searchedDeals.length !== deals.length} />
+          </motion.div>
         ) : (
-          <>
+          <motion.div key="list" variants={fadeIn} initial={switched && !calm ? "hidden" : false} animate="visible">
             {/* ── Desktop: data table ── */}
             <div className="hidden lg:block">
               <DataTable
@@ -325,9 +427,12 @@ export default function DealsPage() {
                             </div>
                             <StatusBadge status={deal.status} size="compact" />
                           </div>
-                          <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
-                            <Calendar className="w-3.5 h-3.5" />
-                            <span>{fmtDate(deal.startDate, fmt.locale)} - {fmtDate(deal.endDate, fmt.locale)}</span>
+                          <div className="flex items-center justify-between gap-3 mt-3">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+                              <Calendar className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">{fmtDate(deal.startDate, fmt.locale)} - {fmtDate(deal.endDate, fmt.locale)}</span>
+                            </div>
+                            {positions?.get(deal.id) && <WorkflowChip position={positions.get(deal.id)!} className="shrink-0" />}
                           </div>
                           <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/10">
                             <span className="text-lg font-bold text-primary">{fmt.money(deal.dealAmountMinor)}</span>
@@ -352,7 +457,7 @@ export default function DealsPage() {
                 </Card>
               )}
             </div>
-          </>
+          </motion.div>
         )}
       </main>
 

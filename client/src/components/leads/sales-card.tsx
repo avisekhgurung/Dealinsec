@@ -97,7 +97,8 @@ function useFinishedRefresh(runId: number | null) {
   useEffect(() => { if (runId !== null && seen.current !== null && seen.current !== runId) void refreshLeads(); if (runId !== null) seen.current = runId; }, [runId]);
 }
 
-export function SalesCard({ leadId, hasWebsite = true }: { leadId: number; hasWebsite?: boolean }) {
+/** `showNextAction={false}` when the page already shows the next best action itself (the lead page's top card). */
+export function SalesCard({ leadId, hasWebsite = true, showNextAction = true }: { leadId: number; hasWebsite?: boolean; showNextAction?: boolean }) {
   const score = useQuery<{ score: LeadScore }>({ queryKey: [scoreUrl(leadId)], retry: false });
   const next = useQuery<{ next: NextAction }>({ queryKey: [nextActionUrl(leadId)], retry: false });
   if (score.isLoading || next.isLoading) return <Card className="glass-card" data-testid="sales-card-loading"><CardContent className="p-4"><div className="h-4 w-1/3 animate-pulse rounded bg-muted" /></CardContent></Card>;
@@ -106,16 +107,18 @@ export function SalesCard({ leadId, hasWebsite = true }: { leadId: number; hasWe
 
   return (
     <div className="space-y-3" data-testid="sales-card">
-      <Card className={cn("border", TONE[n.action === "none" ? "none" : n.action === "reconsider" ? "reconsider" : ""] ?? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/50 dark:bg-emerald-950/20")} data-testid="next-action">
-        <CardContent className="flex items-start gap-3 p-4">
-          <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-400" />
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Next best action</p>
-            <p className="text-sm font-semibold" data-testid="next-action-label">{n.label}</p>
-            <p className="mt-0.5 text-sm text-muted-foreground" data-testid="next-action-reason">{n.reason}</p>
-          </div>
-        </CardContent>
-      </Card>
+      {showNextAction && (
+        <Card className={cn("border", TONE[n.action === "none" ? "none" : n.action === "reconsider" ? "reconsider" : ""] ?? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/50 dark:bg-emerald-950/20")} data-testid="next-action">
+          <CardContent className="flex items-start gap-3 p-4">
+            <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-400" />
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Next best action</p>
+              <p className="text-sm font-semibold" data-testid="next-action-label">{n.label}</p>
+              <p className="mt-0.5 text-sm text-muted-foreground" data-testid="next-action-reason">{n.reason}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="glass-card" data-testid="score-card">
         <CardContent className="space-y-3 p-4">

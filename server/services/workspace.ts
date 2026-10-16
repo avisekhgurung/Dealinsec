@@ -31,7 +31,7 @@ export async function planCompleteDeal(user: User, dealId: number): Promise<Resu
   const deal = await storage.getDeal(dealId);
   if (!deal || !inOrg(deal, user)) return fail(404, "not_found", "That deal isn't in your organization.");
   if (deal.status === "Completed") return fail(409, "no_change", `"${deal.dealTitle}" is already completed.`);
-  if (deal.status !== "Active") return fail(409, "not_active", `Only an active deal can be completed, and "${deal.dealTitle}" is ${deal.status}. A deal becomes active when the client signs the agreement.`);
+  if (deal.status !== "Active") return fail(409, "not_active", `Only an active deal can be completed, and "${deal.dealTitle}" is ${deal.status}. A deal becomes active when its agreement is created.`);
   const invoices = user.organizationId ? await storage.getBrandInvoicesByDealIdForOrg(dealId, user.organizationId, user.id) : [];
   return { ok: true, deal, unpaid: invoices.filter((i) => i.status !== "Paid").length };
 }
