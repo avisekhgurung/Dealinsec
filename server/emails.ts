@@ -99,19 +99,13 @@ function layout(opts: { preview: string; bodyHtml: string }): string {
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${COLORS.bg};padding:24px 0;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:${COLORS.white};border:1px solid ${COLORS.border};border-radius:16px;overflow:hidden;">
-        <!-- Header -->
+        <!-- Header: the logo as a PNG (most mail apps, Gmail included, don't show SVG), with the name as its alt text.
+             A thin emerald rule keeps the brand colour without putting the green mark on green. -->
         <tr>
-          <td style="background:linear-gradient(135deg,#0E8C5A 0%,#10B981 100%);padding:22px 28px;">
-            <table role="presentation" cellpadding="0" cellspacing="0">
-              <tr>
-                <td style="width:34px;vertical-align:middle;">
-                  <div style="width:30px;height:30px;border-radius:8px;background:#FFFFFF;color:#0E8C5A;font-weight:800;font-size:18px;text-align:center;line-height:30px;">D</div>
-                </td>
-                <td style="vertical-align:middle;padding-left:10px;">
-                  <span style="color:#FFFFFF;font-size:18px;font-weight:700;letter-spacing:-0.2px;">DealInSec</span>
-                </td>
-              </tr>
-            </table>
+          <td style="padding:22px 28px 18px;border-bottom:3px solid ${COLORS.accent};">
+            <a href="${base}" style="text-decoration:none;">
+              <img src="${base}/brand/dealinsec-logo@2x.png" width="144" height="32" alt="DealInSec" style="display:block;border:0;outline:none;width:144px;height:32px;color:${COLORS.ink};font-size:18px;font-weight:700;" />
+            </a>
           </td>
         </tr>
         <!-- Body -->
@@ -120,7 +114,7 @@ function layout(opts: { preview: string; bodyHtml: string }): string {
         <tr>
           <td style="padding:20px 28px;border-top:1px solid ${COLORS.border};">
             <p style="margin:0 0 6px;color:${COLORS.muted};font-size:12px;line-height:1.5;">
-              The deal-management OS for every business.
+              DealInSec · Find Clients. Close Deals. Get Paid.
             </p>
             <p style="margin:0;color:${COLORS.muted};font-size:12px;">
               <a href="${base}" style="color:${COLORS.primary};text-decoration:none;">dealinsec.com</a>

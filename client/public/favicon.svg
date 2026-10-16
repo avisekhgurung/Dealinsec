@@ -1,16 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#10B981"/>
-      <stop offset="0.55" stop-color="#059669"/>
-      <stop offset="1" stop-color="#0D9488"/>
-    </linearGradient>
-    <linearGradient id="seal" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#FBBF24"/>
-      <stop offset="1" stop-color="#F59E0B"/>
-    </linearGradient>
-  </defs>
-  <rect width="48" height="48" rx="11" fill="url(#bg)"/>
-  <path d="M13.5 12 H22.5 C29.9558 12 34 16.9249 34 24 C34 31.0751 29.9558 36 22.5 36 H13.5 V12 Z M18.5 17 V31 H22.3 C26.6 31 29 28.4 29 24 C29 19.6 26.6 17 22.3 17 H18.5 Z" fill="white" fill-rule="evenodd"/>
-  <circle cx="35.5" cy="33.5" r="3.2" fill="url(#seal)" stroke="white" stroke-width="1.6"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs><linearGradient id="ft" x1="10" y1="8" x2="56" y2="52" gradientUnits="userSpaceOnUse"><stop stop-color="#2FE6A0"/><stop offset=".45" stop-color="#14BF8F"/><stop offset="1" stop-color="#0C8E7B"/></linearGradient>
+    <linearGradient id="fl" x1="14" y1="10" x2="14" y2="54" gradientUnits="userSpaceOnUse"><stop stop-color="#086B5F"/><stop offset=".35" stop-color="#0E9A85"/><stop offset=".8" stop-color="#0E9883"/><stop offset="1" stop-color="#0A7B6C"/></linearGradient>
+    <linearGradient id="fb" x1="8" y1="56" x2="31" y2="56" gradientUnits="userSpaceOnUse"><stop stop-color="#33EBA4"/><stop offset=".55" stop-color="#1CCB94"/><stop offset="1" stop-color="#10A584"/></linearGradient></defs>
+  <path d="M8 8C10 14.6 14.2 19 20 19V45L8 56Z" fill="url(#fl)"/><path d="M8 8H30C45.5 8 57 18.5 57 32C57 45.5 45.5 56 30 56H28V45H29.5C37 45 42.5 39.4 42.5 32C42.5 24.6 37 19 29.5 19H20C14.2 19 10 14.6 8 8Z" fill="url(#ft)"/><path d="M8 56L20 45H31V56Z" fill="url(#fb)"/>
 </svg>

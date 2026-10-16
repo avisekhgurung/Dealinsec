@@ -79,11 +79,11 @@ const STYLES = `<style>
   header.site{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
   header.site .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
   /* Matches <DealinsecLogo size="md"> in the app header exactly. */
-  .brand{display:inline-flex;align-items:center;gap:10px;font-size:18px;font-weight:700;line-height:1;letter-spacing:-.025em;color:#171717}
+  .brand{display:inline-flex;align-items:center;gap:9px;font-size:19px;font-weight:800;line-height:1;letter-spacing:-.034em;color:#111B22}
   .brand:hover{text-decoration:none}
   .logo{flex-shrink:0;filter:drop-shadow(0 1px 1px rgba(0,0,0,.05))}
-  .brand-text{line-height:1;font-weight:700}
-  .brand-accent{background:linear-gradient(135deg,#059669 0%,#0D9488 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#0D9488}
+  .brand-text{line-height:1;font-weight:800}
+  .brand-accent{background:linear-gradient(180deg,#22D892 0%,#0C8E7B 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#10A584}
   .hero{padding:56px 0 20px;text-align:center}
   .hero h1{font-size:clamp(28px,5vw,44px);font-weight:800;letter-spacing:-.02em}
   .hero p.sub{font-size:clamp(16px,2.2vw,20px);color:var(--muted);max-width:660px;margin:0 auto}
@@ -507,19 +507,18 @@ const STYLES = `<style>
      (window.print) stays borderless — the guard's border/box-shadow are for screen only. */
 </style>`;
 
-// Same mark as the React app's <DealinsecLogo> (client/src/components/
-// dealinsec-logo.tsx) — inlined as SVG so the server-rendered pages match the
-// landing page exactly: emerald gradient tile, geometric "D", gold accent seal.
-export const LOGO_SVG = `<svg width="36" height="36" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo" aria-hidden="true">
+// Same mark as the React app's <DealinsecMark> (client/src/components/dealinsec-logo.tsx) and
+// client/public/brand/dealinsec-mark.svg, inlined so the server-rendered pages match the app exactly:
+// the geometric D (shadowed bar, top ribbon round the bowl, bottom ribbon folding up from the corner).
+export const LOGO_SVG = `<svg width="34" height="34" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo" aria-hidden="true">
   <defs>
-    <linearGradient id="dls-bg" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#10B981"/><stop offset="0.55" stop-color="#059669"/><stop offset="1" stop-color="#0D9488"/></linearGradient>
-    <linearGradient id="dls-sheen" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="white" stop-opacity="0.28"/><stop offset="0.5" stop-color="white" stop-opacity="0"/></linearGradient>
-    <linearGradient id="dls-accent" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FBBF24"/><stop offset="1" stop-color="#F59E0B"/></linearGradient>
+    <linearGradient id="dls-t" x1="10" y1="8" x2="56" y2="52" gradientUnits="userSpaceOnUse"><stop stop-color="#2FE6A0"/><stop offset=".45" stop-color="#14BF8F"/><stop offset="1" stop-color="#0C8E7B"/></linearGradient>
+    <linearGradient id="dls-l" x1="14" y1="10" x2="14" y2="54" gradientUnits="userSpaceOnUse"><stop stop-color="#086B5F"/><stop offset=".35" stop-color="#0E9A85"/><stop offset=".8" stop-color="#0E9883"/><stop offset="1" stop-color="#0A7B6C"/></linearGradient>
+    <linearGradient id="dls-b" x1="8" y1="56" x2="31" y2="56" gradientUnits="userSpaceOnUse"><stop stop-color="#33EBA4"/><stop offset=".55" stop-color="#1CCB94"/><stop offset="1" stop-color="#10A584"/></linearGradient>
   </defs>
-  <rect width="48" height="48" rx="13" fill="url(#dls-bg)"/>
-  <rect width="48" height="48" rx="13" fill="url(#dls-sheen)"/>
-  <path d="M13.5 12 H22.5 C29.9558 12 34 16.9249 34 24 C34 31.0751 29.9558 36 22.5 36 H13.5 V12 Z M18.5 17 V31 H22.3 C26.6 31 29 28.4 29 24 C29 19.6 26.6 17 22.3 17 H18.5 Z" fill="white" fill-rule="evenodd"/>
-  <circle cx="35.5" cy="33.5" r="3.2" fill="url(#dls-accent)" stroke="url(#dls-bg)" stroke-width="1.8"/>
+  <path d="M8 8C10 14.6 14.2 19 20 19V45L8 56Z" fill="url(#dls-l)"/>
+  <path d="M8 8H30C45.5 8 57 18.5 57 32C57 45.5 45.5 56 30 56H28V45H29.5C37 45 42.5 39.4 42.5 32C42.5 24.6 37 19 29.5 19H20C14.2 19 10 14.6 8 8Z" fill="url(#dls-t)"/>
+  <path d="M8 56L20 45H31V56Z" fill="url(#dls-b)"/>
 </svg>`;
 
 const EXT_ICON = `<svg class="ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>`;
@@ -570,7 +569,7 @@ function relatedTools(current = ""): string {
 
 function header(): string {
   return `<header class="site"><div class="wrap">
-    <a class="brand" href="/" aria-label="DealInSec home">${LOGO_SVG}<span class="brand-text">Deal<span class="brand-accent">insec</span></span></a>
+    <a class="brand" href="/" aria-label="DealInSec home">${LOGO_SVG}<span class="brand-text">Deal<span class="brand-accent">InSec</span></span></a>
     <nav class="nav">
       <a href="/tools" class="active">Free Tools</a>
       <a href="/blog">Blog</a>

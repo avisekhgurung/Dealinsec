@@ -85,10 +85,10 @@ const STYLES = `<style>
   .btn.ghost:hover{background:#fff;border-color:var(--green);color:var(--green)}
   header.site{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
   header.site .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
-  .brand{display:inline-flex;align-items:center;gap:10px;font-size:18px;font-weight:700;line-height:1;letter-spacing:-.025em;color:#171717}
+  .brand{display:inline-flex;align-items:center;gap:9px;font-size:19px;font-weight:800;line-height:1;letter-spacing:-.034em;color:#111B22}
   .brand:hover{text-decoration:none}
   .logo{flex-shrink:0;filter:drop-shadow(0 1px 1px rgba(0,0,0,.05))}
-  .brand-accent{background:linear-gradient(135deg,#059669 0%,#0D9488 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#0D9488}
+  .brand-accent{background:linear-gradient(180deg,#22D892 0%,#0C8E7B 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#10A584}
   .nav{display:none;align-items:center;gap:2px}
   @media(min-width:820px){.nav{display:flex}}
   .nav a{padding:8px 14px;border-radius:10px;font-size:14px;font-weight:600;color:var(--muted)}
@@ -154,7 +154,7 @@ const STYLES = `<style>
 
 function header(): string {
   return `<header class="site"><div class="wrap">
-    <a class="brand" href="/" aria-label="DealInSec home">${LOGO_SVG}<span class="brand-text">Deal<span class="brand-accent">insec</span></span></a>
+    <a class="brand" href="/" aria-label="DealInSec home">${LOGO_SVG}<span class="brand-text">Deal<span class="brand-accent">InSec</span></span></a>
     <nav class="nav">
       <a href="/">Product</a>
       <a href="/for-freelancers">Freelancers</a>

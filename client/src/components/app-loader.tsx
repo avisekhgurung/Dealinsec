@@ -1,3 +1,4 @@
+import { DealinsecMark, DealinsecWordmark } from "@/components/dealinsec-logo";
 import { BadgeCheck, Briefcase, FileText, FileCheck, Receipt, Search, type LucideIcon } from "lucide-react";
 
 /**
@@ -67,39 +68,17 @@ export function AppLoader() {
           {/* Center logo badge */}
           <div className="relative w-28 h-28 flex items-center justify-center">
             <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg animate-breathe overflow-hidden"
-              style={{
-                background: "linear-gradient(135deg, #10B981 0%, #059669 55%, #0D9488 100%)",
-                boxShadow: "0 10px 32px -6px rgba(5, 150, 105, 0.5)",
-              }}
+              className="w-16 h-16 rounded-2xl flex items-center justify-center bg-white shadow-lg animate-breathe ring-1 ring-black/5"
+              style={{ boxShadow: "0 10px 32px -6px rgba(5, 150, 105, 0.45)" }}
             >
-              <svg width="36" height="36" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M13.5 12 H22.5 C29.9558 12 34 16.9249 34 24 C34 31.0751 29.9558 36 22.5 36 H13.5 V12 Z M18.5 17 V31 H22.3 C26.6 31 29 28.4 29 24 C29 19.6 26.6 17 22.3 17 H18.5 Z"
-                  fill="white"
-                  fillRule="evenodd"
-                />
-                <circle cx="35.5" cy="33.5" r="3.2" fill="#FBBF24" stroke="white" strokeWidth="1.6" />
-              </svg>
+              <DealinsecMark size={42} />
             </div>
           </div>
         </div>
 
         {/* Brand name with gradient */}
         <div className="flex flex-col items-center gap-1.5">
-          <h1 className="text-2xl font-bold tracking-tight leading-none">
-            <span className="text-foreground">Deal</span>
-            <span
-              style={{
-                background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              insec
-            </span>
-          </h1>
+          <h1 className="leading-none"><DealinsecWordmark size={24} /></h1>
           <p className="text-xs text-muted-foreground tracking-wide">
             Setting up your workspace
           </p>

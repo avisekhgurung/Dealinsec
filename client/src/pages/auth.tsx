@@ -128,7 +128,7 @@ export default function AuthPage() {
       >
         <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-white/5" aria-hidden="true" />
         <div className="relative flex items-center justify-between">
-          <DealinsecLogo size="sm" className="[&_*]:!text-white" />
+          <DealinsecLogo size="sm" tone="inverse" />
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-100/80 hover:text-white transition-colors"

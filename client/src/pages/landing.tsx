@@ -494,7 +494,7 @@ function Header({
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
+          {/* Logo: compact header, no slogan */}
           <DealinsecLogo size="md" withText asLink />
 
           {/* Desktop nav */}
@@ -1373,7 +1373,7 @@ function Footer() {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10 mt-12">
           <div className="col-span-2 md:col-span-1">
-            <DealinsecLogo size="md" withText />
+            <DealinsecLogo size="md" withText tagline />
             <p className="text-xs text-neutral-500 mt-4 leading-relaxed max-w-[240px]">
               Prospects, pipeline, quotations, agreements, invoices and payment tracking for small agencies and consultants, in 50 currencies.
             </p>

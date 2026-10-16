@@ -23,7 +23,7 @@ import { Settings, LogOut, Sparkles, Crown, Users, Zap } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { DealinsecLogo } from "@/components/dealinsec-logo";
+import { DealinsecMark, DealinsecWordmark } from "@/components/dealinsec-logo";
 import { NotificationBell } from "@/components/notification-bell";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -210,11 +210,9 @@ export function DesktopTopNav() {
             className="flex shrink-0 items-center gap-2.5 pr-4 xl:pr-6 outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60 focus-visible:rounded-md"
           >
             <span className="dis-topnav-logo rounded-[11px]">
-              <DealinsecLogo size="sm" withText={false} />
+              <DealinsecMark size={26} />
             </span>
-            <span className="hidden xl:inline text-[17px] font-bold tracking-tight leading-none">
-              Deal<span className="text-emerald-300">insec</span>
-            </span>
+            <DealinsecWordmark size={18} tone="dark" className="hidden xl:inline" />
           </Link>
           <span aria-hidden="true" className="self-center h-8 w-px mr-1 bg-gradient-to-b from-white/0 via-white/20 to-white/0" />
 
