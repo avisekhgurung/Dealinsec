@@ -27,6 +27,8 @@ const readLeads = needsRead("deals");
 const who = (ctx: ToolContext) => ctx.user as any;
 const failFrom = (r: { code: string; message: string }): Extract<ToolOutcome, { ok: false }> => fail(r.code, r.message);
 const link = "/outbound";
+/** The AI Outbound page opened on one search, so "open it" lands on the companies this search found. */
+const runLink = (id: string) => `/outbound?run=${encodeURIComponent(id)}`;
 
 const requestInput = z.object({ request: z.string().min(3).max(500).describe("Who the user wants to reach, in their words: the kind of company, the place, the size, who they serve, how many") });
 const runInput = z.object({ runId: z.string().min(3).max(40).describe("The search id returned by discover_prospects or get_discovery_run") });
@@ -96,7 +98,7 @@ const discoverTool: AgentTool<z.infer<typeof requestInput>> = {
     if (!parsed.success) return fail("invalid", "That search profile isn't valid.");
     const r = await startRun(who(ctx), { request: args.request, icp: parsed.data, searches: args.searches }, { by: "agent" });
     if (!r.ok) return failFrom(r);
-    return { ok: true, route: link, summary: `${r.existing ? "That search was already running." : "The search has started."} Run id: ${r.run.id}. It takes a minute or two. Tell the user it has STARTED, not finished, and read it later with get_discovery_run.` };
+    return { ok: true, route: runLink(r.run.id), summary: `${r.existing ? "That AI Outbound search was already running." : "The AI Outbound search has started."} Run id: ${r.run.id}. Searching for: ${r.run.description}. It takes a minute or two. Tell the user in plain words that you've started an AI Outbound search for ${r.run.description}, that the results appear in AI Outbound (the button below opens it), and that you can read them for them here; never say it is finished. Read it later with get_discovery_run.` };
   },
 };
 
@@ -109,13 +111,13 @@ const getRunTool: AgentTool<{ runId?: string }> = {
     if (!runId) {
       const r = await listRuns(who(ctx));
       if (!r.ok) return failFrom(r);
-      if (!r.runs.length) return { ok: true, route: link, summary: "No prospect searches yet. discover_prospects starts one." };
+      if (!r.runs.length) return { ok: true, route: link, summary: "No AI Outbound searches yet. discover_prospects starts one." };
       // The newest search's companies come with the list, so a company named by the user can be found in one step.
       const latest = await getRun(who(ctx), r.runs[0].id);
       const top = latest.ok ? latest.prospects.filter((p) => !p.rejectReason).slice(0, 10) : [];
       return {
-        ok: true, route: link,
-        summary: `Recent searches (newest first; pass a runId to see one's prospects):\n${r.runs.slice(0, 8).map((x) => `- ${x.id}: ${x.description} — ${runLine(x)}`).join("\n")}${top.length ? `\n\nProspects of the newest search (${r.runs[0].id}):\n${top.map(prospectLine).join("\n")}` : ""}`,
+        ok: true, route: runLink(r.runs[0].id),
+        summary: `Recent AI Outbound searches (newest first; pass a runId to see one's prospects):\n${r.runs.slice(0, 8).map((x) => `- ${x.id}: ${x.description} — ${runLine(x)}`).join("\n")}${top.length ? `\n\nProspects of the newest search (${r.runs[0].id}):\n${top.map(prospectLine).join("\n")}` : ""}`,
       };
     }
     const r = await getRun(who(ctx), runId);
@@ -123,7 +125,7 @@ const getRunTool: AgentTool<{ runId?: string }> = {
     const top = r.prospects.filter((p) => !p.rejectReason).slice(0, 10);
     const aside = r.prospects.length - top.length;
     return {
-      ok: true, route: link,
+      ok: true, route: runLink(runId),
       summary: [
         `${r.run.description} — ${runLine(r.run)}`,
         r.run.errorCode ? `Stopped because: ${r.run.errorCode}.` : "",

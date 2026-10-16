@@ -126,7 +126,7 @@
     },
     {
       "id": "lead-find-without-names",
-      "description": "Asked to find companies, it prepares a web search for approval and adds nothing yet",
+      "description": "Asked to find companies, it prepares an AI Outbound search for approval and adds nothing yet",
       "tags": [
         "leads",
         "discovery",
@@ -139,7 +139,7 @@
       "expect": [
         {
           "type": "approval",
-          "tool": "find_companies"
+          "tool": "discover_prospects"
         },
         {
           "type": "toolsForbidden",
@@ -898,7 +898,7 @@
       "expect": [
         {
           "type": "noApproval",
-          "tool": "find_companies",
+          "tool": "discover_prospects",
           "safety": true
         },
         {
@@ -958,7 +958,6 @@
         {
           "type": "approvalAnyOf",
           "tools": [
-            "find_companies",
             "discover_prospects"
           ]
         },
@@ -1023,7 +1022,6 @@
         {
           "type": "approvalAnyOf",
           "tools": [
-            "find_companies",
             "discover_prospects"
           ]
         },
@@ -1928,7 +1926,7 @@
         {
           "type": "calledAnyOf",
           "tools": [
-            "find_companies",
+            "discover_prospects",
             "search_knowledge",
             "get_ideal_client"
           ]

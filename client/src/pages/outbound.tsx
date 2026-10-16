@@ -7,7 +7,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { motion } from "framer-motion";
-import { AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, Loader2, Radar, Search, Square, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, Loader2, Radar, Search, Sparkles, Square, X } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { FlowSteps, flowState } from "@/components/outbound/flow-steps";
@@ -112,7 +112,10 @@ function RunPanel({ id, canEdit, onOpen }: { id: string; canEdit: boolean; onOpe
       <Card className="glass-card"><CardContent className="space-y-4 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Search</p>
+            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Search
+              {run.by === "agent" && <span className="inline-flex items-center gap-1 rounded-full border border-emerald-600/30 bg-emerald-600/10 px-1.5 py-0.5 normal-case tracking-normal text-emerald-800 dark:text-emerald-300" data-testid="run-by-agent"><Sparkles className="h-2.5 w-2.5" aria-hidden />Started from Agent</span>}
+            </p>
             <p className="break-words text-sm font-semibold">{run.description}</p>
             <p className={cn("mt-1 flex items-center gap-1.5 text-sm", running ? "" : stopped ? "font-medium text-amber-800 dark:text-amber-300" : "text-muted-foreground")} data-testid="run-status" aria-live="polite">
               {running ? <><Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />{RUN_STAGE_LABEL[run.stage] ?? "Working"}…</>
@@ -219,6 +222,9 @@ export default function OutboundPage() {
   const search = useSearch();
   const [location, navigate] = useLocation();
   const viewParam = new URLSearchParams(search).get("view");
+  // ?run=<id>: open that search (the agent's "Open in AI Outbound" link).
+  const runParam = new URLSearchParams(search).get("run");
+  useEffect(() => { if (runParam) setRunId(runParam); }, [runParam]);
   const view = viewParam === "prospects" || viewParam === "outreach" || viewParam === "inbox" ? viewParam : "searches";
   const setView = (v: "prospects" | "searches" | "outreach" | "inbox") => navigate(v === "searches" ? location : `${location}?view=${v}`, { replace: true });
   const runs = useQuery<{ runs: RunView[] }>({ queryKey: [OUTBOUND_RUNS_URL], retry: false, refetchInterval: (q) => (q.state.data?.runs.some((r) => r.status === "running") ? 5000 : false) });
@@ -268,7 +274,7 @@ export default function OutboundPage() {
         <div className="flex items-center justify-between gap-4 px-4 py-4 lg:mx-auto lg:max-w-[1600px] lg:px-8">
           <div className="min-w-0">
             <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight lg:text-2xl"><Radar className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />AI Outbound</h1>
-            <p className="mt-0.5 hidden text-sm text-muted-foreground lg:block">Who to contact, why now, who exactly, and what to say. Only what it can back with evidence.</p>
+            <p className="mt-0.5 hidden text-sm text-muted-foreground lg:block">Find and qualify new companies: who to contact, why now, and what to say. You can also ask Agent mode to run a search; it lands here.</p>
           </div>
           <NotificationBell className="lg:hidden" />
         </div>
@@ -328,6 +334,7 @@ export default function OutboundPage() {
                 {runs.data.runs.slice(0, 8).map((r) => (
                   <button key={r.id} role="tab" aria-selected={runId === r.id} onClick={() => setRunId(r.id)} className={cn("inline-flex max-w-[16rem] shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors", runId === r.id ? "border-emerald-600 bg-emerald-600 text-white" : "border-border bg-background hover:bg-muted")}>
                     {r.status === "running" && <Loader2 className="h-3 w-3 shrink-0 animate-spin" aria-label="Running" />}
+                    {r.by === "agent" && <Sparkles className="h-3 w-3 shrink-0" aria-label="Started from Agent" />}
                     <span className="truncate">{r.description}</span>
                   </button>
                 ))}

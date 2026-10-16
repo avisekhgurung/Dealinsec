@@ -92,13 +92,11 @@ Nothing in `loop.ts`, `policy.ts` or the tools changes for a new channel
 checks the runs are identical). `wiring.ts` supplies the real database, model
 and tools; tests inject fakes.
 
-## Finding companies (web search)
+## Finding companies (AI Outbound)
 
-`find_companies` (`tools/discovery.ts`, `services/discovery.ts`, `server/discovery/*`) searches the web through a
-`DiscoveryProvider` (LangSearch: free, no card; or Brave: paid). It uses a search allowance and sends text out, so it
-**always asks**, shows the exact words, enforces per-organization and whole-app caps, and refuses queries with personal
-details. Environment: `LANGSEARCH_API_KEY` or `BRAVE_SEARCH_API_KEY` (without either the feature is "not set up"),
-`DISCOVERY_PROVIDER` (optional: `langsearch` | `brave`), `DISCOVERY_DAILY_LIMIT` (default 10 per organization),
-`DISCOVERY_MONTHLY_LIMIT` (default 300 overall), `DISCOVERY_PICK_MODEL` (the model that reads results; default
-`deepseek-chat`, because a reasoning model returns nothing for this job), `LANGSEARCH_URL` / `BRAVE_SEARCH_URL` (tests). See
-`docs/ai-engineering/03-finding-companies.md`.
+The agent has ONE way to find new companies: `discover_prospects` (`tools/outbound.ts`), which starts the same AI
+Outbound search the `/outbound` page runs (`server/outbound/service.ts`), with `by: "agent"`. It always asks, runs in
+the background, creates no leads, and its result links to `/outbound?run=<id>`, where the search is marked "Started
+from Agent". The old quick web search (`find_companies`) was retired on 16 Oct 2026 because it gave thinner, unchecked
+results than AI Outbound for the same request. Search providers and their environment (`LANGSEARCH_API_KEY`,
+`BRAVE_SEARCH_API_KEY`, …) live in `server/discovery/*`; see `docs/ai-engineering/03-finding-companies.md`.

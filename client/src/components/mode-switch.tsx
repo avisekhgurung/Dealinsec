@@ -44,8 +44,8 @@ export function useModeSwitch() {
 }
 
 const OPTIONS: { value: Mode; label: string; Icon: typeof Sparkles; hint: string }[] = [
-  { value: "app", label: "Workspace", Icon: LayoutGrid, hint: "Every screen: pipeline, documents and money" },
-  { value: "agent", label: "Agent", Icon: Sparkles, hint: "One conversation: ask, and approve what it prepares" },
+  { value: "app", label: "Workspace", Icon: LayoutGrid, hint: "Every screen: AI Outbound, pipeline, documents and money" },
+  { value: "agent", label: "Agent", Icon: Sparkles, hint: "Ask in plain words: it runs AI Outbound, Leads and Deals for you" },
 ];
 
 /**

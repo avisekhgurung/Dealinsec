@@ -21,6 +21,8 @@ export interface RunView {
   id: string; status: "running" | "done" | "failed" | "cancelled"; stage: string; request: string; icp: Icp; description: string; quantity: number;
   counters: Partial<Counters>; costUsd: number; errorCode: string | null; createdAt: string; finishedAt: string | null;
   queries: { q: string; provider: string; done: boolean; ok?: boolean; results?: number }[];
+  /** "agent" when the search was started from Agent mode. Older servers omit it. */
+  by?: "user" | "agent";
 }
 export interface Evidence {
   id: number; kind: "fact" | "signal" | "decision_maker" | "opportunity"; type: string; label: string; value: string; status: string;

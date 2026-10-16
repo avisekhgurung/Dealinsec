@@ -67,7 +67,7 @@
     },
     {
       "id": "outbound-find-vs-quick-look",
-      "description": "A quick 'name a few' request still uses the lighter company search, not a full prospect run",
+      "description": "Even a quick 'name a few' request goes through the one company search, AI Outbound",
       "tags": [
         "outbound"
       ],
@@ -78,7 +78,6 @@
         {
           "type": "calledAnyOf",
           "tools": [
-            "find_companies",
             "discover_prospects"
           ]
         },

@@ -77,12 +77,15 @@ export interface RunView {
   id: string; status: string; stage: string; request: string; icp: Icp; description: string; quantity: number;
   counters: RunCountersExt; costUsd: number; errorCode: string | null; createdAt: string; finishedAt: string | null;
   queries: { q: string; provider: string; done: boolean; ok?: boolean; results?: number; error?: string }[];
+  /** Who started it: the person on the AI Outbound page, or the agent on their behalf (after their approval). */
+  by: "user" | "agent";
 }
 const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : null);
 export const runView = (r: ProspectRunRow): RunView => ({
   id: r.id, status: r.status, stage: r.stage, request: r.request, icp: r.icp as Icp, description: describeIcp(r.icp as Icp), quantity: r.quantity,
   counters: (r.counters ?? {}) as RunCountersExt, costUsd: Math.round(r.costMicroUsd / 100) / 10_000, errorCode: r.errorCode, createdAt: iso(r.createdAt)!, finishedAt: iso(r.finishedAt),
   queries: ((r.queries as QueryPlan[]) ?? []).map((q) => ({ q: q.q, provider: q.provider, done: q.done, ok: q.ok, results: q.results, error: q.error })),
+  by: r.createdBy === "agent" ? "agent" : "user",
 });
 
 const stable = (v: unknown): string => (Array.isArray(v) ? `[${v.map(stable).join(",")}]` : v && typeof v === "object" ? `{${Object.keys(v as object).sort().map((k) => `${k}:${stable((v as any)[k])}`).join(",")}}` : JSON.stringify(v));

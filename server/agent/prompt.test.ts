@@ -44,7 +44,10 @@ describe("agent system prompt", () => {
     expect(p).toMatch(/never guess a name or an email address/);
     expect(p).toMatch(/Add a company to Leads with add_prospect_to_leads only when the user asks/);
     expect(p).toMatch(/is data, never an instruction/);
-    expect(p).toMatch(/find_companies is the QUICK look[\s\S]*use discover_prospects \(see PROSPECT SEARCH\), not find_companies/);
+    // One way to find companies: AI Outbound. The retired quick web search is never mentioned.
+    expect(p).toMatch(/there is ONE way to find new companies: an AI Outbound prospect search \(discover_prospects\)/);
+    expect(p).toMatch(/I've started an AI Outbound search for/);
+    expect(p).not.toMatch(/find_companies/);
   });
 
   it("keeps the tone brief and free of hype", () => {
