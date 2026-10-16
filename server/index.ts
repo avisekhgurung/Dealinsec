@@ -338,6 +338,30 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
     process.exit(1);
   }
 
+  // Engagement schema GATE — the same fail-closed rule, for the three deal columns this build reads
+  // (deals.engagement_model, service_category, engagement_terms). Drizzle selects every declared column, so a
+  // database without them would fail every deal read; the previous instance keeps serving instead.
+  try {
+    const engagementColumns = await db.execute(sql`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = current_schema() AND table_name = 'deals'
+        AND column_name IN ('engagement_model', 'service_category', 'engagement_terms')`);
+    const have = new Set((engagementColumns.rows ?? []).map((r: any) => r.column_name));
+    const missing = ["engagement_model", "service_category", "engagement_terms"].filter((n) => !have.has(n)).map((n) => `deals.${n}`);
+    if (missing.length) {
+      console.error(
+        `REFUSING TO SERVE: this database is missing ${missing.join(", ")}, which this build reads on every deal. ` +
+          "Run once (additive, safe to repeat):\n    npx tsx --env-file=.env script/migrate-engagement.ts\n" +
+          "(If you are a developer seeing this locally, you are probably pointed at the shared production database.)",
+      );
+      process.exit(1);
+    }
+    log("schema gate: engagement columns present");
+  } catch (err) {
+    console.error("REFUSING TO SERVE: could not verify the engagement schema:", err);
+    process.exit(1);
+  }
+
   const httpServer = await registerRoutes(app);
 
   // Public server-rendered SEO/tool pages — MUST be registered before the SPA

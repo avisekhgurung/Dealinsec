@@ -4,6 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { dealTypeOptions as TAXONOMY_DEAL_TYPES } from "./dealTypeTaxonomy";
 import { AUDIENCES, brandTermsSchema, type BrandTerms } from "./audience";
+import type { EngagementTerms } from "./engagement";
 
 // Legacy enum options — kept for backward compat with existing UI helpers.
 // New deals can store any string here (validated client-side against taxonomy).
@@ -636,6 +637,12 @@ export const deals = pgTable("deals", {
   // collaborations. Null for every deal that does not state any.
   brandTerms: jsonb("brand_terms").$type<BrandTerms>(),
   status: text("status").notNull().default("Pending"),
+  // How the deal is sold and what work it is (shared/engagement.ts; script/migrate-engagement.ts). All three are
+  // optional and NULL on every deal created before them: never backfilled or guessed. Independent of dealType
+  // (deliverables and agreement wording) and of status.
+  engagementModel: varchar("engagement_model", { length: 32 }),
+  serviceCategory: varchar("service_category", { length: 48 }),
+  engagementTerms: jsonb("engagement_terms").$type<EngagementTerms>(),
 });
 
 export const deliverableModeOptions = ["all", "any_one"] as const;
@@ -784,6 +791,10 @@ export const insertDealSchema = createInsertSchema(deals)
     // Re-stated so the bounds are enforced: drizzle-zod infers an open json
     // schema from a jsonb column.
     brandTerms: brandTermsSchema.nullable().optional(),
+    // Shapes only here; the API runs validateEngagement (shared/engagement.ts) on the three together.
+    engagementModel: z.string().max(32).nullable().optional(),
+    serviceCategory: z.string().max(48).nullable().optional(),
+    engagementTerms: z.record(z.unknown()).nullable().optional(),
   });
 export type InsertDeal = z.infer<typeof insertDealSchema>;
 export type Deal = typeof deals.$inferSelect;

@@ -13,6 +13,8 @@ import { AnimatedStatusBadge } from "@/components/animated-status-badge";
 import { DetailSkeleton, DetailUnavailable } from "@/components/document/detail-states";
 import { PlatformIcon } from "@/components/platform-icon";
 import { dealTypeMeta } from "@shared/dealTypeTaxonomy";
+import { engagementLabel, engagementModelMeta, serviceLabel } from "@shared/engagement";
+import { engagementDetailRows } from "@/components/deals/engagement-fields";
 import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useMoney } from "@/hooks/use-locale";
@@ -292,7 +294,7 @@ export default function DealDetailsPage() {
               <div className="flex flex-col items-end gap-1.5 shrink-0">
                 <AnimatedStatusBadge status={deal.status} />
                 <p className="text-xl lg:text-2xl font-bold tabular-nums" data-testid="text-deal-amount">
-                  <span className="sr-only">Deal value: </span>{fmt.money(deal.dealAmountMinor)}
+                  <span className="sr-only">{engagementModelMeta(deal.engagementModel)?.valueLabel ?? "Deal value"}: </span>{fmt.money(deal.dealAmountMinor)}
                 </p>
               </div>
             </div>
@@ -300,7 +302,9 @@ export default function DealDetailsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
               {([
                 { label: "Duration", icon: Calendar, value: `${formatDate(deal.startDate)} – ${formatDate(deal.endDate)}` },
-                { label: "Deal Type", icon: Briefcase, value: `${(dealTypeMeta as any)[(deal as any).dealType]?.emoji ?? "·"} ${(deal as any).dealType || "Custom"}` },
+                deal.engagementModel
+                  ? { label: "Engagement", icon: Briefcase, value: [engagementLabel(deal.engagementModel, deal.engagementTerms), serviceLabel(deal.serviceCategory)].filter(Boolean).join(" · ") }
+                  : { label: "Deal Type", icon: Briefcase, value: `${(dealTypeMeta as any)[(deal as any).dealType]?.emoji ?? "·"} ${(deal as any).dealType || "Custom"}${deal.serviceCategory ? ` · ${serviceLabel(deal.serviceCategory)}` : ""}` },
                 { label: "Deliverables", icon: ListChecks, value: `${deal.deliverables.length} item${deal.deliverables.length !== 1 ? "s" : ""} · ${(deal as any).deliverableMode === "any_one" ? "any one" : "all required"}` },
               ] as const).map((f) => (
                 <div key={f.label} className="rounded-xl border border-border/60 bg-card/40 px-3.5 py-3 min-w-0">
@@ -678,12 +682,30 @@ export default function DealDetailsPage() {
                     </span>
                   </dd>
                 </div>
+                {deal.engagementModel && (
+                  <div className="flex items-center justify-between gap-3" data-testid="row-engagement-model">
+                    <dt className="text-muted-foreground">Engagement</dt>
+                    <dd className="font-medium text-right">{engagementLabel(deal.engagementModel, deal.engagementTerms)}</dd>
+                  </div>
+                )}
+                {deal.serviceCategory && (
+                  <div className="flex items-center justify-between gap-3" data-testid="row-service-category">
+                    <dt className="text-muted-foreground">Service</dt>
+                    <dd className="font-medium text-right">{serviceLabel(deal.serviceCategory)}</dd>
+                  </div>
+                )}
+                {engagementDetailRows(deal.engagementModel, deal.engagementTerms, fmt.money).map((r, i) => (
+                  <div key={`${r.label}-${i}`} className="flex items-start justify-between gap-3">
+                    <dt className="text-muted-foreground shrink-0">{r.label}</dt>
+                    <dd className="font-medium text-right break-words min-w-0">{r.value}</dd>
+                  </div>
+                ))}
                 <div className="flex items-center justify-between gap-3">
                   <dt className="text-muted-foreground">Start Date</dt>
                   <dd className="font-medium">{formatDate(deal.startDate)}</dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">End Date</dt>
+                  <dt className="text-muted-foreground">{engagementModelMeta(deal.engagementModel)?.kind === "recurring" ? "End of first term" : "End Date"}</dt>
                   <dd className="font-medium">{formatDate(deal.endDate)}</dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">

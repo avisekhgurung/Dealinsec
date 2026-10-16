@@ -1,3 +1,4 @@
+import { dealTypeForService, isEngagementModel, validateEngagement } from "@shared/engagement";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -749,6 +750,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.errors });
       }
+      // How it's sold and what work it is (optional): checked together, normalised, before any credit is spent.
+      const eng = validateEngagement({ ...parsed.data, dealAmountMinor: parsed.data.dealAmountMinor });
+      if (!eng.ok) return res.status(400).json({ error: eng.message, field: eng.field });
+      const engagement = { engagementModel: eng.engagementModel, serviceCategory: eng.serviceCategory, engagementTerms: eng.engagementTerms };
+      // A caller that names a service but no deal type gets the service's domain (deliverables and agreement
+      // wording), as the form does. A type the caller sent is never overridden.
+      if (req.body.dealType === undefined && eng.serviceCategory) parsed.data.dealType = dealTypeForService(eng.serviceCategory);
 
       // The ORG's plan and credit pool live on its OWNER's user row. Free
       // plan: 1 Deal Credit = this deal + its quotation; Pro (paid OR
@@ -781,6 +789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const deal = await storage.createDeal({
           ...parsed.data,
+          ...engagement,
           brandTerms: brandTermsForDeal(parsed.data.dealType, parsed.data.brandTerms),
         });
         logOrgActivity(req.user, "created", "deal", deal.id, `Deal: ${deal.dealTitle || deal.brandName}`);
@@ -838,6 +847,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Bounded and blank-stripped; null clears it. Judged by the deal's own
       // type, which this route does not change.
       if (brandTerms !== undefined) updates.brandTerms = brandTermsForDeal(deal.dealType, brandTerms);
+      // Engagement: any of the three may change; they're checked together against the deal as it will be. The
+      // deal's dealType (deliverables and agreement wording) is not changed by a new service.
+      const { engagementModel, serviceCategory, engagementTerms } = req.body;
+      const amountChanged = updates.dealAmountMinor !== undefined && isEngagementModel(deal.engagementModel);
+      if (engagementModel !== undefined || serviceCategory !== undefined || engagementTerms !== undefined || amountChanged) {
+        const eng = validateEngagement({
+          engagementModel: engagementModel !== undefined ? engagementModel : deal.engagementModel,
+          serviceCategory: serviceCategory !== undefined ? serviceCategory : deal.serviceCategory,
+          engagementTerms: engagementTerms !== undefined ? engagementTerms : deal.engagementTerms,
+          dealAmountMinor: updates.dealAmountMinor ?? deal.dealAmountMinor,
+        });
+        if (!eng.ok) return res.status(400).json({ error: eng.message, field: eng.field });
+        updates.engagementModel = eng.engagementModel;
+        updates.serviceCategory = eng.serviceCategory;
+        updates.engagementTerms = eng.engagementTerms;
+      }
 
       const updated = await storage.updateDeal(dealId, updates);
 

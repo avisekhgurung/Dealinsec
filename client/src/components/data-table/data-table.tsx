@@ -515,7 +515,7 @@ function FacetedFilterMenu<TData>({ table, filter }: { table: any; filter: Facet
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-52 p-1" align="start">
+      <PopoverContent className="w-60 max-h-80 overflow-y-auto p-1" align="start">
         {filter.options.map((opt) => {
           const isSel = selected.has(opt.value);
           const count = facets?.get(opt.value);

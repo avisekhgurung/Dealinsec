@@ -41,6 +41,9 @@ import { TaxonomyCombobox } from "@/components/taxonomy-combobox";
 import { audienceForDealType, normalizeBrandTerms } from "@shared/audience";
 import { BrandTermsFields, emptyBrandTermsDraft, type BrandTermsDraft } from "@/components/brand-terms-fields";
 import { MoneyCurrencyPendingError, useMoney } from "@/hooks/use-locale";
+import { parseApiError } from "@/lib/api-error";
+import { EngagementFields, ServiceSelect, draftForPick, draftToTerms, termsToDraft, type EngagementDraft } from "@/components/deals/engagement-fields";
+import { ENGAGEMENT_MODELS, engagementModelMeta, isEngagementModel, suggestedValueMinor, validateEngagement, type EngagementModel } from "@shared/engagement";
 
 const formSchema = z.object({
   brandName: z.string().min(1, "Client / brand name is required"),
@@ -135,6 +138,25 @@ export default function EditDealPage() {
   const brandWording = audienceForDealType(dealType) === "brand_collaboration";
   const [brandTermsDraft, setBrandTermsDraft] = useState<BrandTermsDraft>(() => emptyBrandTermsDraft());
 
+  // The engagement model, service and details, seeded from the deal. Only what
+  // the person touches is sent, so a value this version doesn't recognise is
+  // kept exactly as stored rather than cleared or guessed at.
+  const [engModel, setEngModel] = useState<string | null>(null);
+  const [engService, setEngService] = useState<string | null>(null);
+  const [draft, setDraft] = useState<EngagementDraft>({});
+  const [engTouched, setEngTouched] = useState({ model: false, service: false });
+  const [engError, setEngError] = useState<{ field: string; message: string } | null>(null);
+  const [draftDirty, setDraftDirty] = useState(false);
+  const modelMeta = engagementModelMeta(engModel);
+  const unknownModel = !!engModel && !modelMeta;
+  const changeModel = (v: string) => {
+    const next = v === "none" ? null : (v as EngagementModel);
+    if (next !== engModel) setDraft(draftForPick(next));
+    setEngModel(next);
+    setEngTouched((t) => ({ ...t, model: true }));
+    setEngError(null);
+  };
+
   const handleDealTypeChange = (next: DealType) => {
     form.setValue("dealType", next);
     const current = form.getValues("deliverables");
@@ -143,6 +165,13 @@ export default function EditDealPage() {
       current.map((d) => ({ ...d, platform: "", contentType: "" })),
     );
   };
+
+  const [watchStart, watchEnd, watchAmount] = form.watch(["startDate", "endDate", "dealAmount"]);
+  let suggestedMinor: number | null = null;
+  try {
+    suggestedMinor = modelMeta && fmt.ready ? suggestedValueMinor(modelMeta.id, draftToTerms(draft, fmt.minor), { start: watchStart, end: watchEnd }) : null;
+  } catch { suggestedMinor = null; }
+  if (suggestedMinor !== null && suggestedMinor <= 0) suggestedMinor = null;
 
   // Itemizable custom terms — initialized from deal on load
   const [customTermsList, setCustomTermsList] = useState<string[]>([""]);
@@ -186,6 +215,11 @@ export default function EditDealPage() {
       const parts = String(rawCustomTerms).split(/\n+/).map(s => s.trim()).filter(Boolean);
       setCustomTermsList(parts.length > 0 ? parts : [""]);
       setBrandTermsDraft(emptyBrandTermsDraft((deal as any).brandTerms));
+      setEngModel(deal.engagementModel ?? null);
+      setEngService(deal.serviceCategory ?? null);
+      setDraft(isEngagementModel(deal.engagementModel) ? termsToDraft(deal.engagementTerms, fmt.major) : {});
+      setEngTouched({ model: false, service: false });
+      setDraftDirty(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deal, fmt.ready, seededDealId]);
@@ -196,11 +230,12 @@ export default function EditDealPage() {
   });
 
   const updateDeal = useMutation({
-    mutationFn: async (data: FormData) => {
+    mutationFn: async ({ data, eng }: { data: FormData; eng: Record<string, unknown> }) => {
       // The one place major units become minor. `dealAmount` never leaves.
       const { dealAmount, ...rest } = data;
       const res = await apiRequest("PATCH", `/api/deals/${params.id}`, {
         ...rest,
+        ...eng,
         dealAmountMinor: fmt.minor(dealAmount),
         currency: fmt.currency,
         // Sent only for a brand collaboration; null clears every term.
@@ -218,6 +253,12 @@ export default function EditDealPage() {
       setLocation(`/deals/${params.id}`);
     },
     onError: (err) => {
+      const parsed = parseApiError(err);
+      if (parsed.status === 400 && parsed.field && parsed.error) {
+        setEngError({ field: parsed.field, message: parsed.error });
+        toast({ title: "Check the deal details", description: parsed.error, variant: "destructive" });
+        return;
+      }
       toast({
         title: "Error",
         description: err instanceof MoneyCurrencyPendingError ? err.message : "Failed to update deal. Please try again.",
@@ -239,7 +280,27 @@ export default function EditDealPage() {
       form.setError("dealAmount", { message: "Deal amount must be positive" });
       return;
     }
-    updateDeal.mutate(data);
+    // Checked as the server will check it: the deal as it will be saved.
+    const detailsEdited = engTouched.model || (isEngagementModel(engModel) && draftDirty);
+    const terms = isEngagementModel(engModel) ? draftToTerms(draft, fmt.minor) : null;
+    const eng: Record<string, unknown> = {};
+    if (detailsEdited) { eng.engagementModel = engModel; eng.engagementTerms = terms; }
+    if (engTouched.service) eng.serviceCategory = engService;
+    if (detailsEdited || engTouched.service || isEngagementModel(deal?.engagementModel)) {
+      const checked = validateEngagement({
+        engagementModel: engModel,
+        serviceCategory: engService,
+        engagementTerms: detailsEdited ? terms : deal?.engagementTerms,
+        dealAmountMinor: fmt.minor(data.dealAmount),
+      });
+      if (!checked.ok) {
+        setEngError({ field: checked.field, message: checked.message });
+        document.getElementById("engagement-details")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+    }
+    setEngError(null);
+    updateDeal.mutate({ data, eng });
   };
 
   const addDeliverable = () => {
@@ -287,13 +348,53 @@ export default function EditDealPage() {
           </div>
         )}
 
+        <section className="glass-card rounded-xl p-5 sm:p-6 space-y-4" id="engagement-details">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-primary mb-1">Engagement</div>
+            <h2 className="text-base font-semibold text-foreground">How it's billed and what it's for</h2>
+          </div>
+          {unknownModel && (
+            <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300" data-testid="unknown-engagement-model">
+              This deal's engagement model ({engModel}) isn't one this version recognises. It's kept as is unless you choose another.
+            </p>
+          )}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="engagement-model" className="text-xs font-medium">Engagement model</Label>
+              <Select value={unknownModel ? "__unknown" : engModel ?? "none"} onValueChange={changeModel}>
+                <SelectTrigger id="engagement-model" className="h-10" data-testid="select-engagement-model"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {unknownModel && <SelectItem value="__unknown" disabled>Unrecognised ({engModel})</SelectItem>}
+                  <SelectItem value="none">No engagement model</SelectItem>
+                  {ENGAGEMENT_MODELS.map((m) => <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            {!isBrandDeal && (
+              <div className="space-y-1.5">
+                <Label htmlFor="service-category" className="text-xs font-medium">Service (optional)</Label>
+                <ServiceSelect id="service-category" value={engService} onChange={(v) => { setEngService(v); setEngTouched((t) => ({ ...t, service: true })); setEngError(null); }} />
+              </div>
+            )}
+          </div>
+          {modelMeta && (
+            <div className="border-t border-border/60 pt-4">
+              <EngagementFields model={modelMeta.id} draft={draft} onChange={(d) => { setDraft(d); setDraftDirty(true); if (engError) setEngError(null); }} currency={fmt.currency ?? ""} error={engError} />
+            </div>
+          )}
+          {engError && !modelMeta && <p className="text-xs font-medium text-destructive" role="alert">{engError.message}</p>}
+          {engTouched.service && !isBrandDeal && (
+            <p className="text-[11px] text-muted-foreground">A new service is for your reports and filters. The deliverable categories below stay as they are.</p>
+          )}
+        </section>
+
         <section className="glass-card rounded-xl p-5 sm:p-6 space-y-5">
           <div className="flex items-baseline justify-between gap-3">
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-primary mb-1">
                 Deal Type
               </div>
-              <h2 className="text-base font-semibold text-foreground">Engagement category</h2>
+              <h2 className="text-base font-semibold text-foreground">Work category</h2>
             </div>
             <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
               Changing resets deliverables
@@ -421,7 +522,7 @@ export default function EditDealPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dealAmount">Deal Amount ({fmt.symbol})</Label>
+              <Label htmlFor="dealAmount">{modelMeta ? modelMeta.valueLabel : "Deal Amount"} ({fmt.symbol})</Label>
               <Input
                 id="dealAmount"
                 type="number"
@@ -434,10 +535,22 @@ export default function EditDealPage() {
                 data-testid="input-deal-amount"
                 {...form.register("dealAmount")}
               />
-              {form.formState.errors.dealAmount && (
+              {form.formState.errors.dealAmount ? (
                 <p className="text-xs text-destructive">
                   {form.formState.errors.dealAmount.message}
                 </p>
+              ) : modelMeta ? (
+                <p className="text-[11px] text-muted-foreground">{modelMeta.valueHint}</p>
+              ) : null}
+              {suggestedMinor !== null && fmt.ready && fmt.minor(Number(watchAmount) || 0) !== suggestedMinor && (
+                <button
+                  type="button"
+                  className="text-xs font-medium text-primary hover:underline"
+                  onClick={() => form.setValue("dealAmount", fmt.major(suggestedMinor), { shouldValidate: true, shouldDirty: true })}
+                  data-testid="button-use-suggested-value"
+                >
+                  Use {fmt.money(suggestedMinor)} from the details above
+                </button>
               )}
             </div>
 
@@ -459,7 +572,7 @@ export default function EditDealPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="endDate">End Date</Label>
+                <Label htmlFor="endDate">{modelMeta?.kind === "recurring" ? "End of first term" : "End Date"}</Label>
                 <Input
                   id="endDate"
                   type="date"

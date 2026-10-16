@@ -24,7 +24,7 @@ import { parseApiError, isUpgradeError } from "@/lib/api-error";
 import { PlatformIcon } from "@/components/platform-icon";
 import { TaxonomyCombobox } from "@/components/taxonomy-combobox";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Plus, Trash2, Loader2, FileText, ChevronRight, Pencil } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, FileText, Pencil } from "lucide-react";
 import {
   insertDealSchema,
   frequencyOptions,
@@ -39,15 +39,20 @@ import {
   type DealType,
   type BrandDealType,
 } from "@shared/dealTypeTaxonomy";
-import { audienceForDealType, dealAudienceLabels, normalizeBrandTerms, pickerDealTypes, type BrandTerms } from "@shared/audience";
+import { audienceForDealType, dealAudienceLabels, normalizeBrandTerms, type BrandTerms } from "@shared/audience";
 import { useAudience } from "@/hooks/use-audience";
 import { BrandTermsFields, emptyBrandTermsDraft, type BrandTermsDraft } from "@/components/brand-terms-fields";
 import { trackEvent } from "@/lib/analytics";
 import { DEAL_PREFILL_KEY } from "@/lib/deal-prefill";
 import { MoneyCurrencyPendingError, useMoney } from "@/hooks/use-locale";
+import { EngagementFields, EngagementModelPicker, ServiceSelect, draftForPick, draftToTerms, type EngagementDraft } from "@/components/deals/engagement-fields";
+import {
+  dealTypeForService, engagementModelMeta, isEngagementModel, isServiceCategory, suggestDealTitle, suggestedValueMinor, validateEngagement,
+  type DealPreset, type EngagementModel,
+} from "@shared/engagement";
 
 // Every type the form can hold. The client-work list is the picker's default;
-// Brand Collaboration is offered first to brand accounts (see pickerDealTypes).
+// Brand Collaboration is offered first to brand accounts (the picker's extra card).
 type PickerType = DealType | BrandDealType;
 const PICKABLE = [...brandDealTypeOptions, ...dealTypeOptions] as const;
 const isPickable = (t: string | null | undefined): t is PickerType =>
@@ -90,13 +95,6 @@ const TINT_CHIP: Record<string, string> = {
   amber: "bg-amber-500/10 border-amber-500/20",
   slate: "bg-slate-500/10 border-slate-500/20",
 };
-const TINT_HOVER: Record<string, string> = {
-  emerald: "hover:border-emerald-400/60",
-  teal: "hover:border-teal-400/60",
-  indigo: "hover:border-indigo-400/60",
-  amber: "hover:border-amber-400/60",
-  slate: "hover:border-slate-400/60",
-};
 
 // ?type=Development deep-links straight to the form with the type chosen —
 // used by vertical landing pages and the Copilot.
@@ -113,12 +111,30 @@ function initialTypeFromUrl(): PickerType | null {
 // every deal. The last-used type is remembered per device and the picker
 // is skipped on the next deal — the form banner's "Change" button is the
 // always-one-tap-away escape, so this never locks anyone in.
-const DEAL_TYPE_MEMORY_KEY = "dis_last_deal_type";
+const DEAL_TYPE_MEMORY_KEY = "dis_last_engagement";
 
-function rememberedDealType(): PickerType | null {
+// The engagement model (and service) is what's remembered now. Only a valid
+// model id is trusted; anything else shows the picker again.
+type Engagement = { model: EngagementModel | null; service: string | null };
+function rememberedEngagement(): Engagement | null {
   try {
-    const t = localStorage.getItem(DEAL_TYPE_MEMORY_KEY);
-    return isPickable(t) ? t : null;
+    const raw = JSON.parse(localStorage.getItem(DEAL_TYPE_MEMORY_KEY) ?? "null");
+    if (!raw || typeof raw !== "object" || !isEngagementModel(raw.model)) return null;
+    return { model: raw.model, service: isServiceCategory(raw.service) ? raw.service : null };
+  } catch {
+    return null;
+  }
+}
+function rememberEngagement(e: Engagement) {
+  try { localStorage.setItem(DEAL_TYPE_MEMORY_KEY, JSON.stringify(e)); } catch {}
+}
+
+// ?model=retainer&service=seo deep-links to the form with the engagement chosen.
+function initialEngagementFromUrl(): Engagement | null {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    const model = q.get("model"), service = q.get("service");
+    return isEngagementModel(model) ? { model, service: isServiceCategory(service) ? service : null } : null;
   } catch {
     return null;
   }
@@ -161,13 +177,21 @@ export default function CreateDealPage() {
     trackEvent("deal_started", { source: prefill ? "draft" : "form" });
   }, []);
   const prefillType = isPickable(prefill?.dealType) ? prefill.dealType : null;
+  // A legacy ?type= (or a Copilot draft) names the domain directly and goes
+  // straight to the form with no engagement model: nothing is guessed for it.
   const [urlType] = useState<PickerType | null>(() => prefillType ?? initialTypeFromUrl());
-  const [memoryType] = useState<PickerType | null>(() => (urlType ? null : rememberedDealType()));
+  const [urlEngagement] = useState<Engagement | null>(() => (urlType ? null : initialEngagementFromUrl()));
+  const [memory] = useState<Engagement | null>(() => (urlType || urlEngagement ? null : rememberedEngagement()));
   const account = useAudience();
-  const initialType = urlType ?? memoryType;
+  const startEngagement = urlEngagement ?? memory;
+  const initialType: PickerType | null = urlType ?? (startEngagement ? dealTypeForService(startEngagement.service) : null);
   const [step, setStep] = useState<"type" | "form">(initialType ? "form" : "type");
-  // True while the form shows a type the user didn't pick this visit.
-  const [fromMemory, setFromMemory] = useState(!!memoryType);
+  // True while the form shows a model the user didn't pick this visit.
+  const [fromMemory, setFromMemory] = useState(!!memory);
+  const [engagement, setEngagement] = useState<Engagement>(startEngagement ?? { model: null, service: null });
+  const [draft, setDraft] = useState<EngagementDraft>(() => draftForPick(startEngagement?.model ?? null));
+  const [engError, setEngError] = useState<{ field: string; message: string } | null>(null);
+  const modelMeta = engagementModelMeta(engagement.model);
 
   const { data: brands = [] } = useQuery<BrandOption[]>({
     queryKey: ["/api/brands"],
@@ -224,12 +248,16 @@ export default function CreateDealPage() {
   });
 
   const createDeal = useMutation({
-    mutationFn: async (data: FormData) => {
+    mutationFn: async ({ data, eng }: { data: FormData; eng: Pick<CheckedEngagement, "engagementModel" | "serviceCategory" | "engagementTerms"> }) => {
       // The one place major units become minor. `dealAmount` never leaves.
       const { dealAmount, ...rest } = data;
       const res = await apiRequest("POST", "/api/deals", {
         ...rest,
         dealAmountMinor: fmt.minor(dealAmount),
+        // How it's billed and what it's for. The server validates these again.
+        engagementModel: eng.engagementModel,
+        serviceCategory: eng.serviceCategory,
+        engagementTerms: eng.engagementTerms,
         // Only a brand collaboration carries these; the server stores nothing
         // for any other type and drops blank fields either way.
         brandTerms: isBrandDeal ? normalizeBrandTerms(brandTermsDraft) : null,
@@ -244,8 +272,10 @@ export default function CreateDealPage() {
       // create_deal is the long-standing name (GA key event); deal_created is
       // the same moment under the name the audience reports use.
       const dealAudience = audienceForDealType(deal?.dealType);
-      trackEvent("create_deal", { deal_type: deal?.dealType, audience: dealAudience });
-      trackEvent("deal_created", { deal_type: deal?.dealType, audience: dealAudience });
+      // Ids only (never free text): the model and service the deal was made with.
+      const kind = { engagement_model: deal?.engagementModel ?? "none", service_category: deal?.serviceCategory ?? "none" };
+      trackEvent("create_deal", { deal_type: deal?.dealType, audience: dealAudience, ...kind });
+      trackEvent("deal_created", { deal_type: deal?.dealType, audience: dealAudience, ...kind });
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
       toast({
         title: "Deal created",
@@ -265,6 +295,12 @@ export default function CreateDealPage() {
         return;
       }
       const parsed = parseApiError(err);
+      // The server refused the engagement details: show it on the field.
+      if (parsed.status === 400 && parsed.field && parsed.error) {
+        setEngError({ field: parsed.field, message: parsed.error });
+        toast({ title: "Check the deal details", description: parsed.error, variant: "destructive" });
+        return;
+      }
       if (isUpgradeError(parsed)) {
         // Out of monthly Deal Credits — offer Pro.
         openUpgradeModal({ feature: "deals" });
@@ -295,7 +331,15 @@ export default function CreateDealPage() {
       form.setError("dealAmount", { message: "Deal amount must be positive" });
       return;
     }
-    createDeal.mutate(data);
+    // The same rules the server applies, so a refusal shows on the field now.
+    const checked = checkEngagement(fmt.minor(data.dealAmount));
+    if (!checked.ok) {
+      setEngError({ field: checked.field, message: checked.message });
+      document.getElementById("engagement-details")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    setEngError(null);
+    createDeal.mutate({ data, eng: checked });
   };
 
   const addDeliverable = () => {
@@ -323,14 +367,57 @@ export default function CreateDealPage() {
 
   // Picker → form. Only reset taxonomy fields when the type actually changed
   // (returning via "Change" and re-picking the same type keeps filled rows).
-  // Every explicit pick is remembered so the NEXT deal skips the picker.
   const pickType = (next: PickerType) => {
     if (next !== form.getValues("dealType")) handleDealTypeChange(next);
-    try { localStorage.setItem(DEAL_TYPE_MEMORY_KEY, next); } catch {}
     setFromMemory(false);
     setStep("form");
     window.scrollTo({ top: 0 });
   };
+
+  // A model (or one of the named deal types) picked. The service decides the
+  // domain — deliverable categories and agreement wording — and with no
+  // service it's Custom. Every explicit pick is remembered for the next deal.
+  // Re-picking the same model keeps what was typed.
+  const pickModel = (model: EngagementModel, preset?: DealPreset) => {
+    const service = preset ? preset.service ?? null : engagement.service;
+    if (model !== engagement.model || preset) setDraft(draftForPick(model, preset));
+    setEngagement({ model, service });
+    setEngError(null);
+    rememberEngagement({ model, service });
+    pickType(dealTypeForService(service));
+  };
+  const pickQuick = () => {
+    setEngagement({ model: null, service: null });
+    setDraft({});
+    setEngError(null);
+    pickType("Custom");
+  };
+  const changeService = (service: string | null) => {
+    setEngagement((e) => ({ ...e, service }));
+    if (engagement.model) rememberEngagement({ model: engagement.model, service });
+    // A brand collaboration keeps its own type; a client deal follows its service.
+    if (!isBrandDeal) {
+      const next = dealTypeForService(service);
+      if (next !== form.getValues("dealType")) handleDealTypeChange(next);
+    }
+  };
+
+  // The engagement as it would be saved, checked by the shared rules.
+  type CheckedEngagement = Extract<ReturnType<typeof validateEngagement>, { ok: true }>;
+  const toTerms = () => (engagement.model && fmt.ready ? draftToTerms(draft, fmt.minor) : null);
+  const checkEngagement = (dealAmountMinor: number) =>
+    validateEngagement({ engagementModel: engagement.model, serviceCategory: engagement.service, engagementTerms: toTerms(), dealAmountMinor });
+
+  // Offered, never applied: a value the details imply, and a deal name.
+  const [watchStart, watchEnd, watchClient, watchTitle] = form.watch(["startDate", "endDate", "brandName", "dealTitle"]);
+  let suggestedMinor: number | null = null;
+  try { suggestedMinor = suggestedValueMinor(engagement.model, toTerms(), { start: watchStart, end: watchEnd }); } catch { suggestedMinor = null; }
+  const watchAmount = form.watch("dealAmount");
+  const suggestionDiffers = suggestedMinor !== null && suggestedMinor > 0 && (!fmt.ready || fmt.minor(Number(watchAmount) || 0) !== suggestedMinor);
+  const titleSuggestion = !watchTitle?.trim() && watchClient?.trim() && !isBrandDeal
+    ? suggestDealTitle(watchClient, engagement.model, engagement.service, toTerms())
+    : null;
+  const recurringKind = modelMeta?.kind === "recurring";
 
   const L = getDeliverableLabels(dealType);
 
@@ -377,7 +464,7 @@ export default function CreateDealPage() {
               transition={{ delay: 0.05 }}
               className="text-2xl lg:text-3xl font-bold tracking-tight text-foreground"
             >
-              What kind of deal is this?
+              How is this deal billed?
             </motion.h2>
             <motion.p
               initial={{ opacity: 0, y: 10 }}
@@ -385,58 +472,21 @@ export default function CreateDealPage() {
               transition={{ delay: 0.1 }}
               className="text-sm lg:text-base text-muted-foreground mt-2 max-w-md mx-auto"
             >
-              This tailors your deliverables, agreement wording and documents.
+              Pick the engagement model, or search for the kind of work. You can add the service next.
             </motion.p>
           </div>
 
-          <motion.div
-            initial="hidden"
-            animate="show"
-            variants={{ hidden: {}, show: { transition: { staggerChildren: 0.045 } } }}
-            className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4"
-          >
-            {(pickerDealTypes(account.audience) as readonly PickerType[]).map((dt, _i, all) => {
-              const meta = dealTypeMeta[dt];
-              // 7 types: Custom (last) spans two columns so both the 2-col and
-              // 4-col grids end on a full row instead of a lone gap. With the
-              // brand type there are 8, which already fill the rows.
-              const span = dt === "Custom" && all.length % 2 === 1 ? "col-span-2" : "";
-              return (
-                <motion.button
-                  key={dt}
-                  type="button"
-                  variants={{ hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0 } }}
-                  whileHover={{ y: -4 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => pickType(dt)}
-                  className={`group relative rounded-2xl border border-input/60 bg-card/80 p-4 lg:p-5 text-left shadow-sm hover:shadow-lg transition-shadow ${span} ${TINT_HOVER[meta.tint] ?? "hover:border-primary/40"}`}
-                  data-testid={`select-deal-type-${dt}`}
-                >
-                  <div
-                    className={`w-12 h-12 lg:w-14 lg:h-14 rounded-2xl border flex items-center justify-center text-2xl lg:text-[28px] mb-3 transition-transform group-hover:scale-105 ${TINT_CHIP[meta.tint] ?? "bg-primary/10 border-primary/20"}`}
-                  >
-                    {meta.emoji}
-                  </div>
-                  <div className="text-sm lg:text-[15px] font-semibold leading-tight text-foreground flex items-center gap-1">
-                    {meta.label}
-                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/0 group-hover:text-primary transition-colors" />
-                  </div>
-                  <div className="text-[11px] lg:text-xs text-muted-foreground/90 mt-1 leading-snug line-clamp-2">
-                    {meta.description}
-                  </div>
-                </motion.button>
-              );
-            })}
-          </motion.div>
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="text-center text-xs text-muted-foreground mt-8"
-          >
-            Not sure? Pick <button type="button" className="font-semibold text-primary hover:underline" onClick={() => pickType("Custom")}>Custom</button> — you can describe anything.
-          </motion.p>
+          <EngagementModelPicker
+            onPick={pickModel}
+            onQuick={pickQuick}
+            // Brand accounts keep their own path: a brand collaboration has its
+            // own terms (usage rights, exclusivity) and no engagement model.
+            extra={account.audience === "brand_collaboration" ? {
+              label: dealTypeMeta["Brand Collaboration"].label,
+              description: dealTypeMeta["Brand Collaboration"].description,
+              onPick: () => { setEngagement({ model: null, service: null }); setDraft({}); pickType("Brand Collaboration"); },
+            } : null}
+          />
         </motion.div>
       ) : (
         /* ── Step 2: the deal form ────────────────────────────────────── */
@@ -448,18 +498,22 @@ export default function CreateDealPage() {
           transition={{ duration: 0.18 }}
         >
       <form onSubmit={form.handleSubmit(onSubmit)} className="px-4 py-6 space-y-6 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-7 lg:space-y-5">
-        {/* Selected type — compact banner; "Change" returns to the picker */}
-        <section className="glass-card rounded-xl p-4 sm:p-5">
+        {/* How it's billed and what it's for. "Change" returns to the picker. */}
+        <section className="glass-card rounded-xl p-4 sm:p-5 space-y-4" id="engagement-details">
           <div className="flex items-center gap-3">
             <div className={`w-11 h-11 rounded-xl border flex items-center justify-center text-xl shrink-0 ${TINT_CHIP[dealTypeMeta[dealType].tint] ?? "bg-primary/10 border-primary/20"}`}>
               {dealTypeMeta[dealType].emoji}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-primary">Deal type</div>
-              <div className="text-sm font-semibold text-foreground truncate">{dealTypeMeta[dealType].label}</div>
-              {fromMemory && (
+              <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-primary">{modelMeta ? "Engagement model" : "Deal type"}</div>
+              <div className="text-sm font-semibold text-foreground leading-snug line-clamp-2" data-testid="text-engagement-model">
+                {modelMeta ? modelMeta.label : isBrandDeal ? dealTypeMeta[dealType].label : urlType ? dealTypeMeta[dealType].label : "Quick deal"}
+              </div>
+              {fromMemory ? (
                 <div className="text-[10px] text-muted-foreground mt-0.5">Remembered from your last deal</div>
-              )}
+              ) : !modelMeta && !isBrandDeal ? (
+                <div className="text-[10px] text-muted-foreground mt-0.5">No engagement model. Add one any time with Change.</div>
+              ) : null}
             </div>
             <Button
               type="button"
@@ -473,6 +527,21 @@ export default function CreateDealPage() {
               Change
             </Button>
           </div>
+
+          {!isBrandDeal && (
+            <div className="space-y-1.5 max-w-xl">
+              <Label htmlFor="service-category" className="text-xs font-medium">Service (optional)</Label>
+              <ServiceSelect id="service-category" value={engagement.service} onChange={changeService} />
+              <p className="text-[11px] text-muted-foreground">For your reports and filters. It also picks the deliverable categories below.</p>
+            </div>
+          )}
+
+          {engagement.model && (
+            <div className="border-t border-border/60 pt-4">
+              <EngagementFields model={engagement.model} draft={draft} onChange={(d) => { setDraft(d); if (engError) setEngError(null); }} currency={fmt.currency ?? ""} error={engError} />
+            </div>
+          )}
+          {engError && !engagement.model && <p className="text-xs font-medium text-destructive" role="alert">{engError.message}</p>}
         </section>
 
         <section className="glass-card rounded-xl p-5 space-y-4">
@@ -536,10 +605,20 @@ export default function CreateDealPage() {
                   {form.formState.errors.dealTitle.message}
                 </p>
               )}
+              {titleSuggestion && (
+                <button
+                  type="button"
+                  className="block max-w-full truncate text-left text-xs font-medium text-primary hover:underline"
+                  onClick={() => form.setValue("dealTitle", titleSuggestion, { shouldValidate: true, shouldDirty: true })}
+                  data-testid="button-use-suggested-title"
+                >
+                  Use "{titleSuggestion}"
+                </button>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dealAmount">Deal Amount ({fmt.symbol})</Label>
+              <Label htmlFor="dealAmount">{modelMeta ? modelMeta.valueLabel : "Deal Amount"} ({fmt.symbol})</Label>
               <Input
                 id="dealAmount"
                 type="number"
@@ -552,10 +631,22 @@ export default function CreateDealPage() {
                 data-testid="input-deal-amount"
                 {...form.register("dealAmount")}
               />
-              {form.formState.errors.dealAmount && (
+              {form.formState.errors.dealAmount ? (
                 <p className="text-xs text-destructive">
                   {form.formState.errors.dealAmount.message}
                 </p>
+              ) : modelMeta ? (
+                <p className="text-[11px] text-muted-foreground">{modelMeta.valueHint}</p>
+              ) : null}
+              {suggestionDiffers && fmt.ready && (
+                <button
+                  type="button"
+                  className="text-xs font-medium text-primary hover:underline"
+                  onClick={() => form.setValue("dealAmount", fmt.major(suggestedMinor!), { shouldValidate: true, shouldDirty: true })}
+                  data-testid="button-use-suggested-value"
+                >
+                  Use {fmt.money(suggestedMinor!)} from the details above
+                </button>
               )}
             </div>
 
@@ -577,7 +668,7 @@ export default function CreateDealPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="endDate">End Date</Label>
+                <Label htmlFor="endDate">{recurringKind ? "End of first term" : "End Date"}</Label>
                 <Input
                   id="endDate"
                   type="date"

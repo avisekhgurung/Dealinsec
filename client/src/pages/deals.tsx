@@ -25,6 +25,7 @@ import { useUpgradeModal } from "@/components/upgrade-modal";
 import { parseApiError, isUpgradeError } from "@/lib/api-error";
 import { Plus, Briefcase, ChevronRight, Calendar, Search, X, LayoutList, Columns3 } from "lucide-react";
 import { dealTypeMeta } from "@shared/dealTypeTaxonomy";
+import { engagementLabel, serviceLabel } from "@shared/engagement";
 import type { Deal, Quote, Contract, BrandInvoice } from "@shared/schema";
 import { DEALS_VIEW_KEY, parseDealsView, workflowPositions, type DealsView, type WorkflowPosition } from "@shared/deal-view";
 import { useAudience } from "@/hooks/use-audience";
@@ -47,7 +48,14 @@ function uuid(): string {
  *  matches raw row keys, and the stored key is minor units — searching
  *  "650000" would find a ₹6,500 deal (650000 paise). This key is what the
  *  search looks at instead. */
-type DealRow = Deal & { amountMajor: string; workflow: WorkflowPosition | null };
+type DealRow = Deal & { amountMajor: string; workflow: WorkflowPosition | null; engagementText: string; serviceText: string };
+
+/** The engagement model and service as read (and searched, and exported), never as raw ids. */
+const engagementText = (d: Deal) => engagementLabel(d.engagementModel, d.engagementTerms) ?? "";
+const serviceText = (d: Deal) => serviceLabel(d.serviceCategory) ?? "";
+// Facet values: a missing model or service is its own option, so "none yet" can be filtered too.
+const NONE = "__none";
+const facetFilter = (row: { getValue: (id: string) => unknown }, id: string, value: string[]) => value.includes(row.getValue(id) as string);
 
 const VIEW_OPTIONS = [
   { value: "list", label: "List", Icon: LayoutList, testId: "view-list" },
@@ -102,6 +110,28 @@ const makeColumns = (fmt: MoneyFormat, party = "Client", withWorkflow = false): 
         </span>
       ) : <span className="text-muted-foreground">—</span>;
     },
+  },
+  {
+    id: "engagement",
+    header: "Engagement",
+    accessorFn: (d: DealRow) => d.engagementModel ?? NONE,
+    enableGlobalFilter: false,
+    meta: { label: "Engagement", exportValue: (d: DealRow) => d.engagementText },
+    filterFn: facetFilter,
+    cell: ({ row }) => row.original.engagementText
+      ? <span className="text-xs whitespace-nowrap">{row.original.engagementText}</span>
+      : <span className="text-muted-foreground">—</span>,
+  },
+  {
+    id: "service",
+    header: "Service",
+    accessorFn: (d: DealRow) => d.serviceCategory ?? NONE,
+    enableGlobalFilter: false,
+    meta: { label: "Service", exportValue: (d: DealRow) => d.serviceText },
+    filterFn: facetFilter,
+    cell: ({ row }) => row.original.serviceText
+      ? <span className="text-xs text-muted-foreground whitespace-nowrap">{row.original.serviceText}</span>
+      : <span className="text-muted-foreground">—</span>,
   },
   {
     accessorKey: "dealAmountMinor",
@@ -219,7 +249,9 @@ export default function DealsPage() {
           deal.brandName.toLowerCase().includes(q) ||
           // Match the amount the user can SEE (major units), not the stored
           // paise — "65000" must still find a ₹65,000 deal.
-          String(fmt.major(deal.dealAmountMinor)).includes(q)
+          String(fmt.major(deal.dealAmountMinor)).includes(q) ||
+          engagementText(deal).toLowerCase().includes(q) ||
+          serviceText(deal).toLowerCase().includes(q)
         );
       }
       return true;
@@ -238,9 +270,21 @@ export default function DealsPage() {
   const tableRows = useMemo<DealRow[]>(
     () => deals
       .filter((d) => inRange(d.startDate, dateRange))
-      .map((d) => ({ ...d, amountMajor: String(fmt.major(d.dealAmountMinor)), workflow: positions?.get(d.id) ?? null })),
+      .map((d) => ({ ...d, amountMajor: String(fmt.major(d.dealAmountMinor)), workflow: positions?.get(d.id) ?? null, engagementText: engagementText(d), serviceText: serviceText(d) })),
     [deals, dateRange, fmt, positions],
   );
+  // Only the models and services the workspace actually uses are offered.
+  const engagementFacets = useMemo(() => {
+    const opts = (pick: (d: DealRow) => string | null, label: (d: DealRow) => string, none: string) => {
+      const seen = new Map<string, string>();
+      for (const d of tableRows) { const v = pick(d); seen.set(v ?? NONE, v ? label(d) : none); }
+      return Array.from(seen, ([value, l]) => ({ value, label: l })).sort((a, b) => (a.value === NONE ? 1 : b.value === NONE ? -1 : a.label.localeCompare(b.label)));
+    };
+    return {
+      engagement: opts((d) => d.engagementModel, (d) => engagementLabel(d.engagementModel) ?? "", "No model"),
+      service: opts((d) => d.serviceCategory, (d) => d.serviceText, "No service"),
+    };
+  }, [tableRows]);
 
   const filters: { value: FilterType; label: string }[] = [
     { value: "all", label: "All" },
@@ -385,8 +429,11 @@ export default function DealsPage() {
                 columns={columns}
                 data={tableRows}
                 searchPlaceholder="Search deals..."
-                searchKeys={["brandName", "dealTitle", "amountMajor"]}
-                facetedFilters={[{
+                searchKeys={["brandName", "dealTitle", "amountMajor", "engagementText", "serviceText"]}
+                facetedFilters={[...([...engagementFacets.engagement, ...engagementFacets.service].some((o) => o.value !== NONE) ? [
+                  { columnId: "engagement", title: "Engagement", options: engagementFacets.engagement },
+                  { columnId: "service", title: "Service", options: engagementFacets.service },
+                ] : []), {
                   columnId: "status",
                   title: "Status",
                   options: [

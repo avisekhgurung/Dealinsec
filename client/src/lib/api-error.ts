@@ -20,6 +20,8 @@ export interface ParsedApiError {
   /** A server error's reference (sendInternalError): safe to show, so support can find the logged details. */
   errorId?: string;
   credits?: { monthly: number; purchased: number; resetsAt: string | null };
+  /** A 400 that names the one field it refused (the deal's engagement details). */
+  field?: string;
 }
 
 export function parseApiError(err: unknown): ParsedApiError {
@@ -38,6 +40,7 @@ export function parseApiError(err: unknown): ParsedApiError {
       error: body?.error,
       errorId: typeof body?.errorId === "string" ? body.errorId : undefined,
       credits: body?.credits,
+      field: typeof body?.field === "string" ? body.field : undefined,
     };
   } catch {
     return { status, code: null };
