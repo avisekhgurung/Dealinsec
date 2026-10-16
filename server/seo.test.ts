@@ -695,7 +695,7 @@ describe("homepage crawler fallback: small agencies first, freelancers and creat
   const body = landingSeoBody();
 
   it("leads with the agency headline and the whole workflow, from prospects to payment tracking", () => {
-    expect(body).toContain("<h1>Find better clients. Close deals. Get paid.</h1>");
+    expect(body).toContain("<h1>Find Clients. Close Deals. Get Paid.</h1>");
     expect(body).toContain("Find prospects, Qualify, Deal, Quotation, Agreement, Invoice, Payment tracking");
     for (const kind of ["SEO agencies", "Digital marketing and growth agencies", "B2B marketing agencies", "AI automation agencies"]) expect(body, kind).toContain(kind);
   });

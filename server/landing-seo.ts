@@ -45,7 +45,7 @@ export function landingSeoBody(): string {
   ).join("");
 
   return `<div id="seo-fallback">
-<h1>Find better clients. Close deals. Get paid.</h1>
+<h1>Find Clients. Close Deals. Get Paid.</h1>
 <p>DealInSec helps small SEO, marketing, growth and AI-automation agencies find prospects that fit, run a clear pipeline, and turn won work into quotations, signed agreements and invoices, in one connected workspace. Free plan, 7-day Pro trial, no card needed.</p>
 <p>The workflow: Find prospects, Qualify, Deal, Quotation, Agreement, Invoice, Payment tracking.</p>
 

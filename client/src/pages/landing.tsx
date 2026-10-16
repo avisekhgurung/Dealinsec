@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
+  ChevronDown,
   Briefcase,
   FileText,
   Receipt,
@@ -62,15 +63,8 @@ import { LandingCopilot } from "@/components/landing-copilot";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { BRAND_GRADIENT, GradientText, SectionHeader, fadeUp, stagger } from "@/components/landing-shared";
 import { LandingTryDemo } from "@/components/landing-try-demo";
-import {
-  ProblemSection,
-  HowItWorksSection,
-  AiOutboundSection,
-  PaymentTrackingSection,
-  ProfessionalSection,
-  CountrySection,
-  TrustSection,
-} from "@/components/landing-sections";
+import { AudienceCards, CtaBanner, FaqSection, FeaturesSection, HeroSection, JourneySection, OneWorkspaceSection, OverviewSection } from "@/components/landing-redesign";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LANDING_FAQS } from "@shared/landing-faqs";
 import { rememberAudienceIntent } from "@/lib/audience-intent";
 import type { Audience } from "@shared/audience";
@@ -105,12 +99,27 @@ const SERVER_ROUTE_PREFIXES = [
 ];
 const isServerRoute = (href: string) => SERVER_ROUTE_PREFIXES.some((p) => href.startsWith(p));
 
-const NAV_LINKS = [
+/** The homepage nav: two menus and two links (signed out). Hash links stay on this page; server pages are real links. */
+type NavLink = { label: string; href: string; note?: string };
+const NAV_LINKS: (NavLink | { label: string; items: NavLink[] })[] = [
+  { label: "Product", items: [
+    { label: "Features", href: "#features", note: "Prospects to payment, in one place" },
+    { label: "How it works", href: "#how", note: "From finding the client to getting paid" },
+    { label: "Live demo", href: "#try", note: "Paste a client message, see the deal" },
+    { label: "Who it's for", href: "#audiences", note: "Freelancers and agencies" },
+  ] },
   { label: "How it works", href: "#how" },
-  { label: "AI Outbound", href: "#outbound" },
   { label: "Pricing", href: "#pricing" },
-  { label: "FAQ", href: "#faq" },
+  { label: "Resources", items: [
+    { label: "Blog", href: "/blog" },
+    { label: "Free tools", href: "/tools" },
+    { label: "Deal risk checker", href: "/tools/deal-risk-checker" },
+    { label: "For freelancers", href: "/for-freelancers" },
+    { label: "For creators", href: "/for-creators" },
+    { label: "FAQ", href: "#faq" },
+  ] },
 ];
+const flatNav = (links: typeof NAV_LINKS): NavLink[] => links.flatMap((l) => ("items" in l ? l.items : [l]));
 
 const DASHBOARD_LINKS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -251,26 +260,16 @@ export default function LandingPage() {
       />
 
       <main className="relative z-[1]">
-        <Hero
-          isAuthenticated={isAuthenticated}
-          onPrimaryClick={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
-        />
-        <AudienceSection onStart={isAuthenticated ? undefined : () => openAuth("signup")} />
-        <ProblemSection />
-        <HowItWorksSection />
-        <AiOutboundSection />
+        <HeroSection isAuthenticated={isAuthenticated} onPrimary={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))} />
+        <FeaturesSection />
+        <JourneySection showDemo={!isAuthenticated} />
+        <OneWorkspaceSection />
+        <AudienceCards />
+        <OverviewSection />
         {!isAuthenticated && <LandingTryDemo />}
-        <PaymentTrackingSection />
-        <ProfessionalSection />
-        <CountrySection />
         <PricingPreview onCTA={() => (isAuthenticated ? setLocation("/pricing") : openAuth("signup"))} />
-        <TrustSection />
-        <FreeToolsSection />
-        <FAQSection />
-        <FinalCTA
-          isAuthenticated={isAuthenticated}
-          onCTA={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))}
-        />
+        <CtaBanner isAuthenticated={isAuthenticated} onPrimary={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))} />
+        <FaqSection />
       </main>
 
       <Footer />
@@ -498,10 +497,10 @@ function Header({
           <DealinsecLogo size="md" withText asLink />
 
           {/* Desktop nav */}
-          <nav className="hidden lg:flex items-center gap-1">
-            {(isAuthenticated ? DASHBOARD_LINKS : NAV_LINKS).map((link) => (
-              <NavItem key={link.label} href={link.href} label={link.label} />
-            ))}
+          <nav className="hidden lg:flex items-center gap-1" aria-label="Main">
+            {isAuthenticated
+              ? DASHBOARD_LINKS.map((link) => <NavItem key={link.label} href={link.href} label={link.label} />)
+              : NAV_LINKS.map((link) => ("items" in link ? <NavMenu key={link.label} label={link.label} items={link.items} /> : <NavItem key={link.label} href={link.href} label={link.label} />))}
           </nav>
 
           {/* Right actions */}
@@ -544,8 +543,7 @@ function Header({
                   style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
                   data-testid="button-nav-signup"
                 >
-                  Start free
-                  <ArrowRight className="w-4 h-4 ml-1" />
+                  Get started<span className="hidden sm:inline">&nbsp;free</span>
                 </Button>
               </>
             )}
@@ -573,7 +571,7 @@ function Header({
             className="lg:hidden overflow-hidden border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950"
           >
             <div className="px-4 py-4 space-y-1">
-              {(isAuthenticated ? DASHBOARD_LINKS : NAV_LINKS).map((link: any) => {
+              {(isAuthenticated ? DASHBOARD_LINKS : flatNav(NAV_LINKS)).map((link: any) => {
                 const Icon = link.icon;
                 return (
                   <a
@@ -641,403 +639,24 @@ function NavItem({ href, label }: { href: string; label: string }) {
   );
 }
 
-/** Find prospects → … → Payment tracking: winning the client and getting paid, one workflow. Compact wrapping
- *  chips, so a phone doesn't push the product preview off-screen. */
-const WORKFLOW_STEPS: { label: string; Icon: typeof Briefcase }[] = [
-  { label: "Find prospects", Icon: Search },
-  { label: "Qualify", Icon: Target },
-  { label: "Deal", Icon: Briefcase },
-  { label: "Quotation", Icon: FileText },
-  { label: "Agreement", Icon: FileSignature },
-  { label: "Invoice", Icon: Receipt },
-  { label: "Payment tracking", Icon: Wallet },
-];
-
-function WorkflowStrip() {
+/** A header menu (Product, Resources): keyboard-operable (Radix), hash and server links as real anchors. */
+function NavMenu({ label, items }: { label: string; items: NavLink[] }) {
   return (
-    <ol
-      aria-label="The DealInSec workflow"
-      className="mx-auto flex max-w-5xl flex-wrap items-center justify-center gap-1 sm:gap-2"
-      data-testid="workflow-strip"
-    >
-      {WORKFLOW_STEPS.map(({ label, Icon }, i) => (
-        <li key={label} className="flex items-center gap-1 sm:gap-2">
-          <span className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-emerald-200/80 dark:border-emerald-800/50 bg-white/80 dark:bg-neutral-900/70 px-2.5 py-1.5 sm:px-3.5 sm:py-2 text-xs sm:text-sm font-semibold shadow-sm">
-            <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
-            {label}
-          </span>
-          {i < WORKFLOW_STEPS.length - 1 && <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-neutral-400" aria-hidden />}
-        </li>
-      ))}
-    </ol>
-  );
-}
-
-/** Who it's for: founder-led agencies first, each with what they'd actually do in DealInSec. Starting from a card
- *  remembers "client work" so onboarding preselects it. Freelancers and creators keep their own pages. */
-const AGENCY_USE_CASES: { key: string; title: string; body: string; Icon: typeof Briefcase }[] = [
-  { key: "seo", title: "SEO agencies", body: "Build a list of companies in your niche, with the evidence for each, then quote and bill monthly retainers.", Icon: Search },
-  { key: "marketing", title: "Digital marketing & growth", body: "Keep every lead, proposal and campaign in one pipeline, with a clear next step and follow-ups that don't slip.", Icon: TrendingUp },
-  { key: "b2b", title: "B2B marketing", body: "Research accounts before you reach out, then turn won work into an agreement your client signs online.", Icon: Briefcase },
-  { key: "automation", title: "AI automation", body: "Scope builds as milestones, get the terms signed, and invoice each milestone as it's delivered.", Icon: Bot },
-];
-
-function AudienceSection({ onStart }: { onStart?: () => void }) {
-  return (
-    <section id="audiences" className="py-16 sm:py-20 scroll-mt-20" aria-labelledby="audiences-title">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-2xl mx-auto">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">Who it&apos;s for</p>
-          <h2 id="audiences-title" className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight">Made for founder-led agencies</h2>
-          <p className="mt-2 text-neutral-600 dark:text-neutral-400">One to a handful of people, selling and delivering client work in the US or India.</p>
-        </div>
-        <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {AGENCY_USE_CASES.map(({ key, title, body, Icon }) => (
-            <li key={key} className="flex flex-col rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 p-5 shadow-sm" data-testid={`use-case-${key}`}>
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950/50">
-                <Icon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" aria-hidden />
-              </span>
-              <h3 className="mt-3 font-bold tracking-tight">{title}</h3>
-              <p className="mt-1.5 flex-1 text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">{body}</p>
-              {onStart && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    rememberAudienceIntent("client_work" as Audience);
-                    trackEvent("audience_card_click", { audience: "client_work", segment: key });
-                    onStart();
-                  }}
-                  className="mt-4 inline-flex items-center gap-1.5 self-start text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
-                  data-testid={`use-case-cta-${key}`}
-                >
-                  Start free <ArrowRight className="h-4 w-4" aria-hidden />
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-        <p className="mt-8 text-center text-sm text-neutral-600 dark:text-neutral-400">
-          Working solo? <a href="/for-freelancers" className="font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">DealInSec for freelancers and consultants</a>
-          <span aria-hidden> · </span>
-          Doing brand deals? <a href="/for-creators" className="font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">DealInSec for creators</a>
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function Hero({
-  isAuthenticated,
-  onPrimaryClick,
-}: {
-  isAuthenticated: boolean;
-  onPrimaryClick: () => void;
-}) {
-  const heroRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
-  const floatY = useTransform(scrollYProgress, [0, 1], [0, -40]);
-
-  return (
-    <section ref={heroRef} className="relative pt-12 sm:pt-16 lg:pt-24 pb-16 lg:pb-24">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center max-w-4xl mx-auto">
-          <motion.div variants={heroStagger} initial="hidden" animate="visible" className="space-y-6">
-            <motion.p
-              variants={heroFadeUp}
-              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm border border-emerald-200/70 dark:border-emerald-800/40 shadow-sm text-[11px] font-bold tracking-[0.14em] text-emerald-700 dark:text-emerald-300"
-            >
-              <Briefcase className="w-3.5 h-3.5" aria-hidden />
-              FOR SMALL AGENCIES &amp; CONSULTANTS
-            </motion.p>
-
-            <motion.h1
-              variants={heroFadeUp}
-              className="text-[2.35rem] sm:text-5xl lg:text-[3.75rem] font-bold tracking-tight leading-[1.06] text-balance"
-            >
-              Find better clients.
-              <br />
-              <span
-                className="relative inline-block"
-                style={{
-                  background: "linear-gradient(135deg, #059669 0%, #14B8A6 50%, #0D9488 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                Close deals. Get paid.
-                <motion.span
-                  className="absolute -bottom-1 left-0 right-0 h-[6px] rounded-full opacity-40"
-                  style={{ background: "linear-gradient(90deg, transparent, #10B981, transparent)" }}
-                  initial={{ scaleX: 0 }}
-                  animate={{ scaleX: 1 }}
-                  transition={{ delay: 0.6, duration: 0.8, ease: "easeOut" }}
-                />
-              </span>
-            </motion.h1>
-
-            <motion.p
-              variants={heroFadeUp}
-              className="text-base sm:text-lg lg:text-xl text-neutral-600 dark:text-neutral-400 max-w-2xl mx-auto leading-relaxed text-pretty"
-            >
-              DealInSec helps small SEO, marketing, growth and AI-automation agencies find prospects that fit, run a clear pipeline, and turn won work into quotations, signed agreements and invoices, in one connected workspace.
-            </motion.p>
-
-            <motion.div variants={heroFadeUp} className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-              {isAuthenticated ? (
-                <Button
-                  onClick={onPrimaryClick}
-                  className="h-12 px-7 text-[15px] font-semibold text-white border-0 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all w-full sm:w-auto"
-                  style={{ background: BRAND_GRADIENT }}
-                  data-testid="button-hero-cta"
-                >
-                  Go to Dashboard
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    trackEvent("hero_cta_click", { label: "start_free" });
-                    onPrimaryClick();
-                  }}
-                  className="h-12 px-7 inline-flex items-center justify-center text-[15px] font-semibold rounded-md text-white border-0 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all w-full sm:w-auto"
-                  style={{ background: BRAND_GRADIENT }}
-                  data-testid="button-hero-cta"
-                >
-                  Start free
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </button>
-              )}
-              <a
-                href="#how"
-                onClick={() => trackEvent("hero_cta_click", { label: "see_how" })}
-                className="h-12 px-7 inline-flex items-center justify-center text-[15px] font-semibold rounded-md border border-neutral-300 dark:border-neutral-700 bg-white/60 dark:bg-neutral-900/60 backdrop-blur-sm hover:bg-white dark:hover:bg-neutral-900 w-full sm:w-auto transition-colors"
-                data-testid="link-hero-check"
-              >
-                See how it works
-                <ChevronRight className="w-4 h-4 ml-1" />
-              </a>
-            </motion.div>
-
-            <motion.p variants={heroFadeUp} className="text-xs sm:text-sm text-neutral-500">
-              Free plan · 7-day Pro trial · No card needed
-            </motion.p>
-
-            <motion.div variants={heroFadeUp} className="pt-4">
-              <WorkflowStrip />
-            </motion.div>
-          </motion.div>
-        </div>
-
-        {/* Larger product preview — sits outside the text column so it can breathe */}
-        <motion.div
-          style={{ y: floatY }}
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          className="mt-12 lg:mt-16 relative"
-        >
-          <ProductPreview />
-          <p className="mt-8 text-center text-xs text-neutral-500">Illustration with example data.</p>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-const PREVIEW_STEPS = [
-  { label: "Client", state: "done" },
-  { label: "Quote", state: "done" },
-  { label: "Agreement", state: "done" },
-  { label: "Invoice", state: "done" },
-  { label: "Payment", state: "pending" },
-] as const;
-
-function ProductPreview() {
-  return (
-    <div className="relative max-w-6xl mx-auto">
-      <div
-        className="absolute inset-x-0 -top-12 h-64 blur-3xl opacity-60 pointer-events-none"
-        style={{ background: "radial-gradient(60% 80% at 50% 50%, rgba(16,185,129,0.35), transparent)" }}
-      />
-
-      <div className="relative rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-2xl shadow-emerald-900/10 overflow-hidden text-left">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60">
-          <span className="w-3 h-3 rounded-full bg-red-400/80" />
-          <span className="w-3 h-3 rounded-full bg-amber-400/80" />
-          <span className="w-3 h-3 rounded-full bg-emerald-400/80" />
-          <div className="ml-3 flex-1 max-w-xs mx-auto h-6 rounded-md bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 flex items-center justify-center gap-1.5 text-[10px] text-neutral-500">
-            <Lock className="w-2.5 h-2.5" /> dealinsec.com/deals
-          </div>
-        </div>
-
-        <div className="p-4 sm:p-7 lg:p-9 bg-gradient-to-br from-white to-emerald-50/30 dark:from-neutral-900 dark:to-emerald-950/10">
-          {/* One deal, end to end */}
-          <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/80 p-4 sm:p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-[11px] uppercase tracking-wider text-neutral-500 font-semibold">Client · Cedar &amp; Co</p>
-                <h3 className="text-lg sm:text-2xl font-bold mt-0.5">Website redesign</h3>
-                <p className="text-xs text-neutral-500 mt-0.5">Deal DL-0007 · 4 weeks</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[11px] uppercase tracking-wider text-neutral-500 font-semibold">Deal value</p>
-                <p className="text-xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">$3,200</p>
-              </div>
-            </div>
-
-            <ol className="grid grid-cols-5 gap-1.5 sm:gap-3 mt-6">
-              {PREVIEW_STEPS.map((s, i) => (
-                <li key={s.label} className="min-w-0">
-                  <div
-                    className={`h-1.5 rounded-full ${s.state === "done" ? "" : "bg-amber-300 dark:bg-amber-500/70"}`}
-                    style={s.state === "done" ? { background: BRAND_GRADIENT } : undefined}
-                  />
-                  <p className="flex items-center gap-1 mt-2 text-[9px] sm:text-xs font-semibold truncate">
-                    {s.state === "done" ? (
-                      <Check className="hidden sm:block w-3 h-3 text-emerald-600 shrink-0" />
-                    ) : (
-                      <Clock className="hidden sm:block w-3 h-3 text-amber-500 shrink-0" />
-                    )}
-                    <span className="truncate">{s.label}</span>
-                  </p>
-                  <p className="hidden sm:block text-[10px] text-neutral-500 mt-0.5 truncate">
-                    {["Added", "Accepted", "Signed", "Sent · $1,600", "Pending"][i]}
-                  </p>
-                </li>
-              ))}
-            </ol>
-          </div>
-
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
-            {[
-              { label: "Total invoiced", value: "$4,850", cls: "" },
-              { label: "Paid", value: "$3,200", cls: "text-emerald-600 dark:text-emerald-400" },
-              { label: "Pending", value: "$1,150", cls: "text-amber-600 dark:text-amber-400" },
-              { label: "Overdue", value: "$500", cls: "text-rose-600 dark:text-rose-400" },
-            ].map((s, i) => (
-              <motion.div
-                key={s.label}
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.1 + i * 0.08 }}
-                className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/80 p-3.5"
-              >
-                <p className="text-[10px] uppercase tracking-wider text-neutral-500 font-medium">{s.label}</p>
-                <p className={`text-lg sm:text-2xl font-bold mt-1 tabular-nums ${s.cls}`}>{s.value}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Three quiet status chips straddling the card edge (never over content) — md+ only */}
-      {[
-        { Icon: FileSignature, small: "Agreement signed", big: "Cedar & Co", pos: "-top-5 left-[7%]", delay: 0 },
-        { Icon: Check, small: "Invoice paid", big: "$2,000", pos: "-top-5 right-[7%]", delay: 1 },
-        { Icon: Clock, small: "Payment pending", big: "$1,150", pos: "-bottom-5 right-[10%]", delay: 2 },
-      ].map(({ Icon, small, big, pos, delay }) => (
-        <motion.div
-          key={small}
-          animate={{ y: [0, -6, 0] }}
-          transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay }}
-          className={`hidden md:flex absolute ${pos} items-center gap-2 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xl shadow-emerald-900/10 px-3 py-2`}
-        >
-          <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center">
-            <Icon className="w-4 h-4 text-emerald-600" />
-          </div>
-          <div>
-            <p className="text-[10px] text-neutral-500">{small}</p>
-            <p className="text-xs font-semibold">{big}</p>
-          </div>
-        </motion.div>
-      ))}
-    </div>
-  );
-}
-
-const FREE_TOOLS = [
-  { name: "Quotation Maker", href: "/tools/quotation-maker", desc: "Professional quotations with line items, tax and terms.", icon: FileText },
-  { name: "Service Agreement", href: "/tools/service-agreement-template", desc: "A ready-to-sign contract with scope, fees and editable clauses.", icon: FileSignature },
-  { name: "Bill Generator", href: "/tools/bill-generator", desc: "Create a bill online in a minute — with a PAID stamp.", icon: ReceiptText },
-  { name: "Proforma Invoice", href: "/tools/proforma-invoice-generator", desc: "Confirm price & terms before the sale.", icon: FileCheck },
-  { name: "Purchase Order", href: "/tools/purchase-order-generator", desc: "Raise a clean PO for your vendor in a minute.", icon: ClipboardList },
-  { name: "UK Late Payment Calculator", href: "/tools/uk-late-payment-calculator", desc: "Work out the statutory interest and compensation a late-paying UK client owes.", icon: Clock },
-  { name: "GST Invoice Generator (India)", href: "/tools/gst-invoice-generator", desc: "Auto CGST/SGST/IGST, amount in words, instant PDF.", icon: Receipt },
-  { name: "GST Calculator (India)", href: "/tools/gst-calculator", desc: "Add or remove GST with the CGST/SGST or IGST split.", icon: Calculator },
-];
-
-function FreeToolsSection() {
-  return (
-    <section id="free-tools" className="py-20 sm:py-28 relative">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionHeader
-          eyebrow="Free tools · No sign-up"
-          title={
-            <>
-              Start with a free tool,{" "}
-              <span style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                no account needed
-              </span>
-            </>
-          }
-          subtitle="Quotations, agreements and bills that work wherever you bill from, plus a few country-specific tools. Built in the browser, no sign-up. When you're ready to run whole deals, the app is one click away."
-        />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5 mt-14">
-          {FREE_TOOLS.map((t) => (
-            <a
-              key={t.href}
-              href={t.href}
-              data-testid={`landing-tool-${t.href}`}
-              className="group rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-6 hover:border-emerald-300 dark:hover:border-emerald-700/70 hover:shadow-xl hover:shadow-emerald-500/10 transition-all duration-300 flex flex-col"
-            >
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 bg-emerald-50 dark:bg-emerald-950/40 group-hover:scale-110 transition-transform">
-                <t.icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <h3 className="text-base font-semibold mb-1.5">{t.name}</h3>
-              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed flex-1">{t.desc}</p>
-              <span className="mt-4 text-sm font-semibold text-emerald-700 dark:text-emerald-400 inline-flex items-center gap-1 group-hover:gap-2 transition-all">
-                Open tool <ArrowRight className="w-3.5 h-3.5" />
-              </span>
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger className="inline-flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium text-neutral-600 outline-none transition-colors hover:bg-neutral-100/70 hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-emerald-500/50 data-[state=open]:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white">
+        {label}<ChevronDown className="h-3.5 w-3.5 opacity-60" aria-hidden />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" sideOffset={8} className="w-64 rounded-xl p-1.5">
+        {items.map((i) => (
+          <DropdownMenuItem key={i.href} asChild className="cursor-pointer rounded-lg px-3 py-2">
+            <a href={i.href} className="flex flex-col items-start">
+              <span className="text-sm font-medium">{i.label}</span>
+              {i.note && <span className="text-xs text-neutral-500">{i.note}</span>}
             </a>
-          ))}
-        </div>
-        <div className="mt-10 text-center">
-          <a
-            href="/tools"
-            className="inline-flex items-center gap-2 h-12 px-6 rounded-md text-sm font-semibold border border-neutral-300 dark:border-neutral-700 hover:bg-white dark:hover:bg-neutral-900 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors"
-          >
-            See all free tools <ArrowRight className="w-4 h-4" />
-          </a>
-        </div>
-
-        {/* Discipline bridge: invoice-format guides for the freelance ICP (also
-            internal links that help Google connect the landing to the SEO pages) */}
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-x-2 gap-y-2 text-xs text-neutral-500">
-          <span className="font-semibold uppercase tracking-wider text-[10px]">Invoice formats for your work:</span>
-          {[
-            { label: "Graphic designers", href: "/tools/invoice-format/for-graphic-designers" },
-            { label: "Web developers", href: "/tools/invoice-format/for-web-developers" },
-            { label: "Content writers", href: "/tools/invoice-format/for-content-writers" },
-            { label: "Video editors", href: "/tools/invoice-format/for-video-editors" },
-            { label: "Photographers", href: "/tools/invoice-format/for-photographers" },
-            { label: "Social media managers", href: "/tools/invoice-format/for-social-media-managers" },
-            { label: "Consultants", href: "/tools/invoice-format/for-consultants" },
-            { label: "Freelancers", href: "/tools/invoice-format/for-freelancers" },
-          ].map((s) => (
-            <a
-              key={s.href}
-              href={s.href}
-              className="px-2.5 py-1 rounded-full border border-neutral-200 dark:border-neutral-800 hover:border-emerald-300 dark:hover:border-emerald-700 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
-            >
-              {s.label}
-            </a>
-          ))}
-        </div>
-      </div>
-    </section>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -1280,298 +899,53 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
   );
 }
 
-function FAQSection() {
-  return (
-    <section id="faq" className="py-20 sm:py-28">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionHeader
-          eyebrow="FAQ"
-          title="Questions agencies and consultants ask"
-          subtitle="Straight answers about what DealInSec does, and what it doesn't."
-        />
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="mt-12"
-        >
-          <Accordion type="single" collapsible className="space-y-3">
-            {FAQS.map((f, i) => (
-              <AccordionItem
-                key={f.q}
-                value={`faq-${i}`}
-                className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 px-5 data-[state=open]:shadow-md data-[state=open]:shadow-emerald-500/5"
-              >
-                <AccordionTrigger className="text-left text-sm font-semibold py-4 hover:no-underline">
-                  {f.q}
-                </AccordionTrigger>
-                <AccordionContent className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed pb-4">
-                  {f.a}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
-function FinalCTA({ isAuthenticated, onCTA }: { isAuthenticated: boolean; onCTA: () => void }) {
-  return (
-    <section className="py-20 sm:py-24">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="relative rounded-3xl overflow-hidden p-10 sm:p-16 text-center"
-          style={{ background: "linear-gradient(135deg, #065F46 0%, #0F766E 50%, #115E59 100%)" }}
-        >
-          {/* Decorative shapes */}
-          <div className="absolute -top-20 -left-20 w-80 h-80 rounded-full blur-3xl opacity-30" style={{ background: "radial-gradient(circle, #34D399, transparent)" }} />
-          <div className="absolute -bottom-20 -right-20 w-80 h-80 rounded-full blur-3xl opacity-30" style={{ background: "radial-gradient(circle, #5EEAD4, transparent)" }} />
-
-          <div className="relative">
-            <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-white mb-4 text-balance">
-              Find your next client. Get paid for the last one.
-            </h2>
-            <p className="text-base sm:text-lg text-emerald-100/90 max-w-xl mx-auto mb-8">
-              Prospects, pipeline, quotations, agreements and invoices in one connected workspace.
-            </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Button
-                onClick={onCTA}
-                className="h-12 px-6 text-sm font-semibold bg-white text-emerald-700 hover:bg-neutral-100 border-0 shadow-xl"
-                data-testid="button-final-cta"
-              >
-                {isAuthenticated ? "Go to Dashboard" : "Start free"}
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-              <a
-                href="#how"
-                className="h-12 px-6 inline-flex items-center justify-center text-sm font-semibold rounded-md border border-white/30 text-white hover:bg-white/10 transition-colors"
-              >
-                See how it works
-              </a>
-            </div>
-            <p className="text-xs text-emerald-100/70 mt-6">Free plan · 7-day Pro trial · No card needed</p>
-          </div>
-        </motion.div>
-      </div>
-    </section>
-  );
-}
-
+/** The slim footer: the logo with its slogan, the main links, socials; then a quieter row of every page worth finding. */
 function Footer() {
+  const main = [
+    { label: "Product", href: "#features" }, { label: "Pricing", href: "#pricing" }, { label: "Blog", href: "/blog" },
+    { label: "Support", href: "mailto:support@dealinsec.com" }, { label: "Privacy", href: "/privacy" }, { label: "Terms", href: "/terms" },
+  ];
+  const more = [
+    { label: "For freelancers", href: "/for-freelancers" }, { label: "For creators", href: "/for-creators" }, { label: "Free tools", href: "/tools" },
+    { label: "Deal risk checker", href: "/tools/deal-risk-checker" }, { label: "Freelancer invoice software", href: "/freelancer-invoice-software" },
+    { label: "Quotation software", href: "/quotation-software" }, { label: "Contract management", href: "/contract-management" },
+    { label: "Proposal management", href: "/proposal-management" }, { label: "Invoice management", href: "/invoice-management" },
+    { label: "E-signature", href: "/e-signature" }, { label: "Pitch", href: "/pitch" }, { label: "Refund policy", href: "/refund" }, { label: "Cookies", href: "/cookies" },
+  ];
+  const link = (l: { label: string; href: string }, cls: string) =>
+    l.href.startsWith("#") || l.href.startsWith("mailto:") || isServerRoute(l.href)
+      ? <a key={l.label} href={l.href} className={cls}>{l.label}</a>
+      : <Link key={l.label} href={l.href} className={cls}>{l.label}</Link>;
   return (
-    <footer className="border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-950 relative z-[1]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
-        {/* Newsletter strip */}
-        <NewsletterStrip />
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10 mt-12">
-          <div className="col-span-2 md:col-span-1">
-            <DealinsecLogo size="md" withText tagline />
-            <p className="text-xs text-neutral-500 mt-4 leading-relaxed max-w-[240px]">
-              Prospects, pipeline, quotations, agreements, invoices and payment tracking for small agencies and consultants, in 50 currencies.
-            </p>
-            <div className="flex items-center gap-3 mt-5">
-              {[
-                { Icon: SiInstagram, href: "https://www.instagram.com/dealinsec", label: "Instagram" },
-                { Icon: SiLinkedin, href: "https://www.linkedin.com/company/dealinsec", label: "LinkedIn" },
-                { Icon: SiX, href: "https://x.com/dealinsec", label: "X" },
-              ].map(({ Icon, href, label }) => (
-                <a
-                  key={label}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={label}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-emerald-600 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors"
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                </a>
-              ))}
-            </div>
+    <footer className="relative z-[1] border-t border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+        <div className="flex flex-col items-center gap-6 md:flex-row md:justify-between">
+          <DealinsecLogo size="md" withText tagline asLink />
+          <nav aria-label="Footer" className="flex flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-neutral-600 dark:text-neutral-400">
+            {main.map((l) => link(l, "transition-colors hover:text-emerald-700 dark:hover:text-emerald-300"))}
+          </nav>
+          <div className="flex items-center gap-2">
+            {[
+              { Icon: SiX, href: "https://x.com/dealinsec", label: "X" },
+              { Icon: SiLinkedin, href: "https://www.linkedin.com/company/dealinsec", label: "LinkedIn" },
+              { Icon: SiInstagram, href: "https://www.instagram.com/dealinsec", label: "Instagram" },
+            ].map(({ Icon, href, label }) => (
+              <a key={label} href={href} target="_blank" rel="noopener noreferrer" aria-label={label}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 transition-colors hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-500/10">
+                <Icon className="h-3.5 w-3.5" />
+              </a>
+            ))}
           </div>
-
-          <FooterColumn
-            title="Product"
-            links={[
-              { label: "For Freelancers", href: "/for-freelancers" },
-              { label: "For Creators", href: "/for-creators" },
-              { label: "Deal Risk Checker", href: "/tools/deal-risk-checker" },
-              { label: "Freelancer Invoice Software", href: "/freelancer-invoice-software" },
-              { label: "Quotation Software", href: "/quotation-software" },
-              { label: "Contract Management", href: "/contract-management" },
-              { label: "Proposal Management", href: "/proposal-management" },
-              { label: "Invoice Management", href: "/invoice-management" },
-              { label: "E-Signature", href: "/e-signature" },
-              { label: "Pricing", href: "#pricing" },
-            ]}
-          />
-          <FooterColumn
-            title="Company"
-            links={[
-              { label: "Pitch", href: "/pitch" },
-              { label: "Terms", href: "/terms" },
-              { label: "Privacy", href: "/privacy" },
-              { label: "Refund Policy", href: "/refund" },
-            ]}
-          />
-          <FooterColumn
-            title="Resources"
-            links={[
-              { label: "Free Tools", href: "/tools" },
-              { label: "Blog", href: "/blog" },
-              { label: "Cookies", href: "/cookies" },
-              { label: "Cookie settings", href: "/cookies", onClick: openConsentSettings },
-              { label: "Contact", href: "mailto:support@dealinsec.com" },
-            ]}
-          />
         </div>
-
-        {/* Trust badges */}
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pb-6 border-b border-neutral-200 dark:border-neutral-800">
-          {[
-            { Icon: Shield, text: "256-bit encrypted" },
-            { Icon: Lock, text: "Pro purchases secured by Razorpay" },
-            { Icon: Check, text: "India: UPI · Cards · NetBanking" },
-            { Icon: Zap, text: "Free plan and 7-day Pro trial, worldwide" },
-          ].map(({ Icon, text }) => (
-            <span key={text} className="inline-flex items-center gap-1.5 text-[11px] text-neutral-500">
-              <Icon className="w-3.5 h-3.5 text-emerald-600" />
-              {text}
-            </span>
-          ))}
+        <div className="mt-8 flex flex-wrap justify-center gap-x-4 gap-y-1.5 border-t border-neutral-100 pt-6 text-[12px] text-neutral-500 dark:border-neutral-800">
+          {more.map((l) => link(l, "hover:text-emerald-700 dark:hover:text-emerald-300"))}
+          <button type="button" onClick={openConsentSettings} className="hover:text-emerald-700 dark:hover:text-emerald-300">Cookie settings</button>
         </div>
-
-        <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-neutral-500">
-          <p>© {new Date().getFullYear()} DealInSec. All rights reserved.</p>
-          <a href="mailto:support@dealinsec.com" className="hover:text-emerald-600 transition-colors">
-            support@dealinsec.com
-          </a>
-        </div>
+        <p className="mt-4 text-center text-[12px] text-neutral-400">© {new Date().getFullYear()} DealInSec. All rights reserved. Pro purchases are processed by Razorpay; DealInSec tracks your client payments and never handles them.</p>
       </div>
     </footer>
   );
 }
-
-function NewsletterStrip() {
-  const { toast } = useToast();
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
-
-  const subscribe = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setLoading(true);
-    try {
-      const res = await fetch("/api/newsletter", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), source: "footer" }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Could not subscribe");
-      }
-      setDone(true);
-      setEmail("");
-    } catch (err: any) {
-      toast({ title: "Hmm, that didn't work", description: err.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-6 lg:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-      <div className="max-w-md">
-        <h3 className="text-lg lg:text-xl font-bold text-neutral-900 dark:text-white">
-          Deal tips, straight to your inbox
-        </h3>
-        <p className="text-sm text-neutral-500 mt-1">
-          Get practical tips on closing client deals, pricing your work, and getting paid on time. No spam.
-        </p>
-      </div>
-      {done ? (
-        <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-semibold text-sm">
-          <Check className="w-5 h-5" />
-          You're in! Check your inbox soon.
-        </div>
-      ) : (
-        <form onSubmit={subscribe} className="flex w-full lg:w-auto gap-2">
-          <Input
-            type="email"
-            required
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="h-11 lg:w-64 bg-white dark:bg-neutral-900"
-            data-testid="input-newsletter-email"
-          />
-          <Button
-            type="submit"
-            disabled={loading}
-            className="h-11 px-5 text-sm font-semibold text-white border-0 shrink-0"
-            style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
-            data-testid="button-newsletter-subscribe"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Subscribe"}
-          </Button>
-        </form>
-      )}
-    </div>
-  );
-}
-
-function FooterColumn({ title, links }: { title: string; links: { label: string; href: string; onClick?: () => void }[] }) {
-  return (
-    <div>
-      <p className="text-xs uppercase tracking-widest font-semibold text-neutral-900 dark:text-white mb-4">{title}</p>
-      <ul className="space-y-2.5">
-        {links.map((l) => {
-          if (l.onClick) {
-            return (
-              <li key={l.label}>
-                <button type="button" onClick={l.onClick} className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors" data-testid="footer-cookie-settings">
-                  {l.label}
-                </button>
-              </li>
-            );
-          }
-          const isHashOrExternal =
-            l.href.startsWith("#") || l.href.startsWith("mailto:") || isServerRoute(l.href);
-          if (isHashOrExternal) {
-            return (
-              <li key={l.label}>
-                <a href={l.href} className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
-                  {l.label}
-                </a>
-              </li>
-            );
-          }
-          return (
-            <li key={l.label}>
-              <Link href={l.href} className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
-                {l.label}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-// ── The moat: DealInSec doesn't just store deals, it watches them ──
-// ────────────────────────────────────────────────────────────────────────────
-// Small form helpers
-// ────────────────────────────────────────────────────────────────────────────
 
 function FieldGroup({ id, label, children }: { id: string; label: string; children: React.ReactNode }) {
   return (

@@ -586,7 +586,7 @@ function ctaBand(): string {
   return `<div class="cta-band"><div class="wrap">
     <div class="cta-ico">${clock}</div>
     <div class="cta-copy">
-      <h2>Find better clients. Close deals. Get paid.</h2>
+      <h2>Find Clients. Close Deals. Get Paid.</h2>
       <p>For small agencies, consultants and freelancers, wherever you bill from: research prospects with evidence, then quotation, e-signed agreement, invoice and payment tracking on one thread per client, in your own currency. Free to start, with a 7-day Pro trial and no card in every country. Paid plans can currently be bought in India (₹99/month or ₹999/year).</p>
     </div>
     <a class="btn" href="${APP_LINK}" data-cta>Start free →</a>

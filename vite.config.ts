@@ -16,10 +16,10 @@ export default defineConfig({
       injectRegister: null,
       includeAssets: ["favicon.svg", "favicon.png", "apple-touch-icon.png"],
       manifest: {
-        name: "DealInSec — Find Better Clients. Close Deals. Get Paid.",
+        name: "DealInSec — Find Clients. Close Deals. Get Paid.",
         short_name: "DealInSec",
         description:
-          "Find better clients, close deals and get paid: prospect research with evidence, a clear pipeline, and quotations, signed agreements, invoices and payment tracking in one workspace. For small agencies, consultants and freelancers.",
+          "Find clients, close deals and get paid: prospect research with evidence, a clear pipeline, and quotations, signed agreements, invoices and payment tracking in one workspace. For small agencies, consultants and freelancers.",
         theme_color: "#FFFFFF",
         background_color: "#0F172A",
         display: "standalone",
