@@ -54,7 +54,7 @@ describe.skipIf(!URL_ || !loopback(URL_))("mailbox migration (real Postgres, scr
     expect(after.tables).toEqual(["mail_send_jobs", "mailbox_connections"]);
     expect(await mailboxSchemaPresent(q)).toEqual({ ok: true });
     for (let i = 0; i < 2; i++) {
-      expect(await runMailboxMigration(q)).toEqual({ created: [], addedChecks: [], createdIndexes: [], dryRun: false });
+      expect(await runMailboxMigration(q)).toEqual({ created: [], addedColumns: [], addedChecks: [], createdIndexes: [], dryRun: false });
       expect(await catalog(q, schema)).toEqual(after);
     }
     // the temporary comparison tables are gone with the transaction

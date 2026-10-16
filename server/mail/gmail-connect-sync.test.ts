@@ -87,16 +87,18 @@ describe("connecting with reply sync", () => {
     expect((await connect(["openid", "email", GMAIL_SEND_SCOPE])).done.outcome).toBe("connected");
     const s = await statusFor(ana, deps);
     expect(s.connection!.capabilities).toEqual({ identify: true, send: true, read: false });
-    expect(s.replySync).toEqual({ available: true, granted: false, state: "needs_permission", lastSyncedAt: null });
+    expect(s.replySync).toEqual({ available: true, granted: false, state: "needs_permission", lastSyncedAt: null, retentionDays: null });
   });
 
   it("Settings shows the sync's own state once reading is allowed", async () => {
     await connect();
     expect((await statusFor(ana, deps)).replySync.state).toBe("starting");
     syncRow = { state: "ok", lastSuccessAt: clock, bootstrappedAt: clock };
-    expect((await statusFor(ana, deps)).replySync).toEqual({ available: true, granted: true, state: "ok", lastSyncedAt: clock.toISOString() });
-    syncRow = { state: "retrying", lastSuccessAt: clock, bootstrappedAt: clock };
-    expect((await statusFor(ana, deps)).replySync.state).toBe("retrying");
+    expect((await statusFor(ana, deps)).replySync).toEqual({ available: true, granted: true, state: "ok", lastSyncedAt: clock.toISOString(), inProgress: false, problem: null, retentionDays: null });
+    syncRow = { state: "retrying", lastSuccessAt: clock, bootstrappedAt: clock, lastErrorCode: "rate_limited" } as any;
+    expect((await statusFor(ana, deps)).replySync).toMatchObject({ state: "retrying", problem: expect.stringMatching(/slow down/) });
+    syncRow = { state: "ok", lastSuccessAt: clock, bootstrappedAt: clock, leaseUntil: new Date(clock.getTime() + 60_000) } as any;
+    expect((await statusFor(ana, deps)).replySync.inProgress).toBe(true);
     syncOn = false;
     expect((await statusFor(ana, deps)).replySync.state).toBe("off");
   });

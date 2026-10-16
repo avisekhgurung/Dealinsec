@@ -440,8 +440,8 @@ describe("sending: limits and switches", () => {
     }
   });
 
-  it("the real Gmail adapter can't send in this build, whatever the settings (config off, and the adapter itself refuses)", async () => {
-    const w = makeWorld({ env: { MAIL_PROVIDER: "gmail", GMAIL_OAUTH_CLIENT_ID: "1-a.apps.googleusercontent.com", GMAIL_OAUTH_CLIENT_SECRET: "s", GMAIL_SENDING_ENABLED: "true" } });
+  it("the real Gmail adapter can't send unless GMAIL_SENDING_ENABLED is on (config off, and the adapter itself refuses)", async () => {
+    const w = makeWorld({ env: { MAIL_PROVIDER: "gmail", GMAIL_OAUTH_CLIENT_ID: "1-a.apps.googleusercontent.com", GMAIL_OAUTH_CLIENT_SECRET: "s" } });
     const m = w.approved();
     expect(failed(await sendApproved(w.members.ana, m.id, m.bodyHash, w.deps))).toMatchObject({ status: 503, code: "sending_disabled" });
     const g = new GmailProvider({ clientId: "1-a.apps.googleusercontent.com", clientSecret: "s", fetchImpl: (() => { throw new Error("network"); }) as any });

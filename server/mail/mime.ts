@@ -57,6 +57,8 @@ export function buildMime(mail: OutgoingMail): string {
     textHeader("Subject", mail.subject),
     `Date: ${rfc5322Date(mail.date ?? new Date())}`,
     `Message-ID: ${mail.rfcMessageId}`,
+    ...(mail.inReplyTo ? [`In-Reply-To: ${mail.inReplyTo}`] : []),
+    ...(mail.references?.length ? [`References: ${mail.references.join(`${CRLF} `)}`] : []),
     "MIME-Version: 1.0",
     "Content-Type: text/plain; charset=UTF-8",
     "Content-Transfer-Encoding: base64",

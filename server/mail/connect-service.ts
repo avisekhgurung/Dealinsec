@@ -17,7 +17,7 @@
  */
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { canReadModule, memberCan } from "@shared/permissions";
-import { problemMessage, type ConnectOutcome, type GmailStatusView, type ReplySyncView, type VerifyResult } from "@shared/gmail-connect";
+import { problemMessage, REPLY_SYNC_PROBLEMS, type ConnectOutcome, type GmailStatusView, type ReplySyncView, type VerifyResult } from "@shared/gmail-connect";
 import { forOrg, sendingAvailability, type GmailConfig, type GmailStatus } from "./config";
 import { FakeMailProvider } from "./fake-provider";
 import type { ConnectionView, MailboxStore } from "./mailbox-store";
@@ -61,7 +61,9 @@ export interface MailServiceDeps {
   /** Reply sync (Release B): whether it is on for an organization. Absent: off. */
   replySync?(orgId: string): Promise<boolean>;
   /** Reply sync's state for a connection, for the Settings card. */
-  syncState?(orgId: string, connectionId: number): Promise<{ state: string; lastSuccessAt: Date | null; bootstrappedAt: Date | null } | null>;
+  syncState?(orgId: string, connectionId: number): Promise<{ state: string; lastSuccessAt: Date | null; bootstrappedAt: Date | null; leaseUntil?: Date | null; lastErrorCode?: string | null } | null>;
+  /** How long synced text is kept (MAIL_SYNC_RETENTION_DAYS), for the Settings card. */
+  retentionDays?(): number | null;
   /** Deletes everything synced from a connection (on disconnect). */
   purgeSynced?(orgId: string, connectionId: number): Promise<number>;
 }
@@ -129,16 +131,18 @@ async function replyOn(orgId: string | null | undefined, deps: MailServiceDeps):
 async function replySyncView(user: Member, enabled: boolean, c: ConnectionView | null, deps: MailServiceDeps): Promise<ReplySyncView> {
   const available = enabled && (await replyOn(user.organizationId, deps));
   const granted = !!c && capabilitiesOf(c.scopes).read;
-  const off: ReplySyncView = { available, granted, state: "off", lastSyncedAt: null };
+  const off: ReplySyncView = { available, granted, state: "off", lastSyncedAt: null, retentionDays: deps.retentionDays?.() ?? null };
   if (!available || !c) return off;
   if (c.status !== "active") return { ...off, state: "needs_reconnect" };
   if (!granted) return { ...off, state: "needs_permission" };
   let st: Awaited<ReturnType<NonNullable<MailServiceDeps["syncState"]>>> = null;
   try { st = (await deps.syncState?.(user.organizationId!, c.id)) ?? null; } catch { st = null; }
   const lastSyncedAt = st?.lastSuccessAt?.toISOString() ?? null;
-  if (!st || !st.bootstrappedAt) return { ...off, state: st?.state === "retrying" ? "retrying" : "starting", lastSyncedAt };
+  const inProgress = !!st?.leaseUntil && st.leaseUntil > deps.now();
+  const problem = st?.state === "retrying" ? REPLY_SYNC_PROBLEMS[st.lastErrorCode ?? ""] ?? REPLY_SYNC_PROBLEMS.internal : null;
+  if (!st || !st.bootstrappedAt) return { ...off, state: st?.state === "retrying" ? "retrying" : "starting", lastSyncedAt, inProgress, problem };
   const state = st.state === "needs_reconnect" ? "needs_reconnect" : st.state === "needs_scope" ? "needs_permission" : st.state === "retrying" ? "retrying" : "ok";
-  return { ...off, state, lastSyncedAt };
+  return { ...off, state, lastSyncedAt, inProgress, problem };
 }
 
 export type StartResult = { ok: true; url: string; pending: PendingConnect } | { ok: false; status: number; code: string; message: string };

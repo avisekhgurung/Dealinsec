@@ -11,6 +11,8 @@
  *   GMAIL_ALLOWED_ORG_IDS                            optional: comma-separated organization ids; when set, ONLY those
  *                                                    organizations see or use the integration (others: as if off)
  *   MAIL_SEND_DAILY_CAP                              sends per mailbox per rolling 24 hours (default 50; invalid = no sending)
+ *   GMAIL_SENDING_ENABLED                            "true" | "1": approved messages may be SENT through the real Gmail
+ *                                                    adapter (default off; the fake never sends in production)
  *   GMAIL_REPLY_SYNC_ENABLED                         "true" | "1": ask for read access and sync replies (Release B,
  *                                                    docs/gmail-reply-sync.md; default off; also needs its migration)
  */
@@ -23,13 +25,10 @@ import { mailboxSchemaPresent } from "./mailbox-schema";
 
 export const GMAIL_CALLBACK_PATH = "/api/integrations/gmail/callback";
 /**
- * Sending through the REAL Gmail adapter stays off in this build, whatever any setting says. Two independent locks:
- * sendingAvailability() refuses before anything is reserved, and the adapter is built with this value as its
- * `sendingEnabled`, so its send refuses without calling Google. Turning it on is a deliberate code change, made only
- * once real sending is verified and authorised. Only the fake provider (never allowed in production) can complete a
- * send meanwhile, for local runs and tests.
+ * Sending through the REAL Gmail adapter is off unless GMAIL_SENDING_ENABLED is exactly "true" or "1". Two independent
+ * locks follow from it: sendingAvailability() refuses before anything is reserved, and the adapter is built with it as
+ * its `sendingEnabled`, so its send refuses without calling Google. The fake provider never sends in production.
  */
-export const GMAIL_SENDING_ENABLED = false;
 export const DEFAULT_SEND_DAILY_CAP = 50;
 export const MAX_SEND_DAILY_CAP = 2_000;
 
@@ -42,6 +41,8 @@ export type GmailConfig = {
   sendDailyCap: number | null;
   /** GMAIL_REPLY_SYNC_ENABLED: request gmail.readonly and sync replies. Off by default. */
   replySync: boolean;
+  /** GMAIL_SENDING_ENABLED: approved messages may go out through the real Gmail adapter. Off by default. */
+  sendingEnabled: boolean;
   redirectUri: string; // the one callback URL; never taken from a request
   oauth: { clientId: string; clientSecret: string } | null; // null for fake
 };
@@ -89,9 +90,11 @@ export function resolveGmailConfig(env: Env = process.env): GmailOff | { enabled
   if (allowedOrgIds === false) problems.push("GMAIL_ALLOWED_ORG_IDS must be organization ids separated by commas");
   const sync = (env.GMAIL_REPLY_SYNC_ENABLED ?? "").trim().toLowerCase();
   if (!["", "true", "1", "false", "0"].includes(sync)) problems.push(`GMAIL_REPLY_SYNC_ENABLED must be "true" or "false"`);
+  const sending = (env.GMAIL_SENDING_ENABLED ?? "").trim().toLowerCase();
+  if (!["", "true", "1", "false", "0"].includes(sending)) problems.push(`GMAIL_SENDING_ENABLED must be "true" or "false"`);
 
   if (problems.length || !keyring || allowedOrgIds === false) return { enabled: false, reason: "misconfigured", problems };
-  return { enabled: true, config: { provider: provider as "gmail" | "fake", keyring, allowedOrgIds, sendDailyCap: parseDailyCap(env.MAIL_SEND_DAILY_CAP), replySync: sync === "true" || sync === "1", redirectUri, oauth } };
+  return { enabled: true, config: { provider: provider as "gmail" | "fake", keyring, allowedOrgIds, sendDailyCap: parseDailyCap(env.MAIL_SEND_DAILY_CAP), replySync: sync === "true" || sync === "1", sendingEnabled: sending === "true" || sending === "1", redirectUri, oauth } };
 }
 
 /** GMAIL_ALLOWED_ORG_IDS: unset or blank means every organization; anything malformed is false (the integration stays off). */
@@ -120,7 +123,7 @@ export function parseDailyCap(raw: string | undefined): number | null {
 
 /** Whether a connected mailbox may send in this build, and why not. */
 export function sendingAvailability(config: GmailConfig, env: Env = process.env): { ok: true; cap: number } | { ok: false; reason: "sending_disabled" | "cap_invalid" } {
-  if (config.provider === "gmail" && !GMAIL_SENDING_ENABLED) return { ok: false, reason: "sending_disabled" };
+  if (config.provider === "gmail" && !config.sendingEnabled) return { ok: false, reason: "sending_disabled" };
   if (config.provider === "fake" && env.NODE_ENV === "production") return { ok: false, reason: "sending_disabled" };
   if (config.sendDailyCap === null) return { ok: false, reason: "cap_invalid" };
   return { ok: true, cap: config.sendDailyCap };
@@ -149,8 +152,8 @@ export function createMailProvider(config: GmailConfig, env: Env = process.env):
     return (fakeInstance ??= new FakeMailProvider());
   }
   if (!config.oauth) throw new Error("the Gmail provider needs its OAuth settings");
-  const key = `${config.oauth.clientId}|${config.oauth.clientSecret}`;
-  if (gmailInstance?.key !== key) gmailInstance = { key, provider: new GmailProvider({ clientId: config.oauth.clientId, clientSecret: config.oauth.clientSecret, sendingEnabled: GMAIL_SENDING_ENABLED }) };
+  const key = `${config.oauth.clientId}|${config.oauth.clientSecret}|${config.sendingEnabled}`;
+  if (gmailInstance?.key !== key) gmailInstance = { key, provider: new GmailProvider({ clientId: config.oauth.clientId, clientSecret: config.oauth.clientSecret, sendingEnabled: config.sendingEnabled }) };
   return gmailInstance.provider;
 }
 

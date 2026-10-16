@@ -76,6 +76,10 @@ export interface OutgoingMail {
   text: string;
   rfcMessageId: string; // "<…@…>", ours, so a sent copy can be found later
   date?: Date;
+  /** A reply in an existing conversation (a follow-up): the Message-ID answered, the chain before it, Gmail's thread. */
+  inReplyTo?: string;
+  references?: string[];
+  threadId?: string;
 }
 
 export interface SentMail {
@@ -186,6 +190,11 @@ export function validateOutgoing(mail: OutgoingMail): void {
   if (!mail.subject.trim() || mail.subject.length > 200) throw new MailProviderError("rejected", "a subject is required (at most 200 characters)");
   if (typeof mail.text !== "string" || !mail.text.trim()) throw new MailProviderError("rejected", "there is no message text");
   if (!RFC_ID.test(mail.rfcMessageId)) throw new MailProviderError("rejected", "rfcMessageId is not <local@domain>");
+  // Threading headers are ids we stored ourselves, but checked like any header: one id each, no line breaks.
+  const THREAD_ID = /^<[^<>\s]{1,250}>$/;
+  if (mail.inReplyTo !== undefined && !THREAD_ID.test(mail.inReplyTo)) throw new MailProviderError("rejected", "inReplyTo is not one <message-id>");
+  if (mail.references !== undefined && (mail.references.length > 20 || mail.references.some((r) => !THREAD_ID.test(r)))) throw new MailProviderError("rejected", "references are not <message-id>s");
+  if (mail.threadId !== undefined && !/^[A-Za-z0-9_-]{1,128}$/.test(mail.threadId)) throw new MailProviderError("rejected", "threadId is not a provider thread id");
   if ((mail.fromName ?? "").length > 100 || /[\u0000-\u001f\u007f]/.test(mail.fromName ?? "") || /[\u0000\u0001-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(mail.text) || /[\u0000-\u001f\u007f]/.test(mail.subject)) {
     throw new MailProviderError("rejected", "control characters are not allowed");
   }

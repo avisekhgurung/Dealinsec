@@ -84,6 +84,7 @@ export default function PrivacyPolicy() {
             <tr><td>Resend</td><td>Transactional email delivery</td><td>Recipient name, email address, message content</td></tr>
             <tr><td>Google (Analytics)</td><td>Usage analytics, only if you accept analytics cookies</td><td>Page addresses (without document links or record numbers), events such as "signed up" or "created a deal" without names or content, browser and device details, IP address</td></tr>
             <tr><td>Google (Fonts)</td><td>Web fonts</td><td>IP address and browser details when a page loads its fonts</td></tr>
+            <tr><td>Google (Gmail API)</td><td>Sending your approved emails and finding replies, only if you connect your Gmail</td><td>The approved emails you send; reading your mailbox only to find replies to your outreach. See Section 6.</td></tr>
             <tr><td>DeepSeek</td><td>AI model powering DealInSec Copilot</td><td>Your prompt plus the specific deal, invoice and payment records needed to answer it — sent only when you use the Copilot. See Section 5.</td></tr>
           </tbody>
         </table>
@@ -113,30 +114,66 @@ export default function PrivacyPolicy() {
           </li>
         </ul>
 
-        <h2>6. Data Retention</h2>
+        <h2>6. Connected Gmail</h2>
+        <ul>
+          <li>
+            Connecting Gmail is optional, and only you can connect or disconnect your own mailbox. DealInSec asks
+            Google for your email address and permission to send email you have approved. Where reply syncing is
+            switched on, it also asks for read-only access (Google's <code>gmail.readonly</code> permission); it
+            never asks for permission to change or delete your mail.
+          </li>
+          <li>
+            Read access is used only to find replies to outreach you sent: messages in those conversations, and
+            messages from people you wrote to. For other mail, DealInSec reads only the message headers needed to
+            tell it apart and stores nothing. Message attachments and formatting are never stored.
+          </li>
+          <li>
+            From a matched conversation DealInSec keeps the sender, recipients, subject, date and the new text of
+            each message as plain text (quoted history removed). These conversations are visible to members of your
+            organisation who can view the lead; a message matched only by its sender's address is visible only to
+            you until you confirm it.
+          </li>
+          <li>
+            <strong>No email content is ever sent to an AI model.</strong> Replies are sorted by fixed rules (for
+            example "out of office" or "unsubscribe"), never by AI, and the Copilot cannot read synced email.
+          </li>
+          <li>
+            Synced message text is deleted after one year by default. Disconnecting Gmail removes DealInSec's
+            access at Google, deletes the stored credentials, and deletes every synced message. A minimal record
+            (which account, when) is kept for your organisation's audit history.
+          </li>
+          <li>
+            DealInSec's use and transfer of information received from Google APIs adheres to the{" "}
+            <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer">Google API Services User Data Policy</a>,
+            including the Limited Use requirements. Gmail data is used only to provide these features to you, is not
+            used for advertising, is not sold, and is not used to train AI models.
+          </li>
+        </ul>
+
+        <h2>7. Data Retention</h2>
         <ul>
           <li>Account data is retained as long as your account is active.</li>
           <li>Upon account deletion, personal data is erased within 30 days.</li>
           <li>Financial records (invoices, transactions) are retained for 8 years as required under the Income Tax Act, 1961.</li>
         </ul>
 
-        <h2>7. Your Rights (under DPDP Act)</h2>
+        <h2>8. Your Rights (under DPDP Act)</h2>
         <p>As a Data Principal, you have the right to:</p>
         <ul>
           <li><strong>Access:</strong> Download a complete copy of your account data as JSON at any time — Settings → Your data → Download my data.</li>
           <li><strong>Correction:</strong> Request correction of inaccurate data.</li>
-          <li><strong>Erasure:</strong> Delete your account and its data from Settings → Your data → Delete my account. Financial records are retained for the statutory period in Section 6.</li>
+          <li><strong>Erasure:</strong> Delete your account and its data from Settings → Your data → Delete my account. Financial records are retained for the statutory period in Section 7.</li>
           <li><strong>Withdraw Consent:</strong> Withdraw consent for data processing at any time.</li>
           <li><strong>Grievance Redressal:</strong> File a complaint with our Grievance Officer (details below).</li>
         </ul>
 
-        <h2>8. Children's Data</h2>
+        <h2>9. Children's Data</h2>
         <p>
           DealInSec is not intended for users under 18 years of age. We do not knowingly
           collect data from minors. If we become aware of such data, we will delete it promptly.
         </p>
 
-        <h2>9. Cross-Border Data Transfer</h2>
+        <h2>10. Cross-Border Data Transfer</h2>
         <p>
           Some of the providers listed in Section 4 — including our hosting, database, email and AI
           providers — operate infrastructure outside India, so your data may be processed abroad. We
@@ -144,14 +181,14 @@ export default function PrivacyPolicy() {
           functions described above, and in accordance with the DPDP Act, 2023.
         </p>
 
-        <h2>10. Changes to This Policy</h2>
+        <h2>11. Changes to This Policy</h2>
         <p>
           We may update this Privacy Policy from time to time. We will notify you via email
           or in-app notification of material changes. Continued use of the Platform after
           changes constitutes acceptance.
         </p>
 
-        <h2>11. Grievance Officer</h2>
+        <h2>12. Grievance Officer</h2>
         <p>
           In accordance with Section 13 of the DPDP Act and Rule 5(9) of the IT Rules, 2011:<br />
           <strong>Name:</strong> Avisekh Gurung, Grievance Officer<br />
@@ -159,7 +196,7 @@ export default function PrivacyPolicy() {
           <strong>Response time:</strong> Within 72 hours of receiving a complaint.
         </p>
 
-        <h2>12. Contact Us</h2>
+        <h2>13. Contact Us</h2>
         <p>
           For privacy-related queries:<br />
           <strong>Email:</strong> support@dealinsec.com<br />

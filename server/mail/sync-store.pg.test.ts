@@ -74,9 +74,35 @@ describe.skipIf(!URL_ || !loopback(URL_))("reply sync (real Postgres)", () => {
     await c.query(`CREATE SCHEMA ${s}`); await c.query(`SET search_path TO ${s}`);
     const exec = (t: string, p?: unknown[]) => c.query(t, p as any[]);
     expect(await schema.mailSyncSchemaPresent(exec)).toMatchObject({ ok: false });
-    expect((await schema.runMailSyncMigration(exec)).created).toEqual(["mail_sync_state", "mail_threads", "mail_messages"]);
-    expect(await schema.runMailSyncMigration(exec)).toMatchObject({ created: [], createdIndexes: [] });
+    expect((await schema.runMailSyncMigration(exec)).created).toEqual(["mail_sync_state", "mail_threads", "mail_messages", "outreach_followups"]);
+    expect(await schema.runMailSyncMigration(exec)).toMatchObject({ created: [], addedColumns: [], createdIndexes: [] });
     expect(await schema.mailSyncSchemaPresent(exec)).toEqual({ ok: true });
+    await c.end();
+  });
+
+  it("the migration upgrades an earlier version in place: new nullable/defaulted columns added, rows kept; a required one refused", async () => {
+    const s = `mbx_up_${randomBytes(4).toString("hex")}`; scratchSchemas.push(s);
+    const c = new pg.Client({ connectionString: URL_ }); await c.connect();
+    await c.query(`CREATE SCHEMA ${s}`); await c.query(`SET search_path TO ${s}`);
+    const exec = (t: string, p?: unknown[]) => c.query(t, p as any[]);
+    await schema.runMailSyncMigration(exec);
+    // Back to the first release's shape, with a row in it.
+    await c.query(`ALTER TABLE mail_threads DROP COLUMN status, DROP COLUMN status_at`);
+    await c.query(`ALTER TABLE mail_messages DROP COLUMN classification, DROP COLUMN classified_by, DROP COLUMN classifier_version, DROP COLUMN body_removed_at`);
+    await c.query(`DROP TABLE outreach_followups`);
+    await c.query(`INSERT INTO mail_threads (organization_id, connection_id, provider_thread_id, lead_id, lead_message_id, source, created_at, updated_at) VALUES ('o', 1, 't', 1, 1, 'adopted', now(), now())`);
+    expect(await schema.mailSyncSchemaPresent(exec)).toMatchObject({ ok: false });
+    const r = await schema.runMailSyncMigration(exec);
+    expect(r.created).toEqual(["outreach_followups"]);
+    expect(r.addedColumns.sort()).toEqual(["mail_messages.body_removed_at", "mail_messages.classification", "mail_messages.classified_by", "mail_messages.classifier_version", "mail_threads.status", "mail_threads.status_at"]);
+    expect((await c.query(`SELECT status FROM mail_threads`)).rows).toEqual([{ status: "awaiting" }]);
+    expect(await schema.mailSyncSchemaPresent(exec)).toEqual({ ok: true });
+    // A NOT NULL column without a default can't be added to rows that exist: that is a conflict, and nothing changes.
+    const { compareMailboxSchema } = await import("./mailbox-schema");
+    const spec = [{ ...schema.MAIL_SYNC_TABLES[1], columns: [...schema.MAIL_SYNC_TABLES[1].columns, ["required_x", "integer NOT NULL"] as [string, string]] }];
+    const snap = { relkind: "r", columns: [], primaryKey: "PRIMARY KEY (id)", checks: {}, indexes: [] };
+    const exp = { mail_threads: { ...snap, columns: spec[0].columns.map(([n, d]) => ({ name: n, type: d.split(" ")[0], notNull: /NOT NULL|PRIMARY/.test(d), default: /DEFAULT/.test(d) ? "x" : null })) } };
+    expect(compareMailboxSchema({ expected: exp as any, actual: { mail_threads: { ...snap, columns: [] } as any }, names: [], final: false, tables: spec as any }).filter((p) => p.includes("required_x"))).toEqual(["mail_threads.required_x: column missing"]);
     await c.end();
   });
 

@@ -66,3 +66,16 @@ describe("buildMime", () => {
     expect(rfc5322Date(new Date("2026-01-02T03:04:05Z"))).toBe("Fri, 02 Jan 2026 03:04:05 +0000");
   });
 });
+
+describe("buildMime: a follow-up in its conversation", () => {
+  it("adds In-Reply-To and References, and refuses anything that isn't one Message-ID each", async () => {
+    const { buildMime } = await import("./mime");
+    const base = { from: "ana@agency.test", to: "jo@acme.test", subject: "Re: idea", text: "Following up", rfcMessageId: "<dis-2@dealinsec.com>", date: new Date("2026-10-15T10:00:00Z") };
+    const raw = buildMime({ ...base, inReplyTo: "<dis-1@dealinsec.com>", references: ["<hand-1@agency.test>", "<dis-1@dealinsec.com>"] });
+    expect(raw).toContain("In-Reply-To: <dis-1@dealinsec.com>\r\n");
+    expect(raw).toContain("References: <hand-1@agency.test>\r\n <dis-1@dealinsec.com>\r\n");
+    for (const bad of [{ inReplyTo: "<a@b>\r\nBcc: x@y.z" }, { inReplyTo: "a@b" }, { references: ["<a@b> <c@d>"] }, { threadId: "../x" }]) {
+      expect(() => buildMime({ ...base, ...bad } as any)).toThrow();
+    }
+  });
+});

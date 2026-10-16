@@ -199,7 +199,11 @@ export function compareMailboxSchema(input: {
     if (act.relkind !== "r") continue; // reported above
     for (const c of exp.columns) {
       const a = act.columns.find((x) => x.name === c.name);
-      if (!a) { problems.push(`${spec.name}.${c.name}: column missing`); continue; }
+      if (!a) {
+        // A new nullable or defaulted column is added by the migration (existing rows stay valid); anything else can't be.
+        if (input.final || (c.notNull && c.default === null)) problems.push(`${spec.name}.${c.name}: column missing`);
+        continue;
+      }
       if (a.type !== c.type) problems.push(`${spec.name}.${c.name}: type is ${a.type}, expected ${c.type}`);
       if (a.notNull !== c.notNull) problems.push(`${spec.name}.${c.name}: ${a.notNull ? "NOT NULL" : "nullable"}, expected ${c.notNull ? "NOT NULL" : "nullable"}`);
       if (!sameDefault(a.default, c.default)) problems.push(`${spec.name}.${c.name}: default is ${a.default ?? "none"}, expected ${c.default ?? "none"}`);
@@ -242,7 +246,7 @@ async function inspect(exec: Exec, final: boolean, tables: TableSpec[]): Promise
   return compareMailboxSchema({ expected, actual, names, final, tables });
 }
 
-export interface MailboxMigrationResult { created: string[]; addedChecks: string[]; createdIndexes: string[]; dryRun: boolean }
+export interface MailboxMigrationResult { created: string[]; addedColumns: string[]; addedChecks: string[]; createdIndexes: string[]; dryRun: boolean }
 
 /**
  * Brings the mailbox tables into being, in one transaction on `exec` (a single connection; this function issues
@@ -261,13 +265,17 @@ export async function runMailboxMigration(exec: Exec, opts: { dryRun?: boolean; 
     const conflicts = await inspect(exec, false, tables);
     if (conflicts.length) throw new MailboxSchemaError(conflicts);
 
-    const result: MailboxMigrationResult = { created: [], addedChecks: [], createdIndexes: [], dryRun: !!opts.dryRun };
+    const result: MailboxMigrationResult = { created: [], addedColumns: [], addedChecks: [], createdIndexes: [], dryRun: !!opts.dryRun };
     for (const t of tables) {
       const before = await snapTable(exec, t.name);
       if (!before) result.created.push(t.name);
       await exec(createTable(t));
-      // A table that already existed (e.g. created by `drizzle-kit push`) gets any missing check, validated against its rows.
+      // A table that already existed gets any missing (nullable or defaulted) column, then any missing check,
+      // validated against its rows.
       if (before) {
+        for (const [c, ddl] of t.columns) {
+          if (!before.columns.some((x) => x.name === c)) { await exec(`ALTER TABLE ${t.name} ADD COLUMN ${c} ${ddl}`); result.addedColumns.push(`${t.name}.${c}`); }
+        }
         for (const [n, e] of t.checks) {
           if (before.checks[n] === undefined) { await exec(`ALTER TABLE ${t.name} ADD CONSTRAINT ${n} CHECK (${e})`); result.addedChecks.push(n); }
         }

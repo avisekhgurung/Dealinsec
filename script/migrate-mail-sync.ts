@@ -4,6 +4,8 @@
  *   mail_sync_state  per connected mailbox: the Gmail history cursor, lease and retry state
  *   mail_threads     a Gmail thread tied to one outreach message
  *   mail_messages    the synced messages of those conversations (plain text, quoted history removed)
+ *   outreach_followups  the follow-up sequence of each sent outreach
+ * Run again after an update that adds columns (nullable or defaulted, so existing rows stay valid): it adds them.
  *
  * Additive and idempotent, in one transaction. It REFUSES, changing nothing, when an existing object of the same name
  * differs (server/mail/mailbox-schema.ts). Without it reply sync stays off; connecting and sending are unaffected.
@@ -33,6 +35,7 @@ try {
   const r = await runMailSyncMigration((text, params) => client.query(text, params as any[]), { dryRun });
   const verb = dryRun ? "would create" : "created";
   console.log(`tables ${verb}:`, r.created.length ? r.created.join(", ") : "none (already present)");
+  if (r.addedColumns.length) console.log(`columns ${dryRun ? "that would be added" : "added"} to existing tables:`, r.addedColumns.join(", "));
   if (r.addedChecks.length) console.log(`checks ${dryRun ? "that would be added" : "added"} to existing tables:`, r.addedChecks.join(", "));
   console.log(`indexes ${verb}:`, r.createdIndexes.length ? r.createdIndexes.join(", ") : "none (already present)");
   console.log(dryRun ? "check passed ✓ (rolled back, nothing changed)" : "migration complete ✓ (additive only)");

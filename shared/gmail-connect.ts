@@ -57,6 +57,22 @@ export interface ReplySyncView {
   granted: boolean; // this connection allows reading
   state: ReplySyncState;
   lastSyncedAt: string | null;
+  inProgress?: boolean; // a check is running now
+  problem?: string | null; // the last check's problem, in plain words (retrying)
+  retentionDays?: number | null; // synced text is deleted after this many days (null: kept until disconnect)
+}
+/** Why the last check didn't finish, in the person's words (codes from server/mail/sync-service.ts). */
+export const REPLY_SYNC_PROBLEMS: Record<string, string> = {
+  rate_limited: "Gmail asked DealInSec to slow down. It will check again shortly.",
+  unavailable: "Gmail didn't answer. DealInSec will check again shortly.",
+  cursor_expired: "It's been a while since the last check, so recent mail is being read again. Nothing will be duplicated.",
+  rejected: "Gmail refused a request. DealInSec will try again; reconnect Gmail if this keeps happening.",
+  internal: "Something went wrong on DealInSec's side. It will try again shortly.",
+};
+/** What reply sync keeps, said plainly on the Settings card. */
+export function replySyncStorage(retentionDays: number | null | undefined): string {
+  const keep = retentionDays ? `The text is deleted after ${retentionDays % 365 === 0 ? `${retentionDays / 365} year${retentionDays === 365 ? "" : "s"}` : `${retentionDays} days`}, and everything` : "Everything";
+  return `DealInSec keeps only the conversations that started from your outreach: who wrote, when, the subject and their new text (quoted history removed), as plain text. Other mail is never stored. ${keep} synced is deleted when you disconnect. No AI ever reads your email.`;
 }
 export const REPLY_SYNC_TEXT: Record<ReplySyncState, string> = {
   off: "Reply sync isn't switched on.",

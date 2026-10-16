@@ -20,7 +20,7 @@ export function SegmentedTabs<T extends string>({ value, onChange, tabs, label, 
     refs.current[n]?.focus();
   };
   return (
-    <div className={cn("flex gap-1 rounded-xl border bg-muted/40 p-1 sm:w-fit", className)} role="tablist" aria-label={label}>
+    <div className={cn("flex max-w-full gap-1 rounded-xl border bg-muted/40 p-1 sm:w-fit", className)} role="tablist" aria-label={label}>
       {tabs.map((t, i) => {
         const active = t.value === value;
         return (
@@ -39,7 +39,7 @@ export function SegmentedTabs<T extends string>({ value, onChange, tabs, label, 
               if (e.key === "End") { e.preventDefault(); move(tabs.length - 1); }
             }}
             className={cn(
-              "relative z-0 flex-1 rounded-lg px-4 py-1.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500/60 sm:flex-none",
+              "relative z-0 min-w-0 flex-1 rounded-lg px-2 py-1.5 text-[13px] sm:px-4 sm:text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500/60 sm:flex-none",
               active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
             )}
             data-testid={t.testId}

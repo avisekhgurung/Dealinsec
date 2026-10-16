@@ -70,7 +70,8 @@ export interface ReserveInput {
 
 export type ReserveRefusal =
   | "not_found" | "not_approved" | "already_sent" | "in_flight" | "changed" | "invalid_content" | "no_address"
-  | "do_not_contact" | "suppressed" | "not_member" | "not_allowed" | "mailbox_unavailable" | "missing_send_scope" | "daily_cap";
+  | "do_not_contact" | "suppressed" | "not_member" | "not_allowed" | "mailbox_unavailable" | "missing_send_scope" | "daily_cap"
+  | "followup_stopped"; // a follow-up whose conversation was answered, opted out, bounced, or is held for review
 
 export type Reservation =
   | { ok: true; job: SendJobView; mail: { subject: string; body: string; to: string } }

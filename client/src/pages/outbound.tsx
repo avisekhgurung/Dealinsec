@@ -16,6 +16,7 @@ import { ProspectCard, ProspectCardSkeleton } from "@/components/outbound/prospe
 import { ProspectWorkspace } from "@/components/outbound/prospect-workspace";
 import { OutreachQueue, outreachQueueKey, type QueueItem } from "@/components/outbound/outreach-queue";
 import { SegmentedTabs } from "@/components/outbound/segmented-tabs";
+import { OutreachInbox } from "@/components/outbound/outreach-inbox";
 import { OUTBOUND_USAGE_URL, UsageNote, searchBlockedReason, useOutboundUsage } from "@/components/outbound/usage-note";
 import { LoadError } from "@/components/load-error";
 import { Button } from "@/components/ui/button";
@@ -218,8 +219,8 @@ export default function OutboundPage() {
   const search = useSearch();
   const [location, navigate] = useLocation();
   const viewParam = new URLSearchParams(search).get("view");
-  const view = viewParam === "prospects" || viewParam === "outreach" ? viewParam : "searches";
-  const setView = (v: "prospects" | "searches" | "outreach") => navigate(v === "searches" ? location : `${location}?view=${v}`, { replace: true });
+  const view = viewParam === "prospects" || viewParam === "outreach" || viewParam === "inbox" ? viewParam : "searches";
+  const setView = (v: "prospects" | "searches" | "outreach" | "inbox") => navigate(v === "searches" ? location : `${location}?view=${v}`, { replace: true });
   const runs = useQuery<{ runs: RunView[] }>({ queryKey: [OUTBOUND_RUNS_URL], retry: false, refetchInterval: (q) => (q.state.data?.runs.some((r) => r.status === "running") ? 5000 : false) });
   // Open the most recent run on arrival, once.
   useEffect(() => { if (!runId && runs.data?.runs.length) setRunId(runs.data.runs[0].id); }, [runs.data, runId]);
@@ -253,7 +254,7 @@ export default function OutboundPage() {
   const listed = runs.data?.runs.find((r) => r.id === runId) ?? null;
   const flowRun = view === "searches" ? runCache.data?.run ?? listed : listed ?? runCache.data?.run ?? null;
   const flow = flowState({
-    view,
+    view: view === "inbox" ? "outreach" : view, // the inbox is the outreach step's other half
     composing: parse.isPending ? "reading" : parsed ? "confirming" : null,
     run: flowRun ? { status: flowRun.status, stage: flowRun.stage } : null,
     results: runCache.data ? splitProspects(runCache.data.prospects)[0].length : null,
@@ -317,9 +318,10 @@ export default function OutboundPage() {
             )}
 
             <SegmentedTabs label="AI Outbound views" value={view} onChange={setView}
-              tabs={[{ value: "searches", label: "Searches", testId: "view-searches" }, { value: "prospects", label: "All prospects", testId: "view-prospects" }, { value: "outreach", label: "Outreach", testId: "view-outreach" }]} />
+              tabs={[{ value: "searches", label: "Searches", testId: "view-searches" }, { value: "prospects", label: "All prospects", testId: "view-prospects" }, { value: "outreach", label: "Outreach", testId: "view-outreach" }, { value: "inbox", label: "Inbox", testId: "view-inbox" }]} />
 
-            {view === "outreach" ? <OutreachQueue canEdit={canEdit} onShowReady={() => navigate(`${location}?view=prospects&readiness=ready`, { replace: true })} />
+            {view === "inbox" ? <OutreachInbox />
+              : view === "outreach" ? <OutreachQueue canEdit={canEdit} onShowReady={() => navigate(`${location}?view=prospects&readiness=ready`, { replace: true })} />
               : view === "prospects" ? <ProspectWorkspace canExport={canEdit} onOpen={(r, focus) => setOpen({ id: r.id, runId: r.latestRunId, focus })} onPrepared={() => setView("outreach")} /> : <>
             {runs.data && runs.data.runs.length > 1 && (
               <div className="-mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:flex-wrap lg:px-0" role="tablist" aria-label="Recent searches">

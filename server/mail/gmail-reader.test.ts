@@ -93,3 +93,16 @@ describe("reads", () => {
     }
   });
 });
+
+describe("sending a follow-up", () => {
+  it("asks Gmail to keep it in the outreach's thread", async () => {
+    const calls: any[] = [];
+    const fetchImpl = (async (_u: any, init: any) => { calls.push(JSON.parse(init.body)); return json(200, { id: "m2", threadId: "t1" }); }) as unknown as typeof fetch;
+    const p = new GmailProvider({ clientId: CLIENT, clientSecret: "s", fetchImpl, sendingEnabled: true });
+    await p.send(TOKEN, { from: "a@b.test", to: "c@d.test", subject: "Re: x", text: "t", rfcMessageId: "<f@b>", inReplyTo: "<o@b>", references: ["<o@b>"], threadId: "t1" });
+    await p.send(TOKEN, { from: "a@b.test", to: "c@d.test", subject: "x", text: "t", rfcMessageId: "<g@b>" });
+    expect(calls[0].threadId).toBe("t1");
+    expect(Buffer.from(calls[0].raw, "base64url").toString()).toContain("In-Reply-To: <o@b>");
+    expect("threadId" in calls[1]).toBe(false);
+  });
+});

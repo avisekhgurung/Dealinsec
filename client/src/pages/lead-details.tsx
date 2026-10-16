@@ -7,7 +7,7 @@
  */
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Link, useLocation, useRoute } from "wouter";
+import { Link, useLocation, useRoute, useSearch } from "wouter";
 import { AlertTriangle, ArrowLeft, Archive, ArrowRight, Check, CircleHelp, ExternalLink, Handshake, Lightbulb, Pencil, Sparkles } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { DetailSkeleton, DetailUnavailable } from "@/components/document/detail-states";
@@ -100,6 +100,13 @@ export default function LeadDetailsPage() {
   const [dealAmount, setDealAmount] = useState("");
   const [dealTitle, setDealTitle] = useState("");
   const [dealError, setDealError] = useState<string | null>(null);
+  // "Review and create deal" from the inbox lands here with ?createDeal=1: the same form, opened for review (never created for you).
+  const search = useSearch();
+  const askedForDeal = new URLSearchParams(search).get("createDeal") === "1";
+  const [dealAsked, setDealAsked] = useState(false);
+  useEffect(() => {
+    if (askedForDeal && !dealAsked && data?.canConvert) { setDealAsked(true); setDealError(null); setDealOpen(true); }
+  }, [askedForDeal, dealAsked, data?.canConvert]);
   const [note, setNote] = useState("");
   const [ticket, setTicket] = useState({ title: "", kind: "other", dueAt: "" });
   const [claim, setClaim] = useState({ field: "", value: "", status: "inferred", evidenceUrl: "", evidenceSnippet: "" });

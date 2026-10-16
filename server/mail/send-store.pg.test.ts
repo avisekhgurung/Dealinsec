@@ -126,6 +126,25 @@ describe.skipIf(!URL_ || !loopback(URL_))("Gmail send reservation (real Postgres
     expect(await sends.resolve({ orgId: s.org, jobId: b.job.id, decision: "sent", userId: s.user, now: now(), recordEvent: true })).toMatchObject({ won: false });
   });
 
+  it("on a server ahead of UTC (IST): a fresh lease isn't recovered early, and a send 20 hours ago still counts toward the daily cap", async () => {
+    // node-postgres sends a Date in the process's local time; drizzle stores timestamps as UTC wall-clock.
+    const tz = process.env.TZ;
+    process.env.TZ = "Asia/Kolkata";
+    try {
+      expect(new Date().getTimezoneOffset()).toBe(-330);
+      const s = await seed(2);
+      const a = await reserve(s, s.msgs[0]); // a 60s lease
+      if (!a.ok) throw new Error("reserve failed");
+      expect(await sends.recoverExpired({ orgId: s.org, now: now() })).toBe(0);
+      expect((await jobs(s.org))[0].status).toBe("sending");
+      expect(await sends.recoverExpired({ orgId: s.org, now: new Date(Date.now() + 120_000) })).toBe(1);
+      await sends.resolve({ orgId: s.org, jobId: a.job.id, decision: "sent", userId: s.user, now: new Date(Date.now() - 20 * 3_600_000), recordEvent: false });
+      expect(await reserve(s, s.msgs[1], { dailyCap: 1 })).toMatchObject({ ok: false, code: "daily_cap" });
+    } finally {
+      if (tz === undefined) delete process.env.TZ; else process.env.TZ = tz;
+    }
+  });
+
   it("two reservations of the same message at once: exactly one, never an error, one job row", async () => {
     for (let i = 0; i < 10; i++) {
       const s = await seed();

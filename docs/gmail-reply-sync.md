@@ -1,6 +1,7 @@
 # Gmail reply sync (Release B)
 
-Status: **Phase A (audit) and Phase B (reply-sync foundation) built, off by default.** Nothing reads a mailbox until
+Status (16 Oct 2026): **built, tested, off by default.** Operations, settings and rollout are in
+[gmail-deployment.md](gmail-deployment.md). Phases A–F below are implemented. Nothing reads a mailbox until
 `GMAIL_REPLY_SYNC_ENABLED=true`, the migration has run, and a person reconnects Gmail and allows reading.
 
 ## 1. What existed before this milestone (audit, 16 Oct 2026)
@@ -128,8 +129,8 @@ reduced to text on arrival and never rendered.
 - **Visibility** (the 14 Oct decision): conversations are visible to organization members who can open the lead.
   Review-only messages are visible only to the mailbox owner. The APIs that show them arrive with Phase C.
 - **Logs** carry ids, counts and codes only, never an address, subject, body or token. Tests check this.
-- **Retention beyond disconnect is not decided yet.** A sensible default is to delete synced bodies of conversations
-  idle for 12 months; it needs the founder's decision.
+- **Retention:** synced text is deleted after `MAIL_SYNC_RETENTION_DAYS` (365 by default; the sender, time and match
+  stay). This default is a decision for the founder to confirm.
 
 ## 6. Turning it on (local, then production)
 
@@ -152,27 +153,44 @@ Production, deliberately, after the code is deployed:
 Rollback: set `GMAIL_REPLY_SYNC_ENABLED=false` (sync stops; new connections stop asking to read). Data can then be
 deleted with `DROP TABLE mail_messages, mail_threads, mail_sync_state`. These are copies; the mailbox is untouched.
 
-## 7. Next phases (not built yet)
+## 7. What a reply changes, the inbox, follow-ups and deals (Phases C–F, built)
 
-- **C: inbox and conversation view** in AI Outbound. Filters backed by data: all, awaiting reply, replied, needs
-  review. Conversation view with the outreach, replies, sender and recipient, and links to the lead and deal.
-  Replying goes through the existing approved-send pipeline only.
-- **D: what a reply changes.** Applied from `mail_messages.applied_at` (an outbox, like `follow_due`): record
-  "replied" in `outreach_events` (source `provider`), move the lead, close or pause its follow-up task in the same
-  transaction under the lead lock, recheck suppression before any send. A deterministic opt-out rule
-  ("unsubscribe", "remove me", "stop emailing") adds the address to the do-not-contact list, independently of any AI.
-  Never resumed automatically.
-- **E: AI classification and drafts.** Blocked on the decision below.
-- **F: interested → lead or deal.** Reuses existing records; a deal only on explicit confirmation.
+- **Labels (`reply-rules.ts`), fixed rules only:**
+  - Bounce, opt-out (wins over everything), out of office, then a single clear intent: interested, wants more
+    information, or not interested.
+  - Anything mixed or unclear is "needs review".
+  - Stored with the rules' version. A person can correct a label, and the correction is applied again.
+- **Applying (`reply-apply.ts`)** runs once per message, from the `applied_at` outbox, in one transaction (lock order:
+  mail message, outreach messages, lead, address keys):
+  - **A reply:** "replied" is recorded on the outreach, the lead moves to Replied, follow-ups and their drafts and
+    task are cancelled, and the conversation status is set.
+  - **An opt-out:** the address goes on the do-not-contact list, the lead is marked do-not-contact, unsent messages to
+    that address are cancelled from every lead, and follow-ups are cancelled.
+  - **A bounce:** the outreach address goes on the list, and follow-ups are cancelled.
+  - **Out of office:** nothing changes.
+  - **Awaiting review:** follow-ups are *held*. Confirming applies the reply; dismissing releases them. An opt-out
+    from the address we wrote to is applied even before review.
+  - Timeline entries carry ids only. The activity log gets "Acme replied to your outreach", with no message content.
+- **Follow-ups (`outreach_followups`, `sales/followups.ts`):**
+  - Scheduled in the same transaction that records a send (3 business days, then 5; at most two).
+  - When one falls due, it becomes a **draft** for review: a template filled from the lead, with no model call. It is
+    never sent automatically.
+  - It is rechecked before drafting (no reply, not do-not-contact, not suppressed, lead still being contacted), and
+    rechecked again when its send is reserved (`followup_stopped`).
+  - A follow-up sent through Gmail goes into the outreach's thread (`In-Reply-To`, `References`, `threadId`).
+- **Inbox** (AI Outbound → Inbox, `inbox.ts`):
+  - Conversations with filters and counts: all, awaiting reply, replied, interested, needs review, follow-up due.
+  - Search by company, subject or address. Pages of 30.
+  - Each conversation shows its messages in order, its label (marked as rules, not AI), its follow-ups, and the next
+    step: open the lead or deal, Reply in Gmail (the mailbox owner only), **Review and create deal**.
+  - **Review and create deal** opens the existing deal form on the lead for confirmation. Lead conversion is atomic,
+    so there are no duplicates.
+  - Review queue: "might be for your leads", visible to the mailbox owner only.
 
-## 8. Decision needed before Phase E
+## 8. AI and Gmail content
 
-On 14 Oct the founder decided Gmail content must **never be sent to any AI model**. Classifying replies and drafting
-answers needs the reply text in a model prompt (DeepSeek, per `shared/llm-cost.ts`). The options:
-
-1. Keep the rule. Classification is deterministic only (out-of-office, bounce, opt-out keywords, "meeting"/"price"
-   cues), and the person drafts replies themselves.
-2. Allow it, opt-in per organization. Disclose it in the consent text, and send only the new reply text (no
-   headers or addresses) with prompt-injection guards. This must also meet Google's Limited Use rules for restricted
-   scopes: data from Gmail may be used by AI only to provide user-facing features, never for training, and that has
-   to be stated in the privacy policy and the verification submission.
+The founder kept the 14 Oct rule (16 Oct): **Gmail content never reaches an AI model.**
+- No model call in sync, labelling, applying, the inbox or follow-up drafting (`reply-workflow.pg.test.ts` fails if
+  one happens).
+- No AI module imported by the Gmail code, and no AI code reading synced mail (`no-ai.test.ts`).
+- The AI agent can see that a lead was replied to (its stage, and timeline ids), never what the reply said.

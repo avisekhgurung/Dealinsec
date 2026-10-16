@@ -1677,11 +1677,15 @@ export const mailThreads = pgTable("mail_threads", {
   lastInboundAt: timestamp("last_inbound_at"),
   createdAt: timestamp("created_at").notNull(),
   updatedAt: timestamp("updated_at").notNull(),
+  status: varchar("status", { length: 16 }).notNull().default("awaiting"), // awaiting | replied | interested | not_interested | opted_out | bounced | needs_review
+  statusAt: timestamp("status_at"),
 }, (t) => ({
   sourceCk: check("mail_threads_source_ck", sql`source IN ('send', 'adopted', 'reference')`),
+  statusCk: check("mail_threads_status_ck", sql`status IN ('awaiting', 'replied', 'interested', 'not_interested', 'opted_out', 'bounced', 'needs_review')`),
   connectionThreadUq: uniqueIndex("mail_threads_connection_thread_uq").on(t.connectionId, t.providerThreadId),
   leadIdx: index("mail_threads_lead_idx").on(t.organizationId, t.leadId),
   messageIdx: index("mail_threads_message_idx").on(t.organizationId, t.leadMessageId),
+  inboxIdx: index("mail_threads_inbox_idx").on(t.organizationId, t.lastMessageAt),
 }));
 export type MailThreadRow = typeof mailThreads.$inferSelect;
 
@@ -1711,17 +1715,50 @@ export const mailMessages = pgTable("mail_messages", {
   sentAt: timestamp("sent_at").notNull(),
   appliedAt: timestamp("applied_at"),
   createdAt: timestamp("created_at").notNull(),
+  classification: varchar("classification", { length: 16 }), // reply-rules.ts label or a person's correction; never an AI model's
+  classifiedBy: varchar("classified_by", { length: 8 }), // rules | user
+  classifierVersion: varchar("classifier_version", { length: 12 }),
+  bodyRemovedAt: timestamp("body_removed_at"),
 }, (t) => ({
   directionCk: check("mail_messages_direction_ck", sql`direction IN ('in', 'out')`),
   kindCk: check("mail_messages_kind_ck", sql`kind IN ('reply', 'auto_reply', 'bounce', 'own_reply', 'outreach_copy')`),
   matchCk: check("mail_messages_match_ck", sql`match_kind IN ('thread', 'reference', 'adopted', 'address')`),
   reviewCk: check("mail_messages_review_ck", sql`review_state IN ('none', 'pending', 'confirmed', 'dismissed') AND (review_reason IS NULL OR review_reason IN ('address_only', 'other_sender'))`),
   threadCk: check("mail_messages_thread_ck", sql`thread_id IS NOT NULL OR (match_kind = 'address' AND review_state <> 'confirmed')`),
+  classCk: check("mail_messages_class_ck", sql`(classification IS NULL OR classification IN ('interested', 'more_info', 'not_interested', 'opt_out', 'out_of_office', 'bounce', 'needs_review')) AND (classified_by IS NULL OR classified_by IN ('rules', 'user'))`),
   providerUq: uniqueIndex("mail_messages_provider_uq").on(t.connectionId, t.providerMessageId),
   leadIdx: index("mail_messages_lead_idx").on(t.organizationId, t.leadId, t.sentAt),
   threadIdx: index("mail_messages_thread_idx").on(t.threadId, t.sentAt),
   rfcIdx: index("mail_messages_rfc_idx").on(t.connectionId, t.rfcMessageId).where(sql`rfc_message_id IS NOT NULL`),
   reviewIdx: index("mail_messages_review_idx").on(t.organizationId, t.connectionId).where(sql`review_state = 'pending'`),
   unappliedIdx: index("mail_messages_unapplied_idx").on(t.organizationId, t.createdAt).where(sql`applied_at IS NULL AND direction = 'in'`),
+  retentionIdx: index("mail_messages_retention_idx").on(t.sentAt).where(sql`body_text IS NOT NULL`),
 }));
 export type MailMessageRow = typeof mailMessages.$inferSelect;
+
+/** The follow-up sequence of a sent outreach: each step is due, drafted for review, sent, or cancelled (never sent unreviewed). */
+export const outreachFollowups = pgTable("outreach_followups", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  leadId: integer("lead_id").notNull(),
+  rootMessageId: integer("root_message_id").notNull(),
+  afterMessageId: integer("after_message_id").notNull(),
+  step: smallint("step").notNull(),
+  dueAt: timestamp("due_at").notNull(),
+  status: varchar("status", { length: 12 }).notNull(), // scheduled | held | drafted | sent | cancelled | skipped
+  reason: varchar("reason", { length: 24 }),
+  draftMessageId: integer("draft_message_id"),
+  attempts: integer("attempts").notNull().default(0),
+  leaseUntil: timestamp("lease_until"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  statusCk: check("outreach_followups_status_ck", sql`status IN ('scheduled', 'held', 'drafted', 'sent', 'cancelled', 'skipped')`),
+  stepCk: check("outreach_followups_step_ck", sql`step BETWEEN 1 AND 5`),
+  draftCk: check("outreach_followups_draft_ck", sql`status <> 'drafted' OR draft_message_id IS NOT NULL`),
+  rootStepUq: uniqueIndex("outreach_followups_root_step_uq").on(t.rootMessageId, t.step),
+  draftUq: uniqueIndex("outreach_followups_draft_uq").on(t.draftMessageId).where(sql`draft_message_id IS NOT NULL`),
+  dueIdx: index("outreach_followups_due_idx").on(t.status, t.dueAt),
+  leadIdx: index("outreach_followups_lead_idx").on(t.organizationId, t.leadId),
+}));
+export type OutreachFollowupRow = typeof outreachFollowups.$inferSelect;

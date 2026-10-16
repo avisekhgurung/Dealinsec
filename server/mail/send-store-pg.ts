@@ -9,7 +9,8 @@
  */
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
-import { leadMessages, leads, mailSendJobs, mailboxConnections, orgRoles, outreachEvents, outreachSuppressions, users, type MailSendJobRow } from "@shared/schema";
+import { leadMessages, leads, mailSendJobs, mailboxConnections, orgRoles, outreachEvents, outreachFollowups, outreachSuppressions, users, type MailSendJobRow } from "@shared/schema";
+import { mailSyncSchemaReady } from "./status";
 import { hashDraft } from "@shared/outreach-hash";
 import { normalEmail, suppressionKeys } from "@shared/outreach-safety";
 import { addressLockKey, OUTREACH_ADDRESS_LOCK } from "../sales/message-store";
@@ -20,6 +21,8 @@ import type { Reservation, ReserveInput, SendJobView, SendStore } from "./send-s
 export const DAY_MS = 86_400_000;
 const view = (r: MailSendJobRow): SendJobView => ({ ...r, status: r.status as SendJobView["status"] });
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+/** A Date for raw SQL against a timestamp column: UTC wall-clock, as drizzle stores it (node-postgres would send local time). */
+const at = (d: Date) => sql`${d.toISOString()}::timestamp`;
 
 /** Locks the job's message row, then the job. Null when either is missing or belongs elsewhere. */
 async function lockJob(tx: Tx, orgId: string, jobId: number) {
@@ -49,6 +52,17 @@ export const pgSendStore: SendStore = {
       if (msg.status === "sent" || job?.status === "sent") return { ok: false, code: "already_sent", job };
       if (msg.status === "sending" || job?.status === "sending" || job?.status === "uncertain") return { ok: false, code: "in_flight", job };
       if (msg.status !== "approved") return { ok: false, code: "not_approved", status: msg.status };
+      // 1b. a follow-up: its sequence still open (no reply, opt-out or bounce applied; not held for review). Read under this
+      //     message's lock, which reply-apply.ts takes before cancelling or holding it, so the two can't cross.
+      if (await mailSyncSchemaReady().catch(() => false)) {
+        const [f] = await tx.select({ status: outreachFollowups.status, root: outreachFollowups.rootMessageId }).from(outreachFollowups)
+          .where(and(eq(outreachFollowups.organizationId, i.orgId), eq(outreachFollowups.draftMessageId, msg.id)));
+        if (f && f.status !== "drafted") return { ok: false, code: "followup_stopped" };
+        if (f) {
+          const answered = await tx.execute(sql`SELECT 1 FROM ${outreachEvents} e WHERE e.organization_id = ${i.orgId} AND e.message_id = ${f.root} AND e.kind IN ('replied', 'opted_out', 'bounced') LIMIT 1`);
+          if (answered.rows.length) return { ok: false, code: "followup_stopped" };
+        }
+      }
       // 2. exactly the approved text: the page's hash, and the stored text still hashing to it, with a one-line subject.
       if (msg.bodyHash !== i.expectedHash) return { ok: false, code: "changed" };
       const subject = (msg.subject ?? "").trim(), body = msg.body.trim();
@@ -86,7 +100,7 @@ export const pgSendStore: SendStore = {
       const used = await tx.execute(sql`
         SELECT count(*)::int AS n FROM ${mailSendJobs} j JOIN ${mailboxConnections} c ON c.id = j.connection_id
          WHERE c.provider = ${conn.provider} AND c.account_sub = ${conn.accountSub} AND j.message_id <> ${i.messageId}
-           AND (j.status IN ('sending', 'uncertain') OR (j.status = 'sent' AND j.sent_at > ${new Date(i.now.getTime() - DAY_MS)}))`);
+           AND (j.status IN ('sending', 'uncertain') OR (j.status = 'sent' AND j.sent_at > ${at(new Date(i.now.getTime() - DAY_MS))}))`);
       if (Number((used.rows[0] as { n: unknown }).n) >= i.dailyCap) return { ok: false, code: "daily_cap" };
       if (i.hold) await i.hold();
       // 8. reserve: a new job, or the next attempt of one that certainly didn't go out (same Message-ID).
@@ -145,7 +159,7 @@ export const pgSendStore: SendStore = {
 
   async recoverExpired({ orgId, now }) {
     const r = await db.update(mailSendJobs).set({ status: "uncertain", errorCode: "lease_expired", leaseUntil: null, updatedAt: now })
-      .where(and(eq(mailSendJobs.status, "sending"), sql`${mailSendJobs.leaseUntil} < ${now}`, orgId ? eq(mailSendJobs.organizationId, orgId) : undefined))
+      .where(and(eq(mailSendJobs.status, "sending"), sql`${mailSendJobs.leaseUntil} < ${at(now)}`, orgId ? eq(mailSendJobs.organizationId, orgId) : undefined))
       .returning({ id: mailSendJobs.id });
     return r.length;
   },

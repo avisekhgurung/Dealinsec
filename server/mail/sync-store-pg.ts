@@ -7,13 +7,14 @@ import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { db } from "../db";
 import { leadMessages, mailboxConnections, mailMessages, mailSendJobs, mailSyncState, mailThreads, type MailSyncStateRow } from "@shared/schema";
 import type { ConversationLink, OutreachCandidate } from "./reply-match";
+import { CLASSIFIER_VERSION } from "./reply-rules";
 import type { DueMailbox, StoreMessageInput, SyncStateView, SyncStore } from "./sync-store";
 
 const OUTREACH_STATUSES = ["approved", "sending", "sent"];
 const view = (r: MailSyncStateRow): SyncStateView => ({
   organizationId: r.organizationId, connectionId: r.connectionId, historyId: r.historyId, bootstrappedAt: r.bootstrappedAt,
   state: r.state as SyncStateView["state"], nextRunAt: r.nextRunAt, lastRunAt: r.lastRunAt, lastSuccessAt: r.lastSuccessAt,
-  failures: r.failures, lastErrorCode: r.lastErrorCode, lastErrorAt: r.lastErrorAt,
+  failures: r.failures, lastErrorCode: r.lastErrorCode, lastErrorAt: r.lastErrorAt, leaseUntil: r.leaseUntil,
 });
 /** A timestamp for raw SQL, as drizzle stores them (UTC wall-clock): a bare Date would be sent in the server's local time. */
 const at = (d: Date) => sql`${d.toISOString()}::timestamp`;
@@ -177,6 +178,7 @@ export const pgSyncStore: SyncStore = {
         direction: i.direction, kind: i.kind, matchKind: i.match, reviewReason: i.review, reviewState: i.review ? "pending" : "none",
         fromAddress: i.fromAddress, fromName: i.fromName, toAddresses: i.to, subject: i.subject.slice(0, 300), bodyText: i.bodyText, bodyTrimmed: i.bodyTrimmed,
         rfcMessageId: i.rfcMessageId?.slice(0, 255) ?? null, inReplyTo: i.inReplyTo?.slice(0, 255) ?? null, sentAt: i.sentAt, createdAt: i.now,
+        classification: i.classification, classifiedBy: i.classification ? "rules" : null, classifierVersion: i.classification ? CLASSIFIER_VERSION : null,
       }).onConflictDoNothing({ target: [mailMessages.connectionId, mailMessages.providerMessageId] }).returning({ id: mailMessages.id });
       if (!row) return { created: false, id: null };
       if (linked && thread) {
@@ -212,3 +214,23 @@ export const pgSyncStore: SyncStore = {
   },
 };
 
+/**
+ * The retention period (MAIL_SYNC_RETENTION_DAYS, default 365; "off" keeps text until disconnect): the text of
+ * synced messages older than that is deleted; who, when and the match stay, so the conversation still makes sense.
+ */
+export async function purgeExpiredBodies(days: number, now: Date, limit = 500): Promise<number> {
+  const cutoff = new Date(now.getTime() - days * 86_400_000);
+  const r = await db.execute(sql`
+    UPDATE ${mailMessages} SET body_text = NULL, body_removed_at = ${at(now)}
+     WHERE id IN (SELECT id FROM ${mailMessages} WHERE body_text IS NOT NULL AND sent_at < ${at(cutoff)} ORDER BY sent_at LIMIT ${limit})`);
+  return r.rowCount ?? 0;
+}
+
+/** MAIL_SYNC_RETENTION_DAYS: whole days from 30 to 3650, "off", or unset (365). Anything else: 365, with a problem to log. */
+export function retentionDays(raw: string | undefined): { days: number | null; problem: string | null } {
+  const v = (raw ?? "").trim().toLowerCase();
+  if (!v) return { days: 365, problem: null };
+  if (v === "off") return { days: null, problem: null };
+  const n = Number(v);
+  return /^\d{2,4}$/.test(v) && n >= 30 && n <= 3650 ? { days: n, problem: null } : { days: 365, problem: "MAIL_SYNC_RETENTION_DAYS must be whole days from 30 to 3650, or \"off\"; using 365" };
+}

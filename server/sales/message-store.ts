@@ -1,7 +1,9 @@
 /** Database store for outreach messages. Tests replace this module (eval/world-mocks.ts). Every query is scoped by organization. */
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
-import { leadEvents, leadMessages, leads, leadTickets, outreachEvents, outreachSuppressions, type LeadMessageRow, type OutreachEventRow, type OutreachSuppressionRow } from "@shared/schema";
+import { leadEvents, leadMessages, leads, leadTickets, outreachEvents, outreachFollowups, outreachSuppressions, type LeadMessageRow, type OutreachEventRow, type OutreachSuppressionRow } from "@shared/schema";
+import { followupDueAt, followupPolicy } from "@shared/followup-policy";
+import { mailSyncSchemaReady } from "../mail/status";
 import { canMove, isOpen, type LeadStatus } from "@shared/leads";
 import { FOLLOW_UP_DAYS, pathToContacted } from "@shared/outreach-safety";
 import { tablesReadyCheck } from "../leads/ready";
@@ -172,8 +174,28 @@ export const messageStore: MessageStore = {
           await event("status_changed", { from: status, to: step });
           status = step; movedTo = step;
         }
-        if (isOpen(status)) {
-          const [t] = await tx.insert(leadTickets).values({ leadId: lead.id, organizationId: orgId, title: `Follow up with ${lead.companyName}`, kind: "follow_up", dueAt: new Date(now.getTime() + FOLLOW_UP_DAYS * 86_400_000), createdBy: "user" }).returning({ id: leadTickets.id });
+        // The follow-up sequence (outreach_followups, once migrated): this send is the outreach or one of its follow-ups;
+        // the next step is scheduled unless the sequence is over or the person already answered.
+        let dueAt: Date | null = new Date(now.getTime() + FOLLOW_UP_DAYS * 86_400_000);
+        if (await mailSyncSchemaReady().catch(() => false)) {
+          const [mine] = await tx.select().from(outreachFollowups).where(and(eq(outreachFollowups.organizationId, orgId), eq(outreachFollowups.draftMessageId, messageId))).for("update");
+          const rootId = mine?.rootMessageId ?? messageId, step = mine?.step ?? 0;
+          if (mine) await tx.update(outreachFollowups).set({ status: "sent", updatedAt: now }).where(eq(outreachFollowups.id, mine.id));
+          // Earlier follow-up tasks for this lead are done: this send was the follow-up.
+          if (mine) await tx.update(leadTickets).set({ status: "done", doneAt: now }).where(and(eq(leadTickets.organizationId, orgId), eq(leadTickets.leadId, lead.id), eq(leadTickets.kind, "follow_up"), eq(leadTickets.status, "open")));
+          const answered = lead.doNotContact || (await tx.execute(sql`
+            SELECT 1 FROM ${outreachEvents} e WHERE e.organization_id = ${orgId} AND e.kind IN ('replied', 'opted_out', 'bounced')
+               AND (e.message_id = ${rootId} OR e.message_id IN (SELECT f.draft_message_id FROM ${outreachFollowups} f WHERE f.organization_id = ${orgId} AND f.root_message_id = ${rootId} AND f.draft_message_id IS NOT NULL))
+             LIMIT 1`)).rows.length > 0;
+          const policy = followupPolicy(process.env.OUTREACH_FOLLOWUP_BUSINESS_DAYS);
+          dueAt = answered ? null : followupDueAt(policy, step + 1, now);
+          if (dueAt) {
+            await tx.insert(outreachFollowups).values({ organizationId: orgId, leadId: lead.id, rootMessageId: rootId, afterMessageId: messageId, step: step + 1, dueAt, status: "scheduled", createdAt: now, updatedAt: now })
+              .onConflictDoNothing({ target: [outreachFollowups.rootMessageId, outreachFollowups.step] });
+          }
+        }
+        if (isOpen(status) && dueAt) {
+          const [t] = await tx.insert(leadTickets).values({ leadId: lead.id, organizationId: orgId, title: `Follow up with ${lead.companyName}`, kind: "follow_up", dueAt, createdBy: "user" }).returning({ id: leadTickets.id });
           ticketId = t.id;
           await event("ticket_created", { ticketId, kind: "follow_up" });
         }

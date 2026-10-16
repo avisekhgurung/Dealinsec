@@ -8,6 +8,7 @@
  * (connection, provider message id): the same message seen twice is stored once.
  */
 import type { ConversationLink, MatchKind, MessageKind, OutreachCandidate, ReviewReason } from "./reply-match";
+import type { ReplyLabel } from "./reply-rules";
 
 export type SyncState = "ok" | "retrying" | "needs_reconnect" | "needs_scope";
 
@@ -23,6 +24,8 @@ export interface SyncStateView {
   failures: number;
   lastErrorCode: string | null;
   lastErrorAt: Date | null;
+  /** A pass holds the lease until then (sync in progress). */
+  leaseUntil: Date | null;
 }
 
 export interface DueMailbox { organizationId: string; connectionId: number; userId: string }
@@ -51,6 +54,8 @@ export interface StoreMessageInput {
   inReplyTo: string | null;
   sentAt: Date;
   now: Date;
+  /** reply-rules.ts label for an inbound message (null for outgoing). Rules only, never a model. */
+  classification: ReplyLabel | null;
 }
 
 export type PassOutcome =

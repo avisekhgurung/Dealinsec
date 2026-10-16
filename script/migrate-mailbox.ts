@@ -32,6 +32,7 @@ try {
   const r = await runMailboxMigration((text, params) => client.query(text, params as any[]), { dryRun });
   const verb = dryRun ? "would create" : "created";
   console.log(`tables ${verb}:`, r.created.length ? r.created.join(", ") : "none (already present)");
+  if (r.addedColumns.length) console.log(`columns ${dryRun ? "that would be added" : "added"} to existing tables:`, r.addedColumns.join(", "));
   if (r.addedChecks.length) console.log(`checks ${dryRun ? "that would be added" : "added"} to existing tables:`, r.addedChecks.join(", "));
   console.log(`indexes ${verb}:`, r.createdIndexes.length ? r.createdIndexes.join(", ") : "none (already present)");
   console.log(dryRun ? "check passed ✓ (rolled back, nothing changed)" : "migration complete ✓ (additive only)");

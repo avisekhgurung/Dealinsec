@@ -45,6 +45,8 @@ export interface SendDeps {
   /** Whether a member is still active in the organization (an admin may settle an uncertain send only once its sender has left). */
   isActiveMember(orgId: string, userId: string): Promise<boolean>;
   log(event: string, fields?: Record<string, string | number | boolean | null>): void;
+  /** For a follow-up: the Gmail thread and Message-IDs it answers, so it arrives in the same conversation. */
+  threadFor?(orgId: string, messageId: number): Promise<{ threadId: string | null; inReplyTo: string; references: string[] } | null>;
 }
 
 export type Fail = { ok: false; status: number; code: string; message: string };
@@ -74,6 +76,7 @@ const REFUSALS: Record<ReserveRefusal, [number, string]> = {
   mailbox_unavailable: [409, "Connect your Gmail in Settings (or reconnect it) to send from it."],
   missing_send_scope: [409, "Your Gmail connection can't send email. Reconnect it in Settings and keep \"Send email on your behalf\" ticked."],
   daily_cap: [429, "You've reached today's sending limit for this mailbox. Nothing was sent; try again tomorrow."],
+  followup_stopped: [409, "A reply arrived in this conversation (or it's waiting for you to review one), so this follow-up wasn't sent. Open the inbox to see it."],
 };
 
 /** What a stored job says happened, when a conditional write didn't apply (someone else settled it first). */
@@ -164,11 +167,18 @@ export async function sendApproved(user: Member, messageId: number, bodyHash: un
   const { job } = r;
   deps.log("gmail_send_reserved", { jobId: job.id, attempt: job.attempts });
 
+  // A follow-up goes into the outreach's Gmail conversation (when it is known); a lookup failure sends it on its own.
+  let thread: Awaited<ReturnType<NonNullable<SendDeps["threadFor"]>>> = null;
+  try { thread = (await deps.threadFor?.(orgId, messageId)) ?? null; } catch { thread = null; }
+
   // Outside any transaction: the provider call.
   let sent: { providerMessageId: string; providerThreadId: string | null };
   try {
     sent = await withTransientRetry(
-      () => provider.send(accessToken, { from: conn.accountEmail, fromName: [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || undefined, to: r.mail.to, subject: r.mail.subject, text: r.mail.body, rfcMessageId: job.rfcMessageId, date: deps.now() }),
+      () => provider.send(accessToken, {
+        from: conn.accountEmail, fromName: [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || undefined, to: r.mail.to, subject: r.mail.subject, text: r.mail.body, rfcMessageId: job.rfcMessageId, date: deps.now(),
+        ...(thread ? { inReplyTo: thread.inReplyTo, references: thread.references, ...(thread.threadId ? { threadId: thread.threadId } : {}) } : {}),
+      }),
       (e) => e.kind === "rate_limited", deps);
   } catch (e) {
     const kind = e instanceof MailProviderError ? e.kind : "error";

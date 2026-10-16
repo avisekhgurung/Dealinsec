@@ -13,7 +13,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { parseApiError } from "@/lib/api-error";
 import { useConnectGmail, useDisconnectGmail, useGmailStatus, useSyncGmail, useVerifyGmail } from "@/lib/gmail";
-import { connectDisclosure, CONNECT_OUTCOMES, isConnectOutcome, REPLY_SYNC_TEXT, type ConnectOutcome } from "@shared/gmail-connect";
+import { connectDisclosure, CONNECT_OUTCOMES, isConnectOutcome, replySyncStorage, REPLY_SYNC_TEXT, type ConnectOutcome } from "@shared/gmail-connect";
 
 const GOOD: ConnectOutcome[] = ["connected", "reconnected"];
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
@@ -115,19 +115,20 @@ export function GmailCard() {
             {rs?.available && c.status === "active" && (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-background/60 p-2.5 text-sm" data-testid="gmail-reply-sync" data-state={rs.state}>
                 <span>
-                  {REPLY_SYNC_TEXT[rs.state]}
-                  {rs.lastSyncedAt && rs.state === "ok" && <span className="block text-xs text-muted-foreground">Last checked {new Date(rs.lastSyncedAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}</span>}
+                  {rs.inProgress ? "Checking for replies now…" : rs.problem ?? REPLY_SYNC_TEXT[rs.state]}
+                  {rs.lastSyncedAt && <span className="block text-xs text-muted-foreground">Last successful check {new Date(rs.lastSyncedAt).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</span>}
                 </span>
                 {rs.state === "needs_permission" && data.canConnect && (
                   <Button size="sm" onClick={startConnect} disabled={busy} data-testid="gmail-allow-read">{connect.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Allow</Button>
                 )}
-                {(rs.state === "ok" || rs.state === "retrying" || rs.state === "starting") && (
+                {(rs.state === "ok" || rs.state === "retrying" || rs.state === "starting") && !rs.inProgress && (
                   <Button size="sm" variant="outline" onClick={runSync} disabled={busy} data-testid="gmail-sync-now">
                     {sync.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" aria-hidden />}Check now
                   </Button>
                 )}
               </div>
             )}
+            {c.capabilities.read && rs?.available && <p className="text-xs text-muted-foreground" data-testid="gmail-storage-note">{replySyncStorage(rs.retentionDays)}</p>}
             {c.problem && (
               <div role="alert" className="flex gap-2 rounded-md border border-destructive/30 bg-destructive/10 p-2.5 text-sm" data-testid="gmail-problem" data-code={c.problem.code}>
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />

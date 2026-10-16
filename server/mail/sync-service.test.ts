@@ -215,6 +215,24 @@ describe("reply sync: association", () => {
   });
 });
 
+describe("reply sync: what a stored reply hands on", () => {
+  it("each inbound message is labelled by the rules and applied once right after it is stored; outgoing ones get no label", async () => {
+    const w = world();
+    await w.connect("ana", "org-a");
+    w.outreach();
+    const applied: number[] = [];
+    w.deps.applyReply = async (_org, id) => { applied.push(id); };
+    handSentAndReply(w, { replyText: "Sounds good, let's talk Tuesday." });
+    await w.pass("ana");
+    const reply = w.store.messages.find((m) => m.kind === "reply")!;
+    expect(reply.classification).toBe("interested");
+    expect(w.store.messages.find((m) => m.kind === "outreach_copy")!.classification).toBeNull();
+    expect(applied.sort()).toEqual(w.store.messages.map((m) => m.id).sort());
+    await w.pass("ana"); // nothing new: nothing applied again
+    expect(applied).toHaveLength(2);
+  });
+});
+
 describe("reply sync: organizations and mailboxes stay apart", () => {
   it("Zed (org-b) writing to the same address never links to org-a's outreach, and each mailbox keeps its own", async () => {
     const w = world();

@@ -1,7 +1,7 @@
 /**
  * The Google adapter for Release A: OAuth (authorization code + PKCE + nonce), refresh, revoke, and sending one
  * approved message through Gmail's users.messages.send. Sending is off unless the adapter is constructed with
- * `sendingEnabled: true`; config.ts passes GMAIL_SENDING_ENABLED (false in this build), so a production adapter
+ * `sendingEnabled: true`; config.ts passes the GMAIL_SENDING_ENABLED setting (off by default), so a production adapter
  * refuses without calling Google, independently of the config gate in front of it.
  *
  * No Google SDK: three form posts to Google's documented endpoints. The identity token arrives in the token
@@ -156,7 +156,7 @@ export class GmailProvider implements MailProvider, MailboxReader {
       res = await this.fetchImpl(GMAIL_SEND_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ raw }),
+        body: JSON.stringify(mail.threadId ? { raw, threadId: mail.threadId } : { raw }), // a follow-up stays in its Gmail thread
         redirect: "error",
         signal: AbortSignal.timeout(this.sendTimeoutMs),
       });

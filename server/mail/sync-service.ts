@@ -25,6 +25,7 @@ import { bodyOf, MATCH_HEADERS, parseMail, type ParsedMail } from "./mail-parse"
 import type { MailboxStore } from "./mailbox-store";
 import { capabilitiesOf, GMAIL_READONLY_SCOPE, MailProviderError, type MailboxReader, type MailProvider, type MessageRef } from "./provider";
 import { decideMatch, type ConversationLink } from "./reply-match";
+import { classifyReply } from "./reply-rules";
 import type { PassOutcome, SyncState, SyncStore } from "./sync-store";
 
 export const SYNC_INTERVAL_MS = 3 * 60_000;
@@ -54,6 +55,10 @@ export interface SyncDeps {
   now(): Date;
   random(): number;
   log(event: string, fields?: Record<string, string | number | boolean | null>): void;
+  /** What a stored inbound message changes in the outreach (reply-apply.ts), applied right after it is stored. */
+  applyReply?(orgId: string, mailMessageId: number): Promise<unknown>;
+  /** Re-applies messages stored but not applied (a crash between the two). */
+  applyPending?(): Promise<number>;
 }
 
 export type ReplySync = { on: true; config: GmailConfig } | { on: false; reason: "gmail_off" | "sync_off" | "not_migrated" };
@@ -181,8 +186,13 @@ export async function syncMailbox(input: { orgId: string; userId: string; connec
         direction: d.direction, kind: d.kind, match: d.match, review: d.review, fromAddress: m.from, fromName: m.fromName, to: m.to,
         subject: m.subject, bodyText: body.text, bodyTrimmed: body.trimmed, rfcMessageId: m.rfcMessageId, inReplyTo: m.inReplyTo,
         sentAt: m.date ?? deps.now(), now: deps.now(),
+        classification: d.direction === "in" ? classifyReply({ kind: d.kind, subject: m.subject, text: body.text }) : null,
       });
       if (r.created) result.stored++;
+      if (r.created && r.id !== null && deps.applyReply) {
+        // A failure here is repaired by the sweep (applyPending): the message is stored, its effect is in the outbox.
+        try { await deps.applyReply(input.orgId, r.id); } catch (e) { deps.log("gmail_reply_apply_failed", { mailMessageId: r.id, errorType: (e as Error)?.name ?? "Error" }); }
+      }
       if (r.created && d.adoptThread) backfill.push(m.threadId);
     };
 
@@ -291,6 +301,7 @@ export async function syncDueMailboxes(deps: SyncDeps, opts: { limit?: number } 
     // Whatever is left of disconnected mailboxes goes first, whether or not sync is on.
     const purged = await deps.store.purgeDisconnected(20);
     if (purged) deps.log("gmail_sync_purged", { mailboxes: purged });
+    if (deps.applyPending) await deps.applyPending();
     const s = await deps.status();
     if (!s.enabled || !s.config.replySync) return 0;
     const due = await deps.store.due({ now: deps.now(), readScope: GMAIL_READONLY_SCOPE, limit: opts.limit ?? 5, orgIds: s.config.allowedOrgIds });

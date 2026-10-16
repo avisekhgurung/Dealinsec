@@ -12,7 +12,7 @@ export interface MemThread { id: number; organizationId: string; connectionId: n
 export interface MemStored extends Omit<StoreMessageInput, "link" | "adoptThread" | "linked" | "now" | "orgId"> {
   id: number; organizationId: string; threadId: number | null; leadId: number; leadMessageId: number; reviewState: string; appliedAt: Date | null; createdAt: Date;
 }
-interface MemState extends SyncStateView { leaseOwner: string | null; leaseUntil: Date | null; updatedAt: Date }
+interface MemState extends SyncStateView { leaseOwner: string | null; updatedAt: Date }
 
 export class MemorySyncStore implements SyncStore {
   connections: MemConnection[] = [];
@@ -28,7 +28,7 @@ export class MemorySyncStore implements SyncStore {
     return { leadId: t.leadId, leadMessageId: t.leadMessageId, toAddress: o?.toAddress ?? "" };
   }
   private view(s: MemState): SyncStateView {
-    const { leaseOwner: _o, leaseUntil: _u, updatedAt: _a, ...v } = s;
+    const { leaseOwner: _o, updatedAt: _a, ...v } = s;
     return { ...v };
   }
 

@@ -6,7 +6,7 @@
 import type { Express, Request } from "express";
 import { isAuthenticated } from "../auth";
 import { storage } from "../storage";
-import { createMailProvider, resolveGmailConfig } from "./config";
+import { createMailProvider, resolveGmailConfig, sendingAvailability } from "./config";
 import { disconnectMailboxes, type MailServiceDeps, type Member } from "./connect-service";
 import { pgMailboxStore } from "./mailbox-store-pg";
 import { leadsStore } from "../leads/store";
@@ -15,7 +15,11 @@ import type { SendDeps } from "./send-service";
 import { pgSendStore } from "./send-store-pg";
 import { registerGmailRoutes } from "./routes";
 import { gmailStatus, mailSyncSchemaReady } from "./status";
-import { pgSyncStore } from "./sync-store-pg";
+import { pgSyncStore, purgeExpiredBodies, retentionDays } from "./sync-store-pg";
+import { applyPendingReplies, applyReply, type ApplyDeps } from "./reply-apply";
+import { registerInboxRoutes } from "./inbox-routes";
+import { followupThread } from "./followup-thread";
+import { followupPolicy } from "@shared/followup-policy";
 import { replySyncFor, syncDueMailboxes, syncMailbox, type SyncDeps } from "./sync-service";
 import { loadKeyring } from "./token-crypto";
 
@@ -51,9 +55,20 @@ const deps: MailServiceDeps = {
   },
   async replySync(orgId) { return (await replySyncFor(orgId, syncDeps)).on; },
   syncState: (orgId, connectionId) => pgSyncStore.state(orgId, connectionId).catch(() => null),
+  retentionDays: () => retentionDays(process.env.MAIL_SYNC_RETENTION_DAYS).days,
   async purgeSynced(orgId, connectionId) {
     if (!(await mailSyncSchemaReady())) return 0;
     return pgSyncStore.purge(orgId, connectionId);
+  },
+};
+
+/** What a synced reply changes (reply-apply.ts). Notices go to the activity log: the company and what happened, no message content. */
+const applyDeps: ApplyDeps = {
+  now: () => new Date(),
+  log: (event, fields) => deps.log(event, fields),
+  async notify(n) {
+    const what = { replied: "replied to your outreach", opted_out: "asked not to be contacted", bounced: "outreach bounced", review: "a reply needs your review" }[n.what];
+    await storage.logActivity({ organizationId: n.orgId, userId: n.userId ?? "system", userName: "Gmail", action: what, entityType: "lead", entityId: String(n.leadId), detail: n.companyName });
   },
 };
 
@@ -67,6 +82,8 @@ const syncDeps: SyncDeps = {
   now: () => new Date(),
   random: Math.random,
   log: (event, fields) => deps.log(event, fields),
+  applyReply: (orgId, id) => applyReply(orgId, id, applyDeps),
+  applyPending: () => applyPendingReplies(applyDeps, { limit: 50 }),
 };
 
 /** "Check for replies now", for the signed-in person's own mailbox. */
@@ -114,10 +131,15 @@ const sendDeps: SendDeps = {
     return !!u && u.organizationId === orgId && u.memberStatus !== "removed";
   },
   log: deps.log,
+  async threadFor(orgId, messageId) {
+    return (await mailSyncSchemaReady()) ? followupThread(orgId, messageId) : null;
+  },
 };
 
 export function registerGmail(app: Express): void {
   registerGmailRoutes(app, { ...deps, auth: isAuthenticated, currentUser, send: sendDeps, syncNow });
+  registerInboxRoutes(app, { auth: isAuthenticated, apply: applyDeps, log: deps.log });
+  logStartupConfig();
   startRecoverySweep();
   startReplySync();
 }
@@ -136,6 +158,16 @@ function startRecoverySweep(): void {
     } catch (err) { deps.log("gmail_sweep_failed", { errorType: (err as Error)?.name ?? "Error", where: "leases" }); }
     const { repairAfterSend } = await import("../sales/outreach");
     await repairAfterSend(undefined, 50);
+    // Follow-ups that fell due become drafts for review (never sent from here), and synced text past retention goes.
+    if (await mailSyncSchemaReady()) {
+      const { draftDueFollowups } = await import("../sales/followups");
+      await draftDueFollowups(followupDeps, { limit: 10 });
+      const keep = retentionDays(process.env.MAIL_SYNC_RETENTION_DAYS).days;
+      if (keep) {
+        try { const n = await purgeExpiredBodies(keep, new Date()); if (n) deps.log("gmail_retention_purged", { messages: n, days: keep }); }
+        catch (err) { deps.log("gmail_sweep_failed", { errorType: (err as Error)?.name ?? "Error", where: "retention" }); }
+      }
+    }
   }, 120_000);
   sweeping.unref?.();
 }
@@ -169,4 +201,34 @@ export async function disconnectMailboxesOf(actor: Member, orgId: string, userId
   } catch (err) {
     deps.log("gmail_cleanup_failed", { reason, errorType: (err as Error)?.name ?? "Error" });
   }
+}
+
+const followupDeps = {
+  now: () => new Date(),
+  log: (event: string, fields?: Record<string, string | number | boolean | null>) => deps.log(event, fields),
+  async senderName(orgId: string, userId: string | null) {
+    const u: any = userId ? await storage.getUser(userId) : null;
+    const name = u && u.organizationId === orgId ? [u.firstName, u.lastName].filter(Boolean).join(" ").trim() : "";
+    return name || (await storage.getOrganization(orgId))?.name || "The team";
+  },
+  async notify(n: { orgId: string; leadId: number; companyName: string }) {
+    await storage.logActivity({ organizationId: n.orgId, userId: "system", userName: "Follow-ups", action: "follow-up ready for review", entityType: "lead", entityId: String(n.leadId), detail: n.companyName });
+  },
+};
+
+/**
+ * Settings that are wrong are said once at startup, by name (never their values): a Gmail switch that is on but
+ * unusable, a malformed follow-up or retention setting. The app keeps running with the feature off or the default.
+ */
+function logStartupConfig(): void {
+  const g = resolveGmailConfig();
+  const problems = [
+    ...(g.enabled ? [] : g.reason === "misconfigured" ? g.problems : []),
+    followupPolicy(process.env.OUTREACH_FOLLOWUP_BUSINESS_DAYS).problem,
+    retentionDays(process.env.MAIL_SYNC_RETENTION_DAYS).problem,
+  ].filter((p): p is string => !!p);
+  deps.log("gmail_config", {
+    integration: g.enabled, reason: g.enabled ? null : g.reason, provider: g.enabled ? g.config.provider : null,
+    sending: g.enabled ? sendingAvailability(g.config).ok : false, replySync: g.enabled ? g.config.replySync : false, problems: problems.join(" | ") || null,
+  });
 }

@@ -68,12 +68,19 @@ describe("GmailProvider: what it asks Google for", () => {
     const e = await failure(p.send("ya29", { from: "a@b.test", to: "c@d.test", subject: "s", text: "t", rfcMessageId: "<a@b>" }));
     expect(e?.kind).toBe("rejected");
     expect(calls).toHaveLength(0);
-    const cfg = resolveGmailConfig({ GMAIL_INTEGRATION_ENABLED: "true", MAIL_PROVIDER: "gmail", NODE_ENV: "production", GMAIL_OAUTH_CLIENT_ID: "9-z.apps.googleusercontent.com", GMAIL_OAUTH_CLIENT_SECRET: "s", GMAIL_OAUTH_REDIRECT_URI: "https://www.dealinsec.com/api/integrations/gmail/callback", MAILBOX_TOKEN_KEYS: `1:${Buffer.alloc(32, 7).fill(9, 0, 1).toString("base64")}`, MAILBOX_TOKEN_KEY_CURRENT: "1", GMAIL_SENDING_ENABLED: "true" });
+    const cfg = resolveGmailConfig({ GMAIL_INTEGRATION_ENABLED: "true", MAIL_PROVIDER: "gmail", NODE_ENV: "production", GMAIL_OAUTH_CLIENT_ID: "9-z.apps.googleusercontent.com", GMAIL_OAUTH_CLIENT_SECRET: "s", GMAIL_OAUTH_REDIRECT_URI: "https://www.dealinsec.com/api/integrations/gmail/callback", MAILBOX_TOKEN_KEYS: `1:${Buffer.alloc(32, 7).fill(9, 0, 1).toString("base64")}`, MAILBOX_TOKEN_KEY_CURRENT: "1" });
     if (!cfg.enabled) throw new Error(JSON.stringify(cfg));
     const built = createMailProvider(cfg.config, { NODE_ENV: "production" });
     const spy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => { throw new Error("no request may leave the machine"); });
     expect((await failure(built.send("ya29", { from: "a@b.test", to: "c@d.test", subject: "s", text: "t", rfcMessageId: "<a@b>" })))?.kind).toBe("rejected");
     expect(spy).not.toHaveBeenCalled();
+    // With GMAIL_SENDING_ENABLED the app builds an adapter that does send (a distinct instance: the setting is part of its key).
+    const onCfg = resolveGmailConfig({ ...Object.fromEntries(Object.entries({ GMAIL_INTEGRATION_ENABLED: "true", MAIL_PROVIDER: "gmail", NODE_ENV: "production", GMAIL_OAUTH_CLIENT_ID: "9-z.apps.googleusercontent.com", GMAIL_OAUTH_CLIENT_SECRET: "s", GMAIL_OAUTH_REDIRECT_URI: "https://www.dealinsec.com/api/integrations/gmail/callback", MAILBOX_TOKEN_KEYS: `1:${Buffer.alloc(32, 7).fill(9, 0, 1).toString("base64")}`, MAILBOX_TOKEN_KEY_CURRENT: "1" })), GMAIL_SENDING_ENABLED: "true" });
+    if (!onCfg.enabled) throw new Error(JSON.stringify(onCfg));
+    const sending = createMailProvider(onCfg.config, { NODE_ENV: "production" });
+    expect(sending).not.toBe(built);
+    spy.mockImplementation(async () => new Response(JSON.stringify({ id: "m1", threadId: "t1" }), { status: 200, headers: { "content-type": "application/json" } }));
+    expect(await sending.send("ya29", { from: "a@b.test", to: "c@d.test", subject: "s", text: "t", rfcMessageId: "<a@b>" })).toEqual({ providerMessageId: "m1", providerThreadId: "t1" });
     spy.mockRestore();
   });
 });

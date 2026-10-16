@@ -183,7 +183,11 @@ describe.skipIf(!URL_ || !loopback(URL_))("a send's follow-up, durable and once 
         store.addSuppression(s.org, { kind: "domain", value: "acme.test", reason: "manual", sourceMessageId: null, note: null, userId: null, now: now() }),
       ]);
       expect(ops.filter((o) => o.status === "rejected").map((o: any) => o.reason?.code ?? o.reason?.message)).toEqual([]);
-      expect(await tickets(s)).toBe(1);
+      // At most one follow-up task; none when "do not contact" committed first (no follow-up for a lead we may not write to).
+      const n = await tickets(s);
+      expect(n).toBeLessThanOrEqual(1);
+      const scheduled = (await q.query(`SELECT count(*)::int n FROM outreach_followups WHERE organization_id = $1 AND status = 'scheduled'`, [s.org]).catch(() => ({ rows: [{ n: 0 }] }))).rows[0].n;
+      expect(scheduled).toBe(n);
     }
   });
 });

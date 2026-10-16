@@ -7,6 +7,10 @@
  *   mail_sync_state  one row per connected mailbox: the Gmail history cursor, the lease, retry state and health
  *   mail_threads     a Gmail thread tied to one outreach message (sent from DealInSec, adopted, or found by reference)
  *   mail_messages    the synced messages of those conversations: the minimum to show and act on them
+ *   outreach_followups  the follow-up sequence of a sent outreach (due, drafted for review, sent, cancelled)
+ *
+ * Columns added later are nullable or defaulted, so the migration adds them to existing tables (ALTER TABLE ADD
+ * COLUMN) and code deployed before it still works.
  *
  * Nothing here holds a token, a raw message or HTML. Bodies are plain text, quoted history removed, capped at 20,000
  * characters (mail-parse.ts). Disconnecting a mailbox deletes its rows in all three tables.
@@ -18,6 +22,10 @@ export const THREAD_SOURCES = ["send", "adopted", "reference"] as const;
 export const MESSAGE_KINDS = ["reply", "auto_reply", "bounce", "own_reply", "outreach_copy"] as const;
 export const MATCH_KINDS = ["thread", "reference", "adopted", "address"] as const;
 export const REVIEW_STATES = ["none", "pending", "confirmed", "dismissed"] as const;
+/** Rule-based reply labels (reply-rules.ts); never produced by an AI model. */
+export const REPLY_LABELS = ["interested", "more_info", "not_interested", "opt_out", "out_of_office", "bounce", "needs_review"] as const;
+export const THREAD_STATUSES = ["awaiting", "replied", "interested", "not_interested", "opted_out", "bounced", "needs_review"] as const;
+export const FOLLOWUP_STATUSES = ["scheduled", "held", "drafted", "sent", "cancelled", "skipped"] as const;
 const list = (xs: readonly string[]) => xs.map((x) => `'${x}'`).join(", ");
 
 export const MAIL_SYNC_TABLES: TableSpec[] = [
@@ -65,12 +73,18 @@ export const MAIL_SYNC_TABLES: TableSpec[] = [
       ["last_inbound_at", "timestamp"],
       ["created_at", "timestamp NOT NULL"],
       ["updated_at", "timestamp NOT NULL"],
+      ["status", "varchar(16) NOT NULL DEFAULT 'awaiting'"], // the conversation, for the inbox (reply-apply.ts)
+      ["status_at", "timestamp"],
     ],
-    checks: [["mail_threads_source_ck", `source IN (${list(THREAD_SOURCES)})`]],
+    checks: [
+      ["mail_threads_source_ck", `source IN (${list(THREAD_SOURCES)})`],
+      ["mail_threads_status_ck", `status IN (${list(THREAD_STATUSES)})`],
+    ],
     indexes: [
       { name: "mail_threads_connection_thread_uq", unique: true, columns: ["connection_id", "provider_thread_id"] },
       { name: "mail_threads_lead_idx", columns: ["organization_id", "lead_id"] },
       { name: "mail_threads_message_idx", columns: ["organization_id", "lead_message_id"] },
+      { name: "mail_threads_inbox_idx", columns: ["organization_id", "last_message_at"] },
     ],
   },
   {
@@ -100,6 +114,10 @@ export const MAIL_SYNC_TABLES: TableSpec[] = [
       ["sent_at", "timestamp NOT NULL"],
       ["applied_at", "timestamp"], // when its effect on the outreach (replied, follow-up paused) was applied: the outbox
       ["created_at", "timestamp NOT NULL"],
+      ["classification", "varchar(16)"], // reply-rules.ts label, or a person's correction
+      ["classified_by", "varchar(8)"], // rules | user
+      ["classifier_version", "varchar(12)"],
+      ["body_removed_at", "timestamp"], // the text was deleted under the retention period; the rest stays
     ],
     checks: [
       ["mail_messages_direction_ck", `direction IN ('in', 'out')`],
@@ -108,6 +126,7 @@ export const MAIL_SYNC_TABLES: TableSpec[] = [
       ["mail_messages_review_ck", `review_state IN (${list(REVIEW_STATES)}) AND (review_reason IS NULL OR review_reason IN ('address_only', 'other_sender'))`],
       // Only a linked message has a thread; an address-only match is linked once a person confirms it.
       ["mail_messages_thread_ck", `thread_id IS NOT NULL OR (match_kind = 'address' AND review_state <> 'confirmed')`],
+      ["mail_messages_class_ck", `(classification IS NULL OR classification IN (${list(REPLY_LABELS)})) AND (classified_by IS NULL OR classified_by IN ('rules', 'user'))`],
     ],
     indexes: [
       // The idempotency key: a message is stored once per mailbox, however often it is seen.
@@ -117,6 +136,37 @@ export const MAIL_SYNC_TABLES: TableSpec[] = [
       { name: "mail_messages_rfc_idx", columns: ["connection_id", "rfc_message_id"], where: "rfc_message_id IS NOT NULL" },
       { name: "mail_messages_review_idx", columns: ["organization_id", "connection_id"], where: "review_state = 'pending'" },
       { name: "mail_messages_unapplied_idx", columns: ["organization_id", "created_at"], where: "applied_at IS NULL AND direction = 'in'" },
+      { name: "mail_messages_retention_idx", columns: ["sent_at"], where: "body_text IS NOT NULL" },
+    ],
+  },
+  {
+    name: "outreach_followups",
+    columns: [
+      ["id", "serial PRIMARY KEY"],
+      ["organization_id", "varchar NOT NULL"],
+      ["lead_id", "integer NOT NULL"],
+      ["root_message_id", "integer NOT NULL"], // the first outreach (lead_messages.id) this sequence follows
+      ["after_message_id", "integer NOT NULL"], // the message this step follows (the root, or the previous follow-up)
+      ["step", "smallint NOT NULL"], // 1, 2, …
+      ["due_at", "timestamp NOT NULL"],
+      ["status", "varchar(12) NOT NULL"],
+      ["reason", "varchar(24)"], // why cancelled, skipped or held (replied, opted_out, bounced, suppressed, review…)
+      ["draft_message_id", "integer"], // the follow-up draft (lead_messages.id) waiting for review
+      ["attempts", "integer NOT NULL DEFAULT 0"],
+      ["lease_until", "timestamp"], // drafting in progress
+      ["created_at", "timestamp NOT NULL"],
+      ["updated_at", "timestamp NOT NULL"],
+    ],
+    checks: [
+      ["outreach_followups_status_ck", `status IN (${list(FOLLOWUP_STATUSES)})`],
+      ["outreach_followups_step_ck", `step BETWEEN 1 AND 5`],
+      ["outreach_followups_draft_ck", `status <> 'drafted' OR draft_message_id IS NOT NULL`],
+    ],
+    indexes: [
+      { name: "outreach_followups_root_step_uq", unique: true, columns: ["root_message_id", "step"] },
+      { name: "outreach_followups_draft_uq", unique: true, columns: ["draft_message_id"], where: "draft_message_id IS NOT NULL" },
+      { name: "outreach_followups_due_idx", columns: ["status", "due_at"] },
+      { name: "outreach_followups_lead_idx", columns: ["organization_id", "lead_id"] },
     ],
   },
 ];

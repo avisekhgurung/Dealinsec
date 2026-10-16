@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { createMailProvider, DEFAULT_SEND_DAILY_CAP, forOrg, parseOrgList, GMAIL_SENDING_ENABLED, gmailIntegrationGate, MAX_SEND_DAILY_CAP, parseDailyCap, resolveGmailConfig, sendingAvailability } from "./config";
+import { createMailProvider, DEFAULT_SEND_DAILY_CAP, forOrg, parseOrgList, gmailIntegrationGate, MAX_SEND_DAILY_CAP, parseDailyCap, resolveGmailConfig, sendingAvailability } from "./config";
 import { FakeMailProvider } from "./fake-provider";
 import { GmailProvider } from "./gmail-provider";
 import { MAILBOX_TABLES, type Exec } from "./mailbox-schema";
@@ -69,15 +69,20 @@ describe("Gmail integration switch", () => {
     const p = createMailProvider(s.config);
     expect(p).toBeInstanceOf(GmailProvider);
     expect(createMailProvider(s.config)).toBe(p);
-    expect(GMAIL_SENDING_ENABLED).toBe(false);
+    expect(s.config.sendingEnabled).toBe(false); // off unless GMAIL_SENDING_ENABLED says so
     expect(() => createMailProvider({ ...s.config, oauth: null })).toThrow(/OAuth settings/);
   });
 
-  it("sending: never through the real Gmail adapter in this build; the fake only outside production; an invalid cap stops it", () => {
+  it("sending: the real Gmail adapter only with GMAIL_SENDING_ENABLED; the fake only outside production; an invalid cap stops it", () => {
     const gmail = resolveGmailConfig({ GMAIL_INTEGRATION_ENABLED: "true", ...KEYS, ...GMAIL });
     if (!gmail.enabled) throw new Error("expected enabled");
     expect(sendingAvailability(gmail.config)).toEqual({ ok: false, reason: "sending_disabled" });
-    expect(sendingAvailability(gmail.config, { NODE_ENV: "development", GMAIL_SENDING_ENABLED: "true", MAIL_FAKE_SEND: "true" } as any)).toEqual({ ok: false, reason: "sending_disabled" });
+    // The setting is read once, into the config: a variable appearing later in the process changes nothing.
+    expect(sendingAvailability(gmail.config, { NODE_ENV: "development", GMAIL_SENDING_ENABLED: "true" } as any)).toEqual({ ok: false, reason: "sending_disabled" });
+    const on = resolveGmailConfig({ GMAIL_INTEGRATION_ENABLED: "true", ...KEYS, ...GMAIL, GMAIL_SENDING_ENABLED: "true" });
+    if (!on.enabled) throw new Error("expected enabled");
+    expect(sendingAvailability(on.config)).toEqual({ ok: true, cap: DEFAULT_SEND_DAILY_CAP });
+    expect(resolveGmailConfig({ GMAIL_INTEGRATION_ENABLED: "true", ...KEYS, ...GMAIL, GMAIL_SENDING_ENABLED: "yes" })).toMatchObject({ enabled: false, reason: "misconfigured" });
     const fake = resolveGmailConfig(FAKE_ON);
     if (!fake.enabled) throw new Error("expected enabled");
     expect(sendingAvailability(fake.config, { NODE_ENV: "development" })).toEqual({ ok: true, cap: DEFAULT_SEND_DAILY_CAP });
