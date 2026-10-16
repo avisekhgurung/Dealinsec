@@ -107,8 +107,9 @@ export default function AgentPage() {
             </Link>
           )}
           <span className="hidden h-8 w-8 items-center justify-center rounded-lg bg-emerald-600/10 text-emerald-700 dark:text-emerald-400 sm:flex"><Sparkles className="h-4 w-4" /></span>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-base font-bold leading-tight">DealInSec Agent</h1>
+          <div className="relative min-w-0 flex-1">
+            {/* On a phone the switcher already says "Agent"; the buttons need the row more than a truncated title. */}
+            <h1 className={`truncate text-base font-bold leading-tight ${focus ? "sr-only sm:not-sr-only" : ""}`}>DealInSec Agent</h1>
             <p className="hidden truncate text-xs text-muted-foreground sm:block">Your deals, handled in one conversation</p>
           </div>
           {canCall && !unavailable && (

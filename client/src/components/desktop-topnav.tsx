@@ -34,7 +34,7 @@ import {
   hasLapsedTrial,
   getTrialDaysLeft,
 } from "@shared/schema";
-import { NAV_ICONS, desktopNavSections, navItem } from "@/lib/nav";
+import { desktopNavSections, navItem } from "@/lib/nav";
 import { usePlanPrices, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
 
 /** Plan lifecycle states, resolved strictly in this order. */
@@ -133,8 +133,9 @@ export function DesktopTopNav() {
         className={`dis-topnav-chip inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[12px] font-semibold whitespace-nowrap ${tone}`}
       >
         {icon}
-        <span className="hidden xl:inline">{text}</span>
-        <span className="xl:hidden tabular-nums">{short}</span>
+        {/* The bar stops growing at 1600px, so the long wording appears only once it has reached full width. */}
+        <span className="hidden min-[1600px]:inline">{text}</span>
+        <span className="min-[1600px]:hidden tabular-nums">{short}</span>
       </Link>
     </BarTip>
   );
@@ -149,7 +150,7 @@ export function DesktopTopNav() {
               className="dis-topnav-chip inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[12px] font-semibold text-white/75 whitespace-nowrap"
             >
               <Users className="w-3.5 h-3.5" />
-              <span className="hidden xl:inline">
+              <span className="hidden min-[1600px]:inline">
                 {entitlements?.pro ? "Team · Pro" : entitlements?.trial ? "Team · Pro trial" : "Team · Free"}
               </span>
             </span>
@@ -185,7 +186,7 @@ export function DesktopTopNav() {
               className="gradient-btn inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full text-[12px] font-semibold text-white whitespace-nowrap"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              {checkoutAvailable ? <>Upgrade<span className="hidden xl:inline">&nbsp;— {formatRupees(proMonthlyPrice)}/mo</span></> : <>See Pro plans</>}
+              {checkoutAvailable ? <>Upgrade<span className="hidden min-[1600px]:inline">&nbsp;— {formatRupees(proMonthlyPrice)}/mo</span></> : <>See Pro plans</>}
             </Link>
           </BarTip>
         );
@@ -226,7 +227,6 @@ export function DesktopTopNav() {
                 <div role="group" aria-label={section.label} className="flex items-stretch">
                   {section.items.map((item) => {
                     const active = item.isActive(location);
-                    const Icon = NAV_ICONS[item.key];
                     return (
                       <Link
                         key={item.key}
@@ -235,8 +235,6 @@ export function DesktopTopNav() {
                         aria-current={active ? "page" : undefined}
                         className="dis-topnav-tab relative flex items-center gap-2 px-2.5 xl:px-4 text-[14px] font-semibold whitespace-nowrap outline-none focus-visible:bg-white/10"
                       >
-                        {/* Seven tabs plus the plan chip need the room below 2xl; the label carries the meaning. */}
-                        <Icon className="hidden 2xl:block w-[17px] h-[17px]" strokeWidth={active ? 2.3 : 1.9} />
                         {/* Short labels at lg ("Outbound", "Quotes") keep 1024px from overflowing. */}
                         <span className="xl:hidden">{item.shortLabel}</span>
                         <span className="hidden xl:inline">{item.label}</span>
@@ -251,7 +249,9 @@ export function DesktopTopNav() {
 
           {/* ── Account ── */}
           <div className="ml-auto flex shrink-0 items-center gap-1.5 xl:gap-2 pl-3">
-            <ModeSwitcher tone="dark" labelsFrom="xl" />
+            {/* Icons, with their names as tooltip and accessible label. The bar is capped at 1600px, so a wider
+                screen never buys room for the switcher's words next to seven full tab labels and the plan chip. */}
+            <ModeSwitcher tone="dark" labelsFrom="never" />
             {planChip()}
 
             <span aria-hidden="true" className="mx-1 h-6 w-px bg-white/15" />

@@ -52,7 +52,8 @@ const OPTIONS: { value: Mode; label: string; Icon: typeof Sparkles; hint: string
  * Workspace | Agent, as a radio group: the selected mode is always visible, arrow keys move between them, and the
  * indicator slides to the new one. `tone` matches the surface it sits on.
  */
-export function ModeSwitcher({ tone = "light", labelsFrom, className }: { tone?: "light" | "dark"; /** Show text labels only from this breakpoint (icons + accessible names below it). */ labelsFrom?: "sm" | "xl"; className?: string }) {
+export function ModeSwitcher({ tone = "light", labelsFrom, className }: { tone?: "light" | "dark"; /** Show text labels only from this breakpoint (icons + accessible names below it). "never" keeps the
+   *  crowded desktop top bar icon-only at every width. */ labelsFrom?: "sm" | "xl" | "never"; className?: string }) {
   const compact = !!labelsFrom;
   const { mode, select } = useModeSwitch();
   const id = useId();
@@ -107,7 +108,7 @@ export function ModeSwitcher({ tone = "light", labelsFrom, className }: { tone?:
               />
             )}
             <o.Icon className={cn("h-3.5 w-3.5", active && o.value === "agent" && !dark && "text-emerald-600")} aria-hidden="true" />
-            <span className={labelsFrom === "sm" ? "sr-only sm:not-sr-only" : labelsFrom === "xl" ? "sr-only xl:not-sr-only" : ""}>{o.label}</span>
+            <span className={labelsFrom === "sm" ? "sr-only sm:not-sr-only" : labelsFrom === "xl" ? "sr-only xl:not-sr-only" : labelsFrom === "never" ? "sr-only" : ""}>{o.label}</span>
           </button>
         );
       })}
