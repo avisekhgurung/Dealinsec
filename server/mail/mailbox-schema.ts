@@ -17,7 +17,7 @@
 
 export type Exec = (text: string, params?: unknown[]) => Promise<{ rows: any[] }>;
 
-interface TableSpec {
+export interface TableSpec {
   name: string;
   columns: [name: string, ddl: string][];
   checks: [name: string, expr: string][];
@@ -114,8 +114,8 @@ const createIndex = (t: TableSpec, i: TableSpec["indexes"][number], prefix = "",
   `CREATE ${i.unique ? "UNIQUE " : ""}INDEX ${temp ? "" : "IF NOT EXISTS "}${prefix}${i.name} ON ${prefix}${t.name} (${i.columns.join(", ")})${i.where ? ` WHERE ${i.where}` : ""}`;
 
 /** The statements a fresh database gets (also the documentation of the schema). */
-export function mailboxDdl(): string[] {
-  return MAILBOX_TABLES.flatMap((t) => [createTable(t), ...t.indexes.map((i) => createIndex(t, i))]);
+export function mailboxDdl(tables: TableSpec[] = MAILBOX_TABLES): string[] {
+  return tables.flatMap((t) => [createTable(t), ...t.indexes.map((i) => createIndex(t, i))]);
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -180,9 +180,10 @@ export function compareMailboxSchema(input: {
   actual: Record<string, TableSnap | null>;
   names: NameUse[];
   final: boolean;
+  tables?: TableSpec[];
 }): string[] {
   const problems: string[] = [];
-  for (const spec of MAILBOX_TABLES) {
+  for (const spec of input.tables ?? MAILBOX_TABLES) {
     const exp = input.expected[spec.name];
     const act = input.actual[spec.name];
     const own = new Set(spec.indexes.map((i) => i.name));
@@ -230,15 +231,15 @@ export class MailboxSchemaError extends Error {
   }
 }
 
-async function inspect(exec: Exec, final: boolean): Promise<string[]> {
+async function inspect(exec: Exec, final: boolean, tables: TableSpec[]): Promise<string[]> {
   const expected: Record<string, TableSnap> = {};
   const actual: Record<string, TableSnap | null> = {};
-  for (const t of MAILBOX_TABLES) {
+  for (const t of tables) {
     expected[t.name] = (await snapTable(exec, EXPECT + t.name, true))!;
     actual[t.name] = await snapTable(exec, t.name);
   }
-  const names = await snapNames(exec, MAILBOX_TABLES.flatMap((t) => [t.name, ...t.indexes.map((i) => i.name)]));
-  return compareMailboxSchema({ expected, actual, names, final });
+  const names = await snapNames(exec, tables.flatMap((t) => [t.name, ...t.indexes.map((i) => i.name)]));
+  return compareMailboxSchema({ expected, actual, names, final, tables });
 }
 
 export interface MailboxMigrationResult { created: string[]; addedChecks: string[]; createdIndexes: string[]; dryRun: boolean }
@@ -248,19 +249,20 @@ export interface MailboxMigrationResult { created: string[]; addedChecks: string
  * BEGIN/COMMIT itself). Refuses with MailboxSchemaError, rolling back, if anything conflicts. `dryRun` checks and
  * rolls back without changing anything.
  */
-export async function runMailboxMigration(exec: Exec, opts: { dryRun?: boolean } = {}): Promise<MailboxMigrationResult> {
+export async function runMailboxMigration(exec: Exec, opts: { dryRun?: boolean; tables?: TableSpec[] } = {}): Promise<MailboxMigrationResult> {
+  const tables = opts.tables ?? MAILBOX_TABLES;
   await exec("BEGIN");
   try {
     await exec(`SELECT pg_advisory_xact_lock($1::int, 0)`, [MIGRATION_LOCK]);
-    for (const t of MAILBOX_TABLES) {
+    for (const t of tables) {
       await exec(createTable(t, EXPECT + t.name, true));
       for (const i of t.indexes) await exec(createIndex(t, i, EXPECT, true));
     }
-    const conflicts = await inspect(exec, false);
+    const conflicts = await inspect(exec, false, tables);
     if (conflicts.length) throw new MailboxSchemaError(conflicts);
 
     const result: MailboxMigrationResult = { created: [], addedChecks: [], createdIndexes: [], dryRun: !!opts.dryRun };
-    for (const t of MAILBOX_TABLES) {
+    for (const t of tables) {
       const before = await snapTable(exec, t.name);
       if (!before) result.created.push(t.name);
       await exec(createTable(t));
@@ -275,7 +277,7 @@ export async function runMailboxMigration(exec: Exec, opts: { dryRun?: boolean }
         await exec(createIndex(t, i));
       }
     }
-    const remaining = await inspect(exec, true);
+    const remaining = await inspect(exec, true, tables);
     if (remaining.length) throw new MailboxSchemaError(remaining);
     await exec(opts.dryRun ? "ROLLBACK" : "COMMIT");
     return result;
@@ -289,9 +291,9 @@ export async function runMailboxMigration(exec: Exec, opts: { dryRun?: boolean }
  * The runtime check (read-only, no temporary tables): every table, column, check and index is present by name and
  * every table is an ordinary table. The migration has already judged definitions; this only answers "was it run?".
  */
-export async function mailboxSchemaPresent(exec: Exec): Promise<{ ok: true } | { ok: false; missing: string[] }> {
+export async function mailboxSchemaPresent(exec: Exec, tables: TableSpec[] = MAILBOX_TABLES): Promise<{ ok: true } | { ok: false; missing: string[] }> {
   const missing: string[] = [];
-  for (const t of MAILBOX_TABLES) {
+  for (const t of tables) {
     const s = await snapTable(exec, t.name);
     if (!s || s.relkind !== "r") { missing.push(t.name); continue; }
     for (const [c] of t.columns) if (!s.columns.some((x) => x.name === c)) missing.push(`${t.name}.${c}`);

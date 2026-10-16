@@ -40,11 +40,37 @@ export const CONNECT_DISCLOSURE = [
   "When reply syncing arrives, conversations with your leads will be visible to members of your organization who can open those leads.",
   "Disconnecting removes DealInSec's access at Google and deletes the stored credentials. A minimal record (which account, when) is kept for your organization's audit history.",
 ];
+/** The same, when reply sync is on: connecting also asks to read mail, and says exactly what is kept. */
+export const CONNECT_DISCLOSURE_WITH_SYNC = [
+  "DealInSec asks Google to see your email address, send email as you, and read your mail. It can't change or delete anything in your mailbox.",
+  "Reading is used only to find replies to your outreach: DealInSec keeps the messages of those conversations as plain text, and nothing else from your mailbox.",
+  "Conversations with your leads are visible to members of your organization who can open those leads. A message that only might belong to a lead is shown to you alone until you confirm it.",
+  "Only you can send from your mailbox; owners and admins can't send as you. Every message still needs your approval first.",
+  "Disconnecting removes DealInSec's access at Google, deletes the stored credentials and every synced message. A minimal record (which account, when) is kept for your organization's audit history.",
+];
+export const connectDisclosure = (replySync: boolean) => (replySync ? CONNECT_DISCLOSURE_WITH_SYNC : CONNECT_DISCLOSURE);
+
+/** Reply sync, as the Settings card shows it. */
+export type ReplySyncState = "off" | "needs_permission" | "starting" | "ok" | "retrying" | "needs_reconnect";
+export interface ReplySyncView {
+  available: boolean; // switched on for this organization (connecting asks for read access)
+  granted: boolean; // this connection allows reading
+  state: ReplySyncState;
+  lastSyncedAt: string | null;
+}
+export const REPLY_SYNC_TEXT: Record<ReplySyncState, string> = {
+  off: "Reply sync isn't switched on.",
+  needs_permission: "Reconnect and allow \"Read your email\" so DealInSec can find replies to your outreach.",
+  starting: "Looking for replies to your outreach. This takes a few minutes the first time.",
+  ok: "Replies to your outreach are synced every few minutes.",
+  retrying: "Gmail didn't answer the last check. DealInSec will try again shortly.",
+  needs_reconnect: "Your Gmail connection needs reconnecting before replies can sync.",
+};
 
 export interface GmailConnectionView {
   status: "active" | "needs_reconnect";
   accountEmail: string;
-  capabilities: { identify: boolean; send: boolean };
+  capabilities: { identify: boolean; send: boolean; read: boolean };
   connectedAt: string;
   problem: { code: string; message: string; at: string | null } | null;
 }
@@ -53,6 +79,7 @@ export interface GmailStatusView {
   sendingEnabled: boolean; // this build may send from a connected mailbox (never through the real Gmail adapter yet; the local fake only)
   canConnect: boolean; // this person's role allows it
   connection: GmailConnectionView | null;
+  replySync: ReplySyncView;
 }
 export type VerifyResult = "ok" | "not_connected" | "needs_reconnect" | "temporarily_unavailable";
 

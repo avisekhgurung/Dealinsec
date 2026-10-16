@@ -1,6 +1,7 @@
 /**
- * The boundary between DealInSec and a mailbox provider. Release A needs only: connect (authorization URL, code
- * exchange), keep access (refresh, revoke) and send one message. Reading a mailbox is Release B and is not here.
+ * The boundary between DealInSec and a mailbox provider. Release A: connect (authorization URL, code exchange), keep
+ * access (refresh, revoke) and send one message. Release B (reply sync, behind GMAIL_REPLY_SYNC_ENABLED): read-only
+ * calls that find replies to outreach (MailboxReader below); nothing here can change or delete mail.
  *
  * Adapters classify every failure into MailProviderError kinds, so callers never parse provider responses. For a send,
  * the distinction that matters is whether the provider may have acted: "uncertain" (a timeout, a dropped connection,
@@ -8,22 +9,32 @@
  */
 
 export const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send";
+/**
+ * Release B: read messages, to find replies to outreach. A Google "restricted" scope: production use needs Google's
+ * verification and a yearly security assessment (docs/gmail-reply-sync.md). Requested only while reply sync is on.
+ */
+export const GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly";
 /** Release A: identify the account, and send. No read scope of any kind. */
 export const RELEASE_A_SCOPES = ["openid", "email", GMAIL_SEND_SCOPE] as const;
+/** Release B: Release A plus reading (never modify, compose, insert, labels or settings). */
+export const REPLY_SYNC_SCOPES = [...RELEASE_A_SCOPES, GMAIL_READONLY_SCOPE] as const;
 /** Google reports the "email" scope by its long name. */
 const SCOPE_ALIASES: Record<string, string> = { "https://www.googleapis.com/auth/userinfo.email": "email" };
-/** Anything that could read, change or delete mail. Release A never holds one; a grant that includes one is refused. */
-const MAILBOX_ACCESS = /^https:\/\/(mail\.google\.com\/|www\.googleapis\.com\/auth\/gmail\.(?!send$))/;
+/** Anything that could change or delete mail, or read it beyond gmail.readonly. Never held; a grant that includes one is refused. */
+const MAILBOX_ACCESS = /^https:\/\/(mail\.google\.com\/|www\.googleapis\.com\/auth\/gmail\.(?!send$|readonly$))/;
 
 /** Granted scopes in one comparable form: deduplicated, aliases folded, sorted. */
 export function normalizeScopes(raw: string | string[] | undefined | null): string[] {
   const list = Array.isArray(raw) ? raw : String(raw ?? "").split(/\s+/);
   return Array.from(new Set(list.map((x) => x.trim()).filter(Boolean).map((x) => SCOPE_ALIASES[x] ?? x))).sort();
 }
-/** What a set of granted scopes lets DealInSec do, in Release A terms. */
-export function capabilitiesOf(scopes: readonly string[]): { identify: boolean; send: boolean; mailboxAccess: boolean } {
+/**
+ * What a set of granted scopes lets DealInSec do. `read` is gmail.readonly (reply sync); `mailboxAccess` is anything
+ * more (changing, deleting, composing, full access), which DealInSec never asks for and refuses to hold.
+ */
+export function capabilitiesOf(scopes: readonly string[]): { identify: boolean; send: boolean; read: boolean; mailboxAccess: boolean } {
   const s = normalizeScopes([...scopes]);
-  return { identify: s.includes("email"), send: s.includes(GMAIL_SEND_SCOPE), mailboxAccess: s.some((x) => MAILBOX_ACCESS.test(x)) };
+  return { identify: s.includes("email"), send: s.includes(GMAIL_SEND_SCOPE), read: s.includes(GMAIL_READONLY_SCOPE), mailboxAccess: s.some((x) => MAILBOX_ACCESS.test(x)) };
 }
 
 export interface MailAccount {
@@ -33,6 +44,8 @@ export interface MailAccount {
 }
 
 export interface AuthorizationRequest {
+  /** What to ask for; the provider's Release A scopes when absent. */
+  scopes?: readonly string[];
   state: string;
   codeChallenge: string; // PKCE, S256
   nonce: string; // echoed in the identity token: ties the identity to this request
@@ -77,6 +90,8 @@ export type MailErrorKind =
   | "rejected" // the provider (or the adapter) refused this request as invalid; nothing was done
   | "unavailable" // a non-send call failed in transit; safe to try again later
   | "identity_invalid" // the provider's identity token failed validation (issuer, audience, expiry, nonce, claims)
+  | "cursor_expired" // reading: the sync position is too old for the provider's change history; start over from now
+  | "not_found" // reading: the message or thread is gone (deleted since it was listed)
   | "uncertain"; // a send whose outcome is unknown: it may have gone out
 
 export class MailProviderError extends Error {
@@ -98,6 +113,52 @@ export interface MailProvider {
   refreshAccessToken(refreshToken: string): Promise<AccessGrant>;
   revoke(token: string): Promise<void>;
   send(accessToken: string, mail: OutgoingMail): Promise<SentMail>;
+}
+
+/* ── Release B: reading, for reply sync ─────────────────────────────────────────────── */
+
+/** A header, as the provider decoded it. */
+export interface MailHeader { name: string; value: string }
+/** One MIME part, Gmail's shape (format "full" or "metadata"). `data` is base64url, already transfer-decoded. */
+export interface MailPart {
+  mimeType?: string;
+  filename?: string;
+  headers?: MailHeader[];
+  body?: { size?: number; data?: string; attachmentId?: string };
+  parts?: MailPart[];
+}
+/** A message as read from the mailbox. `payload` has headers only for "metadata", the whole tree for "full". */
+export interface MailboxMessage {
+  id: string;
+  threadId: string;
+  labelIds: string[];
+  internalDate: Date | null;
+  payload: MailPart;
+}
+/** A message id seen in the change history or a listing (no content). */
+export interface MessageRef { id: string; threadId: string; labelIds?: string[] }
+export interface HistoryPage {
+  /** Change records in ascending order; each has its own history id (a safe place to resume after). */
+  records: { id: string; added: MessageRef[] }[];
+  /** The mailbox's current history id. */
+  historyId: string;
+  nextPageToken: string | null;
+}
+
+/**
+ * The read-only calls reply sync needs. Every call takes a short-lived access token; none can change the mailbox.
+ * Failures are MailProviderError kinds: invalid_grant, insufficient_scope, rate_limited, unavailable (try later),
+ * cursor_expired (history), not_found (a message deleted since it was listed), rejected.
+ */
+export interface MailboxReader {
+  profile(accessToken: string): Promise<{ email: string; historyId: string }>;
+  history(accessToken: string, input: { startHistoryId: string; pageToken?: string | null; maxResults?: number }): Promise<HistoryPage>;
+  /** Message ids matching a provider search (Gmail's `q`), newest first. */
+  search(accessToken: string, input: { q: string; maxResults?: number; pageToken?: string | null }): Promise<{ messages: MessageRef[]; nextPageToken: string | null }>;
+  /** The ids (and labels) of a thread's messages, no content. */
+  threadMessages(accessToken: string, threadId: string): Promise<MessageRef[]>;
+  /** "metadata": the named headers only; "full": headers and body. */
+  message(accessToken: string, id: string, format: "metadata" | "full", headers?: readonly string[]): Promise<MailboxMessage>;
 }
 
 const LINE_BREAK = /[\r\n\u0085\u2028\u2029]/;

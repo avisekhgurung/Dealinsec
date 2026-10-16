@@ -1632,3 +1632,96 @@ export const mailSendJobs = pgTable("mail_send_jobs", {
   connectionIdx: index("mail_send_jobs_connection_idx").on(t.connectionId, t.createdAt),
 }));
 export type MailSendJobRow = typeof mailSendJobs.$inferSelect;
+
+/*
+ * Gmail reply sync (Release B; script/migrate-mail-sync.ts, server/mail/mail-sync-schema.ts holds the authoritative DDL
+ * and the two are tested to agree). Plain text only, the minimum to show a conversation; deleted with the mailbox.
+ */
+/** Per connected mailbox: where its Gmail history was last read up to, who is reading it now, and how it is doing. */
+export const mailSyncState = pgTable("mail_sync_state", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  connectionId: integer("connection_id").notNull(),
+  historyId: varchar("history_id", { length: 24 }),
+  bootstrappedAt: timestamp("bootstrapped_at"),
+  state: varchar("state", { length: 16 }).notNull(), // ok | retrying | needs_reconnect | needs_scope
+  leaseOwner: varchar("lease_owner", { length: 40 }),
+  leaseUntil: timestamp("lease_until"),
+  nextRunAt: timestamp("next_run_at").notNull(),
+  lastRunAt: timestamp("last_run_at"),
+  lastSuccessAt: timestamp("last_success_at"),
+  failures: integer("failures").notNull().default(0),
+  lastErrorCode: varchar("last_error_code", { length: 40 }),
+  lastErrorAt: timestamp("last_error_at"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  stateCk: check("mail_sync_state_state_ck", sql`state IN ('ok', 'retrying', 'needs_reconnect', 'needs_scope')`),
+  failuresCk: check("mail_sync_state_failures_ck", sql`failures >= 0`),
+  leaseCk: check("mail_sync_state_lease_ck", sql`(lease_owner IS NULL) = (lease_until IS NULL)`),
+  connectionUq: uniqueIndex("mail_sync_state_connection_uq").on(t.connectionId),
+  dueIdx: index("mail_sync_state_due_idx").on(t.nextRunAt),
+}));
+export type MailSyncStateRow = typeof mailSyncState.$inferSelect;
+
+/** A Gmail thread tied to one outreach message: every later message in it belongs to that conversation. */
+export const mailThreads = pgTable("mail_threads", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  connectionId: integer("connection_id").notNull(),
+  providerThreadId: varchar("provider_thread_id", { length: 200 }).notNull(),
+  leadId: integer("lead_id").notNull(),
+  leadMessageId: integer("lead_message_id").notNull(),
+  source: varchar("source", { length: 12 }).notNull(), // send | adopted | reference
+  lastMessageAt: timestamp("last_message_at"),
+  lastInboundAt: timestamp("last_inbound_at"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  sourceCk: check("mail_threads_source_ck", sql`source IN ('send', 'adopted', 'reference')`),
+  connectionThreadUq: uniqueIndex("mail_threads_connection_thread_uq").on(t.connectionId, t.providerThreadId),
+  leadIdx: index("mail_threads_lead_idx").on(t.organizationId, t.leadId),
+  messageIdx: index("mail_threads_message_idx").on(t.organizationId, t.leadMessageId),
+}));
+export type MailThreadRow = typeof mailThreads.$inferSelect;
+
+/** A synced message of an outreach conversation (or one awaiting review). Stored once per mailbox and Gmail id. */
+export const mailMessages = pgTable("mail_messages", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  connectionId: integer("connection_id").notNull(),
+  providerMessageId: varchar("provider_message_id", { length: 200 }).notNull(),
+  providerThreadId: varchar("provider_thread_id", { length: 200 }).notNull(),
+  threadId: integer("thread_id"),
+  leadId: integer("lead_id").notNull(),
+  leadMessageId: integer("lead_message_id").notNull(),
+  direction: varchar("direction", { length: 3 }).notNull(), // in | out
+  kind: varchar("kind", { length: 16 }).notNull(), // reply | auto_reply | bounce | own_reply | outreach_copy
+  matchKind: varchar("match_kind", { length: 12 }).notNull(), // thread | reference | adopted | address
+  reviewReason: varchar("review_reason", { length: 16 }), // address_only | other_sender
+  reviewState: varchar("review_state", { length: 12 }).notNull(), // none | pending | confirmed | dismissed
+  fromAddress: varchar("from_address", { length: 254 }),
+  fromName: varchar("from_name", { length: 120 }),
+  toAddresses: jsonb("to_addresses").notNull().default(sql`'[]'::jsonb`),
+  subject: varchar("subject", { length: 300 }).notNull().default(""),
+  bodyText: text("body_text"),
+  bodyTrimmed: boolean("body_trimmed").notNull().default(false),
+  rfcMessageId: varchar("rfc_message_id", { length: 255 }),
+  inReplyTo: varchar("in_reply_to", { length: 255 }),
+  sentAt: timestamp("sent_at").notNull(),
+  appliedAt: timestamp("applied_at"),
+  createdAt: timestamp("created_at").notNull(),
+}, (t) => ({
+  directionCk: check("mail_messages_direction_ck", sql`direction IN ('in', 'out')`),
+  kindCk: check("mail_messages_kind_ck", sql`kind IN ('reply', 'auto_reply', 'bounce', 'own_reply', 'outreach_copy')`),
+  matchCk: check("mail_messages_match_ck", sql`match_kind IN ('thread', 'reference', 'adopted', 'address')`),
+  reviewCk: check("mail_messages_review_ck", sql`review_state IN ('none', 'pending', 'confirmed', 'dismissed') AND (review_reason IS NULL OR review_reason IN ('address_only', 'other_sender'))`),
+  threadCk: check("mail_messages_thread_ck", sql`thread_id IS NOT NULL OR (match_kind = 'address' AND review_state <> 'confirmed')`),
+  providerUq: uniqueIndex("mail_messages_provider_uq").on(t.connectionId, t.providerMessageId),
+  leadIdx: index("mail_messages_lead_idx").on(t.organizationId, t.leadId, t.sentAt),
+  threadIdx: index("mail_messages_thread_idx").on(t.threadId, t.sentAt),
+  rfcIdx: index("mail_messages_rfc_idx").on(t.connectionId, t.rfcMessageId).where(sql`rfc_message_id IS NOT NULL`),
+  reviewIdx: index("mail_messages_review_idx").on(t.organizationId, t.connectionId).where(sql`review_state = 'pending'`),
+  unappliedIdx: index("mail_messages_unapplied_idx").on(t.organizationId, t.createdAt).where(sql`applied_at IS NULL AND direction = 'in'`),
+}));
+export type MailMessageRow = typeof mailMessages.$inferSelect;

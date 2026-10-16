@@ -114,12 +114,12 @@ describe("Gmail connect: the happy path", () => {
   it("connects: identity from the provider, token sealed to the row, status shows capabilities, audit records it, nothing is sent", async () => {
     const ana = await browser("ana");
     // the fake provider can complete a send (Milestone 2); the real Gmail adapter can't in this build (config.test.ts)
-    expect(await ana.status()).toEqual({ available: true, sendingEnabled: true, canConnect: true, connection: null });
+    expect(await ana.status()).toEqual({ available: true, sendingEnabled: true, canConnect: true, connection: null, replySync: { available: false, granted: false, state: "off", lastSyncedAt: null } });
     const url = await ana.start();
     expect(new URL(url).pathname).toBe("/api/integrations/gmail/callback");
     expect(await ana.callback(url)).toBe("connected");
     const s = await ana.status();
-    expect(s.connection).toMatchObject({ status: "active", accountEmail: "ana@agency.test", capabilities: { identify: true, send: true }, problem: null });
+    expect(s.connection).toMatchObject({ status: "active", accountEmail: "ana@agency.test", capabilities: { identify: true, send: true, read: false }, problem: null });
     expect(s.sendingEnabled).toBe(true);
     const row = store.rows[0];
     expect(row).toMatchObject({ organizationId: "org-a", userId: "ana", accountSub: "g-sub-ana", status: "active" });
@@ -367,7 +367,7 @@ describe("Gmail connect: CSRF and switches", () => {
     enabled = false;
     expect(await ana.callback(url)).toBe("unavailable");
     expect((await ana.req("POST", "/api/integrations/gmail/connect", { json: {} })).status).toBe(503);
-    expect(await ana.status()).toEqual({ available: false, sendingEnabled: false, canConnect: false, connection: null });
+    expect(await ana.status()).toEqual({ available: false, sendingEnabled: false, canConnect: false, connection: null, replySync: { available: false, granted: false, state: "off", lastSyncedAt: null } });
     enabled = true;
     await ana.callback(await ana.start());
     enabled = false;
@@ -501,7 +501,7 @@ describe("switched on for some organizations only (GMAIL_ALLOWED_ORG_IDS)", () =
     allowedOrgs = "org-a";
     const ana = await browser("ana"), zed = await browser("zed");
     expect((await ana.status()).available).toBe(true);
-    expect(await zed.status()).toEqual({ available: false, sendingEnabled: false, canConnect: false, connection: null });
+    expect(await zed.status()).toEqual({ available: false, sendingEnabled: false, canConnect: false, connection: null, replySync: { available: false, granted: false, state: "off", lastSyncedAt: null } });
     expect((await zed.req("POST", "/api/integrations/gmail/connect", { json: {} })).status).toBe(503);
     expect((await (await zed.req("POST", "/api/integrations/gmail/verify", { json: {} })).json()).result).toBe("temporarily_unavailable");
     // a connect started while org-b was listed, finished after it was taken off the list: refused

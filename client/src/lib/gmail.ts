@@ -25,6 +25,12 @@ export const useDisconnectGmail = () => useMutation({
   onSuccess: (r) => put(r.status),
 });
 
+/** Reply sync: check the connected mailbox for replies now. */
+export const useSyncGmail = () => useMutation({
+  mutationFn: async () => (await apiRequest("POST", `${GMAIL_URL}/sync`, {})).json() as Promise<{ outcome: string; stored: number; status: GmailStatusView }>,
+  onSuccess: (r) => put(r.status),
+});
+
 /* ── sending an approved message from the connected mailbox ─────────────────────────── */
 
 export const sendStateUrl = (messageId: number) => `${GMAIL_URL}/messages/${messageId}/send`;

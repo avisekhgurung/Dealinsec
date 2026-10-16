@@ -11,11 +11,13 @@
  *   GMAIL_ALLOWED_ORG_IDS                            optional: comma-separated organization ids; when set, ONLY those
  *                                                    organizations see or use the integration (others: as if off)
  *   MAIL_SEND_DAILY_CAP                              sends per mailbox per rolling 24 hours (default 50; invalid = no sending)
+ *   GMAIL_REPLY_SYNC_ENABLED                         "true" | "1": ask for read access and sync replies (Release B,
+ *                                                    docs/gmail-reply-sync.md; default off; also needs its migration)
  */
 import { loadKeyring, TokenCryptoError, type Keyring } from "./token-crypto";
 import { FakeMailProvider } from "./fake-provider";
 import { GmailProvider } from "./gmail-provider";
-import type { MailProvider } from "./provider";
+import type { MailboxReader, MailProvider } from "./provider";
 import type { Exec } from "./mailbox-schema";
 import { mailboxSchemaPresent } from "./mailbox-schema";
 
@@ -38,6 +40,8 @@ export type GmailConfig = {
   allowedOrgIds: string[] | null;
   /** Per mailbox, rolling 24 hours (MAIL_SEND_DAILY_CAP). Null when the setting is invalid: then nothing may send. */
   sendDailyCap: number | null;
+  /** GMAIL_REPLY_SYNC_ENABLED: request gmail.readonly and sync replies. Off by default. */
+  replySync: boolean;
   redirectUri: string; // the one callback URL; never taken from a request
   oauth: { clientId: string; clientSecret: string } | null; // null for fake
 };
@@ -83,9 +87,11 @@ export function resolveGmailConfig(env: Env = process.env): GmailOff | { enabled
 
   const allowedOrgIds = parseOrgList(env.GMAIL_ALLOWED_ORG_IDS);
   if (allowedOrgIds === false) problems.push("GMAIL_ALLOWED_ORG_IDS must be organization ids separated by commas");
+  const sync = (env.GMAIL_REPLY_SYNC_ENABLED ?? "").trim().toLowerCase();
+  if (!["", "true", "1", "false", "0"].includes(sync)) problems.push(`GMAIL_REPLY_SYNC_ENABLED must be "true" or "false"`);
 
   if (problems.length || !keyring || allowedOrgIds === false) return { enabled: false, reason: "misconfigured", problems };
-  return { enabled: true, config: { provider: provider as "gmail" | "fake", keyring, allowedOrgIds, sendDailyCap: parseDailyCap(env.MAIL_SEND_DAILY_CAP), redirectUri, oauth } };
+  return { enabled: true, config: { provider: provider as "gmail" | "fake", keyring, allowedOrgIds, sendDailyCap: parseDailyCap(env.MAIL_SEND_DAILY_CAP), replySync: sync === "true" || sync === "1", redirectUri, oauth } };
 }
 
 /** GMAIL_ALLOWED_ORG_IDS: unset or blank means every organization; anything malformed is false (the integration stays off). */
@@ -137,7 +143,7 @@ let gmailInstance: { key: string; provider: GmailProvider } | null = null;
  * The provider for a resolved config, one per process (the fake keeps its codes and tokens in memory, so a connect
  * and its callback must meet the same instance). The fake is refused in production here as well as in the config.
  */
-export function createMailProvider(config: GmailConfig, env: Env = process.env): MailProvider {
+export function createMailProvider(config: GmailConfig, env: Env = process.env): MailProvider & MailboxReader {
   if (config.provider === "fake") {
     if (env.NODE_ENV === "production") throw new Error("the fake mail provider is not allowed in production");
     return (fakeInstance ??= new FakeMailProvider());

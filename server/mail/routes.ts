@@ -10,6 +10,7 @@
  *   POST /api/integrations/gmail/messages/:id/send     send an approved message from my mailbox ({ bodyHash })
  *   GET  /api/integrations/gmail/messages/:id/send     its send state (null when never handed to a mailbox)
  *   POST /api/integrations/gmail/messages/:id/resolve  settle an uncertain send after checking my Sent folder ({ decision })
+ *   POST /api/integrations/gmail/sync        reply sync: check my mailbox for replies now (when reply sync is on)
  *
  * State-changing calls must be same-origin JSON (Sec-Fetch-Site / Origin checked, JSON content type required), on
  * top of the session cookie's SameSite=Lax. The callback is a cross-site navigation by design; it is protected by
@@ -30,6 +31,8 @@ export interface GmailRouteDeps extends MailServiceDeps {
   currentUser(req: Request): Promise<Member | null>;
   /** Sending approved messages (Milestone 2). */
   send: SendDeps;
+  /** Reply sync (Release B): one pass over the signed-in person's own mailbox, now. Absent: not available. */
+  syncNow?(user: Member): Promise<{ outcome: string; stored: number }>;
 }
 
 /**
@@ -66,7 +69,7 @@ function limiter(perHour: number) {
 
 export function registerGmailRoutes(app: Express, deps: GmailRouteDeps): void {
   const used = new UsedStates();
-  const connectLimit = limiter(10), verifyLimit = limiter(30), disconnectLimit = limiter(20), sendLimit = limiter(60), resolveLimit = limiter(30);
+  const connectLimit = limiter(10), verifyLimit = limiter(30), disconnectLimit = limiter(20), sendLimit = limiter(60), resolveLimit = limiter(30), syncLimit = limiter(20);
   const idOf = (v: unknown) => { const n = Number(v); return Number.isSafeInteger(n) && n > 0 ? n : 0; };
   const noStore = (_req: Request, res: Response, next: NextFunction) => { res.set("Cache-Control", "no-store"); next(); };
   const fail = (res: Response, where: string) => (err: unknown) => {
@@ -121,6 +124,12 @@ export function registerGmailRoutes(app: Express, deps: GmailRouteDeps): void {
   app.post("/api/integrations/gmail/messages/:id/resolve", noStore, deps.auth, sameOriginJson, (req: any, res) => {
     if (!resolveLimit(req.user.id, deps.now().getTime())) return limited(res);
     resolveSend(req.user, idOf(req.params.id), req.body, deps.send).then((r) => (r.ok ? res.json({ send: r.send, messageStatus: r.messageStatus }) : res.status(r.status).json({ code: r.code, error: r.message })), fail(res, "resolve"));
+  });
+
+  app.post("/api/integrations/gmail/sync", noStore, deps.auth, sameOriginJson, (req: any, res) => {
+    if (!deps.syncNow) return res.status(404).json({ code: "unavailable", error: "Reply sync isn't available." });
+    if (!syncLimit(req.user.id, deps.now().getTime())) return limited(res);
+    deps.syncNow(req.user).then(async (r) => res.json({ outcome: r.outcome, stored: r.stored, status: await statusFor(req.user, deps) }), fail(res, "sync"));
   });
 
   app.post("/api/integrations/gmail/disconnect", noStore, deps.auth, sameOriginJson, (req: any, res) => {

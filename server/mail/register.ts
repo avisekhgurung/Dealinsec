@@ -14,7 +14,9 @@ import { outreachSafetyReady } from "../sales/message-store";
 import type { SendDeps } from "./send-service";
 import { pgSendStore } from "./send-store-pg";
 import { registerGmailRoutes } from "./routes";
-import { gmailStatus } from "./status";
+import { gmailStatus, mailSyncSchemaReady } from "./status";
+import { pgSyncStore } from "./sync-store-pg";
+import { replySyncFor, syncDueMailboxes, syncMailbox, type SyncDeps } from "./sync-service";
 import { loadKeyring } from "./token-crypto";
 
 const deps: MailServiceDeps = {
@@ -47,7 +49,36 @@ const deps: MailServiceDeps = {
     // Codes and ids only; never tokens, authorization codes, secrets or provider responses.
     console.log(JSON.stringify({ at: new Date().toISOString(), event, ...fields }));
   },
+  async replySync(orgId) { return (await replySyncFor(orgId, syncDeps)).on; },
+  syncState: (orgId, connectionId) => pgSyncStore.state(orgId, connectionId).catch(() => null),
+  async purgeSynced(orgId, connectionId) {
+    if (!(await mailSyncSchemaReady())) return 0;
+    return pgSyncStore.purge(orgId, connectionId);
+  },
 };
+
+/** Reply sync (Release B): the real gate, the Gmail adapter's read calls, Postgres stores. */
+const syncDeps: SyncDeps = {
+  status: gmailStatus,
+  syncSchemaReady: mailSyncSchemaReady,
+  provider: (config) => createMailProvider(config),
+  mailbox: pgMailboxStore,
+  store: pgSyncStore,
+  now: () => new Date(),
+  random: Math.random,
+  log: (event, fields) => deps.log(event, fields),
+};
+
+/** "Check for replies now", for the signed-in person's own mailbox. */
+async function syncNow(user: Member): Promise<{ outcome: string; stored: number }> {
+  if (!user.organizationId) return { outcome: "off", stored: 0 };
+  const gate = await replySyncFor(user.organizationId, syncDeps);
+  if (!gate.on) return { outcome: "off", stored: 0 };
+  const conn = await pgMailboxStore.live(user.organizationId, user.id, gate.config.provider);
+  if (!conn) return { outcome: "not_connected", stored: 0 };
+  const r = await syncMailbox({ orgId: user.organizationId, userId: user.id, connectionId: conn.id, force: true }, syncDeps);
+  return { outcome: r.outcome, stored: r.stored };
+}
 
 /** The session's person, loaded the way isAuthenticated does, but answering null instead of 401. */
 async function currentUser(req: Request): Promise<Member | null> {
@@ -86,8 +117,9 @@ const sendDeps: SendDeps = {
 };
 
 export function registerGmail(app: Express): void {
-  registerGmailRoutes(app, { ...deps, auth: isAuthenticated, currentUser, send: sendDeps });
+  registerGmailRoutes(app, { ...deps, auth: isAuthenticated, currentUser, send: sendDeps, syncNow });
   startRecoverySweep();
+  startReplySync();
 }
 
 /**
@@ -106,6 +138,24 @@ function startRecoverySweep(): void {
     await repairAfterSend(undefined, 50);
   }, 120_000);
   sweeping.unref?.();
+}
+
+/**
+ * Reply sync, every minute while the process is up: a few due mailboxes per tick, one pass each (a pass reads at most
+ * a bounded number of messages; leases keep two processes off the same mailbox). Does nothing unless
+ * GMAIL_REPLY_SYNC_ENABLED is on and its tables are migrated. A sleeping instance simply catches up when it wakes: the
+ * cursor is in the database.
+ */
+let replyTimer: NodeJS.Timeout | null = null;
+let replyRunning = false;
+function startReplySync(): void {
+  if (replyTimer || process.env.NODE_ENV === "test") return;
+  replyTimer = setInterval(async () => {
+    if (replyRunning) return;
+    replyRunning = true;
+    try { await syncDueMailboxes(syncDeps, { limit: 5 }); } finally { replyRunning = false; }
+  }, 60_000);
+  replyTimer.unref?.();
 }
 
 /**

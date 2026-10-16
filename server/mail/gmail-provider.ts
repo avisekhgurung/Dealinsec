@@ -15,13 +15,15 @@
 import { buildMime, toBase64Url } from "./mime";
 import {
   MailProviderError, normalizeScopes, RELEASE_A_SCOPES,
-  type AccessGrant, type AuthorizationRequest, type MailAccount, type MailProvider, type OutgoingMail, type SentMail, type TokenGrant,
+  type AccessGrant, type AuthorizationRequest, type HistoryPage, type MailAccount, type MailboxMessage, type MailboxReader, type MailPart,
+  type MailProvider, type MessageRef, type OutgoingMail, type SentMail, type TokenGrant,
 } from "./provider";
 
 export const GOOGLE_AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 export const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 export const GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 export const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
+export const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const GMAIL_ID = /^[A-Za-z0-9_-]{1,128}$/;
 /** Gmail's reasons for refusing for quota or rate: nothing was sent, so asking again later is safe. */
 const RATE_REASONS = new Set(["rateLimitExceeded", "userRateLimitExceeded", "dailyLimitExceeded", "quotaExceeded", "RATE_LIMIT_EXCEEDED", "RESOURCE_EXHAUSTED"]);
@@ -66,7 +68,7 @@ export function verifyIdTokenClaims(idToken: unknown, expect: { clientId: string
   return { sub: claims.sub, email, emailVerified: verified };
 }
 
-export class GmailProvider implements MailProvider {
+export class GmailProvider implements MailProvider, MailboxReader {
   readonly id = "gmail" as const;
   readonly scopes = RELEASE_A_SCOPES;
   private fetchImpl: typeof fetch;
@@ -89,7 +91,7 @@ export class GmailProvider implements MailProvider {
       client_id: this.opts.clientId,
       redirect_uri: req.redirectUri,
       response_type: "code",
-      scope: this.scopes.join(" "),
+      scope: (req.scopes ?? this.scopes).join(" "),
       access_type: "offline", // a refresh token
       prompt: "consent", // always issue one, and show the person what they grant
       state: req.state,
@@ -176,6 +178,76 @@ export class GmailProvider implements MailProvider {
     throw new MailProviderError("rejected", "Gmail refused the message; nothing was sent");
   }
 
+  /* ── reading (reply sync): GETs only; nothing here can change the mailbox ── */
+
+  async profile(accessToken: string): Promise<{ email: string; historyId: string }> {
+    const j = await this.read(accessToken, `${GMAIL_API}/profile`);
+    if (typeof j.emailAddress !== "string" || !HISTORY_ID.test(String(j.historyId ?? ""))) throw new MailProviderError("unavailable", "Gmail's profile answer was unreadable");
+    return { email: j.emailAddress.toLowerCase(), historyId: String(j.historyId) };
+  }
+
+  async history(accessToken: string, input: { startHistoryId: string; pageToken?: string | null; maxResults?: number }): Promise<HistoryPage> {
+    if (!HISTORY_ID.test(input.startHistoryId)) throw new MailProviderError("rejected", "not a history id");
+    const q = new URLSearchParams({ startHistoryId: input.startHistoryId, historyTypes: "messageAdded", maxResults: String(clamp(input.maxResults, 1, 500, 200)) });
+    if (input.pageToken) q.set("pageToken", input.pageToken);
+    const j = await this.read(accessToken, `${GMAIL_API}/history?${q}`, { notFound: "cursor_expired" });
+    if (!HISTORY_ID.test(String(j.historyId ?? ""))) throw new MailProviderError("unavailable", "Gmail's history answer was unreadable");
+    const records = (Array.isArray(j.history) ? j.history : []).flatMap((h: any) => {
+      if (!HISTORY_ID.test(String(h?.id ?? ""))) return [];
+      const added = (Array.isArray(h.messagesAdded) ? h.messagesAdded : []).map((a: any) => ref(a?.message)).filter(Boolean) as MessageRef[];
+      return [{ id: String(h.id), added }];
+    });
+    return { records, historyId: String(j.historyId), nextPageToken: typeof j.nextPageToken === "string" ? j.nextPageToken : null };
+  }
+
+  async search(accessToken: string, input: { q: string; maxResults?: number; pageToken?: string | null }): Promise<{ messages: MessageRef[]; nextPageToken: string | null }> {
+    const q = new URLSearchParams({ q: input.q, maxResults: String(clamp(input.maxResults, 1, 100, 25)), includeSpamTrash: "false" });
+    if (input.pageToken) q.set("pageToken", input.pageToken);
+    const j = await this.read(accessToken, `${GMAIL_API}/messages?${q}`);
+    return { messages: (Array.isArray(j.messages) ? j.messages : []).map(ref).filter(Boolean) as MessageRef[], nextPageToken: typeof j.nextPageToken === "string" ? j.nextPageToken : null };
+  }
+
+  async threadMessages(accessToken: string, threadId: string): Promise<MessageRef[]> {
+    if (!GMAIL_ID.test(threadId)) throw new MailProviderError("rejected", "not a thread id");
+    const j = await this.read(accessToken, `${GMAIL_API}/threads/${threadId}?format=minimal`, { notFound: "not_found" });
+    return (Array.isArray(j.messages) ? j.messages : []).map(ref).filter(Boolean) as MessageRef[];
+  }
+
+  async message(accessToken: string, id: string, format: "metadata" | "full", headers: readonly string[] = []): Promise<MailboxMessage> {
+    if (!GMAIL_ID.test(id)) throw new MailProviderError("rejected", "not a message id");
+    const q = new URLSearchParams({ format });
+    if (format === "metadata") for (const h of headers) q.append("metadataHeaders", h);
+    const j = await this.read(accessToken, `${GMAIL_API}/messages/${id}?${q}`, { notFound: "not_found" });
+    const r = ref(j);
+    if (!r) throw new MailProviderError("unavailable", "Gmail's message answer was unreadable");
+    const ms = Number(j.internalDate);
+    return { id: r.id, threadId: r.threadId, labelIds: r.labelIds ?? [], internalDate: Number.isFinite(ms) && ms > 0 ? new Date(ms) : null, payload: part(j.payload) };
+  }
+
+  /**
+   * One authorized GET. 401 is "unavailable" (the next pass refreshes, and a revoked grant then says invalid_grant);
+   * 403 for permission is insufficient_scope, for quota rate_limited; 404 is the caller's kind; 5xx and transport
+   * failures are unavailable. Nothing from the answer leaves except parsed fields.
+   */
+  private async read(accessToken: string, url: string, o: { notFound?: "cursor_expired" | "not_found" } = {}): Promise<Record<string, any>> {
+    if (typeof accessToken !== "string" || !accessToken) throw new MailProviderError("rejected", "there is no access token");
+    let res: Response;
+    try {
+      res = await this.fetchImpl(url, { method: "GET", headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" }, redirect: "error", signal: AbortSignal.timeout(this.timeoutMs) });
+    } catch {
+      throw new MailProviderError("unavailable", "Gmail could not be reached");
+    }
+    let body: Record<string, any> = {};
+    try { body = (await res.json()) ?? {}; } catch { if (res.ok) throw new MailProviderError("unavailable", "Gmail's answer was unreadable"); }
+    if (res.ok) return body;
+    const reasons = gmailReasons(body);
+    if (res.status === 429 || reasons.some((r) => RATE_REASONS.has(r))) throw new MailProviderError("rate_limited", "Gmail asked us to slow down", retryAfter(res));
+    if (res.status === 403 && reasons.some((r) => SCOPE_REASONS.has(r))) throw new MailProviderError("insufficient_scope", "the Gmail connection can't read messages");
+    if (res.status === 404 && o.notFound) throw new MailProviderError(o.notFound, o.notFound === "cursor_expired" ? "the sync position is too old" : "that message is gone");
+    if (res.status === 401 || res.status >= 500) throw new MailProviderError("unavailable", "Gmail had a temporary problem");
+    throw new MailProviderError("rejected", "Gmail refused the request");
+  }
+
   private expiry(expiresIn: unknown): Date {
     const s = typeof expiresIn === "number" && expiresIn > 0 ? Math.min(expiresIn, 86_400) : 3_600;
     return new Date(this.now().getTime() + s * 1000);
@@ -205,6 +277,27 @@ export class GmailProvider implements MailProvider {
     if (err === "insufficient_scope") throw new MailProviderError("insufficient_scope", "the Google authorization lacks a needed permission");
     throw new MailProviderError("rejected", "Google refused the request");
   }
+}
+
+const HISTORY_ID = /^\d{1,20}$/;
+const clamp = (v: number | undefined, lo: number, hi: number, dflt: number) => (typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.floor(v))) : dflt);
+
+/** A message reference from any Gmail answer, or null when its ids aren't Gmail ids. */
+function ref(x: any): MessageRef | null {
+  if (!x || typeof x.id !== "string" || !GMAIL_ID.test(x.id) || typeof x.threadId !== "string" || !GMAIL_ID.test(x.threadId)) return null;
+  return { id: x.id, threadId: x.threadId, labelIds: Array.isArray(x.labelIds) ? x.labelIds.filter((l: unknown) => typeof l === "string").slice(0, 50) : [] };
+}
+
+/** A MIME tree, keeping only the fields reply sync reads (bounded depth and width). */
+function part(x: any, depth = 0): MailPart {
+  if (!x || typeof x !== "object" || depth > 8) return {};
+  return {
+    mimeType: typeof x.mimeType === "string" ? x.mimeType.slice(0, 100) : undefined,
+    filename: typeof x.filename === "string" ? x.filename.slice(0, 200) : undefined,
+    headers: Array.isArray(x.headers) ? x.headers.filter((h: any) => typeof h?.name === "string" && typeof h?.value === "string").slice(0, 200).map((h: any) => ({ name: h.name, value: h.value })) : undefined,
+    body: x.body && typeof x.body === "object" ? { size: Number(x.body.size) || 0, data: typeof x.body.data === "string" ? x.body.data : undefined, attachmentId: typeof x.body.attachmentId === "string" ? x.body.attachmentId : undefined } : undefined,
+    parts: Array.isArray(x.parts) ? x.parts.slice(0, 50).map((p: any) => part(p, depth + 1)) : undefined,
+  };
 }
 
 /** The machine-readable reasons in a Google API error (both its older and newer shapes). Never their text. */

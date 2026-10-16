@@ -40,7 +40,7 @@ describe("GmailProvider: what it asks Google for", () => {
       code_challenge: "ch", code_challenge_method: "S256", nonce: "n1", login_hint: "rep@example.com",
     });
     const scopes = u.searchParams.get("scope")!.split(" ");
-    expect(capabilitiesOf(scopes)).toEqual({ identify: true, send: true, mailboxAccess: false });
+    expect(capabilitiesOf(scopes)).toEqual({ identify: true, send: true, read: false, mailboxAccess: false });
     expect(scopes.some((s) => /readonly|modify|metadata|compose|insert|labels|mail\.google\.com/.test(s))).toBe(false);
   });
 

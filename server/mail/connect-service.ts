@@ -17,11 +17,11 @@
  */
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { canReadModule, memberCan } from "@shared/permissions";
-import { problemMessage, type ConnectOutcome, type GmailStatusView, type VerifyResult } from "@shared/gmail-connect";
+import { problemMessage, type ConnectOutcome, type GmailStatusView, type ReplySyncView, type VerifyResult } from "@shared/gmail-connect";
 import { forOrg, sendingAvailability, type GmailConfig, type GmailStatus } from "./config";
 import { FakeMailProvider } from "./fake-provider";
 import type { ConnectionView, MailboxStore } from "./mailbox-store";
-import { capabilitiesOf, MailProviderError, type MailProvider, type TokenGrant } from "./provider";
+import { capabilitiesOf, MailProviderError, RELEASE_A_SCOPES, REPLY_SYNC_SCOPES, type MailProvider, type TokenGrant } from "./provider";
 import type { Keyring } from "./token-crypto";
 
 /** The signed-in person, as the auth middleware loaded them. */
@@ -45,6 +45,8 @@ export interface PendingConnect {
   orgId: string;
   provider: "gmail" | "fake";
   expiresAt: number;
+  /** Read access was asked for (reply sync on for the organization when connecting started). */
+  replySync?: boolean;
 }
 
 export interface MailServiceDeps {
@@ -56,6 +58,12 @@ export interface MailServiceDeps {
   cleanup(): { keyring: Keyring | null; provider: MailProvider | null };
   audit(actor: Member, action: string, connectionId: number, detail: string): void;
   log(event: string, fields?: Record<string, string | number | boolean | null>): void;
+  /** Reply sync (Release B): whether it is on for an organization. Absent: off. */
+  replySync?(orgId: string): Promise<boolean>;
+  /** Reply sync's state for a connection, for the Settings card. */
+  syncState?(orgId: string, connectionId: number): Promise<{ state: string; lastSuccessAt: Date | null; bootstrappedAt: Date | null } | null>;
+  /** Deletes everything synced from a connection (on disconnect). */
+  purgeSynced?(orgId: string, connectionId: number): Promise<number>;
 }
 
 export const PENDING_TTL_MS = 10 * 60_000;
@@ -87,7 +95,7 @@ function toView(c: ConnectionView | null): GmailStatusView["connection"] {
   return {
     status: c.status === "active" ? "active" : "needs_reconnect",
     accountEmail: c.accountEmail,
-    capabilities: { identify: caps.identify, send: caps.send },
+    capabilities: { identify: caps.identify, send: caps.send, read: caps.read },
     connectedAt: c.connectedAt.toISOString(),
     problem: c.status === "needs_reconnect" ? { code: c.lastErrorCode ?? "reconnect_required", message: problemMessage(c.lastErrorCode)!, at: c.lastErrorAt?.toISOString() ?? null } : null,
   };
@@ -107,7 +115,30 @@ export async function statusFor(user: Member, deps: MailServiceDeps): Promise<Gm
       }
     } catch { connection = null; } // tables not there yet: nothing connected
   }
-  return { available: s.enabled, sendingEnabled: s.enabled && sendingAvailability(s.config).ok, canConnect: s.enabled && mayConnect(user), connection: toView(connection) };
+  return {
+    available: s.enabled, sendingEnabled: s.enabled && sendingAvailability(s.config).ok, canConnect: s.enabled && mayConnect(user), connection: toView(connection),
+    replySync: await replySyncView(user, s.enabled, connection, deps),
+  };
+}
+
+async function replyOn(orgId: string | null | undefined, deps: MailServiceDeps): Promise<boolean> {
+  if (!orgId || !deps.replySync) return false;
+  try { return await deps.replySync(orgId); } catch { return false; }
+}
+
+async function replySyncView(user: Member, enabled: boolean, c: ConnectionView | null, deps: MailServiceDeps): Promise<ReplySyncView> {
+  const available = enabled && (await replyOn(user.organizationId, deps));
+  const granted = !!c && capabilitiesOf(c.scopes).read;
+  const off: ReplySyncView = { available, granted, state: "off", lastSyncedAt: null };
+  if (!available || !c) return off;
+  if (c.status !== "active") return { ...off, state: "needs_reconnect" };
+  if (!granted) return { ...off, state: "needs_permission" };
+  let st: Awaited<ReturnType<NonNullable<MailServiceDeps["syncState"]>>> = null;
+  try { st = (await deps.syncState?.(user.organizationId!, c.id)) ?? null; } catch { st = null; }
+  const lastSyncedAt = st?.lastSuccessAt?.toISOString() ?? null;
+  if (!st || !st.bootstrappedAt) return { ...off, state: st?.state === "retrying" ? "retrying" : "starting", lastSyncedAt };
+  const state = st.state === "needs_reconnect" ? "needs_reconnect" : st.state === "needs_scope" ? "needs_permission" : st.state === "retrying" ? "retrying" : "ok";
+  return { ...off, state, lastSyncedAt };
 }
 
 export type StartResult = { ok: true; url: string; pending: PendingConnect } | { ok: false; status: number; code: string; message: string };
@@ -121,10 +152,11 @@ export async function startConnect(user: Member, deps: MailServiceDeps): Promise
   const state = randomBytes(32).toString("base64url");
   const verifier = randomBytes(48).toString("base64url"); // 64 characters (RFC 7636: 43–128)
   const nonce = randomBytes(24).toString("base64url");
-  let url = provider.authorizationUrl({ state, codeChallenge: sha256(verifier), nonce, redirectUri: s.config.redirectUri, loginHint: current?.accountEmail });
+  const replySync = await replyOn(user.organizationId, deps);
+  let url = provider.authorizationUrl({ scopes: replySync ? REPLY_SYNC_SCOPES : RELEASE_A_SCOPES, state, codeChallenge: sha256(verifier), nonce, redirectUri: s.config.redirectUri, loginHint: current?.accountEmail });
   if (provider.id === "fake") url = FakeMailProvider.consentRedirect(url); // local runs: consent is instant, no network
-  const pending: PendingConnect = { stateHash: sha256(state), verifier, nonce, userId: user.id, orgId: user.organizationId, provider: provider.id, expiresAt: deps.now().getTime() + PENDING_TTL_MS };
-  deps.log("gmail_connect_started", { provider: provider.id, reconnect: !!current });
+  const pending: PendingConnect = { stateHash: sha256(state), verifier, nonce, userId: user.id, orgId: user.organizationId, provider: provider.id, expiresAt: deps.now().getTime() + PENDING_TTL_MS, replySync };
+  deps.log("gmail_connect_started", { provider: provider.id, reconnect: !!current, replySync });
   return { ok: true, url, pending };
 }
 
@@ -169,7 +201,8 @@ export async function completeConnect(input: CallbackInput, deps: MailServiceDep
   };
   if (!grant.account.emailVerified) return refuse("unverified_email");
   const caps = capabilitiesOf(grant.scopes);
-  if (caps.mailboxAccess) return refuse("unexpected_scope");
+  // Read access only when it was asked for (reply sync); anything that could change or delete mail, never.
+  if (caps.mailboxAccess || (caps.read && !pending.replySync)) return refuse("unexpected_scope");
   if (!caps.send || !caps.identify) return refuse("missing_send_scope");
 
   const saved = await deps.store.save({
@@ -178,7 +211,7 @@ export async function completeConnect(input: CallbackInput, deps: MailServiceDep
   });
   if (!saved.ok) return refuse(saved.code);
   deps.audit(user, saved.reconnected ? "reconnected Gmail" : "connected Gmail", saved.connection.id, saved.connection.accountEmail);
-  const o = out(saved.reconnected ? "reconnected" : "connected", { connectionId: saved.connection.id });
+  const o = out(saved.reconnected ? "reconnected" : "connected", { connectionId: saved.connection.id, read: caps.read });
   return { ...o, connectionId: saved.connection.id };
 }
 
@@ -245,6 +278,12 @@ export async function disconnectMailboxes(
   const what = input.reason === "user" ? "disconnected Gmail" : input.reason === "member_removed" ? "disconnected Gmail (member removed)" : "disconnected Gmail (account deleted)";
   let revoked: boolean | null = rows.length ? true : null;
   for (const r of rows) {
+    // Synced conversations go with the connection (the person's decision when connecting: disconnect deletes them).
+    if (deps.purgeSynced) {
+      try { await deps.purgeSynced(input.orgId, r.connection.id); } catch (e) {
+        deps.log("gmail_purge_failed", { connectionId: r.connection.id, errorType: (e as Error)?.name ?? "Error" });
+      }
+    }
     if (r.refreshToken && provider && provider.id === r.connection.provider) {
       try {
         await provider.revoke(r.refreshToken);

@@ -1,6 +1,7 @@
 /**
  * An in-memory mailbox provider for tests and isolated local runs. It never touches the network and never delivers
- * anything: a "sent" message is a row in `outbox`. It behaves like a careful real provider where that matters to the
+ * anything: a "sent" message is a row in `outbox` (and a copy in the fake mailbox's Sent mail). For reply sync it is
+ * also a tiny mailbox: `deliver` puts a message in, with Gmail-like threads, labels and a change history. It behaves like a careful real provider where that matters to the
  * safety logic built on it: authorization codes are single-use and PKCE-checked, revoked tokens fail with
  * invalid_grant, a send needs the send scope, and a scripted failure can say the message went out anyway (uncertain).
  *
@@ -9,12 +10,30 @@
 import { createHash, randomBytes } from "node:crypto";
 import { buildMime } from "./mime";
 import {
-  GMAIL_SEND_SCOPE, MailProviderError, normalizeScopes, RELEASE_A_SCOPES, validateOutgoing,
-  type AccessGrant, type AuthorizationRequest, type MailAccount, type MailErrorKind, type MailProvider,
-  type OutgoingMail, type SentMail, type TokenGrant,
+  GMAIL_READONLY_SCOPE, GMAIL_SEND_SCOPE, MailProviderError, normalizeScopes, RELEASE_A_SCOPES, validateOutgoing,
+  type AccessGrant, type AuthorizationRequest, type HistoryPage, type MailAccount, type MailboxMessage, type MailboxReader, type MailErrorKind,
+  type MailHeader, type MailProvider, type MessageRef, type OutgoingMail, type SentMail, type TokenGrant,
 } from "./provider";
 
-type Op = "exchange" | "refresh" | "revoke" | "send";
+type Op = "exchange" | "refresh" | "revoke" | "send" | "profile" | "history" | "search" | "thread" | "message";
+
+/** A message in the fake mailbox. */
+export interface FakeStored { id: string; threadId: string; labelIds: string[]; at: Date; headers: MailHeader[]; text: string | null; html: string | null }
+/** What `deliver` takes: a message arriving (or, with labels ["SENT"], one the person sent from their mail app). */
+export interface FakeIncoming {
+  from: string; // "Name <a@b>" or "a@b"
+  to: string;
+  subject: string;
+  text?: string | null;
+  html?: string | null;
+  threadId?: string; // join an existing thread (Gmail would, for a reply with matching References and subject)
+  messageId?: string; // "<…>"; one is made up when absent
+  inReplyTo?: string;
+  references?: string[];
+  labels?: string[]; // default ["INBOX", "UNREAD"]
+  headers?: MailHeader[]; // anything else (Auto-Submitted, Precedence, Content-Type…)
+  at?: Date;
+}
 interface Scripted { kind: MailErrorKind; delivered?: boolean; retryAfterMs?: number }
 
 export interface FakeMailProviderOptions {
@@ -27,19 +46,24 @@ export interface FakeMailProviderOptions {
 
 const FAKE_AUTHORIZE = "https://fake-mail-provider.invalid/authorize"; // .invalid never resolves (RFC 2606)
 
-export class FakeMailProvider implements MailProvider {
+export class FakeMailProvider implements MailProvider, MailboxReader {
   readonly id = "fake" as const;
   readonly scopes = RELEASE_A_SCOPES;
   /** Every message the fake "delivered", in order (including an uncertain send that went out), with the raw MIME it built. */
   readonly outbox: (OutgoingMail & SentMail & { at: Date; raw: string })[] = [];
   /** Every call, for asserting what a flow did (and did not) ask the provider for. */
   readonly calls: { op: Op; at: Date }[] = [];
+  /** The fake mailbox, oldest first. */
+  readonly mailbox: FakeStored[] = [];
+  private historyLog: { id: number; added: MessageRef[] }[] = [];
+  private historyNext = 1000;
+  private historyFloor = 0;
 
   private account: MailAccount;
-  private granted: string[];
+  private granted: string[] | null;
   private now: () => Date;
   private accessTtlMs: number;
-  private codes = new Map<string, { challenge: string; redirectUri: string; nonce: string }>();
+  private codes = new Map<string, { challenge: string; redirectUri: string; nonce: string; scopes: string[] }>();
   private refreshTokens = new Map<string, { scopes: string[] }>();
   private accessTokens = new Map<string, { scopes: string[]; expiresAt: Date; refresh: string }>();
   private script = new Map<Op, Scripted[]>();
@@ -49,7 +73,7 @@ export class FakeMailProvider implements MailProvider {
 
   constructor(opts: FakeMailProviderOptions = {}) {
     this.account = opts.account ?? { sub: "fake-sub-1", email: "rep@example.test", emailVerified: true };
-    this.granted = opts.grantedScopes ?? [...RELEASE_A_SCOPES];
+    this.granted = opts.grantedScopes ?? null; // null: grant whatever is asked for
     this.now = opts.now ?? (() => new Date());
     this.accessTtlMs = opts.accessTtlMs ?? 3_600_000;
   }
@@ -72,9 +96,10 @@ export class FakeMailProvider implements MailProvider {
   authorizationUrl(req: AuthorizationRequest): string {
     if (!req.state || !req.codeChallenge || !req.nonce || !req.redirectUri) throw new MailProviderError("rejected", "state, codeChallenge, nonce and redirectUri are required");
     const code = `fake-code-${++this.seq}-${randomBytes(6).toString("hex")}`;
-    this.codes.set(code, { challenge: req.codeChallenge, redirectUri: req.redirectUri, nonce: req.nonce });
+    const scopes = [...(req.scopes ?? this.scopes)];
+    this.codes.set(code, { challenge: req.codeChallenge, redirectUri: req.redirectUri, nonce: req.nonce, scopes });
     const u = new URL(FAKE_AUTHORIZE);
-    u.search = new URLSearchParams({ code, state: req.state, redirect_uri: req.redirectUri, scope: this.scopes.join(" ") }).toString();
+    u.search = new URLSearchParams({ code, state: req.state, redirect_uri: req.redirectUri, scope: scopes.join(" ") }).toString();
     return u.toString();
   }
 
@@ -105,9 +130,10 @@ export class FakeMailProvider implements MailProvider {
     if (challenge !== c.challenge) throw new MailProviderError("invalid_grant", "PKCE verifier does not match");
     if (input.nonce !== c.nonce) throw new MailProviderError("identity_invalid", "the identity token's nonce does not match");
     const refreshToken = `fake-refresh-${randomBytes(16).toString("hex")}`;
-    this.refreshTokens.set(refreshToken, { scopes: [...this.granted] });
-    const access = this.issueAccess(refreshToken, this.granted);
-    return { refreshToken, accessToken: access.accessToken, accessExpiresAt: access.expiresAt, scopes: normalizeScopes(this.granted), account: { ...this.account } };
+    const granted = this.granted ?? c.scopes;
+    this.refreshTokens.set(refreshToken, { scopes: [...granted] });
+    const access = this.issueAccess(refreshToken, granted);
+    return { refreshToken, accessToken: access.accessToken, accessExpiresAt: access.expiresAt, scopes: normalizeScopes(granted), account: { ...this.account } };
   }
 
   async refreshAccessToken(refreshToken: string): Promise<AccessGrant> {
@@ -148,8 +174,100 @@ export class FakeMailProvider implements MailProvider {
     if (scripted && !scripted.delivered) throw new MailProviderError(scripted.kind, `scripted ${scripted.kind}`, scripted.retryAfterMs);
     const sent: SentMail = { providerMessageId: `fake-msg-${++this.seq}`, providerThreadId: `fake-thread-${this.seq}` };
     this.outbox.push({ ...mail, ...sent, at: this.now(), raw });
+    this.store({ id: sent.providerMessageId, threadId: sent.providerThreadId!, labelIds: ["SENT"], at: this.now(), text: mail.text, html: null,
+      headers: [{ name: "From", value: mail.fromName ? `${mail.fromName} <${mail.from}>` : mail.from }, { name: "To", value: mail.to }, { name: "Subject", value: mail.subject }, { name: "Message-ID", value: mail.rfcMessageId }] });
     if (scripted) throw new MailProviderError(scripted.kind, `scripted ${scripted.kind} after delivery`, scripted.retryAfterMs);
     return sent;
+  }
+
+  /* ── the fake mailbox (reply sync) ── */
+
+  /** A message arrives (or is sent from the person's own mail app, with labels ["SENT"]). Returns its ids. */
+  deliver(m: FakeIncoming): { id: string; threadId: string } {
+    const id = `fake-in-${++this.seq}`;
+    const threadId = m.threadId ?? `fake-thread-${this.seq}`;
+    const headers: MailHeader[] = [
+      { name: "From", value: m.from }, { name: "To", value: m.to }, { name: "Subject", value: m.subject },
+      { name: "Message-ID", value: m.messageId ?? `<${id}@fake.example>` },
+      { name: "Date", value: (m.at ?? this.now()).toUTCString() },
+      ...(m.inReplyTo ? [{ name: "In-Reply-To", value: m.inReplyTo }] : []),
+      ...(m.references?.length ? [{ name: "References", value: m.references.join(" ") }] : []),
+      ...(m.headers ?? []),
+    ];
+    this.store({ id, threadId, labelIds: m.labels ?? ["INBOX", "UNREAD"], at: m.at ?? this.now(), headers, text: m.text === undefined ? "" : m.text, html: m.html ?? null });
+    return { id, threadId };
+  }
+
+  /** As if the mailbox's change history were trimmed: any cursor from before now is too old (cursor_expired). */
+  expireHistory(): void {
+    this.historyFloor = this.historyNext++; // the mailbox's current id moves on and stays valid, like Gmail's
+  }
+
+  /** The current history id (what a profile read returns). */
+  get historyId(): string {
+    return String(this.historyNext - 1);
+  }
+
+  private store(m: FakeStored): void {
+    this.mailbox.push(m);
+    this.historyLog.push({ id: this.historyNext++, added: [{ id: m.id, threadId: m.threadId, labelIds: [...m.labelIds] }] });
+  }
+
+  private async readable(op: Op, accessToken: string): Promise<void> {
+    this.record(op);
+    await this.pause(op);
+    const a = this.accessTokens.get(accessToken);
+    if (!a || a.expiresAt <= this.now()) throw new MailProviderError("unavailable", "access token expired or revoked");
+    if (!a.scopes.includes(GMAIL_READONLY_SCOPE)) throw new MailProviderError("insufficient_scope", "the read scope was not granted");
+  }
+
+  async profile(accessToken: string): Promise<{ email: string; historyId: string }> {
+    await this.readable("profile", accessToken);
+    return { email: this.account.email, historyId: this.historyId };
+  }
+
+  async history(accessToken: string, input: { startHistoryId: string; pageToken?: string | null; maxResults?: number }): Promise<HistoryPage> {
+    await this.readable("history", accessToken);
+    const start = Number(input.startHistoryId);
+    if (!Number.isFinite(start) || start < this.historyFloor) throw new MailProviderError("cursor_expired", "the sync position is too old");
+    const after = this.historyLog.filter((h) => h.id > start);
+    const offset = Number(input.pageToken ?? 0) || 0;
+    const size = input.maxResults ?? 100;
+    const page = after.slice(offset, offset + size);
+    return { records: page.map((h) => ({ id: String(h.id), added: h.added.map((r) => ({ ...r, labelIds: this.labelsOf(r.id) ?? r.labelIds })) })), historyId: this.historyId, nextPageToken: offset + size < after.length ? String(offset + size) : null };
+  }
+
+  async search(accessToken: string, input: { q: string; maxResults?: number }): Promise<{ messages: MessageRef[]; nextPageToken: string | null }> {
+    await this.readable("search", accessToken);
+    const addresses = (input.q.match(/[^\s(){}:]+@[^\s(){}]+/g) ?? []).map((a) => a.toLowerCase());
+    const hit = (m: FakeStored) => ["From", "To"].some((n) => addresses.some((a) => (m.headers.find((h) => h.name === n)?.value ?? "").toLowerCase().includes(a)));
+    const xs = this.mailbox.filter((m) => hit(m) && !m.labelIds.some((l) => l === "SPAM" || l === "TRASH")).slice().reverse().slice(0, input.maxResults ?? 25);
+    return { messages: xs.map((m) => ({ id: m.id, threadId: m.threadId, labelIds: [...m.labelIds] })), nextPageToken: null };
+  }
+
+  async threadMessages(accessToken: string, threadId: string): Promise<MessageRef[]> {
+    await this.readable("thread", accessToken);
+    const xs = this.mailbox.filter((m) => m.threadId === threadId);
+    if (!xs.length) throw new MailProviderError("not_found", "no such thread");
+    return xs.map((m) => ({ id: m.id, threadId: m.threadId, labelIds: [...m.labelIds] }));
+  }
+
+  async message(accessToken: string, id: string, format: "metadata" | "full", headers: readonly string[] = []): Promise<MailboxMessage> {
+    await this.readable("message", accessToken);
+    const m = this.mailbox.find((x) => x.id === id);
+    if (!m) throw new MailProviderError("not_found", "no such message");
+    const want = new Set(headers.map((h) => h.toLowerCase()));
+    const hs = format === "metadata" ? m.headers.filter((h) => want.has(h.name.toLowerCase())) : m.headers;
+    const enc = (t: string) => Buffer.from(t, "utf8").toString("base64url");
+    const parts = [
+      ...(m.text !== null ? [{ mimeType: "text/plain", headers: [{ name: "Content-Type", value: "text/plain; charset=utf-8" }], body: { size: m.text.length, data: enc(m.text) } }] : []),
+      ...(m.html !== null ? [{ mimeType: "text/html", headers: [{ name: "Content-Type", value: "text/html; charset=utf-8" }], body: { size: m.html.length, data: enc(m.html) } }] : []),
+    ];
+    return { id: m.id, threadId: m.threadId, labelIds: [...m.labelIds], internalDate: m.at, payload: format === "metadata" ? { headers: hs } : { mimeType: "multipart/alternative", headers: hs, parts } };
+  }
+
+  private labelsOf(id: string): string[] | null {
+    return this.mailbox.find((m) => m.id === id)?.labelIds ?? null;
   }
 
   private issueAccess(refresh: string, scopes: string[]): AccessGrant {
