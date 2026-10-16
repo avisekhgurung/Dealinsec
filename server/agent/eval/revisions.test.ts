@@ -11,7 +11,6 @@ vi.mock("../../entitlements", async () => (await import("./world-mocks")).entitl
 vi.mock("../../emails", async () => (await import("./world-mocks")).emailsMock());
 vi.mock("../../leads/profile-store", async () => (await import("./world-mocks")).profileStoreMock());
 vi.mock("../../discovery/provider", async () => (await import("./world-mocks")).discoveryProviderMock());
-vi.mock("../../discovery/usage", async () => (await import("./world-mocks")).discoveryUsageMock());
 vi.mock("../../documents/style-store", async () => (await import("./world-mocks")).documentStyleStoreMock());
 vi.mock("../../knowledge/store", async () => (await import("./world-mocks")).knowledgeStoreMock());
 vi.mock("../../knowledge/net-guard", async (orig) => (await import("./world-mocks")).netGuardMock(orig as () => Promise<any>));

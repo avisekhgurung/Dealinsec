@@ -90,6 +90,7 @@ const TOOL_LABELS: Record<string, string> = {
   get_ideal_client: "your ideal client",
   update_ideal_client: "your ideal client",
   assess_lead_fit: "how well the lead fits",
+  // Retired 16 Oct 2026 (company finding is AI Outbound now); kept so saved conversations still read well.
   find_companies: "the company search",
   revise_quotation: "the quotation changes",
   revise_agreement: "the agreement changes",
@@ -151,7 +152,7 @@ const APPROVE_LABELS: Record<string, string> = {
   add_lead_claim: "Record fact",
   archive_lead: "Archive lead",
   update_ideal_client: "Save",
-  find_companies: "Search",
+  find_companies: "Search", // retired; for saved conversations
   revise_quotation: "Revise quotation",
   revise_agreement: "Revise agreement",
   update_document_style: "Apply style",

@@ -1,5 +1,11 @@
 # 03. Finding companies: tools that spend money and read the open web
 
+> **Retired 16 Oct 2026.** The agent's quick web search (`find_companies`, with `services/discovery.ts`, `discovery/pick.ts` and the
+> `discovery/usage.ts` caps) was removed: it gave thinner, unchecked results than AI Outbound for the same request, and having two
+> ways to "find companies" confused people. The agent now finds companies only through AI Outbound (`discover_prospects`, the
+> same search as the `/outbound` page). The providers described here (`server/discovery/*`: LangSearch, Brave, and the provider
+> choice in `activeProviderName`) live on as AI Outbound's search. The rest of this note is kept for the lessons in it.
+
 ## 1. What we built
 The agent can search the web for companies that match a short description ("small logistics companies in Pune that could use a new website"), show the candidates as a card, and let the user add the ones they pick as leads. The search service sits behind a small `DiscoveryProvider` interface; **LangSearch** (free, no card) and **Brave Search** (paid) are implemented. Nothing is added to the pipeline by the search itself.
 

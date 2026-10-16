@@ -394,7 +394,7 @@ export const traceStoreMock = () => ({
   },
 });
 
-/** The web search: configured/unconfigured, canned results, and the usage counters, all from the world. */
+/** AI Outbound's web search: configured or not, and canned results, from the world. */
 export const discoveryProviderMock = async () => {
   const { DiscoveryError } = await import("../../discovery/types");
   const provider = {
@@ -411,14 +411,9 @@ export const discoveryProviderMock = async () => {
       },
   };
   return {
-    discoveryConfigured: () => world().discovery.configured,
-    discoveryProvider: provider,
     outboundSearchProviders: async () => (world().discovery.configured ? [provider] : []),
   };
 };
-export const discoveryUsageMock = () => ({
-  searchCount: async (o: { orgId?: string }) => (o.orgId ? world().discovery.usedDay : world().discovery.usedMonth),
-});
 
 export const entitlementsMock = () => ({
   getBillingUser: async (u: any) =>

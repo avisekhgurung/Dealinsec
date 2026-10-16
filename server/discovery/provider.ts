@@ -1,6 +1,6 @@
 /**
- * The configured search provider, or none. Keys are read at call time and never
- * leave the server. Which provider runs:
+ * The web search providers behind AI Outbound. Keys are read at call time and never
+ * leave the server. The default single provider:
  *   DISCOVERY_PROVIDER=langsearch|brave   (explicit), otherwise
  *   LANGSEARCH_API_KEY set -> LangSearch (free, no card), otherwise
  *   BRAVE_SEARCH_API_KEY set -> Brave (paid), otherwise none: "not set up".
@@ -8,7 +8,7 @@
  */
 import { BraveProvider } from "./brave";
 import { LangSearchProvider } from "./langsearch";
-import type { DiscoveryProvider, SearchOptions } from "./types";
+import type { DiscoveryProvider } from "./types";
 
 export type ProviderName = "langsearch" | "brave";
 
@@ -21,31 +21,9 @@ export function activeProviderName(env: NodeJS.ProcessEnv = process.env): Provid
   return null;
 }
 
-export const discoveryConfigured = (): boolean => activeProviderName() !== null;
-
-function build(name: ProviderName): DiscoveryProvider {
-  return name === "langsearch"
-    ? new LangSearchProvider(process.env.LANGSEARCH_API_KEY ?? "", process.env.LANGSEARCH_URL || undefined)
-    : new BraveProvider(process.env.BRAVE_SEARCH_API_KEY ?? "", process.env.BRAVE_SEARCH_URL || undefined);
-}
-
-/** Delegates to whichever provider is configured right now. Its description (label, paid, country support) is read live. */
-export const discoveryProvider: DiscoveryProvider = {
-  get name() { return activeProviderName() ?? "none"; },
-  get label() { const n = activeProviderName(); return n ? build(n).label : "a search service"; },
-  get paid() { const n = activeProviderName(); return n ? build(n).paid : true; },
-  get supportsCountry() { const n = activeProviderName(); return n ? build(n).supportsCountry : false; },
-  search(query: string, opts?: SearchOptions) {
-    const n = activeProviderName();
-    if (!n) throw new Error("No search provider is configured.");
-    return build(n).search(query, opts);
-  },
-};
-
 /**
  * Every search provider that has a key, for the AI Outbound engine, which may spread its queries over several.
  * OUTBOUND_SEARCH_PROVIDERS=tavily,brave picks and orders them; otherwise the configured discovery provider alone.
- * The free-text search card above (find_companies) keeps using `discoveryProvider` unchanged.
  */
 export async function outboundSearchProviders(env: NodeJS.ProcessEnv = process.env): Promise<DiscoveryProvider[]> {
   const { TavilyProvider } = await import("./tavily");

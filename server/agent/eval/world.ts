@@ -51,8 +51,8 @@ export interface World {
   outboundFailNextSave?: boolean;
   /** Knowledge: sources, passages and picture bytes (all with their organization), and the pages the fake web serves. */
   knowledge: { sources: Row[]; chunks: Row[]; files: Map<string, Row>; web: Record<string, { status: number; headers: Record<string, string>; body: string }>; dns: Record<string, string[]> };
-  /** The fake web search: what it returns, what it was asked, and the usage counters. */
-  discovery: { configured: boolean; results: { title: string; url: string; snippet?: string }[]; queries: string[]; countries: (string | undefined)[]; error: string | null; usedDay: number; usedMonth: number; provider: { label: string; paid: boolean; supportsCountry: boolean } };
+  /** The fake web search behind AI Outbound: what it returns and what it was asked. */
+  discovery: { configured: boolean; results: { title: string; url: string; snippet?: string }[]; queries: string[]; countries: (string | undefined)[]; error: string | null; provider: { label: string; paid: boolean; supportsCountry: boolean } };
 }
 
 export const ORG1 = "org-1";
@@ -86,7 +86,7 @@ export function createWorld(): World {
     research: [], llmCalls: [], salesReady: true, messages: [], messagesReady: true, suppressions: [], outreachEvents: [], outreachSafetyReady: true,
     outbound: { runs: [], prospects: [], items: [], findings: [], providerCalls: [], ready: true },
     knowledge: { sources: [], chunks: [], files: new Map(), web: {}, dns: {} },
-    discovery: { configured: true, results: [], queries: [], countries: [], error: null, usedDay: 0, usedMonth: 0, provider: { label: "Brave Search", paid: true, supportsCountry: true } },
+    discovery: { configured: true, results: [], queries: [], countries: [], error: null, provider: { label: "Brave Search", paid: true, supportsCountry: true } },
   };
   let id = 100;
   const nextId = () => ++id;
