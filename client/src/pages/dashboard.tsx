@@ -1,5 +1,5 @@
-import { FollowUpsPanel } from "@/components/leads/follow-ups";
 import { LeadsStrip } from "@/components/leads/leads-strip";
+import { TodayPanel } from "@/components/dashboard/today-panel";
 import { GettingStarted } from "@/components/getting-started";
 import { LoadError } from "@/components/load-error";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,7 +18,7 @@ import {
   TrendingUp, IndianRupee, Banknote, CheckCircle2,
   UserCircle, MapPin, FileText, PenTool, Landmark, X as XIcon, Sparkles,
   Crown, Rocket, Users2, UserPlus2, Settings as SettingsIcon,
-  Zap, FileSignature, ArrowUpRight, ShieldAlert
+  Zap, FileSignature, ArrowUpRight, Radar
 } from "lucide-react";
 import {
   BarChart, Bar, Cell, PieChart, Pie, AreaChart, Area,
@@ -28,7 +28,7 @@ import {
   hasActivePro, hasActiveDealBoost, hasActiveTrial, hasLapsedTrial, getSubscriptionType, minorUnitFactor,
 } from "@shared/schema";
 import { TrialCountdown } from "@/components/trial-countdown";
-import { memberCan } from "@shared/permissions";
+import { canSeeModule, memberCan } from "@shared/permissions";
 import { useLocale, useMoney, type MoneyFormat } from "@/hooks/use-locale";
 import type { Deal, Contract, BrandInvoice, Quote, User } from "@shared/schema";
 import { invoiceStats, paidInvoicesSubline } from "@shared/invoice-stats";
@@ -532,132 +532,6 @@ function StatCard({ title, value, format, icon: Icon, tone, href, loading, sub, 
   );
 }
 
-// ─── money tile ──────────────────────────────────────────────────────────────
-// Earned/Pending strip: tinted surface + icon chip + counted-up amount, so the
-// two money numbers read as money at a glance instead of plain glass boxes.
-
-const MONEY_TINTS = {
-  emerald: {
-    card: "border border-emerald-200/60 dark:border-emerald-900/40 bg-gradient-to-br from-emerald-500/[0.08] via-teal-500/[0.04] to-transparent",
-    chip: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-    amount: "text-emerald-600 dark:text-emerald-400",
-  },
-  amber: {
-    card: "border border-amber-200/60 dark:border-amber-900/40 bg-gradient-to-br from-amber-500/[0.08] via-orange-500/[0.04] to-transparent",
-    chip: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-    amount: "text-amber-600 dark:text-amber-400",
-  },
-} as const;
-
-function ProtectionIssuesCard({ isBrand }: { isBrand: boolean }) {
-  const { data } = useQuery<{
-    protection?: { checked: number; withIssues: number; important: number; usageRights: number; exclusivity: number };
-  }>({ queryKey: ["/api/copilot/briefing"], staleTime: 60_000 });
-  const p = data?.protection;
-  if (!p || p.withIssues === 0) return null;
-  const stats = [
-    { label: "Important", n: p.important, dot: "bg-rose-500" },
-    ...(isBrand
-      ? [
-          { label: "Usage rights", n: p.usageRights, dot: "bg-amber-500" },
-          { label: "Exclusivity", n: p.exclusivity, dot: "bg-amber-500" },
-        ]
-      : []),
-  ].filter((x) => x.n > 0);
-  return (
-    <Card className="glass-card border-amber-300/40 dark:border-amber-800/40" data-testid="protection-issues">
-      <CardContent className="p-4 lg:p-5">
-        <div className="flex items-start gap-3">
-          <ShieldAlert className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" aria-hidden />
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Protection issues</p>
-            <p className="text-sm font-semibold mt-0.5">
-              {p.withIssues} pending deal{p.withIssues === 1 ? " has" : "s have"} terms worth clarifying before you send.
-            </p>
-            {stats.length > 0 && (
-              <ul className="mt-2 flex flex-wrap gap-2">
-                {stats.map((x) => (
-                  <li key={x.label} className="inline-flex items-center gap-1.5 rounded-full border border-border/70 px-2.5 py-1 text-xs font-semibold">
-                    <span className={`w-2 h-2 rounded-full ${x.dot}`} aria-hidden /> {x.n} {x.label.toLowerCase()}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <Link href="/deals" className="shrink-0">
-            <Button size="sm" variant="outline" className="h-8 text-xs font-semibold">
-              Review <ChevronRight className="w-3.5 h-3.5 ml-1" />
-            </Button>
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ─── Money Radar ─────────────────────────────────────────────────────────────
-// "How much money am I leaving on the table?" — three deterministic buckets
-// from the insights engine; every number clickable, none invented.
-function MoneyRadarCard() {
-  // Mirrors the Radar shape in server/copilot/insights.ts. This is a hand-typed
-  // response, so the compiler cannot see a rename on the server — the `Minor`
-  // suffixes must match there exactly, or every bucket reads `undefined` and
-  // the card silently shows nothing collectible.
-  const { data } = useQuery<{
-    radar: {
-      overdue: { totalMinor: number; count: number };
-      dueThisWeek: { totalMinor: number; count: number };
-      readyToInvoice: { totalMinor: number; count: number };
-      collectibleMinor: number;
-    };
-  }>({ queryKey: ["/api/copilot/briefing"], staleTime: 60_000 });
-  const fmt = useMoney();
-  const radar = data?.radar;
-  if (!radar || !(radar.collectibleMinor > 0)) return null;
-  const buckets = [
-    { label: "Overdue", totalMinor: radar.overdue.totalMinor, count: radar.overdue.count, href: "/invoices", dot: "bg-rose-500", cls: "text-rose-600 dark:text-rose-400", tint: "bg-rose-500/[0.04] border-rose-500/20 hover:border-rose-500/40" },
-    { label: "Due this week", totalMinor: radar.dueThisWeek.totalMinor, count: radar.dueThisWeek.count, href: "/invoices", dot: "bg-amber-500", cls: "text-amber-600 dark:text-amber-400", tint: "bg-amber-500/[0.04] border-amber-500/20 hover:border-amber-500/40" },
-    { label: "Ready to invoice", totalMinor: radar.readyToInvoice.totalMinor, count: radar.readyToInvoice.count, href: "/contracts", dot: "bg-emerald-500", cls: "text-emerald-600 dark:text-emerald-400", tint: "bg-emerald-500/[0.04] border-emerald-500/20 hover:border-emerald-500/40" },
-  ].filter((b) => b.totalMinor > 0);
-  return (
-    <Card className="glass-card border-emerald-300/40 dark:border-emerald-800/40 relative overflow-hidden" data-testid="money-radar">
-      {/* Ambient wash + soft corner glow — the hero card of the dashboard. */}
-      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/[0.07] via-transparent to-transparent pointer-events-none" />
-      <div className="absolute -top-24 -right-16 w-72 h-72 rounded-full bg-emerald-400/10 blur-3xl pointer-events-none" aria-hidden="true" />
-      <CardContent className="relative p-5 lg:p-7">
-        <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-700/80 dark:text-emerald-400/80">
-          <span className="relative flex w-1.5 h-1.5">
-            <span className="absolute inline-flex w-full h-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-            <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-emerald-500" />
-          </span>
-          Money Radar
-        </p>
-        <p className="mt-2 text-[2.35rem] leading-[1.05] lg:text-[3.25rem] font-black tracking-tight tabular-nums text-foreground">
-          {fmt.money(radar.collectibleMinor)}
-        </p>
-        <p className="text-sm text-muted-foreground mt-1 mb-5">
-          potentially collectible right now
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          {buckets.map((b) => (
-            <Link key={b.label} href={b.href}>
-              <button
-                type="button"
-                className={`w-full text-left rounded-xl border p-3.5 transition-all hover:-translate-y-0.5 hover:shadow-md ${b.tint}`}
-              >
-                <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground font-semibold uppercase tracking-wide">
-                  <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`} /> {b.label} · {b.count}
-                </p>
-                <p className={`font-bold text-xl lg:text-2xl tabular-nums mt-1 ${b.cls}`}>{fmt.money(b.totalMinor)}</p>
-              </button>
-            </Link>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 // ─── main page ───────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -665,6 +539,8 @@ export default function DashboardPage() {
   const audience = useAudience();
   const fmt = useMoney();
   const canCreateDeal = memberCan(user as any, "deals.create");
+  // AI Outbound sits under the deals module in the nav (shared/nav-model.ts), so the same check decides its shortcut.
+  const canSeeOutbound = canSeeModule(user as any, "deals");
   const displayName = user?.firstName && user?.lastName
     ? `${user.firstName} ${user.lastName}`
     : user?.email?.split("@")[0] || "there";
@@ -915,14 +791,9 @@ export default function DashboardPage() {
       <TeamSeatsCard />
     </>
   );
-  const attentionEl = (
-    <>
-      <MoneyRadarCard />
-      <FollowUpsPanel max={4} />
-      <ProtectionIssuesCard isBrand={audience.isBrand} />
-      <LeadsStrip />
-    </>
-  );
+  // "What needs me today?" — overdue money, due follow-ups, unsigned agreements, work ready to invoice, approved
+  // messages to send, quotations waiting. It replaces the Money Radar, follow-ups and protection cards that stood here.
+  const todayEl = <TodayPanel />;
   const statsEl = (
     <>
 {/* ── Stat cards — the funnel, in order: deal → quote → agreement →
@@ -1422,6 +1293,15 @@ export default function DashboardPage() {
             </h1>
           </div>
           <div className="flex items-center gap-2 lg:gap-3">
+            {/* Secondary, desktop only: mobile already has Outbound in the bottom bar. */}
+            {canSeeOutbound && (
+              <Link href="/outbound" className="hidden lg:block">
+                <Button size="sm" variant="outline" className="font-semibold" data-testid="header-find-prospects">
+                  <Radar className="w-4 h-4 mr-1.5" />
+                  Find prospects
+                </Button>
+              </Link>
+            )}
             {canCreateDeal && (
               <Link href="/deals/new" className="hidden lg:block">
                 <Button size="sm" className="gradient-btn text-white font-semibold" data-testid="header-new-deal">
@@ -1460,15 +1340,17 @@ export default function DashboardPage() {
             </Card>
             <GettingStarted />
             {profileStripEl}
-            {attentionEl}
+            {/* Today reads its own sources (invoices, agreements, follow-ups…), so it still answers without deals. */}
+            {todayEl}
             {accountEl}
           </>
         ) : firstRun ? (
           <>
             <GettingStarted />
             {nudgeEl}
+            {/* A brand-new account sees Today only when something real needs it — never an unearned "All clear". */}
+            <TodayPanel hideWhenEmpty />
             {accountEl}
-            {attentionEl}
             {statsEl}
             {dealStatusEl}
             {analyticsEl}
@@ -1480,11 +1362,18 @@ export default function DashboardPage() {
           <>
             <GettingStarted />
             {profileStripEl}
+            {todayEl}
             {statsEl}
-            {attentionEl}
-            {analyticsEl}
-            {chartsEl}
-            {dealStatusEl}
+            {!isLoading && (
+              <section className="space-y-4 lg:space-y-5" aria-labelledby="dashboard-insights-title" data-testid="dashboard-insights">
+                <h2 id="dashboard-insights-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Insights</h2>
+                {/* The pipeline's size, won and lost: a number to read, not a task, so it lives here. */}
+                <LeadsStrip />
+                {analyticsEl}
+                {chartsEl}
+                {dealStatusEl}
+              </section>
+            )}
             {recentEl}
             <section className="space-y-4" aria-label="Account and setup" data-testid="dashboard-account">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Account</h2>
