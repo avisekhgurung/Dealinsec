@@ -229,7 +229,7 @@ function footer(): string {
       ${COOKIE_FOOTER_LINKS}
     </div>
     ${consentBanner()}
-    <div class="muted">© 2026 DealInSec — quotations, e-signed agreements and invoices for freelancers and creators worldwide. Articles are general information, not legal or tax advice.</div>
+    <div class="muted">© 2026 DealInSec — prospects, quotations, e-signed agreements and invoices for agencies, consultants, freelancers and creators. Articles are general information, not legal or tax advice.</div>
   </div></footer>`;
 }
 

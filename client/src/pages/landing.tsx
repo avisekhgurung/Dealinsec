@@ -1286,7 +1286,7 @@ function FAQSection() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
           eyebrow="FAQ"
-          title="Questions freelancers and creators ask"
+          title="Questions agencies and consultants ask"
           subtitle="Straight answers about what DealInSec does, and what it doesn't."
         />
 
@@ -1375,7 +1375,7 @@ function Footer() {
           <div className="col-span-2 md:col-span-1">
             <DealinsecLogo size="md" withText />
             <p className="text-xs text-neutral-500 mt-4 leading-relaxed max-w-[240px]">
-              Quotes, agreements, invoices and payment tracking for freelancers and creators worldwide, in 50 currencies.
+              Prospects, pipeline, quotations, agreements, invoices and payment tracking for small agencies and consultants, in 50 currencies.
             </p>
             <div className="flex items-center gap-3 mt-5">
               {[

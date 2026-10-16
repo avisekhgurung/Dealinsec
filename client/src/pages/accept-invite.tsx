@@ -128,7 +128,7 @@ export default function AcceptInvitePage() {
         </CardContent>
       </Card>
 
-      <p className="text-xs text-muted-foreground mt-6">DealInSec · deal management for freelancers and creators</p>
+      <p className="text-xs text-muted-foreground mt-6">DealInSec · find better clients, close deals, get paid</p>
     </div>
   );
 }

@@ -587,8 +587,8 @@ function ctaBand(): string {
   return `<div class="cta-band"><div class="wrap">
     <div class="cta-ico">${clock}</div>
     <div class="cta-copy">
-      <h2>Get every deal in writing — and get paid on time</h2>
-      <p>Built for freelancers and creators, wherever you bill from: quotation, e-signed agreement, invoice and payment tracking on one thread per client or brand, in your own currency. Free to start, with a 7-day Pro trial and no card in every country. Paid plans can currently be bought in India (₹99/month or ₹999/year).</p>
+      <h2>Find better clients. Close deals. Get paid.</h2>
+      <p>For small agencies, consultants and freelancers, wherever you bill from: research prospects with evidence, then quotation, e-signed agreement, invoice and payment tracking on one thread per client, in your own currency. Free to start, with a 7-day Pro trial and no card in every country. Paid plans can currently be bought in India (₹99/month or ₹999/year).</p>
     </div>
     <a class="btn" href="${APP_LINK}" data-cta>Start free →</a>
   </div></div>`;
@@ -644,7 +644,7 @@ function footer(): string {
       ${SOCIALS}
     </div>
     ${consentBanner()}
-    <div class="muted">© ${y} DealInSec — quotation, agreement and invoice software for freelancers and creators. These free tools run in your browser; nothing you enter is stored on our servers.</div>
+    <div class="muted">© ${y} DealInSec — find better clients, close deals and get paid. For agencies, consultants, freelancers and creators. These free tools run in your browser; nothing you enter is stored on our servers.</div>
   </div></footer>`;
 }
 

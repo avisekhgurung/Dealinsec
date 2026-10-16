@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Loader2, Briefcase, FileText, FileCheck, Receipt, Check, ArrowLeft, Eye, EyeOff,
+  Loader2, Briefcase, FileText, FileCheck, Receipt, Search, BadgeCheck, Check, ArrowLeft, Eye, EyeOff,
   Mail, Lock, ShieldCheck, KeyRound, Trash2, Sparkles,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -28,16 +28,19 @@ import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { trackEvent } from "@/lib/analytics";
 import { postAuthDestination } from "@/lib/deal-prefill";
 
+/** The whole journey: find the client, then get paid. Short labels so all six fit a phone. */
 const PIPELINE = [
+  { icon: Search, label: "Prospect" },
   { icon: Briefcase, label: "Deal" },
-  { icon: FileText, label: "Quotation" },
+  { icon: FileText, label: "Quote" },
   { icon: FileCheck, label: "Agreement" },
   { icon: Receipt, label: "Invoice" },
+  { icon: BadgeCheck, label: "Paid" },
 ];
 
 const PROOF_POINTS = [
   "Agreements carry a signed execution record",
-  "Built for freelancers and creators worldwide",
+  "Built for small agencies and consultants in the US and India",
   "7-day Pro trial — everything unlocked",
 ];
 
@@ -139,8 +142,8 @@ export default function AuthPage() {
             Deal · Sign · Secured
           </p>
           <h2 className="text-[26px] leading-[1.15] font-bold tracking-tight">
-            Get every deal in writing.<br />
-            <span className="text-emerald-300">And get paid on time.</span>
+            Find better clients.<br />
+            <span className="text-emerald-300">Close deals. Get paid.</span>
           </h2>
 
           <div className="flex items-center gap-1 mt-5">
@@ -374,28 +377,27 @@ export default function AuthPage() {
             Deal · Sign · Secured
           </p>
           <h2 className="text-3xl xl:text-[40px] font-bold text-white leading-[1.12] tracking-tight">
-            Get every deal in writing.<br />
-            <span className="text-emerald-300">And get paid on time.</span>
+            Find better clients.<br />
+            <span className="text-emerald-300">Close deals. Get paid.</span>
           </h2>
           <p className="text-emerald-100/70 mt-4 text-sm leading-relaxed">
-            One workflow for freelancers and creators worldwide — designers, developers,
-            writers, video editors &amp; photographers, marketers, consultants, UGC creators
-            and influencers. Quotation, e-signed agreement, invoice and payment tracking,
-            on one thread per client or brand.
+            For small SEO, marketing, growth and AI-automation agencies, consultants and
+            freelancers: research prospects with evidence, run a clear pipeline, then quote,
+            get the agreement signed, invoice and track payment, all from the same deal.
           </p>
 
-          <div className="flex items-center gap-2 mt-9">
+          <div className="flex items-center gap-1.5 xl:gap-2 mt-9">
             {PIPELINE.map(({ icon: Icon, label }, i) => (
-              <div key={label} className="flex items-center gap-2">
+              <div key={label} className="flex items-center gap-1.5 xl:gap-2">
                 {i > 0 && (
                   <span
-                    className="w-6 border-t border-dashed border-emerald-400/50"
+                    className="w-3 xl:w-5 border-t border-dashed border-emerald-400/50"
                     aria-hidden="true"
                   />
                 )}
                 <div className="flex flex-col items-center gap-2">
-                  <span className="w-12 h-12 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center">
-                    <Icon className="w-5 h-5 text-emerald-200" strokeWidth={2} />
+                  <span className="w-10 h-10 xl:w-12 xl:h-12 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center">
+                    <Icon className="w-[18px] h-[18px] xl:w-5 xl:h-5 text-emerald-200" strokeWidth={2} />
                   </span>
                   <span className="text-[11px] font-semibold text-emerald-100/80 tracking-wide">{label}</span>
                 </div>

@@ -1,10 +1,11 @@
-import { Briefcase, FileText, FileCheck, Receipt, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Briefcase, FileText, FileCheck, Receipt, Search, type LucideIcon } from "lucide-react";
 
 /**
  * Modern branded app loader.
- * Shows the REAL Dealinsec workflow (Deal → Quotation → Agreement →
- * Invoice) as a traveling wave — each stage fills emerald as the flow
- * passes through it, a 3-second preview of what the product does.
+ * Shows the whole DealInSec journey (Prospect → Deal → Quote → Agreement →
+ * Invoice → Paid: find the client, then get paid) as a traveling wave — each
+ * stage fills emerald as the flow passes through it. Sized so all six fit a
+ * 375px phone.
  */
 export function AppLoader() {
   return (
@@ -104,16 +105,15 @@ export function AppLoader() {
           </p>
         </div>
 
-        {/* Pipeline animation: Deal → Quotation → Agreement → Invoice */}
-        <div className="flex items-center gap-1.5 sm:gap-2 mt-2">
-          <PipelineStep icon={Briefcase} delay={0} label="Deal" />
-          <PipelineConnector delay={0.35} />
-          <PipelineStep icon={FileText} delay={0.7} label="Quotation" />
-          <PipelineConnector delay={1.05} />
-          <PipelineStep icon={FileCheck} delay={1.4} label="Agreement" />
-          <PipelineConnector delay={1.75} />
-          <PipelineStep icon={Receipt} delay={2.1} label="Invoice" />
-        </div>
+        {/* The journey: find the client, then get paid */}
+        <ol aria-label="Prospect, deal, quote, agreement, invoice, paid" className="flex items-start gap-1 sm:gap-1.5 mt-2">
+          {JOURNEY.map(({ icon, label }, i) => (
+            <li key={label} className="flex items-start gap-1 sm:gap-1.5">
+              {i > 0 && <PipelineConnector delay={i * 0.45 - 0.2} />}
+              <PipelineStep icon={icon} delay={i * 0.45} label={label} />
+            </li>
+          ))}
+        </ol>
 
         {/* Progress dots */}
         <div className="flex items-center gap-1.5 mt-1">
@@ -150,7 +150,7 @@ export function AppLoader() {
         .animate-breathe { animation: breathe 2.5s ease-in-out infinite; }
         .animate-bounce-dot { animation: bounce-dot 1.2s ease-in-out infinite; }
         .animate-pipeline-step {
-          animation: pipeline-step 3.2s ease-in-out infinite;
+          animation: pipeline-step 3.6s ease-in-out infinite;
         }
         @media (prefers-reduced-motion: reduce) {
           .animate-pipeline-step, .animate-pipeline-flow, .animate-spin-slow,
@@ -167,6 +167,15 @@ export function AppLoader() {
   );
 }
 
+const JOURNEY: { icon: LucideIcon; label: string }[] = [
+  { icon: Search, label: "Prospect" },
+  { icon: Briefcase, label: "Deal" },
+  { icon: FileText, label: "Quote" },
+  { icon: FileCheck, label: "Agreement" },
+  { icon: Receipt, label: "Invoice" },
+  { icon: BadgeCheck, label: "Paid" },
+];
+
 function PipelineStep({
   icon: Icon,
   delay,
@@ -179,7 +188,7 @@ function PipelineStep({
   return (
     <div className="flex flex-col items-center gap-1.5">
       <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center bg-white dark:bg-white/10 border border-emerald-200/50 dark:border-emerald-500/20 animate-pipeline-step"
+        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center bg-white dark:bg-white/10 border border-emerald-200/50 dark:border-emerald-500/20 animate-pipeline-step"
         style={{ animationDelay: `${delay}s` }}
       >
         <Icon className="w-4 h-4 text-current" strokeWidth={2.2} />
@@ -193,7 +202,7 @@ function PipelineStep({
 
 function PipelineConnector({ delay }: { delay: number }) {
   return (
-    <div className="w-6 h-0.5 rounded-full animate-pipeline-flow" style={{ animationDelay: `${delay}s` }} />
+    <div aria-hidden="true" className="mt-[17px] sm:mt-[19px] w-2 sm:w-5 h-0.5 rounded-full animate-pipeline-flow" style={{ animationDelay: `${delay}s` }} />
   );
 }
 
