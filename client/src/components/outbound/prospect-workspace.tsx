@@ -10,7 +10,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useSearch } from "wouter";
-import { AlertTriangle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, ExternalLink, Filter, Loader2, PanelRightOpen, RotateCcw, Search, X } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, ExternalLink, Filter, Loader2, PanelRightOpen, RotateCcw, Search, SearchX, X } from "lucide-react";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -100,7 +100,7 @@ function DateRange({ label, from, to, onChange, testId }: { label: string; from?
 
 const SORTABLE: Partial<Record<string, SortField>> = { company: "name", domain: "domain", country: "country", fit: "icpFit", readiness: "readiness", evidence: "evidence", count: "evidenceCount", created: "created" };
 
-export function ProspectWorkspace({ canExport, onOpen, onPrepared }: { canExport: boolean; onOpen: (row: WorkspaceRow) => void; onPrepared?: () => void }) {
+export function ProspectWorkspace({ canExport, onOpen, onPrepared }: { canExport: boolean; /** focus "evidence": open the brief at its evidence. */ onOpen: (row: WorkspaceRow, focus?: "evidence") => void; onPrepared?: () => void }) {
   const { toast } = useToast();
   const search = useSearch();
   const [location, navigate] = useLocation();
@@ -343,11 +343,26 @@ export function ProspectWorkspace({ canExport, onOpen, onPrepared }: { canExport
           <div className="mt-3 flex justify-center gap-2"><Button size="sm" variant="outline" onClick={() => void q.refetch()} data-testid="workspace-retry"><RotateCcw className="mr-1.5 h-4 w-4" />Retry</Button>{active && <Button size="sm" variant="ghost" onClick={reset}>Reset filters</Button>}</div>
         </div>
       ) : !data ? (
-        <div className="space-y-2" aria-busy="true" aria-label="Loading prospects">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+        <div className="divide-y rounded-xl border" aria-busy="true" aria-label="Loading prospects">
+          {Array.from({ length: 6 }, (_, i) => (
+            <div key={i} className="flex items-center gap-3 px-3 py-2.5" aria-hidden>
+              <Skeleton className="h-4 w-4 shrink-0 rounded" />
+              <Skeleton className="h-4 w-40 shrink-0" />
+              <Skeleton className="hidden h-3 w-28 shrink-0 sm:block" />
+              <Skeleton className="hidden h-3 w-20 shrink-0 md:block" />
+              <Skeleton className="ml-auto h-5 w-20 shrink-0 rounded-full" />
+            </div>
+          ))}
+        </div>
       ) : data.summary.all === 0 ? (
         <p className="rounded-2xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground" data-testid="workspace-empty">No prospects yet. Companies appear here once a search has checked them.</p>
       ) : rows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed px-4 py-10 text-center" data-testid="workspace-no-match"><p className="text-sm text-muted-foreground">No prospects match these filters.</p><Button size="sm" variant="ghost" className="mt-2" onClick={reset}>Reset filters</Button></div>
+        <div className="rounded-2xl border border-dashed px-4 py-10 text-center" data-testid="workspace-no-match">
+          <SearchX className="mx-auto mb-2 h-6 w-6 text-muted-foreground" aria-hidden />
+          <p className="text-sm font-medium">No prospects match these filters.</p>
+          <p className="mt-1 text-xs text-muted-foreground">{s ? `${s.all} prospect${s.all === 1 ? "" : "s"} in your workspace; none fit every filter you chose.` : "None fit every filter you chose."} Remove a filter, or reset them all.</p>
+          <Button size="sm" variant="outline" className="mt-3" onClick={reset}><RotateCcw className="mr-1.5 h-3.5 w-3.5" />Reset filters</Button>
+        </div>
       ) : (
         <div className={cn("relative overflow-x-auto rounded-xl border", q.isFetching && "opacity-70")} aria-busy={q.isFetching}>
           <table className="w-full min-w-[1400px] border-collapse text-sm" data-testid="workspace-table">
@@ -395,7 +410,7 @@ export function ProspectWorkspace({ canExport, onOpen, onPrepared }: { canExport
                     <td className={cn("whitespace-nowrap px-3 py-2 text-xs font-medium", FIT_TONE[r.icpFit])} title={[...r.icpMatch, ...r.icpUnmatched].join("\n") || undefined}>{ICP_FIT_LABEL[r.icpFit]}</td>
                     <td className="whitespace-nowrap px-3 py-2"><span className={cn("rounded-full border px-2 py-0.5 text-[11px] font-medium", READY_TONE[r.readiness])} title={r.readinessBlockers.join("\n") || undefined}>{READINESS_LABEL[r.readiness]}</span></td>
                     <td className="whitespace-nowrap px-3 py-2 text-xs" title={r.latestEvidence ? `${r.latestEvidence.title}: ${r.latestEvidence.claim}` : undefined}>{evidenceDate(r) ?? <Missing label="No dated evidence" />}</td>
-                    <td className="px-3 py-2 text-right text-xs tabular-nums">{r.evidenceCount}</td>
+                    <td className="px-3 py-2 text-right text-xs tabular-nums">{r.evidenceCount > 0 ? <button onClick={() => onOpen(r, "evidence")} className="rounded px-1 underline-offset-2 hover:bg-muted hover:underline" aria-label={`Show the evidence for ${r.name} (${r.evidenceCount})`} data-testid={`evidence-${r.id}`}>{r.evidenceCount}</button> : r.evidenceCount}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-xs text-muted-foreground" title={`Updated ${shortDate(r.updatedAt)}`}>{shortDate(r.createdAt)}</td>
                     <td className="px-3 py-2"><Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => onOpen(r)} aria-label={`Open details for ${r.name}`} data-testid={`open-${r.id}`}><PanelRightOpen className="h-4 w-4" /></Button></td>
                   </tr>

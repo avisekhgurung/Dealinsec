@@ -4,15 +4,18 @@
  * can back with evidence. Nothing is contacted. The good ones are added to Leads by you.
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useSearch } from "wouter";
-import { ArrowRight, CheckCircle2, Loader2, Radar, Search, Square, X } from "lucide-react";
+import { motion } from "framer-motion";
+import { AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, Loader2, Radar, Search, Square, X } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
+import { FlowSteps, flowState } from "@/components/outbound/flow-steps";
 import { ProspectBrief } from "@/components/outbound/prospect-brief";
-import { ProspectCard } from "@/components/outbound/prospect-card";
+import { ProspectCard, ProspectCardSkeleton } from "@/components/outbound/prospect-card";
 import { ProspectWorkspace } from "@/components/outbound/prospect-workspace";
-import { OutreachQueue } from "@/components/outbound/outreach-queue";
+import { OutreachQueue, outreachQueueKey, type QueueItem } from "@/components/outbound/outreach-queue";
+import { SegmentedTabs } from "@/components/outbound/segmented-tabs";
 import { OUTBOUND_USAGE_URL, UsageNote, searchBlockedReason, useOutboundUsage } from "@/components/outbound/usage-note";
 import { LoadError } from "@/components/load-error";
 import { Button } from "@/components/ui/button";
@@ -22,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { leadCall, leadError } from "@/lib/leads";
+import { stagger, staggerItem, useCalmMotion } from "@/lib/motion";
 import { queryClient } from "@/lib/queryClient";
 import { ICP_URL, OUTBOUND_RUNS_URL, RUN_ERROR, RUN_STAGE_LABEL, countryName, runUrl, prospectUrl, type ParsedIcp, type ProspectCard as Card_, type RunView } from "@/lib/outbound";
 import { cn } from "@/lib/utils";
@@ -34,6 +38,15 @@ const EXAMPLES = [
 ];
 
 const notSetUp = (e: unknown) => !!e && /PROSPECTS_NOT_SETUP/.test(String((e as Error).message));
+type RunData = { run: RunView; prospects: Card_[] };
+/** Passed the checks (shown as cards) vs set aside, split the same way everywhere on this page. */
+const splitProspects = (ps: Card_[]) => [ps.filter((p) => !p.rejectReason), ps.filter((p) => p.rejectReason)] as const;
+
+/** A run's stages, in the order the pipeline moves through them (server/outbound/pipeline.ts). */
+const STAGES = [
+  { key: "search", label: "Search" }, { key: "verify", label: "Check sites" }, { key: "enrich", label: "Read" },
+  { key: "research", label: "Research" }, { key: "finalize", label: "Score" },
+] as const;
 
 function Funnel({ run }: { run: RunView }) {
   const c = run.counters;
@@ -42,22 +55,37 @@ function Funnel({ run }: { run: RunView }) {
     { n: c.signals ?? 0, label: "with a dated reason" }, { n: c.strongTiming ?? 0, label: "strong timing" }, { n: c.decisionMakers ?? 0, label: "with a decision maker" }, { n: c.ready ?? 0, label: "outreach-ready", strong: true },
   ];
   return (
-    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7" data-testid="funnel">
+    <dl className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7" data-testid="funnel" aria-label="What this search counted so far">
       {steps.map((s) => (
-        <div key={s.label} className={cn("rounded-xl border px-3 py-2", s.strong && "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30")}>
-          <p className="text-xl font-bold tabular-nums leading-tight">{s.n}</p>
-          <p className="text-[11px] leading-tight text-muted-foreground">{s.label}</p>
+        <div key={s.label} className={cn("flex flex-col-reverse rounded-xl border px-3 py-2", s.strong && "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30")}>
+          <dt className="text-[11px] leading-tight text-muted-foreground">{s.label}</dt>
+          <dd className="text-xl font-bold tabular-nums leading-tight">{s.n}</dd>
         </div>
       ))}
+    </dl>
+  );
+}
+
+/** Which stage a running search is in, from its stage field only. Unknown stages show nothing rather than a guess. */
+function StageTrack({ stage }: { stage: string }) {
+  const at = STAGES.findIndex((s) => s.key === stage);
+  if (at < 0) return null;
+  return (
+    <div className="space-y-1" data-testid="run-stages">
+      <ol className="flex gap-1" aria-label={`Stage ${at + 1} of ${STAGES.length}: ${RUN_STAGE_LABEL[stage] ?? stage}`}>
+        {STAGES.map((s, i) => <li key={s.key} className={cn("h-1.5 flex-1 rounded-full", i < at ? "bg-emerald-600/50" : i === at ? "bg-emerald-600" : "bg-muted")} aria-hidden />)}
+      </ol>
+      <p className="flex justify-between text-[10px] text-muted-foreground" aria-hidden>{STAGES.map((s, i) => <span key={s.key} className={cn(i === at && "font-semibold text-foreground")}>{s.label}</span>)}</p>
     </div>
   );
 }
 
-function RunPanel({ id, canEdit, onOpen }: { id: string; canEdit: boolean; onOpen: (p: Card_) => void }) {
+function RunPanel({ id, canEdit, onOpen }: { id: string; canEdit: boolean; onOpen: (p: Card_, focus?: "evidence") => void }) {
   const { toast } = useToast();
-  const q = useQuery<{ run: RunView; prospects: Card_[] }>({ queryKey: [runUrl(id)], refetchInterval: (query) => (query.state.data?.run.status === "running" ? 3000 : false) });
+  const q = useQuery<RunData>({ queryKey: [runUrl(id)], refetchInterval: (query) => (query.state.data?.run.status === "running" ? 3000 : false) });
   const [showAside, setShowAside] = useState(false);
   const [adding, setAdding] = useState<number | null>(null);
+  const calm = useCalmMotion();
   const cancel = useMutation({ mutationFn: () => leadCall("POST", `${runUrl(id)}/cancel`, {}), onSuccess: () => void queryClient.invalidateQueries({ queryKey: [runUrl(id)] }) });
   const add = useMutation({
     mutationFn: (pid: number) => { setAdding(pid); return leadCall("POST", prospectUrl(pid, "lead"), {}); },
@@ -66,45 +94,111 @@ function RunPanel({ id, canEdit, onOpen }: { id: string; canEdit: boolean; onOpe
     onSettled: () => setAdding(null),
   });
   const data = q.data;
-  const [good, aside] = useMemo(() => {
-    const ps = data?.prospects ?? [];
-    return [ps.filter((p) => !p.rejectReason), ps.filter((p) => p.rejectReason)] as const;
-  }, [data]);
+  const [good, aside] = useMemo(() => splitProspects(data?.prospects ?? []), [data]);
+  // The cards that animate in: the first ones this panel shows for this search. Later polls add cards without motion.
+  const firstIds = useRef<Set<number> | null>(null);
+  if (firstIds.current === null && good.length > 0) firstIds.current = new Set(good.map((p) => p.id));
   if (!data && q.isError) return <Card className="glass-card"><CardContent className="p-0"><LoadError compact what="this search" onRetry={() => void q.refetch()} retrying={q.isFetching} /></CardContent></Card>;
-  if (!data) return <div className="space-y-3">{[0, 1].map((i) => <Skeleton key={i} className="h-40 w-full rounded-2xl" />)}</div>;
+  if (!data) return <RunSkeleton />;
   const run = data.run;
   const running = run.status === "running";
+  const stopped = run.status === "cancelled" || run.status === "failed";
+  const readyN = good.filter((p) => (p.classification ? p.classification === "ready" : p.ready)).length;
+  const qualifiedN = good.filter((p) => p.classification === "qualified").length;
+  const errorText = run.errorCode ? RUN_ERROR[run.errorCode] : undefined;
   return (
     <div className="min-w-0 space-y-4" data-testid="run-panel">
-      <Card className="glass-card"><CardContent className="space-y-3 p-4">
+      <Card className="glass-card"><CardContent className="space-y-4 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Search</p>
             <p className="break-words text-sm font-semibold">{run.description}</p>
-            <p className={cn("mt-1 flex items-center gap-1.5 text-sm", running ? "" : "text-muted-foreground")} data-testid="run-status">
-              {running ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />{RUN_STAGE_LABEL[run.stage] ?? "Working"}…</> : run.status === "done" ? <><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />Done · included in your plan</> : run.status === "cancelled" ? "Stopped" : "Couldn't finish"}
+            <p className={cn("mt-1 flex items-center gap-1.5 text-sm", running ? "" : stopped ? "font-medium text-amber-800 dark:text-amber-300" : "text-muted-foreground")} data-testid="run-status" aria-live="polite">
+              {running ? <><Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />{RUN_STAGE_LABEL[run.stage] ?? "Working"}…</>
+                : run.status === "done" ? <><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-hidden />Done · included in your plan</>
+                : run.status === "cancelled" ? <><Square className="h-3.5 w-3.5" aria-hidden />Stopped</>
+                : <><AlertTriangle className="h-3.5 w-3.5" aria-hidden />Couldn't finish</>}
             </p>
-            {run.errorCode && RUN_ERROR[run.errorCode] && <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">{RUN_ERROR[run.errorCode]}</p>}
+            {/* A finished search's own numbers, counted from the prospects shown below. */}
+            {!running && good.length > 0 && (
+              <p className="mt-1 text-sm" data-testid="run-summary">
+                <span className="text-muted-foreground">{stopped ? "Found before it stopped" : "Found"}</span> <strong className="tabular-nums">{good.length}</strong>
+                <span className="text-muted-foreground"> · Ready </span><strong className="tabular-nums">{readyN}</strong>
+                <span className="text-muted-foreground"> · Qualified </span><strong className="tabular-nums">{qualifiedN}</strong>
+                {aside.length > 0 && <span className="text-muted-foreground"> · {aside.length} set aside</span>}
+              </p>
+            )}
           </div>
-          {running && canEdit && <Button size="sm" variant="outline" onClick={() => cancel.mutate()} disabled={cancel.isPending} data-testid="run-cancel"><Square className="mr-1.5 h-3.5 w-3.5" />Stop</Button>}
+          {running && canEdit && <Button size="sm" variant="outline" onClick={() => cancel.mutate()} disabled={cancel.isPending} data-testid="run-cancel">{cancel.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Square className="mr-1.5 h-3.5 w-3.5" />}Stop</Button>}
         </div>
+        {stopped ? (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200" role="status" data-testid="run-stopped">
+            <p>{errorText ?? (run.status === "cancelled" ? "This search was stopped before it finished." : "This search stopped before it finished.")}</p>
+            <p className="mt-0.5 text-xs">
+              {good.length > 0 ? "What it found before stopping is below. " : "Nothing passed the checks before it stopped. "}
+              {canEdit ? "To try again, describe who you want above and start a new search." : "Someone who can run searches can start it again."}
+            </p>
+          </div>
+        ) : errorText ? (
+          <p className="text-xs text-amber-700 dark:text-amber-400">{errorText}</p>
+        ) : null}
+        {running && <StageTrack stage={run.stage} />}
         <Funnel run={run} />
       </CardContent></Card>
 
-      {good.length === 0 && running && <p className="text-sm text-muted-foreground">Companies appear here as they are checked. This usually takes a minute or two.</p>}
-      {good.length === 0 && !running && <p className="rounded-2xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">No company passed the checks. Try a broader description, or a different place.</p>}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 [&>*]:min-w-0" data-testid="prospect-grid">
-        {good.map((p) => <ProspectCard key={p.id} p={p} canEdit={canEdit} adding={adding === p.id} onOpen={() => onOpen(p)} onAdd={() => add.mutate(p.id)} />)}
-      </div>
+      {good.length === 0 && running && <p className="text-sm text-muted-foreground" aria-live="polite">Companies appear here as they are checked. This usually takes a minute or two.</p>}
+      {good.length === 0 && run.status === "done" && <p className="rounded-2xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">No company passed the checks. Try a broader description, or a different place.</p>}
+      {good.length > 0 && (
+        <motion.div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" variants={stagger} initial={calm ? false : "hidden"} animate="visible" data-testid="prospect-grid">
+          {good.map((p, i) => (
+            <motion.div key={p.id} className="min-w-0" variants={staggerItem(i)} initial={firstIds.current?.has(p.id) ? undefined : false}>
+              <ProspectCard p={p} canEdit={canEdit} adding={adding === p.id} onOpen={() => onOpen(p)} onEvidence={() => onOpen(p, "evidence")} onAdd={() => add.mutate(p.id)} />
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
 
       {aside.length > 0 && (
         <div>
-          <button onClick={() => setShowAside((v) => !v)} className="text-sm text-muted-foreground underline-offset-2 hover:underline" data-testid="toggle-aside">{showAside ? "Hide" : "Show"} {aside.length} set aside</button>
+          <button onClick={() => setShowAside((v) => !v)} aria-expanded={showAside} className="inline-flex items-center gap-1 text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline" data-testid="toggle-aside">
+            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showAside && "rotate-180")} aria-hidden />{showAside ? "Hide" : "Show"} {aside.length} set aside
+          </button>
           {showAside && (
             <ul className="mt-2 divide-y rounded-2xl border text-sm">
               {aside.map((p) => <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-2"><span className="min-w-0 truncate">{p.name} <span className="text-muted-foreground">· {p.domain}</span></span><span className="shrink-0 text-xs text-muted-foreground">{p.rejectLabel}</span></li>)}
             </ul>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A search loading: the shape of its header and the first cards, nothing more. */
+function RunSkeleton() {
+  return (
+    <div className="space-y-4" aria-busy="true" aria-label="Loading the search">
+      <div className="space-y-3 rounded-2xl border p-4" aria-hidden>
+        <Skeleton className="h-3 w-16" /><Skeleton className="h-4 w-2/3" /><Skeleton className="h-3 w-40" />
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7">{Array.from({ length: 7 }, (_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}</div>
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((i) => <ProspectCardSkeleton key={i} />)}</div>
+    </div>
+  );
+}
+
+/** No searches yet: what happens, that nothing is contacted, and examples to start from. */
+function FirstSearch({ canEdit, onPick }: { canEdit: boolean; onPick: (example: string) => void }) {
+  return (
+    <div className="rounded-2xl border border-dashed px-5 py-10 text-center" data-testid="outbound-first-time">
+      <Radar className="mx-auto mb-3 h-7 w-7 text-emerald-700 dark:text-emerald-400" aria-hidden />
+      <p className="font-semibold">{canEdit ? "Start with who you want to reach" : "No searches yet"}</p>
+      <p className="mx-auto mt-1 max-w-lg text-sm text-muted-foreground">
+        {canEdit ? "DealInSec searches the web, checks each company's own website and keeps only what it can back with evidence. Nothing is contacted: you choose who goes to Leads and what gets sent." : "Searches your team runs show up here, with the evidence behind each company. Nothing is contacted from here."}
+      </p>
+      {canEdit && (
+        <div className="mx-auto mt-4 flex max-w-2xl flex-wrap justify-center gap-2">
+          {EXAMPLES.map((x) => <button key={x} onClick={() => onPick(x)} className="rounded-full border bg-background px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" data-testid="outbound-example">{x}</button>)}
         </div>
       )}
     </div>
@@ -118,8 +212,9 @@ export default function OutboundPage() {
   const [text, setText] = useState("");
   const [parsed, setParsed] = useState<ParsedIcp | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   // The drawer: a prospect, and the search it belongs to (research and contact lookups are tied to a run).
-  const [open, setOpen] = useState<{ id: number; runId: string | null } | null>(null);
+  const [open, setOpen] = useState<{ id: number; runId: string | null; focus?: "evidence" } | null>(null);
   const search = useSearch();
   const [location, navigate] = useLocation();
   const viewParam = new URLSearchParams(search).get("view");
@@ -147,6 +242,24 @@ export default function OutboundPage() {
   const off = notSetUp(runs.error);
   const usage = useOutboundUsage(canEdit && !off);
   const blocked = searchBlockedReason(usage.data?.usage);
+  const firstTime = !!runs.data && runs.data.runs.length === 0;
+  const pickExample = (x: string) => { setText(x); setParsed(null); inputRef.current?.focus(); };
+
+  // The flow indicator reads only what this page already holds: the selected search (kept fresh by its panel or the
+  // runs list) and outreach lists the Outreach view loaded. These observers never fetch on their own.
+  const runCache = useQuery<RunData>({ queryKey: [runId ? runUrl(runId) : "outbound-no-run"], enabled: false });
+  const waitingCache = useQuery<{ items: QueueItem[] }>({ queryKey: outreachQueueKey("waiting"), enabled: false });
+  const sentCache = useQuery<{ items: QueueItem[] }>({ queryKey: outreachQueueKey("sent"), enabled: false });
+  const listed = runs.data?.runs.find((r) => r.id === runId) ?? null;
+  const flowRun = view === "searches" ? runCache.data?.run ?? listed : listed ?? runCache.data?.run ?? null;
+  const flow = flowState({
+    view,
+    composing: parse.isPending ? "reading" : parsed ? "confirming" : null,
+    run: flowRun ? { status: flowRun.status, stage: flowRun.stage } : null,
+    results: runCache.data ? splitProspects(runCache.data.prospects)[0].length : null,
+    anyInLeads: !!runCache.data?.prospects.some((p) => p.leadId),
+    queue: waitingCache.data ? { waiting: waitingCache.data.items.length, sent: sentCache.data?.items.length ?? 0 } : null,
+  });
 
   return (
     <div className="min-h-screen bg-background pb-20 lg:pb-12">
@@ -165,12 +278,14 @@ export default function OutboundPage() {
           <div className="rounded-2xl border px-6 py-14 text-center"><p className="font-semibold">AI Outbound isn't switched on yet</p><p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">This workspace is still being set up for it. Try again shortly.</p></div>
         ) : (
           <>
+            <FlowSteps state={flow} />
+
             {canEdit ? (
               <Card className="glass-card"><CardContent className="space-y-3 p-4">
                 <label htmlFor="outbound-request" className="text-sm font-semibold">Tell me who you want to reach…</label>
-                <Textarea id="outbound-request" value={text} onChange={(e) => { setText(e.target.value); setParsed(null); }} rows={2} maxLength={500}
+                <Textarea ref={inputRef} id="outbound-request" value={text} onChange={(e) => { setText(e.target.value); setParsed(null); }} rows={2} maxLength={500}
                   placeholder="US SEO agencies with 5–30 employees serving SaaS companies" disabled={parse.isPending || start.isPending} data-testid="outbound-input" />
-                {!text && <div className="flex flex-wrap gap-2">{EXAMPLES.map((x) => <button key={x} onClick={() => setText(x)} className="rounded-full border px-3 py-1 text-left text-xs text-muted-foreground hover:bg-muted">{x}</button>)}</div>}
+                {!text && !firstTime && !runs.isLoading && <div className="flex flex-wrap gap-2">{EXAMPLES.map((x) => <button key={x} onClick={() => pickExample(x)} className="rounded-full border px-3 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">{x}</button>)}</div>}
                 <UsageNote usage={usage.data?.usage} />
                 {!parsed ? (
                   <Button onClick={() => parse.mutate()} disabled={text.trim().length < 3 || parse.isPending || !!blocked} className="gradient-btn text-white" data-testid="outbound-find">
@@ -193,6 +308,7 @@ export default function OutboundPage() {
                       <Button onClick={() => start.mutate()} disabled={start.isPending || !!blocked} className="gradient-btn text-white" data-testid="outbound-start">{start.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-1.5 h-4 w-4" />}Start search</Button>
                       <Button variant="ghost" onClick={() => setParsed(null)}>Change</Button>
                     </div>
+                    <p className="text-xs text-muted-foreground">Starting a search only looks companies up. Nobody is contacted.</p>
                   </div>
                 )}
               </CardContent></Card>
@@ -200,30 +316,31 @@ export default function OutboundPage() {
               <p className="text-sm text-muted-foreground">You can see searches your team ran. Ask your owner for permission to start one.</p>
             )}
 
-            <div className="flex gap-1 rounded-xl border bg-muted/40 p-1 sm:w-fit" role="tablist" aria-label="AI Outbound views">
-              {([["searches", "Searches"], ["prospects", "All prospects"], ["outreach", "Outreach"]] as const).map(([v, label]) => (
-                <button key={v} role="tab" aria-selected={view === v} onClick={() => setView(v)} className={cn("flex-1 rounded-lg px-4 py-1.5 text-sm font-medium sm:flex-none", view === v ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground")} data-testid={`view-${v}`}>{label}</button>
-              ))}
-            </div>
+            <SegmentedTabs label="AI Outbound views" value={view} onChange={setView}
+              tabs={[{ value: "searches", label: "Searches", testId: "view-searches" }, { value: "prospects", label: "All prospects", testId: "view-prospects" }, { value: "outreach", label: "Outreach", testId: "view-outreach" }]} />
 
-            {view === "outreach" ? <OutreachQueue canEdit={canEdit} /> : view === "prospects" ? <ProspectWorkspace canExport={canEdit} onOpen={(r) => setOpen({ id: r.id, runId: r.latestRunId })} onPrepared={() => setView("outreach")} /> : <>
+            {view === "outreach" ? <OutreachQueue canEdit={canEdit} onShowReady={() => navigate(`${location}?view=prospects&readiness=ready`, { replace: true })} />
+              : view === "prospects" ? <ProspectWorkspace canExport={canEdit} onOpen={(r, focus) => setOpen({ id: r.id, runId: r.latestRunId, focus })} onPrepared={() => setView("outreach")} /> : <>
             {runs.data && runs.data.runs.length > 1 && (
               <div className="-mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:flex-wrap lg:px-0" role="tablist" aria-label="Recent searches">
                 {runs.data.runs.slice(0, 8).map((r) => (
-                  <button key={r.id} role="tab" aria-selected={runId === r.id} onClick={() => setRunId(r.id)} className={cn("max-w-[16rem] shrink-0 truncate rounded-full border px-3 py-1.5 text-sm", runId === r.id ? "border-emerald-600 bg-emerald-600 text-white" : "border-border bg-background hover:bg-muted")}>{r.description}</button>
+                  <button key={r.id} role="tab" aria-selected={runId === r.id} onClick={() => setRunId(r.id)} className={cn("inline-flex max-w-[16rem] shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors", runId === r.id ? "border-emerald-600 bg-emerald-600 text-white" : "border-border bg-background hover:bg-muted")}>
+                    {r.status === "running" && <Loader2 className="h-3 w-3 shrink-0 animate-spin" aria-label="Running" />}
+                    <span className="truncate">{r.description}</span>
+                  </button>
                 ))}
               </div>
             )}
 
-            {runId ? <RunPanel key={runId} id={runId} canEdit={canEdit} onOpen={(p) => setOpen({ id: p.id, runId })} />
-              : runs.isLoading ? <Skeleton className="h-40 w-full rounded-2xl" />
+            {runId ? <RunPanel key={runId} id={runId} canEdit={canEdit} onOpen={(p, focus) => setOpen({ id: p.id, runId, focus })} />
+              : runs.isLoading ? <RunSkeleton />
               : runs.isError && !runs.data ? <Card className="glass-card"><CardContent className="p-0"><LoadError what="your searches" onRetry={() => void runs.refetch()} retrying={runs.isFetching} /></CardContent></Card>
-              : <p className="rounded-2xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">Your searches will show up here, with who to contact and why now.</p>}
+              : <FirstSearch canEdit={canEdit} onPick={pickExample} />}
             </>}
           </>
         )}
       </main>
-      <ProspectBrief id={open?.id ?? null} runId={open?.runId ?? null} open={!!open} onOpenChange={(o) => !o && setOpen(null)} canEdit={canEdit} />
+      <ProspectBrief id={open?.id ?? null} runId={open?.runId ?? null} open={!!open} onOpenChange={(o) => !o && setOpen(null)} canEdit={canEdit} focus={open?.focus ?? null} />
       <BottomNav />
     </div>
   );

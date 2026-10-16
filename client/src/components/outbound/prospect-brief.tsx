@@ -3,9 +3,12 @@
  * eligibility, kept apart, each with what blocks it and a safe next step), the score and why, then what is KNOWN (facts and signals, each with its quote and
  * page), who to reach, and what is only INFERRED (pain points, opportunities), kept visibly apart. Actions: research
  * again, find contacts (when a data provider is connected), generate the outreach angle, add to Leads.
+ *
+ * Opened with focus="evidence" (a card's "N evidence"), it scrolls to the evidence and moves keyboard focus there once
+ * the brief has loaded, so the sources are one click from the card.
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { CheckCircle2, CircleDashed, CircleHelp, ExternalLink, Flame, Lightbulb, Loader2, RefreshCw, Sparkles, UserRound, UserSearch, XCircle } from "lucide-react";
 import { MISSING_CONTACT, MISSING_REASON } from "@shared/prospect";
@@ -15,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { leadCall, leadError } from "@/lib/leads";
+import { useCalmMotion } from "@/lib/motion";
 import { countryName, prospectUrl, type Brief, type Evidence } from "@/lib/outbound";
 import { cn } from "@/lib/utils";
 import { ScoreBadge } from "./prospect-card";
@@ -108,7 +112,7 @@ function Quote({ e }: { e: Evidence }) {
   );
 }
 
-export function ProspectBrief({ id, runId, open, onOpenChange, canEdit }: { id: number | null; runId: string | null; open: boolean; onOpenChange: (o: boolean) => void; canEdit: boolean }) {
+export function ProspectBrief({ id, runId, open, onOpenChange, canEdit, focus = null }: { id: number | null; runId: string | null; open: boolean; onOpenChange: (o: boolean) => void; canEdit: boolean; /** Where to take the reader once loaded. */ focus?: "evidence" | null }) {
   const { toast } = useToast();
   const q = useQuery<{ brief: Brief }>({ queryKey: [id ? prospectUrl(id) : "none"], enabled: !!id && open });
   const [contact, setContact] = useState<number | null>(null);
@@ -125,6 +129,20 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit }: { id: 
   const busy = research.isPending || contacts.isPending || angle.isPending || add.isPending;
   const b = q.data?.brief;
   const p = b?.prospect;
+
+  // Taken to the evidence once per opening, when the brief is there; a refetch never yanks the reader back.
+  const evidenceRef = useRef<HTMLDivElement>(null);
+  const focused = useRef(false);
+  const calm = useCalmMotion();
+  useEffect(() => { if (!open) focused.current = false; }, [open]);
+  useEffect(() => {
+    if (!open || focus !== "evidence" || !b || focused.current) return;
+    const el = evidenceRef.current;
+    if (!el) return;
+    focused.current = true;
+    el.focus({ preventScroll: true });
+    el.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" });
+  }, [open, focus, b, calm]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -196,39 +214,42 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit }: { id: 
               </Section>
             )}
 
-            <Section title="Why now · signals" tone="signal" hint={`stated on their site · ${p.timingLabel ?? ""}`}>
-              {b.signals.length ? b.signals.map((e) => (
-                <div key={e.id} className={cn("rounded-lg px-3 py-2 text-sm", e.timing === "strong" ? "bg-orange-50/70 dark:bg-orange-950/20" : "border")}>
-                  <p className={cn("flex items-center gap-1.5 text-[11px] font-semibold", e.timing === "strong" ? "text-orange-700 dark:text-orange-400" : "text-muted-foreground")}>{e.timing === "strong" && <Flame className="h-3 w-3" />}{e.label} · {e.date ?? e.freshness}{e.freshness && e.date && e.freshness !== "Undated" ? ` (${e.freshness.toLowerCase()})` : ""} · {e.timing === "strong" ? "strong timing" : e.timing === "context" ? "context, not urgency" : e.timing === "stale" ? "over a year old" : "no usable date"}</p>
-                  <p className="break-words">{e.value}</p><Quote e={e} /><Provenance e={e} />
-                </div>
-              )) : <p className="text-sm text-muted-foreground">No dated change found on their site{p.researched ? "." : " yet. Research it to look."}</p>}
-            </Section>
+            <div ref={evidenceRef} id="brief-evidence" tabIndex={-1} role="region" aria-labelledby="brief-evidence-title" className="scroll-mt-4 space-y-5 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 focus-visible:ring-offset-4" data-testid="brief-evidence">
+              <p id="brief-evidence-title" className="border-t pt-4 text-xs font-semibold">Evidence <span className="font-normal text-muted-foreground">· what was found, each with where it came from</span></p>
+              <Section title="Why now · signals" tone="signal" hint={`stated on their site · ${p.timingLabel ?? ""}`}>
+                {b.signals.length ? b.signals.map((e) => (
+                  <div key={e.id} className={cn("rounded-lg px-3 py-2 text-sm", e.timing === "strong" ? "bg-orange-50/70 dark:bg-orange-950/20" : "border")}>
+                    <p className={cn("flex items-center gap-1.5 text-[11px] font-semibold", e.timing === "strong" ? "text-orange-700 dark:text-orange-400" : "text-muted-foreground")}>{e.timing === "strong" && <Flame className="h-3 w-3" />}{e.label} · {e.date ?? e.freshness}{e.freshness && e.date && e.freshness !== "Undated" ? ` (${e.freshness.toLowerCase()})` : ""} · {e.timing === "strong" ? "strong timing" : e.timing === "context" ? "context, not urgency" : e.timing === "stale" ? "over a year old" : "no usable date"}</p>
+                    <p className="break-words">{e.value}</p><Quote e={e} /><Provenance e={e} />
+                  </div>
+                )) : <p className="text-sm text-muted-foreground">No dated change found on their site{p.researched ? "." : " yet. Research it to look."}</p>}
+              </Section>
 
-            <Section title="People" hint="decision makers first, then other employees">
-              {b.people.length ? b.people.map((e) => (
-                <label key={e.id} className="flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm">
-                  {canEdit && !p.leadId && <input type="radio" name="contact" className="mt-1" checked={contact === e.id} onChange={() => setContact(e.id)} aria-label={`Use ${e.value} as the lead's contact`} />}
-                  <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0">
-                    <span className="block break-words font-medium">{e.value}</span>
-                    <span className={cn("block text-[11px]", e.senior ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>{e.senior ? "Decision maker" : "Employee · not a senior decision-maker"}</span>
-                    {e.meta?.title && <span className="block text-xs">{String(e.meta.title)}</span>}
-                    {e.meta?.email && <span className="block text-xs">{e.meta.email} · <span className={e.meta.emailStatus === "verified" ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}>{e.meta.emailStatus === "verified" ? "verified by provider" : e.meta.emailStatus === "accept_all" ? "domain accepts all (unverified)" : "not verified"}</span></span>}
-                    <Quote e={e} />
-                    {/* The person's own provenance, apart from any research evidence about the company. */}
-                    <span className="block text-[10px] uppercase tracking-wide text-muted-foreground">{e.source === "provider" ? `Contact from ${String(e.meta?.provider ?? "a data provider")}` : "Named on their website"}{e.retrievedAt ? ` · checked ${day(e.retrievedAt)}` : ""} · no phone or LinkedIn stored</span>
-                  </span>
-                </label>
-              )) : <p className="text-sm text-muted-foreground">No one named with a role on their website.</p>}
-              {canEdit && !p.leadId && b.people.length > 0 && <p className="text-[11px] text-muted-foreground">Pick a person to make them the lead's contact. An email is added only when the provider verified it.</p>}
-            </Section>
+              <Section title="People" hint="decision makers first, then other employees">
+                {b.people.length ? b.people.map((e) => (
+                  <label key={e.id} className="flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm">
+                    {canEdit && !p.leadId && <input type="radio" name="contact" className="mt-1" checked={contact === e.id} onChange={() => setContact(e.id)} aria-label={`Use ${e.value} as the lead's contact`} />}
+                    <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0">
+                      <span className="block break-words font-medium">{e.value}</span>
+                      <span className={cn("block text-[11px]", e.senior ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>{e.senior ? "Decision maker" : "Employee · not a senior decision-maker"}</span>
+                      {e.meta?.title && <span className="block text-xs">{String(e.meta.title)}</span>}
+                      {e.meta?.email && <span className="block text-xs">{e.meta.email} · <span className={e.meta.emailStatus === "verified" ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}>{e.meta.emailStatus === "verified" ? "verified by provider" : e.meta.emailStatus === "accept_all" ? "domain accepts all (unverified)" : "not verified"}</span></span>}
+                      <Quote e={e} />
+                      {/* The person's own provenance, apart from any research evidence about the company. */}
+                      <span className="block text-[10px] uppercase tracking-wide text-muted-foreground">{e.source === "provider" ? `Contact from ${String(e.meta?.provider ?? "a data provider")}` : "Named on their website"}{e.retrievedAt ? ` · checked ${day(e.retrievedAt)}` : ""} · no phone or LinkedIn stored</span>
+                    </span>
+                  </label>
+                )) : <p className="text-sm text-muted-foreground">No one named with a role on their website.</p>}
+                {canEdit && !p.leadId && b.people.length > 0 && <p className="text-[11px] text-muted-foreground">Pick a person to make them the lead's contact. An email is added only when the provider verified it.</p>}
+              </Section>
 
-            <Section title="Facts" tone="fact" hint="each with the words from their site">
-              {b.facts.length ? b.facts.map((e) => (
-                <div key={e.id} className="text-sm"><span className="text-xs text-muted-foreground">{e.label}:</span> <span className="break-words">{e.value}</span><Quote e={e} /><Provenance e={e} /></div>
-              )) : <p className="text-sm text-muted-foreground">Nothing confirmed yet.</p>}
-            </Section>
+              <Section title="Facts" tone="fact" hint="each with the words from their site">
+                {b.facts.length ? b.facts.map((e) => (
+                  <div key={e.id} className="text-sm"><span className="text-xs text-muted-foreground">{e.label}:</span> <span className="break-words">{e.value}</span><Quote e={e} /><Provenance e={e} /></div>
+                )) : <p className="text-sm text-muted-foreground">Nothing confirmed yet.</p>}
+              </Section>
+            </div>
 
             {(b.inferences.length > 0 || b.opportunities.length > 0) && (
               <Section title="Inferences · not confirmed" tone="inference">
