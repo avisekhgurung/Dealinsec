@@ -50,7 +50,7 @@ const SOLID = "M8 8H30C45.5 8 57 18.5 57 32C57 45.5 45.5 56 30 56H8ZM20 19V45H29
 
 /** The D on its own, transparent. Decorative unless given a label. */
 export function DealinsecMark({ size = 32, variant = "default", className = "", label }: { size?: number; variant?: DealinsecLogoProps["variant"]; className?: string; label?: string }) {
-  const id = useId().replace(/:/g, "");
+  const id = `dlm${useId().replace(/[^a-zA-Z0-9]/g, "")}-`; // unique per instance, never a prefix of another
   const a11y = label ? { role: "img", "aria-label": label } : { "aria-hidden": true };
   if (variant !== "default") {
     return (
