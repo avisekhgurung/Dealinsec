@@ -1,16 +1,18 @@
-# Plans & pricing (INR, inclusive of taxes; one-time payments, no auto-debit)
+# Plans & billing
 
-- **7-day Pro trial** — every new account starts with one after finishing
-  setup. Everything unlocked, no credit card. One trial per account/mailbox,
-  ends automatically and drops you to Free — nothing is charged.
-- **Free** — ₹0 forever. 4 deals per month (each with its quotation),
-  dashboard, quotation PDFs. Agreements, invoices and payment tracking need Pro.
-- **Pro Monthly — ₹99/month** — the complete workflow, unlimited: deals,
-  quotations, e-signed agreements, professional invoices, payment tracking.
-- **Pro Annual — ₹999/year** (about ₹83/month) — same as Pro Monthly. Twelve
-  months of Monthly is ₹1,188, so the annual plan saves ₹189 a year — a small
-  discount, not free months.
-- No platform fee or commission on your deal value — ever.
-- Extra team seats, if you add a teammate beyond your plan's seats: ₹99/seat/month.
-Payments via Razorpay (UPI/cards/netbanking). 7-day refund policy. Billing is
-managed by the organization owner at /pricing.
+The exact plans, prices and who can buy them are in product-facts (generated
+from the billing code) — always quote prices from there, never from memory.
+
+How billing works:
+- Paid plans are one-time payments for a fixed term (a month or a year), with
+  no auto-debit and no auto-renewal. Buy again to extend.
+- Checkout is in Indian rupees through Razorpay (UPI, cards, netbanking) and
+  is available only to workspaces in India for now. Outside India, including
+  the United States, the free plan and the trial are open, but paid plans
+  can't be bought yet. Do not suggest a date for that.
+- Prices shown in other currencies are not available to buy; never convert a
+  rupee price into another currency.
+- The 7-day refund policy is on the /refund page.
+- Billing belongs to the organization's owner (in the app at /pricing); every
+  member shares the owner's plan.
+- No platform fee or commission on your deal value.

@@ -21,6 +21,7 @@
 import type { Express } from "express";
 import { esc, SITE_ORIGIN, LOGO_SVG, gaSnippet, COOKIE_FOOTER_LINKS } from "./tools/layout";
 import { consentBanner } from "@shared/consent-script";
+import { TAGLINE } from "@shared/product-facts";
 
 // ?ref=, not utm_*: an internal UTM would overwrite the organic session source in GA4.
 const SIGNUP = "/auth?mode=signup&ref=blog";
@@ -236,8 +237,8 @@ function footer(): string {
 /** Bottom-of-page conversion band — every blog page funnels into the app. */
 function ctaBand(): string {
   return `<div class="cta-band"><div class="wrap">
-    <h2>Stop retyping the same deal three times</h2>
-    <p>DealInSec turns one deal into a quotation, an e-signed agreement and an invoice that always agree with each other — and tells you who hasn't paid.</p>
+    <h2>${TAGLINE}</h2>
+    <p>DealInSec helps small agencies and consultants research prospects with evidence, then turns each won deal into a quotation, an agreement signed online and invoices that always agree with each other — and shows who hasn't paid.</p>
     <a class="btn" href="${SIGNUP}" data-cta>Start your 7-day free trial →</a>
     <span class="sub-note">No card required · Free plan after the trial · 7-day Pro trial in every country</span>
   </div></div>`;

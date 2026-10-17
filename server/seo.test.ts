@@ -704,8 +704,8 @@ describe("homepage crawler fallback: small agencies first, freelancers and creat
     for (const href of ["/for-freelancers", "/for-creators", "/tools/deal-risk-checker"]) expect(body, href).toContain(`href="${href}"`);
   });
 
-  it("answers the creator question in its FAQ, without claiming a marketplace", () => {
-    expect(body).toContain("Can I use DealInSec for brand deals as a creator?");
+  it("answers the freelancer and creator question as a secondary one, without claiming a marketplace", () => {
+    expect(body).toContain("Can freelancers or creators use DealInSec?");
     expect(body).toMatch(/not a marketplace and it does not find brand deals/);
   });
 
@@ -714,6 +714,8 @@ describe("homepage crawler fallback: small agencies first, freelancers and creat
     expect(body).toMatch(/does not process them/);
     expect(body).toMatch(/isn't a certified digital signature/);
     expect(body).toMatch(/paid plans can't be bought from the US yet/);
+    expect(body).toMatch(/never read by AI: DealInSec never sends Gmail content to an AI model/);
+    expect(body).toMatch(/limited early access/);
     // no claims the product can't back
     expect(body).not.toMatch(/GST-ready|automatically sends|unified inbox|syncs your inbox|collects? (client )?payments/i);
   });
@@ -736,8 +738,8 @@ describe("the tools hub", () => {
     expect(html.indexOf("/tools/deal-risk-checker")).toBeLessThan(html.indexOf("/tools/quotation-maker"));
   });
 
-  it("is addressed to freelancers and creators", () => {
-    expect(html).toMatch(/Free tools for<br \/><span class="accent">freelancers &amp; creators<\/span>/);
+  it("is addressed to freelancers, agencies and consultants (the tools serve every audience; creators are no longer the headline)", () => {
+    expect(html).toMatch(/Free tools for<br \/><span class="accent">freelancers, agencies &amp; consultants<\/span>/);
     expect(html).toContain("Who are the tools for?");
   });
 });

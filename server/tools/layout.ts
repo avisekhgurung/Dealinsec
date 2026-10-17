@@ -35,6 +35,7 @@ const APP_LINK = "/?ref=tools";
 const APP_SIGNUP = "/?ref=tools_remove_brand";
 
 import { consentBanner, consentScript, GA_ID } from "@shared/consent-script";
+import { PRICING } from "@shared/product-facts";
 
 /** Same property as client/index.html; server/seo.test.ts asserts they match. */
 export const GA_MEASUREMENT_ID = GA_ID;
@@ -587,7 +588,7 @@ function ctaBand(): string {
     <div class="cta-ico">${clock}</div>
     <div class="cta-copy">
       <h2>Find Clients. Close Deals. Get Paid.</h2>
-      <p>For small agencies, consultants and freelancers, wherever you bill from: research prospects with evidence, then quotation, e-signed agreement, invoice and payment tracking on one thread per client, in your own currency. Free to start, with a 7-day Pro trial and no card in every country. Paid plans can currently be bought in India (₹99/month or ₹999/year).</p>
+      <p>For small agencies, consultants and freelancers, wherever you bill from: research prospects with evidence, then quotation, an agreement signed online, invoice and payment tracking for each client, in your own currency. Free to start, with a ${PRICING.trialDays}-day Pro trial and no card in every country. Paid plans can currently be bought in India (₹${PRICING.proMonthlyInr}/month or ₹${PRICING.proYearlyInr}/year).</p>
     </div>
     <a class="btn" href="${APP_LINK}" data-cta>Start free →</a>
   </div></div>`;
@@ -643,7 +644,7 @@ function footer(): string {
       ${SOCIALS}
     </div>
     ${consentBanner()}
-    <div class="muted">© ${y} DealInSec — find better clients, close deals and get paid. For agencies, consultants, freelancers and creators. These free tools run in your browser; nothing you enter is stored on our servers.</div>
+    <div class="muted">© ${y} DealInSec — find clients, close deals and get paid. For small agencies, consultants and freelancers. These free tools run in your browser; nothing you enter is stored on our servers.</div>
   </div></footer>`;
 }
 
@@ -662,8 +663,8 @@ function brandModal(): string {
       <div style="padding:20px">
         <ul class="bm-list">
           <li>Remove the &ldquo;Made with DealInSec&rdquo; footer</li>
-          <li><b>4 free Deal Credits every month</b> &mdash; run real deals with quotations</li>
-          <li>E-signed agreements, invoices and payment tracking with Pro &mdash; the 7-day trial is open everywhere; paid plans can currently be bought in India (₹99/month)</li>
+          <li><b>${PRICING.freeMonthlyDeals} free deals every month</b> &mdash; run real deals with quotations</li>
+          <li>Agreements signed online, invoices and payment tracking with Pro &mdash; the ${PRICING.trialDays}-day trial is open everywhere; paid plans can currently be bought in India (₹${PRICING.proMonthlyInr}/month)</li>
         </ul>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px">
           <a class="btn" href="${APP_SIGNUP}" data-cta style="flex:1;min-width:150px;justify-content:center">Sign up free →</a>

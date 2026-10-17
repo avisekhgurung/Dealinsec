@@ -22,6 +22,7 @@ import { paymentReminderPage, paymentReminderMeta } from "./payment-reminder-ema
 import { invoiceDueDatePage, invoiceDueDateMeta } from "./invoice-due-date";
 import { dealRiskPage, dealRiskMeta } from "./deal-risk";
 import { registerProgrammaticPages, programmaticSitemapPaths } from "./programmatic";
+import { PRICING } from "@shared/product-facts";
 
 // html-to-image UMD bundle (for PNG export), read once and served self-hosted
 // so the tool pages have no external CDN dependency.
@@ -92,10 +93,10 @@ const ICONS: Record<string, string> = {
 
 const INDEX_FAQ: { q: string; a: string }[] = [
   { q: "Are these tools really free?", a: "Yes — every tool is free to use with no sign-up. You can check a client or brand message, and create and download unlimited invoices, quotations and agreements as PDFs." },
-  { q: "Who are the tools for?", a: "Freelancers and other people who do client work, and creators, UGC creators and influencers who do paid brand collaborations. The deal risk checker and the documents work for both; the deal risk checker asks which kind of deal you are looking at." },
+  { q: "Who are the tools for?", a: "Anyone who quotes and bills client work: freelancers, consultants and small agencies, and creators who do paid brand collaborations. The deal risk checker and the documents work for client deals and brand deals alike; the deal risk checker asks which kind of deal you are looking at." },
   { q: "Do the tools work outside India?", a: "Yes. The deal risk checker, quotation maker, invoice and bill generator, payment reminder email generator, invoice due date calculator, service agreement, proforma invoice and purchase order work in any country: pick your country and currency, and the document follows it — the currency, the date format, the name of your tax (GST, VAT or sales tax) and the tax number your clients expect. A few tools are built on one country's rules and say so: the GST invoice generator and GST calculator for India, and the late-payment calculator for the UK." },
   { q: "Is my data safe?", a: "Everything runs in your browser. What you type is saved only on your own device and is never sent to or stored on our servers." },
-  { q: "What do I get if I create an account?", a: "Every client project lives on one thread — quotation, agreement, invoice and payment tracking — instead of scattered across WhatsApp, email and your downloads folder. The free plan covers 4 deals a month, each with its quotation, and every new account starts with a 7-day Pro trial (no card) that unlocks e-signed agreements, invoices and payment tracking. In India, Pro is ₹99 a month or ₹999 a year. Outside India the free plan and the trial are open today; paid plans can't be bought from other countries yet." },
+  { q: "What do I get if I create an account?", a: `DealInSec is a workspace to find clients, close deals and get paid: AI Outbound researches prospects with evidence, and each won deal carries its quotation, agreement, invoices and payment tracking instead of scattering them across email and your downloads folder. The free plan covers ${PRICING.freeMonthlyDeals} deals a month, each with its quotation, plus AI Outbound research within daily limits, and every new account starts with a ${PRICING.trialDays}-day Pro trial (no card) that unlocks agreements signed online, invoices and payment tracking. In India, Pro is ₹${PRICING.proMonthlyInr} a month or ₹${PRICING.proYearlyInr} a year. Outside India the free plan and the trial are open today; paid plans can't be bought from other countries yet.` },
 ];
 
 function toolCard(t: ToolDef): string {
@@ -121,8 +122,8 @@ function toolsIndexPage(): string {
   const body = `
   <div class="hero"><div class="wrap">
     <span class="badge">🎁 100% Free · No sign-up · Instant download</span>
-    <h1>Free tools for<br /><span class="accent">freelancers &amp; creators</span></h1>
-    <p class="sub">Check a client or brand message before you say yes, then create the quotation, agreement and invoice — for freelancers, consultants, creators and influencers, in your own currency, done in your browser, no sign-up.</p>
+    <h1>Free tools for<br /><span class="accent">freelancers, agencies &amp; consultants</span></h1>
+    <p class="sub">Check a client or brand message before you say yes, then create the quotation, agreement and invoice — in your own currency, done in your browser, no sign-up.</p>
   </div></div>
 
   <section><div class="wrap">
@@ -158,9 +159,9 @@ function toolsIndexPage(): string {
   </div></section>`;
 
   return renderToolPage({
-    title: "Free Deal, Invoice, Quotation & Agreement Tools for Freelancers and Creators | DealInSec",
+    title: "Free Deal, Invoice, Quotation & Agreement Tools for Freelancers and Agencies | DealInSec",
     description:
-      "Free, no-sign-up tools for freelancers and creators in any country — a deal risk checker for client and brand messages, quotation maker, invoice generator, payment reminder email generator, service agreement, proforma invoice and purchase order in your own currency, plus GST tools for India and a UK late-payment calculator.",
+      "Free, no-sign-up tools for freelancers, agencies and consultants in any country — a deal risk checker for client and brand messages, quotation maker, invoice generator, payment reminder email generator, service agreement, proforma invoice and purchase order in your own currency, plus GST tools for India and a UK late-payment calculator.",
     canonicalPath: "/tools",
     bodyHtml: body,
     jsonLd: [

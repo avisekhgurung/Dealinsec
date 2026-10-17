@@ -30,6 +30,7 @@
  */
 import type { Express } from "express";
 import { esc } from "./tools/layout";
+import { AUDIENCE_LINE, ONE_LINER, PRICING } from "@shared/product-facts";
 import { renderCategoryPage, type CategoryPage } from "./category-pages";
 
 export const REVIEWED_ON = "2026-09-26";
@@ -458,10 +459,10 @@ ${METHODOLOGY([vendor("bonsai")])}`,
     updated: REVIEWED_ON,
     metaTitle: "About DealInSec: Who Makes It and How We Write",
     description:
-      "About DealInSec: software for small agencies, consultants, freelancers and creators to find clients and run each deal from quotation to payment. Who makes it, what it does and doesn't do, where paid plans are available, and how our guides are written.",
+      "About DealInSec: an AI-assisted client acquisition and deal-to-payment workspace for small B2B agencies and consultants. Who makes it, what it does and doesn't do, where paid plans are available, and how our guides are written.",
     h1: "About DealInSec",
-    sub: "DealInSec is software for small agencies and consultants, freelancers, and creators doing paid brand collaborations to find better clients and run each deal from quotation to payment — built and run by an independent founder.",
-    chips: ["Independent founder", "Freelancers and creators in any country", "50 currencies", "Free plan · 7-day trial"],
+    sub: `${ONE_LINER} It helps founder-led agencies and consultants find clients, close deals and get paid — built and run by an independent founder.`,
+    chips: ["Independent founder", "Agencies and consultants in any country", "50 currencies", `Free plan · ${PRICING.trialDays}-day trial`],
     shortLabel: "About DealInSec",
     extraJsonLd: [
       {
@@ -479,8 +480,7 @@ ${METHODOLOGY([vendor("bonsai")])}`,
         url: "https://www.dealinsec.com/",
         logo: "https://www.dealinsec.com/apple-touch-icon.png",
         email: "support@dealinsec.com",
-        description:
-          "Software for small agencies, consultants, freelancers and creators to find better clients and run each deal from quotation to payment: prospect research, quotations, online agreement signing, invoices and payment tracking.",
+        description: ONE_LINER,
         founder: { "@type": "Person", name: "Avisekh Gurung" },
         address: { "@type": "PostalAddress", addressLocality: "Darjeeling", addressRegion: "West Bengal", addressCountry: "IN" },
       },
@@ -488,7 +488,7 @@ ${METHODOLOGY([vendor("bonsai")])}`,
     sections: `
 <section><div class="wrap">
   <h2>What DealInSec is</h2>
-  <p class="sec-sub">DealInSec is web software for freelancers and solo service providers — designers, developers, writers, video editors and photographers, marketers and consultants — and for creators, UGC creators and influencers who do paid brand collaborations. It keeps each client or brand deal on one record: a quotation the client or brand can accept online, an agreement they can sign online, invoices drawn from that agreement, and a clear view of what is paid, pending and overdue. It is one product with two ways in: at signup you choose whether you work with clients or with brands, and the wording and the deal fields follow. It works in 50 currencies, with the tax field, invoice numbering and date format of the country you work from.</p>
+  <p class="sec-sub">${ONE_LINER} It is built for ${AUDIENCE_LINE}. AI Outbound researches real prospects and shows the evidence for each; you approve the outreach and send it yourself; and each won deal carries one connected record: a quotation the client can accept online, an agreement they can sign online, invoices drawn from that agreement, and a clear view of what is paid, pending and overdue. Freelancers use it the same way, and creators can use it for paid brand collaborations. It works in 50 currencies, with the tax field, invoice numbering and date format of the country you work from.</p>
 </div></section>
 <section><div class="wrap">
   <h2>Who makes it</h2>
@@ -497,13 +497,13 @@ ${METHODOLOGY([vendor("bonsai")])}`,
 <section><div class="wrap">
   <h2>What it does — and what it doesn't</h2>
   <div class="feat">
-    <div class="ft"><b>What it does</b><p>Deals and quotations with a client or brand acceptance link; agreements with a public signing link, recording who signed, when and with which signature; invoices drawn from the agreement; payment tracking; a Protection Check that flags risky or missing terms before you send, including usage rights and exclusivity for brand deals; and AI-drafted payment reminders that you review and send yourself.</p></div>
-    <div class="ft"><b>What it doesn't</b><p>It is not a marketplace and does not find you clients or brand deals. It does not track time, run a client portal, do accounting or expenses, schedule meetings, send reminders automatically or collect payments. Your client or brand pays you directly and you mark the invoice paid. Online signing is electronic acceptance with an audit record, not a certified digital signature, and nothing it produces is legal advice.</p></div>
+    <div class="ft"><b>What it does</b><p>AI Outbound prospect research with sources and dates; a leads pipeline with follow-up tasks and a do-not-contact list; AI-drafted first messages you approve and send from your own email; deals and quotations with a client acceptance link; agreements with a public signing link, recording who signed, when and with which signature; invoices drawn from the agreement; payment tracking; a Protection Check that flags risky or missing terms before you send; and AI-drafted payment reminders that you review and send yourself.</p></div>
+    <div class="ft"><b>What it doesn't</b><p>It is not a marketplace, an email marketing platform or an autonomous sales agent: it never contacts prospects or clients on your behalf, and it doesn't send emails, follow-ups or reminders automatically. It does not track time, run a client portal, do accounting or expenses, schedule meetings or collect payments. Your client pays you directly and you mark the invoice paid. Online signing is electronic acceptance with an audit record, not a certified digital signature, and nothing it produces is legal advice.</p></div>
   </div>
 </div></section>
 <section><div class="wrap">
   <h2>Where it is available</h2>
-  <p class="sec-sub">The free plan (4 deals a month, each with its quotation) and the 7-day Pro trial are open in every country, with no card. The paid Pro plan — ₹99 a month or ₹999 a year — can currently be bought in India only. We can't yet take payments from other countries, and we will say so on this page when that changes. The <a href="/tools">free tools</a> need no account and don't store what you type on our servers.</p>
+  <p class="sec-sub">The free plan (${PRICING.freeMonthlyDeals} deals a month, each with its quotation) and the ${PRICING.trialDays}-day Pro trial are open in every country, with no card. The paid Pro plan — ₹${PRICING.proMonthlyInr} a month or ₹${PRICING.proYearlyInr} a year — can currently be bought in India only. We can't yet take payments from other countries, and we will say so on this page when that changes. The <a href="/tools">free tools</a> need no account and don't store what you type on our servers.</p>
 </div></section>
 <section><div class="wrap">
   <h2>How we write our guides</h2>

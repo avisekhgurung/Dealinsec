@@ -1,30 +1,21 @@
 /**
  * Landing Copilot — the public product guide (marketing funnel).
  *
- * A visitor can interrogate DealInSec before signing up: "can it handle 50%
- * advance?", "is it GST ready?", "what does it cost?". It answers from the
- * same /ai-knowledge base the in-app Copilot uses, so marketing can never
- * drift from the product. It has NO database access and NO tools — it is a
- * product guide, not an account. After a few exchanges it nudges the trial.
+ * A visitor can ask DealInSec before signing up: "how does AI Outbound work?",
+ * "does it send emails automatically?", "what does it cost?". It answers from
+ * the verified product facts (shared/product-facts.ts) and the same
+ * /ai-knowledge base the in-app Copilot uses, so marketing can never drift
+ * from the product. It has NO database access and NO tools — it is a product
+ * guide, not an account. After a few exchanges it suggests the trial.
  */
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, X, SendHorizonal, Loader2, ArrowRight } from "lucide-react";
-
-const OPENER =
-  "Ask me anything about DealInSec — how the workflow runs, what it costs, whether it fits how you bill clients.";
-
-const SUGGESTIONS = [
-  "How does DealInSec help me get paid on time?",
-  "Can I do 50% advance and 50% on delivery?",
-  "What does it cost?",
-  "Does this work for a freelance video editor?",
-];
+import { ASK_CTA_LABEL, ASK_CTA_TEXT, ASK_OPENER as OPENER, ASK_SUGGESTIONS as SUGGESTIONS } from "@shared/ask-dealinsec";
 
 interface Msg { role: "user" | "assistant"; content: string }
 
-/** One chat, two placements: the floating bubble and the inline section on the
- *  landing page. Extracted so the two can never drift apart. */
+/** The chat's state, kept apart from its layout (the floating bubble). */
 function useCopilotChat() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -101,10 +92,10 @@ function ChatBody({ chat, onCta, className }: {
         {showCta && !busy && (
           <div className="ml-9 rounded-xl border border-emerald-300/60 dark:border-emerald-800/60 bg-emerald-500/[0.06] p-3">
             <p className="text-xs text-neutral-700 dark:text-neutral-300 mb-2">
-              The quickest way to see it: put your last 3 deals in. 7-day trial, no card.
+              {ASK_CTA_TEXT}
             </p>
             <Button size="sm" className="h-8 text-xs font-bold gradient-btn text-white" onClick={onCta} data-testid="landing-copilot-cta">
-              Start managing deals <ArrowRight className="w-3 h-3 ml-1" />
+              {ASK_CTA_LABEL} <ArrowRight className="w-3 h-3 ml-1" />
             </Button>
           </div>
         )}
@@ -131,63 +122,7 @@ function ChatBody({ chat, onCta, className }: {
   );
 }
 
-/**
- * Inline section — the chat sits OPEN in the page instead of hiding behind a
- * button. A visitor who never thinks to click a bubble still sees a live
- * assistant they can type into, which is the whole point of putting it on a
- * marketing page.
- */
-export function LandingCopilotSection({ onCta }: { onCta: () => void }) {
-  const chat = useCopilotChat();
-  return (
-    <section id="ask" className="py-20 sm:py-28 border-t border-neutral-200 dark:border-neutral-800">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-8">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-emerald-600 dark:text-emerald-400 mb-3">
-            <Sparkles className="w-3.5 h-3.5" />
-            Ask before you sign up
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-balance">
-            Not sure it fits how you work? Just ask.
-          </h2>
-        </div>
-
-        <div className="text-center mb-6">
-          <p className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">
-            Ask about quotes, agreements, invoices or pricing. No sign-up, no email. It answers from the same
-            product knowledge the app uses.
-          </p>
-        </div>
-
-        <div className="relative">
-          {/* Soft glow to pull the eye to the one thing on this page you can use right now. */}
-          <div
-            className="absolute -inset-3 rounded-[28px] opacity-40 blur-2xl pointer-events-none animate-pulse"
-            style={{ background: "linear-gradient(135deg, #10B98133, #0D948833)" }}
-            aria-hidden="true"
-          />
-          <div className="relative flex flex-col h-[520px] rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 shadow-2xl shadow-emerald-900/5 overflow-hidden">
-            <div
-              className="flex items-center gap-2.5 px-4 py-3 text-white shrink-0"
-              style={{ background: "linear-gradient(135deg, hsl(160 84% 22%) 0%, hsl(174 70% 26%) 100%)" }}
-            >
-              <span className="w-8 h-8 rounded-xl bg-white/15 flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-amber-300" />
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold leading-tight">Ask DealInSec</p>
-                <p className="text-[11px] text-emerald-100/80 leading-tight">Product guide · no account needed</p>
-              </div>
-            </div>
-            <ChatBody chat={chat} onCta={onCta} />
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/** Floating bubble — stays available everywhere else on the page. */
+/** Floating bubble — available everywhere on the landing page. */
 export function LandingCopilot({ onCta }: { onCta: () => void }) {
   const [open, setOpen] = useState(false);
   const chat = useCopilotChat();

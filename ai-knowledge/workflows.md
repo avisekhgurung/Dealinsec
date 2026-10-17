@@ -1,28 +1,33 @@
 # The core workflow
 
-Stages, in order. Each stage's action needs the matching role permission, and
-Pro features need an active Pro plan or trial.
+Prospect → Lead → Deal → Quotation → Agreement → Invoice → Payment tracking.
+Each stage's action needs the matching role permission; agreements, invoices
+and payment tracking need Pro or the trial.
 
-1. **Deal** — create from Deals → New Deal (or dashboard "New Deal"). Pick the
-   deal type (Design, Development, Writing, Marketing, Video & Photo,
-   Consulting, Custom), client name, title, amount, dates, deliverables. Free
-   plan: 4 deals per month for the whole organization; Pro/trial: unlimited.
-   A deal starts as Pending. It can only be edited while Pending.
-2. **Quotation** — open the deal → Generate Quote. Included with the deal (no
-   extra credit). Re-generating after edits creates a new version; the old one
-   is marked revised. The quotation renders as a professional document you can
-   print/share as PDF.
-3. **Agreement** — from the deal page → Create Agreement (Pro feature). One
-   agreement per deal. You review terms, confirm billing details (address,
-   PAN, signature — collected right there if missing) and create it. The deal
-   becomes Active. Uploading the signed proof marks the agreement Signed.
-4. **Invoice** — from the agreement/contract page → Generate Invoice (Pro).
-   Single invoice or split invoices (e.g. advance + final by percentage).
-5. **Payment tracking** — open the invoice → mark it Paid when the client pays
-   (Pro feature, "payments.manage" permission). The dashboard's Earned/Pending
-   tiles and Invoice Status chart update from this.
+0. **Prospect** — AI Outbound (/outbound): describe who you want, confirm the
+   profile, start the search (it runs for a minute or two). Review the
+   prospects with their evidence and score, then "Add to Leads" for the ones
+   worth pursuing.
+1. **Lead** — Leads (/leads) or added from AI Outbound. Record facts, set next
+   steps, draft and approve a first message, send it from your own email and
+   mark it sent. When the lead is won, "Turn into a deal" creates its deal and
+   marks the lead Won.
+2. **Deal** — Deals → New Deal (or from a won lead). Pick the engagement model
+   and service, then client, title, value, dates and deliverables. Free plan:
+   4 deals a month for the organization; Pro/trial: unlimited. A deal starts
+   Pending and can be edited only while Pending.
+3. **Quotation** — open the deal → Generate Quote (included with the deal).
+   Re-generating after edits makes a new version. Share the acceptance link
+   or print/PDF.
+4. **Agreement** — from the deal → Create Agreement (Pro). One per deal.
+   Review terms, confirm billing details, create it; the deal becomes Active.
+   Send the signing link, or upload a signed copy; either marks it Signed.
+5. **Invoice** — from the agreement → Generate Invoice (Pro). Single or split
+   (for example an advance and a final invoice by percentage).
+6. **Payment tracking** — open the invoice → mark it Paid when the client pays
+   (Pro, "payments.manage" permission). Paid, pending and overdue update.
 
 Next-step logic: no quote → generate the quotation; quote but no agreement →
-create the agreement; agreement without signed proof → upload signed proof;
-signed but no invoice → generate the invoice; invoice unpaid → record payment
-when it arrives; everything done → the deal can be marked Completed.
+create the agreement; agreement unsigned → send the signing link; signed but
+no invoice → generate the invoice; invoice unpaid → record payment when it
+arrives; everything done → mark the deal Completed.

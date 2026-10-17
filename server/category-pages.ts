@@ -34,6 +34,7 @@
 import type { Express } from "express";
 import { esc, SITE_ORIGIN, LOGO_SVG, gaSnippet, COOKIE_FOOTER_LINKS } from "./tools/layout";
 import { consentBanner } from "@shared/consent-script";
+import { PRICING, TAGLINE } from "@shared/product-facts";
 
 // ?ref=, not utm_*: an internal UTM would overwrite the organic session source in GA4.
 const SIGNUP = "/auth?mode=signup&ref=category";
@@ -170,8 +171,8 @@ function header(): string {
 function footer(region: "IN" | "global"): string {
   const tagline =
     region === "IN"
-      ? "for India's freelancers: quotation, e-signed agreement, invoice and payment tracking on one thread per client."
-      : "for freelancers and creators worldwide: quotation, e-signed agreement, invoice and payment tracking on one thread per client or brand.";
+      ? "find clients, close deals and get paid. For small agencies, consultants and freelancers in India: prospect research, then quotation, agreement signed online, invoice and payment tracking."
+      : "find clients, close deals and get paid. For small agencies, consultants and freelancers wherever they bill from: prospect research, then quotation, agreement signed online, invoice and payment tracking.";
   return `<footer class="site"><div class="wrap">
     <div class="links">
       <a href="/">Product</a>
@@ -200,14 +201,14 @@ function footer(region: "IN" | "global"): string {
 function ctaBand(region: "IN" | "global"): string {
   const sub =
     region === "IN"
-      ? "Quotation, e-signed scope, invoices and payment follow-up that always agree with each other — built for India's freelancers."
-      : "Quotation, e-signed scope, invoices and payment follow-up that always agree with each other — built for freelancers and creators, wherever you bill from.";
+      ? "From the first prospect to the paid invoice: AI-assisted prospect research, then a quotation, an agreement signed online, invoices and payment tracking that always agree with each other. For small agencies, consultants and freelancers in India."
+      : "From the first prospect to the paid invoice: AI-assisted prospect research, then a quotation, an agreement signed online, invoices and payment tracking that always agree with each other. For small agencies, consultants and freelancers, wherever you bill from.";
   const note =
     region === "IN"
-      ? "No card required · Free plan after the trial · Pro ₹99/month or ₹999/year"
+      ? `No card required · Free plan after the trial · Pro ₹${PRICING.proMonthlyInr}/month or ₹${PRICING.proYearlyInr}/year`
       : "No card required · Free plan and 7-day Pro trial in every country · Paid plans currently available in India";
   return `<div class="cta-band"><div class="wrap">
-    <h2>One client. One thread. Zero retyping.</h2>
+    <h2>${TAGLINE}</h2>
     <p>${sub}</p>
     <a class="btn" href="${SIGNUP}" data-cta>Start your 7-day free trial →</a>
     <span class="sub-note">${note}</span>

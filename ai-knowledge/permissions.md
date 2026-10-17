@@ -1,7 +1,7 @@
 # Roles & permissions
 
-Most freelancers use DealInSec alone, as the Owner. Roles only matter if you
-add someone — an assistant, a partner, your CA. Every member of an
+Small teams use roles to decide who may do what: the founder is the Owner,
+and teammates (sales, delivery, accounts) join with a role. Every member of an
 organization can VIEW its records; what a member can DO depends on their role.
 
 - OWNER: everything, including billing and role management. One per org.
@@ -13,4 +13,4 @@ organization can VIEW its records; what a member can DO depends on their role.
   Organization (edit settings), Activity (view log).
 - Billing and org deletion always stay with the owner and can never be granted.
 - Changes to a role apply to its members immediately.
-Seats: most freelancers use DealInSec alone as the Owner. If you do add someone, the plan covers up to 5 members; extra seats are ₹99/seat/month.
+Seats: Pro and the trial include 5 members; the free plan has one. Extra seats are priced in product-facts.

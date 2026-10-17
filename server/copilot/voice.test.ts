@@ -8,16 +8,26 @@ const IN = resolveLocaleSettings({ country: "IN" } as any);
 const US = resolveLocaleSettings({ country: "US" } as any);
 
 describe("the client-work Copilot prompt is exactly the one that shipped", () => {
-  // Hashes of the prompt as it was before the audience change (checked against
-  // the previous revision for IN, US, GB, AE and DE). A wording edit to the
-  // client-work prompt changes these on purpose and should be a decision.
+  // Hashes of the client-work prompt. A wording edit changes these on purpose
+  // and should be a decision. Last decided 2026-10-17: the audience line moved
+  // from solo freelancers to founder-led agencies and consultants
+  // (shared/product-facts.ts AUDIENCE_LINE); nothing else changed.
   it("India", () => {
-    expect(sha(chatSystemPrompt(IN))).toBe("8660344257df0284ce44766e97e4f8be185ac215593b4d45b22d6271f375a264");
+    expect(sha(chatSystemPrompt(IN))).toBe("5f676506e0ecfb888ab03d53e061425647bb1eadbb6865d9d4e8a60ec43889bc");
     expect(chatSystemPrompt(IN, "client_work")).toBe(chatSystemPrompt(IN));
   });
   it("the neutral voice", () => {
-    expect(sha(chatSystemPrompt(US))).toBe("b0135c06fb12dd9185546e671badf19c88444c5595361a62a71d47102af7ef88");
+    expect(sha(chatSystemPrompt(US))).toBe("2755bd081b1a6053cc5273b03069af924835d9f712ff8876c54e13019b026b12");
     expect(chatSystemPrompt(US, "client_work")).toBe(chatSystemPrompt(US));
+  });
+});
+
+describe("who the assistants are told they serve", () => {
+  it("agencies and consultants first, never 'solo professionals' or India's freelancers", () => {
+    for (const p of [chatSystemPrompt(IN), chatSystemPrompt(US)]) {
+      expect(p).toMatch(/founder-led B2B service businesses of about 1 to 10 people/);
+      expect(p).not.toMatch(/India's freelancers|Solo professionals|video editors & photographers/);
+    }
   });
 });
 

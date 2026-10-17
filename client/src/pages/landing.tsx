@@ -106,7 +106,7 @@ const NAV_LINKS: (NavLink | { label: string; items: NavLink[] })[] = [
     { label: "Features", href: "#features", note: "Prospects to payment, in one place" },
     { label: "How it works", href: "#how", note: "From finding the client to getting paid" },
     { label: "Live demo", href: "#try", note: "Paste a client message, see the deal" },
-    { label: "Who it's for", href: "#audiences", note: "Freelancers and agencies" },
+    { label: "Who it's for", href: "#audiences", note: "Agencies and consultants" },
   ] },
   { label: "How it works", href: "#how" },
   { label: "Pricing", href: "#pricing" },
@@ -197,6 +197,8 @@ export default function LandingPage() {
   // The auth experience is a dedicated page now (professional split-screen
   // + forgot-password flow) — the popup stays only as dead markup until a
   // future cleanup pass.
+  // Which call to action a visitor used (the hero has its own event, hero_cta_click). A fixed location id only.
+  const landingCta = (location: "pricing" | "final_banner" | "ask_dealinsec") => trackEvent("landing_cta_click", { location, signed_in: isAuthenticated });
   const openAuth = (tab: "signup" | "login") => {
     setLocation(tab === "login" ? "/auth?mode=signin" : "/auth?mode=signup");
   };
@@ -267,8 +269,8 @@ export default function LandingPage() {
         <AudienceCards />
         <OverviewSection />
         {!isAuthenticated && <LandingTryDemo />}
-        <PricingPreview onCTA={() => (isAuthenticated ? setLocation("/pricing") : openAuth("signup"))} />
-        <CtaBanner isAuthenticated={isAuthenticated} onPrimary={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))} />
+        <PricingPreview onCTA={() => { landingCta("pricing"); isAuthenticated ? setLocation("/pricing") : openAuth("signup"); }} />
+        <CtaBanner isAuthenticated={isAuthenticated} onPrimary={() => { landingCta("final_banner"); isAuthenticated ? setLocation("/dashboard") : openAuth("signup"); }} />
         <FaqSection />
       </main>
 
@@ -276,7 +278,7 @@ export default function LandingPage() {
 
       {/* Public product guide — answers from the same knowledge base the
           in-app Copilot uses, so marketing can't drift from the product. */}
-      <LandingCopilot onCta={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))} />
+      <LandingCopilot onCta={() => { landingCta("ask_dealinsec"); isAuthenticated ? setLocation("/dashboard") : openAuth("signup"); }} />
 
       {/* Auth Modal */}
       <Dialog open={authModalOpen} onOpenChange={setAuthModalOpen}>
@@ -538,7 +540,7 @@ function Header({
                   Sign in
                 </Button>
                 <Button
-                  onClick={() => onAuthClick("signup")}
+                  onClick={() => { trackEvent("landing_cta_click", { location: "header", signed_in: false }); onAuthClick("signup"); }}
                   className="h-9 px-4 text-sm font-semibold text-white border-0 shadow-sm shadow-emerald-500/20"
                   style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
                   data-testid="button-nav-signup"

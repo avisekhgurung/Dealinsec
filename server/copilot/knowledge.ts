@@ -1,7 +1,9 @@
 /**
  * DealinSec Copilot — product knowledge system.
  *
- * The /ai-knowledge markdown files are the AUTHORITATIVE product knowledge:
+ * The verified facts (shared/product-facts.ts: who it's for, what is live, limited or not available, prices and
+ * checkout, generated from the code) come first in EVERY answer, so a price or a capability is never taken from a
+ * stale copy. The /ai-knowledge markdown files add the how-to detail and are the AUTHORITATIVE product knowledge:
  * the model is instructed to answer from them (plus live tool results) and
  * to say it doesn't know otherwise. Files are loaded once at first use and
  * retrieved by keyword overlap — at this corpus size (~8 small files) a
@@ -15,8 +17,11 @@
  */
 import fs from "fs";
 import path from "path";
+import { productFactsMarkdown } from "@shared/product-facts";
 
-export const AI_KNOWLEDGE_VERSION = "2026-10-16.1";
+export const AI_KNOWLEDGE_VERSION = "2026-10-17.1";
+/** The generated facts document's name in retrieved knowledge. */
+export const FACTS_DOC = "product-facts.md";
 
 interface KnowledgeDoc {
   name: string;
@@ -32,7 +37,8 @@ const tokenize = (s: string): string[] =>
 function load(): KnowledgeDoc[] {
   if (docs) return docs;
   const dir = path.resolve(process.cwd(), "ai-knowledge");
-  docs = [];
+  const facts = productFactsMarkdown();
+  docs = [{ name: FACTS_DOC, text: facts, words: new Set(tokenize(facts)) }];
   try {
     for (const file of fs.readdirSync(dir)) {
       if (!file.endsWith(".md")) continue;
@@ -45,8 +51,8 @@ function load(): KnowledgeDoc[] {
   return docs;
 }
 
-/** Top-K knowledge files for a query, always including product.md as the
- *  grounding context. Small corpus → whole files, not chunks. */
+/** Top-K knowledge files for a query, always including the verified facts and product.md as the grounding context.
+ *  Small corpus → whole files, not chunks. */
 export function retrieveKnowledge(query: string, k = 3): string {
   const all = load();
   if (!all.length) return "";
@@ -58,10 +64,12 @@ export function retrieveKnowledge(query: string, k = 3): string {
     }))
     .sort((a, b) => b.score - a.score);
   const picked = new Map<string, KnowledgeDoc>();
-  const product = all.find((d) => d.name === "product.md");
-  if (product) picked.set(product.name, product);
+  for (const name of [FACTS_DOC, "product.md"]) {
+    const d = all.find((x) => x.name === name);
+    if (d) picked.set(d.name, d);
+  }
   for (const { d, score } of scored) {
-    if (picked.size >= k + 1) break;
+    if (picked.size >= k + 2) break;
     if (score > 0) picked.set(d.name, d);
   }
   return Array.from(picked.values())

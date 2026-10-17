@@ -34,42 +34,8 @@
          also reads the site name from og:site_name and the WebSite schema below. -->
     <title>DealInSec — Find Clients. Close Deals. Get Paid.</title>
 
-    <!-- Structured data (helps Google understand + show the site) -->
-    <!-- Only INR offers are listed, and the paid ones carry eligibleRegion IN:
-         No international payment rail exists (Razorpay International was rejected,
-         2026-09-23), so ₹99/month and ₹999/year are the only prices that can
-         actually be charged today. No foreign price may appear here as a
-         buyable Offer. -->
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "DealInSec",
-        "applicationCategory": "BusinessApplication",
-        "operatingSystem": "Web",
-        "description": "Sales and deal workspace for small agencies and consultants — SEO, digital marketing, growth, B2B marketing and AI-automation agencies — and for freelancers and creators. AI Outbound researches prospects against your ideal client and shows the evidence; first messages are drafted for your approval and sent from your own email. Won work becomes a deal, then a quotation, an agreement the client signs online, invoices and payment tracking. 50 currencies, with the tax IDs, bank labels and invoice numbering each country uses, including PAN and GSTIN in India.",
-        "url": "https://www.dealinsec.com/",
-        "offers": [
-          { "@type": "Offer", "name": "Free", "price": "0", "priceCurrency": "INR", "description": "4 deals a month, each with its quotation. Available in every country." },
-          { "@type": "Offer", "name": "Pro Monthly", "price": "99", "priceCurrency": "INR", "eligibleRegion": { "@type": "Country", "name": "India" } },
-          { "@type": "Offer", "name": "Pro Annual", "price": "999", "priceCurrency": "INR", "eligibleRegion": { "@type": "Country", "name": "India" } }
-        ],
-        "publisher": { "@type": "Organization", "name": "DealInSec", "url": "https://www.dealinsec.com/" }
-      }
-    </script>
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "Organization",
-        "name": "DealInSec",
-        "url": "https://www.dealinsec.com/",
-        "logo": "https://www.dealinsec.com/apple-touch-icon.png",
-        "description": "Prospect research, pipeline, quotation, agreement, invoice and payment-tracking software for small agencies, consultants, freelancers and creators, used in the United States, India and elsewhere. Indian accounts get PAN and GSTIN fields and free GST tools."
-      }
-    </script>
-    <script type="application/ld+json">
-      { "@context": "https://schema.org", "@type": "WebSite", "name": "DealInSec", "url": "https://www.dealinsec.com/" }
-    </script>
+    <!-- Structured data (SoftwareApplication, Organization, WebSite) is added to the homepage by the server
+         (server/site-head.ts), generated from shared/product-facts.ts so it can't drift from the product. -->
 
     <!-- Google Analytics (GA4) -->
     <!-- SPA route changes are tracked from the React side (see lib/analytics.ts),

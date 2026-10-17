@@ -9,6 +9,7 @@ import { useLocation, useSearch } from "wouter";
 import { motion } from "framer-motion";
 import { AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, Loader2, Radar, Search, Sparkles, Square, X } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
+import { trackEvent } from "@/lib/analytics";
 import { NotificationBell } from "@/components/notification-bell";
 import { FlowSteps, flowState } from "@/components/outbound/flow-steps";
 import { ProspectBrief } from "@/components/outbound/prospect-brief";
@@ -96,6 +97,17 @@ function RunPanel({ id, canEdit, onOpen }: { id: string; canEdit: boolean; onOpe
   });
   const data = q.data;
   const [good, aside] = useMemo(() => splitProspects(data?.prospects ?? []), [data]);
+  // "Prospect research completed": once, when THIS page saw the search finish (not for a search that was already done).
+  const sawRunning = useRef(false);
+  useEffect(() => {
+    const status = data?.run.status;
+    if (status === "running") sawRunning.current = true;
+    else if (status === "done" && sawRunning.current) {
+      sawRunning.current = false;
+      const [shown] = splitProspects(data!.prospects);
+      trackEvent("prospect_research_completed", { prospects: shown.length, ready: shown.filter((p) => (p.classification ? p.classification === "ready" : p.ready)).length });
+    }
+  }, [data?.run.status]);
   // The cards that animate in: the first ones this panel shows for this search. Later polls add cards without motion.
   const firstIds = useRef<Set<number> | null>(null);
   if (firstIds.current === null && good.length > 0) firstIds.current = new Set(good.map((p) => p.id));
@@ -227,6 +239,8 @@ export default function OutboundPage() {
   useEffect(() => { if (runParam) setRunId(runParam); }, [runParam]);
   const view = viewParam === "prospects" || viewParam === "outreach" || viewParam === "inbox" ? viewParam : "searches";
   const setView = (v: "prospects" | "searches" | "outreach" | "inbox") => navigate(v === "searches" ? location : `${location}?view=${v}`, { replace: true });
+  // AI Outbound opened (counts only; which view, never a search or a company).
+  useEffect(() => { trackEvent("outbound_opened", { view }); }, []);
   const runs = useQuery<{ runs: RunView[] }>({ queryKey: [OUTBOUND_RUNS_URL], retry: false, refetchInterval: (q) => (q.state.data?.runs.some((r) => r.status === "running") ? 5000 : false) });
   // Open the most recent run on arrival, once.
   useEffect(() => { if (!runId && runs.data?.runs.length) setRunId(runs.data.runs[0].id); }, [runs.data, runId]);

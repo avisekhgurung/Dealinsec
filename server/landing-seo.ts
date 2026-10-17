@@ -19,6 +19,7 @@
 
 import { LANDING_FAQS } from "@shared/landing-faqs";
 import { guidesHtml } from "./blog";
+import { ONE_LINER, PRICING } from "@shared/product-facts";
 
 const FAQS = LANDING_FAQS;
 
@@ -46,16 +47,18 @@ export function landingSeoBody(): string {
 
   return `<div id="seo-fallback">
 <h1>Find Clients. Close Deals. Get Paid.</h1>
-<p>DealInSec helps small SEO, marketing, growth and AI-automation agencies find prospects that fit, run a clear pipeline, and turn won work into quotations, signed agreements and invoices, in one connected workspace. Free plan, 7-day Pro trial, no card needed.</p>
+<p>${ONE_LINER} It helps small SEO, marketing, growth, AI-automation, web and software agencies and B2B consultants research prospects that fit, run a clear pipeline, and turn won work into quotations, signed agreements and invoices, in one connected workspace. Free plan, ${PRICING.trialDays}-day Pro trial, no card needed.</p>
 <p>The workflow: Find prospects, Qualify, Deal, Quotation, Agreement, Invoice, Payment tracking.</p>
 
 <h2>Made for founder-led agencies</h2>
-<p>One to a handful of people, selling and delivering client work in the US or India.</p>
+<p>About 1 to 10 people, selling and delivering client work in the United States, India and beyond.</p>
 <ul>
 <li><strong>SEO agencies</strong>: build a list of companies in your niche, with the evidence for each, then quote and bill monthly retainers.</li>
 <li><strong>Digital marketing and growth agencies</strong>: keep every lead, proposal and campaign in one pipeline, with a clear next step and follow-ups that don't slip.</li>
 <li><strong>B2B marketing agencies</strong>: research accounts before you reach out, then turn won work into an agreement your client signs online.</li>
 <li><strong>AI automation agencies</strong>: scope builds as milestones, get the terms signed, and invoice each milestone as it's delivered.</li>
+<li><strong>Web design, development and software studios</strong>: quote a fixed-price project or a retainer, get it signed online, and invoice the advance and the final payment.</li>
+<li><strong>B2B consultants and specialist services</strong>: independent consultants, content and lead-generation agencies run the same workflow.</li>
 </ul>
 <p>Working solo? <a href="/for-freelancers">DealInSec for freelancers and consultants</a>. Doing brand deals? <a href="/for-creators">DealInSec for creators</a>. Not sure what a client's message leaves out? The free <a href="/tools/deal-risk-checker">Deal Risk Checker</a> lists what is missing, with no account.</p>
 
@@ -83,7 +86,7 @@ export function landingSeoBody(): string {
 
 <h2>One workspace, set up for how you bill</h2>
 <p><strong>Agencies in the United States</strong>: quote, agree and invoice in US dollars with your business details on every document; invoice numbers restart each calendar year; DealInSec doesn't calculate sales tax. Use the free plan and the 7-day Pro trial today; paid plans can't be bought from the US yet.</p>
-<p><strong>Agencies in India</strong>: quote, agree and invoice in rupees with your PAN and GSTIN on documents; invoice numbers follow the financial year from 1 April; in-app invoices aren't GST tax invoices, and the free GST invoice generator is built for those. Pro is ₹99 a month or ₹999 a year, paid through Razorpay.</p>
+<p><strong>Agencies in India</strong>: quote, agree and invoice in rupees with your PAN and GSTIN on documents; invoice numbers follow the financial year from 1 April; in-app invoices aren't GST tax invoices, and the free GST invoice generator is built for those. Pro is ₹${PRICING.proMonthlyInr} a month or ₹${PRICING.proYearlyInr} a year, paid through Razorpay (UPI, cards or netbanking).</p>
 <p>Clients elsewhere? Bill in any of 50 currencies, including EUR, GBP, CAD, AUD and AED.</p>
 
 <h2>Built so you stay in charge</h2>
@@ -108,7 +111,7 @@ export function landingSeoBody(): string {
 ${guidesHtml()}
 
 <h2>Start simple. Grow when you need to.</h2>
-<p>The free plan is permanent and covers 4 deals a month, each with its quotation, plus the leads pipeline and AI Outbound research within its daily limits. Every new account also starts with a 7-day Pro trial with no card, in every country. Pro adds unlimited deals, agreements your client signs online, invoices, payment tracking and up to 5 team members. In India, Pro is ₹99 per month or ₹999 per year. In the United States and other countries the free plan and the trial are fully open; paid plans can't be bought from outside India yet. No platform fee on your deal value.</p>
+<p>The free plan is permanent and covers ${PRICING.freeMonthlyDeals} deals a month, each with its quotation, plus the leads pipeline and AI Outbound research within its daily limits. Every new account also starts with a ${PRICING.trialDays}-day Pro trial with no card, in every country. Pro adds unlimited deals, agreements your client signs online, invoices, payment tracking and up to 5 team members. In India, Pro is ₹${PRICING.proMonthlyInr} per month or ₹${PRICING.proYearlyInr} per year. In the United States and other countries the free plan and the trial are fully open; paid plans can't be bought from outside India yet. No platform fee on your deal value.</p>
 
 <h2>Frequently asked questions</h2>
 ${faqs}

@@ -132,13 +132,13 @@ export function HeroSection({ isAuthenticated, onPrimary }: { isAuthenticated: b
         <div className="max-w-xl">
           <p style={{ animationDelay: "0.05s" }} className="dis-hero-in inline-flex items-center gap-2 rounded-full border border-emerald-200/80 bg-white/80 px-3 py-1 text-[11.5px] font-semibold text-emerald-700 shadow-sm backdrop-blur dark:border-emerald-800/50 dark:bg-neutral-900/70 dark:text-emerald-300">
             <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60 motion-reduce:hidden" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" /></span>
-            All-in-one client acquisition &amp; deal management
+            AI-assisted client acquisition, from deal to payment
           </p>
           <h1 style={{ animationDelay: "0.13s" }} className="dis-hero-in mt-5 text-[2.75rem] font-extrabold leading-[1.02] tracking-[-0.035em] text-[#111B22] sm:text-6xl lg:text-[4.1rem] dark:text-white">
             Find Clients.<br />Close <span className={GREEN}>Deals.</span><br /><span className="dis-gradient-text">Get Paid.</span>
           </h1>
           <p style={{ animationDelay: "0.21s" }} className="dis-hero-in mt-5 max-w-lg text-base leading-relaxed text-neutral-600 sm:text-lg dark:text-neutral-400">
-            DealInSec helps agencies and freelancers find the right clients, send professional quotations, get agreements signed and track every payment, all in one place.
+            DealInSec helps small agencies and consultants research the right clients, send professional quotations, get agreements signed and track every payment, all in one place.
           </p>
           <div style={{ animationDelay: "0.29s" }} className="dis-hero-in mt-7 flex flex-col gap-3 sm:flex-row">
             <button type="button" onClick={() => { trackEvent("hero_cta_click", { label: isAuthenticated ? "dashboard" : "start_free" }); onPrimary(); }} data-testid="button-hero-cta"
@@ -312,7 +312,7 @@ export function OneWorkspaceSection() {
               <div>
                 <p className="mb-2 text-lg font-extrabold">One workspace</p>
                 <ul className="space-y-2 text-sm">
-                  {["Prospects to payment in one place", "A simple, connected workflow", "Built for agencies and freelancers", "Less admin, more client work"].map((t) => (
+                  {["Prospects to payment in one place", "A simple, connected workflow", "Built for small agencies and consultants", "Less admin, more client work"].map((t) => (
                     <li key={t} className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />{t}</li>
                   ))}
                 </ul>
@@ -328,9 +328,9 @@ export function OneWorkspaceSection() {
 /* ── Who it's for ────────────────────────────────────────────────────────────────────── */
 
 const AUDIENCES = [
-  { Icon: UserRound, title: "Freelancers", text: "Get more clients, stay organized, and get paid faster.", href: "/for-freelancers" },
-  { Icon: Users, title: "Digital marketing agencies", text: "SEO, growth and AI-automation agencies: prospects, deals and paperwork in one place.", href: null },
-  { Icon: Building2, title: "Creative & service businesses", text: "Design, development, marketing, consulting and more.", href: null },
+  { Icon: Users, title: "Marketing, SEO & growth agencies", text: "Research prospects with evidence, then quote, sign and bill retainers in one place.", href: null },
+  { Icon: Building2, title: "AI automation, web & software studios", text: "Scope builds as milestones, get the agreement signed online, and invoice each stage.", href: null },
+  { Icon: UserRound, title: "Consultants & specialist services", text: "Independent B2B consultants, content and lead-generation agencies. Freelancers work the same way.", href: "/for-freelancers" },
 ];
 
 export function AudienceCards() {
@@ -338,8 +338,8 @@ export function AudienceCards() {
     <section id="audiences" className="scroll-mt-20 py-16 sm:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <Reveal className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Built for freelancers and agencies</h2>
-          <p className="mt-3 text-neutral-600 dark:text-neutral-400">Whether you work alone or run a growing agency, DealInSec fits how you win and deliver work.</p>
+          <h2 className="text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Built for small B2B service businesses</h2>
+          <p className="mt-3 text-neutral-600 dark:text-neutral-400">Founder-led agencies and consultants of about 1 to 10 people, in the United States, India and beyond.</p>
         </Reveal>
         <motion.ul initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={stagger} className="mt-10 grid gap-4 md:grid-cols-3">
           {AUDIENCES.map(({ Icon, title, text, href }) => (
@@ -347,7 +347,7 @@ export function AudienceCards() {
               <Icon className="h-7 w-7 text-emerald-600" strokeWidth={1.8} />
               <h3 className="mt-4 text-lg font-bold">{title}</h3>
               <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{text}</p>
-              {href && <Link href={href} className="mt-3 inline-flex items-center text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-300">See how it works for you<ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>}
+              {href && <Link href={href} className="mt-3 inline-flex items-center text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-300">DealInSec for freelancers<ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>}
             </motion.li>
           ))}
         </motion.ul>

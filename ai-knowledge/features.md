@@ -1,52 +1,62 @@
 # Feature highlights
 
-- Dashboard: greeting, animated KPI funnel (Deals→Quotations→Agreements→Paid
-  Invoices→Pipeline value), deal status split, Earned/Pending, deliverables
-  chart, recent deals, trial countdown.
-- Deal types match freelance work (Design, Development, Writing, Marketing,
-  Video & Photo, Consulting, Custom) plus Brand Collaboration for paid brand
-  deals (Reels, UGC, YouTube integrations, posts, stories), with picklists for the kind of work and
-  how you bill it (per project, milestone, hourly, monthly retainer, per
-  word/article/design) plus an "Other (specify)" free-text option.
-- Quotations: versioned, professional documents; print/PDF from the browser.
-- Agreements: standard + custom terms, billing details collected just-in-time,
-  signature image applied, signed-proof upload. Electronic acceptance with an
-  audit record — not a Digital Signature Certificate or Aadhaar eSign.
-- Invoices record the agreed contract value and print PAN/GSTIN when set. They
-  are NOT tax invoices under Rule 46 of the CGST Rules — DealInSec does not
-  compute CGST/SGST/IGST on them, and the invoice says so in its footer. The
-  free browser tool at /tools/gst-invoice DOES compute GST; the app does not.
-  Call them GST-ready professional invoices, never "GST invoices",
-  "GST-compliant" or Rule-46 tax invoices — they carry your PAN/GSTIN but no
-  CGST/SGST/IGST computation.
-- Invoices: single or split, attachments (e.g. GST invoice, TDS certificate),
-  payment status tracking.
-- Team (optional): invite an assistant or partner by email or join link, roles
-  with a permission matrix, activity log of who did what.
-- Free public tools at /tools (invoice/GST/quotation generators) for marketing.
-- PWA install, dark mode, keyboard shortcut [ to collapse the sidebar.
+## Finding clients
+- AI Outbound (/outbound): describe who you want to reach ("US SEO agencies
+  with 5–30 employees serving SaaS"), confirm the profile it reads back, and
+  start a search. It finds real companies, checks each company's own website
+  against your ideal-client profile, looks for dated reasons to reach out now
+  and named decision makers, and scores each one (0–100, with the parts that
+  are unknown shown as unknown). Every fact links to its source and date;
+  guesses are labelled. Nothing is contacted and nothing becomes a lead until
+  you add it. Daily limits per workspace apply.
+- Outreach drafts: AI writes a first message only from verified facts. You
+  edit and approve the exact text, send it from your own email app, and mark
+  it sent; a follow-up task is added. Messages to addresses on the
+  do-not-contact list are refused.
+- Leads (/leads): stages new → researching → qualified → contacted → replied →
+  meeting → proposal → won or lost, next steps with due dates, facts with
+  sources, a lead score with its reasons, import from CSV, and "Turn into a
+  deal" when it's won.
+- Gmail (limited early access, selected workspaces): see product-facts.
+  Replies are sorted by fixed rules, never by AI.
 
-## Copilot AI (in-app assistant)
-- Create a deal from a pasted WhatsApp chat, email thread or a plain request:
-  Copilot extracts the client, scope, amount (converts lakh/crore), dates and
-  payment terms, shows a summary, and proposes a "Create this deal" button.
-  NOTHING is created until the user confirms — and Copilot never invents an
-  amount that wasn't stated.
-- Protection Check on every deal: flags risky wording (e.g. unlimited
-  revisions, "pay when our client pays", "to be decided later", contradicting
-  payment figures) and missing protections (no advance, no balance timeline,
-  no revision limit, no exclusions, no late-payment consequence, no
-  cancellation terms, no ownership statement, no acceptance step). For brand
-  collaborations it also checks usage rights, usage duration, open-ended usage
-  ("in perpetuity", "all media"), exclusivity and the approval process. Each
-  finding is Important, Attention or Good to know, says why it matters and what
-  to ask, and never blocks anything. One tap suggests the missing term lines and
-  can add them to a Pending deal. It checks the wording of the terms only; it
-  does not give legal advice.
-- Payment Chaser: drafts follow-up messages for unpaid invoices in five tones
-  including Hinglish, using only the real invoice facts. The user copies and
-  sends it themselves — DealInSec never messages a client directly.
-- Daily briefing and Money Radar (overdue / due this week / ready to invoice)
-  are COMPUTED from the user's records, never AI-generated. The rule across
-  all AI features: numbers are computed, AI only writes words, and every
-  action needs the user's confirmation.
+## Closing and getting paid
+- Deals: pick the engagement model first (monthly retainer, fixed-price
+  project, hourly, recurring service, milestone-based, one-time service,
+  commission, usage-based, subscription, consulting, or custom), then an
+  optional service (SEO, paid ads, web development, AI automation and so on).
+  The model decides which details are asked (billing frequency, hourly rate,
+  milestones, commission…). A quick deal with just the basics is also possible.
+- Quotations: versioned, professional documents with a link the client can
+  open and accept online; print/PDF from the browser.
+- Agreements: standard + custom terms, billing details collected just in
+  time, your signature image applied, and a link the client signs online (or
+  upload a signed paper copy). Electronic acceptance with an audit record —
+  not a certified digital signature (not a DSC or Aadhaar eSign).
+- Invoices: drawn from the agreement, single or split (advance + final),
+  attachments, and your registration numbers printed. App invoices don't
+  calculate tax and are not GST tax invoices under Rule 46 of India's CGST
+  Rules; the free browser tool at /tools/gst-invoice-generator does compute GST.
+- Payment tracking: mark an invoice paid; the dashboard shows paid, pending
+  and overdue. DealInSec never collects the money.
+- Protection Check on every deal: flags risky wording (unlimited revisions,
+  "pay when our client pays", "to be decided later") and missing protections
+  (no advance, no balance timeline, no revision limit, no cancellation terms,
+  no ownership statement). Each finding says why it matters and what to ask;
+  it never blocks anything and is not legal advice.
+
+## Working in the app
+- Dashboard: a Today list (overdue invoices, due follow-ups, agreements
+  awaiting signature, deals ready to invoice), pipeline numbers and recent deals.
+- Copilot and Agent mode: ask in plain words; it finds records, starts AI
+  Outbound searches, turns a pasted brief into a deal, and prepares
+  quotations, agreements and invoices. Every change waits for your approval.
+- Team (Pro): invite teammates with roles and a permission matrix, and see an
+  activity log.
+- Free public tools at /tools (quotation, invoice, agreement and GST
+  generators, a deal-risk checker and more) need no account.
+- Payment Chaser: drafts a follow-up message for an unpaid invoice from the
+  real invoice facts; you copy and send it yourself. Indian workspaces also
+  get a Hinglish tone.
+- Numbers are computed from your records, never by AI; AI only writes words,
+  and every action needs your confirmation.

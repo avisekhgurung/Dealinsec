@@ -265,6 +265,7 @@ export default function OnboardingPage() {
         if (updated?.trialStartedAt) trackEvent("pro_trial_started");
       }
       trackEvent("onboarding_step_completed", { step: 3 });
+      trackEvent("onboarding_completed", { goal: goal ?? "none" });
       setFirstGoal(user?.id, goal);
       trackEvent("onboarding_goal_selected", { goal: goal ?? "none" });
 

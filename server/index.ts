@@ -14,6 +14,7 @@ import { registerBlogPages, blogSitemapPaths } from './blog';
 import { registerCategoryPages, categorySitemapPaths } from './category-pages';
 import { registerComparisonPages, comparisonSitemapPaths } from './comparison-pages';
 import { llmsTxt } from './llms';
+import { indexableSpaPaths } from './site-head';
 import { registerLegacyRedirects } from './legacy-redirects';
 // The ledger key only, from a module with no side effects. NEVER import
 // script/migrate-money-minor-units.ts here: that bundles its CLI into the server.
@@ -100,7 +101,7 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
     // real last-modified date; a date that is invented (e.g. "today") would
     // teach Google to distrust the field, so tools/category pages omit it.
     const entries: (string | { loc: string; lastmod?: string })[] = [
-      "/", "/pitch", "/terms", "/privacy", "/cookies", "/refund",
+      ...indexableSpaPaths(),
       ...categorySitemapPaths(), ...comparisonSitemapPaths(), ...toolSitemapPaths(), ...blogSitemapPaths(),
     ];
     const urls = entries

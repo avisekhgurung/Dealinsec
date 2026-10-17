@@ -12,6 +12,7 @@ import { POSTS } from "./blog";
 import { COMPARISON_PAGES } from "./comparison-pages";
 import { PAGES } from "./category-pages";
 import { TOOLS } from "./tools";
+import { AUDIENCE_LINE, CAPABILITIES, MARKETS, ONE_LINER, PRICING_LINES, SECONDARY_AUDIENCE, SUMMARY, SUPPORT_EMAIL, TAGLINE, WORKFLOW } from "@shared/product-facts";
 
 /**
  * One factual line per free tool, keyed by slug: what it takes in and what it
@@ -54,7 +55,7 @@ export const COMPARISON_DESCRIPTIONS: Record<string, string> = {
     "compares Bonsai and DealInSec side by side: Bonsai's current pricing, what each product includes, what DealInSec does not do, and who each suits",
 };
 
-/** One factual line per audience page, keyed by path. */
+/** One factual line per audience page, keyed by path. These pages serve the secondary audiences. */
 export const AUDIENCE_DESCRIPTIONS: Record<string, string> = {
   "/for-freelancers":
     "how a client deal runs from request to payment for freelancers and independent professionals: scope, quotation, agreement, invoice and payment tracking, with a Protection Check of the terms",
@@ -72,18 +73,27 @@ export function llmsTxt(origin: string): string {
   const globalPosts = POSTS.filter((p) => !p.region);
   const indiaPosts = POSTS.filter((p) => p.region === "IN");
 
+  const capability = (status: "live" | "limited" | "not_available") =>
+    CAPABILITIES.filter((c) => c.status === status).map((c) => `  - ${c.name}: ${c.text}`).join("\n");
+
   return `# DealInSec
 
-> DealInSec is web software for freelancers, solo service providers and creators doing paid brand collaborations to run each client or brand deal from quotation to payment: a quotation the client or brand can accept online, an agreement they can sign online, invoices drawn from that agreement, and tracking of what is paid, pending and overdue. It works in 50 currencies and is used in any country.
+> ${ONE_LINER} ${TAGLINE} ${SUMMARY}
 
 ## Key facts
 
 - Maker: DealInSec is a sole proprietorship of Avisekh Gurung, based in Darjeeling, India.
-- Contact: support@dealinsec.com
-- Who it is for: founder-led agencies and consultants (SEO, digital marketing, growth, B2B marketing and AI-automation agencies) in the United States, India and elsewhere, plus freelancers and creators.
-- What it does: AI Outbound prospect research (it researches companies against the user's ideal-client profile and shows the evidence, with sources and dates; first messages are AI drafts the user approves and sends from their own email); a leads pipeline with follow-up tasks and a do-not-contact list; deals; quotations with a client acceptance link; agreements with a public signing link (electronic acceptance with an audit record of who signed, when and with which signature — not a certified digital signature); invoices drawn from the agreement; payment status tracking; Protection Check, which flags risky or missing terms (such as unlimited revisions, no advance, unclear usage rights or exclusivity) before a deal is sent; AI-drafted payment reminders that the user reviews and sends themselves.
-- What it does not do: time tracking, a client portal, accounting or expense tracking, meeting scheduling, sending email or reminders automatically, or collecting payments. Clients and brands pay the user directly; DealInSec records the status. It is not a marketplace, and it never contacts prospects on the user's behalf.
-- Pricing: a free plan (4 deals a month, each with its quotation) and a 7-day Pro trial with no card are open in every country. The paid Pro plan (₹99 a month or ₹999 a year) can currently be bought in India only; payments from other countries are not available yet.
+- Contact: ${SUPPORT_EMAIL}
+- Who it is for: ${AUDIENCE_LINE}. ${MARKETS} Also used by ${SECONDARY_AUDIENCE.join(" and ")}.
+- The connected workflow: ${WORKFLOW.join(" → ")}. AI Outbound is where new clients start; a won lead becomes a deal that carries through to payment tracking.
+- Available now:
+${capability("live")}
+- Limited availability:
+${capability("limited")}
+- Not available:
+${capability("not_available")}
+- Pricing:
+${PRICING_LINES.map((l) => `  - ${l}`).join("\n")}
 - Free tools: browser-based document tools that need no account and do not store what is typed on DealInSec's servers.
 
 ## About
@@ -93,6 +103,7 @@ ${link(pillar.shortLabel, pillar.path, "what freelance business management softw
 
 ## Who it is for
 
+${link("DealInSec for agencies and consultants", "/", "the homepage: finding clients with AI Outbound, then deal, quotation, agreement, invoice and payment tracking for small B2B service businesses")}
 ${audiencePages.map((p) => link(p.shortLabel, p.path, AUDIENCE_DESCRIPTIONS[p.path])).join("\n")}
 
 ## Free tools
