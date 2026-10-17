@@ -6,7 +6,7 @@
  * the verified product facts (shared/product-facts.ts) and the same
  * /ai-knowledge base the in-app Copilot uses, so marketing can never drift
  * from the product. It has NO database access and NO tools — it is a product
- * guide, not an account. After a few exchanges it suggests the trial.
+ * guide, not an account. After a few exchanges it suggests signing up free.
  */
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -52,7 +52,7 @@ function useCopilotChat() {
     }
   };
 
-  // After a real conversation, put the trial in front of them.
+  // After a real conversation, put the free signup in front of them.
   const showCta = messages.filter((m) => m.role === "assistant").length >= 2;
 
   return { messages, input, setInput, busy, send, showCta, scrollRef, inputRef };

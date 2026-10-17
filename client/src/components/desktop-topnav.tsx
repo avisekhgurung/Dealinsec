@@ -31,7 +31,6 @@ import {
 import {
   hasActivePro,
   hasActiveDealBoost,
-  hasLapsedTrial,
   getTrialDaysLeft,
 } from "@shared/schema";
 import { desktopNavSections, navItem } from "@/lib/nav";
@@ -44,7 +43,6 @@ type PlanState =
   | "TRIAL_ACTIVE"  // 4–7 days left
   | "TRIAL_ENDING"  // 1–3 days left
   | "BOOST"         // Deal Boost still running (no longer sold)
-  | "TRIAL_ENDED"   // lived a real trial, let it lapse — highest-intent moment
   | "FREE";
 
 function BarTip({ label, children }: { label: string; children: React.ReactNode }) {
@@ -98,8 +96,7 @@ export function DesktopTopNav() {
     : trialDaysLeft >= 4 ? "TRIAL_ACTIVE"
     : trialDaysLeft >= 1 ? "TRIAL_ENDING"
     : hasActiveDealBoost(user) ? "BOOST"
-    : hasLapsedTrial(user) ? "TRIAL_ENDED"
-    : "FREE";
+    : "FREE"; // a lapsed trial reads as the Free plan: the trial is no longer offered
 
   // Route ownership (/deals/:id/quote → Quotations, /brand-invoices → Invoices)
   // lives in @shared/nav-model.
@@ -176,20 +173,6 @@ export function DesktopTopNav() {
         );
       case "BOOST":
         return chip("text-orange-100", <Zap className="w-3.5 h-3.5 text-orange-300" />, "Deal Boost", "Boost", "Deal Boost active — upgrade to Pro");
-      case "TRIAL_ENDED":
-        // The single highest-intent moment in the lifecycle — the only filled CTA.
-        return (
-          <BarTip label="Your trial has ended. Your deals and documents are safe.">
-            <Link
-              href="/pricing"
-              data-testid="topnav-plan-chip"
-              className="gradient-btn inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full text-[12px] font-semibold text-white whitespace-nowrap"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              {checkoutAvailable ? <>Upgrade<span className="hidden min-[1600px]:inline">&nbsp;— {formatRupees(proMonthlyPrice)}/mo</span></> : <>See Pro plans</>}
-            </Link>
-          </BarTip>
-        );
       case "FREE":
         return chip("text-white/85", <Sparkles className="w-3.5 h-3.5 text-emerald-300" />, "Free plan · Upgrade", "Upgrade", "Free plan — upgrade to Pro");
     }

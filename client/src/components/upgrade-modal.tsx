@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import { Check, Crown, Globe, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { usePlanPrices, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
-import { hasLapsedTrial } from "@shared/schema";
 import { trackEvent } from "@/lib/analytics";
 import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
 
@@ -76,10 +75,6 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [feature, setFeature] = useState<UpgradeFeature>("deals");
   const [, setLocation] = useLocation();
-  // Lapsed trialists get their own framing: they've SEEN the full workflow,
-  // so the modal speaks to what they're losing, not what they'd gain.
-  const { user } = useAuth();
-  const trialEnded = hasLapsedTrial(user);
   // Fetched only once the modal opens; the defaults are the list prices.
   const { proMonthlyPrice } = usePlanPrices({ enabled: open });
   // Plans can only be bought from India until international checkout is live
@@ -110,12 +105,10 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
               <Crown className="w-6 h-6 text-amber-300" />
             </div>
             <DialogTitle className="text-center text-xl">
-              {trialEnded ? "Your 7-day trial has ended" : FEATURE_TITLE[feature]}
+              {FEATURE_TITLE[feature]}
             </DialogTitle>
             <DialogDescription className="text-center">
-              {trialEnded
-                ? `${FEATURE_COPY[feature]} Your deals and documents are safe — upgrade to keep the full workflow you've been using.`
-                : FEATURE_COPY[feature]}
+              {FEATURE_COPY[feature]}
             </DialogDescription>
           </DialogHeader>
 

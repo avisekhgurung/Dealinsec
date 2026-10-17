@@ -356,8 +356,8 @@ export function WorkflowWalkthrough() {
 const OUTCOMES: { Icon: typeof Radar; title: string; plan: string; text: string; points: string[] }[] = [
   {
     Icon: Radar, title: "Research prospects with AI", plan: "Free and Pro, with limits",
-    text: "Describe the clients you want and where. AI Outbound searches the web and checks each company's own website against your profile.",
-    points: ["A score and the reasons for it", "Dated signals with their sources; guesses labelled", "First messages drafted from verified facts, approved by you"],
+    text: "Describe the clients you want and where. AI Outbound searches the web, or lists local businesses in a city from Google Maps, and checks each company's own website against your profile.",
+    points: ["Companies in any country, or local businesses in your city", "A score and the reasons for it", "Dated signals with their sources; guesses labelled", "First messages drafted from verified facts, approved by you"],
   },
   {
     Icon: Users, title: "Manage leads and deals", plan: "Free and Pro",
@@ -507,7 +507,7 @@ export function CtaBanner({ isAuthenticated, onPrimary }: { isAuthenticated: boo
               className="group mt-7 inline-flex h-12 items-center rounded-lg bg-white px-6 text-sm font-semibold text-emerald-800 shadow-xl transition hover:bg-emerald-50">
               {isAuthenticated ? "Go to dashboard" : "Start Free"}<ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
-            <p className="mt-4 text-xs text-emerald-50/75">No credit card · {PRICING.trialDays}-day Pro trial · Pro ₹{PRICING.proMonthlyInr}/month in India</p>
+            <p className="mt-4 text-xs text-emerald-50/75">No credit card · Free plan · Pro ₹{PRICING.proMonthlyInr}/month in India</p>
           </div>
         </Reveal>
       </div>

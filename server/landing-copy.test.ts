@@ -96,3 +96,13 @@ describe("one price everywhere", () => {
     expect(OUTBOUND_ALLOWANCE_DEFAULTS.free.monthlySearches).toBeLessThan(OUTBOUND_ALLOWANCE_DEFAULTS.pro.monthlySearches);
   });
 });
+
+describe("no trial on the homepage, sign-up or pricing", () => {
+  it("offers the free plan, never a trial", () => {
+    const offer = /\b\d+-day (pro |free )?trial|free trial|start (your |the )?(free )?trial|\{PRICING\.trialDays\}|free for 7 days/i;
+    for (const f of [...FILES, "client/src/pages/auth.tsx", "client/src/pages/pricing.tsx", "client/src/pages/onboarding.tsx", "client/src/pages/pitch.tsx"]) {
+      const text = read(f).replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+      expect(text, f).not.toMatch(offer);
+    }
+  });
+});

@@ -85,7 +85,7 @@ export function UsageNote({ usage, mode = "web" }: { usage: OutboundUsage | unde
           {[
             usage.plan.prospects && `${usage.plan.prospects.remaining} of ${usage.plan.prospects.limit} researched prospects left`,
             usage.plan.drafts && `${usage.plan.drafts.remaining} of ${usage.plan.drafts.limit} AI drafts`,
-            usage.plan.sends && `${usage.plan.sends.remaining} of ${usage.plan.sends.limit} Gmail sends`,
+            usage.plan.sends && `${usage.plan.sends.remaining} of ${usage.plan.sends.limit} sends from Gmail or WhatsApp Business`,
           ].filter(Boolean).join(" · ")}
           {typeof usage.plan.spendPercent === "number" && usage.plan.spendPercent >= 80 && <> · AI usage at {usage.plan.spendPercent}% of this period&apos;s limit</>}
         </p>

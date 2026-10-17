@@ -15,7 +15,7 @@ export default function TermsOfService() {
       </header>
 
       <main className="px-4 py-8 max-w-2xl mx-auto prose prose-sm dark:prose-invert animate-fade-in">
-        <p className="text-muted-foreground text-xs">Last updated: 10 August 2026</p>
+        <p className="text-muted-foreground text-xs">Last updated: 18 October 2026</p>
 
         <h2>1. Acceptance of Terms</h2>
         <p>
@@ -116,7 +116,7 @@ export default function TermsOfService() {
 
         <h2>7. Plans, Credits &amp; Payments</h2>
         <ul>
-          <li><strong>Free trial</strong> — new accounts receive a one-time 7-day trial of DealInSec Pro, granted when account setup is completed. <strong>One trial per account and per person/business</strong>; creating additional accounts to obtain further trials is prohibited and may lead to trial revocation or account suspension. The trial has no monetary value, is non-transferable, and ends automatically — no payment method is collected and nothing is charged.</li>
+          <li><strong>No free trial</strong> — new accounts start on the free plan; DealInSec no longer offers a trial of DealInSec Pro. A trial granted before 18 October 2026 continues until its original end date: it has no monetary value, is non-transferable and ends automatically, and nothing is charged for it. Accounts created to obtain further trials could have that trial revoked or the account suspended.</li>
           <li>The free plan includes 4 Deal Credits each month. Unused monthly credits do not roll over.</li>
           <li><strong>DealInSec Pro</strong> (₹199/month) unlocks AI Outbound with the Pro research allowance and unlimited deals, quotations, agreements, invoices and payment tracking for the paid term. AI Outbound research is limited per plan and per day; no plan includes unlimited research or sending.</li>
           <li>All plans are one-time payments for a fixed term processed via our integrated Razorpay payment gateway — nothing auto-renews.</li>

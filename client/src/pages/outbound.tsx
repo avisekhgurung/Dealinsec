@@ -54,6 +54,9 @@ const EXAMPLES = [
 const PRESETS = DISCOVERY_PRESETS;
 const presetChip = "rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-left text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300";
 
+/** A country as it reads in a sentence: "in the United States", "in the UAE", "in India". */
+const placeName = (code: string) => { const n = countryName(code); return /^(United |UAE$|Netherlands$|Philippines$)/.test(n) ? `the ${n}` : n; };
+
 const notSetUp = (e: unknown) => !!e && /PROSPECTS_NOT_SETUP/.test(String((e as Error).message));
 type RunData = { run: RunView; prospects: Card_[] };
 /** Passed the checks (shown as cards) vs set aside, split the same way everywhere on this page. */
@@ -165,7 +168,7 @@ function RunPanel({ id, canEdit, onOpen }: { id: string; canEdit: boolean; onOpe
         {run.status === "done" && good.length < 3 && (
           // Honest about thin results: search coverage varies by market, and nothing is padded or invented to fill the list.
           <p className="rounded-xl border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" role="status" data-testid="run-thin-market">
-            Only {good.length === 0 ? "no" : good.length} compan{good.length === 1 ? "y" : "ies"} passed the checks{run.icp.locations[0] || run.icp.countries.length ? ` in ${run.icp.locations[0] ?? run.icp.countries.map(countryName).join(", ")}` : ""}. Coverage of some markets and niches is thin: try a broader kind of business, a nearby city, or another country.
+            {good.length === 0 ? "No companies" : `Only ${good.length} compan${good.length === 1 ? "y" : "ies"}`} passed the checks{run.icp.locations[0] || run.icp.countries.length ? ` in ${run.icp.locations[0] ?? run.icp.countries.map(placeName).join(", ")}` : ""}. Coverage of some markets and niches is thin: try a broader kind of business, a nearby city, or another country.
           </p>
         )}
         {stopped ? (
@@ -231,7 +234,7 @@ function FirstSearch({ canEdit, onPick, onPreset }: { canEdit: boolean; onPick: 
       <Radar className="mx-auto mb-3 h-7 w-7 text-emerald-700 dark:text-emerald-400" aria-hidden />
       <p className="font-semibold">{canEdit ? "Start with who you want to reach" : "No searches yet"}</p>
       <p className="mx-auto mt-1 max-w-lg text-sm text-muted-foreground">
-        {canEdit ? "DealInSec searches the web, checks each company's own website and keeps only what it can back with evidence. Nothing is contacted: you choose who goes to Leads and what gets sent." : "Searches your team runs show up here, with the evidence behind each company. Nothing is contacted from here."}
+        {canEdit ? "DealInSec searches the web (or Google Maps, for local businesses in a city), checks each company's own website and keeps only what it can back with evidence. Nothing is contacted: you choose who goes to Leads and what gets sent." : "Searches your team runs show up here, with the evidence behind each company. Nothing is contacted from here."}
       </p>
       {canEdit && (
         <div className="mx-auto mt-4 flex max-w-2xl flex-wrap justify-center gap-2">

@@ -41,7 +41,7 @@ const PIPELINE = [
 const PROOF_POINTS = [
   "Agreements carry a signed execution record",
   "Built for small agencies and consultants in the US and India",
-  "7-day Pro trial — everything unlocked",
+  "Free plan, no card. Pro when you need it",
 ];
 
 /** Security facts, each one verifiable in the code — see the PRIVACY policy. */
@@ -200,7 +200,7 @@ export default function AuthPage() {
               </h1>
               <p className="text-sm text-muted-foreground mt-1.5 mb-6">
                 {mode === "signup"
-                  ? "Every Pro feature free for 7 days."
+                  ? "Start on the free plan. No card needed."
                   : "Sign in to continue to your workspace."}
               </p>
 
@@ -320,7 +320,7 @@ export default function AuthPage() {
                   ) : (
                     <Lock className="w-4 h-4 mr-2" />
                   )}
-                  {mode === "signup" ? "Start free trial" : "Sign in"}
+                  {mode === "signup" ? "Create free account" : "Sign in"}
                 </Button>
               </form>
 
@@ -334,7 +334,7 @@ export default function AuthPage() {
                 ) : (
                   <>New to DealInSec?{" "}
                     <button type="button" className="font-semibold text-primary hover:underline" onClick={() => setMode("signup")} data-testid="switch-signup">
-                      Start your free trial
+                      Create a free account
                     </button>
                   </>
                 )}

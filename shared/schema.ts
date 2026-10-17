@@ -1773,3 +1773,102 @@ export const outreachFollowups = pgTable("outreach_followups", {
   leadIdx: index("outreach_followups_lead_idx").on(t.organizationId, t.leadId),
 }));
 export type OutreachFollowupRow = typeof outreachFollowups.$inferSelect;
+
+// ── Outreach channels beyond email (shared/channels.ts; script/migrate-channels.ts, server/channels/ddl.ts) ──
+// Email keeps lead_messages and its Gmail send path untouched; WhatsApp, LinkedIn and X messages live here. The same
+// approval rule: body_hash is the hash of the exact text a person approved, and sending a different text is refused.
+// A LinkedIn or X message is never sent by DealInSec: "sent" with sent_via 'manual' is the person's own record.
+
+/** A workspace's WhatsApp Business number (Cloud API). One live connection per workspace; the token is sealed (token-crypto). */
+export const whatsappConnections = pgTable("whatsapp_connections", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  status: varchar("status", { length: 16 }).notNull(), // active | needs_attention | disconnected
+  phoneNumberId: varchar("phone_number_id", { length: 40 }).notNull(),
+  wabaId: varchar("waba_id", { length: 40 }).notNull(),
+  displayPhone: varchar("display_phone", { length: 32 }),
+  verifiedName: varchar("verified_name", { length: 120 }),
+  accessTokenEnc: text("access_token_enc"),
+  tokenKeyVersion: smallint("token_key_version"),
+  lastErrorCode: varchar("last_error_code", { length: 40 }),
+  lastErrorAt: timestamp("last_error_at"),
+  connectedBy: varchar("connected_by").notNull(),
+  connectedAt: timestamp("connected_at").notNull(),
+  disconnectedAt: timestamp("disconnected_at"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  statusCk: check("whatsapp_connections_status_ck", sql`status IN ('active', 'needs_attention', 'disconnected')`),
+  tokenCk: check("whatsapp_connections_token_ck", sql`(status = 'disconnected') = (access_token_enc IS NULL) AND (access_token_enc IS NULL) = (token_key_version IS NULL)`),
+  liveOrgUq: uniqueIndex("whatsapp_connections_live_org_uq").on(t.organizationId).where(sql`status <> 'disconnected'`),
+  livePhoneUq: uniqueIndex("whatsapp_connections_live_phone_uq").on(t.phoneNumberId).where(sql`status <> 'disconnected'`),
+}));
+export type WhatsappConnectionRow = typeof whatsappConnections.$inferSelect;
+
+/**
+ * Who agreed to hear from the workspace on WhatsApp, recorded by a person with how they agreed (Meta requires an opt-in
+ * before a business messages someone), when they last wrote (which opens the 24-hour window for free-form messages) and
+ * whether they asked to stop. One row per workspace and number.
+ */
+export const whatsappContacts = pgTable("whatsapp_contacts", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  phone: varchar("phone", { length: 20 }).notNull(), // E.164
+  leadId: integer("lead_id"),
+  optedInAt: timestamp("opted_in_at"),
+  optInSource: varchar("opt_in_source", { length: 200 }),
+  optInRecordedBy: varchar("opt_in_recorded_by"),
+  optedOutAt: timestamp("opted_out_at"),
+  lastInboundAt: timestamp("last_inbound_at"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  orgPhoneUq: uniqueIndex("whatsapp_contacts_org_phone_uq").on(t.organizationId, t.phone),
+  leadIdx: index("whatsapp_contacts_lead_idx").on(t.organizationId, t.leadId),
+}));
+export type WhatsappContactRow = typeof whatsappContacts.$inferSelect;
+
+/** Messages on WhatsApp, LinkedIn and X, out (drafted, approved, sent) and, for WhatsApp, in (replies from the webhook). */
+export const channelMessages = pgTable("channel_messages", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  leadId: integer("lead_id").notNull(),
+  channel: varchar("channel", { length: 10 }).notNull(), // whatsapp | linkedin | x
+  kind: varchar("kind", { length: 16 }).notNull(), // text | template | connection_note | message | dm | inbound
+  direction: varchar("direction", { length: 3 }).notNull().default("out"), // out | in
+  body: text("body"),
+  bodyHash: varchar("body_hash", { length: 64 }),
+  toAddress: varchar("to_address", { length: 254 }), // E.164 phone, LinkedIn page, X handle; the sender's number for "in"
+  templateName: varchar("template_name", { length: 120 }),
+  templateLang: varchar("template_lang", { length: 15 }),
+  templateParams: jsonb("template_params"),
+  status: varchar("status", { length: 12 }).notNull(), // draft | approved | sending | sent | failed | uncertain | cancelled | received
+  sentVia: varchar("sent_via", { length: 6 }), // api | manual
+  delivery: varchar("delivery", { length: 10 }), // delivered | read (only when the provider reported it)
+  providerMessageId: varchar("provider_message_id", { length: 200 }),
+  errorCode: varchar("error_code", { length: 40 }),
+  attempts: integer("attempts").notNull().default(0),
+  promptVersion: varchar("prompt_version", { length: 20 }),
+  claimIds: jsonb("claim_ids").notNull().default(sql`'[]'::jsonb`),
+  edited: boolean("edited").notNull().default(false),
+  createdBy: varchar("created_by", { length: 8 }).notNull().default("user"),
+  createdByUser: varchar("created_by_user"),
+  approvedBy: varchar("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  readAt: timestamp("read_at"),
+  repliedAt: timestamp("replied_at"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  statusCk: check("channel_messages_status_ck", sql`status IN ('draft', 'approved', 'sending', 'sent', 'failed', 'uncertain', 'cancelled', 'received')`),
+  channelCk: check("channel_messages_channel_ck", sql`channel IN ('whatsapp', 'linkedin', 'x')`),
+  sentCk: check("channel_messages_sent_ck", sql`status <> 'sent' OR (sent_at IS NOT NULL AND sent_via IS NOT NULL)`),
+  apiOnlyWhatsappCk: check("channel_messages_api_ck", sql`sent_via IS DISTINCT FROM 'api' OR channel = 'whatsapp'`),
+  oneUnsentUq: uniqueIndex("channel_messages_one_unsent_uq").on(t.leadId, t.channel).where(sql`direction = 'out' AND status IN ('draft', 'approved', 'sending', 'uncertain')`),
+  providerUq: uniqueIndex("channel_messages_provider_uq").on(t.channel, t.providerMessageId).where(sql`provider_message_id IS NOT NULL`),
+  leadIdx: index("channel_messages_lead_idx").on(t.organizationId, t.leadId, t.createdAt),
+  sentIdx: index("channel_messages_sent_idx").on(t.organizationId, t.channel, t.sentAt).where(sql`sent_via = 'api'`),
+}));
+export type ChannelMessageRow = typeof channelMessages.$inferSelect;

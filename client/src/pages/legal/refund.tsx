@@ -15,7 +15,7 @@ export default function RefundPolicy() {
       </header>
 
       <main className="px-4 py-8 max-w-2xl mx-auto prose prose-sm dark:prose-invert animate-fade-in">
-        <p className="text-muted-foreground text-xs">Last updated: 24 July 2026</p>
+        <p className="text-muted-foreground text-xs">Last updated: 18 October 2026</p>
 
         <p>
           This Refund Policy applies to all purchases made on DealInSec ("Platform"),
@@ -72,18 +72,18 @@ export default function RefundPolicy() {
           <li>Process a full refund to your original payment method within 5–7 business days.</li>
         </ul>
 
-        <h2>3. Free Plan Allowance &amp; Trial</h2>
+        <h2>3. Free Plan Allowance</h2>
         <p>
           The free plan's monthly allowance of 4 deals is granted at no charge, is
           non-refundable, has no monetary value, and cannot be exchanged for cash.
           Unused monthly allowance does not roll over.
         </p>
         <p>
-          The one-time 7-day Pro trial is likewise free of charge and has no monetary
-          value — nothing is billed for it, so nothing about it is refundable. It ends
-          automatically on its expiry date; unused trial days are not credited against
-          a later purchase. Documents you created during the trial remain accessible
-          after it ends.
+          DealInSec no longer offers a trial of Pro. A trial granted before 18 October 2026
+          was free of charge and has no monetary value — nothing was billed for it, so
+          nothing about it is refundable. It ends automatically on its original expiry date;
+          unused trial days are not credited against a later purchase. Documents created
+          during it remain accessible after it ends.
         </p>
 
         <h2>4. How to Request a Refund</h2>

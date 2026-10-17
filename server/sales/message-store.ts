@@ -1,4 +1,5 @@
 /** Database store for outreach messages. Tests replace this module (eval/world-mocks.ts). Every query is scoped by organization. */
+import { channelCountFor } from "../channels/store";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { leadEvents, leadMessages, leads, leadTickets, outreachEvents, outreachFollowups, outreachSuppressions, type LeadMessageRow, type OutreachEventRow, type OutreachSuppressionRow } from "@shared/schema";
@@ -86,10 +87,10 @@ export interface MessageStore {
   listForOrg(orgId: string, statuses: MessageStatus[], limit: number): Promise<LeadMessageRow[]>;
 
   /** The first do-not-contact entry matching any of `keys` (an address, its domain), or null. */
-  suppressedMatch(orgId: string, keys: { kind: "email" | "domain"; value: string }[]): Promise<OutreachSuppressionRow | null>;
+  suppressedMatch(orgId: string, keys: { kind: "email" | "domain" | "phone"; value: string }[]): Promise<OutreachSuppressionRow | null>;
   listSuppressions(orgId: string, limit: number): Promise<OutreachSuppressionRow[]>;
   /** Adds an entry, or returns the existing one (the unique index decides: one entry per organization, kind and value). */
-  addSuppression(orgId: string, e: { kind: "email" | "domain"; value: string; reason: string; sourceMessageId: number | null; note: string | null; userId: string | null; now: Date }): Promise<{ row: OutreachSuppressionRow; created: boolean }>;
+  addSuppression(orgId: string, e: { kind: "email" | "domain" | "phone"; value: string; reason: string; sourceMessageId: number | null; note: string | null; userId: string | null; now: Date }): Promise<{ row: OutreachSuppressionRow; created: boolean }>;
   /** Removes an entry the team added by hand (never an opt-out, bounce or complaint). Null when there is no such entry. */
   removeManualSuppression(orgId: string, id: number): Promise<OutreachSuppressionRow | null>;
   /** Records what happened to a message, once per message and kind (a repeat answers created: false). */
@@ -113,7 +114,8 @@ export const messageStore: MessageStore = {
           await tx.execute(sql`SELECT pg_advisory_xact_lock(${DRAFT_ALLOWANCE_LOCK}, hashtext(${m.orgId}))`);
           const used = await tx.execute(sql`SELECT count(*)::int AS n FROM ${leadMessages} WHERE organization_id = ${m.orgId} AND direction = 'out'
             AND prompt_version LIKE ${a.prefix + "%"} AND created_at >= ${a.since.toISOString()}::timestamp`);
-          if (Number((used.rows[0] as { n: unknown }).n) >= a.max) throw new DraftAllowanceReached(a.max);
+          // One allowance for AI drafts on every channel (server/channels/store.ts counts both tables the same way, under this lock).
+          if (Number((used.rows[0] as { n: unknown }).n) + (await channelCountFor(tx as any, "ai_drafts", m.orgId, a.since, a.prefix)) >= a.max) throw new DraftAllowanceReached(a.max);
           const [row] = await tx.insert(leadMessages).values({
             leadId: m.leadId, organizationId: m.orgId, subject: m.subject, body: m.body, bodyHash: m.bodyHash, toAddress: m.toAddress, toSource: m.toSource,
             status: "draft", researchId: m.researchId, claimIds: m.claimIds, promptVersion: m.promptVersion, createdBy: m.by, createdByUser: m.userId,
@@ -137,7 +139,7 @@ export const messageStore: MessageStore = {
   async countAiDrafts(orgId, since, prefix) {
     const r = await db.execute(sql`SELECT count(*)::int AS n FROM ${leadMessages} WHERE organization_id = ${orgId} AND direction = 'out'
       AND prompt_version LIKE ${prefix + "%"} AND created_at >= ${since.toISOString()}::timestamp`);
-    return Number((r.rows[0] as { n: unknown } | undefined)?.n ?? 0);
+    return Number((r.rows[0] as { n: unknown } | undefined)?.n ?? 0) + (await channelCountFor(db as any, "ai_drafts", orgId, since, prefix));
   },
   async get(orgId, id) {
     const [r] = await db.select().from(leadMessages).where(and(eq(leadMessages.organizationId, orgId), eq(leadMessages.id, id))).limit(1);

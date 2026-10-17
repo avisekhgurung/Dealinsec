@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLocale, useMoney } from "@/hooks/use-locale";
 import { useLocation, Link } from "wouter";
 import { BottomNav } from "@/components/bottom-nav";
-import { hasActivePro, hasActiveTrial, hasLapsedTrial, getTrialDaysLeft } from "@shared/schema";
+import { hasActivePro, hasActiveTrial, getTrialDaysLeft } from "@shared/schema";
 import { bankRoutingLabel, taxIdLabel } from "@shared/invoice-tax";
 
 // ─── Country-specific field labels ───────────────────────────────────────────
@@ -1073,9 +1073,7 @@ export default function ProfilePage() {
                         ? `Unlimited workflow${user?.planExpiresAt ? ` · until ${new Date(user.planExpiresAt).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}` : ""}`
                         : hasActiveTrial(user)
                           ? `${getTrialDaysLeft(user) === 1 ? "Last day" : `${getTrialDaysLeft(user)} days left`} · everything unlocked`
-                          : hasLapsedTrial(user)
-                            ? "Trial ended · your documents stay yours"
-                            : "Deals & quotations · upgrade for agreements and invoices"}
+                          : "Deals & quotations · upgrade for agreements and invoices"}
                     </p>
                   </div>
                   <Link href="/pricing">

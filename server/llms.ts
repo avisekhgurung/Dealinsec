@@ -57,6 +57,8 @@ export const COMPARISON_DESCRIPTIONS: Record<string, string> = {
 
 /** One factual line per audience page, keyed by path. These pages serve the secondary audiences. */
 export const AUDIENCE_DESCRIPTIONS: Record<string, string> = {
+  "/find-local-clients":
+    "how an agency in India finds local business clients: list businesses in a city from Google Maps (shown for the search, not kept), research the websites that fit with sources, and turn the right ones into leads, deals and paid invoices",
   "/for-freelancers":
     "how a client deal runs from request to payment for freelancers and independent professionals: scope, quotation, agreement, invoice and payment tracking, with a Protection Check of the terms",
   "/for-creators":
@@ -105,7 +107,7 @@ ${link(pillar.shortLabel, pillar.path, "what freelance business management softw
 
 ${link("DealInSec homepage", "/", "what it does, how the workflow runs from prospect research to payment tracking, and who it is for: freelancers, consultants and small B2B service agencies")}
 ${link("Plans and pricing", "/#pricing", "Free and Pro side by side, with the AI research allowances and how checkout and renewal work")}
-${link("Frequently asked questions", "/#faq", "direct answers on plans, AI research, guarantees, agreements, invoices and billing")}
+${link("Frequently asked questions", "/#faq", "direct answers on plans, AI research, local business search, guarantees, agreements, invoices and billing")}
 ${audiencePages.map((p) => link(p.shortLabel, p.path, AUDIENCE_DESCRIPTIONS[p.path])).join("\n")}
 
 ## Free tools

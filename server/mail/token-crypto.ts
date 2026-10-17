@@ -15,13 +15,16 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 export const MAILBOX_PROVIDERS = ["gmail", "fake"] as const;
 export type MailboxProvider = (typeof MAILBOX_PROVIDERS)[number];
+/** Every provider whose credential may be sealed here: mailboxes, and a workspace's WhatsApp Business access token. */
+export const SEALED_PROVIDERS = [...MAILBOX_PROVIDERS, "whatsapp"] as const;
+export type SealedProvider = (typeof SEALED_PROVIDERS)[number];
 
 /** Who a token belongs to. All four are sealed into the ciphertext as associated data. */
 export interface TokenBinding {
   organizationId: string;
   userId: string;
   connectionId: number;
-  provider: MailboxProvider;
+  provider: SealedProvider;
 }
 
 export interface Keyring {
@@ -83,13 +86,16 @@ function checkBinding(b: TokenBinding): void {
   const ok = typeof b?.organizationId === "string" && b.organizationId.length > 0
     && typeof b.userId === "string" && b.userId.length > 0
     && Number.isSafeInteger(b.connectionId) && b.connectionId > 0
-    && (MAILBOX_PROVIDERS as readonly string[]).includes(b.provider);
+    && (SEALED_PROVIDERS as readonly string[]).includes(b.provider);
   if (!ok) throw new TokenCryptoError("bad_binding", "a token must be bound to an organization, a user, a saved connection and a provider");
 }
 
 /** The associated data: unambiguous (a JSON array, so no field can bleed into the next) and versioned. */
 function associatedData(version: number, b: TokenBinding): Buffer {
-  return Buffer.from(JSON.stringify(["dealinsec/mailbox-refresh-token/v1", version, b.organizationId, b.userId, b.connectionId, b.provider]), "utf8");
+  // A mailbox token keeps the label it was first sealed under; another provider's credential has its own, so a sealed
+  // value can never be read as the other kind.
+  const label = b.provider === "whatsapp" ? "dealinsec/whatsapp-access-token/v1" : "dealinsec/mailbox-refresh-token/v1";
+  return Buffer.from(JSON.stringify([label, version, b.organizationId, b.userId, b.connectionId, b.provider]), "utf8");
 }
 
 /** Seals a token under the current key. The envelope is `mbt1.<key version>.<iv>.<tag>.<ciphertext>` (base64url). */

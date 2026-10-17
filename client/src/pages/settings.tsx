@@ -614,7 +614,7 @@ export default function SettingsPage() {
                 <ul className="text-sm text-muted-foreground space-y-1.5 max-w-xl list-disc pl-5">
                   <li>Give your accountant the <strong className="text-foreground">Accounts</strong> role: they raise invoices and track payments, but can't create or edit deals.</li>
                   <li>Give an assistant the <strong className="text-foreground">Sales</strong> role: they create deals and quotations, but can't touch invoices.</li>
-                  <li>Pro — and your free trial — includes up to 5 people, you included.</li>
+                  <li>Pro includes up to 5 people, you included.</li>
                 </ul>
                 {!canInvite && <PermissionNote>Only the Owner or an Admin can invite people.</PermissionNote>}
               </SettingsSection>
@@ -1099,7 +1099,7 @@ export default function SettingsPage() {
                   </p>
                 ) : (
                   <p className="text-sm text-muted-foreground max-w-md">
-                    Free plan includes 1 user. Pro — and your free trial — includes 5 team members.{" "}
+                    Free plan includes 1 user. Pro includes 5 team members.{" "}
                     {checkoutAvailable
                       ? <>Need more? Extra seats are {formatRupees(extraSeatPrice)}/seat per month.</>
                       : <>Need more? Extra seats aren't available in your country yet.</>}

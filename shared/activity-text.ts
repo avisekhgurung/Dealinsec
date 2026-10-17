@@ -11,7 +11,11 @@ export const ACTIVITY_LABEL: Record<string, string> = {
   message_sent: "Email sent", message_send_resolved: "Send outcome confirmed", message_send_late_confirmation: "Send confirmed late",
   outreach_replied: "They replied", outreach_opted_out: "They asked not to be contacted", outreach_bounced: "Email bounced",
   reply_labelled: "Reply label changed", reply_match_confirmed: "Reply confirmed as theirs", reply_match_dismissed: "Reply marked not related",
+  channel_draft_created: "Message draft written", channel_message_sent: "Message sent", channel_reply: "They replied",
+  channel_opt_in: "WhatsApp permission recorded", channel_opted_out: "They asked to stop WhatsApp messages",
 };
+
+const CHANNEL_NAME: Record<string, string> = { whatsapp: "WhatsApp", linkedin: "LinkedIn", x: "X" };
 
 const WHY_STOPPED: Record<string, string> = {
   replied: "they replied", opted_out: "they asked not to be contacted", bounced: "the address bounced", won: "the lead became a deal",
@@ -37,6 +41,15 @@ export function activityDetail(kind: string, d: Record<string, unknown>, stage: 
       return typeof d.why === "string" && WHY_STOPPED[d.why] ? `Stopped because ${WHY_STOPPED[d.why]}` : null;
     case "converted":
       return d.via === "inbox" ? "From an interested email reply" : null;
+    case "channel_draft_created":
+    case "channel_message_sent":
+    case "channel_reply": {
+      const on = typeof d.channel === "string" && CHANNEL_NAME[d.channel] ? `On ${CHANNEL_NAME[d.channel]}` : null;
+      if (!on) return null;
+      if (kind === "channel_message_sent") return d.via === "manual" ? `${on}, sent by you outside DealInSec` : `${on}, from your business number`;
+      if (kind === "channel_reply") return d.via === "manual" ? `${on}, recorded by you` : on;
+      return d.ai ? `${on}, written by AI for you to review` : on;
+    }
     case "updated":
       return Array.isArray(d.fields) && d.fields.includes("doNotContact") && d.via === "gmail_sync" ? "Marked do-not-contact after their reply" : null;
     default:

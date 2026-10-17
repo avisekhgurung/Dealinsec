@@ -7,6 +7,7 @@
  * adding to the list takes one address key; removing a member updates the user row and then locks their mailbox rows;
  * disconnecting locks the mailbox rows. Every finishing write locks the message row before touching the job.
  */
+import { channelCountFor } from "../channels/store";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
 import { leadMessages, leads, mailSendJobs, mailboxConnections, orgRoles, outreachEvents, outreachFollowups, outreachSuppressions, users, type MailSendJobRow } from "@shared/schema";
@@ -111,7 +112,8 @@ export const pgSendStore: SendStore = {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(${PLAN_SEND_LOCK}, hashtext(${i.orgId}))`);
         const ws = await tx.execute(sql`SELECT count(*)::int AS n FROM ${mailSendJobs} WHERE organization_id = ${i.orgId} AND message_id <> ${i.messageId}
           AND (status IN ('sending', 'uncertain') OR (status = 'sent' AND sent_at >= ${at(i.planCap.since)}))`);
-        if (Number((ws.rows[0] as { n: unknown }).n) >= i.planCap.max) return { ok: false, code: "plan_send_limit" };
+        // One allowance for every send through a provider: WhatsApp API sends (server/channels/store.ts) count too, under this lock.
+        if (Number((ws.rows[0] as { n: unknown }).n) + (await channelCountFor(tx as any, "api_sends", i.orgId, i.planCap.since)) >= i.planCap.max) return { ok: false, code: "plan_send_limit" };
       }
       if (i.hold) await i.hold();
       // 8. reserve: a new job, or the next attempt of one that certainly didn't go out (same Message-ID).
@@ -209,5 +211,5 @@ export const PLAN_SEND_LOCK = 7_310_032;
 export async function countWorkspaceSends(orgId: string, since: Date): Promise<number> {
   const r = await db.execute(sql`SELECT count(*)::int AS n FROM ${mailSendJobs} WHERE organization_id = ${orgId}
     AND (status IN ('sending', 'uncertain') OR (status = 'sent' AND sent_at >= ${since.toISOString()}::timestamp))`);
-  return Number((r.rows[0] as { n: unknown } | undefined)?.n ?? 0);
+  return Number((r.rows[0] as { n: unknown } | undefined)?.n ?? 0) + (await channelCountFor(db as any, "api_sends", orgId, since));
 }

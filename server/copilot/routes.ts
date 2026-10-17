@@ -167,7 +167,7 @@ export function registerCopilotRoutes(app: Express) {
       const xff = String(req.headers["x-forwarded-for"] || "").split(",").map((x: string) => x.trim()).filter(Boolean);
       const ip = (cf ? String(cf) : xff.length ? xff[xff.length - 1] : req.ip || "unknown").trim() || "unknown";
       if (!takePublicQuota(ip)) {
-        return res.status(429).json({ error: "That's all the questions I can take right now — start the free trial and the in-app Copilot has no such limit." });
+        return res.status(429).json({ error: "That's all the questions I can take right now — create a free account and the in-app Copilot has no such limit." });
       }
       const raw = Array.isArray(req.body?.messages) ? req.body.messages : [];
       const history: ChatMessage[] = raw

@@ -15,5 +15,5 @@ export const ASK_SUGGESTIONS = [
 ] as const;
 
 /** Shown after a couple of answers: a real next step, true for every visitor. */
-export const ASK_CTA_TEXT = "The quickest way to see it: research a few prospects and run one deal through. 7-day trial, no card.";
+export const ASK_CTA_TEXT = "The quickest way to see it: research a few prospects and run one deal through. Free plan, no card.";
 export const ASK_CTA_LABEL = "Start free";

@@ -21,6 +21,7 @@ import { registerKnowledgeRoutes } from "./knowledge/routes";
 import { registerVoiceRoutes } from "./voice/routes";
 import { registerSalesRoutes } from "./sales/routes";
 import { registerOutboundRoutes } from "./outbound/routes";
+import { registerChannelRoutes } from "./channels/routes";
 import { disconnectMailboxesOf, registerGmail } from "./mail/register";
 import { reviseDraftQuote } from "./services/deals";
 import { notifyAgreementCreated } from "./services/agreements";
@@ -623,6 +624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerVoiceRoutes(app);
   registerSalesRoutes(app);
   registerOutboundRoutes(app);
+  registerChannelRoutes(app);
   registerGmail(app);
   registerQuoteShareRoutes(app);
   registerAgreementSignRoutes(app);
@@ -1816,9 +1818,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
-      // Finishing onboarding is the trial's grant point. maybeStartTrial is
-      // one atomic guarded UPDATE (one-shot per owner + canonical-email
-      // dedupe), so calling it on a replay grants nothing.
+      // Finishing onboarding was the trial's grant point. New trials are off
+      // (server/trial.ts: nothing is granted unless PRO_TRIAL_ENABLED=true);
+      // when on, it is one atomic guarded UPDATE, so a replay grants nothing.
       if (!wasOnboarded && user.onboardingComplete) {
         const granted = await maybeStartTrial(userId);
         if (granted) user = granted;

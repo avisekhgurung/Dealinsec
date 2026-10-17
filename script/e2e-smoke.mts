@@ -93,6 +93,14 @@ const member = jar();
  * it. A server on any other database has never seen that row and answers 401,
  * before the smoke has made a single write through the API.
  */
+/** A month of Pro for a throwaway account, recorded in the LOCAL database as a completed purchase is (plan + planExpiresAt).
+ *  There is no trial any more, so the Pro parts of the money path need this. */
+async function grantPro(email: string): Promise<void> {
+  const pool = new pg.Pool({ connectionString: DATABASE_URL });
+  try { await pool.query(`UPDATE users SET plan = 'pro', plan_expires_at = now() + interval '30 days' WHERE lower(email) = lower($1)`, [email]); }
+  finally { await pool.end(); }
+}
+
 async function requireServerOnLocalDatabase(): Promise<void> {
   const pool = new pg.Pool({ connectionString: DATABASE_URL });
   const id = randomUUID();
@@ -147,9 +155,15 @@ async function main() {
   check("profile/onboarding saves", r.status === 200, `got ${r.status} ${r.text}`);
 
   r = await owner.req("GET", "/api/auth/user");
-  check("7-day trial granted once onboarding completes",
-    !!r.json?.trialEndsAt || r.json?.entitlements?.trial === true,
-    `trialEndsAt=${r.json?.trialEndsAt} trial=${r.json?.entitlements?.trial}`);
+  // There is no trial any more (server/trial.ts): finishing onboarding leaves a new account on the free plan.
+  check("no trial is granted when onboarding completes (free plan)",
+    !r.json?.trialEndsAt && r.json?.entitlements?.trial !== true && r.json?.entitlements?.pro !== true,
+    `trialEndsAt=${r.json?.trialEndsAt} trial=${r.json?.entitlements?.trial} pro=${r.json?.entitlements?.pro}`);
+  // The money path below (agreements, invoices) is Pro: give this throwaway account a month of Pro in the LOCAL
+  // database, the way a completed purchase records it (plan + planExpiresAt).
+  await grantPro(OWNER.email);
+  r = await owner.req("GET", "/api/auth/user");
+  check("Pro (as purchased) unlocks the full workflow", r.json?.entitlements?.pro === true, `pro=${r.json?.entitlements?.pro}`);
 
   // Every amount below is INR paise. India is the default, and a new account
   // that silently landed on another currency would break the "zero visible
@@ -320,6 +334,7 @@ async function main() {
   r = await org2.req("POST", "/api/auth/signup", OWNER2);
   check("second org signs up", r.status === 200 || r.status === 201, `got ${r.status}`);
   await org2.req("PATCH", "/api/profile", { phone: "9000000000", onboardingComplete: true });
+  await grantPro(OWNER2.email);
 
   r = await org2.req("POST", "/api/deals", { currency: "INR",
     brandName: "Second Client", dealTitle: "Second job", dealAmountMinor: inr(50000),
@@ -349,6 +364,7 @@ async function main() {
   r = await uk.req("PATCH", "/api/org", ukRegion);
   check("UK region saves on an org with no records", r.status === 200 && r.json?.country === "GB", `got ${r.status} ${r.text}`);
   await uk.req("PATCH", "/api/profile", { ...ukRegion, phone: "7700900123", onboardingComplete: true });
+  await grantPro(UK_OWNER.email);
 
   r = await uk.req("POST", "/api/deals", { currency: "GBP",
     brandName: "UK Client", dealTitle: "Brand refresh", dealAmountMinor: 125050, // £1,250.50 in pence

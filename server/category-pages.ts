@@ -35,6 +35,7 @@ import type { Express } from "express";
 import { esc, SITE_ORIGIN, LOGO_SVG, gaSnippet, COOKIE_FOOTER_LINKS } from "./tools/layout";
 import { consentBanner } from "@shared/consent-script";
 import { PRICING, TAGLINE } from "@shared/product-facts";
+import { OUTBOUND_ALLOWANCE_DEFAULTS as OB, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
 
 // ?ref=, not utm_*: an internal UTM would overwrite the organic session source in GA4.
 const SIGNUP = "/auth?mode=signup&ref=category";
@@ -179,6 +180,7 @@ function footer(region: "IN" | "global"): string {
       <a href="/freelance-business-management-software">Freelance Business Management</a>
       <a href="/for-freelancers">For Freelancers</a>
       <a href="/for-creators">For Creators</a>
+      <a href="/find-local-clients">Find Local Clients</a>
       <a href="/tools/deal-risk-checker">Deal Risk Checker</a>
       <a href="/freelancer-invoice-software">Freelancer Invoice Software</a>
       <a href="/quotation-software">Quotation Software</a>
@@ -205,12 +207,12 @@ function ctaBand(region: "IN" | "global"): string {
       : "From the first prospect to the paid invoice: AI-assisted prospect research, then a quotation, an agreement signed online, invoices and payment tracking that always agree with each other. For small agencies, consultants and freelancers, wherever you bill from.";
   const note =
     region === "IN"
-      ? `No card required · Free plan after the trial · Pro ₹${PRICING.proMonthlyInr}/month`
-      : "No card required · Free plan and 7-day Pro trial in every country · Paid plans currently available in India";
+      ? `No card required · Free plan · Pro ₹${PRICING.proMonthlyInr}/month`
+      : "No card required · Free plan in every country · Paid plans currently available in India";
   return `<div class="cta-band"><div class="wrap">
     <h2>${TAGLINE}</h2>
     <p>${sub}</p>
-    <a class="btn" href="${SIGNUP}" data-cta>Start your 7-day free trial →</a>
+    <a class="btn" href="${SIGNUP}" data-cta>Start free →</a>
     <span class="sub-note">${note}</span>
   </div></div>`;
 }
@@ -273,7 +275,7 @@ export const PAGES: CategoryPage[] = [
       "For India's freelancers: quotation, e-signed scope, advance & milestone invoices with your PAN/GSTIN, and payment reminders drafted in English or Hinglish — on one thread per client. Free plan; Pro ₹199/month.",
     h1: "Invoice software for Indian freelancers who are tired of chasing payments",
     sub: "For India's freelancers — designers, developers, writers, video editors & photographers, marketers and consultants. Quote the work, get the scope accepted in writing, bill the advance and milestones, and follow up on late payments — one thread per client, ₹199/month.",
-    chips: ["Advance + milestone billing", "Signed, timestamped scope", "Reminders in English or Hinglish", "Pro ₹199/month · free plan", "7-day trial · no card"],
+    chips: ["Advance + milestone billing", "Signed, timestamped scope", "Reminders in English or Hinglish", "Pro ₹199/month · free plan", "No card needed"],
     shortLabel: "Freelancer Invoice Software",
     sections: `
 <section><div class="wrap">
@@ -326,7 +328,7 @@ export const PAGES: CategoryPage[] = [
     <tr><td><b>Getting paid</b></td><td>You remember, then chase awkwardly</td><td>Overdue list, plus a drafted reminder in the tone you pick</td></tr>
     <tr><td><b>Cost</b></td><td>—</td><td>Free plan for quotations; Pro ₹199/month</td></tr>
   </table></div>
-  <div class="callout honest"><b>What it costs, plainly</b><p>Free is ₹0: 4 deals a month, each with its quotation. Pro is ₹199/month, paid once a month with no auto-renewal, and adds AI Outbound with a larger research allowance, e-signed agreements, invoices, payment tracking and unlimited deals. Every account starts with a 7-day Pro trial, no card. DealInSec takes no percentage of your project value. Just need one invoice today? The <a href="/tools/gst-invoice-generator">free GST invoice generator</a> and <a href="/tools/quotation-maker">quotation maker</a> need no sign-up.</p></div>
+  <div class="callout honest"><b>What it costs, plainly</b><p>Free is ₹0: 4 deals a month, each with its quotation. Pro is ₹199/month, paid once a month with no auto-renewal, and adds AI Outbound with a larger research allowance, e-signed agreements, invoices, payment tracking and unlimited deals. The free plan needs no card. DealInSec takes no percentage of your project value. Just need one invoice today? The <a href="/tools/gst-invoice-generator">free GST invoice generator</a> and <a href="/tools/quotation-maker">quotation maker</a> need no sign-up.</p></div>
   <p class="muted" style="font-size:14px;margin-top:10px">Guides: <a href="/blog/advance-payment-terms">advance payment terms</a> · <a href="/blog/payment-reminder-message-to-client">payment reminder messages</a> · <a href="/blog/how-to-make-a-quotation-online">making a quotation online</a>.</p>
 </div></section>`,
     faq: [
@@ -340,7 +342,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "How much does it cost?",
-        a: "Free is ₹0 for 4 deals a month, each with its quotation. Pro is ₹199/month and adds e-signed agreements, invoices, payment tracking and unlimited deals. Every new account gets a 7-day Pro trial with no card, and DealInSec takes no percentage of your project value.",
+        a: "Free is ₹0 for 4 deals a month, each with its quotation. Pro is ₹199/month and adds e-signed agreements, invoices, payment tracking and unlimited deals. The free plan needs no card, and DealInSec takes no percentage of your project value.",
       },
       {
         q: "Can I take an advance and bill in milestones?",
@@ -367,10 +369,10 @@ export const PAGES: CategoryPage[] = [
     region: "IN",
     metaTitle: "Refrens Alternative for Freelancers in India",
     description:
-      "A Refrens alternative for Indian freelancers who want the whole client deal on one thread: quotation → e-signed scope → advance & milestone invoices → payment follow-up. Honest comparison. Pro ₹199/month; free 7-day trial, no card.",
+      "A Refrens alternative for Indian freelancers who want the whole client deal on one thread: quotation → e-signed scope → advance & milestone invoices → payment follow-up. Honest comparison. Pro ₹199/month; free plan, no card.",
     h1: "Looking for a Refrens alternative?",
     sub: "Refrens is a solid invoicing and quotation platform. DealInSec is built for a different job — running each client deal a freelancer takes on, from quotation to accepted scope to milestone invoices to getting paid, on one thread.",
-    chips: ["Built for freelancers", "Quote → signed scope → invoice", "Pro ₹199/month", "Free 7-day trial · no card"],
+    chips: ["Built for freelancers", "Quote → signed scope → invoice", "Pro ₹199/month", "Free plan · no card"],
     shortLabel: "Refrens Alternative",
     sections: `
 <section><div class="wrap">
@@ -400,7 +402,7 @@ export const PAGES: CategoryPage[] = [
     faq: [
       {
         q: "Is DealInSec a free Refrens alternative?",
-        a: "DealInSec has a free plan (4 deals a month, each with its quotation) and a 7-day Pro trial with no card, plus free no-sign-up tools (GST invoice, quotation maker, bill maker). Agreements, invoices and payment tracking are on Pro at ₹199/month. It isn't a clone of Refrens, though — it's built to run the whole deal, not just billing, so compare on the job you need done.",
+        a: "DealInSec has a free plan (4 deals a month, each with its quotation) with no card, plus free no-sign-up tools (GST invoice, quotation maker, bill maker). Agreements, invoices and payment tracking are on Pro at ₹199/month. It isn't a clone of Refrens, though — it's built to run the whole deal, not just billing, so compare on the job you need done.",
       },
       {
         q: "Why would a freelancer choose DealInSec over Refrens?",
@@ -408,7 +410,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "Can I switch from Refrens to DealInSec?",
-        a: "Yes — start with the free trial and run one live client deal end to end (quotation → agreement → invoice) to see if the thread fits how you work. Keep using whatever handles the rest of your accounting.",
+        a: "Yes — start on the free plan and run one live client deal end to end (quotation → agreement → invoice) to see if the thread fits how you work. Keep using whatever handles the rest of your accounting.",
       },
     ],
   },
@@ -419,10 +421,10 @@ export const PAGES: CategoryPage[] = [
     region: "IN",
     metaTitle: "Vyapar Alternative for Freelancers (India)",
     description:
-      "A Vyapar alternative for freelancers, not shops: DealInSec runs client deals — quotation, e-signed scope, milestone invoices and payment follow-up — instead of inventory-based GST billing. Honest comparison. Pro ₹199/month; free trial, no card.",
+      "A Vyapar alternative for freelancers, not shops: DealInSec runs client deals — quotation, e-signed scope, milestone invoices and payment follow-up — instead of inventory-based GST billing. Honest comparison. Pro ₹199/month; free plan, no card.",
     h1: "Looking for a Vyapar alternative?",
     sub: "Vyapar is excellent GST billing and inventory software for shops and product businesses. If you're a freelancer — you sell design, code, words, edits or advice, not stock — DealInSec is built for the way you actually get paid.",
-    chips: ["For freelancers, not shops", "Quote → signed scope → invoice", "Pro ₹199/month", "Free 7-day trial · no card"],
+    chips: ["For freelancers, not shops", "Quote → signed scope → invoice", "Pro ₹199/month", "Free plan · no card"],
     shortLabel: "Vyapar Alternative",
     sections: `
 <section><div class="wrap">
@@ -459,7 +461,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "I'm a freelancer, not a shop — which fits?",
-        a: "DealInSec. Freelance work is about scope, the client's acceptance and getting paid per milestone — not inventory. That's exactly what DealInSec is built for: a free plan for quotations, Pro at ₹199/month, and a 7-day trial with no card.",
+        a: "DealInSec. Freelance work is about scope, the client's acceptance and getting paid per milestone — not inventory. That's exactly what DealInSec is built for: a free plan for quotations with no card, and Pro at ₹199/month.",
       },
     ],
   },
@@ -505,7 +507,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "Is there a free version?",
-        a: "Two, honestly: the free quotation maker tool needs no account at all, and every new DealInSec account starts with a 7-day Pro trial (no card) followed by a free plan covering 4 deals a month, each with a quotation.",
+        a: "Two, honestly: the free quotation maker tool needs no account at all, and every new DealInSec account starts on a free plan (no card) covering 4 deals a month, each with a quotation.",
       },
       {
         q: "Does it handle GST on quotations?",
@@ -528,10 +530,10 @@ export const PAGES: CategoryPage[] = [
     region: "IN",
     metaTitle: "Contract Management Software for Freelancers in India",
     description:
-      "Contract management for Indian freelancers: agreements generated from accepted quotations, electronic acceptance with an audit record, statuses, and linked invoices. Pro ₹199/month; free 7-day trial, no card.",
+      "Contract management for Indian freelancers: agreements generated from accepted quotations, electronic acceptance with an audit record, statuses, and linked invoices. Pro ₹199/month; free plan, no card.",
     h1: "Contract management software for freelancers",
     sub: "Your agreement is generated from the accepted quotation — same scope, same figures — accepted electronically by your client with an audit record, and linked to the invoices it authorises.",
-    chips: ["Electronic acceptance + audit record", "Made for freelancers", "Free 7-day trial · no card"],
+    chips: ["Electronic acceptance + audit record", "Made for freelancers", "Free plan · no card"],
     shortLabel: "Contract Management",
     sections: `
 <section><div class="wrap">
@@ -560,7 +562,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "What does it cost?",
-        a: "Agreements are part of Pro: ₹199/month, with unlimited deals, agreements, invoices and payment tracking. Every new account starts with a 7-day Pro trial with no card; after that the free plan covers 4 deals a month with quotations.",
+        a: "Agreements are part of Pro: ₹199/month, with unlimited deals, agreements, invoices and payment tracking. The free plan, with no card, covers 4 deals a month with quotations.",
       },
       {
         q: "Can my client sign without creating an account?",
@@ -575,10 +577,10 @@ export const PAGES: CategoryPage[] = [
     region: "IN",
     metaTitle: "Proposal Management Software for Freelancers",
     description:
-      "Proposal management for Indian freelancers: itemised, priced proposals (quotations) with revision rounds and advance terms, tracked to acceptance and converted into e-signed agreements and invoices. Free 7-day trial.",
+      "Proposal management for Indian freelancers: itemised, priced proposals (quotations) with revision rounds and advance terms, tracked to acceptance and converted into e-signed agreements and invoices. Free plan, no card.",
     h1: "Proposal management, the quotation-first way",
     sub: "For a freelancer, your proposal is a priced scope with terms — a quotation. DealInSec manages that proposal from first draft to accepted, signed and invoiced.",
-    chips: ["Priced proposals with terms", "Tracked to acceptance", "Free 7-day trial · no card"],
+    chips: ["Priced proposals with terms", "Tracked to acceptance", "Free plan · no card"],
     shortLabel: "Proposal Management",
     sections: `
 <section><div class="wrap">
@@ -618,10 +620,10 @@ export const PAGES: CategoryPage[] = [
     region: "IN",
     metaTitle: "Invoice Management Software for Freelancers in India",
     description:
-      "Invoice management for Indian freelancers: invoices generated from agreements, consecutive numbering per financial year, paid/unpaid tracking with dates, and a dashboard of what to bill and chase. Pro ₹199/month; free 7-day trial.",
+      "Invoice management for Indian freelancers: invoices generated from agreements, consecutive numbering per financial year, paid/unpaid tracking with dates, and a dashboard of what to bill and chase. Pro ₹199/month; free plan.",
     h1: "Invoice management software that knows what you're owed",
     sub: "Invoices generated from the agreement — never more than it's worth — numbered consecutively per financial year, tracked from sent to paid, with a dashboard of what to bill and what to chase today.",
-    chips: ["INV-series per financial year", "Paid/unpaid with dates", "Made for freelancers", "Free 7-day trial"],
+    chips: ["INV-series per financial year", "Paid/unpaid with dates", "Made for freelancers", "Free plan"],
     shortLabel: "Invoice Management",
     sections: `
 <section><div class="wrap">
@@ -650,7 +652,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "Is there a free plan?",
-        a: "The free plan covers 4 deals a month, each with its quotation. Invoices, agreements and payment tracking are Pro — ₹199/month. Every new account gets a 7-day Pro trial with no card, so you can raise real invoices before deciding.",
+        a: "The free plan covers 4 deals a month, each with its quotation. Invoices, agreements and payment tracking are Pro — ₹199/month. The free plan needs no card, so you can run real deals and quotations before deciding.",
       },
       {
         q: "What do I do when a client hasn't paid?",
@@ -665,10 +667,10 @@ export const PAGES: CategoryPage[] = [
     region: "IN",
     metaTitle: "E-Signature for Freelancers in India",
     description:
-      "E-signature for Indian freelancers: your client accepts the agreement electronically with an audit record — who signed, when, with which signature — built into the quotation-to-invoice workflow. Honest about what it is. Pro ₹199/month; free 7-day trial.",
+      "E-signature for Indian freelancers: your client accepts the agreement electronically with an audit record — who signed, when, with which signature — built into the quotation-to-invoice workflow. Honest about what it is. Pro ₹199/month; free plan.",
     h1: "E-signature built into the deal, not bolted on",
     sub: "Your client accepts the agreement electronically with an audit record — who, when, which signature — and the signed document links straight to the quotation before it and the invoices after it.",
-    chips: ["Audit record on the document", "Section 10A, IT Act 2000", "Free 7-day trial · no card"],
+    chips: ["Audit record on the document", "Section 10A, IT Act 2000", "Free plan · no card"],
     shortLabel: "E-Signature",
     sections: `
 <section><div class="wrap">
@@ -678,7 +680,7 @@ export const PAGES: CategoryPage[] = [
     <div class="ft"><b>Execution record on the face</b><p>The agreement prints who accepted it, when, and with which signature — plus your signature image and stamp where you've set them.</p></div>
     <div class="ft"><b>Client-friendly</b><p>Your client accepts electronically through a confirmation flow — the signed copy stays on record, and the printed document reflects the acceptance.</p></div>
     <div class="ft"><b>Signature binding</b><p>The signature captured at creation stays with the document — it doesn't change when someone else views or reprints it.</p></div>
-    <div class="ft"><b>Priced for a freelancer</b><p>E-sign is part of Pro — ₹199/month, with a 7-day free trial — rather than a separate per-envelope bill in dollars.</p></div>
+    <div class="ft"><b>Priced for a freelancer</b><p>E-sign is part of Pro — ₹199/month — rather than a separate per-envelope bill in dollars.</p></div>
   </div>
   <div class="callout honest"><b>What this is — and isn't</b><p>Electronic contracts are recognised in India under Section 10A of the Information Technology Act, 2000, and DealInSec records electronic acceptance with an audit record. It is <b>not</b> a Digital Signature Certificate (DSC) or an Aadhaar eSign, and every agreement says so on its face. If a client or regulator specifically requires DSC/Aadhaar eSign, use those; for an everyday freelance scope, an accepted document with a clear audit record is the practical option. We are not a law firm — have important agreements reviewed by a lawyer.</p></div>
 </div></section>`,
@@ -697,7 +699,86 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "What does it cost?",
-        a: "E-signed agreements are part of Pro — ₹199/month, with unlimited agreements. Every new account starts with a 7-day Pro trial with no card; the free plan after that covers 4 deals a month with quotations only.",
+        a: "E-signed agreements are part of Pro — ₹199/month, with unlimited agreements. The free plan, with no card, covers 4 deals a month with quotations only.",
+      },
+    ],
+  },
+  /* ── /find-local-clients — local businesses in an Indian city (AI Outbound, Google Maps listings) ── */
+  {
+    path: "/find-local-clients",
+    region: "IN",
+    updated: "2026-10-18",
+    metaTitle: "Find Local Business Clients in Your City for Your Agency",
+    description:
+      "List local businesses in any Indian city from Google Maps, research the websites that fit, and turn the right ones into leads, deals and paid invoices.",
+    h1: "Find local business clients in your city",
+    sub: "Type a kind of business and a city — dentists in Siliguri, coaching institutes in Kota, cafes in Pune — and DealInSec lists matching businesses from Google Maps. Research the websites that fit, save the right ones as leads and run each deal through to a paid invoice.",
+    chips: ["Any Indian city, or anywhere else", "Listings from Google Maps", "Websites researched with sources", "You approve every message", "Free plan, no card"],
+    shortLabel: "Find Local Clients",
+    sections: `
+<section><div class="wrap">
+  <h2>Why local businesses are hard to find with a web search</h2>
+  <p class="sec-sub">For a web design, digital marketing or software agency in India, many good clients are down the road: clinics, coaching centres, restaurants, showrooms, builders, salons and family firms. Many of them are on Google Maps but say little anywhere else online, so a general web search lists directories and big brands instead of them.</p>
+  <div class="feat">
+    <div class="ft"><b>They are on the map</b><p>A clinic or a coaching centre usually keeps its Google Maps listing up to date long before it has much of a website, so a city's listings are where they show up first.</p></div>
+    <div class="ft"><b>The website says what they need</b><p>Whether a business already has a website, and what it says, tells you more about how to approach them than any list of names.</p></div>
+    <div class="ft"><b>Your city, or someone else's</b><p>Search your own city for clients you can meet, or another city or country where you want to grow. You choose where; it is never set from your own account.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>How it works</h2>
+  <p class="sec-sub">Local search sits inside AI Outbound, next to the search for companies online. Nothing is contacted at any step until you send a message yourself.</p>
+  <div class="feat">
+    <div class="ft"><b>1. Search a city</b><p>Choose Local businesses, type the kind of business and the city, and pick listings with a website, without one, or both. One local search uses one AI Outbound search and shows up to 20 businesses.</p></div>
+    <div class="ft"><b>2. Look through the listings</b><p>Each business shows its address, phone, website if one is listed and a link to open it in Google Maps, with businesses already in your leads marked.</p></div>
+    <div class="ft"><b>3. Research the websites you pick</b><p>Tick the businesses worth a closer look. DealInSec reads each website itself, checks it against your search and records what it finds with the page it came from and the date.</p></div>
+    <div class="ft"><b>4. Save the right ones as leads</b><p>A researched business becomes a lead in one step. A business without a website can be saved too, under the name you give it, with a link to its listing.</p></div>
+    <div class="ft"><b>5. Reach out yourself</b><p>AI drafts a first message from the facts DealInSec verified. You edit it, approve it and send it from your own email; follow-ups are tasks for you, never automatic.</p></div>
+    <div class="ft"><b>6. Quote, sign, invoice, get paid</b><p>When a business says yes, the lead becomes a deal: a quotation they accept online, an agreement they sign online, invoices from that agreement and a clear view of what is paid and overdue.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>What you see, and what DealInSec keeps</h2>
+  <p class="sec-sub">Listings come from Google Maps and are shown for your search only. DealInSec is not a business directory and does not build a database of listings.</p>
+  <div class="tbl-scroll"><table class="cmp">
+    <tr><th>Information</th><th>What happens to it</th></tr>
+    <tr><td><b>Name, address and phone on a listing</b></td><td>Shown for that search, with a link to the listing. Not copied into DealInSec; open the listing for the current details.</td></tr>
+    <tr><td><b>A business's own website</b></td><td>Researched only when you choose it. The facts found are kept on the prospect with the page and the date they came from.</td></tr>
+    <tr><td><b>A lead you save from a listing</b></td><td>Keeps the name you give it and a link back to the listing.</td></tr>
+    <tr><td><b>“No website listed”</b></td><td>Means only that the listing shows none. The business may still have one, and it doesn't mean they need one: check before you pitch.</td></tr>
+  </table></div>
+  <div class="callout honest"><b>What it doesn't do</b><p>DealInSec doesn't guarantee clients, replies or meetings, and it isn't a contact database: phone numbers and emails are only what a listing or a website publishes, and they aren't verified. It doesn't send messages for you. Searching is limited: the free plan includes ${OB.free.monthlySearches} AI Outbound searches every ${OUTBOUND_WINDOW_DAYS} days and Pro (₹${PRICING.proMonthlyInr} a month in India) includes ${OB.pro.monthlySearches}, with researched websites counted separately.</p></div>
+</div></section>
+<section><div class="wrap">
+  <h2>After the first yes</h2>
+  <div class="rel-grid">
+    <a class="rel-card" href="/quotation-software">Quotation software<span>A quote from the deal that the client accepts online.</span></a>
+    <a class="rel-card" href="/e-signature">Agreements signed online<span>The accepted quote becomes the agreement.</span></a>
+    <a class="rel-card" href="/freelancer-invoice-software">Invoices and payment tracking<span>Invoices from the agreement; see what is overdue.</span></a>
+    <a class="rel-card" href="/tools/gst-invoice-generator">Free GST invoice generator<span>One invoice today, no sign-up.</span></a>
+  </div>
+  <p class="muted" style="font-size:14px;margin-top:12px">Looking for companies online instead, in India or abroad? AI Outbound searches the web for them too; see <a href="/">how DealInSec works</a> and <a href="/for-freelancers">DealInSec for freelancers</a>.</p>
+</div></section>`,
+    faq: [
+      {
+        q: "How do I find local clients for my agency with DealInSec?",
+        a: "Open AI Outbound, choose Local businesses, and type the kind of business and the city, for example dentists in Siliguri. DealInSec lists matching businesses from Google Maps. Pick the ones worth a closer look and DealInSec researches their websites with sources; save the right ones as leads, approve a first message and send it from your own email.",
+      },
+      {
+        q: "Which cities can I search?",
+        a: "Any city or area: choose the country and type the place. It works best for the kinds of business people look up on a map, such as clinics, coaching centres, restaurants, salons, showrooms and builders. For companies that work online, such as agencies or software firms, the search for companies online usually finds more.",
+      },
+      {
+        q: "Does DealInSec give me phone numbers and email addresses?",
+        a: "A listing shows the phone number and website it publishes, for that search, with a link to the listing. DealInSec doesn't copy them into your leads and doesn't verify them. When it researches a website, it records any contact details the site itself publishes, with the page they came from.",
+      },
+      {
+        q: "Is a business without a website a good lead for a website project?",
+        a: "Not necessarily. “No website listed” means only that the listing shows none: the business may have a site the listing doesn't mention, or may not want one. Treat it as a reason to look, not as proof of need.",
+      },
+      {
+        q: "What does local search cost?",
+        a: `It is part of AI Outbound, with no separate price. One local search uses one AI Outbound search: the free plan includes ${OB.free.monthlySearches} every ${OUTBOUND_WINDOW_DAYS} days, and Pro, ₹${PRICING.proMonthlyInr} a month in India, includes ${OB.pro.monthlySearches}. Researching websites uses your plan's researched prospects. The free plan needs no card.`,
       },
     ],
   },
@@ -803,7 +884,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "Can I use DealInSec outside India?",
-        a: "Yes. The free plan, which covers 4 deals a month with their quotations, and a 7-day Pro trial with no card are open in every country, in 50 currencies. Paid plans can currently be bought in India only.",
+        a: "Yes. The free plan, which covers 4 deals a month with their quotations and needs no card, is open in every country, in 50 currencies. Paid plans can currently be bought in India only.",
       },
       {
         q: "Is the client's signature legally valid?",
@@ -920,7 +1001,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "Can I use DealInSec outside India?",
-        a: "Yes. The free plan, which covers 4 deals a month with their quotations, and a 7-day Pro trial with no card are open in every country, in 50 currencies. Paid plans can currently be bought in India only.",
+        a: "Yes. The free plan, which covers 4 deals a month with their quotations and needs no card, is open in every country, in 50 currencies. Paid plans can currently be bought in India only.",
       },
       {
         q: "Is the brand's signature legally valid?",
@@ -948,10 +1029,10 @@ export function renderCategoryPage(p: CategoryPage, siblings: RelatedLink[]): st
   const offers =
     p.region === "IN"
       ? [
-          { "@type": "Offer", name: "DealInSec Pro", price: String(PRICING.proMonthlyInr), priceCurrency: "INR", description: `Pro plan ₹${PRICING.proMonthlyInr}/month; free plan and ${PRICING.trialDays}-day trial available` },
+          { "@type": "Offer", name: "DealInSec Pro", price: String(PRICING.proMonthlyInr), priceCurrency: "INR", description: `Pro plan ₹${PRICING.proMonthlyInr}/month; free plan available` },
         ]
       : // Never advertise a price that cannot be bought from where the reader is.
-        [{ "@type": "Offer", name: "Free plan", price: "0", priceCurrency: "USD", description: "4 deals a month with quotations; 7-day Pro trial, in every country" }];
+        [{ "@type": "Offer", name: "Free plan", price: "0", priceCurrency: "USD", description: "4 deals a month with quotations, in every country" }];
   const jsonLd: object[] = [
     {
       "@context": "https://schema.org",
@@ -998,7 +1079,7 @@ export function renderCategoryPage(p: CategoryPage, siblings: RelatedLink[]): st
   <h1>${esc(p.h1)}</h1>
   <p class="sub">${esc(p.sub)}</p>
   <div class="hero-ctas">
-    <a class="btn" href="${SIGNUP}" data-cta>Start free trial →</a>
+    <a class="btn" href="${SIGNUP}" data-cta>Start free →</a>
     <a class="btn ghost" href="/tools">Try the free tools</a>
   </div>
   <div class="chips">${chips}</div>

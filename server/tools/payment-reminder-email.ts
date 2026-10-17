@@ -182,7 +182,7 @@ const BODY = `
 <section><div class="wrap">
   <div class="pr-cta">
     <h2>Keep the follow-up on the same record as the invoice</h2>
-    <p>This tool drafts one email from what you type. In DealInSec, invoices are tracked from sent to paid, and Copilot can draft a payment reminder from the real invoice — number, amount, due date, days overdue — so nothing is retyped. It only drafts: you review it and send it yourself, and DealInSec never contacts your client for you. Free plan and 7-day trial in every country, no card.</p>
+    <p>This tool drafts one email from what you type. In DealInSec, invoices are tracked from sent to paid, and Copilot can draft a payment reminder from the real invoice — number, amount, due date, days overdue — so nothing is retyped. It only drafts: you review it and send it yourself, and DealInSec never contacts your client for you. Free plan in every country, no card.</p>
     <a class="btn" href="${SIGNUP}" data-cta>Try DealInSec free →</a>
   </div>
 </div></section>

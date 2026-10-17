@@ -26,7 +26,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 import {
-  hasActivePro, hasActiveDealBoost, hasActiveTrial, hasLapsedTrial, getSubscriptionType, minorUnitFactor,
+  hasActivePro, hasActiveDealBoost, hasActiveTrial, getSubscriptionType, minorUnitFactor,
 } from "@shared/schema";
 import { TrialCountdown } from "@/components/trial-countdown";
 import { canSeeModule, memberCan } from "@shared/permissions";
@@ -135,32 +135,24 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
   // Free plan: no credit counters in the UI (they confused users) — just the
   // plan and an upgrade path. The 4-deals-a-month limit is enforced
   // server-side and surfaces through the upgrade modal when it's reached.
-  // A lapsed trial gets its own framing: the user has SEEN the full
-  // workflow, so speak to what they're missing, not what's included.
-  const trialEnded = hasLapsedTrial(user);
   return (
     <Card
-      className={`glass-card relative overflow-hidden ${trialEnded ? "border-rose-300/40 dark:border-rose-900/40" : ""}`}
+      className="glass-card relative overflow-hidden"
       data-testid="subscription-card"
     >
-      {trialEnded && (
-        <div className="absolute inset-0 bg-gradient-to-r from-rose-500/[0.05] to-transparent pointer-events-none" />
-      )}
       <CardContent className="relative p-4 lg:p-3.5 flex items-center gap-3.5">
-        <div className={`w-10 h-10 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${trialEnded ? "bg-rose-500/10" : "bg-primary/10"}`}>
-          <Sparkles className={`w-5 h-5 lg:w-4 lg:h-4 ${trialEnded ? "text-rose-500" : "text-primary"}`} />
+        <div className="w-10 h-10 lg:w-8 lg:h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-primary/10">
+          <Sparkles className="w-5 h-5 lg:w-4 lg:h-4 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm">
-            {trialEnded ? "Your Pro trial has ended" : "Free plan"}
+            Free plan
           </p>
           <p className="text-xs text-muted-foreground">
-            {trialEnded
-              ? "Your deals and documents are safe — upgrade to keep creating agreements & invoices"
-              : "Upgrade for unlimited deals, signed agreements, invoices & payment tracking"}
+            Upgrade for unlimited deals, signed agreements, invoices &amp; payment tracking
           </p>
         </div>
-        <Link href="/pricing" onClick={() => trackEvent("upgrade_clicked", { source: trialEnded ? "dashboard_trial_ended" : "dashboard" })}>
+        <Link href="/pricing" onClick={() => trackEvent("upgrade_clicked", { source: "dashboard" })}>
           <Button size="sm" className="flex-shrink-0 text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700" data-testid="dashboard-upgrade-cta">
             <Crown className="w-3.5 h-3.5 mr-1.5 text-amber-300" />
             Upgrade

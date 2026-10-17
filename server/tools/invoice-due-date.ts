@@ -297,7 +297,7 @@ const BODY = `
 <section><div class="wrap">
   <div class="dd-cta">
     <h2>Track the invoice after it is sent</h2>
-    <p>Once an invoice is created in DealInSec, it is tracked as paid, pending or overdue, and DealInSec can draft a payment reminder from the invoice details — number, amount, due date and days overdue. It only drafts: you review the reminder and send it yourself. The free plan and a 7-day trial with no card are open in every country; paid plans can currently be bought in India only.</p>
+    <p>Once an invoice is created in DealInSec, it is tracked as paid, pending or overdue, and DealInSec can draft a payment reminder from the invoice details — number, amount, due date and days overdue. It only drafts: you review the reminder and send it yourself. The free plan needs no card and is open in every country; paid plans can currently be bought in India only.</p>
     <a class="btn" href="${SIGNUP}" data-cta>Try DealInSec free →</a>
   </div>
 </div></section>

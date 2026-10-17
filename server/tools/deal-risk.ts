@@ -396,7 +396,7 @@ const BODY = `
 
     <div class="dr-cta">
       <h2>Keep the answers in one place</h2>
-      <p>Create a free DealInSec account and turn this into a deal: the terms you agree go into a quotation, an agreement the client or brand can sign online and an invoice. The free plan and a 7-day trial with no card are open in every country; paid plans can currently be bought in India only.</p>
+      <p>Create a free DealInSec account and turn this into a deal: the terms you agree go into a quotation, an agreement the client or brand can sign online and an invoice. The free plan needs no card and is open in every country; paid plans can currently be bought in India only.</p>
       <a class="btn" id="dr-cta" href="${SIGNUP}" data-cta>Turn this into a DealInSec deal →</a>
     </div>
   </div>

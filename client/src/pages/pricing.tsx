@@ -17,7 +17,6 @@ import {
   hasActivePro,
   hasActiveDealBoost,
   hasActiveTrial,
-  hasLapsedTrial,
   getTrialDaysLeft,
   getSubscriptionType,
 } from "@shared/schema";
@@ -96,7 +95,6 @@ export default function PricingPage() {
   // no longer sold; boostActive only labels a boost someone already bought.
   const trialActive = hasActiveTrial(user);
   const trialDaysLeft = getTrialDaysLeft(user);
-  const trialLapsed = hasLapsedTrial(user);
   const subType = getSubscriptionType(user);
   const proExpiryLabel = user?.planExpiresAt
     ? new Date(user.planExpiresAt).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })
@@ -259,7 +257,7 @@ export default function PricingPage() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="font-bold text-sm">
-                  {trialLapsed ? "Your Pro trial has ended — you're on the Free plan" : "You're on the Free plan"}
+                  You're on the Free plan
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
                   4 deals a month with quotations · agreements, invoices &amp; payment tracking need Pro
@@ -469,7 +467,7 @@ export default function PricingPage() {
             ))}
           </div>
           <p className="text-[11px] text-muted-foreground pt-1 border-t border-border/50">
-            Every new account starts with a 7-day Pro trial — the full workflow, unlocked. One trial per account.
+            Every new account starts on the free plan, no card. Upgrade to Pro when you need agreements, invoices and payment tracking.
           </p>
         </div>
 

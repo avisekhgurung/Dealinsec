@@ -261,8 +261,8 @@ export default function OnboardingPage() {
         timezone: region.timezone,
         onboardingComplete: true,
       });
-      // Onboarding is the trial's one-shot grant point (server/trial.ts) —
-      // this is the only place that can ever observe the moment it starts.
+      // Onboarding was the trial's one-shot grant point (server/trial.ts); new trials are off (PRO_TRIAL_ENABLED),
+      // so this only fires if they are ever switched back on.
       if (!user?.trialStartedAt) {
         const updated = await profileRes.json().catch(() => null);
         if (updated?.trialStartedAt) trackEvent("pro_trial_started");
@@ -311,15 +311,10 @@ export default function OnboardingPage() {
       </motion.p>
     ) : null;
 
-  const trialChip = (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-      <Sparkles className="h-3.5 w-3.5" aria-hidden /> 7-day Pro trial starts when you finish
-    </span>
-  );
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-background to-muted">
-      {/* Header: brand, the three-step progress, and the trial note. */}
+      {/* Header: brand and the three-step progress. */}
       <header className="sticky top-0 z-10 border-b border-border/60 bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
           <DealinsecLogo size="md" withText />
@@ -371,7 +366,6 @@ export default function OnboardingPage() {
             </ol>
           </nav>
 
-          <div className="hidden md:block">{trialChip}</div>
         </div>
         {/* Phone: a thin bar instead of the labelled steps. */}
         <div className="h-1 bg-border/60 sm:hidden" aria-hidden>
@@ -389,7 +383,6 @@ export default function OnboardingPage() {
           <p className="mb-3 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:hidden">
             Step {step + 1} of {STEPS.length} · {STEPS[step].label}
           </p>
-          <div className="mb-4 flex justify-center md:hidden">{trialChip}</div>
 
           <div className="overflow-hidden rounded-2xl border border-border/70 bg-card p-6 shadow-lg shadow-emerald-900/5 sm:p-8">
             <AnimatePresence mode="wait" custom={dir} initial={false}>
@@ -647,7 +640,7 @@ export default function OnboardingPage() {
                       {isLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin" aria-label="Saving" />
                       ) : (
-                        <>Complete Setup &amp; Start Free Trial <Rocket className="ml-2 h-4 w-4" aria-hidden /></>
+                        <>Complete setup <Rocket className="ml-2 h-4 w-4" aria-hidden /></>
                       )}
                     </Button>
                   </motion.div>

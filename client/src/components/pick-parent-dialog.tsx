@@ -23,7 +23,7 @@ import {
   Search, Plus, ArrowRight, FileText, FileCheck, Receipt, Crown,
   AlertTriangle, Scissors,
 } from "lucide-react";
-import { hasProAccess, hasLapsedTrial } from "@shared/schema";
+import { hasProAccess } from "@shared/schema";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
 import { isAgreementSigned } from "@shared/agreement-lifecycle";
 import { useAuth } from "@/hooks/useAuth";
@@ -232,9 +232,8 @@ export function PickParentDialog({
                   {kind === "agreement" ? "Agreements" : "Invoices"} are a Pro feature
                 </p>
                 <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
-                  {/* In-app invoices don't calculate tax, so they are never called "GST-ready". A user who already used
-                      their one-per-account trial isn't offered another. */}
-                  {hasLapsedTrial(user) ? "Your 7-day trial has ended. Upgrade" : "Upgrade"} to Pro for the
+                  {/* In-app invoices don't calculate tax, so they are never called "GST-ready". */}
+                  Upgrade to Pro for the
                   full workflow — agreements,{" "}
                   invoices and payment tracking.
                 </p>

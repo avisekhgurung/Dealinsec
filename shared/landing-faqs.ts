@@ -24,7 +24,7 @@ export const LANDING_FAQS: LandingFaq[] = [
   },
   {
     q: "What is included in the free plan?",
-    a: `The free plan is permanent and costs ₹0: ${PRICING.freeMonthlyDeals} new deals a month, each with its quotation; the lead pipeline, where you save researched prospects as leads; ${OB.free.monthlySearches} AI prospect research searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each); outreach drafts you approve; and the dashboard. That is enough to research a prospect, save the lead, create a deal and send a quotation. Every new account also starts with a ${PRICING.trialDays}-day Pro trial with no card.`,
+    a: `The free plan is permanent and costs ₹0: ${PRICING.freeMonthlyDeals} new deals a month, each with its quotation; the lead pipeline, where you save researched prospects as leads; ${OB.free.monthlySearches} AI prospect research searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each); outreach drafts you approve; and the dashboard. That is enough to research a prospect, save the lead, create a deal and send a quotation. No card is needed, and you upgrade to Pro only when you want the rest.`,
   },
   {
     q: "What does Pro unlock?",
@@ -33,6 +33,10 @@ export const LANDING_FAQS: LandingFaq[] = [
   {
     q: "How does AI prospect research work?",
     a: `Describe the clients you want and where to look (any countries or cities, or worldwide), and confirm the profile it reads back. AI Outbound then searches the web, checks each company's own website against your profile, looks for recent, dated reasons to reach out and named decision makers, and scores each company with its reasons. Every fact shows its source and date, and guesses are labelled as guesses. You choose who to save as a lead, and AI drafts a first message from verified facts for you to edit and approve. Searches are limited per plan and counted over ${OUTBOUND_WINDOW_DAYS} days.`,
+  },
+  {
+    q: "Can DealInSec find local businesses in my city?",
+    a: "Yes. Choose Local businesses, type the kind of business and the city (for example dentists in Siliguri, coaching institutes in Kota or cafes in Pune), and DealInSec lists matching businesses from Google Maps, with their address, phone, website if listed, and a link to the listing. You can filter to listings with or without a website. The listings are shown for that search and not kept in DealInSec: you choose which websites it researches, the same way as any prospect, or save a business to Leads under the name you give it. One local search uses one AI Outbound search. A listing without a website only means none is listed; it doesn't prove the business has no website or needs one.",
   },
   {
     q: "Does DealInSec guarantee customers or verified contact details?",
@@ -44,7 +48,7 @@ export const LANDING_FAQS: LandingFaq[] = [
   },
   {
     q: "How do billing and cancellation work?",
-    a: `Pro is ₹${PRICING.proMonthlyInr} for one month, paid in rupees through Razorpay (UPI, cards or netbanking) by a workspace in India; DealInSec adds no tax on top of that price. It is a one-time payment for the month with no auto-debit, so there is nothing to cancel: if you don't pay again, your account returns to the free plan when the month ends, and your records stay. The refund policy explains what applies to a purchase. Outside India, including the United States, paid plans can't be bought yet; the free plan and the trial are open everywhere.`,
+    a: `Pro is ₹${PRICING.proMonthlyInr} for one month, paid in rupees through Razorpay (UPI, cards or netbanking) by a workspace in India; DealInSec adds no tax on top of that price. It is a one-time payment for the month with no auto-debit, so there is nothing to cancel: if you don't pay again, your account returns to the free plan when the month ends, and your records stay. The refund policy explains what applies to a purchase. Outside India, including the United States, paid plans can't be bought yet; the free plan is open everywhere.`,
   },
   {
     q: "What happens when I reach my AI search limit?",

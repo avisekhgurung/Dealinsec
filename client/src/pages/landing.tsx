@@ -292,7 +292,7 @@ export default function LandingPage() {
                 {authTab === "signup" ? "Create your account" : "Welcome back"}
               </h2>
               <p className="text-sm text-neutral-500 mt-1">
-                {authTab === "signup" ? "Every Pro feature free for 7 days." : "Sign in to continue"}
+                {authTab === "signup" ? "Start on the free plan. No card needed." : "Sign in to continue"}
               </p>
             </div>
 
@@ -662,7 +662,7 @@ function NavMenu({ label, items }: { label: string; items: NavLink[] }) {
 }
 
 function PricingPreview({ onCTA }: { onCTA: () => void }) {
-  const free = OUTBOUND_ALLOWANCE_DEFAULTS.free, pro = OUTBOUND_ALLOWANCE_DEFAULTS.pro, trial = OUTBOUND_ALLOWANCE_DEFAULTS.trial;
+  const free = OUTBOUND_ALLOWANCE_DEFAULTS.free, pro = OUTBOUND_ALLOWANCE_DEFAULTS.pro;
   const freePerks = [
     `${PRICING.freeMonthlyDeals} new deals a month, each with its quotation`,
     "Lead pipeline: save researched prospects as leads, with follow-ups",
@@ -698,7 +698,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
             <Globe className="w-3.5 h-3.5" /> United States, India and everywhere else
           </p>
           <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            Every new account starts with a {PRICING.trialDays}-day Pro trial, and the free plan stays free after it. Both are open in every country, with no card. <strong className="font-semibold text-neutral-800 dark:text-neutral-200">In India</strong>, Pro is paid in rupees at the price below — and AI Outbound finds clients in India, the US, the UK, Canada, Australia, the UAE and other countries. <strong className="font-semibold text-neutral-800 dark:text-neutral-200">In the US and other countries</strong>, paid plans can&apos;t be bought yet, and we won&apos;t take a foreign card until they can.
+            Every new account starts on the free plan, which stays free and is open in every country, with no card. Upgrade to Pro when you need agreements, invoices and payment tracking. <strong className="font-semibold text-neutral-800 dark:text-neutral-200">In India</strong>, Pro is paid in rupees at the price below — and AI Outbound finds clients in India, the US, the UK, Canada, Australia, the UAE and other countries, and local businesses in your own city. <strong className="font-semibold text-neutral-800 dark:text-neutral-200">In the US and other countries</strong>, paid plans can&apos;t be bought yet, and we won&apos;t take a foreign card until they can.
           </p>
         </motion.div>
 
@@ -739,7 +739,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
             >
               Start free
             </Button>
-            <p className="text-[11px] text-neutral-500 text-center mt-3">Starts with a {PRICING.trialDays}-day Pro trial ({trial.monthlySearches} AI searches), no card.</p>
+            <p className="text-[11px] text-neutral-500 text-center mt-3">Free forever, no card. Upgrade to Pro any time.</p>
           </motion.div>
 
           {/* Pro Monthly — recommended */}

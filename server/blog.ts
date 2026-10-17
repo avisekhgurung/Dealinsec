@@ -169,7 +169,7 @@ const STYLES = `<style>
   .post-card .pc-meta{font-size:13px;color:var(--muted)}
   .post-card .go{color:var(--green);font-weight:700;font-size:14px;margin-top:8px}
 
-  /* ── Trial CTA band (the funnel) ── */
+  /* ── Signup CTA band (the funnel) ── */
   .cta-band{background:linear-gradient(135deg,var(--green),#0a6e46);margin-top:40px}
   .cta-band .wrap{padding:44px 20px;text-align:center}
   .cta-band h2{color:#fff;font-size:clamp(22px,3.5vw,30px);font-weight:800;margin:0 0 8px}
@@ -239,8 +239,8 @@ function ctaBand(): string {
   return `<div class="cta-band"><div class="wrap">
     <h2>${TAGLINE}</h2>
     <p>DealInSec helps small agencies and consultants research prospects with evidence, then turns each won deal into a quotation, an agreement signed online and invoices that always agree with each other — and shows who hasn't paid.</p>
-    <a class="btn" href="${SIGNUP}" data-cta>Start your 7-day free trial →</a>
-    <span class="sub-note">No card required · Free plan after the trial · 7-day Pro trial in every country</span>
+    <a class="btn" href="${SIGNUP}" data-cta>Start free →</a>
+    <span class="sub-note">No card required · Free plan in every country</span>
   </div></div>`;
 }
 
@@ -473,7 +473,7 @@ ${ctaInline("Skip the formatting — use the free maker", "Line items, GST, term
 </ul>
 
 <h2>From quotation to getting paid</h2>
-<p>The format above gets you a professional quotation. What happens after acceptance matters more: the quoted scope and amount should flow into a written agreement, and the agreement into the invoice, with no retyping and no drift between documents. That chain — quote → agreement → invoice, all agreeing with each other — is exactly what <a href="/">DealInSec</a> automates for India's freelancers: a 7-day free trial with no card, a free plan after it, and ₹199/month for Pro.</p>
+<p>The format above gets you a professional quotation. What happens after acceptance matters more: the quoted scope and amount should flow into a written agreement, and the agreement into the invoice, with no retyping and no drift between documents. That chain — quote → agreement → invoice, all agreeing with each other — is exactly what <a href="/">DealInSec</a> automates for India's freelancers: a free plan with no card for deals and quotations, and ₹199/month for Pro, which adds the agreement and invoices.</p>
 `,
   },
 
@@ -717,7 +717,7 @@ ${ctaInline("Need the real thing?", "Make a genuine, professional quotation in f
   <li><b>Your identity on the documents</b> — your name, logo and PAN/GSTIN on the papers a client keeps, not the vendor's branding.</li>
 </ul>
 
-${ctaInline("See it on one real deal", "Create a deal, generate the quotation, convert it to an agreement, raise the invoice — 7-day free trial, no card.", SIGNUP, "Try DealInSec free →")}
+${ctaInline("See it on one real deal", "Create a deal and generate the quotation on the free plan, no card; Pro (₹199/month in India) turns it into an agreement and invoices.", SIGNUP, "Try DealInSec free →")}
 
 <h2>Who actually needs it</h2>
 <p>Freelancers — designers, developers, writers, video editors and photographers, marketers and consultants — anyone who quotes, signs and bills their own clients, so the work follows the quote → agree → deliver → bill arc. If you sell products off a shelf, you need billing/inventory software instead; if your problem is finding clients rather than papering them, you need a CRM first. DealInSec's stack covers the deal side: <a href="/quotation-software">quotation software</a>, <a href="/contract-management">contract management</a>, <a href="/invoice-management">invoice management</a> and <a href="/e-signature">e-signature</a> on one thread. To see how that differs from all-in-one tools with time tracking and accounting, read <a href="/freelance-business-management-software">what freelance business management software covers</a>; to try the first step without an account, use the free <a href="/tools/quotation-maker">quotation maker</a>.</p>
@@ -795,7 +795,7 @@ ${ctaInline("See it on one real deal", "Create a deal, generate the quotation, c
 ${ctaInline("Replace the template first — it's free", "The free quotation maker does rows, GST and amount-in-words with no sign-up. Upgrade to the full thread only if you need it.", "/tools/quotation-maker", "Open the free maker →")}
 
 <h2>The honest migration path</h2>
-<p>Don't buy software on day one. Step 1: swap the Excel template for the <a href="/tools/quotation-maker">free quotation maker</a> — same five minutes, no math errors, no account. Step 2: when a quote turns into a real project, take the <a href="/">DealInSec trial</a> and run that one deal through quotation → agreement → invoice. If the thread saves you one retype and one awkward "which version?" conversation, you'll know whether it's worth ₹199 a month. If it doesn't — keep the free tool and lose nothing.</p>
+<p>Don't buy software on day one. Step 1: swap the Excel template for the <a href="/tools/quotation-maker">free quotation maker</a> — same five minutes, no math errors, no account. Step 2: when a quote turns into a real project, put that one deal into <a href="/">DealInSec</a>: the quotation is free, and Pro carries it through agreement → invoice. If the thread saves you one retype and one awkward "which version?" conversation, you'll know whether it's worth ₹199 a month. If it doesn't — keep the free tool and lose nothing.</p>
 `,
   },
 
@@ -825,7 +825,7 @@ ${ctaInline("Replace the template first — it's free", "The free quotation make
       },
       {
         q: "Is there completely free quotation software?",
-        a: "Yes. DealInSec's free quotation maker needs no account at all, and the app's free plan covers 4 deals a month after a 7-day Pro trial with no card. Several competitors also offer free tiers — check what each caps (documents, users, or features).",
+        a: "Yes. DealInSec's free quotation maker needs no account at all, and the app's free plan covers 4 deals a month with no card. Several competitors also offer free tiers — check what each caps (documents, users, or features).",
       },
       {
         q: "Should quotation software handle GST?",
@@ -869,7 +869,7 @@ ${ctaInline("Replace the template first — it's free", "The free quotation make
   <li><b>Wrong pick:</b> you sell inventory (you need stock-aware billing — the Vyapar shape), you need full double-entry accounting (that's an accounting package), or you only ever need one quote a year (use our <a href="/tools/quotation-maker">free maker</a> and pay nobody).</li>
 </ul>
 
-${ctaInline("Test the whole thread in an afternoon", "Free 7-day trial, no card: run one real deal from quotation to invoice and judge it on your own client.", SIGNUP, "Start the trial →")}
+${ctaInline("Test it on one real deal", "Start free, no card: create the deal and its quotation, and judge it on your own client. Pro adds the agreement and invoices.", SIGNUP, "Start free →")}
 
 <h2>How to run the test</h2>
 <ol>

@@ -12,7 +12,7 @@
  *   OUTBOUND_MAX_COMPANIES_FREE / _TRIAL / _PRO      companies one search may look for (defaults 10 / 10 / 10)
  *   OUTBOUND_MONTHLY_PROSPECTS_FREE / _TRIAL / _PRO  researched prospects              (defaults 30 / 100 / 100)
  *   OUTBOUND_MONTHLY_DRAFTS_FREE / _TRIAL / _PRO     AI first-message drafts           (defaults 3 / 10 / 10)
- *   OUTBOUND_MONTHLY_SENDS_FREE / _TRIAL / _PRO      Gmail sends                       (defaults 3 / 10 / 10)
+ *   OUTBOUND_MONTHLY_SENDS_FREE / _TRIAL / _PRO      sends through Gmail or the WhatsApp Cloud API, together (defaults 3 / 10 / 10)
  *   WORKSPACE_MONTHLY_SPEND_USD                      model + provider spend per workspace (default $1.50)
  *
  * Platform-wide, every workspace together, per UTC day (on top of the above, never instead of it):

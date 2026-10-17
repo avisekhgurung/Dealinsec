@@ -13,7 +13,6 @@
  */
 import { GLOBAL_PLANS } from "./globalPlans";
 import { PRO_INCLUDED_SEATS } from "./permissions";
-import { TRIAL_DAYS } from "./schema";
 import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "./outbound-plans";
 
 const OB = OUTBOUND_ALLOWANCE_DEFAULTS;
@@ -45,7 +44,7 @@ export const AUDIENCE_LINE =
 export const SECONDARY_AUDIENCE = ["creators who do paid brand collaborations"] as const;
 
 export const MARKETS =
-  "Launching first in India: plans are priced and paid in rupees, and onboarding, support and billing are set up for Indian agencies. Indian agencies can find clients in India and abroad: AI Outbound searches the United States, the United Kingdom, Canada, Australia, the UAE, India and other countries, whichever you choose, wherever your own business is. Workspaces in other countries can use the free plan and the trial; documents follow each workspace's country and currency (50 currencies are supported).";
+  "Launching first in India: plans are priced and paid in rupees, and onboarding, support and billing are set up for Indian agencies. Indian agencies can find clients in India and abroad: AI Outbound searches the United States, the United Kingdom, Canada, Australia, the UAE, India and other countries, whichever you choose, wherever your own business is, and can list local businesses in a city (Siliguri, Pune, Austin or anywhere else) from Google Maps. Workspaces in other countries can use the free plan; documents follow each workspace's country and currency (50 currencies are supported).";
 
 /** The intended connected workflow. Every stage below is live today (see CAPABILITIES for the details and limits). */
 export const WORKFLOW = ["Prospect", "Lead", "Deal", "Quotation", "Agreement", "Invoice", "Payment tracking"] as const;
@@ -55,7 +54,7 @@ export interface Capability {
   key: string;
   name: string;
   status: CapabilityStatus;
-  /** Which plan has it: "all" (free plan and trial included), "pro" (Pro or the trial). Not for not_available. */
+  /** Which plan has it: "all" (the free plan included), "pro" (Pro). Not for not_available. */
   plan?: "all" | "pro";
   /** What it does, plainly, including its limits. */
   text: string;
@@ -64,7 +63,7 @@ export interface Capability {
 export const CAPABILITIES: readonly Capability[] = [
   {
     key: "ai_outbound", name: "AI Outbound (prospect research)", status: "live", plan: "all",
-    text: `The hero feature. Describe the companies you want to reach and choose where (any countries, regions or cities: the US, the UK, Canada, Australia, the UAE, India and others, or worldwide); you confirm the profile, then it searches the web, checks each company's own website against your ideal-client profile, looks for recent, dated reasons to reach out and named decision makers, and scores each one. Every finding shows its source and date; guesses and unknowns are labelled, and thin markets are said plainly. Nothing is contacted and no lead is created until you add one. One credit is one search: the free plan includes ${OB.free.monthlySearches} a month (up to ${OB.free.maxCompanies} companies each), the trial ${OB.trial.monthlySearches}, and Pro ${OB.pro.monthlySearches} a month (up to ${OB.pro.maxCompanies} companies each), counted over ${OUTBOUND_WINDOW_DAYS} days, with at most 5 a day. Research is never unlimited, and contact details aren't always available.`,
+    text: `The hero feature. Describe the companies you want to reach and choose where (any countries, regions or cities: the US, the UK, Canada, Australia, the UAE, India and others, or worldwide); you confirm the profile, then it searches the web, checks each company's own website against your ideal-client profile, looks for recent, dated reasons to reach out and named decision makers, and scores each one. For local businesses (dentists in Siliguri, cafes in Pune), it can instead list businesses in a city from Google Maps: the listings are shown for that search and not kept, you choose which listed websites DealInSec researches the same way, and you can save a business to Leads under the name you give it, with a link to its listing. A listing without a website says only that; it doesn't mean the business has no website or needs one. Every finding shows its source and date; guesses and unknowns are labelled, and thin markets are said plainly. Nothing is contacted and no lead is created until you add one. One credit is one search: the free plan includes ${OB.free.monthlySearches} a month (up to ${OB.free.maxCompanies} companies each), and Pro ${OB.pro.monthlySearches} a month (up to ${OB.pro.maxCompanies} companies each), counted over ${OUTBOUND_WINDOW_DAYS} days, with at most 5 a day. Research is never unlimited, and contact details aren't always available.`,
   },
   {
     key: "outreach_drafts", name: "Outreach drafts with approval", status: "live", plan: "all",
@@ -104,7 +103,7 @@ export const CAPABILITIES: readonly Capability[] = [
   },
   {
     key: "team", name: "Team members and roles", status: "live", plan: "pro",
-    text: `Invite teammates with roles and permissions and see an activity log. Pro and the trial include ${PRO_INCLUDED_SEATS} members; the free plan has one.`,
+    text: `Invite teammates with roles and permissions and see an activity log. Pro includes ${PRO_INCLUDED_SEATS} members; the free plan has one.`,
   },
   {
     key: "gmail", name: "Gmail connection", status: "limited",
@@ -137,16 +136,14 @@ export const FREE_MONTHLY_DEALS = 4;
 
 export const PRICING = {
   freeMonthlyDeals: FREE_MONTHLY_DEALS,
-  trialDays: TRIAL_DAYS,
   proMonthlyInr: inr.monthly!.amount,
   extraSeatInr: EXTRA_SEAT_PRICE_INR,
   /** Who can buy a paid plan today. */
-  checkout: "India only: paid plans are bought in Indian rupees through Razorpay (UPI, cards, netbanking) by a workspace in India. Outside India, including the United States, paid plans can't be bought yet; the free plan and the trial are open everywhere.",
+  checkout: "India only: paid plans are bought in Indian rupees through Razorpay (UPI, cards, netbanking) by a workspace in India. Outside India, including the United States, paid plans can't be bought yet; the free plan is open everywhere.",
 } as const;
 
 export const PRICING_LINES: readonly string[] = [
   `Free plan: ${OB.free.monthlySearches} AI Outbound searches a month (up to ${OB.free.maxCompanies} companies each), the leads pipeline, and ${PRICING.freeMonthlyDeals} deals a month, each with its quotation. Agreements, invoices and payment tracking are Pro. Permanent, no card.`,
-  `${PRICING.trialDays}-day Pro trial: every new account gets the Pro workflow once it finishes setup (with ${OB.trial.monthlySearches} AI Outbound searches), with no card. It ends on its own and moves you to the free plan; nothing is charged.`,
   `DealInSec Pro: one plan that includes everything — AI Outbound with ${OB.pro.monthlySearches} searches a month (up to ${OB.pro.maxCompanies} companies each), the leads pipeline, unlimited deals, quotations, agreements with online signing, invoices, payment tracking and ${PRO_INCLUDED_SEATS} team members. ${rupees(PRICING.proMonthlyInr)} a month in India, paid once a month: it does not renew or charge automatically, you pay again to extend. There is no separate plan for AI Outbound or the CRM, and no annual plan. Extra team members are ${rupees(PRICING.extraSeatInr)} each a month.`,
   PRICING.checkout,
   `Checkout charges exactly the listed price (${rupees(PRICING.proMonthlyInr)} for Pro); DealInSec adds no tax on top of it.`,
@@ -168,6 +165,9 @@ export const NEVER_CLAIM: readonly string[] = [
   "that its agreements are certified digital signatures, or that it is legally or tax compliant in any country",
   "integrations it does not have (Outlook, WhatsApp, Stripe, PayPal, Salesforce, HubSpot)",
   "user numbers, ratings, reviews or customer logos",
+  "a free trial of Pro (new accounts start on the free plan; there is no trial)",
+  "that DealInSec is a business directory or keeps a database of Google Maps listings",
+  "that a business without a website on its listing has no website or needs one",
 ];
 
 const STATUS_WORD: Record<CapabilityStatus, string> = { live: "Available now", limited: "Limited availability", not_available: "Not available" };
@@ -178,7 +178,7 @@ const STATUS_WORD: Record<CapabilityStatus, string> = { live: "Available now", l
  */
 export function productFactsMarkdown(): string {
   const byStatus = (s: CapabilityStatus) => CAPABILITIES.filter((c) => c.status === s)
-    .map((c) => `- **${c.name}** (${STATUS_WORD[s]}${c.plan ? `, ${c.plan === "all" ? "every plan" : "Pro and trial"}` : ""}): ${c.text}`).join("\n");
+    .map((c) => `- **${c.name}** (${STATUS_WORD[s]}${c.plan ? `, ${c.plan === "all" ? "every plan" : "Pro"}` : ""}): ${c.text}`).join("\n");
   return `# ${PRODUCT_NAME}: verified product facts
 
 ${ONE_LINER} ${TAGLINE}

@@ -23,8 +23,7 @@ import { AUDIENCE_INTENT_KEY } from "@/lib/audience-intent";
 import { setOutboundPrefill } from "@/lib/outbound-prefill";
 import { NOT_SPECIFIED } from "@shared/audience";
 import { COUNTRY_NAME, countryLabel, parseIcpFallback, searchStrategies, type Icp } from "@shared/icp";
-import { OUTBOUND_ALLOWANCE_DEFAULTS } from "@shared/outbound-plans";
-import { PRICING } from "@shared/product-facts";
+import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
 import { cn } from "@/lib/utils";
 
 type Step = "find" | "close" | "paid";
@@ -43,7 +42,7 @@ const REPLY_EXAMPLE =
   "Thanks for reaching out! We do need a new landing page for our launch. Budget is $1,500 and we need it in two weeks. We can discuss revisions later. Payment after launch.";
 const REPLY_PLACEHOLDER = "Thanks for reaching out! We need a landing page for our launch. Budget is $1,500, two weeks, two revisions.";
 const MAX_LEN = 600;
-const TRIAL = OUTBOUND_ALLOWANCE_DEFAULTS.trial;
+const FREE = OUTBOUND_ALLOWANCE_DEFAULTS.free;
 
 interface Flag { id: string; priority: "high" | "attention"; level: Finding["level"]; title: string; detail: string; why: string; ask: string; suggestedTerm?: string }
 interface DemoResult {
@@ -216,7 +215,7 @@ function FindClients({ onStart, onNext, onSignup }: { onStart: () => void; onNex
             <button type="button" onClick={() => onSignup(text.trim())} data-testid="demo-run-search" className={cn(primaryBtn, "h-11 px-6")} style={{ background: BRAND_GRADIENT }}>
               Run this search free <ArrowRight className="w-4 h-4" />
             </button>
-            <p className="text-xs text-neutral-500">Your {PRICING.trialDays}-day free trial includes {TRIAL.monthlySearches} searches, no card. Your target carries over.</p>
+            <p className="text-xs text-neutral-500">The free plan includes {FREE.monthlySearches} searches every {OUTBOUND_WINDOW_DAYS} days, no card. Your target carries over.</p>
           </div>
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-[11px] text-neutral-500">This preview runs in your browser with no AI and sends nothing. In the app, AI reads more detail (company size, who they serve, who to contact) and runs the search for real.</p>

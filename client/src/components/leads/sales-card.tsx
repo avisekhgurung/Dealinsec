@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { memberCan } from "@shared/permissions";
 import { Card, CardContent } from "@/components/ui/card";
 import { leadCall, leadError, nextActionUrl, refreshLeads, researchUrl, scoreUrl } from "@/lib/leads";
-import { OutreachPanel } from "./outreach-panel";
+import { ChannelPanel } from "./channel-panel";
 import { cn } from "@/lib/utils";
 import type { LeadScore } from "@shared/lead-score";
 import type { NextAction } from "@shared/next-action";
@@ -98,7 +98,7 @@ function useFinishedRefresh(runId: number | null) {
 }
 
 /** `showNextAction={false}` when the page already shows the next best action itself (the lead page's top card). */
-export function SalesCard({ leadId, hasWebsite = true, showNextAction = true }: { leadId: number; hasWebsite?: boolean; showNextAction?: boolean }) {
+export function SalesCard({ leadId, hasWebsite = true, showNextAction = true, companyName = "", contactName = null }: { leadId: number; hasWebsite?: boolean; showNextAction?: boolean; companyName?: string; contactName?: string | null }) {
   const score = useQuery<{ score: LeadScore }>({ queryKey: [scoreUrl(leadId)], retry: false });
   const next = useQuery<{ next: NextAction }>({ queryKey: [nextActionUrl(leadId)], retry: false });
   if (score.isLoading || next.isLoading) return <Card className="glass-card" data-testid="sales-card-loading"><CardContent className="p-4"><div className="h-4 w-1/3 animate-pulse rounded bg-muted" /></CardContent></Card>;
@@ -151,7 +151,7 @@ export function SalesCard({ leadId, hasWebsite = true, showNextAction = true }: 
         </CardContent>
       </Card>
       <ResearchPanel leadId={leadId} hasWebsite={hasWebsite} />
-      <OutreachPanel leadId={leadId} />
+      <ChannelPanel leadId={leadId} companyName={companyName} contactName={contactName} />
     </div>
   );
 }

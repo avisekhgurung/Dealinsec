@@ -772,3 +772,52 @@ describe("one subscription at one price, on every public page (India launch, Oct
     }
   });
 });
+
+describe("/find-local-clients: local business search, for India", () => {
+  const P = "/find-local-clients";
+  const html = () => pages.get(P) ?? "";
+  const text = () => stripJsonLd((html().match(/<main>([\s\S]*?)<\/main>/)?.[1] ?? "")).replace(/<[^>]+>/g, " ").replace(/&[a-z#0-9]+;/g, " ").replace(/\s+/g, " ").toLowerCase();
+
+  it("is registered as an India page, in the sitemap, matched by the SSR pattern and listed in llms.txt", () => {
+    expect(html().length).toBeGreaterThan(1000);
+    expect(PAGES.find((x) => x.path === P)?.region).toBe("IN");
+    expect(categorySitemapPaths()).toContain(P);
+    expect(SSR_PATH_PATTERN.test(P)).toBe(true);
+    expect(llmsTxt("https://www.dealinsec.com")).toContain(`https://www.dealinsec.com${P}`);
+    expect(AUDIENCE_DESCRIPTIONS[P]).toMatch(/not kept/);
+  });
+
+  it("has one H1, its own canonical, and a FAQ that matches its markup", () => {
+    const page = PAGES.find((x) => x.path === P)!;
+    expect(html().match(/<h1[\s>]/g)?.length).toBe(1);
+    expect(html()).toContain(`<link rel="canonical" href="https://www.dealinsec.com${P}" />`);
+    expect(page.description.length).toBeLessThan(200);
+    const faq = jsonLdBlocks(html()).find((b) => b["@type"] === "FAQPage");
+    expect(faq.mainEntity.map((q: any) => q.name)).toEqual(page.faq.map((f) => f.q));
+  });
+
+  it("says where listings come from and that they aren't kept, and makes no promise about need or results", () => {
+    const t = text();
+    expect(t).toContain("google maps");
+    expect(t).toMatch(/not copied into dealinsec/);
+    expect(t).toMatch(/not a business directory/);
+    expect(t).toMatch(/doesn.t mean they need one/);
+    expect(t).not.toMatch(/(?<!doesn.t |not )guarantee[ds]? (clients|replies|leads)|verified (phone|email|contact)s?(?! )|the best\b|#1\b/);
+    expect(t).toMatch(/doesn.t guarantee clients/);
+  });
+});
+
+describe("no trial is offered anywhere public", () => {
+  // DealInSec is Free + Pro: new accounts start on the free plan. Competitors' own trials (Bonsai, Indy…) are facts
+  // about them and stay in the comparison tables.
+  const OFFER = /\b\d+-day (pro |free )?trial|\bfree trial\b|start (your |the )?(free )?trial/i;
+  const ABOUT_COMPETITORS = /Bonsai offers a 7-day free trial rather than a free plan\.?/g;
+  it("in every server-rendered page, llms.txt and the homepage crawler copy", () => {
+    for (const [path, html] of htmlPages) {
+      const text = stripJsonLd(html).replace(/<[^>]+>/g, " ").replace(ABOUT_COMPETITORS, "");
+      expect(text, path).not.toMatch(OFFER);
+    }
+    expect(llmsTxt("https://www.dealinsec.com")).not.toMatch(OFFER);
+    expect(landingSeoBody()).not.toMatch(OFFER);
+  });
+});

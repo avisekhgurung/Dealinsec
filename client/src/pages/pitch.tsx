@@ -840,7 +840,7 @@ export default function PitchPage() {
           <section className="text-center py-8 bg-muted/30 rounded-2xl print:py-4">
             <h2 className="text-2xl font-bold mb-2 print:text-xl">Ready to run your next client deal properly?</h2>
             <p className="text-muted-foreground mb-6 print:mb-4">
-              Start your next client deal with the scope in writing — 7-day Pro trial, no card.
+              Start your next client deal with the scope in writing — free plan, no card.
             </p>
             <div className="flex items-center justify-center gap-4 flex-wrap print:hidden">
               <Button size="lg">
