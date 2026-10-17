@@ -113,6 +113,11 @@ describe("AI Outbound usage before a search", () => {
     expect(u.platform.state).toBe("unknown");
   });
 
+  it("says whether local business search is configured (off unless a source is)", async () => {
+    expect(ok(await outboundUsage(ana, deps().d)).localReady).toBe(false);
+    expect(ok(await outboundUsage(ana, deps({ localReady: () => true }).d)).localReady).toBe(true);
+  });
+
   it("contact lookups are shown when a contact provider is connected", async () => {
     const u = ok(await outboundUsage(ana, deps({ contactReady: () => true, countProviderCalls: async (o) => (o.operation === "contact" ? 7 : 0) }).d));
     expect(u.workspace.contactLookups).toMatchObject({ used: 7, limit: 30, remaining: 23 });

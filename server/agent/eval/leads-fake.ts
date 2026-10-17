@@ -82,6 +82,10 @@ export class FakeLeadsStore implements LeadsStore {
   }
 
   async findByDomain(orgId: string, domain: string) { return this.copy(this.live(orgId).find((l) => l.domain === domain)) ?? null; }
+  async leadIdsByEvidenceUrls(orgId: string, urls: string[]) {
+    const live = new Set(this.live(orgId).map((l) => l.id));
+    return this.claims.filter((c) => c.organizationId === orgId && live.has(c.leadId) && c.evidenceUrl && urls.includes(c.evidenceUrl)).map((c) => ({ leadId: c.leadId, url: c.evidenceUrl! }));
+  }
   async findByName(orgId: string, name: string) { return this.copy(this.live(orgId).find((l) => l.companyName.toLowerCase() === name.trim().toLowerCase())) ?? null; }
 
   async insert(orgId: string, d: NewLead): Promise<Lead> {

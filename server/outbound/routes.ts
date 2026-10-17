@@ -16,6 +16,9 @@
  *   POST /api/outbound/prospects/:id/contacts    named people from the connected contact provider ({ runId })
  *   POST /api/outbound/prospects/:id/angle       the outreach angle
  *   POST /api/outbound/prospects/:id/lead        add to Leads ({ contactFindingId? })
+ *   POST /api/outbound/local/search              local businesses in a city (Google Places): shown, never stored
+ *   POST /api/outbound/local/research            research the websites of chosen listings ({ category, city, country, places })
+ *   POST /api/outbound/local/lead                save a listing as a lead the person names ({ placeId, companyName, location? })
  */
 import type { Express, Response } from "express";
 import { isAuthenticated } from "../auth";
@@ -24,6 +27,7 @@ import * as svc from "./service";
 import { exportProspects, listWorkspace } from "./workspace";
 import { prepareOutreach } from "./outreach-prepare";
 import { outboundUsage } from "./usage";
+import { localSearch, researchLocalSites, saveLocalLead } from "./local-search";
 
 export function registerOutboundRoutes(app: Express) {
   const send = (res: Response, r: any, ok: (r: any) => Record<string, unknown>, status = 200) => {
@@ -66,5 +70,8 @@ export function registerOutboundRoutes(app: Express) {
   app.post("/api/outbound/prospects/:id/contacts", isAuthenticated, guarded("outbound_contacts", async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); send(res, await svc.findContacts(req.user, id, req.body?.runId), (r) => ({ brief: r.brief, found: r.found })); }));
   app.post("/api/outbound/prospects/:id/angle", isAuthenticated, guarded("outbound_angle", async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); send(res, await svc.generateAngle(req.user, id), (r) => ({ brief: r.brief })); }));
   app.post("/api/outbound/prospects/:id/feedback", isAuthenticated, guarded("outbound_feedback", async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); send(res, await svc.setProspectFeedback(req.user, id, req.body?.value ?? null), (r) => ({ feedback: r.feedback })); }));
+  app.post("/api/outbound/local/search", isAuthenticated, guarded("outbound_local_search", async (req, res) => { res.setHeader("Cache-Control", "no-store"); send(res, await localSearch(req.user, req.body), (r) => ({ runId: r.runId, results: r.results, source: r.source })); }));
+  app.post("/api/outbound/local/research", isAuthenticated, guarded("outbound_local_research", async (req, res) => send(res, await researchLocalSites(req.user, req.body), (r) => ({ runId: r.runId, queued: r.queued, skipped: r.skipped }), 201)));
+  app.post("/api/outbound/local/lead", isAuthenticated, guarded("outbound_local_lead", async (req, res) => send(res, await saveLocalLead(req.user, req.body), (r) => ({ leadId: r.leadId, existing: r.existing }), 201)));
   app.post("/api/outbound/prospects/:id/lead", isAuthenticated, guarded("outbound_lead", async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); send(res, await svc.addToLeads(req.user, id, { contactFindingId: req.body?.contactFindingId }), (r) => ({ leadId: r.leadId, existing: r.existing }), 201); }));
 }

@@ -19,6 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { EXPORT_URL, PREPARE_OUTREACH_URL, WORKSPACE_URL, countryName } from "@/lib/outbound";
@@ -232,6 +233,43 @@ export function ProspectWorkspace({ canExport, onOpen, onPrepared }: { canExport
   if (f.inLeads) chips.push({ label: f.inLeads === "yes" ? "In Leads" : "Not in Leads", clear: () => patch({ inLeads: undefined }) });
   const moreCount = [f.location, f.industry, f.size?.length, f.phone?.length, f.source?.length, f.evidenceFrom || f.evidenceTo, f.createdFrom || f.createdTo, f.inLeads].filter(Boolean).length;
   const reset = () => { setText(""); setQuery({ filters: {} }); };
+  const activeFilterCount = [f.readiness?.length, f.icpFit?.length, f.country?.length, f.contact?.length, f.email?.length].filter(Boolean).length + moreCount;
+  /** The filter controls, once: in the bar from tablets up, in a drawer on phones. */
+  const filterControls = (
+    <>
+        <MultiFilter label="Readiness" testId="readiness" values={f.readiness} options={READINESS} labels={(v) => READINESS_LABEL[v]} onChange={(v) => patch({ readiness: v })} />
+        <MultiFilter label="ICP fit" testId="icp" values={f.icpFit} options={ICP_FIT} labels={(v) => ICP_FIT_LABEL[v]} onChange={(v) => patch({ icpFit: v })} />
+        <MultiFilter label="Country" testId="country" values={f.country} options={(data?.facets.countries ?? []).map((c) => c.value)} labels={(v) => `${countryName(v)} (${data?.facets.countries.find((c) => c.value === v)?.count ?? 0})`} onChange={(v) => patch({ country: v })} />
+        <MultiFilter label="Contact" testId="contact" values={f.contact} options={CONTACT_LEVEL} labels={(v) => CONTACT_LABEL[v]} onChange={(v) => patch({ contact: v })} />
+        <MultiFilter label="Email" testId="email" values={f.email} options={EMAIL_STATUS} labels={(v) => EMAIL_LABEL[v]} onChange={(v) => patch({ email: v })} />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className={cn("h-8 gap-1.5", moreCount && "border-emerald-600")} data-testid="filter-more"><Filter className="h-3.5 w-3.5" />More{moreCount ? <span className="rounded-full bg-emerald-600 px-1.5 text-[10px] font-semibold text-white">{moreCount}</span> : null}</Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-80 space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <label className="space-y-1 text-xs font-medium">Location<TextFilter value={f.location} onChange={(v) => patch({ location: v })} placeholder="e.g. Austin" testId="filter-location" /></label>
+              <label className="space-y-1 text-xs font-medium">Industry / market<TextFilter value={f.industry} onChange={(v) => patch({ industry: v })} placeholder="e.g. SaaS" testId="filter-industry" /></label>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <MultiFilter label="Company size" testId="size" values={f.size} options={SIZE_BUCKETS} labels={(v) => SIZE_LABEL[v]} onChange={(v) => patch({ size: v })} />
+              <MultiFilter label="Phone" testId="phone" values={f.phone} options={PHONE_STATUS} labels={(v) => PHONE_LABEL[v]} onChange={(v) => patch({ phone: v })} />
+              <MultiFilter label="Found via" testId="source" values={f.source} options={(data?.facets.sources ?? []).map((c) => c.value)} labels={(v) => v} onChange={(v) => patch({ source: v })} />
+            </div>
+            <DateRange label="Latest evidence date" testId="evidence" from={f.evidenceFrom} to={f.evidenceTo} onChange={(a, b) => patch({ evidenceFrom: a, evidenceTo: b })} />
+            <DateRange label="Found on" testId="created" from={f.createdFrom} to={f.createdTo} onChange={(a, b) => patch({ createdFrom: a, createdTo: b })} />
+            <div className="space-y-1">
+              <p className="text-xs font-medium">In Leads</p>
+              <Select value={f.inLeads ?? "any"} onValueChange={(v) => patch({ inLeads: v === "any" ? undefined : (v as "yes" | "no") })}>
+                <SelectTrigger className="h-8 text-xs" aria-label="In Leads"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="any">Any</SelectItem><SelectItem value="yes">Added to Leads</SelectItem><SelectItem value="no">Not added</SelectItem></SelectContent>
+              </Select>
+            </div>
+          </PopoverContent>
+        </Popover>
+        {(active || chips.length > 0) && <Button variant="ghost" size="sm" className="h-8" onClick={reset} data-testid="filters-reset"><RotateCcw className="mr-1 h-3.5 w-3.5" />Reset filters</Button>}
+    </>
+  );
 
   const s = data?.summary;
   const scopeWord = active ? "in this view" : "in your workspace";
@@ -273,37 +311,17 @@ export function ProspectWorkspace({ canExport, onOpen, onPrepared }: { canExport
           <Search className="absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
           <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Search company or domain" className="h-8 pl-8 text-sm" maxLength={100} aria-label="Search company or domain" data-testid="workspace-search" />
         </div>
-        <MultiFilter label="Readiness" testId="readiness" values={f.readiness} options={READINESS} labels={(v) => READINESS_LABEL[v]} onChange={(v) => patch({ readiness: v })} />
-        <MultiFilter label="ICP fit" testId="icp" values={f.icpFit} options={ICP_FIT} labels={(v) => ICP_FIT_LABEL[v]} onChange={(v) => patch({ icpFit: v })} />
-        <MultiFilter label="Country" testId="country" values={f.country} options={(data?.facets.countries ?? []).map((c) => c.value)} labels={(v) => `${countryName(v)} (${data?.facets.countries.find((c) => c.value === v)?.count ?? 0})`} onChange={(v) => patch({ country: v })} />
-        <MultiFilter label="Contact" testId="contact" values={f.contact} options={CONTACT_LEVEL} labels={(v) => CONTACT_LABEL[v]} onChange={(v) => patch({ contact: v })} />
-        <MultiFilter label="Email" testId="email" values={f.email} options={EMAIL_STATUS} labels={(v) => EMAIL_LABEL[v]} onChange={(v) => patch({ email: v })} />
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className={cn("h-8 gap-1.5", moreCount && "border-emerald-600")} data-testid="filter-more"><Filter className="h-3.5 w-3.5" />More{moreCount ? <span className="rounded-full bg-emerald-600 px-1.5 text-[10px] font-semibold text-white">{moreCount}</span> : null}</Button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-80 space-y-3">
-            <div className="grid grid-cols-2 gap-2">
-              <label className="space-y-1 text-xs font-medium">Location<TextFilter value={f.location} onChange={(v) => patch({ location: v })} placeholder="e.g. Austin" testId="filter-location" /></label>
-              <label className="space-y-1 text-xs font-medium">Industry / market<TextFilter value={f.industry} onChange={(v) => patch({ industry: v })} placeholder="e.g. SaaS" testId="filter-industry" /></label>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <MultiFilter label="Company size" testId="size" values={f.size} options={SIZE_BUCKETS} labels={(v) => SIZE_LABEL[v]} onChange={(v) => patch({ size: v })} />
-              <MultiFilter label="Phone" testId="phone" values={f.phone} options={PHONE_STATUS} labels={(v) => PHONE_LABEL[v]} onChange={(v) => patch({ phone: v })} />
-              <MultiFilter label="Found via" testId="source" values={f.source} options={(data?.facets.sources ?? []).map((c) => c.value)} labels={(v) => v} onChange={(v) => patch({ source: v })} />
-            </div>
-            <DateRange label="Latest evidence date" testId="evidence" from={f.evidenceFrom} to={f.evidenceTo} onChange={(a, b) => patch({ evidenceFrom: a, evidenceTo: b })} />
-            <DateRange label="Found on" testId="created" from={f.createdFrom} to={f.createdTo} onChange={(a, b) => patch({ createdFrom: a, createdTo: b })} />
-            <div className="space-y-1">
-              <p className="text-xs font-medium">In Leads</p>
-              <Select value={f.inLeads ?? "any"} onValueChange={(v) => patch({ inLeads: v === "any" ? undefined : (v as "yes" | "no") })}>
-                <SelectTrigger className="h-8 text-xs" aria-label="In Leads"><SelectValue /></SelectTrigger>
-                <SelectContent><SelectItem value="any">Any</SelectItem><SelectItem value="yes">Added to Leads</SelectItem><SelectItem value="no">Not added</SelectItem></SelectContent>
-              </Select>
-            </div>
-          </PopoverContent>
-        </Popover>
-        {(active || chips.length > 0) && <Button variant="ghost" size="sm" className="h-8" onClick={reset} data-testid="filters-reset"><RotateCcw className="mr-1 h-3.5 w-3.5" />Reset filters</Button>}
+        {/* Phones: the filters live in a drawer, so the list stays readable; from tablets up they sit in the bar. */}
+        <div className="hidden md:contents">{filterControls}</div>
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="sm" className={cn("h-9 gap-1.5 md:hidden", activeFilterCount && "border-emerald-600")} data-testid="filters-drawer"><Filter className="h-4 w-4" />Filters{activeFilterCount ? <span className="rounded-full bg-emerald-600 px-1.5 text-[10px] font-semibold text-white">{activeFilterCount}</span> : null}</Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto" data-testid="filters-sheet">
+            <SheetHeader><SheetTitle>Filter prospects</SheetTitle></SheetHeader>
+            <div className="flex flex-wrap items-center gap-2 pt-3">{filterControls}</div>
+          </SheetContent>
+        </Sheet>
       </div>
       {chips.length > 0 && (
         <ul className="flex flex-wrap gap-1.5" aria-label="Active filters" data-testid="active-filters">
@@ -364,7 +382,37 @@ export function ProspectWorkspace({ canExport, onOpen, onPrepared }: { canExport
           <Button size="sm" variant="outline" className="mt-3" onClick={reset}><RotateCcw className="mr-1.5 h-3.5 w-3.5" />Reset filters</Button>
         </div>
       ) : (
-        <div className={cn("relative overflow-x-auto rounded-xl border", q.isFetching && "opacity-70")} aria-busy={q.isFetching}>
+        <>
+        {/* Phones and tablets: one card per prospect (two columns on a tablet), nothing to scroll sideways; the table on laptops up. */}
+        <ul className={cn("grid gap-2 sm:grid-cols-2 lg:hidden", q.isFetching && "opacity-70")} aria-busy={q.isFetching} aria-label="Prospects" data-testid="workspace-cards">
+          {rows.map((r) => {
+            const on = isSelected(sel, r.id);
+            return (
+              <li key={r.id} className={cn("rounded-xl border p-3", on && "border-emerald-400 bg-emerald-50/50 dark:bg-emerald-950/20")} data-testid={`workspace-card-${r.id}`}>
+                <div className="flex items-start gap-3">
+                  <Checkbox className="mt-1" checked={on} disabled={sel.mode === "filter"} onCheckedChange={() => setSel((cur) => toggleId(cur, r.id))} aria-label={`Select ${r.name}`} />
+                  <div className="min-w-0 flex-1">
+                    <button onClick={() => onOpen(r)} className="block max-w-full truncate text-left text-[15px] font-semibold hover:underline">{r.name}</button>
+                    <a href={r.website} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex max-w-full items-center gap-1 text-xs text-muted-foreground hover:underline"><span className="truncate">{r.domain}</span><ExternalLink className="h-3 w-3 shrink-0" /></a>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{[r.country ? countryName(r.country) : null, r.industry, r.companySize].filter(Boolean).join(" · ") || "Location and industry not known"}</p>
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+                  <span className={cn("rounded-full border px-2 py-0.5 font-medium", READY_TONE[r.readiness])}>{READINESS_LABEL[r.readiness]}</span>
+                  <span className={cn("rounded-full border px-2 py-0.5 font-medium", FIT_TONE[r.icpFit])}>ICP: {ICP_FIT_LABEL[r.icpFit]}</span>
+                  <span className={cn("rounded-full border px-2 py-0.5", r.emailStatus === "verified" ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>{EMAIL_LABEL[r.emailStatus]}</span>
+                  {r.phoneStatus !== "none" && <span className="rounded-full border px-2 py-0.5 text-muted-foreground">{PHONE_LABEL[r.phoneStatus]}</span>}
+                </div>
+                {r.contact && <p className="mt-1.5 truncate text-xs">{r.contact.name}{r.contact.title ? ` · ${r.contact.title}` : ""}</p>}
+                <div className="mt-2 flex items-center justify-between gap-2 border-t pt-2">
+                  <span className="text-[11px] text-muted-foreground">{evidenceDate(r) ? `Latest evidence ${evidenceDate(r)}` : "No dated evidence"} · {r.evidenceCount} finding{r.evidenceCount === 1 ? "" : "s"}</span>
+                  <Button size="sm" variant="outline" className="h-9 shrink-0" onClick={() => onOpen(r)} aria-label={`Open details for ${r.name}`} data-testid={`open-card-${r.id}`}>Open</Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <div className={cn("relative hidden overflow-x-auto rounded-xl border lg:block", q.isFetching && "opacity-70")} aria-busy={q.isFetching}>
           <table className="w-full min-w-[1400px] border-collapse text-sm" data-testid="workspace-table">
             <thead className="bg-muted">
               <tr className="border-b">
@@ -419,6 +467,7 @@ export function ProspectWorkspace({ canExport, onOpen, onPrepared }: { canExport
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {data && rows.length > 0 && (

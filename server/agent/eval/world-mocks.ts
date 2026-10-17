@@ -303,9 +303,14 @@ export const outboundStoreMock = () => {
           if (left <= 0) throw new RunLimitReached((r.limits ?? []).length);
           quantity = Math.min(quantity, left);
         }
-        const row = { id: r.id, organizationId: r.orgId, createdByUser: r.userId, createdBy: r.by, request: r.request, icp: r.icp, quantity, status: "running", stage: "search", counters: {}, queries: r.queries, costMicroUsd: 0, errorCode: null, idemKey: r.idemKey, leaseUntil: null, attempts: 0, createdAt: r.now, updatedAt: r.now, finishedAt: null };
+        const row = { id: r.id, organizationId: r.orgId, createdByUser: r.userId, createdBy: r.by, request: r.request, icp: r.icp, quantity, status: r.finished ? "done" : "running", stage: r.finished ? "done" : "search", counters: r.finished ? copy(r.finished.counters) : {}, queries: r.queries, costMicroUsd: 0, errorCode: null, idemKey: r.idemKey, leaseUntil: r.holdUntil ?? null, attempts: 0, createdAt: r.now, updatedAt: r.now, finishedAt: r.finished ? r.now : null };
         o().runs.push(row);
         return copy(row);
+      },
+      async settleFinishedRun(orgId: string, id: string, counters: any, errorCode: string | null) { col30(errorCode); const r = o().runs.find((x) => x.organizationId === orgId && x.id === id && x.status === "done"); if (r) Object.assign(r, { counters: copy(counters), errorCode }); },
+      async prospectsByDomains(orgId: string, domains: string[]) { return o().prospects.filter((x) => x.organizationId === orgId && domains.includes(x.domain)).map((x) => ({ id: x.id, domain: x.domain, leadId: x.leadId ?? null })); },
+      async prospectsByPlaceIds(orgId: string, placeIds: string[]) {
+        return o().prospects.filter((x) => x.organizationId === orgId).flatMap((x) => (x.sources ?? []).filter((s: any) => placeIds.includes(s?.placeId)).map((s: any) => ({ id: x.id, placeId: s.placeId as string, leadId: x.leadId ?? null })));
       },
       async getRun(orgId: string, id: string) { return copy(o().runs.find((x) => x.organizationId === orgId && x.id === id) ?? null); },
       async listRuns(orgId: string, limit: number) { return o().runs.filter((x) => x.organizationId === orgId).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit).map(copy); },
@@ -383,12 +388,13 @@ export const outboundStoreMock = () => {
       async recordProviderCall(r: any) { col30(r.errorCode); o().providerCalls.push({ organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: r.operation, ok: r.ok, errorCode: r.errorCode, latencyMs: r.latencyMs, costMicroUsd: r.costMicroUsd, createdAt: r.now }); },
       async countProviderCalls(q: { orgId?: string; operation: string; since: Date }) { return o().providerCalls.filter((c) => (!q.orgId || c.organizationId === q.orgId) && c.operation === q.operation && c.createdAt >= q.since).length; },
       // Atomic like the database's advisory lock: the count and the insert happen with no await in between.
-      async reserveSearch(r: { orgId: string; runId: string | null; provider: string; costMicroUsd: number; limit: number; since: Date; now: Date; workspace?: { since: Date; maxMicroUsd: number } }) {
+      async reserveSearch(r: { orgId: string; runId: string | null; provider: string; costMicroUsd: number; limit: number; since: Date; now: Date; workspace?: { since: Date; maxMicroUsd: number }; operation?: string }) {
         if (o().failReserve) throw new Error("db down");
-        if (o().providerCalls.filter((c) => c.operation === "search" && c.createdAt >= r.since).length >= r.limit) return null;
+        const op = r.operation ?? "search";
+        if (o().providerCalls.filter((c) => c.operation === op && c.createdAt >= r.since).length >= r.limit) return null;
         if (r.workspace && workspaceSpend(r.orgId, r.workspace.since) + r.costMicroUsd > r.workspace.maxMicroUsd) return "workspace" as const;
         const id = o().providerCalls.length + 1;
-        o().providerCalls.push({ id, organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: "search", ok: false, errorCode: "reserved", latencyMs: 0, costMicroUsd: r.costMicroUsd, createdAt: r.now });
+        o().providerCalls.push({ id, organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: op, ok: false, errorCode: "reserved", latencyMs: 0, costMicroUsd: r.costMicroUsd, createdAt: r.now });
         return id;
       },
       async settleProviderCall(id: number, r: { ok: boolean; errorCode: string | null; latencyMs: number; costMicroUsd: number }) { col30(r.errorCode); Object.assign(o().providerCalls.find((c) => c.id === id) ?? {}, r); },

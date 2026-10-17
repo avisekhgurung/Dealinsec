@@ -13,6 +13,8 @@ interface Allowance { used: number; limit: number; remaining: number; nextFreesA
 export interface OutboundUsage {
   asOf: string;
   searchReady: boolean;
+  /** Local business search (Google Places) is configured (absent from an older server = not available). */
+  localReady?: boolean;
   charge: "included";
   workspace: { searches: Allowance | null; webSearches: Allowance | null; contactLookups: Allowance | null };
   /** The plan's 30-day allowance (absent from an older server). */
@@ -34,10 +36,13 @@ const when = (iso: string) => {
   return d.toDateString() === today.toDateString() ? `at ${time(iso)}` : `${d.toLocaleDateString(undefined, { weekday: "short" })} at ${time(iso)}`;
 };
 
-/** Why a search can't start right now, from the server's answer, or null. The server refuses it either way. */
-export function searchBlockedReason(u: OutboundUsage | undefined): string | null {
+/** Why a search can't start right now, from the server's answer, or null. The server refuses it either way. A local
+ *  business search needs its own source, uses one search credit and researches nothing by itself (so the researched
+ *  prospects allowance and the web-search platform cap don't stop it). */
+export function searchBlockedReason(u: OutboundUsage | undefined, mode: "web" | "local" = "web"): string | null {
   if (!u) return null;
-  if (!u.searchReady) return "Web search isn't set up on this server yet, so a search can't start.";
+  if (mode === "local" && !u.localReady) return "Local business search isn't switched on yet. Search for companies online meanwhile.";
+  if (mode === "web" && !u.searchReady) return "Web search isn't set up on this server yet, so a search can't start.";
   const m = u.plan?.searches;
   if (m && m.remaining <= 0) {
     return u.plan!.tier === "free"
@@ -45,7 +50,7 @@ export function searchBlockedReason(u: OutboundUsage | undefined): string | null
       : `You've used the ${m.limit} searches included in ${u.plan!.label} for this ${u.plan!.windowDays}-day period.${m.nextFreesAt ? ` The next one frees up ${when(m.nextFreesAt)}.` : ""}`;
   }
   const pr = u.plan?.prospects;
-  if (pr && pr.remaining <= 0) {
+  if (mode === "web" && pr && pr.remaining <= 0) {
     return u.plan!.tier === "free"
       ? `You've used the free plan's ${pr.limit} researched prospects for this ${u.plan!.windowDays}-day period. Upgrade to Pro for more.`
       : `You've used the ${pr.limit} researched prospects included in ${u.plan!.label} for this ${u.plan!.windowDays}-day period. More become available as earlier searches pass ${u.plan!.windowDays} days.`;
@@ -53,14 +58,14 @@ export function searchBlockedReason(u: OutboundUsage | undefined): string | null
   if ((u.plan?.spendPercent ?? 0) >= 100) return `This workspace's AI usage for the last ${u.plan!.windowDays} days has reached its limit. It frees up as earlier usage passes ${u.plan!.windowDays} days.`;
   const s = u.workspace.searches;
   if (s && s.remaining <= 0) return `You've used today's ${s.limit} searches.${s.nextFreesAt ? ` The next one frees up ${when(s.nextFreesAt)}.` : ""}`;
-  if (u.platform.state === "paused") return `AI Outbound has reached today's limit across DealInSec. It starts again ${when(u.platform.resetsAt)}. This doesn't use any of your searches.`;
+  if (mode === "web" && u.platform.state === "paused") return `AI Outbound has reached today's limit across DealInSec. It starts again ${when(u.platform.resetsAt)}. This doesn't use any of your searches.`;
   return null;
 }
 
-export function UsageNote({ usage }: { usage: OutboundUsage | undefined }) {
+export function UsageNote({ usage, mode = "web" }: { usage: OutboundUsage | undefined; mode?: "web" | "local" }) {
   if (!usage) return null;
   const s = usage.workspace.searches;
-  const blocked = searchBlockedReason(usage);
+  const blocked = searchBlockedReason(usage, mode);
   return (
     <div className="space-y-1.5 text-xs" data-testid="outbound-usage" aria-live="polite">
       <p className="flex items-start gap-1.5 text-muted-foreground">
@@ -89,7 +94,7 @@ export function UsageNote({ usage }: { usage: OutboundUsage | undefined }) {
         <p className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400" role="status" data-testid="outbound-blocked">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />{blocked}
         </p>
-      ) : usage.platform.state === "limited" ? (
+      ) : mode === "web" && usage.platform.state === "limited" ? (
         <p className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400" data-testid="outbound-limited">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
           AI Outbound is busy across DealInSec today, so a search may stop early with fewer companies. Full capacity returns {when(usage.platform.resetsAt)}.

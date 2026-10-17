@@ -12,7 +12,7 @@
  * crash redoes at most the slice in flight. The model only ever proposes; shared/prospect-intel.ts decides.
  */
 import { randomUUID } from "node:crypto";
-import { byResearchPriority, worthResearchingEarly, rankCandidates, collectCandidates, checkSite, emptyCounters, findingsAsClaims, readiness, runBudget, pickResearchLinks, SIGNAL_LABEL, timingOf, isDecisionMaker, type RejectReason, type RunCounters, type SearchHit, type FindingLike } from "@shared/prospect";
+import { isSeeded, byResearchPriority, worthResearchingEarly, rankCandidates, collectCandidates, checkSite, emptyCounters, findingsAsClaims, readiness, runBudget, pickResearchLinks, SIGNAL_LABEL, timingOf, isDecisionMaker, type RejectReason, type RunCounters, type SearchHit, type FindingLike } from "@shared/prospect";
 import { contactFormFinding, normalizeEnrichment, normalizeResearch, type FactDraft } from "@shared/prospect-intel";
 import { COUNTRIES, countryOfQuery, industryMatched, isSeniorDecisionMaker, prospectFit, type Icp, type ProspectProfile } from "@shared/icp";
 import { scoreLead } from "@shared/lead-score";
@@ -296,7 +296,13 @@ async function rankStep(run: ProspectRunRow, icp: Icp, deps: PipelineDeps): Prom
     const candidate = { domain: i.prospect.domain, name: i.prospect.name, website: i.prospect.website, sources: (i.prospect.sources as any[]) ?? [], rank: 0 };
     found.push({ i, order: i.id, candidate, isLead: !!i.prospect.leadId || !!(await deps.leadByDomain(run.organizationId, i.prospect.domain)) });
   }
-  const ranked = rankCandidates(found, icp, budget.verify);
+  // A website the person chose from a local listing is checked whatever its words say: it is there by their choice, not
+  // because a web search matched it (rankCandidates' relevance test is for search results).
+  const seeded = found.filter((x) => isSeeded(x.candidate.sources) && !x.isLead);
+  const ranked = [
+    ...seeded.map((x) => ({ ...x, score: 1, rel: 1, outcome: "keep" as const })),
+    ...rankCandidates(found.filter((x) => !seeded.includes(x)), icp, Math.max(0, budget.verify - seeded.length)),
+  ];
   for (const r of ranked) {
     if (r.outcome === "keep") await deps.store.setItem(r.i.id, { rank: r.score, updatedAt: deps.now() });
     else await deps.store.setItem(r.i.id, { rank: r.score, stage: "rejected", errorCode: r.outcome, updatedAt: deps.now() });
@@ -332,7 +338,12 @@ async function verifyOne(run: ProspectRunRow, item: ItemWithProspect, deps: Pipe
   let reason: RejectReason | null = null;
   if (!page.ok) reason = page.code === "not_html" ? "not_html" : page.code === "robots" ? "robots_disallowed" : "unreachable";
   else if (!sameSite(new URL(page.url).hostname, p.domain) && !new URL(page.url).hostname.endsWith(`.${p.domain}`)) reason = "offsite_redirect";
-  else { const c = checkSite({ name: p.name, domain: p.domain }, page); if (!c.ok) reason = c.reason!; }
+  else {
+    const c = checkSite({ name: p.name, domain: p.domain }, page);
+    // A site a listing linked to is that business's own: a missing name match isn't a reason to set it aside (its listing
+    // name isn't kept to compare with). Parked and thin sites still are.
+    if (!c.ok && !(c.reason === "no_identity" && isSeeded(p.sources))) reason = c.reason!;
+  }
   if (reason === "unreachable" && item.attempts < 1) return void (await retryLater(deps, item, "unreachable"));
   if (reason) {
     await deps.store.updateProspect(run.organizationId, p.id, { status: "rejected", rejectReason: reason, verifiedAt: now, updatedAt: now });
@@ -348,8 +359,16 @@ async function verifyOne(run: ProspectRunRow, item: ItemWithProspect, deps: Pipe
       contentHash: read.hash, confidence: "high", meta: { signal: x.signal, ...(x.year ? { year: x.year } : {}) },
     })) });
   }
-  await deps.store.updateProspect(run.organizationId, p.id, { status: p.status === "candidate" || p.status === "rejected" ? "verified" : p.status, rejectReason: null, verifiedAt: now, contentHash: (page as any).hash, updatedAt: now });
+  // A prospect known only by its domain (chosen from a listing) takes its name from its own home page's title.
+  const ownName = p.name === p.domain ? nameFromTitle(read.title) : null;
+  await deps.store.updateProspect(run.organizationId, p.id, { status: p.status === "candidate" || p.status === "rejected" ? "verified" : p.status, rejectReason: null, verifiedAt: now, contentHash: (page as any).hash, updatedAt: now, ...(ownName ? { name: ownName } : {}) });
   await deps.store.setItem(item.id, { stage: "verified", updatedAt: now });
+}
+
+/** A business's name from its home page title: the part before " | ", " – " or " - " (the brand usually comes first). */
+export function nameFromTitle(title: string): string | null {
+  const first = String(title ?? "").split(/\s+[|–—-]\s+|\s*\|\s*/)[0].replace(/\s+/g, " ").trim();
+  return first.length >= 2 && first.length <= 120 && !/^(home|homepage|welcome|index)$/i.test(first) ? first : null;
 }
 
 /* ── enrich + fit gate ──────────────────────────────────────────────────── */

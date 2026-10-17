@@ -36,6 +36,10 @@ export interface NewRun {
    * createRun throws RunLimitReached with index = limits.length.
    */
   prospects?: { since: Date; max: number };
+  /** Inserted already finished (a local search: its results are shown, never stored), with these counters. */
+  finished?: { counters: Record<string, unknown> };
+  /** Held from the runner until then (a run whose companies are added right after it is created); release with setLease(id, 0, null). */
+  holdUntil?: Date;
 }
 export interface NewFinding {
   kind: string; type: string; value: string; status: string; sourceUrl: string | null; sourceType: string; quote: string | null;
@@ -54,6 +58,11 @@ export interface OutboundStore {
   countRunsSince(orgId: string, since: Date): Promise<number>;
   /** Researched prospects this workspace's runs hold or used since `since` (see NewRun.prospects). */
   prospectsHeldSince(orgId: string, since: Date): Promise<number>;
+  /** A finished run's counters replaced (a local search that failed is set to searched: 0, so it isn't charged). */
+  settleFinishedRun(orgId: string, id: string, counters: Record<string, unknown>, errorCode: string | null): Promise<void>;
+  /** This workspace's prospects with these domains, or whose provenance carries these place IDs. */
+  prospectsByDomains(orgId: string, domains: string[]): Promise<{ id: number; domain: string; leadId: number | null }[]>;
+  prospectsByPlaceIds(orgId: string, placeIds: string[]): Promise<{ id: number; placeId: string; leadId: number | null }[]>;
   /** One atomic claim of a running run whose lease is free (or expired). */
   claimRun(now: Date, leaseMs: number): Promise<ClaimedRun | null>;
   /** Changes a run only while this worker still holds it (claim number unchanged, run still running). False = not held any more. */
@@ -102,7 +111,7 @@ export interface OutboundStore {
    * null. Throws when the searches can't be counted (the caller refuses). The row is completed by settleProviderCall.
    */
   /** null = the platform-wide daily searches are used up; "workspace" = the workspace's spend ceiling would be passed. */
-  reserveSearch(r: { orgId: string; runId: string | null; provider: string; costMicroUsd: number; limit: number; since: Date; now: Date; workspace?: WorkspaceCeiling }): Promise<number | null | "workspace">;
+  reserveSearch(r: { orgId: string; runId: string | null; provider: string; costMicroUsd: number; limit: number; since: Date; now: Date; workspace?: WorkspaceCeiling; /** Default "search" (web search); "local_search" for Places, counted on its own. */ operation?: string }): Promise<number | null | "workspace">;
   settleProviderCall(id: number, r: { ok: boolean; errorCode: string | null; latencyMs: number; costMicroUsd: number }): Promise<void>;
   runCostMicroUsd(runId: string): Promise<number>;
 }
@@ -151,7 +160,8 @@ export const outboundStore: OutboundStore = {
         }
         const [row] = await tx.insert(prospectRuns).values({
           id: r.id, organizationId: r.orgId, createdByUser: r.userId, createdBy: r.by, request: r.request, icp: r.icp, quantity,
-          status: "running", stage: "search", counters: {}, queries: r.queries, idemKey: r.idemKey, createdAt: r.now, updatedAt: r.now,
+          status: r.finished ? "done" : "running", stage: r.finished ? "done" : "search", counters: r.finished?.counters ?? {}, queries: r.queries, idemKey: r.idemKey,
+          createdAt: r.now, updatedAt: r.now, ...(r.finished ? { finishedAt: r.now } : {}), ...(r.holdUntil ? { leaseUntil: r.holdUntil } : {}),
         }).returning();
         return row;
       });
@@ -172,6 +182,21 @@ export const outboundStore: OutboundStore = {
   },
   async listRunsSince(orgId, since, limit) {
     return db.select().from(prospectRuns).where(and(eq(prospectRuns.organizationId, orgId), gte(prospectRuns.createdAt, since))).orderBy(desc(prospectRuns.createdAt)).limit(limit);
+  },
+  async settleFinishedRun(orgId, id, counters, errorCode) {
+    await db.update(prospectRuns).set({ counters, errorCode, updatedAt: new Date() })
+      .where(and(eq(prospectRuns.organizationId, orgId), eq(prospectRuns.id, id), eq(prospectRuns.status, "done")));
+  },
+  async prospectsByDomains(orgId, domains) {
+    if (!domains.length) return [];
+    return db.select({ id: prospects.id, domain: prospects.domain, leadId: prospects.leadId }).from(prospects)
+      .where(and(eq(prospects.organizationId, orgId), inArray(prospects.domain, domains)));
+  },
+  async prospectsByPlaceIds(orgId, placeIds) {
+    if (!placeIds.length) return [];
+    const r = await db.execute(sql`SELECT p.id, s->>'placeId' AS place_id, p.lead_id FROM ${prospects} p, jsonb_array_elements(p.sources) s
+      WHERE p.organization_id = ${orgId} AND s->>'placeId' IN (${sql.join(placeIds.map((x) => sql`${x}`), sql`, `)})`);
+    return (r.rows as { id: number; place_id: string; lead_id: number | null }[]).map((x) => ({ id: Number(x.id), placeId: x.place_id, leadId: x.lead_id == null ? null : Number(x.lead_id) }));
   },
   async prospectsHeldSince(orgId, since) {
     const [r] = await db.select({ n: sql<number>`COALESCE(sum(${PROSPECTS_HELD}), 0)::int` }).from(prospectRuns)
@@ -323,10 +348,10 @@ export const outboundStore: OutboundStore = {
       if (r.workspace) await tx.execute(sql`SELECT pg_advisory_xact_lock(${WORKSPACE_SPEND_LOCK}, hashtext(${r.orgId}))`);
       // Serialises check-then-reserve across every process; held for the count and the insert only, never across the search.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${GLOBAL_SEARCH_BUDGET_LOCK})`);
-      const [c] = await tx.select({ n: sql<number>`count(*)::int` }).from(providerCalls).where(and(eq(providerCalls.operation, "search"), gte(providerCalls.createdAt, r.since)));
+      const [c] = await tx.select({ n: sql<number>`count(*)::int` }).from(providerCalls).where(and(eq(providerCalls.operation, r.operation ?? "search"), gte(providerCalls.createdAt, r.since)));
       if ((c?.n ?? 0) >= r.limit) return null;
       if (r.workspace && (await workspaceSpendTx(tx, r.orgId, r.workspace.since)) + r.costMicroUsd > r.workspace.maxMicroUsd) return "workspace";
-      const [ins] = await tx.insert(providerCalls).values({ organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: "search", ok: false, errorCode: "reserved", latencyMs: 0, costMicroUsd: r.costMicroUsd, createdAt: r.now }).returning({ id: providerCalls.id });
+      const [ins] = await tx.insert(providerCalls).values({ organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: r.operation ?? "search", ok: false, errorCode: "reserved", latencyMs: 0, costMicroUsd: r.costMicroUsd, createdAt: r.now }).returning({ id: providerCalls.id });
       return ins.id;
     });
   },

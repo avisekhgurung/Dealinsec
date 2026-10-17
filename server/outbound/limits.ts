@@ -27,6 +27,8 @@ export const dailySearchLimit = () => int(process.env.OUTBOUND_DAILY_SEARCHES, 6
 export const dailyContactLimit = () => int(process.env.OUTBOUND_DAILY_CONTACT_LOOKUPS, 30);
 export const dailyCompanyLimit = () => int(process.env.OUTBOUND_DAILY_COMPANY_LOOKUPS, 100);
 export const globalSearchLimit = () => int(process.env.OUTBOUND_GLOBAL_DAILY_SEARCHES, 30);
+/** Local business searches (Google Places) across all workspaces per UTC day: 30 a day stays inside the 1,000 free a month. */
+export const globalLocalSearchLimit = () => int(process.env.OUTBOUND_GLOBAL_DAILY_LOCAL_SEARCHES, 30);
 
 
 /** A plan's AI Outbound allowance: the shared defaults, each overridable by its environment variable. */

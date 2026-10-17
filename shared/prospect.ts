@@ -74,7 +74,9 @@ export function junkReason(r: SearchResult, exclusions: string[] = []): RejectRe
 
 /* ── one candidate per company ──────────────────────────────────────────── */
 
-export interface Provenance { provider: string; query: string; url: string; title: string; snippet?: string; at: string }
+export interface Provenance { provider: string; query: string; url: string; title: string; snippet?: string; at: string; /** A Google place ID (the only listing data that may be kept): the website came from that listing. */ placeId?: string }
+/** A candidate the person chose from a local listing (its website), rather than one found by web search. */
+export const isSeeded = (sources: unknown): boolean => Array.isArray(sources) && sources.some((s) => (s as Provenance)?.provider === "google_places");
 export interface Candidate { domain: string; name: string; website: string; sources: Provenance[]; rank: number }
 export interface Rejected { url: string; reason: RejectReason }
 export interface SearchHit extends SearchResult { provider: string; query: string; at: string }

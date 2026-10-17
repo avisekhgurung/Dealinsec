@@ -87,6 +87,13 @@ export class DbLeadsStore implements LeadsStore {
     return row ?? null;
   }
 
+  async leadIdsByEvidenceUrls(orgId: string, urls: string[]): Promise<{ leadId: number; url: string }[]> {
+    if (!urls.length) return [];
+    const rows = await db.select({ leadId: leadClaims.leadId, url: leadClaims.evidenceUrl }).from(leadClaims).innerJoin(leads, eq(leads.id, leadClaims.leadId))
+      .where(and(eq(leadClaims.organizationId, orgId), inArray(leadClaims.evidenceUrl, urls), isNull(leads.archivedAt)));
+    return rows.map((r) => ({ leadId: r.leadId, url: String(r.url) }));
+  }
+
   async findByName(orgId: string, name: string): Promise<Lead | null> {
     const [row] = await db.select().from(leads).where(and(eq(leads.organizationId, orgId), sql`lower(${leads.companyName}) = ${name.trim().toLowerCase()}`, isNull(leads.archivedAt)));
     return row ?? null;

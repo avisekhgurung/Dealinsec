@@ -68,6 +68,8 @@ export interface LeadsStore {
   detail(orgId: string, id: number): Promise<LeadDetail | null>;
   findByDomain(orgId: string, domain: string): Promise<Lead | null>;
   findByName(orgId: string, name: string): Promise<Lead | null>;
+  /** Live leads of this workspace with a fact whose evidence is one of these URLs (a Google Maps link built from a place ID). */
+  leadIdsByEvidenceUrls(orgId: string, urls: string[]): Promise<{ leadId: number; url: string }[]>;
 
   insert(orgId: string, data: NewLead): Promise<Lead>;
   update(orgId: string, id: number, patch: LeadPatch): Promise<Lead | null>;

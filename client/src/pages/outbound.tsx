@@ -21,6 +21,7 @@ import { OutreachQueue, outreachQueueKey, type QueueItem } from "@/components/ou
 import { SegmentedTabs } from "@/components/outbound/segmented-tabs";
 import { OutreachInbox } from "@/components/outbound/outreach-inbox";
 import { OUTBOUND_USAGE_URL, UsageNote, searchBlockedReason, useOutboundUsage } from "@/components/outbound/usage-note";
+import { LocalSearch, type LocalFields } from "@/components/outbound/local-search";
 import { LoadError } from "@/components/load-error";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,6 +34,7 @@ import { stagger, staggerItem, useCalmMotion } from "@/lib/motion";
 import { queryClient } from "@/lib/queryClient";
 import { COUNTRY_NAME, ICP_URL, OUTBOUND_RUNS_URL, RUN_ERROR, RUN_STAGE_LABEL, countryName, runUrl, prospectUrl, type ParsedIcp, type ProspectCard as Card_, type RunView } from "@/lib/outbound";
 import { searchStrategies } from "@shared/icp";
+import { DISCOVERY_PRESETS, suggestDiscoveryMode, type DiscoveryMode, type DiscoveryPreset } from "@shared/local-discovery";
 import { takeOutboundPrefill } from "@/lib/outbound-prefill";
 import { getTargetMarket } from "@/lib/first-goal";
 import { cn } from "@/lib/utils";
@@ -45,13 +47,12 @@ const EXAMPLES = [
 ];
 
 /**
- * Ready-made searches for a common service. The request is what is searched (concrete businesses, size and place); the
- * service the person sells is not put into it, or the search would look for companies offering it. Each company's home
- * page is checked for a mobile viewport tag and an old copyright year anyway (shared/site-signals.ts), shown as observations.
+ * Ready-made searches (shared/local-discovery.ts), each editable before it runs. A web preset's request is what is
+ * searched (concrete businesses, size and place); the service the person sells is not put into it, or the search would
+ * look for companies offering it. A local preset fills the local form; the person types their city.
  */
-const PRESETS = [
-  { label: "Website redesign · US local businesses", request: "10 US dental clinics and law firms with 5–50 employees", note: "Each company's home page is checked for a mobile viewport tag and an old copyright year: hints worth checking, not proof they need a new site." },
-];
+const PRESETS = DISCOVERY_PRESETS;
+const presetChip = "rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-left text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300";
 
 const notSetUp = (e: unknown) => !!e && /PROSPECTS_NOT_SETUP/.test(String((e as Error).message));
 type RunData = { run: RunView; prospects: Card_[] };
@@ -224,7 +225,7 @@ function RunSkeleton() {
 }
 
 /** No searches yet: what happens, that nothing is contacted, and examples to start from. */
-function FirstSearch({ canEdit, onPick }: { canEdit: boolean; onPick: (example: string) => void }) {
+function FirstSearch({ canEdit, onPick, onPreset }: { canEdit: boolean; onPick: (example: string) => void; onPreset: (p: DiscoveryPreset) => void }) {
   return (
     <div className="rounded-2xl border border-dashed px-5 py-10 text-center" data-testid="outbound-first-time">
       <Radar className="mx-auto mb-3 h-7 w-7 text-emerald-700 dark:text-emerald-400" aria-hidden />
@@ -234,7 +235,7 @@ function FirstSearch({ canEdit, onPick }: { canEdit: boolean; onPick: (example: 
       </p>
       {canEdit && (
         <div className="mx-auto mt-4 flex max-w-2xl flex-wrap justify-center gap-2">
-          {PRESETS.map((x) => <button key={x.label} onClick={() => onPick(x.request)} title={x.note} className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-left text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" data-testid="outbound-preset">Preset: {x.label}</button>)}
+          {PRESETS.map((x) => <button key={x.key} onClick={() => onPreset(x)} title={x.note} className={presetChip} data-testid="outbound-preset">{x.label}</button>)}
           {EXAMPLES.map((x) => <button key={x} onClick={() => onPick(x)} className="rounded-full border bg-background px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" data-testid="outbound-example">{x}</button>)}
         </div>
       )}
@@ -250,6 +251,13 @@ export default function OutboundPage() {
   const [text, setText] = useState("");
   const [parsed, setParsed] = useState<ParsedIcp | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
+  // Two sources, one search: companies found online (web research) or local businesses in a city (map listings). The
+  // person chooses; a suggestion never switches it by itself. The country is where to look, never the account's own.
+  const [mode, setMode] = useState<DiscoveryMode>("web");
+  const [localFields, setLocalFields] = useState<LocalFields>(() => {
+    const t = getTargetMarket(user?.id);
+    return { category: "", city: "", country: t && t !== "WW" && t in COUNTRY_NAME ? t : "IN", website: "any", max: 10 };
+  });
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // The drawer: a prospect, and the search it belongs to (research and contact lookups are tied to a run).
   const [open, setOpen] = useState<{ id: number; runId: string | null; focus?: "evidence" } | null>(null);
@@ -312,7 +320,8 @@ export default function OutboundPage() {
 
   const off = notSetUp(runs.error);
   const usage = useOutboundUsage(canEdit && !off);
-  const blocked = searchBlockedReason(usage.data?.usage);
+  const blocked = searchBlockedReason(usage.data?.usage, mode);
+  const localReady = !!usage.data?.usage.localReady;
   // The most companies one search may look for on this plan (the server caps it the same way).
   const maxCompanies = usage.data?.usage.plan?.maxCompanies ?? 50;
   // Where to look is the person's choice (never their own account's country): editing it re-plans the searches with the
@@ -326,7 +335,20 @@ export default function OutboundPage() {
     setPlaceText("");
   };
   const firstTime = !!runs.data && runs.data.runs.length === 0;
-  const pickExample = (x: string) => { setText(x); setParsed(null); inputRef.current?.focus(); };
+  const pickExample = (x: string) => { setMode("web"); setText(x); setParsed(null); setTimeout(() => inputRef.current?.focus(), 0); };
+  const applyPreset = (p: DiscoveryPreset) => {
+    trackEvent("outbound_preset_used", { preset: p.key });
+    if (p.mode === "local") { setMode("local"); setLocalFields((f) => ({ ...f, ...p.local })); }
+    else if (p.request) pickExample(p.request);
+  };
+  // "Dentists in Siliguri" read as a web search: offer the local source with the same business type and place.
+  const suggestLocal = !!icp && localReady && suggestDiscoveryMode(icp) === "local";
+  const switchToLocal = () => {
+    if (!icp) return;
+    trackEvent("outbound_mode_suggested_local");
+    setLocalFields((f) => ({ ...f, category: icp.industry.slice(0, 80), city: (icp.locations[0] ?? "").slice(0, 60), country: icp.countries[0] && icp.countries[0] in COUNTRY_NAME ? icp.countries[0] : f.country }));
+    setMode("local"); setParsed(null);
+  };
 
   // The flow indicator reads only what this page already holds: the selected search (kept fresh by its panel or the
   // runs list) and outreach lists the Outreach view loaded. These observers never fetch on their own.
@@ -365,11 +387,24 @@ export default function OutboundPage() {
 
             {canEdit ? (
               <Card className="glass-card"><CardContent className="space-y-3 p-4">
+                <SegmentedTabs label="Where to look" value={mode} onChange={(m) => { setMode(m); trackEvent("outbound_mode_changed", { mode: m }); }} className="w-full sm:w-fit"
+                  tabs={[
+                    { value: "web", label: <><span className="sm:hidden">Companies online</span><span className="hidden sm:inline">Companies online (any country)</span></>, testId: "mode-web" },
+                    { value: "local", label: <><span className="sm:hidden">Local businesses</span><span className="hidden sm:inline">Local businesses (a city)</span></>, testId: "mode-local" },
+                  ]} />
+                {!text && !parsed && !firstTime && !runs.isLoading && <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" data-testid="outbound-presets">
+                  {PRESETS.map((x) => <button key={x.key} onClick={() => applyPreset(x)} title={x.note} className={cn(presetChip, "shrink-0 whitespace-nowrap sm:whitespace-normal")} data-testid="outbound-preset">{x.label}</button>)}
+                </div>}
+                {mode === "local" ? <>
+                  {!localReady && usage.data && <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200" data-testid="local-not-ready">Local business search isn't switched on yet. Search for companies online meanwhile: a city in your request still narrows it.</p>}
+                  <LocalSearch fields={localFields} onChange={setLocalFields} blocked={blocked} maxCompanies={maxCompanies}
+                    onResearchStarted={(id) => { setRunId(id); if (view !== "searches") setView("searches"); setTimeout(() => document.getElementById("outbound-run")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150); }} />
+                  <UsageNote usage={usage.data?.usage} mode="local" />
+                </> : <>
                 <label htmlFor="outbound-request" className="text-sm font-semibold">Tell me who you want to reach…</label>
                 <Textarea ref={inputRef} id="outbound-request" value={text} onChange={(e) => { setText(e.target.value); setParsed(null); }} rows={2} maxLength={500}
                   placeholder="US SEO agencies with 5–30 employees serving SaaS companies" disabled={parse.isPending || start.isPending} data-testid="outbound-input" />
                 {!text && !firstTime && !runs.isLoading && <div className="flex flex-wrap gap-2">
-                  {PRESETS.map((x) => <button key={x.label} onClick={() => { trackEvent("outbound_preset_used", { preset: "website_redesign_us" }); pickExample(x.request); }} title={x.note} className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-left text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" data-testid="outbound-preset">Preset: {x.label}</button>)}
                   {EXAMPLES.map((x) => <button key={x} onClick={() => pickExample(x)} className="rounded-full border px-3 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">{x}</button>)}
                 </div>}
                 <UsageNote usage={usage.data?.usage} />
@@ -408,9 +443,14 @@ export default function OutboundPage() {
                       <Button onClick={() => start.mutate()} disabled={start.isPending || !!blocked} className="gradient-btn text-white" data-testid="outbound-start">{start.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-1.5 h-4 w-4" />}Start search</Button>
                       <Button variant="ghost" onClick={() => setParsed(null)}>Change</Button>
                     </div>
+                    {suggestLocal && <p className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-xs dark:border-emerald-900 dark:bg-emerald-950/30" data-testid="outbound-suggest-local">
+                      This looks like local businesses in a place. Map listings usually find more of them than web search.
+                      <Button type="button" size="sm" variant="outline" className="h-8" onClick={switchToLocal}>Search local businesses instead</Button>
+                    </p>}
                     <p className="text-xs text-muted-foreground">Starting a search only looks companies up. Nobody is contacted.</p>
                   </div>
                 )}
+                </>}
               </CardContent></Card>
             ) : (
               <p className="text-sm text-muted-foreground">You can see searches your team ran. Ask your owner for permission to start one.</p>
@@ -434,10 +474,11 @@ export default function OutboundPage() {
               </div>
             )}
 
+            <div id="outbound-run" className="scroll-mt-20" />
             {runId ? <RunPanel key={runId} id={runId} canEdit={canEdit} onOpen={(p, focus) => setOpen({ id: p.id, runId, focus })} />
               : runs.isLoading ? <RunSkeleton />
               : runs.isError && !runs.data ? <Card className="glass-card"><CardContent className="p-0"><LoadError what="your searches" onRetry={() => void runs.refetch()} retrying={runs.isFetching} /></CardContent></Card>
-              : <FirstSearch canEdit={canEdit} onPick={pickExample} />}
+              : <FirstSearch canEdit={canEdit} onPick={pickExample} onPreset={applyPreset} />}
             </>}
           </>
         )}

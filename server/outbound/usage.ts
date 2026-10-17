@@ -35,6 +35,8 @@ export interface OutboundUsage {
   asOf: string;
   /** Searching can run on this server at all (a web-search provider is connected). */
   searchReady: boolean;
+  /** Local business search (Google Places) is configured on this server. */
+  localReady: boolean;
   /** Starting a search never takes money or credits; it uses the allowances below. */
   charge: "included";
   workspace: { searches: Allowance | null; webSearches: Allowance | null; contactLookups: Allowance | null };
@@ -57,6 +59,7 @@ export interface UsageDeps {
   tablesReady: () => Promise<boolean>;
   searchReady: () => Promise<boolean>;
   contactReady: () => boolean;
+  localReady?: () => boolean;
   /** Runs started in the window, newest first (enough of them to cover the allowance). */
   recentRuns: (orgId: string, since: Date, limit: number) => Promise<Pick<ProspectRunRow, "status" | "counters" | "createdAt">[]>;
   /** The workspace's plan for AI Outbound. */
@@ -122,6 +125,7 @@ export async function outboundUsage(user: Who, d: Partial<UsageDeps> = {}): Prom
     usage: {
       asOf: now.toISOString(),
       searchReady: (await safe(deps.searchReady)) ?? false,
+      localReady: deps.localReady ? deps.localReady() : false,
       charge: "included",
       workspace: { searches, webSearches, contactLookups },
       plan: { tier, label: TIER_LABEL[tier], searches: monthly, maxCompanies: planAllowance.maxCompanies, windowDays: OUTBOUND_WINDOW_DAYS, prospects, drafts, sends, spendPercent },
@@ -139,6 +143,7 @@ function defaultUsageDeps(): UsageDeps {
     tablesReady: prospectsTablesReady,
     searchReady: async () => (await pipe().searchProviders()).length > 0,
     contactReady: () => !!pipe().contact,
+    localReady: () => !!process.env.GOOGLE_PLACES_API_KEY,
     recentRuns: (orgId, since, limit) => pipe().store.listRunsSince(orgId, since, limit),
     tier: outboundTier,
     countProviderCalls: (o) => pipe().store.countProviderCalls(o),

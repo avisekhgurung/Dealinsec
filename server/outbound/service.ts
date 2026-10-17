@@ -164,7 +164,9 @@ export async function listRuns(user: Who, d: Partial<PipelineDeps> = {}): Promis
   if (gate) return gate;
   if (!(await ready())) return NOT_SETUP();
   (deps.kick ?? (() => outboundRunner.kick()))();
-  return { ok: true, runs: (await deps.store.listRuns(user.organizationId!, 20)).map(runView) };
+  // A local business search is recorded as a finished run (it uses a search credit) but has no prospects of its own:
+  // its listings were shown once and not kept, so it isn't listed as a search to open.
+  return { ok: true, runs: (await deps.store.listRuns(user.organizationId!, 20)).filter((r) => (r.counters as { mode?: unknown } | null)?.mode !== "local").map(runView) };
 }
 
 export async function cancelRun(user: Who, id: string, d: Partial<PipelineDeps> = {}): Promise<Result<{ run: RunView }>> {

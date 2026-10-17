@@ -271,7 +271,7 @@ export function contactProvider(env: NodeJS.ProcessEnv = process.env): ContactEn
 
 /* ── estimated cost per call (an estimate, overridable: PROVIDER_COST_USD_<NAME>) ─────────────────────────── */
 
-const DEFAULT_COST_USD: Record<string, number> = { langsearch: 0, brave: 0.005, tavily: 0.008, serper: 0.001, firecrawl: 0.002, builtin: 0, apollo: 0.02, hunter: 0.03 };
+const DEFAULT_COST_USD: Record<string, number> = { langsearch: 0, brave: 0.005, tavily: 0.008, serper: 0.001, firecrawl: 0.002, builtin: 0, apollo: 0.02, hunter: 0.03, google_places: 0.035 };
 export function costMicroUsd(provider: string, env: NodeJS.ProcessEnv = process.env): number {
   const v = Number(env[`PROVIDER_COST_USD_${provider.toUpperCase()}`]);
   const usd = Number.isFinite(v) && v >= 0 ? v : DEFAULT_COST_USD[provider] ?? 0;
