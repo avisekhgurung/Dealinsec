@@ -1,3 +1,4 @@
+import { trackEvent } from "@/lib/analytics";
 import { LeadsStrip } from "@/components/leads/leads-strip";
 import { TodayPanel } from "@/components/dashboard/today-panel";
 import { GettingStarted } from "@/components/getting-started";
@@ -92,7 +93,7 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm">DealInSec Pro · {tier}</p>
             <p className="text-xs text-muted-foreground">
-              Unlimited workflow{user?.planExpiresAt ? ` · valid until ${fmtDate(user.planExpiresAt)}` : ""}
+              Unlimited deals, agreements &amp; invoices{user?.planExpiresAt ? ` · valid until ${fmtDate(user.planExpiresAt)}` : ""}
             </p>
           </div>
           <Link href="/pricing">
@@ -159,7 +160,7 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
               : "Upgrade for unlimited deals, signed agreements, invoices & payment tracking"}
           </p>
         </div>
-        <Link href="/pricing">
+        <Link href="/pricing" onClick={() => trackEvent("upgrade_clicked", { source: trialEnded ? "dashboard_trial_ended" : "dashboard" })}>
           <Button size="sm" className="flex-shrink-0 text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700" data-testid="dashboard-upgrade-cta">
             <Crown className="w-3.5 h-3.5 mr-1.5 text-amber-300" />
             Upgrade

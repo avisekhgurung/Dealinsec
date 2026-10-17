@@ -21,6 +21,7 @@ import { getLocaleSettings, type LocaleFields, type LocaleSettings } from "@shar
 import { sameRegion } from "@shared/region";
 import { useLocation } from "wouter";
 import { postAuthDestination, hasPendingDealPrefill } from "@/lib/deal-prefill";
+import { hasPendingOutboundPrefill } from "@/lib/outbound-prefill";
 import { trackEvent } from "@/lib/analytics";
 import { setFirstGoal, setTargetMarket, TARGET_MARKETS, type TargetMarket } from "@/lib/first-goal";
 import { destinationFor, type FirstGoal } from "@shared/getting-started";
@@ -119,7 +120,8 @@ export default function OnboardingPage() {
   const [audience, setAudience] = useState<Audience | null>(readAudienceIntent);
   const [describes, setDescribes] = useState<string | null>(null);
   // Optional: shapes where they land and the dashboard's "Get started" order.
-  const [goal, setGoal] = useState<FirstGoal | null>(null);
+  // A client search started in the landing demo already answers it: finding clients.
+  const [goal, setGoal] = useState<FirstGoal | null>(() => (hasPendingOutboundPrefill() ? "find_clients" : null));
   const [market, setMarket] = useState<TargetMarket | "">("");
   // Signup already asked for the name: start from it rather than asking twice.
   const [fullName, setFullName] = useState(() => [user?.firstName, user?.lastName].filter(Boolean).join(" "));
@@ -273,7 +275,7 @@ export default function OnboardingPage() {
       trackEvent("onboarding_goal_selected", { goal: goal ?? "none" });
 
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      const restoring = hasPendingDealPrefill();
+      const restoring = hasPendingDealPrefill() || hasPendingOutboundPrefill();
       toast({
         title: "You're in!",
         description: restoring

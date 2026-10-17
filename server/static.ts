@@ -39,6 +39,10 @@ export function serveStatic(app: Express) {
   app.use("*", (req, res) => {
     const url = req.originalUrl.split("?")[0].replace(/\/+$/, "") || "/";
     res.setHeader("Cache-Control", "no-cache");
+    // Everything else here is the app (dashboards, settings, auth), a client's private document link (/q/…, signing
+    // links) or a mistyped URL: all of them get the homepage's shell, so they are kept out of search rather than
+    // indexed as copies of the homepage. Public marketing pages are server-rendered elsewhere with their own head.
+    if (!CRAWLABLE.has(url) && !pageHtml.has(url)) res.setHeader("X-Robots-Tag", "noindex, nofollow");
     res.type("html").send(CRAWLABLE.has(url) ? landingHtml : pageHtml.get(url) ?? shell);
   });
 }

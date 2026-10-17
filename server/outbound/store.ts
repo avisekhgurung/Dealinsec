@@ -12,6 +12,7 @@ import {
 import type { Provenance } from "@shared/prospect";
 import { tablesReadyCheck } from "../leads/ready";
 import { clipCodeOrNull } from "@shared/error-code";
+import { WORKSPACE_SPEND_LOCK, workspaceSpendTx, type WorkspaceCeiling } from "../llm/trace-store";
 
 /** The feature needs its own five tables and the model trace (allowances are counted from it). */
 export const prospectsTablesReady = tablesReadyCheck(["prospect_runs", "prospects", "prospect_run_items", "prospect_findings", "provider_calls", "llm_calls"]);
@@ -29,6 +30,12 @@ export interface NewRun {
   idemKey: string; queries: unknown[]; now: Date;
   /** Checked under a per-workspace lock together with the insert, so concurrent starts can't both fit under a limit. */
   limits?: { since: Date; max: number }[];
+  /**
+   * The researched-prospects allowance, under the same lock: a running search holds its requested number, a finished one
+   * counts what it really researched (never more than it asked for). The new run is trimmed to what's left; at zero
+   * createRun throws RunLimitReached with index = limits.length.
+   */
+  prospects?: { since: Date; max: number };
 }
 export interface NewFinding {
   kind: string; type: string; value: string; status: string; sourceUrl: string | null; sourceType: string; quote: string | null;
@@ -45,6 +52,8 @@ export interface OutboundStore {
   /** Runs started since `since`, newest first, at most `limit` (the usage view's rolling window). */
   listRunsSince(orgId: string, since: Date, limit: number): Promise<ProspectRunRow[]>;
   countRunsSince(orgId: string, since: Date): Promise<number>;
+  /** Researched prospects this workspace's runs hold or used since `since` (see NewRun.prospects). */
+  prospectsHeldSince(orgId: string, since: Date): Promise<number>;
   /** One atomic claim of a running run whose lease is free (or expired). */
   claimRun(now: Date, leaseMs: number): Promise<ClaimedRun | null>;
   /** Changes a run only while this worker still holds it (claim number unchanged, run still running). False = not held any more. */
@@ -92,7 +101,8 @@ export interface OutboundStore {
    * are fewer than `limit`, a provider_calls row is inserted as this search's reservation and its id returned; otherwise
    * null. Throws when the searches can't be counted (the caller refuses). The row is completed by settleProviderCall.
    */
-  reserveSearch(r: { orgId: string; runId: string | null; provider: string; costMicroUsd: number; limit: number; since: Date; now: Date }): Promise<number | null>;
+  /** null = the platform-wide daily searches are used up; "workspace" = the workspace's spend ceiling would be passed. */
+  reserveSearch(r: { orgId: string; runId: string | null; provider: string; costMicroUsd: number; limit: number; since: Date; now: Date; workspace?: WorkspaceCeiling }): Promise<number | null | "workspace">;
   settleProviderCall(id: number, r: { ok: boolean; errorCode: string | null; latencyMs: number; costMicroUsd: number }): Promise<void>;
   runCostMicroUsd(runId: string): Promise<number>;
 }
@@ -111,6 +121,8 @@ export const GLOBAL_SEARCH_BUDGET_LOCK = 7_310_002;
 /** Advisory-lock namespace for starting a run; the second key is the workspace (hashtext of its id). */
 export const RUN_START_LOCK = 7_310_003;
 /** runCountsTowardLimit (shared/outbound-usage.ts), in SQL: a finished run that made no web search doesn't count. */
+/** What one run holds of the researched-prospects allowance (shared/outbound-plans.ts), as SQL; prospectsHeld below is the same rule. */
+const PROSPECTS_HELD = sql`CASE WHEN ${prospectRuns.status} = 'running' THEN ${prospectRuns.quantity} ELSE LEAST(${prospectRuns.quantity}, COALESCE((${prospectRuns.counters}->>'researched')::int, 0)) END`;
 const COUNTS_TOWARD_LIMIT = sql`(${prospectRuns.status} = 'running' OR COALESCE((${prospectRuns.counters}->>'searched')::int, 0) > 0)`;
 
 export const outboundStore: OutboundStore = {
@@ -119,17 +131,26 @@ export const outboundStore: OutboundStore = {
       return await db.transaction(async (tx) => {
         // Count-then-insert under a lock per workspace (held for this short transaction only): two searches started at
         // the same moment would otherwise both see room under the monthly or daily limit and both start.
-        if (r.limits?.length) {
+        let quantity = r.quantity;
+        if (r.limits?.length || r.prospects) {
           await tx.execute(sql`SELECT pg_advisory_xact_lock(${RUN_START_LOCK}, hashtext(${r.orgId}))`);
-          for (let i = 0; i < r.limits.length; i++) {
-            const l = r.limits[i];
+          const limits = r.limits ?? [];
+          for (let i = 0; i < limits.length; i++) {
+            const l = limits[i];
             const [c] = await tx.select({ n: sql<number>`count(*)::int` }).from(prospectRuns).where(and(
               eq(prospectRuns.organizationId, r.orgId), gte(prospectRuns.createdAt, l.since), COUNTS_TOWARD_LIMIT));
             if ((c?.n ?? 0) >= l.max) throw new RunLimitReached(i);
           }
+          if (r.prospects) {
+            const [u] = await tx.select({ n: sql<number>`COALESCE(sum(${PROSPECTS_HELD}), 0)::int` }).from(prospectRuns)
+              .where(and(eq(prospectRuns.organizationId, r.orgId), gte(prospectRuns.createdAt, r.prospects.since), COUNTS_TOWARD_LIMIT));
+            const left = r.prospects.max - Number(u?.n ?? 0);
+            if (left <= 0) throw new RunLimitReached(r.limits?.length ?? 0);
+            quantity = Math.min(quantity, left);
+          }
         }
         const [row] = await tx.insert(prospectRuns).values({
-          id: r.id, organizationId: r.orgId, createdByUser: r.userId, createdBy: r.by, request: r.request, icp: r.icp, quantity: r.quantity,
+          id: r.id, organizationId: r.orgId, createdByUser: r.userId, createdBy: r.by, request: r.request, icp: r.icp, quantity,
           status: "running", stage: "search", counters: {}, queries: r.queries, idemKey: r.idemKey, createdAt: r.now, updatedAt: r.now,
         }).returning();
         return row;
@@ -151,6 +172,11 @@ export const outboundStore: OutboundStore = {
   },
   async listRunsSince(orgId, since, limit) {
     return db.select().from(prospectRuns).where(and(eq(prospectRuns.organizationId, orgId), gte(prospectRuns.createdAt, since))).orderBy(desc(prospectRuns.createdAt)).limit(limit);
+  },
+  async prospectsHeldSince(orgId, since) {
+    const [r] = await db.select({ n: sql<number>`COALESCE(sum(${PROSPECTS_HELD}), 0)::int` }).from(prospectRuns)
+      .where(and(eq(prospectRuns.organizationId, orgId), gte(prospectRuns.createdAt, since), COUNTS_TOWARD_LIMIT));
+    return Number(r?.n ?? 0);
   },
   async countRunsSince(orgId, since) {
     const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(prospectRuns).where(and(
@@ -293,10 +319,13 @@ export const outboundStore: OutboundStore = {
   },
   async reserveSearch(r) {
     return db.transaction(async (tx) => {
+      // The workspace's lock first, then the platform's (the same order as the model-call reservation: no deadlock).
+      if (r.workspace) await tx.execute(sql`SELECT pg_advisory_xact_lock(${WORKSPACE_SPEND_LOCK}, hashtext(${r.orgId}))`);
       // Serialises check-then-reserve across every process; held for the count and the insert only, never across the search.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${GLOBAL_SEARCH_BUDGET_LOCK})`);
       const [c] = await tx.select({ n: sql<number>`count(*)::int` }).from(providerCalls).where(and(eq(providerCalls.operation, "search"), gte(providerCalls.createdAt, r.since)));
       if ((c?.n ?? 0) >= r.limit) return null;
+      if (r.workspace && (await workspaceSpendTx(tx, r.orgId, r.workspace.since)) + r.costMicroUsd > r.workspace.maxMicroUsd) return "workspace";
       const [ins] = await tx.insert(providerCalls).values({ organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: "search", ok: false, errorCode: "reserved", latencyMs: 0, costMicroUsd: r.costMicroUsd, createdAt: r.now }).returning({ id: providerCalls.id });
       return ins.id;
     });

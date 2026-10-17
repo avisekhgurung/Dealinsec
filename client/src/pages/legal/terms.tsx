@@ -118,7 +118,7 @@ export default function TermsOfService() {
         <ul>
           <li><strong>Free trial</strong> — new accounts receive a one-time 7-day trial of DealInSec Pro, granted when account setup is completed. <strong>One trial per account and per person/business</strong>; creating additional accounts to obtain further trials is prohibited and may lead to trial revocation or account suspension. The trial has no monetary value, is non-transferable, and ends automatically — no payment method is collected and nothing is charged.</li>
           <li>The free plan includes 4 Deal Credits each month. Unused monthly credits do not roll over.</li>
-          <li><strong>DealInSec Pro</strong> (₹499/month) unlocks AI Outbound with the Pro research allowance and unlimited deals, quotations, agreements, invoices and payment tracking for the paid term. AI Outbound research is limited per plan and per day; no plan includes unlimited research or sending.</li>
+          <li><strong>DealInSec Pro</strong> (₹199/month) unlocks AI Outbound with the Pro research allowance and unlimited deals, quotations, agreements, invoices and payment tracking for the paid term. AI Outbound research is limited per plan and per day; no plan includes unlimited research or sending.</li>
           <li>All plans are one-time payments for a fixed term processed via our integrated Razorpay payment gateway — nothing auto-renews.</li>
           <li>Plans and credits are non-transferable and tied to your account.</li>
           <li>All prices are listed in Indian Rupees (INR) and inclusive of applicable taxes.</li>

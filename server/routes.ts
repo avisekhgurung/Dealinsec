@@ -2736,7 +2736,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   //
   // What can be bought (one-time payments; terms don't auto-renew), decided by
   // resolveSku (server/billing/purchase-rules.ts):
-  //   { plan: "pro_monthly" } — DealInSec Pro for 1 month (₹499 by default)
+  //   { plan: "pro_monthly" } — DealInSec Pro for 1 month (₹199 by default)
   //   { plan: "extra_seat", qty } — extra team seats for 1 month, Pro only
   // Pro Annual, Deal Boost and the legacy bodies for them are refused (410), never
   // swapped for another price. Live prices are env-driven (see razorpayClient.ts).

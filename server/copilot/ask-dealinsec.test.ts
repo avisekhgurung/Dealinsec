@@ -21,8 +21,8 @@ describe("Ask DealInSec: the prompt", () => {
   for (const country of ["US", "IN", "GB"]) {
     const p = publicSystemPrompt(country);
     it(`(${country}) knows what DealInSec is and who it is for`, () => {
-      expect(p).toMatch(/AI-assisted client acquisition and deal-to-payment workspace/);
-      expect(p).toMatch(/founder-led B2B service businesses of about 1 to 10 people/);
+      expect(p).toMatch(/client-acquisition and deal-to-payment workspace for freelancers, consultants and small B2B service agencies/);
+      expect(p).toMatch(/freelancers, solo consultants and small B2B service agencies of about 1 to 10 people/);
       expect(p).not.toMatch(/India's freelancers|designers, developers, writers, video editors/);
     });
     it(`(${country}) holds the honesty rules: availability, email, Gmail and AI, checkout, payments`, () => {
@@ -95,9 +95,10 @@ describe("the product knowledge files", () => {
     for (const f of files) expect(f.text, f.name).not.toMatch(/₹\s?\d/);
   });
 
-  it("lead with agencies and consultants, and keep freelancers and creators secondary", () => {
+  it("lead with freelancers, consultants and small agencies, keep creators secondary, and promise no outcomes", () => {
     const product = files.find((f) => f.name === "product.md")!.text;
-    expect(product.slice(0, 400)).toMatch(/AI-assisted client acquisition and deal-to-payment workspace/);
+    expect(product.slice(0, 400)).toMatch(/client-acquisition and deal-to-payment workspace for\s+freelancers, consultants and small B2B service agencies/);
     expect(product).toMatch(/not the main\s+audience/);
+    expect(product).toMatch(/does not guarantee clients/);
   });
 });

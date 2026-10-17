@@ -17,8 +17,8 @@ import { prospectsTablesReady } from "./store";
 
 const inFlight = new Set<string>();
 /** Draft results that mean "nothing to do here", with the person's words; anything else is a failure. */
-const SKIP = new Set(["draft_exists", "already_contacted", "do_not_contact", "closed", "suppressed", "no_address", "no_facts", "global_limit", "daily_limit"]);
-const STOP = new Set(["global_limit", "daily_limit"]);
+const SKIP = new Set(["draft_exists", "already_contacted", "do_not_contact", "closed", "suppressed", "no_address", "no_facts", "global_limit", "daily_limit", "workspace_budget", "draft_allowance"]);
+const STOP = new Set(["global_limit", "daily_limit", "workspace_budget", "draft_allowance"]);
 
 export async function prepareOutreach(user: Who, raw: unknown, d: Partial<PipelineDeps> & { draft?: typeof draftOutreach } = {}): Promise<Result<{ results: PrepareOutcome[] }>> {
   const deps = { ...pipelineDeps(), ...d };

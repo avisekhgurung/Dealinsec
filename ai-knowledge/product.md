@@ -1,16 +1,21 @@
 # What DealInSec is
 
-DealInSec is an AI-assisted client acquisition and deal-to-payment workspace
-for small B2B service businesses. Find Clients. Close Deals. Get Paid.
+DealInSec is a client-acquisition and deal-to-payment workspace for
+freelancers, consultants and small B2B service agencies: AI-assisted prospect
+research, leads, deals, quotations, agreements, invoices and payment tracking
+in one place. Find Clients. Close Deals. Get Paid.
 
-Who it is for: founder-led agencies and consultants of about 1 to 10 people —
-digital marketing, SEO, growth and performance marketing, AI automation and
-AI implementation, web design and development, software development and IT
-consulting, social media and content, and lead-generation agencies, plus
-independent B2B consultants. It is built for the United States and other
-international markets, and for India. Freelancers use it the same way, and
-creators can use it for paid brand collaborations, but they are not the main
-audience.
+Who it is for: freelancers, solo consultants and small B2B service agencies of
+about 1 to 10 people, including web development and software services,
+digital marketing, SEO, growth, AI automation, content and lead-generation
+businesses. It is launching first in India, and Indian businesses can find
+clients in India and abroad. Creators can use it for paid brand
+collaborations, but they are not the main audience.
+
+What it does not do: it does not guarantee clients, replies, meetings or
+sales; it is not a verified contact database (contact details are not always
+found); it is not an autonomous sales agent and never sends messages on its
+own; and it does not replace accounting software.
 
 The problem it solves: a small agency's sales live in too many places —
 prospect lists in a spreadsheet, outreach in Gmail, deals in someone's head,

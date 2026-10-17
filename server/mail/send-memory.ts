@@ -81,6 +81,12 @@ export class MemorySendWorld implements SendStore {
     const used = this.jobs.filter((j) => accountConns.has(j.connectionId) && j.messageId !== i.messageId
       && (j.status === "sending" || j.status === "uncertain" || (j.status === "sent" && j.sentAt && j.sentAt.getTime() > i.now.getTime() - DAY_MS))).length;
     if (used >= i.dailyCap) return { ok: false, code: "daily_cap" };
+    if (i.planCap) {
+      const cap = i.planCap;
+      const ws = this.jobs.filter((j) => j.organizationId === i.orgId && j.messageId !== i.messageId
+        && (j.status === "sending" || j.status === "uncertain" || (j.status === "sent" && j.sentAt && j.sentAt.getTime() >= cap.since.getTime()))).length;
+      if (ws >= cap.max) return { ok: false, code: "plan_send_limit" };
+    }
     if (i.hold) await i.hold();
     const fields = { status: "sending" as const, connectionId: conn.id, requestedBy: i.userId, bodyHash: msg.bodyHash, toAddress: to, leaseUntil: new Date(i.now.getTime() + i.leaseMs), errorCode: null, resolvedBy: null, resolvedAt: null, updatedAt: i.now };
     let row: SendJobView;

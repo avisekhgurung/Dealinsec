@@ -23,13 +23,15 @@ import { parseJsonObject } from "../agent/extraction";
 import { DiscoveryError, type DiscoveryProvider } from "../discovery/types";
 import { outboundSearchProviders } from "../discovery/provider";
 import { leadsStore } from "../leads/store";
-import { CapExceeded, CapUnavailable, GlobalCapExceeded, remainingToday, tracedChat, type TraceCtx } from "../llm/traced";
+import { CapExceeded, CapUnavailable, GlobalCapExceeded, WorkspaceBudgetExceeded, remainingToday, tracedChat, type TraceCtx } from "../llm/traced";
 import type { ChatMessage } from "../copilot/provider";
 import { PROMPT_VERSIONS, SIGNALS_PAGE_CHARS, enrichSystemPrompt, enrichUserMessage, signalsSystemPrompt, signalsUserMessage } from "./prompts";
 import { companyProvider, contactProvider, costMicroUsd, pageReader, readSitemap, researchPage, type CompanyEnrichmentProvider, type ContactEnrichmentProvider, type PageRead, type PageReader } from "./providers";
 import { outboundStore, type ItemWithProspect, type NewFinding, type OutboundStore } from "./store";
-import { dailyCompanyLimit, dailySearchLimit, globalSearchLimit } from "./limits";
+import { dailyCompanyLimit, dailySearchLimit, globalSearchLimit, workspaceMonthlySpendMicroUsd } from "./limits";
+import { OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
 import { utcDayStart } from "@shared/llm-cost";
+import { siteSignals } from "@shared/site-signals";
 import { failureCode, retryCode } from "./diagnostics";
 import { researchDiagnosticsDir, searchDiagnosticsDir, writeSearchDiagnostic } from "./search-diagnostics";
 import { researchDateDiagnostics } from "@shared/research-diagnostics";
@@ -37,6 +39,11 @@ import { queryRecord, rankRecord } from "@shared/search-diagnostics";
 import type { StepResult } from "../workflow/runner";
 
 export const CACHE_DAYS = 14;
+/**
+ * The most companies a run researches in depth: its requested number, which is what it holds of the workspace's
+ * researched-prospects allowance (shared/outbound-plans.ts). Enrichment may look at more to find them; research doesn't.
+ */
+const researchCap = (quantity: number) => Math.min(runBudget(quantity).research, Math.max(1, quantity));
 const DAY = 86_400_000;
 const MAX_ATTEMPTS = 3;
 
@@ -86,10 +93,16 @@ export interface QueryPlan { q: string; provider: string; done: boolean; ok?: bo
 export interface RunCountersExt extends RunCounters { searchRejectedBy?: Partial<Record<RejectReason, number>>; costMicroUsd?: number; stoppedBy?: string | null }
 
 const pageCache = new Map<string, { at: number; page: PageRead }>();
-async function readPage(deps: PipelineDeps, url: string): Promise<PageRead> {
+/** Who a page read is for: a paid read (`via`) is recorded against them as a provider call, with its estimated cost. */
+interface ReadFor { orgId: string; runId: string | null }
+async function readPage(deps: PipelineDeps, url: string, readFor?: ReadFor): Promise<PageRead> {
   const hit = pageCache.get(url);
   if (hit && deps.now().getTime() - hit.at < 30 * 60_000) return hit.page;
+  const t0 = Date.now();
   const page = await deps.reader.read(url);
+  if (page.via && readFor) {
+    await deps.store.recordProviderCall({ ...readFor, provider: page.via, operation: "page", ok: page.ok, errorCode: page.ok ? null : page.code, latencyMs: Date.now() - t0, costMicroUsd: costMicroUsd(page.via), now: deps.now() }).catch(() => {});
+  }
   // A failure is never remembered: it is retried after its back-off, and a cached failure would make every retry a no-op.
   if (page.ok) {
     if (pageCache.size > 300) pageCache.delete(pageCache.keys().next().value as string);
@@ -194,7 +207,7 @@ export async function stepRun(run: ProspectRunRow, deadline: number, deps: Pipel
     }
   } catch (e) {
     if (e instanceof StopRun) return finalize(run, icp, deps, e.code);
-    if (e instanceof CapExceeded) return finalize(run, icp, deps, e instanceof GlobalCapExceeded ? "global_limit" : "daily_limit");
+    if (e instanceof CapExceeded) return finalize(run, icp, deps, e instanceof GlobalCapExceeded ? "global_limit" : e instanceof WorkspaceBudgetExceeded ? "workspace_budget" : "daily_limit");
     throw e;
   }
 }
@@ -228,12 +241,14 @@ async function searchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps:
     const used = await deps.store.countProviderCalls({ orgId: run.organizationId, operation: "search", since: new Date(deps.now().getTime() - DAY) });
     // The platform-wide budget is reserved (atomically, for every workspace together) only after the workspace's own
     // limit passed; a reservation that can't be made because the searches can't be counted stops the run (fail closed).
-    let reservation: number | null = null;
+    let reservation: number | null | "workspace" = null;
     if (provider && used < dailySearchLimit()) {
-      try { reservation = await deps.store.reserveSearch({ orgId: run.organizationId, runId: run.id, provider: provider.name, costMicroUsd: costMicroUsd(provider.name), limit: globalSearchLimit(), since: utcDayStart(deps.now()), now: deps.now() }); }
+      const workspace = { since: new Date(deps.now().getTime() - OUTBOUND_WINDOW_DAYS * DAY), maxMicroUsd: workspaceMonthlySpendMicroUsd() };
+      try { reservation = await deps.store.reserveSearch({ orgId: run.organizationId, runId: run.id, provider: provider.name, costMicroUsd: costMicroUsd(provider.name), limit: globalSearchLimit(), since: utcDayStart(deps.now()), now: deps.now(), workspace }); }
       catch { throw new StopRun("cap_unavailable"); }
     }
     if (!provider) { next.done = true; next.ok = false; next.error = "not_configured"; }
+    else if (reservation === "workspace") { for (const q of plan) if (!q.done) { q.done = true; q.ok = false; q.error = "workspace_budget"; } counters.stoppedBy = "workspace_budget"; }
     else if (used >= dailySearchLimit()) { for (const q of plan) if (!q.done) { q.done = true; q.ok = false; q.error = "daily_limit"; } counters.stoppedBy = "daily_limit"; }
     else if (reservation === null) { for (const q of plan) if (!q.done) { q.done = true; q.ok = false; q.error = "global_limit"; } counters.stoppedBy = "global_limit"; }
     else {
@@ -272,7 +287,7 @@ async function rankStep(run: ProspectRunRow, icp: Icp, deps: PipelineDeps): Prom
   const plan = run.queries as QueryPlan[];
   const items = await deps.store.runItems(run.organizationId, run.id);
   if (!items.length) {
-    const code = plan.length && plan.every((q) => !q.ok) ? (plan.some((q) => q.error === "global_limit") ? "global_limit" : plan.some((q) => q.error === "daily_limit") ? "daily_limit" : "search_unavailable") : null;
+    const code = plan.length && plan.every((q) => !q.ok) ? (plan.some((q) => q.error === "global_limit") ? "global_limit" : plan.some((q) => q.error === "workspace_budget") ? "workspace_budget" : plan.some((q) => q.error === "daily_limit") ? "daily_limit" : "search_unavailable") : null;
     return finalize(run, icp, deps, code);
   }
   const budget = runBudget(run.quantity);
@@ -312,16 +327,26 @@ async function verifyOne(run: ProspectRunRow, item: ItemWithProspect, deps: Pipe
     return void (await deps.store.setItem(item.id, { stage: "verified", updatedAt: now }));
   }
   let page: PageRead;
-  try { page = await readPage(deps, `https://${p.domain}/`); }
+  try { page = await readPage(deps, `https://${p.domain}/`, { orgId: run.organizationId, runId: run.id }); }
   catch { return void (await retryLater(deps, item, "page_error")); }
   let reason: RejectReason | null = null;
-  if (!page.ok) reason = page.code === "not_html" ? "not_html" : "unreachable";
+  if (!page.ok) reason = page.code === "not_html" ? "not_html" : page.code === "robots" ? "robots_disallowed" : "unreachable";
   else if (!sameSite(new URL(page.url).hostname, p.domain) && !new URL(page.url).hostname.endsWith(`.${p.domain}`)) reason = "offsite_redirect";
   else { const c = checkSite({ name: p.name, domain: p.domain }, page); if (!c.ok) reason = c.reason!; }
   if (reason === "unreachable" && item.attempts < 1) return void (await retryLater(deps, item, "unreachable"));
   if (reason) {
     await deps.store.updateProspect(run.organizationId, p.id, { status: "rejected", rejectReason: reason, verifiedAt: now, updatedAt: now });
     return void (await rejectItem(deps, item, reason));
+  }
+  // What the home page's own markup shows (a missing mobile viewport tag, an old copyright year): saved as observations
+  // with their source and date, replacing the last check's. Never a judgement that they need a new website.
+  const read = page as Extract<PageRead, { ok: true }>; // verified above: the page was read
+  const signals = siteSignals(read.site, now);
+  if (read.site) {
+    await deps.store.saveStep({ orgId: run.organizationId, prospectId: p.id, batch: "site_check", now, findings: signals.map((x) => ({
+      kind: "fact", type: "site_signal", value: x.value, status: "confirmed", sourceUrl: read.url, sourceType: "website", quote: x.quote ?? null,
+      contentHash: read.hash, confidence: "high", meta: { signal: x.signal, ...(x.year ? { year: x.year } : {}) },
+    })) });
   }
   await deps.store.updateProspect(run.organizationId, p.id, { status: p.status === "candidate" || p.status === "rejected" ? "verified" : p.status, rejectReason: null, verifiedAt: now, contentHash: (page as any).hash, updatedAt: now });
   await deps.store.setItem(item.id, { stage: "verified", updatedAt: now });
@@ -376,7 +401,7 @@ async function enrichStep(run: ProspectRunRow, icp: Icp, deadline: number, deps:
  * are still examined, as before; the research stage then stops the run as it always has).
  */
 async function researchEarly(run: ProspectRunRow, icp: Icp, deadline: number, deps: PipelineDeps, all: ItemWithProspect[]): Promise<boolean> {
-  const room = Math.max(0, runBudget(run.quantity).research - all.filter((i) => i.stage === "done").length);
+  const room = Math.max(0, researchCap(run.quantity) - all.filter((i) => i.stage === "done").length);
   if (room === 0) return false;
   const now = deps.now();
   const ready = all.filter((i) => i.stage === "enriched" && (!i.nextAttemptAt || new Date(i.nextAttemptAt) <= now) && worthResearchingEarly(i.prospect.fit as any, deps.earlyResearchMinMatches))
@@ -393,10 +418,11 @@ export async function enrichOne(run: Pick<ProspectRunRow, "id" | "organizationId
   try {
     let facts = (await deps.store.findings(orgId, p.id)).filter((f) => f.batch === "enrich" || f.batch === "company");
     if (!(facts.some((f) => f.batch === "enrich" && fresh(f.retrievedAt, now)) || (fresh(p.researchedAt, now) && facts.length))) {
-      const home = await readPage(deps, `https://${p.domain}/`);
+      const readFor = { orgId, runId: run.id };
+      const home = await readPage(deps, `https://${p.domain}/`, readFor);
       if (!home.ok) { if (item) await retryLater(deps, item, `page_error:${home.code}`); return; }
       const extra = pickLinks(home.links, new URL(home.url), 2);
-      const others = await Promise.all(extra.map((u) => readPage(deps, u)));
+      const others = await Promise.all(extra.map((u) => readPage(deps, u, readFor)));
       const pages: ResearchPage[] = [home, ...others].filter((x): x is Extract<PageRead, { ok: true }> => x.ok && sameSite(new URL(x.url).hostname, p.domain)).map((x, i) => ({ index: i + 1, url: x.url, text: x.text }));
       const raw = await askJson(deps, { task: "enrich", orgId, userId: run.createdByUser, runId: run.id, promptVersion: PROMPT_VERSIONS.enrich },
         [{ role: "system", content: enrichSystemPrompt() }, { role: "user", content: enrichUserMessage(p.name, pages) }], MAX_TOKENS.enrich);
@@ -409,7 +435,7 @@ export async function enrichOne(run: Pick<ProspectRunRow, "id" | "organizationId
       // kept as a guess, with why. Email and person routes are judged on their own.
       const read = [home, ...others].filter((x): x is Extract<PageRead, { ok: true }> => x.ok && sameSite(new URL(x.url).hostname, p.domain));
       for (const d of drafts.filter((f) => f.type === "contact_form")) {
-        const check = await confirmForm(deps, d.value, read, p.domain);
+        const check = await confirmForm(deps, d.value, read, p.domain, { orgId, runId: run.id });
         if (check === "ok") d.meta = { formConfirmed: true };
         else { d.status = "inferred"; d.confidence = "low"; d.meta = { formConfirmed: false, formCheck: check }; }
       }
@@ -460,12 +486,12 @@ const pageKey = (u: string) => { try { const x = new URL(u); return `${x.hostnam
  * Whether a page the model called a contact form really holds one: the page already read, or read now (one more fetch, no
  * model call); "unreadable" when it can't be read or leaves the site, "no_form" when the reader saw no contact form on it.
  */
-export async function confirmForm(deps: Pick<PipelineDeps, "reader" | "now">, url: string, read: Extract<PageRead, { ok: true }>[], domain: string): Promise<"ok" | "no_form" | "unreadable"> {
+export async function confirmForm(deps: Pick<PipelineDeps, "reader" | "now">, url: string, read: Extract<PageRead, { ok: true }>[], domain: string, readFor?: ReadFor): Promise<"ok" | "no_form" | "unreadable"> {
   const key = pageKey(url);
   if (!key) return "unreadable";
   let page = read.find((x) => pageKey(x.url) === key);
   if (!page) {
-    const r = await readPage(deps as PipelineDeps, url).catch(() => null);
+    const r = await readPage(deps as PipelineDeps, url, readFor).catch(() => null);
     if (!r || !r.ok || !sameSite(new URL(r.url).hostname, domain)) return "unreadable";
     page = r;
   }
@@ -483,7 +509,7 @@ async function researchStep(run: ProspectRunRow, icp: Icp, deadline: number, dep
     .sort((a, b) => byResearchPriority({ rank: a.rank, fit: a.prospect.fit as any }, { rank: b.rank, fit: b.prospect.fit as any }));
   if (!waiting.length) return finalize(run, icp, deps, null);
   if (!dueNow.length) return waitFor(run, "enriched", deps);
-  const room = Math.max(0, budget.research - researched);
+  const room = Math.max(0, researchCap(run.quantity) - researched);
   if (room === 0) return finalize(run, icp, deps, null); // the rest keep their enrichment; finalize scores them
   const left = await allowanceOrStop(deps, "signals", run.organizationId);
   if (left <= 0) throw new StopRun("daily_limit");
@@ -500,13 +526,14 @@ export async function researchOne(run: Pick<ProspectRunRow, "id" | "organization
       if (item) await deps.store.setItem(item.id, { stage: "done", updatedAt: now });
       return { kept: 0 };
     }
-    const home = await readPage(deps, `https://${p.domain}/`);
+    const readFor = { orgId, runId: run.id };
+    const home = await readPage(deps, `https://${p.domain}/`, readFor);
     if (!home.ok) { if (item) await retryLater(deps, item, `page_error:${home.code}`); return null; }
     const homeUrl = new URL(home.url);
     let links = home.links.map((l) => l.href);
     let picked = pickResearchLinks(links, homeUrl, 4);
     if (picked.length < 3) { links = [...links, ...(await deps.sitemap(p.domain).catch(() => []))]; picked = pickResearchLinks(links, homeUrl, 4); }
-    const reads = await Promise.all(picked.map((u) => readPage(deps, u)));
+    const reads = await Promise.all(picked.map((u) => readPage(deps, u, readFor)));
     // Each page as the model will see it (SIGNALS_PAGE_CHARS): its dates line, as much of its text as fits, its labelled blocks.
     const pages: ResearchPage[] = [home, ...reads].filter((x): x is Extract<PageRead, { ok: true }> => x.ok && sameSite(new URL(x.url).hostname, p.domain)).slice(0, 5).map((x, i) => researchPage(x, i + 1, SIGNALS_PAGE_CHARS));
     const known = (await deps.store.findings(orgId, p.id)).filter((f) => f.kind === "fact" && (f.batch === "enrich" || f.batch === "company"));
@@ -605,7 +632,7 @@ async function finalize(run: ProspectRunRow, icp: Icp, deps: PipelineDeps, stopp
   for (const i of items) {
     if (i.stage === "enriched" || i.stage === "done") await scoreProspect(run.organizationId, i.prospectId, deps);
     if (i.stage === "enriched") await deps.store.setItem(i.id, { stage: "done", errorCode: stoppedBy ? stoppedBy : "not_researched", updatedAt: deps.now() });
-    const why = stoppedBy === "daily_limit" || stoppedBy === "global_limit" ? stoppedBy : stoppedBy ? "failed" : "budget";
+    const why = stoppedBy === "daily_limit" || stoppedBy === "global_limit" || stoppedBy === "workspace_budget" ? stoppedBy : stoppedBy ? "failed" : "budget";
     if (i.stage === "found" || i.stage === "verified") await deps.store.setItem(i.id, { stage: "rejected", errorCode: why, updatedAt: deps.now() });
   }
   const counters = await computeCounters({ ...run, counters: { ...(run.counters as object), stoppedBy: stoppedBy ?? (run.counters as RunCountersExt)?.stoppedBy ?? null } as any }, deps);

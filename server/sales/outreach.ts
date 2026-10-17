@@ -37,13 +37,16 @@ import { ProviderError, type ChatMessage } from "../copilot/provider";
 import { agentLog } from "../agent/log";
 import { parseJsonObject } from "../agent/extraction";
 import { leadsStore } from "../leads/store";
-import { CapExceeded, CapUnavailable, GlobalCapExceeded, assertWithinCap, tracedChat } from "../llm/traced";
+import { CapExceeded, CapUnavailable, GlobalCapExceeded, WorkspaceBudgetExceeded, assertWithinCap, tracedChat } from "../llm/traced";
 import { getIdealClient } from "../services/ideal-client";
 import { relatedKnowledge } from "../services/knowledge";
 import { createTicket, fail, getLead, moveLead, readGate, updateLead, writeGate, type Result, type Who } from "../services/leads";
 import { storage } from "../storage";
 import { OUTREACH_PROMPT_VERSION, draftSystemPrompt, draftUserMessage, type DraftInput } from "./outreach-prompt";
-import { DraftExists, messageStore, messagesTablesReady, outreachSafetyReady, type MessageStore } from "./message-store";
+import { DraftAllowanceReached, DraftExists, messageStore, messagesTablesReady, outreachSafetyReady, type MessageStore } from "./message-store";
+import { AI_DRAFT_VERSION_PREFIX, outboundTier } from "../outbound/plan";
+import { outboundAllowance } from "../outbound/limits";
+import { OUTBOUND_WINDOW_DAYS, TIER_LABEL } from "@shared/outbound-plans";
 import { researchStore, salesTablesReady } from "./research-store";
 
 export interface OutreachDeps { store: MessageStore; chat: typeof tracedChat; now: () => Date }
@@ -180,8 +183,19 @@ export async function draftOutreach(user: Who, leadId: number, opts: { by?: "use
   const { facts, angles } = draftFacts(scoreClaims);
   if (!facts.length) return fail(422, "no_facts", "There is nothing verified about this company to write from yet. Research the lead first, so the message says something true.");
 
+  // The plan's AI-draft allowance over 30 days: checked here so no model call is paid for a draft that couldn't be saved,
+  // and again with the insert (store.create, under a per-workspace lock) so parallel requests can't pass it together.
+  const tier = await outboundTier(user);
+  const plan = outboundAllowance(tier);
+  const allowance = { since: new Date(deps.now().getTime() - OUTBOUND_WINDOW_DAYS * 86_400_000), max: plan.monthlyDrafts, prefix: AI_DRAFT_VERSION_PREFIX };
+  const draftLimit = () => tier === "free"
+    ? fail(402, "NO_CREDITS", `You've used the free plan's ${plan.monthlyDrafts} AI drafts for this 30-day period. Upgrade to Pro for more, or write this message yourself.`, { feature: "outbound" })
+    : fail(429, "draft_allowance", `You've used the ${plan.monthlyDrafts} AI drafts included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier drafts pass 30 days; you can still write this message yourself.`);
+  if ((await deps.store.countAiDrafts(orgId, allowance.since, allowance.prefix)) >= allowance.max) return draftLimit();
+
   try { await assertWithinCap("draft", orgId); }
   catch (e) {
+    if (e instanceof WorkspaceBudgetExceeded) return fail(429, "workspace_budget", "This workspace's AI usage for the last 30 days has reached its limit. What's already found and saved stays; it frees up as earlier usage passes 30 days.");
     if (e instanceof GlobalCapExceeded) return fail(429, "global_limit", "Today's AI budget for lead research and drafting is used up for everyone on DealInSec. It resets at midnight UTC.");
     if (e instanceof CapExceeded) return fail(429, "daily_limit", `You've used today's ${dailyLimit("draft")} drafts. Try again tomorrow.`);
     if (e instanceof CapUnavailable) return fail(503, "SALES_NOT_SETUP", "The sales agent isn't set up on this server yet.");
@@ -217,6 +231,7 @@ export async function draftOutreach(user: Who, leadId: number, opts: { by?: "use
       messages.push({ role: "assistant", content: reply.content ?? "" }, { role: "user", content: `That draft cannot be used. Fix these problems and return the JSON object again:\n${issuesForRetry(issues)}` });
     }
   } catch (e) {
+    if (e instanceof WorkspaceBudgetExceeded) return fail(429, "workspace_budget", "This workspace's AI usage for the last 30 days has reached its limit. What's already found and saved stays; it frees up as earlier usage passes 30 days.");
     if (e instanceof GlobalCapExceeded) return fail(429, "global_limit", "Today's AI budget for lead research and drafting is used up for everyone on DealInSec. It resets at midnight UTC.");
     if (e instanceof CapExceeded) return fail(429, "daily_limit", `You've used today's ${dailyLimit("draft")} drafts. Try again tomorrow.`);
     if (e instanceof CapUnavailable) return fail(503, "SALES_NOT_SETUP", "The sales agent isn't set up on this server yet.");
@@ -230,10 +245,11 @@ export async function draftOutreach(user: Who, leadId: number, opts: { by?: "use
     row = await deps.store.create({
       orgId, leadId, subject: draft.subject, body: draft.body, bodyHash: hashDraft(draft.subject, draft.body), toAddress: to.address, toSource: to.source,
       researchId: await latestResearchId(orgId, leadId), claimIds: [...facts, ...angles].map((f) => f.id), promptVersion: OUTREACH_PROMPT_VERSION,
-      by: opts.by ?? "user", userId: user.id, now: deps.now(),
+      by: opts.by ?? "user", userId: user.id, now: deps.now(), allowance,
     });
   } catch (e) {
     if (e instanceof DraftExists) return fail(409, "draft_exists", "This lead already has a message waiting. Send or cancel it first.");
+    if (e instanceof DraftAllowanceReached) return draftLimit();
     throw e;
   }
   await leadsStore.addEvent(orgId, leadId, { kind: "draft_created", data: { messageId: row.id, claims: facts.length + angles.length }, actor: opts.by ?? "user", actorUserId: user.id });

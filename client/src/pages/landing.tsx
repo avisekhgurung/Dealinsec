@@ -10,7 +10,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import {
   ChevronDown,
   Briefcase,
-  FileText,
   Receipt,
   ReceiptText,
   Shield,
@@ -58,13 +57,14 @@ import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { trackEvent } from "@/lib/analytics";
 import { PRICING } from "@shared/product-facts";
-import { OUTBOUND_ALLOWANCE_DEFAULTS } from "@shared/outbound-plans";
+import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
+import { PRO_INCLUDED_SEATS } from "@shared/permissions";
 import { openConsentSettings } from "@/lib/consent";
 import { LandingCopilot } from "@/components/landing-copilot";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { BRAND_GRADIENT, GradientText, SectionHeader, fadeUp, stagger } from "@/components/landing-shared";
 import { LandingTryDemo } from "@/components/landing-try-demo";
-import { AiOutboundSection, AudienceCards, CtaBanner, FaqSection, FeaturesSection, HeroSection, JourneySection, OneWorkspaceSection, OverviewSection } from "@/components/landing-redesign";
+import { AudienceCards, CtaBanner, FaqSection, FeaturesSection, HeroSection, ManualWorkflowSection, WorkflowWalkthrough } from "@/components/landing-redesign";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LANDING_FAQS } from "@shared/landing-faqs";
 import { rememberAudienceIntent } from "@/lib/audience-intent";
@@ -104,10 +104,9 @@ const isServerRoute = (href: string) => SERVER_ROUTE_PREFIXES.some((p) => href.s
 type NavLink = { label: string; href: string; note?: string };
 const NAV_LINKS: (NavLink | { label: string; items: NavLink[] })[] = [
   { label: "Product", items: [
-    { label: "Features", href: "#features", note: "Prospects to payment, in one place" },
-    { label: "How it works", href: "#how", note: "From finding the client to getting paid" },
-    { label: "Live demo", href: "#try", note: "Paste a client message, see the deal" },
-    { label: "Who it's for", href: "#audiences", note: "Agencies and consultants" },
+    { label: "Features", href: "#features", note: "Research, deals, quotations, agreements, invoices" },
+    { label: "Live demo", href: "#try", note: "Plan a search, read a reply, see what's next" },
+    { label: "Who it's for", href: "#audiences", note: "Freelancers, consultants and small agencies" },
   ] },
   { label: "How it works", href: "#how" },
   { label: "Pricing", href: "#pricing" },
@@ -264,12 +263,10 @@ export default function LandingPage() {
 
       <main className="relative z-[1]">
         <HeroSection isAuthenticated={isAuthenticated} onPrimary={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))} />
-        <AiOutboundSection />
+        <WorkflowWalkthrough />
         <FeaturesSection />
-        <JourneySection showDemo={!isAuthenticated} />
-        <OneWorkspaceSection />
+        <ManualWorkflowSection />
         <AudienceCards />
-        <OverviewSection />
         {!isAuthenticated && <LandingTryDemo />}
         <PricingPreview onCTA={() => { landingCta("pricing"); isAuthenticated ? setLocation("/pricing") : openAuth("signup"); }} />
         <CtaBanner isAuthenticated={isAuthenticated} onPrimary={() => { landingCta("final_banner"); isAuthenticated ? setLocation("/dashboard") : openAuth("signup"); }} />
@@ -665,20 +662,20 @@ function NavMenu({ label, items }: { label: string; items: NavLink[] }) {
 }
 
 function PricingPreview({ onCTA }: { onCTA: () => void }) {
-  const free = OUTBOUND_ALLOWANCE_DEFAULTS.free, pro = OUTBOUND_ALLOWANCE_DEFAULTS.pro;
+  const free = OUTBOUND_ALLOWANCE_DEFAULTS.free, pro = OUTBOUND_ALLOWANCE_DEFAULTS.pro, trial = OUTBOUND_ALLOWANCE_DEFAULTS.trial;
   const freePerks = [
-    `AI Outbound: ${free.monthlySearches} prospect searches a month, in any country`,
-    `${PRICING.freeMonthlyDeals} deals every month, each with a quotation`,
-    "Leads pipeline with follow-ups",
-    "Quotation PDFs and share links",
+    `${PRICING.freeMonthlyDeals} new deals a month, each with its quotation`,
+    "Lead pipeline: save researched prospects as leads, with follow-ups",
+    `AI prospect research: ${free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${free.maxCompanies} companies each`,
+    "Outreach drafts you approve, and the dashboard",
   ];
   const proMonthlyPerks = [
-    `AI Outbound: ${pro.monthlySearches} prospect searches a month, up to ${pro.maxCompanies} companies each`,
     "Unlimited deals & quotations",
     "Agreements your client signs online",
     "Invoices and payment tracking",
-    "Up to 5 team members",
-    "One plan: no separate CRM or AI Outbound fee",
+    `AI prospect research: ${pro.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${pro.maxCompanies} companies each`,
+    `Up to ${PRO_INCLUDED_SEATS} team members`,
+    "One plan: no separate CRM or AI fee",
   ];
 
   return (
@@ -687,7 +684,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
         <SectionHeader
           eyebrow="Pricing"
           title="Start simple. Grow when you need to."
-          subtitle="Start free in any country. Upgrade when agreements, invoices and payment tracking are worth it to you."
+          subtitle="Start free in any country. Upgrade when you need agreements, invoices, payment tracking and more AI research."
         />
 
         {/* Honest currency note: only Indian accounts can be charged today. */}
@@ -727,7 +724,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
               <span className="text-4xl font-bold tracking-tight">₹0</span>
               <span className="text-sm text-neutral-500">/ forever</span>
             </div>
-            <p className="text-xs text-neutral-500 mt-1">Try DealInSec with your first real client work.</p>
+            <p className="text-xs text-neutral-500 mt-1">Research a prospect, save the lead, create the deal and send the quotation.</p>
             <ul className="mt-5 space-y-2.5">
               {freePerks.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">
@@ -742,7 +739,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
             >
               Start free
             </Button>
-            <p className="text-[11px] text-neutral-500 text-center mt-3">Starts with a 7-day Pro trial.</p>
+            <p className="text-[11px] text-neutral-500 text-center mt-3">Starts with a {PRICING.trialDays}-day Pro trial ({trial.monthlySearches} AI searches), no card.</p>
           </motion.div>
 
           {/* Pro Monthly — recommended */}
@@ -787,7 +784,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                 </span>
                 <span className="text-sm text-neutral-500">/ month</span>
               </div>
-              <p className="text-xs text-neutral-500 mt-1">Paid monthly in India. It doesn&apos;t renew or charge automatically — pay again to extend.</p>
+              <p className="text-xs text-neutral-500 mt-1">₹{PRICING.proMonthlyInr} is charged at checkout, with no tax added on top. Paid monthly in India; it doesn&apos;t renew or charge automatically — pay again to extend.</p>
 
               <ul className="mt-5 space-y-2.5">
                 {proMonthlyPerks.map((f) => (
@@ -825,34 +822,26 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
 
         </motion.div>
 
-        {/* What's free vs. what needs Pro */}
+        {/* How the AI research limits work: read from shared/outbound-plans.ts and the run limits the server enforces. */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="mt-10 max-w-4xl mx-auto rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 overflow-hidden"
+          className="mt-10 max-w-4xl mx-auto rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-5 sm:p-6"
+          data-testid="pricing-limits"
         >
-          <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-neutral-200 dark:divide-neutral-800">
+          <p className="text-sm font-bold">How AI search limits work</p>
+          <ul className="mt-3 grid gap-x-6 gap-y-2 text-sm text-neutral-600 dark:text-neutral-400 sm:grid-cols-2">
             {[
-              { step: "1", title: "Create Deal", cost: "Free · 4/mo", icon: Briefcase },
-              { step: "2", title: "Send Quote", cost: "Included", icon: FileText },
-              { step: "3", title: "Sign Agreement", cost: "Pro", icon: FileSignature, highlight: true },
-              { step: "4", title: "Invoice & track payment", cost: "Pro", icon: Receipt, highlight: true },
-            ].map((s) => (
-              <div key={s.step} className={`p-4 text-center ${s.highlight ? "bg-emerald-50/70 dark:bg-emerald-950/20" : ""}`}>
-                <div className={`w-9 h-9 mx-auto rounded-lg flex items-center justify-center mb-2 ${s.highlight ? "bg-emerald-600 text-white" : "bg-neutral-100 dark:bg-neutral-800 text-emerald-600"}`}>
-                  <s.icon className="w-4 h-4" />
-                </div>
-                <p className="text-xs font-semibold">{s.title}</p>
-                <p className={`text-[11px] mt-0.5 font-semibold ${s.highlight ? "text-emerald-700 dark:text-emerald-300" : "text-neutral-500"}`}>
-                  {s.cost}
-                </p>
-              </div>
+              `One credit is one search that ran on the web. A search that stopped before searching isn't counted.`,
+              `Counted over a rolling ${OUTBOUND_WINDOW_DAYS} days, with at most 5 searches a day.`,
+              `At the limit on Free, upgrade to Pro or wait; on Pro, searches free up as earlier ones pass ${OUTBOUND_WINDOW_DAYS} days.`,
+              "Nothing is unlimited, and what you already found stays in your workspace.",
+            ].map((t) => (
+              <li key={t} className="flex items-start gap-2"><Check className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" /><span>{t}</span></li>
             ))}
-          </div>
+          </ul>
         </motion.div>
-
-
       </div>
     </section>
   );

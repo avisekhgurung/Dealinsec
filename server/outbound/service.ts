@@ -10,19 +10,20 @@ import { createHash } from "node:crypto";
 import { sanitizeQuery } from "@shared/discovery";
 import { describeIcp, icpSchema, mergeIcp, parseIcpFallback, searchStrategies, withSavedExclusions, type Icp } from "@shared/icp";
 import { normalizeAngle } from "@shared/prospect-intel";
-import { FRESHNESS_LABEL, PROSPECT_CLASS_LABEL, REJECT_LABEL, SIGNAL_LABEL, TIMING_LABEL, dateLabel, isContactFormRoute, isDecisionMaker, isSignalType, readiness, runBudget, signalDating, timingOf, type FindingLike, type ProspectClass, type RejectReason, type Timing } from "@shared/prospect";
+import { FRESHNESS_LABEL, PROSPECT_CLASS_LABEL, REJECT_LABEL, SIGNAL_LABEL, TIMING_LABEL, dateLabel, isContactFormRoute, isDecisionMaker, isSignalType, readiness, runBudget, signalDating, timingOf, type FindingLike, type ProspectClass, type RejectReason, type Timing, hasVerifiedEmail } from "@shared/prospect";
 import { roleRank } from "@shared/icp";
 import type { ProspectFindingRow, ProspectRow, ProspectRunRow } from "@shared/schema";
 import { parseJsonObject } from "../agent/extraction";
 import { agentLog } from "../agent/log";
 import { DiscoveryError } from "../discovery/types";
-import { CapExceeded, CapUnavailable, GlobalCapExceeded, tracedChat } from "../llm/traced";
+import { CapExceeded, CapUnavailable, GlobalCapExceeded, WorkspaceBudgetExceeded, tracedChat } from "../llm/traced";
 import { dailyLimit } from "@shared/llm-cost";
 import { profileStore } from "../leads/profile-store";
 import { addClaim, addNote, createLead, fail, readGate, writeGate, type Result, type Who } from "../services/leads";
 import { PROMPT_VERSIONS, angleSystemPrompt, angleUserMessage, icpSystemPrompt, icpUserMessage } from "./prompts";
 import { pipelineDeps, newRunId, researchOne, enrichOne, scoreProspect, type PipelineDeps, type QueryPlan, type RunCountersExt } from "./pipeline";
 import { prospectsTablesReady, RunActive, RunLimitReached } from "./store";
+import { isProspectFeedback, type ProspectFeedback } from "@shared/prospect-feedback";
 import { dailyContactLimit, dailyRunLimit, outboundAllowance } from "./limits";
 import { outboundTier } from "./plan";
 import { OUTBOUND_WINDOW_DAYS, TIER_LABEL } from "@shared/outbound-plans";
@@ -33,7 +34,8 @@ const DAY = 86_400_000;
 const NOT_SETUP = () => fail(503, "PROSPECTS_NOT_SETUP", "AI Outbound isn't set up on this server yet.");
 async function ready(): Promise<boolean> { try { return await prospectsTablesReady(); } catch { return false; } }
 const capFail = (e: unknown, task: Parameters<typeof dailyLimit>[0]) =>
-  e instanceof GlobalCapExceeded ? fail(429, "global_limit", "Today's AI Outbound budget for everyone on DealInSec is used up. Lead research and drafting are not affected. It resets at midnight UTC.")
+  e instanceof WorkspaceBudgetExceeded ? fail(429, "workspace_budget", "This workspace's AI usage for the last 30 days has reached its limit. What's already found and saved stays; it frees up as earlier usage passes 30 days.")
+  : e instanceof GlobalCapExceeded ? fail(429, "global_limit", "Today's AI Outbound budget for everyone on DealInSec is used up. Lead research and drafting are not affected. It resets at midnight UTC.")
   : e instanceof CapExceeded ? fail(429, "daily_limit", `You've used today's AI allowance for this (${dailyLimit(task)} a day). Try again tomorrow.`)
     : e instanceof CapUnavailable ? NOT_SETUP() : null;
 
@@ -120,12 +122,19 @@ export async function startRun(user: Who, raw: { request?: unknown; icp?: unknow
     { since: new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY), max: allowance.monthlySearches },
     { since: new Date(now.getTime() - DAY), max: dailyRunLimit() },
   ];
-  const limitReached = (i: number) => i === 0
+  // The researched-prospects allowance: a new search may research only what is left of it (index limits.length).
+  const prospects = { since: limits[0].since, max: allowance.monthlyProspects };
+  const limitReached = (i: number) => i === 0 || i === limits.length
     ? tier === "free"
-      ? fail(402, "NO_CREDITS", `You've used the free plan's ${allowance.monthlySearches} AI Outbound searches for this 30-day period. Upgrade to Pro for more.`, { feature: "outbound" })
-      : fail(429, "monthly_limit", `You've used the ${allowance.monthlySearches} AI Outbound searches included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`)
+      ? fail(402, "NO_CREDITS", i === 0
+        ? `You've used the free plan's ${allowance.monthlySearches} AI Outbound searches for this 30-day period. Upgrade to Pro for more.`
+        : `You've used the free plan's ${allowance.monthlyProspects} researched prospects for this 30-day period. Upgrade to Pro for more.`, { feature: "outbound" })
+      : fail(429, "monthly_limit", i === 0
+        ? `You've used the ${allowance.monthlySearches} AI Outbound searches included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`
+        : `You've used the ${allowance.monthlyProspects} researched prospects included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`)
     : fail(429, "daily_limit", `You've started today's ${dailyRunLimit()} prospect searches. Try again tomorrow.`);
   for (let i = 0; i < limits.length; i++) if ((await deps.store.countRunsSince(orgId, limits[i].since)) >= limits[i].max) return limitReached(i);
+  if ((await deps.store.prospectsHeldSince(orgId, prospects.since)) >= prospects.max) return limitReached(limits.length);
   // The searches the person saw (and may have edited) are the plan, each re-checked; none given = the default strategies.
   const given = Array.isArray(raw.searches) ? (raw.searches as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 12) : [];
   const max = runBudget(icp.quantity).queries;
@@ -136,7 +145,7 @@ export async function startRun(user: Who, raw: { request?: unknown; icp?: unknow
   const request = typeof raw.request === "string" && raw.request.trim() ? raw.request.trim().slice(0, 500) : describeIcp(icp);
   const idemKey = createHash("sha256").update(`${orgId}|${stable(icp)}`).digest("hex");
   try {
-    const run = await deps.store.createRun({ id: newRunId(), orgId, userId: user.id, by: opts.by ?? "user", request, icp, quantity: icp.quantity, idemKey, queries, now, limits });
+    const run = await deps.store.createRun({ id: newRunId(), orgId, userId: user.id, by: opts.by ?? "user", request, icp, quantity: icp.quantity, idemKey, queries, now, limits, prospects });
     (deps.kick ?? (() => outboundRunner.kick()))();
     return { ok: true, run: runView(run), existing: false };
   } catch (e) {
@@ -186,9 +195,18 @@ export interface ProspectCard {
   /** The best signal: a strong timing signal when there is one, otherwise context (see `timing`). Never a stale one. */
   /** decisionMaker: a SENIOR decision-maker only. contactPerson: when there is none, the best other named employee (a real person, not a decision-maker). */
   whyNow: Evidence | null; opportunity: Evidence | null; decisionMaker: Evidence | null; contactPerson: Evidence | null; evidenceCount: number; leadId: number | null; researched: boolean;
+  /**
+   * How it can be reached, kept apart from whether it fits: "verified" = an email a contact provider itself verified;
+   * "public" = a business email or a confirmed contact form on their own site (found, not verified); "none" = neither yet.
+   */
+  contact: "verified" | "public" | "none";
+  /** Deterministic observations from their home page's markup (shared/site-signals.ts): hints, never proof of need. */
+  siteSignals: string[];
+  /** The person's own verdict on this prospect, when the feedback table exists (prospect-feedback.ts). */
+  feedback?: ProspectFeedback | null;
 }
 
-const LABEL: Record<string, string> = { description: "What it does", services: "Services", industry: "Industry", location: "Location", country: "Country", team_size: "Team size", target_customers: "Who they serve", business_email: "Business email", business_phone: "Phone", contact_form: "Contact page", pain_point: "Possible pain point" };
+const LABEL: Record<string, string> = { description: "What it does", services: "Services", industry: "Industry", location: "Location", country: "Country", team_size: "Team size", target_customers: "Who they serve", business_email: "Business email", business_phone: "Phone", contact_form: "Contact page", pain_point: "Possible pain point", site_signal: "Website check" };
 
 const likeOf = (f: ProspectFindingRow): FindingLike => ({ id: f.id, kind: f.kind, type: f.type, value: f.value, status: f.status, sourceUrl: f.sourceUrl, observedAt: f.observedAt, retrievedAt: f.retrievedAt, meta: f.meta as Record<string, unknown> });
 
@@ -242,6 +260,9 @@ export function prospectCard(p: ProspectRow, fs: ProspectFindingRow[], now: Date
     profile: { industry: prof.industry?.value ?? null, location: prof.location?.value ?? null, country: prof.country?.value ?? null, employees: prof.team_size?.value ?? null, serves: prof.target_customers?.value ?? null },
     whyNow: sig ? evidenceOf(sig, now) : null, opportunity: opp ? evidenceOf(opp, now) : null, decisionMaker: person && senior(person) ? evidenceOf(person, now) : null, contactPerson: person && !senior(person) ? evidenceOf(person, now) : null,
     evidenceCount: fs.filter((f) => f.kind !== "opportunity").length, leadId: p.leadId, researched: fs.some((f) => f.batch === "research"),
+    contact: fs.some((f) => hasVerifiedEmail(likeOf(f))) ? "verified"
+      : fs.some((f) => (f.kind === "fact" && f.type === "business_email" && f.status === "confirmed") || isContactFormRoute(likeOf(f))) ? "public" : "none",
+    siteSignals: fs.filter((f) => f.kind === "fact" && f.type === "site_signal").map((f) => f.value),
   };
 }
 
@@ -259,13 +280,41 @@ export async function getRun(user: Who, id: string, d: Partial<PipelineDeps> = {
   const by = new Map<number, ProspectFindingRow[]>();
   for (const f of fs) { const a = by.get(f.prospectId) ?? []; a.push(f); by.set(f.prospectId, a); }
   const now = deps.now();
-  const cards = items.map((i) => prospectCard(i.prospect, by.get(i.prospectId) ?? [], now, i))
+  const verdicts = await feedbackFor(orgId, items.map((i) => i.prospectId));
+  const cards = items.map((i) => ({ ...prospectCard(i.prospect, by.get(i.prospectId) ?? [], now, i), feedback: verdicts?.get(i.prospectId) ?? null }))
     .sort((a, b) => Number(b.ready) - Number(a.ready) || Number(!!b.score) - Number(!!a.score) || (b.score?.total ?? -1) - (a.score?.total ?? -1) || Number(!a.rejectReason) - Number(!b.rejectReason));
   return { ok: true, run: runView(run), prospects: cards };
 }
 
 export interface StoredAngle { problem: string; opportunity: string; positioning: string; targetPerson: string | null; reason: string; evidenceIds: number[]; confidence: "low" | "medium"; promptVersion?: string; at?: string }
 export interface ProspectBrief { prospect: ProspectCard; facts: Evidence[]; signals: Evidence[]; people: Evidence[]; inferences: Evidence[]; opportunities: Evidence[]; sources: { provider: string; query: string; url: string; title: string }[]; angle: StoredAngle | null; providers: { contact: boolean } }
+
+/* ── the person's verdict on a prospect (shared/prospect-feedback.ts) ───── */
+
+/** The verdicts on these prospects, or null when feedback isn't set up (or can't be read): never a reason to fail the page. */
+async function feedbackFor(orgId: string, ids: number[]): Promise<Map<number, ProspectFeedback> | null> {
+  try {
+    const m = await import("./prospect-feedback");
+    if (!(await m.prospectFeedbackReady())) return null;
+    return await m.feedbackStore.forProspects(orgId, ids);
+  } catch { return null; }
+}
+
+/** Records (or with null clears) the person's verdict on a prospect of their workspace. It changes no score, readiness or allowance. */
+export async function setProspectFeedback(user: Who, id: number, value: unknown, d: Partial<PipelineDeps> = {}): Promise<Result<{ feedback: ProspectFeedback | null }>> {
+  const deps = { ...pipelineDeps(), ...d };
+  const gate = writeGate(user);
+  if (gate) return gate;
+  if (!(await ready())) return NOT_SETUP();
+  if (value !== null && !isProspectFeedback(value)) return fail(400, "invalid", "Choose Relevant, Not relevant, Duplicate or Already contacted.");
+  const orgId = user.organizationId!;
+  if (!(await deps.store.getProspect(orgId, id))) return fail(404, "not_found", "That company isn't in your workspace.");
+  let m: typeof import("./prospect-feedback");
+  try { m = await import("./prospect-feedback"); if (!(await m.prospectFeedbackReady())) throw new Error("not set up"); }
+  catch { return fail(503, "FEEDBACK_NOT_SETUP", "Feedback on prospects isn't set up on this server yet."); }
+  await m.feedbackStore.set({ orgId, prospectId: id, value, userId: user.id, now: deps.now() });
+  return { ok: true, feedback: value };
+}
 
 export async function getProspect(user: Who, id: number, d: Partial<PipelineDeps> = {}): Promise<Result<{ brief: ProspectBrief }>> {
   const deps = { ...pipelineDeps(), ...d };
@@ -278,10 +327,11 @@ export async function getProspect(user: Who, id: number, d: Partial<PipelineDeps
   const fs = await deps.store.findings(orgId, id);
   const now = deps.now();
   const ev = fs.map((f) => evidenceOf(f, now));
+  const verdicts = await feedbackFor(orgId, [p.id]);
   return {
     ok: true,
     brief: {
-      prospect: prospectCard(p, fs, now),
+      prospect: { ...prospectCard(p, fs, now), feedback: verdicts?.get(p.id) ?? null },
       facts: ev.filter((e) => e.kind === "fact" && e.status === "confirmed"),
       signals: ev.filter((e) => e.kind === "signal"),
       people: ev.filter((e) => e.kind === "decision_maker").sort((a, b) => Number(!!b.senior) - Number(!!a.senior) || Number((a.meta as any)?.rank ?? 99) - Number((b.meta as any)?.rank ?? 99)),

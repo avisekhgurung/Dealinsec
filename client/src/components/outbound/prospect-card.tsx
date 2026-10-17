@@ -12,6 +12,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { press } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { countryName, type Evidence, type ProspectCard as Card } from "@/lib/outbound";
+import { PROSPECT_FEEDBACK_LABEL } from "@shared/prospect-feedback";
+import { SITE_SIGNAL_NOTE } from "@shared/site-signals";
 
 export function ScoreBadge({ score, size = "md" }: { score: Card["score"]; size?: "md" | "lg" }) {
   if (!score) return <div className={cn("flex shrink-0 flex-col items-center justify-center rounded-xl border border-dashed text-muted-foreground", size === "lg" ? "h-16 w-16" : "h-12 w-12")}><CircleHelp className="h-4 w-4" /><span className="text-[9px]">no score</span></div>;
@@ -91,6 +93,15 @@ export function ProspectCard({ p, onOpen, onEvidence, onAdd, adding, canEdit }: 
           {qual.reason && <p className="break-words text-xs text-muted-foreground" data-testid="prospect-class-reason">{qual.reason}</p>}
         </div>
       )}
+
+      {/* How it can be reached, kept apart from whether it fits; the person's own verdict; what their home page shows. */}
+      <div className="flex flex-wrap items-center gap-1.5" data-testid="prospect-status-chips">
+        {p.contact === "verified" && <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" title="An email the contact provider itself verified" data-testid="prospect-contact" data-state="verified"><BadgeCheck className="h-3 w-3" aria-hidden />Verified contact</span>}
+        {p.contact === "public" && <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium" title="A business email or contact form found on their own site. Found, not verified." data-testid="prospect-contact" data-state="public"><Link2 className="h-3 w-3" aria-hidden />Public contact · not verified</span>}
+        {p.contact === "none" && <span className="inline-flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-[11px] text-muted-foreground" data-testid="prospect-contact" data-state="none"><CircleDashed className="h-3 w-3" aria-hidden />No contact found yet</span>}
+        {(p.siteSignals?.length ?? 0) > 0 && <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground" title={`${p.siteSignals!.join(". ")}. ${SITE_SIGNAL_NOTE}`} data-testid="prospect-site-signals">Website: {p.siteSignals!.length} observation{p.siteSignals!.length === 1 ? "" : "s"}</span>}
+        {p.feedback && <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium" data-testid="prospect-feedback">You marked: {PROSPECT_FEEDBACK_LABEL[p.feedback]}</span>}
+      </div>
 
       {(fits.length > 0 || misses.length > 0) && (
         <ul className="space-y-0.5 text-sm" aria-label="Why they fit">

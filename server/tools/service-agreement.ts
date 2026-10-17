@@ -34,7 +34,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "How do I get it signed?",
-    a: "You can print and sign it, or send it from DealInSec: your client accepts it online and the agreement keeps an execution record — who accepted it, when, and with which signature — attached to the deal. Agreements are part of Pro (₹499/month in India; paid plans can't be bought from other countries yet), and every new account starts with a 7-day Pro trial, no card.",
+    a: "You can print and sign it, or send it from DealInSec: your client accepts it online and the agreement keeps an execution record — who accepted it, when, and with which signature — attached to the deal. Agreements are part of Pro (₹199/month in India; paid plans can't be bought from other countries yet), and every new account starts with a 7-day Pro trial, no card.",
   },
 ];
 

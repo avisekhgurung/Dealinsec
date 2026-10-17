@@ -5,6 +5,8 @@
  * shape, on purpose: "continue the deal I already started" is one mechanism
  * regardless of where the draft came from.
  */
+import { hasPendingOutboundPrefill } from "./outbound-prefill";
+
 export const DEAL_PREFILL_KEY = "dis_deal_prefill";
 
 export function hasPendingDealPrefill(): boolean {
@@ -16,8 +18,10 @@ export function hasPendingDealPrefill(): boolean {
 }
 
 /** Where a successful auth (signup, login, or onboarding completion) should
- *  land: the create-deal form (which will consume and clear the prefill) if
- *  one is waiting, otherwise the ordinary dashboard. */
-export function postAuthDestination(): "/deals/new" | "/dashboard" {
-  return hasPendingDealPrefill() ? "/deals/new" : "/dashboard";
+ *  land: the create-deal form (which will consume and clear the prefill) if a
+ *  demo deal is waiting, AI Outbound if the demo's client search is waiting,
+ *  otherwise the ordinary dashboard. */
+export function postAuthDestination(): "/deals/new" | "/outbound" | "/dashboard" {
+  if (hasPendingDealPrefill()) return "/deals/new";
+  return hasPendingOutboundPrefill() ? "/outbound" : "/dashboard";
 }

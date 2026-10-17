@@ -131,6 +131,10 @@ const sendDeps: SendDeps = {
     return !!u && u.organizationId === orgId && u.memberStatus !== "removed";
   },
   log: deps.log,
+  async planSendCap(user) {
+    const [{ outboundTier }, { outboundAllowance }, { OUTBOUND_WINDOW_DAYS }] = await Promise.all([import("../outbound/plan"), import("../outbound/limits"), import("@shared/outbound-plans")]);
+    return { since: new Date(Date.now() - OUTBOUND_WINDOW_DAYS * 86_400_000), max: outboundAllowance(await outboundTier(user as any)).monthlySends };
+  },
   async threadFor(orgId, messageId) {
     return (await mailSyncSchemaReady()) ? followupThread(orgId, messageId) : null;
   },

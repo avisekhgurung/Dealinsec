@@ -42,12 +42,22 @@ export type MessageStatus = "draft" | "approved" | "sending" | "sent" | "cancell
 export interface NewMessage {
   orgId: string; leadId: number; subject: string; body: string; bodyHash: string; toAddress: string; toSource: "lead" | "site";
   researchId: number | null; claimIds: number[]; promptVersion: string; by: "user" | "agent"; userId: string; now: Date;
+  /**
+   * The plan's AI-draft allowance (shared/outbound-plans.ts): AI first messages saved since `since` (prompt version
+   * starting with `prefix`) must be under `max`, counted under a per-workspace lock with the insert, else DraftAllowanceReached.
+   */
+  allowance?: { since: Date; max: number; prefix: string };
 }
 export class DraftExists extends Error { constructor() { super("this lead already has an unsent message"); } }
+export class DraftAllowanceReached extends Error { constructor(public max: number) { super("the plan's AI drafts for this period are used"); } }
+/** Serialises the AI-draft allowance check with the insert, per workspace. */
+export const DRAFT_ALLOWANCE_LOCK = 7_310_031;
 
 export interface MessageStore {
   /** Creates a draft, or throws DraftExists if the lead already has an unsent (draft or approved) message. */
   create(m: NewMessage): Promise<LeadMessageRow>;
+  /** AI first messages this workspace saved since `since` (prompt version starting with `prefix`), whatever happened to them since. */
+  countAiDrafts(orgId: string, since: Date, prefix: string): Promise<number>;
   get(orgId: string, id: number): Promise<LeadMessageRow | null>;
   listForLead(orgId: string, leadId: number, limit?: number): Promise<LeadMessageRow[]>;
   /** The lead's unsent message, if any. */
@@ -97,6 +107,21 @@ export interface MessageStore {
 export const messageStore: MessageStore = {
   async create(m) {
     try {
+      if (m.allowance) {
+        const a = m.allowance;
+        return await db.transaction(async (tx) => {
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(${DRAFT_ALLOWANCE_LOCK}, hashtext(${m.orgId}))`);
+          const used = await tx.execute(sql`SELECT count(*)::int AS n FROM ${leadMessages} WHERE organization_id = ${m.orgId} AND direction = 'out'
+            AND prompt_version LIKE ${a.prefix + "%"} AND created_at >= ${a.since.toISOString()}::timestamp`);
+          if (Number((used.rows[0] as { n: unknown }).n) >= a.max) throw new DraftAllowanceReached(a.max);
+          const [row] = await tx.insert(leadMessages).values({
+            leadId: m.leadId, organizationId: m.orgId, subject: m.subject, body: m.body, bodyHash: m.bodyHash, toAddress: m.toAddress, toSource: m.toSource,
+            status: "draft", researchId: m.researchId, claimIds: m.claimIds, promptVersion: m.promptVersion, createdBy: m.by, createdByUser: m.userId,
+            createdAt: m.now, updatedAt: m.now,
+          }).returning();
+          return row;
+        });
+      }
       const [row] = await db.insert(leadMessages).values({
         leadId: m.leadId, organizationId: m.orgId, subject: m.subject, body: m.body, bodyHash: m.bodyHash, toAddress: m.toAddress, toSource: m.toSource,
         status: "draft", researchId: m.researchId, claimIds: m.claimIds, promptVersion: m.promptVersion, createdBy: m.by, createdByUser: m.userId,
@@ -108,6 +133,11 @@ export const messageStore: MessageStore = {
       if ((e as { code?: string })?.code === "23505") throw new DraftExists();
       throw e;
     }
+  },
+  async countAiDrafts(orgId, since, prefix) {
+    const r = await db.execute(sql`SELECT count(*)::int AS n FROM ${leadMessages} WHERE organization_id = ${orgId} AND direction = 'out'
+      AND prompt_version LIKE ${prefix + "%"} AND created_at >= ${since.toISOString()}::timestamp`);
+    return Number((r.rows[0] as { n: unknown } | undefined)?.n ?? 0);
   },
   async get(orgId, id) {
     const [r] = await db.select().from(leadMessages).where(and(eq(leadMessages.organizationId, orgId), eq(leadMessages.id, id))).limit(1);

@@ -24,28 +24,25 @@ export const SUPPORT_EMAIL = "support@dealinsec.com";
 
 /** One sentence: what it is. */
 export const ONE_LINER =
-  "DealInSec is an AI-assisted client acquisition and deal-to-payment workspace for small B2B service businesses.";
+  "DealInSec is a client-acquisition and deal-to-payment workspace for freelancers, consultants and small B2B service agencies: AI-assisted prospect research, leads, deals, quotations, agreements, invoices and payment tracking in one place.";
 
 /** A short paragraph for summaries, meta descriptions and the top of AI-readable files. */
 export const SUMMARY =
-  "Use AI to discover relevant prospects, prepare personalized outreach and manage the journey from conversation to payment. DealInSec helps founder-led agencies and consultants research real prospects, approve outreach, manage interested leads, and move each deal through quotations, agreements, invoices and payment tracking in one connected workspace, on one subscription. AI does the research and drafting; you review and approve before anything goes to a client.";
+  "DealInSec helps service businesses manage the journey from prospect discovery to payment: find prospects, research and qualify them, save leads, manage deals, send quotations, create agreements and collect signatures online, generate invoices and track payments. AI-assisted prospect research checks each company's own website, shows dated signals with their sources and drafts a first message; you review and approve before anything reaches a client, and you send it yourself. Every document comes from the same deal, so the scope and the numbers match.";
 
-/** The primary audience, in the order the homepage and assistants name it. About 1 to 10 people. */
+/** The primary audience, in the order the homepage and assistants name it. */
 export const PRIMARY_AUDIENCE = [
-  "digital marketing agencies",
-  "SEO agencies and SEO consultants",
-  "growth and performance marketing agencies",
-  "AI automation agencies and AI implementation consultants",
-  "web design and development agencies",
-  "software development and IT consulting firms",
-  "social media and content marketing agencies",
-  "lead-generation and sales-development agencies",
+  "freelancers and solo consultants",
+  "web development and software services agencies",
+  "digital marketing, SEO and growth agencies",
+  "AI automation agencies and consultants",
+  "social media, content and lead-generation agencies",
   "independent B2B consultants and specialist service providers",
 ] as const;
 export const AUDIENCE_LINE =
-  "founder-led B2B service businesses of about 1 to 10 people: digital marketing, SEO, growth, AI automation, web and software development, content and lead-generation agencies, independent B2B consultants, and solo founders starting a B2B service business";
+  "freelancers, solo consultants and small B2B service agencies of about 1 to 10 people, including web development and software services, digital marketing, SEO, growth, AI automation, content and lead-generation businesses";
 /** Kept, but never the headline: older pages and tools for these still exist. */
-export const SECONDARY_AUDIENCE = ["freelancers and independent professionals", "creators who do paid brand collaborations"] as const;
+export const SECONDARY_AUDIENCE = ["creators who do paid brand collaborations"] as const;
 
 export const MARKETS =
   "Launching first in India: plans are priced and paid in rupees, and onboarding, support and billing are set up for Indian agencies. Indian agencies can find clients in India and abroad: AI Outbound searches the United States, the United Kingdom, Canada, Australia, the UAE, India and other countries, whichever you choose, wherever your own business is. Workspaces in other countries can use the free plan and the trial; documents follow each workspace's country and currency (50 currencies are supported).";
@@ -152,12 +149,16 @@ export const PRICING_LINES: readonly string[] = [
   `${PRICING.trialDays}-day Pro trial: every new account gets the Pro workflow once it finishes setup (with ${OB.trial.monthlySearches} AI Outbound searches), with no card. It ends on its own and moves you to the free plan; nothing is charged.`,
   `DealInSec Pro: one plan that includes everything — AI Outbound with ${OB.pro.monthlySearches} searches a month (up to ${OB.pro.maxCompanies} companies each), the leads pipeline, unlimited deals, quotations, agreements with online signing, invoices, payment tracking and ${PRO_INCLUDED_SEATS} team members. ${rupees(PRICING.proMonthlyInr)} a month in India, paid once a month: it does not renew or charge automatically, you pay again to extend. There is no separate plan for AI Outbound or the CRM, and no annual plan. Extra team members are ${rupees(PRICING.extraSeatInr)} each a month.`,
   PRICING.checkout,
+  `Checkout charges exactly the listed price (${rupees(PRICING.proMonthlyInr)} for Pro); DealInSec adds no tax on top of it.`,
   "No platform fee or commission on your deal value.",
 ];
 
 /** Promises no page, answer or file may make (the tests look for them). */
 export const NEVER_CLAIM: readonly string[] = [
   "that DealInSec guarantees a client pays, or recovers money",
+  "that DealInSec guarantees new clients, leads, meetings, replies or sales",
+  "that DealInSec is a verified contact database or that contact details are verified",
+  "that DealInSec is an autonomous sales agent, or replaces every CRM or accounting product",
   "that it sends emails, follow-ups or reminders automatically",
   "that it collects or processes client payments",
   "that AI reads or classifies Gmail messages",

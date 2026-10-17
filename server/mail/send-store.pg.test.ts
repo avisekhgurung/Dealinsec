@@ -219,6 +219,26 @@ describe.skipIf(!URL_ || !loopback(URL_))("Gmail send reservation (real Postgres
     expect(await second).toMatchObject({ ok: false, code: "daily_cap" });
   });
 
+  it("the plan's send allowance: two teammates' mailboxes racing for the workspace's last send; the second waits and is refused", async () => {
+    const s = await seed(1);
+    // A second member of the same workspace, with their own mailbox and their own approved message.
+    const ben = `u-${randomBytes(5).toString("hex")}`;
+    await q.query(`INSERT INTO users (id, email, organization_id, org_role, member_status) VALUES ($1, $2, $3, 'SALES', 'active')`, [ben, `${ben}@example.test`, s.org]);
+    const conn = await mailbox.save({ orgId: s.org, userId: ben, provider: "fake", account: { sub: `sub-${ben}`, email: `${ben}@agency.test` }, scopes: ["email", "openid", "https://www.googleapis.com/auth/gmail.send"], refreshToken: "rt", keyring, now: now() });
+    if (!conn.ok) throw new Error(conn.code);
+    const lead = (await q.query(`INSERT INTO leads (organization_id, owner_user_id, company_name, domain, source, status, do_not_contact, created_at, updated_at) VALUES ($1, $2, 'Acme', $3, 'outbound', 'qualified', false, now(), now()) RETURNING id`, [s.org, ben, `ben${seq}.test`])).rows[0].id;
+    const hash = hashDraft(SUBJECT, BODY);
+    const id = (await q.query(`INSERT INTO lead_messages (lead_id, organization_id, direction, channel, subject, body, body_hash, to_address, to_source, status, claim_ids, created_by, created_at, updated_at) VALUES ($1, $2, 'out', 'manual', $3, $4, $5, $6, 'site', 'approved', '[]', 'user', now(), now()) RETURNING id`, [lead, s.org, SUBJECT, BODY, hash, `ben-target${seq}@acme-foods.test`])).rows[0].id;
+    const planCap = { since: new Date(now().getTime() - 30 * 86_400_000), max: 1 };
+    const h = held(s, s.m, { planCap }); await h.at;
+    const second = sends.reserve({ orgId: s.org, userId: ben, messageId: id, expectedHash: hash, connectionId: conn.connection.id, provider: "fake", checkList: true, dailyCap: 50, planCap, now: now(), leaseMs: 60_000, newRfcMessageId: `<dis-${randomBytes(8).toString("hex")}@dealinsec.com>` });
+    await blocked();
+    h.release();
+    expect((await h.done).ok).toBe(true);
+    expect(await second).toMatchObject({ ok: false, code: "plan_send_limit" });
+    expect(await msgStatus(id)).toBe("approved"); // nothing reserved for the refused one
+  });
+
   it("'I sent it' (by hand) against a Gmail send of the same message: exactly one wins, in either order", async () => {
     const s = await seed();
     const h = held(s); await h.at;

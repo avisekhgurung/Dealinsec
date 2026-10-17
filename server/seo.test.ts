@@ -341,7 +341,8 @@ describe("entity and AEO surface", () => {
     const txt = llmsTxt(ORIGIN);
     const urls = [...txt.matchAll(/\]\((https?:\/\/[^)]+)\)/g)].map((m) => m[1]);
     expect(urls.length).toBeGreaterThan(30);
-    const bad = urls.filter((u) => !u.startsWith(ORIGIN) || !known.has(u.slice(ORIGIN.length)));
+    // A homepage section ("/#pricing") is the homepage; landing-copy.test.ts checks the section ids exist.
+    const bad = urls.filter((u) => !u.startsWith(ORIGIN) || !known.has(u.slice(ORIGIN.length).replace(/#[\w-]+$/, "")));
     expect(bad).toEqual([]);
     // Every post, tool and comparison page is listed.
     for (const p of POSTS) expect(txt, p.slug).toContain(`${ORIGIN}/blog/${p.slug})`);
@@ -694,10 +695,26 @@ describe("audience pages: /for-freelancers and /for-creators", () => {
 describe("homepage crawler fallback: small agencies first, freelancers and creators kept", () => {
   const body = landingSeoBody();
 
-  it("leads with the agency headline and the whole workflow, from prospects to payment tracking", () => {
+  it("leads with the brand promise, freelancers, consultants and small agencies, and the whole workflow to payment tracking", () => {
     expect(body).toContain("<h1>Find Clients. Close Deals. Get Paid.</h1>");
-    expect(body).toContain("Find prospects, Qualify, Deal, Quotation, Agreement, Invoice, Payment tracking");
-    for (const kind of ["SEO agencies", "Digital marketing and growth agencies", "B2B marketing agencies", "AI automation agencies"]) expect(body, kind).toContain(kind);
+    expect(body.match(/<h1[\s>]/g)?.length).toBe(1);
+    expect(body).toContain("AI researches and drafts; you approve every message, and nothing is sent automatically.");
+    for (const step of ["Research a potential client", "Save the prospect and manage the lead", "Create a deal and send a quotation", "Create an agreement and collect a signature", "Generate an invoice and track payment"]) expect(body, step).toContain(step);
+    for (const kind of ["Freelancers and solo consultants", "Web development and software services", "Digital marketing, SEO and growth agencies", "AI automation businesses"]) expect(body, kind).toContain(kind);
+    // An inference is never presented as a verified need, and no outcome is promised.
+    expect(body).toMatch(/Inferences are labelled as possible opportunities, not facts/);
+    expect(body).toMatch(/doesn't guarantee clients, replies or meetings/);
+  });
+
+  it("states the AI research allowances the server enforces, the price and the checkout terms", async () => {
+    const { OUTBOUND_ALLOWANCE_DEFAULTS: OB } = await import("@shared/outbound-plans");
+    expect(body).toContain(`${OB.free.monthlySearches} AI Outbound searches every 30 days (up to ${OB.free.maxCompanies} companies each)`);
+    expect(body).toContain(`${OB.pro.monthlySearches} AI searches every 30 days (up to ${OB.pro.maxCompanies} companies each)`);
+    const { PRICING } = await import("@shared/product-facts");
+    expect(body).toContain(`₹${PRICING.proMonthlyInr} a month`);
+    expect(body).toMatch(/at most 5 a day/);
+    expect(body).toMatch(/no auto-debit|no auto-renewal/);
+    expect(body).not.toMatch(/a month or a year|Pro Annual|₹999/);
   });
 
   it("still links the freelancer and creator pages and the checker", () => {

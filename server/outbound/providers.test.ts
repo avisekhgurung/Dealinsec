@@ -111,3 +111,88 @@ describe("cost estimates", () => {
     expect(costMicroUsd("unknown", {} as any)).toBe(0);
   });
 });
+
+describe("what a home page's markup shows (siteMarkup + siteSignals): observations, never a judgement", async () => {
+  const { siteMarkup, readHtml } = await import("./providers");
+  const { siteSignals, OLD_COPYRIGHT_YEARS } = await import("@shared/site-signals");
+  const NOW = new Date("2026-10-18T00:00:00Z");
+  it("reads the viewport tag and the LATEST copyright year, in its usual spellings", () => {
+    expect(siteMarkup('<head><meta name="viewport" content="width=device-width"></head><footer>© 2015–2019 Acme</footer>', NOW)).toMatchObject({ viewport: true, copyrightYear: 2019, copyrightText: "© 2015–2019" });
+    expect(siteMarkup("<footer>Copyright &copy; 2021 Acme. Copyright 2024</footer>", NOW)).toMatchObject({ viewport: false, copyrightYear: 2024 });
+    expect(siteMarkup("<footer>&#169; 2018 Acme</footer>", NOW).copyrightYear).toBe(2018);
+    expect(siteMarkup("<p>Founded in 2009. Call 2019 2020.</p>", NOW).copyrightYear).toBeNull(); // a year that isn't in a copyright notice isn't one
+    expect(siteMarkup("<footer>© 2099 Acme</footer>", NOW).copyrightYear).toBeNull();            // a future year is not trusted
+  });
+  it("says only what was observed: no viewport tag; a copyright year at least OLD_COPYRIGHT_YEARS old; nothing for a current site", () => {
+    expect(siteSignals({ viewport: true, copyrightYear: 2026 }, NOW)).toEqual([]);
+    expect(siteSignals({ viewport: true, copyrightYear: 2026 - OLD_COPYRIGHT_YEARS + 1 }, NOW)).toEqual([]);
+    expect(siteSignals({ viewport: false, copyrightYear: 2019, copyrightText: "© 2019" }, NOW)).toEqual([
+      { signal: "no_viewport", value: "The home page has no mobile viewport tag" },
+      { signal: "old_copyright", value: "The home page's copyright notice reads 2019", year: 2019, quote: "© 2019" },
+    ]);
+    expect(siteSignals(undefined, NOW)).toEqual([]); // a paid reader's markdown has no markup: nothing is claimed
+    for (const s of siteSignals({ viewport: false, copyrightYear: 2010 }, NOW)) expect(s.value).not.toMatch(/needs?|outdated|bad|broken|should/i);
+  });
+  it("the built-in reader attaches what it saw", async () => {
+    const r = await readHtml(new TextEncoder().encode('<html><head><title>Acme</title></head><body><main><h1>Acme</h1><p>Acme builds things for people. '.repeat(10) + '</p></main><footer>© 2020 Acme</footer></body></html>'), new URL("https://acme.com/"), NOW);
+    expect(r.ok && r.site).toMatchObject({ viewport: false, copyrightYear: 2020 });
+  });
+});
+
+describe("the paid page reader is a fallback only (FallbackReader)", async () => {
+  const { FallbackReader, MAX_PAID_READS_PER_DOMAIN } = await import("./providers");
+  const okPage = (url: string) => ({ ok: true as const, url, title: "t", text: "x", links: [], hash: "h" });
+  const reader = (code: "unreachable" | "blocked" | "not_html" | "bad_response" | null) => {
+    const paid: string[] = [];
+    const r = new FallbackReader(
+      { name: "builtin", read: async (u) => (code ? { ok: false, code } : okPage(u)) },
+      { name: "firecrawl", read: async (u) => { paid.push(u); return okPage(u); } },
+      () => 1_000,
+    );
+    return { r, paid };
+  };
+  it("the free reader's success never reaches the paid one", async () => {
+    const t = reader(null);
+    expect(await t.r.read("https://a.com/")).toMatchObject({ ok: true });
+    expect(t.paid).toEqual([]);
+  });
+  it("a page the free reader couldn't read is tried once with the paid one, and says so (for its cost)", async () => {
+    const t = reader("unreachable");
+    expect(await t.r.read("https://a.com/")).toMatchObject({ ok: true, via: "firecrawl" });
+    expect(t.paid).toEqual(["https://a.com/"]);
+  });
+  it("never for an address the safety guard refused, or a file that isn't a page", async () => {
+    for (const code of ["blocked", "not_html"] as const) {
+      const t = reader(code);
+      expect(await t.r.read("https://a.com/")).toEqual({ ok: false, code });
+      expect(t.paid).toEqual([]);
+    }
+  });
+  it(`at most ${MAX_PAID_READS_PER_DOMAIN} paid reads per site in a day; other sites have their own`, async () => {
+    const t = reader("bad_response");
+    for (let i = 0; i < 5; i++) await t.r.read(`https://www.a.com/p${i}`);
+    await t.r.read("https://b.com/");
+    expect(t.paid.filter((u) => u.includes("a.com"))).toHaveLength(MAX_PAID_READS_PER_DOMAIN);
+    expect(t.paid.filter((u) => u.includes("b.com"))).toHaveLength(1);
+  });
+  it("pageReader: no Firecrawl key, no paid reader at all", async () => {
+    const { pageReader } = await import("./providers");
+    expect(pageReader({}).name).toBe("builtin");
+    expect(pageReader({ FIRECRAWL_API_KEY: "k" }).name).toBe("builtin+firecrawl");
+  });
+});
+
+describe("robots.txt is asked first (RobotsReader)", async () => {
+  const { RobotsReader } = await import("./providers");
+  it("a disallowed page reaches no reader (free or paid); robots.txt is fetched once per site; none means allowed", async () => {
+    const reads: string[] = [], fetched: string[] = [];
+    const inner = { name: "builtin+firecrawl", read: async (u: string) => { reads.push(u); return { ok: true as const, url: u, title: "", text: "", links: [], hash: "h" }; } };
+    const r = new RobotsReader(inner, async (origin) => { fetched.push(origin); return origin.includes("closed.com") ? "User-agent: *\nDisallow: /team" : null; }, () => 0);
+    expect(await r.read("https://closed.com/team")).toEqual({ ok: false, code: "robots" });
+    expect(await r.read("https://closed.com/")).toMatchObject({ ok: true });
+    expect(await r.read("https://open.com/team")).toMatchObject({ ok: true });
+    expect(reads).toEqual(["https://closed.com/", "https://open.com/team"]);
+    expect(fetched).toEqual(["https://closed.com", "https://open.com"]);
+    expect(r.name).toBe("builtin+firecrawl");
+  });
+});

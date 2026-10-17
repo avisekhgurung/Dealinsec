@@ -1,3 +1,4 @@
+import type { ProspectFeedback } from "@shared/prospect-feedback";
 /** AI Outbound: the shapes the /api/outbound routes return, and their addresses. */
 export const OUTBOUND_RUNS_URL = "/api/outbound/runs";
 export const runUrl = (id: string) => `/api/outbound/runs/${id}`;
@@ -37,6 +38,11 @@ export interface ProspectCard {
   classification?: "ready" | "qualified" | "insufficient_evidence" | "not_a_fit"; classificationLabel?: string; timing?: "strong" | "context" | "stale" | "undated" | "none"; timingLabel?: string; blockers?: string[];
   profile: { industry: string | null; location: string | null; country: string | null; employees: string | null; serves: string | null };
   whyNow: Evidence | null; opportunity: Evidence | null; decisionMaker: Evidence | null; contactPerson?: Evidence | null; evidenceCount: number; leadId: number | null; researched: boolean;
+  /** "verified": a provider-verified email; "public": a business email or confirmed contact form on their site (found, not verified). */
+  contact?: "verified" | "public" | "none";
+  /** Observations from their home page's markup: hints, never proof of need. */
+  siteSignals?: string[];
+  feedback?: ProspectFeedback | null;
 }
 export interface Angle { problem: string; opportunity: string; positioning: string; targetPerson: string | null; reason: string; evidenceIds: number[]; confidence: "low" | "medium" }
 export interface Brief {
@@ -57,6 +63,7 @@ export const RUN_STAGE_LABEL: Record<string, string> = {
 export const RUN_ERROR: Record<string, string> = {
   daily_limit: "Today's allowance ran out partway; what was found so far is below.",
   global_limit: "Today's AI Outbound budget (AI or search, every workspace together) ran out partway; what was found so far is below. It resets at midnight UTC.",
+  workspace_budget: "This workspace's AI usage for the last 30 days reached its limit partway; what was found so far is below. It frees up as earlier usage passes 30 days.",
   search_unavailable: "Web search didn't answer, so nothing could be found. Try again later.",
   cap_unavailable: "The AI or search budget couldn't be checked, so the search stopped safely.",
   cancelled: "You stopped this search.",

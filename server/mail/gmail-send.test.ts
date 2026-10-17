@@ -401,6 +401,32 @@ describe("sending: settling an uncertain send", () => {
 });
 
 describe("sending: limits and switches", () => {
+  it("the plan's send allowance: counted across the WORKSPACE's mailboxes over 30 days; a failed send frees its slot", async () => {
+    const w = makeWorld();
+    w.deps.planSendCap = async () => ({ since: new Date(w.clock.getTime() - 30 * 86_400_000), max: 2 });
+    await w.connect("ana"); await w.connect("ben");
+    const [a, b, c, d] = [w.approved(), w.approved(), w.approved(), w.approved()];
+    ok(await sendApproved(w.members.ana, a.id, a.bodyHash, w.deps));
+    w.fake.failNext("send", "rejected");                                   // certainly not accepted: frees its slot
+    expect(ok(await sendApproved(w.members.ben, b.id, b.bodyHash, w.deps)).outcome).toBe("failed");
+    ok(await sendApproved(w.members.ben, c.id, c.bodyHash, w.deps));
+    const r = failed(await sendApproved(w.members.ana, d.id, d.bodyHash, w.deps)); // a different mailbox, the same workspace
+    expect(r).toMatchObject({ status: 429, code: "plan_send_limit" });
+    expect(r.message).toMatch(/Nothing was sent/);
+    expect(w.fake.outbox.map((x) => x.to)).toEqual([a.toAddress, c.toAddress]);
+  });
+
+  it("two messages racing for the plan's last send: exactly one goes", async () => {
+    const w = makeWorld();
+    w.deps.planSendCap = async () => ({ since: new Date(w.clock.getTime() - 30 * 86_400_000), max: 1 });
+    await w.connect("ana");
+    const [a, b] = [w.approved(), w.approved()];
+    w.fake.delayNext("send", 20);
+    const rs = await Promise.all([sendApproved(w.members.ana, a.id, a.bodyHash, w.deps), sendApproved(w.members.ana, b.id, b.bodyHash, w.deps)]);
+    expect(rs.map((x) => (x.ok ? x.outcome : x.code)).sort()).toEqual(["plan_send_limit", "sent"]);
+    expect(w.fake.outbox).toHaveLength(1);
+  });
+
   it("the per-mailbox daily cap: counts sends and anything in flight or uncertain over a rolling 24 hours, across reconnects", async () => {
     const w = makeWorld({ env: { MAIL_SEND_DAILY_CAP: "2" } });
     await w.connect("ana");

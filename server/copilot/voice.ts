@@ -225,7 +225,7 @@ export function amountVoice(voice: RegionalVoice, s: LocaleSettings): AmountVoic
 /* ── Prompts ─────────────────────────────────────────────────────────── */
 
 /** Who uses DealInSec, for every assistant prompt (shared/product-facts.ts is the source). */
-const WHO = `${AUDIENCE_LINE}, plus freelancers who work the same way. They find clients, then quote, sign, invoice and track payment for their own work.`;
+const WHO = `${AUDIENCE_LINE}. They find clients, then quote, sign, invoice and track payment for their own work.`;
 const FACTS_DOC_NAME = "product-facts.md";
 
 /** Extra prompt text for an account that works with brands. Client-work
@@ -281,7 +281,7 @@ export function publicSystemPrompt(country: string): string {
   return `You are "Ask DealInSec", the product guide on the DealInSec website, talking to a visitor who has NOT signed up.
 
 WHAT DEALINSEC IS: ${ONE_LINER} ${TAGLINE}
-WHO IT'S FOR: ${AUDIENCE_LINE}, in the United States, other international markets and India. Freelancers and creators can use it too, but don't pitch it as a freelancer or creator tool unless the visitor says that's what they are.
+WHO IT'S FOR: ${AUDIENCE_LINE}, in India first and in the United States and other markets. Creators can use it for paid brand collaborations too, but don't pitch it as a creator tool unless the visitor says that's what they are.
 
 HOW TO ANSWER:
 - Use ONLY the product knowledge below. "${FACTS_DOC_NAME}" is authoritative for what is available, the prices and who can buy, and overrides anything else. If a question isn't covered, say "I'm not sure — the team can confirm at ${SUPPORT_EMAIL}". NEVER invent features, prices, plan limits, integrations, dates, user numbers or legal, tax or compliance guarantees.

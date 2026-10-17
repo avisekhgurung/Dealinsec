@@ -19,7 +19,8 @@
 
 import { LANDING_FAQS } from "@shared/landing-faqs";
 import { guidesHtml } from "./blog";
-import { ONE_LINER, PRICING } from "@shared/product-facts";
+import { ONE_LINER, PRICING, WORKFLOW } from "@shared/product-facts";
+import { OUTBOUND_ALLOWANCE_DEFAULTS as OB, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
 
 const FAQS = LANDING_FAQS;
 
@@ -47,36 +48,39 @@ export function landingSeoBody(): string {
 
   return `<div id="seo-fallback">
 <h1>Find Clients. Close Deals. Get Paid.</h1>
-<p>${ONE_LINER} Use AI to discover relevant prospects, prepare personalized outreach and manage the journey from conversation to payment. Built for SEO, marketing, growth, AI-automation, web and software agencies and B2B consultants in India finding clients in India and abroad (the US, the UK, Canada, Australia, the UAE and more). One plan: free to start, Pro ₹${PRICING.proMonthlyInr} a month, ${PRICING.trialDays}-day Pro trial, no card needed.</p>
-<p>The workflow: Find prospects, Qualify, Deal, Quotation, Agreement, Invoice, Payment tracking.</p>
+<p>${ONE_LINER} DealInSec helps service businesses research prospects, manage deals, send quotations, create agreements, generate invoices and track payments in one connected workspace. AI researches and drafts; you approve every message, and nothing is sent automatically. Free plan: ${PRICING.freeMonthlyDeals} new deals a month with quotations, the lead pipeline and ${OB.free.monthlySearches} AI research searches every ${OUTBOUND_WINDOW_DAYS} days. Pro: ₹${PRICING.proMonthlyInr} a month in India.</p>
 
-<h2>Made for founder-led agencies</h2>
-<p>About 1 to 10 people, selling and delivering client work in the United States, India and beyond.</p>
-<ul>
-<li><strong>SEO agencies</strong>: build a list of companies in your niche, with the evidence for each, then quote and bill monthly retainers.</li>
-<li><strong>Digital marketing and growth agencies</strong>: keep every lead, proposal and campaign in one pipeline, with a clear next step and follow-ups that don't slip.</li>
-<li><strong>B2B marketing agencies</strong>: research accounts before you reach out, then turn won work into an agreement your client signs online.</li>
-<li><strong>AI automation agencies</strong>: scope builds as milestones, get the terms signed, and invoice each milestone as it's delivered.</li>
-<li><strong>Web design, development and software studios</strong>: quote a fixed-price project or a retainer, get it signed online, and invoice the advance and the final payment.</li>
-<li><strong>B2B consultants and specialist services</strong>: independent consultants, content and lead-generation agencies run the same workflow.</li>
-</ul>
-<p>Working solo? <a href="/for-freelancers">DealInSec for freelancers and consultants</a>. Doing brand deals? <a href="/for-creators">DealInSec for creators</a>. Not sure what a client's message leaves out? The free <a href="/tools/deal-risk-checker">Deal Risk Checker</a> lists what is missing, with no account.</p>
-
-<h2>Winning and billing clients shouldn't take 7 different apps</h2>
-<p>Prospects in a spreadsheet, conversations in email and WhatsApp, proposals in docs, invoices in another tool, and who has paid lives in someone's head. In DealInSec a prospect becomes a lead, a won lead becomes a deal, and every document is generated from that deal, so the scope and the numbers always match.</p>
-
-<h2>From finding the client to getting paid</h2>
+<h2>How it works: from a potential client to a paid invoice</h2>
 <ol>
-<li><strong>Find prospects</strong>: describe your ideal client; DealInSec researches companies and shows the evidence for each fit.</li>
-<li><strong>Reach out</strong>: AI drafts a first message; you approve it, send it from your own email and mark it sent.</li>
-<li><strong>Create the deal</strong>: a won lead becomes a deal with the client, scope, timeline and fee.</li>
-<li><strong>Send a quote</strong> generated from the deal, with your terms.</li>
-<li><strong>Get it signed</strong>: send a signing link and your client signs online without an account.</li>
-<li><strong>Invoice and track</strong>: advance, milestone or final invoices, then see what is paid, pending or overdue.</li>
+<li><strong>Research a potential client</strong> (Free): describe who you want and where; AI Outbound checks each company's own website against your profile and shows recent, dated signals with their sources. Inferences are labelled as possible opportunities, not facts.</li>
+<li><strong>Save the prospect and manage the lead</strong> (Free): stages, next steps, follow-up dates and the facts with their sources. AI drafts a first message from verified facts; you approve it and send it from your own email. DealInSec doesn't send email for you and never contacts anyone on its own.</li>
+<li><strong>Create a deal and send a quotation</strong> (Free, ${PRICING.freeMonthlyDeals} deals a month): the deal records the engagement model, scope, fee and dates; the quotation is generated from it, with a link your client can accept online. Protection Check flags missing terms first.</li>
+<li><strong>Create an agreement and collect a signature</strong> (Pro): your client signs online through a link, with an audit record of who signed and when. It isn't a certified digital signature.</li>
+<li><strong>Generate an invoice and track payment</strong> (Pro): invoices come from the agreement, single or as an advance and a final payment; you mark them paid and see what is paid, pending and overdue. DealInSec does not process payments.</li>
 </ol>
 
-<h2>AI Outbound: find clients who fit, with the evidence</h2>
-<p>Describe the clients you want, like US dental groups opening new locations, and choose where to look: an agency in India can search the United States, the United Kingdom, Canada, Australia, the UAE, India or worldwide. DealInSec researches companies, checks each one against your ideal client and marks it qualified, partial, not a fit or not enough evidence, with the reasons. Evidence shows its source and how recent it is; guesses are labelled as guesses and gaps are shown, not filled in. Add the best prospects to your pipeline. AI drafts a first message; you approve every word, send it from your own email and mark it sent. Your do-not-contact list is checked before anything is drafted or approved. DealInSec doesn't send email for you and never contacts anyone on its own. Each plan includes a number of AI Outbound searches a month (one credit per search); nothing is unlimited.</p>
+<h2>What DealInSec does</h2>
+<ul>
+<li><strong>AI-assisted prospect research</strong>: a score with reasons, dated signals with sources, and first messages drafted from verified facts. Contact details aren't always available, and DealInSec doesn't guarantee clients, replies or meetings.</li>
+<li><strong>Lead and deal management</strong>: a lead pipeline, deals by engagement model (retainer, fixed price, hourly, milestones and more) and a dashboard of what needs you today.</li>
+<li><strong>Quotations and client proposals</strong>: versioned quotations your client accepts online, as a link or a PDF.</li>
+<li><strong>Agreements and signatures</strong>: standard and custom terms, signed online or uploaded as a signed paper copy.</li>
+<li><strong>Invoices and payment tracking</strong>: invoices bounded by the agreement, payment status, and follow-up messages drafted for late invoices.</li>
+<li><strong>A connected client workflow</strong>: the prospect becomes the lead, the lead the deal, and every document comes from that deal, so the scope and the numbers match.</li>
+</ul>
+
+<h2>Why keep the client journey in one place</h2>
+<p>Prospects in browser tabs and spreadsheets, outreach in an inbox, quotations and agreements in documents, invoices in another tool and payments in a bank app means re-typing the client, the scope and the fee at every step. In DealInSec one record carries the client from research to payment. It doesn't replace accounting software.</p>
+
+<h2>Who DealInSec is for</h2>
+<p>Freelancers, solo consultants and small B2B service agencies of about 1 to 10 people, in India and abroad:</p>
+<ul>
+<li><strong>Freelancers and solo consultants</strong>: find clients, quote them properly, get the scope signed and know what you're owed. See <a href="/for-freelancers">DealInSec for freelancers and consultants</a>.</li>
+<li><strong>Web development and software services</strong>: research accounts, scope builds as milestones and invoice each stage.</li>
+<li><strong>Digital marketing, SEO and growth agencies</strong>: find companies in your niche with evidence, then quote, sign and bill retainers.</li>
+<li><strong>AI automation businesses</strong>: spot companies showing repetitive work publicly, such as support or operations hiring, with dated sources.</li>
+</ul>
+<p>Doing brand deals? <a href="/for-creators">DealInSec for creators</a>. Not sure what a client's message leaves out? The free <a href="/tools/deal-risk-checker">Deal Risk Checker</a> lists what is missing, with no account.</p>
 
 <h2>Know exactly what you're owed</h2>
 <p>Track every invoice from sent to paid: total invoiced, paid, pending and overdue at a glance. DealInSec tracks payments but does not process them; your client pays you directly and you mark the invoice paid. When something is late, Copilot drafts the follow-up and you review and send it.</p>
@@ -111,7 +115,7 @@ export function landingSeoBody(): string {
 ${guidesHtml()}
 
 <h2>Start simple. Grow when you need to.</h2>
-<p>The free plan is permanent and covers ${PRICING.freeMonthlyDeals} deals a month, each with its quotation, plus the leads pipeline and AI Outbound research within its daily limits. Every new account also starts with a ${PRICING.trialDays}-day Pro trial with no card, in every country. Pro adds unlimited deals, agreements your client signs online, invoices, payment tracking and up to 5 team members. In India, Pro is ₹${PRICING.proMonthlyInr} per month. In the United States and other countries the free plan and the trial are fully open; paid plans can't be bought from outside India yet. No platform fee on your deal value.</p>
+<p>The free plan is permanent: ${OB.free.monthlySearches} AI Outbound searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each), the leads pipeline, and ${PRICING.freeMonthlyDeals} deals a month, each with its quotation. Every new account also starts with a ${PRICING.trialDays}-day Pro trial (${OB.trial.monthlySearches} AI searches) with no card, in every country. Pro is ₹${PRICING.proMonthlyInr} a month in India and includes ${OB.pro.monthlySearches} AI searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.pro.maxCompanies} companies each), unlimited deals, agreements your client signs online, invoices, payment tracking and up to 5 team members. Searches are counted over a rolling ${OUTBOUND_WINDOW_DAYS} days, with at most 5 a day; when you reach the limit, more become available as earlier searches pass ${OUTBOUND_WINDOW_DAYS} days, and nothing is unlimited. Pro is paid once a month with no auto-renewal: pay again to extend, or it returns to the free plan. In the United States and other countries the free plan and the trial are open; paid plans can't be bought from outside India yet. No platform fee on your deal value.</p>
 
 <h2>Frequently asked questions</h2>
 ${faqs}

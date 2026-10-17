@@ -21,6 +21,9 @@ import { leadCall, leadError } from "@/lib/leads";
 import { useCalmMotion } from "@/lib/motion";
 import { countryName, prospectUrl, type Brief, type Evidence } from "@/lib/outbound";
 import { cn } from "@/lib/utils";
+import { trackEvent } from "@/lib/analytics";
+import { PROSPECT_FEEDBACK, PROSPECT_FEEDBACK_LABEL, type ProspectFeedback } from "@shared/prospect-feedback";
+import { SITE_SIGNAL_NOTE } from "@shared/site-signals";
 import { ScoreBadge } from "./prospect-card";
 
 const CONF: Record<string, string> = { low: "Mostly unknown", medium: "Partly known", high: "Well measured" };
@@ -127,6 +130,12 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit, focus = 
   const angle = act("angle");
   const add = act("lead", contact ? { contactFindingId: contact } : {}, (r) => toast({ title: r.existing ? "Already in your leads" : "Added to Leads", description: "Its evidence is on the lead's Facts tab." }));
   const busy = research.isPending || contacts.isPending || angle.isPending || add.isPending;
+  // The person's verdict: stored as given, changes nothing else; the same choice again clears it.
+  const verdict = useMutation({
+    mutationFn: (value: ProspectFeedback | null) => leadCall("POST", prospectUrl(id!, "feedback"), { value }),
+    onSuccess: (_r, value) => { refresh(); if (value) trackEvent("prospect_feedback", { value }); },
+    onError: (e) => toast({ title: "That didn't work", description: leadError(e), variant: "destructive" }),
+  });
   const b = q.data?.brief;
   const p = b?.prospect;
 
@@ -186,6 +195,22 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit, focus = 
             )}
             {!b.providers.contact && <p className="-mt-3 text-[11px] text-muted-foreground">People shown come from the company's own website. Connect a contact data provider to look up business emails.</p>}
 
+            {canEdit && (
+              <div className="space-y-1.5" data-testid="brief-feedback">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Is this a useful prospect?</p>
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Your verdict on this prospect">
+                  {PROSPECT_FEEDBACK.map((v) => {
+                    const on = p.feedback === v;
+                    return (
+                      <Button key={v} size="sm" variant={on ? "default" : "outline"} aria-pressed={on} disabled={verdict.isPending}
+                        onClick={() => verdict.mutate(on ? null : v)} data-testid={`brief-feedback-${v}`}>{PROSPECT_FEEDBACK_LABEL[v]}</Button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground">Your answer is kept so research quality can be measured. It doesn't change the score.</p>
+              </div>
+            )}
+
             <Qualification b={b} />
 
             {b.angle && (
@@ -244,8 +269,17 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit, focus = 
                 {canEdit && !p.leadId && b.people.length > 0 && <p className="text-[11px] text-muted-foreground">Pick a person to make them the lead's contact. An email is added only when the provider verified it.</p>}
               </Section>
 
+              {b.facts.some((e) => e.type === "site_signal") && (
+                <Section title="Website observations" hint="from their home page's markup" >
+                  {b.facts.filter((e) => e.type === "site_signal").map((e) => (
+                    <div key={e.id} className="text-sm" data-testid="brief-site-signal"><span className="break-words">{e.value}</span><Quote e={e} /></div>
+                  ))}
+                  <p className="text-[11px] text-muted-foreground">{SITE_SIGNAL_NOTE}</p>
+                </Section>
+              )}
+
               <Section title="Facts" tone="fact" hint="each with the words from their site">
-                {b.facts.length ? b.facts.map((e) => (
+                {b.facts.filter((e) => e.type !== "site_signal").length ? b.facts.filter((e) => e.type !== "site_signal").map((e) => (
                   <div key={e.id} className="text-sm"><span className="text-xs text-muted-foreground">{e.label}:</span> <span className="break-words">{e.value}</span><Quote e={e} /><Provenance e={e} /></div>
                 )) : <p className="text-sm text-muted-foreground">Nothing confirmed yet.</p>}
               </Section>

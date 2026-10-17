@@ -1,22 +1,23 @@
 /**
- * The homepage sections (Oct 2026 redesign, "Find Clients. Close Deals. Get Paid."): hero with the product, the six
- * things DealInSec does, the journey from prospect to payment, one workspace instead of many tools, who it's for, the
- * overview, the closing call to action and the FAQ. landing.tsx composes them with the header, pricing, demo and footer.
+ * The homepage sections ("Find Clients. Close Deals. Get Paid."): the hero, how it works (the five workflow stages on
+ * one example client), what it does by outcome, why keep the journey in one place, who it's for, the closing call to
+ * action and the FAQ. landing.tsx composes them with the header, demo, pricing and footer.
  *
  * Honesty rules (see the landing notes): pictures of the product use example data and say so; nothing claims payment
  * processing (DealInSec tracks payments), sending email for you, customer counts or logos; other companies' products
  * are named generically, never by logo. Scroll-in reveals use framer; continuous motion is CSS, and everything holds
  * still for people who prefer reduced motion.
  */
-import { useEffect, useRef, useState } from "react";
-import { motion, useInView } from "framer-motion";
+import { useState } from "react";
+import { motion } from "framer-motion";
 import { Link } from "wouter";
 import {
-  ArrowRight, Building2, Check, CheckCircle2, CreditCard, FileSignature, FileText, LayoutDashboard, LifeBuoy,
-  Globe2, Handshake, MailCheck, PlayCircle, Plus, ReceiptText, Search, ShieldCheck, Signature, Sparkles, UserRound, Users,
+  ArrowRight, Building2, Check, CheckCircle2, FileSignature, FileText, LayoutDashboard, LifeBuoy,
+  Handshake, PlayCircle, ReceiptText, Search, ShieldCheck, Signature, Sparkles, UserRound, Users,
+  Bot, Flame, Lightbulb, Link2, Radar, X,
 } from "lucide-react";
 import { PRICING } from "@shared/product-facts";
-import { OUTBOUND_ALLOWANCE_DEFAULTS } from "@shared/outbound-plans";
+import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { DealinsecMark, DealinsecWordmark } from "@/components/dealinsec-logo";
 import { trackEvent } from "@/lib/analytics";
@@ -54,12 +55,11 @@ function Scribble({ children, className, arrow = "down" }: { children: React.Rea
 
 /* ── Hero ─────────────────────────────────────────────────────────────────────────────── */
 
-const DEAL_ROWS = [
-  { client: "Acme Marketing", value: "$3,500", stage: "Quote sent", tone: "sky", when: "2 days ago" },
-  { client: "Pixel Studio", value: "$7,200", stage: "Negotiating", tone: "amber", when: "4 days ago" },
-  { client: "BrandBoost", value: "$1,800", stage: "Won", tone: "emerald", when: "1 week ago" },
-  { client: "GrowthLabs", value: "$4,500", stage: "Quote sent", tone: "sky", when: "1 week ago" },
-  { client: "DesignCraft", value: "$2,200", stage: "Lost", tone: "rose", when: "2 weeks ago" },
+/** Example prospects, drawn the way AI Outbound's prospect cards show them (components/outbound/prospect-card.tsx). */
+const PROSPECTS = [
+  { name: "Northwind Logistics", meta: "Pune · Freight & warehousing · 60 people", score: 82, label: "Ready", tone: "emerald", strong: true, why: "Hiring · 2 Oct", line: "3 customer-support roles" },
+  { name: "Bluepeak Freight", meta: "Mumbai · Logistics · 120 people", score: 74, label: "Qualified", tone: "sky", strong: false, why: "New location · Sep 2026", line: "Opened a Nashik hub" },
+  { name: "Clearwater Cargo", meta: "Pune · Logistics · 25 people", score: 52, label: "Partial", tone: "amber", strong: false, why: null, line: null },
 ] as const;
 const TONE: Record<string, string> = {
   sky: "bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
@@ -67,12 +67,15 @@ const TONE: Record<string, string> = {
   emerald: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
   rose: "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
 };
+const scoreTone = (n: number) => (n >= 70
+  ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
+  : "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300");
 
-/** The product, drawn: the Deals screen with example data, and an invoice marked paid. */
+/** The product, drawn: AI Outbound's prospects with example data, and an interested reply becoming a deal. */
 function HeroProduct() {
   const side = [
-    { Icon: LayoutDashboard, label: "Dashboard" }, { Icon: Search, label: "Prospects" }, { Icon: Users, label: "Leads" },
-    { Icon: Building2, label: "Deals", active: true }, { Icon: FileText, label: "Quotes" }, { Icon: FileSignature, label: "Agreements" }, { Icon: ReceiptText, label: "Invoices" },
+    { Icon: LayoutDashboard, label: "Dashboard" }, { Icon: Search, label: "AI Outbound", active: true }, { Icon: Users, label: "Leads" },
+    { Icon: Building2, label: "Deals" }, { Icon: FileText, label: "Quotes" }, { Icon: FileSignature, label: "Agreements" }, { Icon: ReceiptText, label: "Invoices" },
   ];
   return (
     <div className="relative" aria-hidden="true">
@@ -91,37 +94,44 @@ function HeroProduct() {
             </ul>
           </div>
           <div className="min-w-0 flex-1 p-4 sm:p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-[15px] font-bold">Deals</span>
-              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-white"><Plus className="h-3 w-3" />Create deal</span>
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <span className="text-[15px] font-bold">Prospects</span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-white"><Sparkles className="h-3 w-3" />New search</span>
             </div>
-            <div className="mb-3 flex gap-3 border-b border-neutral-100 pb-2 text-[10px] text-neutral-500 dark:border-neutral-800">
-              <span className="font-semibold text-emerald-700 dark:text-emerald-300">All</span><span>Quote sent</span><span>Negotiating</span><span>Won</span><span className="hidden sm:inline">Lost</span>
-            </div>
-            <div className="grid grid-cols-[1.5fr_.8fr_1fr_.9fr] gap-2 px-1 pb-1.5 text-[9.5px] font-medium uppercase tracking-wide text-neutral-400">
-              <span>Client</span><span>Value</span><span>Stage</span><span className="text-right">Updated</span>
-            </div>
-            <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
-              {DEAL_ROWS.map((r, i) => (
-                <li key={r.client} style={{ animationDelay: `${0.6 + i * 0.09}s` }}
-                  className="dis-row-in grid grid-cols-[1.5fr_.8fr_1fr_.9fr] items-center gap-2 px-1 py-2 text-[11px]">
-                  <span className="truncate font-medium">{r.client}</span>
-                  <span className="tabular-nums">{r.value}</span>
-                  <span><span className={cn("rounded-full px-2 py-0.5 text-[9.5px] font-semibold", TONE[r.tone])}>{r.stage}</span></span>
-                  <span className="text-right text-neutral-400">{r.when}</span>
+            <p className="mb-3 truncate rounded-lg border border-neutral-100 bg-neutral-50 px-2.5 py-1.5 text-[10.5px] text-neutral-600 dark:border-neutral-800 dark:bg-neutral-800/40 dark:text-neutral-300">
+              <Search className="mr-1 inline h-3 w-3" />Logistics companies in Pune and Mumbai · 20–200 people
+            </p>
+            <ul className="space-y-2">
+              {PROSPECTS.map((p, i) => (
+                <li key={p.name} style={{ animationDelay: `${0.6 + i * 0.12}s` }} className="dis-row-in flex gap-2.5 rounded-xl border border-neutral-100 p-2.5 dark:border-neutral-800">
+                  <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-[13px] font-extrabold tabular-nums", scoreTone(p.score))}>{p.score}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center justify-between gap-2">
+                      <b className="truncate text-[12px]">{p.name}</b>
+                      <span className="flex shrink-0 gap-1">
+                        <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold", TONE[p.tone])}>{p.label}</span>
+                        {p.strong && <span className="hidden rounded-full bg-orange-50 px-1.5 py-0.5 text-[9px] font-semibold text-orange-700 sm:inline dark:bg-orange-500/15 dark:text-orange-300">Strong timing</span>}
+                      </span>
+                    </span>
+                    <span className="block truncate text-[10px] text-neutral-500">{p.meta}</span>
+                    {p.why
+                      ? <span className="mt-1 block truncate text-[10.5px]"><b className="text-orange-700 dark:text-orange-400">Why now · {p.why}</b> <span className="text-neutral-600 dark:text-neutral-300">{p.line}</span></span>
+                      : <span className="mt-1 block truncate text-[10.5px] text-neutral-400">No dated reason to reach out yet</span>}
+                  </span>
                 </li>
               ))}
             </ul>
+            <div className="mt-3 flex flex-wrap items-center justify-end gap-1.5 text-[10px] font-semibold">
+              <span className="rounded-md border border-neutral-200 px-2 py-1 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">AI brief</span>
+              <span className="rounded-md bg-emerald-600 px-2 py-1 text-white">Add to Leads</span>
+            </div>
           </div>
         </div>
       </div>
       <div
-        className="dis-invoice-in absolute -bottom-7 right-2 flex items-center gap-3 rounded-xl border border-neutral-200/80 bg-white px-3.5 py-2.5 shadow-xl sm:-right-6 dark:border-neutral-800 dark:bg-neutral-900">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-500/15"><CheckCircle2 className="h-4.5 w-4.5 text-emerald-600" /></span>
-        <span className="text-[11px] leading-tight"><b className="block text-[12px]">Invoice paid 🎉</b><span className="text-neutral-500">$3,500 from Acme Marketing</span></span>
-        <span className="ml-1 flex h-7 items-end gap-0.5">
-          {[40, 65, 50, 100].map((h, i) => <span key={i} className="dis-bar w-1.5 rounded-sm bg-gradient-to-t from-emerald-600 to-emerald-400" style={{ height: `${h}%`, animationDelay: `${1.4 + i * 0.1}s` }} />)}
-        </span>
+        className="dis-invoice-in absolute -bottom-8 left-2 flex items-center gap-3 rounded-xl border border-neutral-200/80 bg-white px-3.5 py-2.5 shadow-xl sm:-left-6 dark:border-neutral-800 dark:bg-neutral-900">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-500/15"><Handshake className="h-4 w-4 text-emerald-600" /></span>
+        <span className="text-[11px] leading-tight"><b className="block text-[12px]">Interested reply 🎉</b><span className="text-neutral-500">Northwind Logistics → new deal</span></span>
       </div>
     </div>
   );
@@ -131,35 +141,37 @@ export function HeroSection({ isAuthenticated, onPrimary }: { isAuthenticated: b
   return (
     <section className="relative overflow-hidden pb-20 pt-10 sm:pt-14 lg:pb-28 lg:pt-16">
       <div className="mx-auto grid max-w-7xl items-center gap-14 px-4 sm:px-6 lg:grid-cols-[1fr_1.12fr] lg:gap-10 lg:px-8">
-        <div className="max-w-xl">
+        <div className="min-w-0 max-w-xl">
           <p style={{ animationDelay: "0.05s" }} className="dis-hero-in inline-flex items-center gap-2 rounded-full border border-emerald-200/80 bg-white/80 px-3 py-1 text-[11.5px] font-semibold text-emerald-700 shadow-sm backdrop-blur dark:border-emerald-800/50 dark:bg-neutral-900/70 dark:text-emerald-300">
             <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60 motion-reduce:hidden" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" /></span>
-            AI-assisted client acquisition, from deal to payment
+            For freelancers, consultants and small B2B service agencies
           </p>
           <h1 style={{ animationDelay: "0.13s" }} className="dis-hero-in mt-5 text-[2.75rem] font-extrabold leading-[1.02] tracking-[-0.035em] text-[#111B22] sm:text-6xl lg:text-[4.1rem] dark:text-white">
             Find Clients.<br />Close <span className={GREEN}>Deals.</span><br /><span className="dis-gradient-text">Get Paid.</span>
           </h1>
           <p style={{ animationDelay: "0.21s" }} className="dis-hero-in mt-5 max-w-lg text-base leading-relaxed text-neutral-600 sm:text-lg dark:text-neutral-400">
-            Use AI to discover relevant prospects, prepare personalized outreach and manage the journey from conversation to payment. Built for agencies in India finding clients in India and abroad.
+            DealInSec helps service businesses research prospects, manage deals, send quotations, create agreements, generate invoices and track payments in one connected workspace.
           </p>
-          <div style={{ animationDelay: "0.29s" }} className="dis-hero-in mt-7 flex flex-col gap-3 sm:flex-row">
+          <div style={{ animationDelay: "0.29s" }} className="dis-hero-in mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <button type="button" onClick={() => { trackEvent("hero_cta_click", { label: isAuthenticated ? "dashboard" : "start_free" }); onPrimary(); }} data-testid="button-hero-cta"
-              className="group inline-flex h-12 items-center justify-center rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-6 text-[15px] font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:shadow-emerald-600/40">
-              {isAuthenticated ? "Go to dashboard" : "Start for free"}<ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              className="group inline-flex h-12 items-center justify-center whitespace-nowrap rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-6 text-[15px] font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:shadow-emerald-600/40">
+              {isAuthenticated ? "Go to dashboard" : "Start Free"}<ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
-            {/* The live demo is for visitors; a signed-in person sees how it works instead. */}
-            <a href={isAuthenticated ? "#how" : "#try"} onClick={() => trackEvent("hero_cta_click", { label: isAuthenticated ? "see_how" : "live_demo" })} data-testid="link-hero-demo"
-              className="inline-flex h-12 items-center justify-center rounded-lg border border-neutral-200 bg-white px-6 text-[15px] font-semibold shadow-sm transition hover:border-emerald-300 dark:border-neutral-700 dark:bg-neutral-900">
-              <PlayCircle className="mr-2 h-5 w-5 text-emerald-600" />{isAuthenticated ? "See how it works" : "Try the live demo"}
+            <a href="#how" onClick={() => trackEvent("hero_cta_click", { label: "see_how" })} data-testid="link-hero-demo"
+              className="inline-flex h-12 items-center justify-center whitespace-nowrap rounded-lg border border-neutral-200 bg-white px-5 text-[15px] font-semibold shadow-sm transition hover:border-emerald-300 dark:border-neutral-700 dark:bg-neutral-900">
+              <PlayCircle className="mr-2 h-5 w-5 text-emerald-600" />See How It Works
             </a>
           </div>
-          <ul style={{ animationDelay: "0.37s" }} className="dis-hero-in mt-6 flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-neutral-600 dark:text-neutral-400">
-            {["No credit card required", "Free plan with AI Outbound", `One plan: ₹${PRICING.proMonthlyInr}/month`].map((t) => (
+          <p style={{ animationDelay: "0.33s" }} className="dis-hero-in mt-4 flex items-start gap-2 text-sm font-medium text-neutral-800 dark:text-neutral-200" data-testid="hero-approval">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />AI researches and drafts; you approve every message. Nothing is sent automatically.
+          </p>
+          <ul style={{ animationDelay: "0.37s" }} className="dis-hero-in mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-neutral-500 dark:text-neutral-400">
+            {[`Free: ${PRICING.freeMonthlyDeals} new deals a month with quotations`, `${OUTBOUND_ALLOWANCE_DEFAULTS.free.monthlySearches} AI research searches every ${OUTBOUND_WINDOW_DAYS} days`, `Pro ₹${PRICING.proMonthlyInr}/month in India`].map((t) => (
               <li key={t} className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-emerald-600" />{t}</li>
             ))}
           </ul>
         </div>
-        <div className="relative lg:pl-4">
+        <div className="relative min-w-0 lg:pl-4">
           <HeroProduct />
           <p className="mt-12 text-center text-[11px] text-neutral-400">Illustration with example data.</p>
         </div>
@@ -168,15 +180,205 @@ export function HeroSection({ isAuthenticated, onPrimary }: { isAuthenticated: b
   );
 }
 
-/* ── Everything you need ─────────────────────────────────────────────────────────────── */
+/* ── How it works: the real workflow on one example client ───────────────────────────── */
 
-const FEATURES = [
-  { Icon: Search, title: "Find prospects", text: "AI Outbound finds companies that fit, in any country, with the evidence behind each one." },
-  { Icon: Users, title: "Create deals", text: "Track every opportunity from first contact to won." },
-  { Icon: FileText, title: "Send quotes", text: "Professional quotations in minutes, in your brand." },
-  { Icon: Signature, title: "Sign agreements", text: "Get agreements signed online by your client." },
-  { Icon: ReceiptText, title: "Create invoices", text: "Raise invoices straight from the agreed scope." },
-  { Icon: CreditCard, title: "Get paid", text: "Track payments and stay on top of cash flow." },
+/**
+ * The five stages DealInSec runs, walked through on ONE made-up client (labelled as a demonstration): research the
+ * company (evidence vs inference kept apart, as the product keeps them), save and work the lead, create the deal and
+ * its quotation, the agreement and its signature, the invoice and its payment. Example domains use the reserved
+ * ".example" TLD so no real company is implied. Each stage names the plan it needs.
+ */
+const WALK = [
+  { key: "research", label: "Research a potential client", plan: "Free" },
+  { key: "lead", label: "Save the prospect and manage the lead", plan: "Free" },
+  { key: "quote", label: "Create a deal and send a quotation", plan: "Free" },
+  { key: "agreement", label: "Create an agreement and collect a signature", plan: "Pro" },
+  { key: "invoice", label: "Generate an invoice and track payment", plan: "Pro" },
+] as const;
+type WalkKey = (typeof WALK)[number]["key"];
+
+function Source({ children }: { children: React.ReactNode }) {
+  return <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-neutral-500"><Link2 className="h-3 w-3" aria-hidden />{children}</span>;
+}
+const box = "rounded-xl border border-neutral-200 p-3.5 dark:border-neutral-800";
+const label = "text-[10px] font-bold uppercase tracking-wider";
+const Row = ({ k, v, tone }: { k: string; v: React.ReactNode; tone?: string }) => (
+  <div className="flex items-center justify-between gap-3 py-1.5 text-sm"><span className="text-neutral-500">{k}</span><span className={cn("text-right font-semibold", tone)}>{v}</span></div>
+);
+const Pill = ({ children, tone = "emerald" }: { children: React.ReactNode; tone?: keyof typeof TONE }) => <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", TONE[tone])}>{children}</span>;
+
+function WalkPanel({ step }: { step: WalkKey }) {
+  switch (step) {
+    case "research":
+      return (
+        <div className="space-y-3">
+          <div className={box}>
+            <p className={cn(label, "text-neutral-500")}>You describe who you want</p>
+            <p className="mt-1 text-sm font-medium">Logistics companies in Pune and Mumbai with 20–200 people</p>
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-300 bg-emerald-50 text-base font-extrabold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">82</span>
+            <div className="min-w-0">
+              <p className="font-bold">Northwind Logistics</p>
+              <p className="text-xs text-neutral-500">northwind-logistics.example · Pune · about 60 people</p>
+            </div>
+          </div>
+          <div className="rounded-xl bg-orange-50 p-3.5 dark:bg-orange-950/30">
+            <p className={cn(label, "flex items-center gap-1.5 text-orange-700 dark:text-orange-400")}><Flame className="h-3 w-3" />Why now · Hiring · 2 Oct 2026</p>
+            <p className="mt-1 text-sm">Hiring three customer-support executives for the Pune warehouse.</p>
+            <Source>northwind-logistics.example/careers · stated on their site</Source>
+          </div>
+          <div className="rounded-xl border border-dashed border-neutral-300 p-3.5 dark:border-neutral-700">
+            <p className={cn(label, "flex items-center gap-1.5 text-neutral-500")}><Lightbulb className="h-3 w-3" />Possible opportunity · inference</p>
+            <p className="mt-1 text-sm">A growing support team may handle repetitive status questions that could be partly automated.</p>
+          </div>
+        </div>
+      );
+    case "lead":
+      return (
+        <div className="space-y-3">
+          <div className={box}>
+            <div className="flex items-center justify-between gap-2"><b>Northwind Logistics</b><Pill tone="sky">Replied</Pill></div>
+            <Row k="Next step" v="Send a proposal · due Fri" />
+            <Row k="Facts" v="3 facts, each with its source" />
+            <Row k="Contact" v="Founder, named on their site" />
+          </div>
+          <div className={box}>
+            <p className={cn(label, "text-emerald-700 dark:text-emerald-400")}>First message · approved by you</p>
+            <p className="mt-1 text-sm">Drafted by AI from the verified facts, edited and approved by you, then sent from your own email and marked sent. A follow-up task was added.</p>
+          </div>
+          <p className="text-xs text-neutral-500">Stages: new → researching → qualified → contacted → replied → meeting → proposal → won or lost.</p>
+        </div>
+      );
+    case "quote":
+      return (
+        <div className="space-y-3">
+          <div className={box}>
+            <p className={cn(label, "text-neutral-500")}>Deal</p>
+            <Row k="Engagement" v="Fixed-price project" />
+            <Row k="Service" v="AI automation · support assistant" />
+            <Row k="Value" v="₹85,000 · 4 weeks" />
+          </div>
+          <div className={box}>
+            <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-sm font-semibold"><FileText className="h-4 w-4 text-emerald-600" />Quotation · version 1</span><Pill>Accepted online</Pill></div>
+            <p className="mt-1.5 text-xs text-neutral-500">Generated from the deal and shared as a link the client opened and accepted. Print or PDF anytime.</p>
+          </div>
+          <div className="rounded-xl bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
+            <b className="text-amber-800 dark:text-amber-300">Protection Check:</b> no advance agreed yet. Ask for one before work starts.
+          </div>
+        </div>
+      );
+    case "agreement":
+      return (
+        <div className="space-y-3">
+          <div className={box}>
+            <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-sm font-semibold"><Signature className="h-4 w-4 text-emerald-600" />Agreement</span><Pill>Signed</Pill></div>
+            <ul className="mt-2 space-y-1 text-sm text-neutral-600 dark:text-neutral-300">
+              <li>· Scope and fee carried over from the deal</li>
+              <li>· 50% advance, balance within 7 days of delivery</li>
+              <li>· Two rounds of revisions</li>
+            </ul>
+          </div>
+          <div className={box}>
+            <p className={cn(label, "text-neutral-500")}>Audit record</p>
+            <p className="mt-1 text-sm">Signed online through a signing link, with who signed and when recorded.</p>
+          </div>
+          <p className="text-xs text-neutral-500">Electronic acceptance with an audit record. It isn&apos;t a certified digital signature, and DealInSec gives no legal advice.</p>
+        </div>
+      );
+    case "invoice":
+      return (
+        <div className="space-y-3">
+          <div className={box}>
+            <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-sm font-semibold"><ReceiptText className="h-4 w-4 text-emerald-600" />Advance invoice · 50%</span><Pill>Paid</Pill></div>
+            <Row k="Amount" v="₹42,500" />
+          </div>
+          <div className={box}>
+            <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-sm font-semibold"><ReceiptText className="h-4 w-4 text-emerald-600" />Final invoice · 50%</span><Pill tone="amber">Pending</Pill></div>
+            <Row k="Amount" v="₹42,500" />
+          </div>
+          <p className="text-xs text-neutral-500">Invoices come from the agreement and can't exceed it. You mark them paid; DealInSec records payments and never collects or moves your client&apos;s money.</p>
+        </div>
+      );
+  }
+}
+
+/** The product's workflow near the top of the page: what each stage produces, on one example client. */
+export function WorkflowWalkthrough() {
+  const [step, setStep] = useState<WalkKey>("research");
+  const choose = (k: WalkKey) => { setStep(k); trackEvent("landing_walkthrough_step", { step: k }); };
+  const onKey = (e: React.KeyboardEvent, i: number) => {
+    const next = e.key === "ArrowDown" || e.key === "ArrowRight" ? i + 1 : e.key === "ArrowUp" || e.key === "ArrowLeft" ? i - 1 : null;
+    if (next === null) return;
+    e.preventDefault();
+    const k = WALK[(next + WALK.length) % WALK.length].key;
+    choose(k);
+    document.getElementById(`walk-tab-${k}`)?.focus();
+  };
+  return (
+    <section id="how" className="scroll-mt-20 bg-gradient-to-b from-emerald-50/50 to-transparent py-16 sm:py-20 dark:from-emerald-950/20" data-testid="landing-walkthrough">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <Reveal className="mx-auto max-w-3xl text-center">
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400">How it works</p>
+          <h2 className="mt-2 text-balance text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">From a potential client to a paid invoice</h2>
+          <p className="mt-3 text-neutral-600 dark:text-neutral-400">One example client through every stage. Each stage carries the details forward, so nothing is typed twice.</p>
+        </Reveal>
+
+        <div className="mt-10 grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <div role="tablist" aria-label="Workflow stages" aria-orientation="vertical" className="flex flex-col gap-1.5">
+            {WALK.map(({ key, label: text, plan }, i) => {
+              const on = key === step;
+              return (
+                <button key={key} id={`walk-tab-${key}`} type="button" role="tab" aria-selected={on} aria-controls="walk-panel" tabIndex={on ? 0 : -1}
+                  onClick={() => choose(key)} onKeyDown={(e) => onKey(e, i)} data-testid={`walk-step-${key}`}
+                  className={cn("flex items-center gap-3 rounded-xl border px-4 py-3 text-left text-sm font-semibold transition",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500",
+                    on ? "border-emerald-400 bg-white shadow-sm dark:border-emerald-700 dark:bg-neutral-900" : "border-transparent text-neutral-600 hover:bg-white/70 dark:text-neutral-400 dark:hover:bg-neutral-900/50")}>
+                  <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold", on ? "bg-emerald-600 text-white" : "bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300")}>{i + 1}</span>
+                  <span className="flex-1">{text}</span>
+                  <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold", plan === "Free" ? "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300")}>{plan}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div id="walk-panel" role="tabpanel" aria-labelledby={`walk-tab-${step}`} className="min-w-0 rounded-2xl border border-neutral-200 bg-white p-5 shadow-lg shadow-emerald-900/5 sm:p-6 dark:border-neutral-800 dark:bg-neutral-900">
+            <WalkPanel step={step} />
+            <p className="mt-5 border-t border-neutral-100 pt-3 text-[11px] text-neutral-400 dark:border-neutral-800">Demonstration with example data. Research results depend on what each company publishes.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── What it does, by outcome ──────────────────────────────────────────────────────────── */
+
+const OUTCOMES: { Icon: typeof Radar; title: string; plan: string; text: string; points: string[] }[] = [
+  {
+    Icon: Radar, title: "Research prospects with AI", plan: "Free and Pro, with limits",
+    text: "Describe the clients you want and where. AI Outbound searches the web and checks each company's own website against your profile.",
+    points: ["A score and the reasons for it", "Dated signals with their sources; guesses labelled", "First messages drafted from verified facts, approved by you"],
+  },
+  {
+    Icon: Users, title: "Manage leads and deals", plan: "Free and Pro",
+    text: "Save a researched prospect as a lead, work it through stages, and turn a yes into a deal.",
+    points: ["Stages, next steps and follow-up dates", "Deals by engagement model: retainer, fixed price, hourly, milestones and more", "A dashboard of what needs you today"],
+  },
+  {
+    Icon: FileText, title: "Send quotations", plan: "Free and Pro",
+    text: "Generate a professional quotation from the deal and share a link your client can open and accept online.",
+    points: ["Versioned when the scope changes", "Print or PDF", "Protection Check flags missing terms before you send"],
+  },
+  {
+    Icon: Signature, title: "Agreements and signatures", plan: "Pro",
+    text: "Create the agreement from the deal with your terms, and send a link your client signs online.",
+    points: ["Standard and custom terms", "An audit record of who signed and when", "Or upload a signed paper copy"],
+  },
+  {
+    Icon: ReceiptText, title: "Invoices and payment tracking", plan: "Pro",
+    text: "Generate invoices from the agreement, single or split into an advance and a final payment, and track each to paid.",
+    points: ["Paid, pending and overdue at a glance", "Follow-up messages drafted for late invoices", "Your business and tax details printed"],
+  },
 ];
 
 export function FeaturesSection() {
@@ -184,185 +386,74 @@ export function FeaturesSection() {
     <section id="features" className="scroll-mt-20 py-16 sm:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <Reveal className="mx-auto max-w-3xl text-center">
-          <h2 className="text-balance text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Everything you need to <span className={GREEN}>grow your business</span></h2>
-          <p className="mt-3 text-neutral-600 dark:text-neutral-400">Stop juggling separate tools. DealInSec brings your whole client journey together.</p>
+          <h2 className="text-balance text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Everything from first contact <span className={GREEN}>to final payment</span></h2>
+          <p className="mt-3 text-neutral-600 dark:text-neutral-400">Research prospects, manage the deal, and send the documents that get you paid. AI does the research and drafting; you approve everything that reaches a client.</p>
         </Reveal>
-        <motion.ul initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={stagger} className="mt-10 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-6">
-          {FEATURES.map(({ Icon, title, text }) => (
-            <motion.li key={title} variants={reveal}
-              className="group rounded-2xl border border-neutral-200/80 bg-white p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-900/5 sm:p-5 dark:border-neutral-800 dark:bg-neutral-900/60 dark:hover:border-emerald-800">
-              <span className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 transition group-hover:scale-105 group-hover:bg-emerald-600 group-hover:text-white dark:bg-emerald-500/15 dark:text-emerald-300">
-                <Icon className="h-5 w-5" strokeWidth={2} />
-              </span>
-              <h3 className="text-[15px] font-bold">{title}</h3>
-              <p className="mt-1 text-[13px] leading-snug text-neutral-500 dark:text-neutral-400">{text}</p>
+        <motion.ul initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={stagger} className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {OUTCOMES.map(({ Icon, title, plan, text, points }) => (
+            <motion.li key={title} variants={reveal} className="flex flex-col rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300"><Icon className="h-5 w-5" aria-hidden /></span>
+                <span className="text-[11px] font-semibold text-neutral-500">{plan}</span>
+              </div>
+              <h3 className="mt-3 text-[17px] font-bold">{title}</h3>
+              <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{text}</p>
+              <ul className="mt-3 space-y-1.5 text-[13px] text-neutral-600 dark:text-neutral-400">
+                {points.map((p) => <li key={p} className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />{p}</li>)}
+              </ul>
             </motion.li>
           ))}
+          <motion.li variants={reveal} className="flex flex-col justify-center rounded-2xl border border-emerald-300 bg-gradient-to-br from-emerald-50 to-white p-5 dark:border-emerald-800 dark:from-emerald-950/40 dark:to-neutral-900">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white"><Handshake className="h-5 w-5" aria-hidden /></span>
+            <h3 className="mt-3 text-[17px] font-bold">One connected client record</h3>
+            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">The prospect becomes the lead, the lead the deal, and every quotation, agreement and invoice comes from that deal, so the scope and the numbers always match.</p>
+          </motion.li>
         </motion.ul>
       </div>
     </section>
   );
 }
 
-/* ── From finding the client to getting paid ─────────────────────────────────────────── */
+/* ── Why keep it together ──────────────────────────────────────────────────────────────── */
 
-const STEPS = [
-  { title: "Find and add prospects", text: "Discover companies that fit, or import your own list." },
-  { title: "Create a deal", text: "Track the opportunity and its details." },
-  { title: "Send a professional quote", text: "A clear, branded quotation your client can accept online." },
-  { title: "Get the agreement signed", text: "The agreed scope becomes an agreement they sign online." },
-  { title: "Invoice and track payment", text: "Raise the invoice and see when it's paid." },
+const SPREAD = [
+  "Prospects in browser tabs and a spreadsheet",
+  "Outreach and replies scattered across your inbox",
+  "Quotations and agreements in separate documents",
+  "Invoices in another tool, payments in your bank app",
+  "Re-typing the client, the scope and the fee at every step",
 ];
-const RAIL = [
-  { Icon: UserRound, label: "Prospect" }, { Icon: Users, label: "Deal" }, { Icon: FileText, label: "Quote" },
-  { Icon: Signature, label: "Agreement" }, { Icon: ReceiptText, label: "Invoice" }, { Icon: CreditCard, label: "Payment" },
+const TOGETHER = [
+  "Researched prospects saved straight into your lead pipeline",
+  "Each lead's facts, sources, next steps and follow-ups in one place",
+  "Quotation, agreement and invoices generated from the same deal",
+  "What's paid, pending and overdue on one dashboard",
+  "AI drafts; you approve everything that reaches a client",
 ];
 
-export function JourneySection({ showDemo = true }: { showDemo?: boolean }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const seen = useInView(ref, { once: true, margin: "-120px" });
+export function ManualWorkflowSection() {
   return (
-    <section id="how" className="scroll-mt-20 bg-gradient-to-b from-emerald-50/50 to-transparent py-16 sm:py-24 dark:from-emerald-950/20">
-      <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-[1fr_1.1fr] lg:items-center lg:px-8">
-        <Reveal>
-          <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />How it works</p>
-          <h2 className="mt-3 text-3xl font-extrabold leading-tight tracking-[-0.025em] sm:text-[2.6rem]">From finding the client<br className="hidden sm:block" /> to getting paid.</h2>
-          <p className="mt-3 max-w-md text-neutral-600 dark:text-neutral-400">One connected process, so you win more of the right clients and get paid faster.</p>
-          <ol className="mt-7 space-y-5">
-            {STEPS.map((s, i) => (
-              <li key={s.title} className="flex gap-4">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white shadow-md shadow-emerald-600/25">{i + 1}</span>
-                <span><b className="block text-[15px]">{s.title}</b><span className="text-sm text-neutral-500 dark:text-neutral-400">{s.text}</span></span>
-              </li>
-            ))}
-          </ol>
-          {showDemo && <a href="#try" className="mt-8 inline-flex h-11 items-center rounded-lg bg-emerald-700 px-5 text-sm font-semibold text-white shadow-md transition hover:bg-emerald-800">Try the live demo<ArrowRight className="ml-2 h-4 w-4" /></a>}
-        </Reveal>
-
-        <div ref={ref} aria-hidden="true" className={cn("dis-journey relative grid grid-cols-[auto_1fr] items-center gap-5 sm:gap-8", seen && "dis-journey-on")}>
-          <ul className="relative flex flex-col gap-4 sm:gap-5">
-            <span className="absolute left-[17px] top-4 bottom-4 w-px bg-emerald-200 dark:bg-emerald-900" />
-            {RAIL.map(({ Icon, label }, i) => (
-              <li key={label} className="dis-rail-step relative flex items-center gap-2.5" style={{ animationDelay: `${0.2 + i * 0.25}s` }}>
-                <span className="flex h-9 w-9 items-center justify-center rounded-full border border-emerald-200 bg-white text-emerald-600 dark:border-emerald-800 dark:bg-neutral-900"><Icon className="h-4 w-4" /></span>
-                <span className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-[13px] font-semibold shadow-sm dark:border-neutral-800 dark:bg-neutral-900">{label}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="flex flex-col gap-4">
-            <div className="dis-slide rounded-2xl border border-neutral-200 bg-white p-4 shadow-lg shadow-emerald-900/5 dark:border-neutral-800 dark:bg-neutral-900" style={{ animationDelay: ".4s" }}>
-              <div className="flex items-start justify-between"><span className="flex items-center gap-2 text-[12px] font-semibold"><FileText className="h-4 w-4 text-emerald-600" />Quote #Q-001</span><span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white">Sent</span></div>
-              <p className="mt-1 text-[11px] text-neutral-500">Acme Marketing</p>
-              <p className="mt-1 text-lg font-extrabold tabular-nums">$3,500</p>
-              <div className="mt-2 flex justify-end"><span className="rounded-md border border-neutral-200 px-2 py-0.5 text-[10px] text-neutral-500 dark:border-neutral-700">View quote</span></div>
-            </div>
-            <div className="dis-slide ml-0 rounded-2xl border border-neutral-200 bg-white p-4 shadow-lg shadow-emerald-900/5 sm:ml-6 dark:border-neutral-800 dark:bg-neutral-900" style={{ animationDelay: ".7s" }}>
-              <div className="flex items-start justify-between"><span className="flex items-center gap-2 text-[12px] font-semibold"><Signature className="h-4 w-4 text-emerald-600" />Agreement</span><span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold text-white">Signed</span></div>
-              <svg viewBox="0 0 160 40" className="mt-2 h-10 w-40 text-neutral-800 dark:text-neutral-200" fill="none">
-                <path className="dis-sign" d="M6 30C14 8 20 6 22 14S18 34 26 30 38 10 44 16 40 32 52 26 66 12 72 20 78 30 90 24 108 14 118 20 130 26 152 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </div>
-            <div className="dis-slide rounded-2xl border border-neutral-200 bg-white p-4 shadow-lg shadow-emerald-900/5 dark:border-neutral-800 dark:bg-neutral-900" style={{ animationDelay: "1s" }}>
-              <div className="flex items-start justify-between"><span className="flex items-center gap-2 text-[12px] font-semibold"><ReceiptText className="h-4 w-4 text-emerald-600" />Invoice #INV-001</span><span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">● Paid</span></div>
-              <p className="mt-1 text-[11px] text-neutral-500">Acme Marketing</p>
-              <p className="mt-1 text-lg font-extrabold tabular-nums">$3,500</p>
-              <div className="mt-2 flex justify-end"><span className="rounded-md border border-neutral-200 px-2 py-0.5 text-[10px] text-neutral-500 dark:border-neutral-700">View invoice</span></div>
-            </div>
-            <p className="text-right text-[11px] text-neutral-400">Example data.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ── One workspace instead of many tools ─────────────────────────────────────────────── */
-
-/** The jobs people stitch together with separate apps, named generically (no logos, no claim about other products). */
-const SCATTERED = [
-  { label: "Spreadsheets", x: "18%", y: "8%" }, { label: "Docs", x: "54%", y: "0%" }, { label: "E-sign app", x: "4%", y: "38%" },
-  { label: "Task board", x: "40%", y: "40%" }, { label: "Invoice app", x: "70%", y: "30%" }, { label: "Notes", x: "12%", y: "72%" },
-  { label: "Reminders", x: "52%", y: "74%" },
-];
-
-export function OneWorkspaceSection() {
-  return (
-    <section className="py-16 sm:py-24">
+    <section className="py-16 sm:py-20" data-testid="landing-manual-vs">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <Reveal className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Clients shouldn't take <span className={GREEN}>7 different apps.</span></h2>
-          <p className="mt-3 text-neutral-600 dark:text-neutral-400">No more copying the same client between spreadsheets, docs, e-sign tools and invoice apps. DealInSec keeps the whole client journey in one place.</p>
+          <h2 className="text-balance text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Why keep the client journey <span className={GREEN}>in one place</span></h2>
+          <p className="mt-3 text-neutral-600 dark:text-neutral-400">When each step lives in a different tool, details get re-typed, follow-ups slip and nobody is sure what was agreed or paid.</p>
         </Reveal>
-        <div className="mt-12 grid items-center gap-10 md:grid-cols-[1fr_auto_1fr]">
-          <div aria-hidden="true" className="relative mx-auto h-60 w-full max-w-md">
-            <Scribble className="-left-2 -top-10 -rotate-12" arrow="down-right">Too many tools</Scribble>
-            {SCATTERED.map((t, i) => (
-              <span key={t.label} className="dis-float absolute rounded-xl border border-neutral-200 bg-white px-3.5 py-2 text-[13px] font-semibold text-neutral-700 shadow-md dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"
-                style={{ left: t.x, top: t.y, animationDelay: `${i * 0.45}s`, rotate: `${((i % 3) - 1) * 2}deg` }}>
-                {t.label}
-              </span>
-            ))}
-            <Scribble className="-bottom-16 left-[30%] hidden rotate-[-4deg] sm:flex" arrow="up">So much time wasted</Scribble>
-          </div>
-          <ArrowRight aria-hidden="true" className="dis-nudge mx-auto h-9 w-9 rotate-90 text-neutral-400 md:rotate-0" />
-          <Reveal className="rounded-3xl border border-neutral-200 bg-white p-6 shadow-[0_24px_60px_-28px_rgba(6,78,59,0.35)] sm:p-8 dark:border-neutral-800 dark:bg-neutral-900">
-            <div className="flex flex-col items-center gap-6 sm:flex-row">
-              <div className="flex flex-col items-center">
-                <DealinsecMark size={86} className="drop-shadow-[0_10px_18px_rgba(6,95,70,0.25)]" />
-                <DealinsecWordmark size={22} className="mt-2" />
-              </div>
-              <div>
-                <p className="mb-2 text-lg font-extrabold">One workspace</p>
-                <ul className="space-y-2 text-sm">
-                  {["Prospects to payment in one place", "A simple, connected workflow", "Built for small agencies and consultants", "Less admin, more client work"].map((t) => (
-                    <li key={t} className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />{t}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
+        <div className="mt-10 grid gap-4 md:grid-cols-2">
+          <Reveal className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-6 dark:border-neutral-800 dark:bg-neutral-900/40">
+            <h3 className="font-bold text-neutral-700 dark:text-neutral-300">Spread across tools</h3>
+            <ul className="mt-4 space-y-2.5 text-sm text-neutral-600 dark:text-neutral-400">
+              {SPREAD.map((t) => <li key={t} className="flex gap-2"><X className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" aria-hidden />{t}</li>)}
+            </ul>
+          </Reveal>
+          <Reveal delay={0.08} className="rounded-2xl border border-emerald-300 bg-white p-6 shadow-sm dark:border-emerald-800 dark:bg-neutral-900">
+            <h3 className="font-bold text-emerald-800 dark:text-emerald-300">In DealInSec</h3>
+            <ul className="mt-4 space-y-2.5 text-sm">
+              {TOGETHER.map((t) => <li key={t} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />{t}</li>)}
+            </ul>
           </Reveal>
         </div>
-      </div>
-    </section>
-  );
-}
-
-/* ── AI Outbound, the hero feature ─────────────────────────────────────────────────────── */
-
-const OUTBOUND_STEPS = [
-  { Icon: Globe2, title: "Choose who and where", text: "Describe your ideal client and pick the countries or cities. Your own location is never assumed." },
-  { Icon: ShieldCheck, title: "Research with evidence", text: "Each company's own website is checked against your profile. Facts carry their source and date; guesses are labelled." },
-  { Icon: MailCheck, title: "Approve the outreach", text: "AI drafts a first message from verified facts. You edit, approve and send it from your own email." },
-  { Icon: Handshake, title: "Turn replies into deals", text: "Interested companies become leads, then deals with a quotation, agreement and invoice." },
-];
-const TARGETS = ["United States", "United Kingdom", "Canada", "Australia", "UAE", "India", "Worldwide"];
-
-/** AI Outbound: where new clients come from. Every line is true of the product today (shared/product-facts.ts). */
-export function AiOutboundSection() {
-  const free = OUTBOUND_ALLOWANCE_DEFAULTS.free, pro = OUTBOUND_ALLOWANCE_DEFAULTS.pro;
-  return (
-    <section id="ai-outbound" className="scroll-mt-20 py-16 sm:py-20" data-testid="landing-ai-outbound">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <Reveal className="mx-auto max-w-3xl text-center">
-          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400">AI Outbound</p>
-          <h2 className="mt-2 text-3xl font-extrabold tracking-[-0.025em] text-balance sm:text-4xl">Find clients in India and abroad</h2>
-          <p className="mt-3 text-neutral-600 dark:text-neutral-400">An agency in Bengaluru can research companies in Texas, London or Dubai as easily as in Mumbai. You choose the market; DealInSec does the research and shows its work.</p>
-          <ul className="mt-5 flex flex-wrap justify-center gap-2" aria-label="Markets you can search">
-            {TARGETS.map((t) => <li key={t} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">{t}</li>)}
-          </ul>
-        </Reveal>
-        <motion.ol initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={stagger} className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {OUTBOUND_STEPS.map(({ Icon, title, text }, n) => (
-            <motion.li key={title} variants={reveal} className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
-              <span className="flex items-center gap-2 text-xs font-bold text-emerald-700 dark:text-emerald-400"><Icon className="h-5 w-5" aria-hidden />Step {n + 1}</span>
-              <h3 className="mt-3 font-bold">{title}</h3>
-              <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{text}</p>
-            </motion.li>
-          ))}
-        </motion.ol>
-        <p className="mx-auto mt-6 max-w-3xl text-center text-xs text-neutral-500 dark:text-neutral-400">
-          Free includes {free.monthlySearches} searches a month; Pro (₹{PRICING.proMonthlyInr}/month) includes {pro.monthlySearches}, up to {pro.maxCompanies} companies each. Nothing is sent automatically, contact details aren&apos;t always available, and some markets have thinner coverage — DealInSec says so instead of filling gaps.
-        </p>
+        <p className="mx-auto mt-5 max-w-2xl text-center text-xs text-neutral-500">DealInSec doesn&apos;t replace your accounting software, and it doesn&apos;t guarantee clients or replies: it keeps the work of winning and billing a client together.</p>
       </div>
     </section>
   );
@@ -371,9 +462,10 @@ export function AiOutboundSection() {
 /* ── Who it's for ────────────────────────────────────────────────────────────────────── */
 
 const AUDIENCES = [
-  { Icon: Users, title: "Marketing, SEO & growth agencies", text: "Research prospects with evidence, then quote, sign and bill retainers in one place.", href: null },
-  { Icon: Building2, title: "AI automation, web & software studios", text: "Scope builds as milestones, get the agreement signed online, and invoice each stage.", href: null },
-  { Icon: UserRound, title: "Consultants & specialist services", text: "Independent B2B consultants, content and lead-generation agencies. Freelancers work the same way.", href: "/for-freelancers" },
+  { Icon: UserRound, title: "Freelancers & solo consultants", text: "Find clients, quote them properly, get the scope signed and know what you're owed.", href: "/for-freelancers" },
+  { Icon: Building2, title: "Web development & software services", text: "Research accounts, scope builds as milestones and invoice each stage.", href: null },
+  { Icon: Users, title: "Digital marketing, SEO & growth agencies", text: "Find companies in your niche with evidence, then quote, sign and bill retainers.", href: null },
+  { Icon: Bot, title: "AI automation businesses", text: "Spot companies showing repetitive work publicly, such as support or operations hiring, with dated sources.", href: null },
 ];
 
 export function AudienceCards() {
@@ -381,91 +473,19 @@ export function AudienceCards() {
     <section id="audiences" className="scroll-mt-20 py-16 sm:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <Reveal className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Built for small B2B service businesses</h2>
-          <p className="mt-3 text-neutral-600 dark:text-neutral-400">Founder-led agencies and consultants of about 1 to 10 people, in the United States, India and beyond.</p>
+          <h2 className="text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Built for service businesses</h2>
+          <p className="mt-3 text-neutral-600 dark:text-neutral-400">Freelancers, solo consultants and small B2B agencies of about 1 to 10 people, in India and beyond.</p>
         </Reveal>
-        <motion.ul initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={stagger} className="mt-10 grid gap-4 md:grid-cols-3">
+        <motion.ul initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={stagger} className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {AUDIENCES.map(({ Icon, title, text, href }) => (
-            <motion.li key={title} variants={reveal} className="group rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg dark:border-neutral-800 dark:bg-neutral-900/60">
-              <Icon className="h-7 w-7 text-emerald-600" strokeWidth={1.8} />
-              <h3 className="mt-4 text-lg font-bold">{title}</h3>
+            <motion.li key={title} variants={reveal} className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
+              <Icon className="h-6 w-6 text-emerald-600" strokeWidth={1.8} aria-hidden />
+              <h3 className="mt-3 font-bold">{title}</h3>
               <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{text}</p>
               {href && <Link href={href} className="mt-3 inline-flex items-center text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-300">DealInSec for freelancers<ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>}
             </motion.li>
           ))}
         </motion.ul>
-      </div>
-    </section>
-  );
-}
-
-/* ── Know where your business stands ─────────────────────────────────────────────────── */
-
-function CountUp({ to, prefix = "", run }: { to: number; prefix?: string; run: boolean }) {
-  const [n, setN] = useState(0);
-  useEffect(() => {
-    if (!run) return;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { setN(to); return; }
-    const start = performance.now(), ms = 1100;
-    let raf = 0;
-    const tick = (t: number) => { const p = Math.min(1, (t - start) / ms); setN(Math.round(to * (1 - (1 - p) ** 3))); if (p < 1) raf = requestAnimationFrame(tick); };
-    raf = requestAnimationFrame(tick);
-    const done = setTimeout(() => setN(to), ms + 200); // lands on the number even where frames don't run
-    return () => { cancelAnimationFrame(raf); clearTimeout(done); };
-  }, [run, to]);
-  return <>{prefix}{n.toLocaleString("en-US")}</>;
-}
-
-export function OverviewSection() {
-  const ref = useRef<HTMLDivElement>(null);
-  const seen = useInView(ref, { once: true, margin: "-100px" });
-  const stats = [
-    { label: "New deals", to: 12, prefix: "", delta: "+20%" },
-    { label: "Total value", to: 18500, prefix: "$", delta: "+32%" },
-    { label: "Paid invoices", to: 9200, prefix: "$", delta: "+10%" },
-  ];
-  const activity = [
-    { Icon: Signature, text: "Acme Marketing signed the agreement", when: "2h ago" },
-    { Icon: ReceiptText, text: "Invoice #INV-001 paid · $3,500", when: "5h ago" },
-    { Icon: Users, text: "New deal from Pixel Studio", when: "1d ago" },
-    { Icon: FileText, text: "Quote #Q-002 sent", when: "1d ago" },
-  ];
-  return (
-    <section className="py-16 sm:py-24">
-      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
-        <div ref={ref} aria-hidden="true" className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-[0_24px_60px_-28px_rgba(6,78,59,0.35)] sm:p-6 dark:border-neutral-800 dark:bg-neutral-900">
-          <p className="text-sm font-bold">This month</p>
-          <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
-            {stats.map((s) => (
-              <div key={s.label} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-2.5 sm:p-3 dark:border-neutral-800 dark:bg-neutral-800/40">
-                <p className="text-[10px] text-neutral-500 sm:text-[11px]">{s.label}</p>
-                <p className="mt-1 text-lg font-extrabold tabular-nums sm:text-2xl"><CountUp to={s.to} prefix={s.prefix} run={seen} /></p>
-                <p className="mt-0.5 text-[10px] font-semibold text-emerald-600 sm:text-[11px]">↑ {s.delta}</p>
-              </div>
-            ))}
-          </div>
-          <p className="mt-5 text-sm font-bold">Recent activity</p>
-          <motion.ul initial="hidden" whileInView="visible" viewport={{ once: true }} variants={stagger} className="mt-2 divide-y divide-neutral-100 dark:divide-neutral-800">
-            {activity.map(({ Icon, text, when }) => (
-              <motion.li key={text} variants={reveal} className="flex items-center gap-3 py-2.5 text-[13px]">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15"><Icon className="h-3.5 w-3.5" /></span>
-                <span className="min-w-0 flex-1 truncate">{text}</span>
-                <span className="text-[11px] text-neutral-400">{when}</span>
-              </motion.li>
-            ))}
-          </motion.ul>
-          <p className="mt-2 text-right text-[11px] text-neutral-400">Example data.</p>
-        </div>
-        <Reveal>
-          <p className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Stay in control</p>
-          <h2 className="mt-3 text-3xl font-extrabold leading-tight tracking-[-0.025em] sm:text-[2.6rem]">Know exactly where your business stands.</h2>
-          <p className="mt-3 text-neutral-600 dark:text-neutral-400">A clear view of your deals, what they're worth and what's been paid, with a list of what needs you today.</p>
-          <ul className="mt-6 space-y-3">
-            {["Track your pipeline and its value", "See which invoices are paid, due or overdue", "A daily list of what needs your attention", "Follow-up reminders, so nothing slips"].map((t) => (
-              <li key={t} className="flex items-center gap-2.5 text-[15px]"><CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />{t}</li>
-            ))}
-          </ul>
-        </Reveal>
       </div>
     </section>
   );
@@ -482,12 +502,12 @@ export function CtaBanner({ isAuthenticated, onPrimary }: { isAuthenticated: boo
           <span aria-hidden="true" className="dis-orb absolute -bottom-20 -right-10 h-72 w-72 rounded-full bg-teal-300/25 blur-3xl" style={{ animationDelay: "2s" }} />
           <div className="relative">
             <h2 className="text-3xl font-extrabold leading-tight tracking-[-0.025em] sm:text-5xl">Find your next client.<br />Get paid for the last one.</h2>
-            <p className="mx-auto mt-4 max-w-xl text-emerald-50/90">Start free with prospects, your pipeline and quotations. Agreements, invoices and payment tracking are in the 7-day Pro trial.</p>
+            <p className="mx-auto mt-4 max-w-xl text-emerald-50/90">Start free: research prospects, save leads, create deals and send quotations. Upgrade when you need agreements, invoices and payment tracking.</p>
             <button type="button" onClick={onPrimary} data-testid="button-final-cta"
               className="group mt-7 inline-flex h-12 items-center rounded-lg bg-white px-6 text-sm font-semibold text-emerald-800 shadow-xl transition hover:bg-emerald-50">
-              {isAuthenticated ? "Go to dashboard" : "Start for free"}<ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              {isAuthenticated ? "Go to dashboard" : "Start Free"}<ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
-            <p className="mt-4 text-xs text-emerald-50/75">No credit card required · Free plan: 4 deals a month</p>
+            <p className="mt-4 text-xs text-emerald-50/75">No credit card · {PRICING.trialDays}-day Pro trial · Pro ₹{PRICING.proMonthlyInr}/month in India</p>
           </div>
         </Reveal>
       </div>

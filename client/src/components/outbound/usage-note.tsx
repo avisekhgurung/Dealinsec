@@ -16,7 +16,11 @@ export interface OutboundUsage {
   charge: "included";
   workspace: { searches: Allowance | null; webSearches: Allowance | null; contactLookups: Allowance | null };
   /** The plan's 30-day allowance (absent from an older server). */
-  plan?: { tier: "free" | "trial" | "pro"; label: string; searches: Allowance | null; maxCompanies: number; windowDays: number };
+  plan?: {
+    tier: "free" | "trial" | "pro"; label: string; searches: Allowance | null; maxCompanies: number; windowDays: number;
+    /** Separate allowances over the same days (absent from an older server; null = couldn't be counted). */
+    prospects?: Allowance | null; drafts?: Allowance | null; sends?: Allowance | null; spendPercent?: number | null;
+  };
   perSearch: { webSearches: number };
   platform: { state: "available" | "limited" | "paused" | "unknown"; resetsAt: string };
 }
@@ -40,6 +44,13 @@ export function searchBlockedReason(u: OutboundUsage | undefined): string | null
       ? `You've used the free plan's ${m.limit} AI Outbound searches for this ${u.plan!.windowDays}-day period. Upgrade to Pro for more.`
       : `You've used the ${m.limit} searches included in ${u.plan!.label} for this ${u.plan!.windowDays}-day period.${m.nextFreesAt ? ` The next one frees up ${when(m.nextFreesAt)}.` : ""}`;
   }
+  const pr = u.plan?.prospects;
+  if (pr && pr.remaining <= 0) {
+    return u.plan!.tier === "free"
+      ? `You've used the free plan's ${pr.limit} researched prospects for this ${u.plan!.windowDays}-day period. Upgrade to Pro for more.`
+      : `You've used the ${pr.limit} researched prospects included in ${u.plan!.label} for this ${u.plan!.windowDays}-day period. More become available as earlier searches pass ${u.plan!.windowDays} days.`;
+  }
+  if ((u.plan?.spendPercent ?? 0) >= 100) return `This workspace's AI usage for the last ${u.plan!.windowDays} days has reached its limit. It frees up as earlier usage passes ${u.plan!.windowDays} days.`;
   const s = u.workspace.searches;
   if (s && s.remaining <= 0) return `You've used today's ${s.limit} searches.${s.nextFreesAt ? ` The next one frees up ${when(s.nextFreesAt)}.` : ""}`;
   if (u.platform.state === "paused") return `AI Outbound has reached today's limit across DealInSec. It starts again ${when(u.platform.resetsAt)}. This doesn't use any of your searches.`;
@@ -64,6 +75,16 @@ export function UsageNote({ usage }: { usage: OutboundUsage | undefined }) {
           {usage.plan?.tier === "free" && <> <Link href="/pricing" className="font-semibold text-primary hover:underline" data-testid="outbound-upgrade">Pro includes more</Link>.</>}
         </span>
       </p>
+      {usage.plan && (usage.plan.prospects || usage.plan.drafts || usage.plan.sends) && (
+        <p className="pl-5 text-muted-foreground" data-testid="outbound-plan-allowances">
+          {[
+            usage.plan.prospects && `${usage.plan.prospects.remaining} of ${usage.plan.prospects.limit} researched prospects left`,
+            usage.plan.drafts && `${usage.plan.drafts.remaining} of ${usage.plan.drafts.limit} AI drafts`,
+            usage.plan.sends && `${usage.plan.sends.remaining} of ${usage.plan.sends.limit} Gmail sends`,
+          ].filter(Boolean).join(" · ")}
+          {typeof usage.plan.spendPercent === "number" && usage.plan.spendPercent >= 80 && <> · AI usage at {usage.plan.spendPercent}% of this period&apos;s limit</>}
+        </p>
+      )}
       {blocked ? (
         <p className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400" role="status" data-testid="outbound-blocked">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />{blocked}

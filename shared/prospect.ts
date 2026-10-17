@@ -42,7 +42,7 @@ export function domainOf(url: string): string | null {
 export type RejectReason =
   | "not_a_url" | "blocked_site" | "non_business_host" | "listing_page" | "file" | "excluded_word"
   | "duplicate" | "already_lead" | "unreachable" | "not_html" | "offsite_redirect" | "parked" | "no_identity" | "thin_site"
-  | "poor_fit" | "unclear" | "off_topic" | "not_a_company" | "budget" | "daily_limit" | "global_limit" | "failed";
+  | "poor_fit" | "unclear" | "off_topic" | "not_a_company" | "budget" | "daily_limit" | "global_limit" | "workspace_budget" | "robots_disallowed" | "failed";
 
 export const REJECT_LABEL: Record<RejectReason, string> = {
   not_a_url: "Not a web address", blocked_site: "A directory, social or news site", non_business_host: "Not a business website",
@@ -52,7 +52,7 @@ export const REJECT_LABEL: Record<RejectReason, string> = {
   no_identity: "Couldn't tell whose site it is", thin_site: "Too little on the site to judge", poor_fit: "Doesn't fit who you want",
   unclear: "Couldn't tell what they do", off_topic: "Nothing about what you asked for", not_a_company: "A directory, marketplace, publication or institution",
   budget: "Not checked (this run's limit was reached)", daily_limit: "Not checked (today's AI allowance ran out)",
-  global_limit: "Not checked (today's platform-wide AI or search budget ran out)", failed: "Couldn't be checked",
+  global_limit: "Not checked (today's platform-wide AI or search budget ran out)", workspace_budget: "Not checked (this workspace's AI usage for the last 30 days reached its limit)", robots_disallowed: "Not read (their robots.txt asks automated readers not to)", failed: "Couldn't be checked",
 };
 
 /** Why a search result can't be a company's own site, or null when it might be. Judged on host and title, never the model. */

@@ -33,6 +33,7 @@ import { stagger, staggerItem, useCalmMotion } from "@/lib/motion";
 import { queryClient } from "@/lib/queryClient";
 import { COUNTRY_NAME, ICP_URL, OUTBOUND_RUNS_URL, RUN_ERROR, RUN_STAGE_LABEL, countryName, runUrl, prospectUrl, type ParsedIcp, type ProspectCard as Card_, type RunView } from "@/lib/outbound";
 import { searchStrategies } from "@shared/icp";
+import { takeOutboundPrefill } from "@/lib/outbound-prefill";
 import { getTargetMarket } from "@/lib/first-goal";
 import { cn } from "@/lib/utils";
 import { memberCan } from "@shared/permissions";
@@ -41,6 +42,15 @@ const EXAMPLES = [
   "Find 30 US digital marketing agencies with 5–30 employees that serve SaaS companies",
   "20 UK accounting firms that work with restaurants",
   "Boutique hotels in Portugal with their own website",
+];
+
+/**
+ * Ready-made searches for a common service. The request is what is searched (concrete businesses, size and place); the
+ * service the person sells is not put into it, or the search would look for companies offering it. Each company's home
+ * page is checked for a mobile viewport tag and an old copyright year anyway (shared/site-signals.ts), shown as observations.
+ */
+const PRESETS = [
+  { label: "Website redesign · US local businesses", request: "10 US dental clinics and law firms with 5–50 employees", note: "Each company's home page is checked for a mobile viewport tag and an old copyright year: hints worth checking, not proof they need a new site." },
 ];
 
 const notSetUp = (e: unknown) => !!e && /PROSPECTS_NOT_SETUP/.test(String((e as Error).message));
@@ -95,7 +105,7 @@ function RunPanel({ id, canEdit, onOpen }: { id: string; canEdit: boolean; onOpe
   const cancel = useMutation({ mutationFn: () => leadCall("POST", `${runUrl(id)}/cancel`, {}), onSuccess: () => void queryClient.invalidateQueries({ queryKey: [runUrl(id)] }) });
   const add = useMutation({
     mutationFn: (pid: number) => { setAdding(pid); return leadCall("POST", prospectUrl(pid, "lead"), {}); },
-    onSuccess: (r: any) => { toast({ title: r.existing ? "Already in your leads" : "Added to Leads", description: "Its evidence is on the lead's Facts tab." }); void queryClient.invalidateQueries({ predicate: (k) => typeof k.queryKey[0] === "string" && ((k.queryKey[0] as string).startsWith("/api/outbound") || (k.queryKey[0] as string).startsWith("/api/leads")) }); },
+    onSuccess: (r: any) => { if (!r.existing) trackEvent("lead_created", { source: "outbound" }); toast({ title: r.existing ? "Already in your leads" : "Added to Leads", description: "Its evidence is on the lead's Facts tab." }); void queryClient.invalidateQueries({ predicate: (k) => typeof k.queryKey[0] === "string" && ((k.queryKey[0] as string).startsWith("/api/outbound") || (k.queryKey[0] as string).startsWith("/api/leads")) }); },
     onError: (e) => toast({ title: "Couldn't add it", description: leadError(e), variant: "destructive" }),
     onSettled: () => setAdding(null),
   });
@@ -224,6 +234,7 @@ function FirstSearch({ canEdit, onPick }: { canEdit: boolean; onPick: (example: 
       </p>
       {canEdit && (
         <div className="mx-auto mt-4 flex max-w-2xl flex-wrap justify-center gap-2">
+          {PRESETS.map((x) => <button key={x.label} onClick={() => onPick(x.request)} title={x.note} className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-left text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" data-testid="outbound-preset">Preset: {x.label}</button>)}
           {EXAMPLES.map((x) => <button key={x} onClick={() => onPick(x)} className="rounded-full border bg-background px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" data-testid="outbound-example">{x}</button>)}
         </div>
       )}
@@ -257,7 +268,7 @@ export default function OutboundPage() {
   useEffect(() => { if (!runId && runs.data?.runs.length) setRunId(runs.data.runs[0].id); }, [runs.data, runId]);
 
   const parse = useMutation({
-    mutationFn: () => leadCall<ParsedIcp>("POST", ICP_URL, { request: text }),
+    mutationFn: (request?: string) => leadCall<ParsedIcp>("POST", ICP_URL, { request: request ?? text }),
     // A request that names no place starts from the market chosen at setup, as a visible, removable chip; "worldwide"
     // (or no choice) leaves it worldwide. Never the person's own account country.
     onSuccess: (r) => {
@@ -269,9 +280,24 @@ export default function OutboundPage() {
     },
     onError: (e) => toast({ title: "I couldn't read that", description: leadError(e), variant: "destructive" }),
   });
+  // A target typed in the landing demo before signing up: filled in and read once, so the person lands on the profile
+  // to confirm (reading it is one model call against the workspace's own allowance; no search starts until they confirm).
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (prefilled.current || !canEdit) return;
+    prefilled.current = true;
+    const request = takeOutboundPrefill();
+    if (!request) return;
+    setText(request);
+    trackEvent("outbound_prefill_from_demo");
+    parse.mutate(request);
+  }, [canEdit]);
   const start = useMutation({
     mutationFn: () => leadCall<{ run: RunView; existing: boolean }>("POST", OUTBOUND_RUNS_URL, { request: text, icp: parsed!.icp, searches: parsed!.searches }),
-    onSuccess: (r) => { setRunId(r.run.id); setParsed(null); setText(""); if (view === "prospects") setView("searches"); if (r.existing) toast({ title: "That search is already running" }); void queryClient.invalidateQueries({ queryKey: [OUTBOUND_RUNS_URL] }); void queryClient.invalidateQueries({ queryKey: [OUTBOUND_USAGE_URL] }); },
+    onSuccess: (r) => {
+      // Counts only: never the request, the profile or a company. first_search marks the workspace's first search in its window.
+      if (!r.existing) trackEvent("outbound_search_started", { first_search: (usage.data?.usage.plan?.searches?.used ?? 0) === 0 });
+      setRunId(r.run.id); setParsed(null); setText(""); if (view === "prospects") setView("searches"); if (r.existing) toast({ title: "That search is already running" }); void queryClient.invalidateQueries({ queryKey: [OUTBOUND_RUNS_URL] }); void queryClient.invalidateQueries({ queryKey: [OUTBOUND_USAGE_URL] }); },
     // A refusal (a limit reached meanwhile) refreshes the allowance shown, so the page and the server agree again.
     onError: (e) => {
       // Out of the free plan's searches: the upgrade sheet, not an error.
@@ -342,10 +368,13 @@ export default function OutboundPage() {
                 <label htmlFor="outbound-request" className="text-sm font-semibold">Tell me who you want to reach…</label>
                 <Textarea ref={inputRef} id="outbound-request" value={text} onChange={(e) => { setText(e.target.value); setParsed(null); }} rows={2} maxLength={500}
                   placeholder="US SEO agencies with 5–30 employees serving SaaS companies" disabled={parse.isPending || start.isPending} data-testid="outbound-input" />
-                {!text && !firstTime && !runs.isLoading && <div className="flex flex-wrap gap-2">{EXAMPLES.map((x) => <button key={x} onClick={() => pickExample(x)} className="rounded-full border px-3 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">{x}</button>)}</div>}
+                {!text && !firstTime && !runs.isLoading && <div className="flex flex-wrap gap-2">
+                  {PRESETS.map((x) => <button key={x.label} onClick={() => { trackEvent("outbound_preset_used", { preset: "website_redesign_us" }); pickExample(x.request); }} title={x.note} className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-left text-xs font-medium text-emerald-800 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" data-testid="outbound-preset">Preset: {x.label}</button>)}
+                  {EXAMPLES.map((x) => <button key={x} onClick={() => pickExample(x)} className="rounded-full border px-3 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">{x}</button>)}
+                </div>}
                 <UsageNote usage={usage.data?.usage} />
                 {!parsed ? (
-                  <Button onClick={() => parse.mutate()} disabled={text.trim().length < 3 || parse.isPending || !!blocked} className="gradient-btn text-white" data-testid="outbound-find">
+                  <Button onClick={() => parse.mutate(undefined)} disabled={text.trim().length < 3 || parse.isPending || !!blocked} className="gradient-btn text-white" data-testid="outbound-find">
                     {parse.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Search className="mr-1.5 h-4 w-4" />}Find prospects
                   </Button>
                 ) : icp && (

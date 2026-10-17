@@ -28,7 +28,7 @@ export default function RefundPolicy() {
           of purchase):
         </p>
         <ul>
-          <li><strong>DealInSec Pro (₹499 a month)</strong>: AI Outbound with the Pro research allowance and the full workflow (unlimited deals, quotations, agreements, invoices and payment tracking) for 1 month.</li>
+          <li><strong>DealInSec Pro (₹199 a month)</strong>: AI Outbound with the Pro research allowance and the full workflow (unlimited deals, quotations, agreements, invoices and payment tracking) for 1 month.</li>
           <li><strong>Extra team seats (₹99 per seat a month)</strong>: an add-on for Pro.</li>
           <li>Pro Annual purchased before October 2026 remains valid for its paid term; it is no longer sold.</li>
         </ul>

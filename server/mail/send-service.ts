@@ -47,6 +47,8 @@ export interface SendDeps {
   log(event: string, fields?: Record<string, string | number | boolean | null>): void;
   /** For a follow-up: the Gmail thread and Message-IDs it answers, so it arrives in the same conversation. */
   threadFor?(orgId: string, messageId: number): Promise<{ threadId: string | null; inReplyTo: string; references: string[] } | null>;
+  /** The workspace plan's send allowance over 30 days (shared/outbound-plans.ts); none = only the mailbox's daily cap applies. */
+  planSendCap?(user: Member): Promise<{ since: Date; max: number } | null>;
 }
 
 export type Fail = { ok: false; status: number; code: string; message: string };
@@ -77,6 +79,7 @@ const REFUSALS: Record<ReserveRefusal, [number, string]> = {
   missing_send_scope: [409, "Your Gmail connection can't send email. Reconnect it in Settings and keep \"Send email on your behalf\" ticked."],
   daily_cap: [429, "You've reached today's sending limit for this mailbox. Nothing was sent; try again tomorrow."],
   followup_stopped: [409, "A reply arrived in this conversation (or it's waiting for you to review one), so this follow-up wasn't sent. Open the inbox to see it."],
+  plan_send_limit: [429, "You've used your plan's Gmail sends for the last 30 days. Nothing was sent. More become available as earlier sends pass 30 days, or you can copy the message and send it yourself."],
 };
 
 /** What a stored job says happened, when a conditional write didn't apply (someone else settled it first). */
@@ -155,9 +158,10 @@ export async function sendApproved(user: Member, messageId: number, bodyHash: un
   try { checkList = await deps.listReady(); } catch { return fail(503, "suppression_unavailable", "Your do-not-contact list couldn't be checked, so nothing was sent. Try again shortly."); }
   if (!checkList) return fail(503, "outreach_not_setup", "Sending from Gmail needs the do-not-contact list, which isn't set up on this server yet.");
 
+  const planCap = deps.planSendCap ? await deps.planSendCap(user) : null;
   const r = await deps.sends.reserve({
     orgId, userId: user.id, messageId, expectedHash: bodyHash, connectionId: conn.id, provider: provider.id, checkList,
-    dailyCap: gate.cap, now: deps.now(), leaseMs: SEND_LEASE_MS, newRfcMessageId: `<dis-${randomBytes(16).toString("hex")}@dealinsec.com>`,
+    dailyCap: gate.cap, planCap: planCap ?? undefined, now: deps.now(), leaseMs: SEND_LEASE_MS, newRfcMessageId: `<dis-${randomBytes(16).toString("hex")}@dealinsec.com>`,
   });
   if (!r.ok) {
     if (r.code === "already_sent" && r.job) return { ok: true, outcome: "already_sent", send: sendView(r.job, user) };

@@ -149,6 +149,7 @@ export const researchStoreMock = () => {
 /** Outreach messages, in memory, with the database's rules: one unsent (draft or approved) message per lead, and a status change that applies only if the row is still in the status the caller saw. */
 export const messageStoreMock = () => {
   class DraftExists extends Error { constructor() { super("this lead already has an unsent message"); } }
+  class DraftAllowanceReached extends Error { constructor(public max: number) { super("the plan's AI drafts for this period are used"); } }
   let seq = 0;
   const w = () => world();
   const mine = (orgId: string, id: number) => w().messages.find((m) => m.organizationId === orgId && m.id === id);
@@ -158,6 +159,8 @@ export const messageStoreMock = () => {
   };
   return {
     DraftExists,
+    DraftAllowanceReached,
+    DRAFT_ALLOWANCE_LOCK: 7_310_031,
     messagesTablesReady: async () => w().messagesReady,
     outreachSafetyReady: async () => w().outreachSafetyReady,
     messageStore: {
@@ -166,10 +169,13 @@ export const messageStoreMock = () => {
       create: async (m: Record<string, any>) => {
         if (w().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL");
         if (w().messages.some((x) => x.organizationId === m.orgId && x.leadId === m.leadId && x.direction === "out" && (x.status === "draft" || x.status === "approved"))) throw new DraftExists();
+        // message-store.ts: the AI-draft allowance, checked with the insert (no await in between, so atomic here too).
+        if (m.allowance && w().messages.filter((x) => x.organizationId === m.orgId && x.direction === "out" && String(x.promptVersion ?? "").startsWith(m.allowance.prefix) && x.createdAt >= m.allowance.since).length >= m.allowance.max) throw new DraftAllowanceReached(m.allowance.max);
         const row = { id: ++seq, leadId: m.leadId, organizationId: m.orgId, direction: "out", channel: "manual", subject: m.subject, body: m.body, bodyHash: m.bodyHash, toAddress: m.toAddress, toSource: m.toSource, status: "draft", researchId: m.researchId, claimIds: m.claimIds, promptVersion: m.promptVersion, edited: false, createdBy: m.by, createdByUser: m.userId, approvedBy: null, approvedAt: null, sentAt: null, createdAt: m.now, updatedAt: m.now };
         w().messages.push(row);
         return { ...row };
       },
+      countAiDrafts: async (orgId: string, since: Date, prefix: string) => w().messages.filter((x) => x.organizationId === orgId && x.direction === "out" && String(x.promptVersion ?? "").startsWith(prefix) && x.createdAt >= since).length,
       get: async (orgId: string, id: number) => { const r = mine(orgId, id); return r ? { ...r } : null; },
       listForLead: async (orgId: string, leadId: number) => w().messages.filter((m) => m.organizationId === orgId && m.leadId === leadId).sort((a, b) => b.createdAt - a.createdAt || b.id - a.id).map((m) => ({ ...m })),
       unsent: async (orgId: string, leadId: number) => { const r = w().messages.find((m) => m.organizationId === orgId && m.leadId === leadId && m.direction === "out" && (m.status === "draft" || m.status === "approved")); return r ? { ...r } : null; },
@@ -275,6 +281,9 @@ export const outboundStoreMock = () => {
   const copy = <T extends object | null | undefined>(x: T): T => (x ? JSON.parse(JSON.stringify(x), (k, v) => (typeof v === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(v) && /(At|Until|at)$/.test(k) ? new Date(v) : v)) : x);
   const withP = (items: any[], orgId?: string) => items.map((i) => ({ ...copy(i), prospect: copy(o().prospects.find((p) => p.id === i.prospectId && (!orgId || p.organizationId === orgId))) })).filter((x) => x.prospect);
   const order = (a: any, b: any) => b.rank - a.rank || a.id - b.id;
+  // store.ts PROSPECTS_HELD: a running search holds its requested number, a finished one what it researched (at most that).
+  const prospectsHeld = (orgId: string, since: Date) => o().runs.filter((x) => x.organizationId === orgId && x.createdAt >= since && runCountsTowardLimit(x as any))
+    .reduce((n, x) => n + (x.status === "running" ? x.quantity : Math.min(x.quantity, Number((x.counters as any)?.researched ?? 0))), 0);
   return {
     RunActive,
     RunLimitReached,
@@ -288,12 +297,19 @@ export const outboundStoreMock = () => {
         (r.limits ?? []).forEach((l: { since: Date; max: number }, i: number) => {
           if (o().runs.filter((x) => x.organizationId === r.orgId && x.createdAt >= l.since && runCountsTowardLimit(x as any)).length >= l.max) throw new RunLimitReached(i);
         });
-        const row = { id: r.id, organizationId: r.orgId, createdByUser: r.userId, createdBy: r.by, request: r.request, icp: r.icp, quantity: r.quantity, status: "running", stage: "search", counters: {}, queries: r.queries, costMicroUsd: 0, errorCode: null, idemKey: r.idemKey, leaseUntil: null, attempts: 0, createdAt: r.now, updatedAt: r.now, finishedAt: null };
+        let quantity = r.quantity;
+        if (r.prospects) {
+          const left = r.prospects.max - prospectsHeld(r.orgId, r.prospects.since);
+          if (left <= 0) throw new RunLimitReached((r.limits ?? []).length);
+          quantity = Math.min(quantity, left);
+        }
+        const row = { id: r.id, organizationId: r.orgId, createdByUser: r.userId, createdBy: r.by, request: r.request, icp: r.icp, quantity, status: "running", stage: "search", counters: {}, queries: r.queries, costMicroUsd: 0, errorCode: null, idemKey: r.idemKey, leaseUntil: null, attempts: 0, createdAt: r.now, updatedAt: r.now, finishedAt: null };
         o().runs.push(row);
         return copy(row);
       },
       async getRun(orgId: string, id: string) { return copy(o().runs.find((x) => x.organizationId === orgId && x.id === id) ?? null); },
       async listRuns(orgId: string, limit: number) { return o().runs.filter((x) => x.organizationId === orgId).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit).map(copy); },
+      async prospectsHeldSince(orgId: string, since: Date) { return prospectsHeld(orgId, since); },
       async countRunsSince(orgId: string, since: Date) { return o().runs.filter((x) => x.organizationId === orgId && x.createdAt >= since && runCountsTowardLimit(x as any)).length; },
       async listRunsSince(orgId: string, since: Date, limit: number) { return o().runs.filter((x) => x.organizationId === orgId && x.createdAt >= since).sort((a, b) => +b.createdAt - +a.createdAt).slice(0, limit) as any; },
       async claimRun(now: Date, leaseMs: number) {
@@ -367,9 +383,10 @@ export const outboundStoreMock = () => {
       async recordProviderCall(r: any) { col30(r.errorCode); o().providerCalls.push({ organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: r.operation, ok: r.ok, errorCode: r.errorCode, latencyMs: r.latencyMs, costMicroUsd: r.costMicroUsd, createdAt: r.now }); },
       async countProviderCalls(q: { orgId?: string; operation: string; since: Date }) { return o().providerCalls.filter((c) => (!q.orgId || c.organizationId === q.orgId) && c.operation === q.operation && c.createdAt >= q.since).length; },
       // Atomic like the database's advisory lock: the count and the insert happen with no await in between.
-      async reserveSearch(r: { orgId: string; runId: string | null; provider: string; costMicroUsd: number; limit: number; since: Date; now: Date }) {
+      async reserveSearch(r: { orgId: string; runId: string | null; provider: string; costMicroUsd: number; limit: number; since: Date; now: Date; workspace?: { since: Date; maxMicroUsd: number } }) {
         if (o().failReserve) throw new Error("db down");
         if (o().providerCalls.filter((c) => c.operation === "search" && c.createdAt >= r.since).length >= r.limit) return null;
+        if (r.workspace && workspaceSpend(r.orgId, r.workspace.since) + r.costMicroUsd > r.workspace.maxMicroUsd) return "workspace" as const;
         const id = o().providerCalls.length + 1;
         o().providerCalls.push({ id, organizationId: r.orgId, runId: r.runId, provider: r.provider, operation: "search", ok: false, errorCode: "reserved", latencyMs: 0, costMicroUsd: r.costMicroUsd, createdAt: r.now });
         return id;
@@ -380,6 +397,11 @@ export const outboundStoreMock = () => {
   };
 };
 
+/** A workspace's model + provider spend since `since`, like trace-store.ts workspaceSpendTx (the ceiling's ledger). */
+const workspaceSpend = (orgId: string, since: Date) =>
+  world().llmCalls.filter((c) => c.organizationId === orgId && c.createdAt >= since).reduce((n, c) => n + (c.costMicroUsd ?? 0), 0)
+  + world().outbound.providerCalls.filter((c) => c.organizationId === orgId && c.createdAt >= since).reduce((n, c) => n + (c.costMicroUsd ?? 0), 0);
+
 /** The model-call trace, in memory: what the daily allowances count. */
 export const traceStoreMock = () => ({
   llmTraceReady: async () => world().salesReady,
@@ -388,17 +410,19 @@ export const traceStoreMock = () => ({
     count: async (o: { orgId: string; task: string; since: Date }) => world().llmCalls.filter((c) => c.organizationId === o.orgId && c.task === o.task && c.ok && c.createdAt >= o.since).length,
     spendMicroUsd: async (o: { orgId: string; since: Date }) => world().llmCalls.filter((c) => c.organizationId === o.orgId && c.createdAt >= o.since).reduce((n, c) => n + c.costMicroUsd, 0),
     // The platform-wide model budget, atomic like the database's (no await between the sum and the insert).
-    reserve: async (row: Record<string, any>, q: { since: Date; overallMicroUsd: number; poolMicroUsd: number; poolTasks: readonly string[] }) => {
+    reserve: async (row: Record<string, any>, q: { since: Date; overallMicroUsd: number; poolMicroUsd: number; poolTasks: readonly string[]; workspace?: { since: Date; maxMicroUsd: number } }) => {
       if (world().outbound.failReserve) throw new Error("db down");
       col30(row.errorCode);
       const today = world().llmCalls.filter((c) => c.createdAt >= q.since);
       const spent = today.reduce((n, c) => n + (c.costMicroUsd ?? 0), 0), pool = today.filter((c) => q.poolTasks.includes(c.task)).reduce((n, c) => n + (c.costMicroUsd ?? 0), 0);
       if (spent + row.costMicroUsd > q.overallMicroUsd || pool + row.costMicroUsd > q.poolMicroUsd) return null;
+      if (q.workspace && workspaceSpend(row.organizationId, q.workspace.since) + row.costMicroUsd > q.workspace.maxMicroUsd) return "workspace" as const;
       const id = world().llmCalls.length + 1;
       world().llmCalls.push({ ...row, id, createdAt: new Date() });
       return id;
     },
     settle: async (id: number, row: Record<string, any>) => { col30(row.errorCode); Object.assign(world().llmCalls.find((c) => c.id === id) ?? {}, row); },
+    workspaceSpend: async (orgId: string, since: Date) => workspaceSpend(orgId, since),
   },
 });
 

@@ -90,7 +90,7 @@ describe("Razorpay signatures (checkout and webhook)", () => {
     const { getProMonthlyPrice } = await import("../razorpayClient");
     const before = process.env.PRO_MONTHLY_PRICE;
     process.env.PRO_MONTHLY_PRICE = "₹499";
-    expect(getProMonthlyPrice()).toBe(499);
+    expect(getProMonthlyPrice()).toBe(199);
     process.env.PRO_MONTHLY_PRICE = "1";
     expect(getProMonthlyPrice()).toBe(1); // test-mode runs at ₹1 still work
     if (before === undefined) delete process.env.PRO_MONTHLY_PRICE; else process.env.PRO_MONTHLY_PRICE = before;

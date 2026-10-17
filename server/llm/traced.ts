@@ -8,6 +8,8 @@
 import { ProviderError, aiProvider, type AIProvider, type ChatMessage, type ChatOptions, type ChatResult } from "../copilot/provider";
 import { budgetPoolOf, costMicroUsd, dailyLimit, globalDailySpendMicroUsd, modelFor, poolDailySpendMicroUsd, poolTasks, pricesFromEnv, utcDayStart, type BudgetPool, type LlmTask } from "@shared/llm-cost";
 import { traceStore, type TraceStore } from "./trace-store";
+import { workspaceMonthlySpendMicroUsd } from "../outbound/limits";
+import { OUTBOUND_WINDOW_DAYS as WORKSPACE_WINDOW_DAYS } from "@shared/outbound-plans";
 
 export interface TraceCtx {
   task: LlmTask; orgId: string; userId?: string | null; leadId?: number | null; runId?: string | null;
@@ -28,6 +30,15 @@ export class CapUnavailable extends Error { constructor() { super("the daily all
  * AI Outbound or the other metered features) or the overall ceiling. It IS a CapExceeded, so every caller that already
  * stops cleanly on a workspace's limit stops on this too; `code` tells the two apart.
  */
+/**
+ * This workspace's AI and provider spend over the last 30 days has reached its ceiling (WORKSPACE_MONTHLY_SPEND_USD).
+ * A CapExceeded too, so callers that stop cleanly on a limit stop on this; `code` tells it apart for the message.
+ */
+export class WorkspaceBudgetExceeded extends CapExceeded {
+  readonly code = "workspace_budget";
+  constructor(task: LlmTask, readonly limitMicroUsd: number) { super(task, limitMicroUsd, limitMicroUsd); this.message = "this workspace's AI usage for the last 30 days has reached its limit"; }
+}
+
 export class GlobalCapExceeded extends CapExceeded {
   readonly code = "global_limit";
   constructor(task: LlmTask, limitMicroUsd: number, readonly pool: BudgetPool = budgetPoolOf(task)) { super(task, limitMicroUsd, limitMicroUsd); this.message = `today's platform-wide AI budget for ${pool === "outbound" ? "AI Outbound" : "lead research and drafting"} is used up`; }
@@ -74,12 +85,14 @@ export async function tracedChat(ctx: TraceCtx, messages: ChatMessage[], opts: C
   const base = { organizationId: ctx.orgId, userId: ctx.userId ?? null, task: ctx.task, model, promptVersion: ctx.promptVersion, leadId: ctx.leadId ?? null, runId: ctx.runId ?? null };
   // The task's allocation and the overall ceiling are checked together, in one atomic reservation.
   const pool = budgetPoolOf(ctx.task), limit = poolDailySpendMicroUsd(pool, env);
-  let reservation: number | null;
+  const workspaceCeiling = workspaceMonthlySpendMicroUsd(env);
+  let reservation: number | null | "workspace";
   try {
     reservation = await d.store.reserve({ ...base, tokensIn: 0, tokensOut: 0, latencyMs: 0, costMicroUsd: estimateCallMicroUsd(messages, opts.maxTokens, env), ok: false, errorCode: "reserved" },
-      { since: utcDayStart(d.now()), overallMicroUsd: globalDailySpendMicroUsd(env), poolMicroUsd: limit, poolTasks: poolTasks(pool) });
+      { since: utcDayStart(d.now()), overallMicroUsd: globalDailySpendMicroUsd(env), poolMicroUsd: limit, poolTasks: poolTasks(pool), workspace: { since: new Date(d.now() - WORKSPACE_WINDOW_DAYS * DAY_MS), maxMicroUsd: workspaceCeiling } });
   } catch { throw new CapUnavailable(); }
   if (reservation === null) throw new GlobalCapExceeded(ctx.task, limit, pool);
+  if (reservation === "workspace") throw new WorkspaceBudgetExceeded(ctx.task, workspaceCeiling);
   const id = reservation;
   const started = d.now();
   const write = async (ok: boolean, usage: { inputTokens: number; outputTokens: number } | undefined, errorCode: string | null) => {

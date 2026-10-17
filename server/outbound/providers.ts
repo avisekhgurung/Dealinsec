@@ -8,6 +8,7 @@
  */
 import { createHash } from "node:crypto";
 import { sameSite, siteHost, type PageLink, type ResearchPage } from "@shared/research";
+import { robotsAllows, robotsRules, type RobotsRule } from "@shared/robots";
 import { extractContactBlock, extractHtml, extractLinks, extractPeople, hasContactForm } from "../knowledge/extract";
 import { QUOTED_BLOCK, STAFF_BLOCK } from "@shared/staff";
 import { composePageText, datedItemsBlock, pageDatesLine, type PageDates, type PageParts } from "@shared/page-dates";
@@ -28,8 +29,12 @@ export type PageRead =
     /** The page in parts (built-in reader): its dates line, its readable text and its labelled blocks, for composing
      * the text a model sees within that model's budget. `text` is the same composed at PAGE_TEXT_CHARS. */
     parts?: PageParts; dates?: PageDates; truncated?: boolean;
+    /** Set when a paid reader was used for this read (the caller records its cost). */
+    via?: "firecrawl";
+    /** What the raw HTML shows (built-in reader only): a mobile viewport tag, and the latest year in a copyright notice. */
+    site?: SiteMarkup;
   }
-  | { ok: false; code: "blocked" | "unreachable" | "bad_response" | "too_big" | "unsupported" | "not_html" | "unreadable" | "provider" };
+  | { ok: false; code: "blocked" | "unreachable" | "bad_response" | "too_big" | "unsupported" | "not_html" | "unreadable" | "provider" | "robots"; via?: "firecrawl" };
 
 export interface PageReader {
   readonly name: string;
@@ -53,6 +58,20 @@ export const builtinReader: PageReader = {
   },
 };
 
+/** Deterministic facts from a page's own markup, never a judgement: shared/site-signals.ts decides what is worth saying. */
+export interface SiteMarkup { viewport: boolean; copyrightYear: number | null; copyrightText?: string | null }
+export function siteMarkup(html: string, now: Date): SiteMarkup {
+  const viewport = /<meta\b[^>]*\bname\s*=\s*["']?viewport\b/i.test(html);
+  let copyrightYear: number | null = null, copyrightText: string | null = null;
+  const thisYear = now.getUTCFullYear();
+  const re = /(?:©|&copy;|&#169;|\bcopyright\b)\s*(?:\(c\)\s*)?(?:(?:19|20)\d{2}\s*(?:-|–|—|&ndash;|to)\s*)?((?:19|20)\d{2})\b/gi;
+  for (let m = re.exec(html); m; m = re.exec(html)) {
+    const y = Number(m[1]);
+    if (y >= 1995 && y <= thisYear + 1 && (copyrightYear === null || y > copyrightYear)) { copyrightYear = y; copyrightText = m[0].replace(/&copy;|&#169;/gi, "©").replace(/&ndash;/gi, "–").replace(/\s+/g, " ").trim().slice(0, 60); }
+  }
+  return { viewport, copyrightYear, copyrightText };
+}
+
 /** One fetched HTML page as the built-in reader returns it (no network here: fixtures run through exactly this). */
 export async function readHtml(bytes: Uint8Array, url: URL, now: Date): Promise<PageRead> {
   const r = { bytes, url };
@@ -69,7 +88,8 @@ export async function readHtml(bytes: Uint8Array, url: URL, now: Date): Promise<
   const tail = [people.staff.length ? `${STAFF_BLOCK}\n${people.staff.join("\n")}` : "", people.quoted.length ? `${QUOTED_BLOCK}\n${people.quoted.join("\n")}` : "", block ? `[Footer and contact details]\n${block}` : "", datedItemsBlock(dates.items)];
   const parts: PageParts = { head: pageDatesLine(dates), body: ex.text.slice(0, PAGE_BODY_KEEP), tail };
   const composed = composePageText(parts, PAGE_TEXT_CHARS);
-  return { ok: true, url: r.url.toString(), title: ex.title ?? "", text: composed.text, links: await extractLinks(r.bytes), hash: hashOf(composed.text), hasForm: hasContactForm(r.bytes), parts, dates, truncated: composed.truncated || ex.truncated };
+  const site = siteMarkup(new TextDecoder("utf-8", { fatal: false }).decode(r.bytes.subarray(0, PAGE_BYTES)), now);
+  return { ok: true, url: r.url.toString(), title: ex.title ?? "", text: composed.text, links: await extractLinks(r.bytes), hash: hashOf(composed.text), hasForm: hasContactForm(r.bytes), parts, dates, truncated: composed.truncated || ex.truncated, site };
 }
 
 /** A page as a model is given it, within `budget` characters: the text it reads is exactly the text its quotes are checked against. */
@@ -121,8 +141,68 @@ export class FirecrawlReader implements PageReader {
   }
 }
 
+/** Failures a paid reader may get past (a site that refuses plain fetches or renders with script); never "blocked" (net-guard's own refusal of a private or unsafe address). */
+const FALLBACK_CODES = new Set(["unreachable", "bad_response", "unreadable"]);
+export const MAX_PAID_READS_PER_DOMAIN = 3;
+const PAID_WINDOW_MS = 24 * 3_600_000;
+
+/**
+ * The free reader first; the paid one (Firecrawl) only when the free one couldn't read the page, and at most
+ * MAX_PAID_READS_PER_DOMAIN times per site in 24 hours (per process). A read that used the paid reader, whether it
+ * worked or not, says so (`via`), so its cost is recorded against the workspace and run that asked for it.
+ */
+export class FallbackReader implements PageReader {
+  readonly name = "builtin+firecrawl";
+  private paid = new Map<string, { n: number; since: number }>();
+  constructor(private readonly primary: PageReader, private readonly fallback: PageReader, private readonly now: () => number = Date.now) {}
+  async read(url: string): Promise<PageRead> {
+    const first = await this.primary.read(url);
+    if (first.ok || !FALLBACK_CODES.has(first.code)) return first;
+    let host = "";
+    try { host = siteHost(new URL(url).hostname); } catch { return first; }
+    const t = this.now(), used = this.paid.get(host);
+    const window = used && t - used.since < PAID_WINDOW_MS ? used : { n: 0, since: t };
+    if (window.n >= MAX_PAID_READS_PER_DOMAIN) return first;
+    this.paid.set(host, { n: window.n + 1, since: window.since });
+    if (this.paid.size > 2000) this.paid.delete(this.paid.keys().next().value as string);
+    const second = await this.fallback.read(url).catch((): PageRead => ({ ok: false, code: "provider" }));
+    return second.ok ? { ...second, via: "firecrawl" } : { ...first, via: "firecrawl" };
+  }
+}
+
+/**
+ * Asks each site's robots.txt first (fetched once per site through the same safety-guarded fetcher, cached for a day):
+ * a page our user-agent (or "*") is disallowed from is not read by any reader, free or paid ("robots"). A site without a
+ * readable robots.txt is treated as allowing everything, the usual convention.
+ */
+export class RobotsReader implements PageReader {
+  private cache = new Map<string, { rules: RobotsRule[]; at: number }>();
+  constructor(private readonly inner: PageReader, private readonly fetchRobots: (origin: string) => Promise<string | null> = defaultRobotsFetch, private readonly now: () => number = Date.now) {}
+  get name() { return this.inner.name; }
+  async read(url: string): Promise<PageRead> {
+    let u: URL;
+    try { u = new URL(url); } catch { return this.inner.read(url); }
+    const key = u.origin, t = this.now();
+    let hit = this.cache.get(key);
+    if (!hit || t - hit.at > ROBOTS_TTL_MS) {
+      const text = await this.fetchRobots(u.origin).catch(() => null);
+      hit = { rules: text ? robotsRules(text, "DealInSec") : [], at: t };
+      if (this.cache.size > 2000) this.cache.delete(this.cache.keys().next().value as string);
+      this.cache.set(key, hit);
+    }
+    if (!robotsAllows(hit.rules, `${u.pathname}${u.search}`)) return { ok: false, code: "robots" };
+    return this.inner.read(url);
+  }
+}
+const ROBOTS_TTL_MS = 24 * 3_600_000;
+async function defaultRobotsFetch(origin: string): Promise<string | null> {
+  const r = await fetchPublicPage(`${origin}/robots.txt`, realPageIO, 200_000, { userAgent: PROSPECT_USER_AGENT });
+  return r.ok && (r.contentType === "text" || r.contentType === "html") ? new TextDecoder().decode(r.bytes) : null;
+}
+
 export function pageReader(env: NodeJS.ProcessEnv = process.env): PageReader {
-  return env.FIRECRAWL_API_KEY ? new FirecrawlReader(env.FIRECRAWL_API_KEY, env.FIRECRAWL_URL || undefined) : builtinReader;
+  const inner = env.FIRECRAWL_API_KEY ? new FallbackReader(builtinReader, new FirecrawlReader(env.FIRECRAWL_API_KEY, env.FIRECRAWL_URL || undefined)) : builtinReader;
+  return new RobotsReader(inner);
 }
 
 /* ── company enrichment ─────────────────────────────────────────────────── */

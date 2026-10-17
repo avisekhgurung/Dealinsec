@@ -13,3 +13,6 @@ export async function outboundTier(user: Who): Promise<OutboundTier> {
   if (hasActiveTrial(billing)) return "trial";
   return "free";
 }
+
+/** AI-written first messages: their prompt version starts with "draft-" (template follow-ups are "followup-…"). What the AI-draft allowance counts. */
+export const AI_DRAFT_VERSION_PREFIX = "draft-";

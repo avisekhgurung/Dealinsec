@@ -26,7 +26,7 @@ describe("client-rendered public pages get their own head", () => {
       expect(html).toContain(`<meta property="og:url" content="https://www.dealinsec.com${p}" />`);
       expect(one(html, /<title>/)).toBe(1);
       expect(one(html, /rel="canonical"/)).toBe(1);
-      expect(html).not.toContain("<title>DealInSec — Find Clients. Close Deals. Get Paid.</title>");
+      expect(html).not.toContain(shell.match(/<title>[\s\S]*?<\/title>/)![0]); // never the homepage's own title
       expect(html.includes('name="robots"')).toBe(!!head.robots);
     });
   }
@@ -80,7 +80,7 @@ describe("AI-readable and crawlable product descriptions", () => {
   });
 
   it("quote only prices that can be charged", () => {
-    const allowed = new Set([PRICING.proMonthlyInr, PRICING.extraSeatInr].map(String));
+    const allowed = new Set([0, PRICING.proMonthlyInr, PRICING.extraSeatInr].map(String)); // ₹0 is the free plan
     for (const [name, text] of sources) {
       for (const m of text.matchAll(/₹\s?([\d,]+)/g)) expect(allowed.has(m[1].replace(/,/g, "")), `${name}: ₹${m[1]}`).toBe(true);
       expect(text, name).not.toMatch(/\$\s?\d+\s*(\/|a |per )(month|year|yr|mo)/i); // no foreign plan price is buyable

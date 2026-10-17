@@ -29,7 +29,7 @@ import { queryClient } from "@/lib/queryClient";
 import { PaymentResult } from "@/components/payment-result";
 import { useRazorpayCheckout, type CheckoutPlan } from "@/hooks/use-razorpay-checkout";
 import { PLAN_PRICE_DEFAULTS, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
-import { OUTBOUND_ALLOWANCE_DEFAULTS } from "@shared/outbound-plans";
+import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
 import { useLocale } from "@/hooks/use-locale";
 import { trackEvent } from "@/lib/analytics";
 
@@ -64,7 +64,7 @@ export default function PricingPage() {
   const [purchasedPlan, setPurchasedPlan] = useState<CheckoutPlan>("pro_monthly");
 
   // Live pricing — driven by server env vars (PRO_MONTHLY_PRICE etc.)
-  // Defaults (₹499 Pro, ₹99 per extra seat) are shared with the other surfaces.
+  // Defaults (₹199 Pro, ₹99 per extra seat) are shared with the other surfaces.
   const [proMonthlyPrice, setProMonthlyPrice] = useState<number>(PLAN_PRICE_DEFAULTS.proMonthlyPrice);
   const [extraSeatPrice, setExtraSeatPrice] = useState<number>(PLAN_PRICE_DEFAULTS.extraSeatPrice);
   const [seatQty, setSeatQty] = useState<number>(1);
@@ -152,8 +152,8 @@ export default function PricingPage() {
   };
 
   const PRO_FEATURES = [
-    `AI Outbound: ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.monthlySearches} prospect searches a month, up to ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.maxCompanies} companies each, in any country`,
     "Unlimited deals & quotations",
+    `AI prospect research: ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.maxCompanies} companies each, in any country`,
     "Unlimited agreements your client signs online",
     // In-app invoices carry the country's tax IDs but are not GST tax invoices (see shared/landing-faqs.ts), so they
     // are never described as "GST-ready".
@@ -319,9 +319,9 @@ export default function PricingPage() {
             <p className="text-xs text-muted-foreground mb-4">Find your first clients and quote them properly, free</p>
             <ul className="space-y-2.5 mb-6 flex-1">
               {[
-                `AI Outbound: ${OUTBOUND_ALLOWANCE_DEFAULTS.free.monthlySearches} prospect searches a month, up to ${OUTBOUND_ALLOWANCE_DEFAULTS.free.maxCompanies} companies each`,
-                "Leads pipeline with follow-ups",
-                "4 deals every month, each with a quotation",
+                "4 new deals every month, each with its quotation",
+                "Lead pipeline: save researched prospects as leads, with follow-ups",
+                `AI prospect research: ${OUTBOUND_ALLOWANCE_DEFAULTS.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${OUTBOUND_ALLOWANCE_DEFAULTS.free.maxCompanies} companies each`,
                 "Quotation PDFs and share links",
               ].map((f) => (
                 <li key={f} className="flex items-start gap-2.5 text-sm">
@@ -356,7 +356,7 @@ export default function PricingPage() {
                 <span className="text-sm text-muted-foreground font-medium">/ month</span>
               </div>
               <p className="text-xs text-muted-foreground mb-4">
-                Find clients, close deals and get paid. Paid monthly; it doesn&apos;t renew or charge automatically.
+                {fmt(proMonthlyPrice)} is charged at checkout, with no tax added on top. Paid monthly; it doesn&apos;t renew or charge automatically.
               </p>
               <ul className="space-y-2.5 mb-6 flex-1">
                 {PRO_FEATURES.map((f) => (

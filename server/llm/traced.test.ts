@@ -4,14 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("./trace-store", () => ({ traceStore: {}, llmTraceReady: async () => true }));
 
 import { ProviderError, type AIProvider, type ChatResult } from "../copilot/provider";
-import { CapExceeded, CapUnavailable, GlobalCapExceeded, assertWithinCap, estimateCallMicroUsd, tracedChat, type TraceCtx, type TraceDeps } from "./traced";
+import { CapExceeded, CapUnavailable, GlobalCapExceeded, WorkspaceBudgetExceeded, assertWithinCap, estimateCallMicroUsd, tracedChat, type TraceCtx, type TraceDeps } from "./traced";
 import { budgetPoolOf, globalDailySpendMicroUsd, poolDailySpendMicroUsd } from "@shared/llm-cost";
 import type { TraceRow, TraceStore } from "./trace-store";
 
 const CTX: TraceCtx = { task: "research", orgId: "org-1", userId: "u1", leadId: 7, promptVersion: "r1" };
 const MSGS = [{ role: "system" as const, content: "SECRET PROMPT TEXT" }, { role: "user" as const, content: "private customer words" }];
 
-function rig(over: { chat?: AIProvider["chat"]; used?: number; countFails?: boolean; settleFails?: boolean; reserveFails?: boolean; ledger?: { at: number; cost: number; task?: string }[] } = {}) {
+function rig(over: { chat?: AIProvider["chat"]; used?: number; countFails?: boolean; settleFails?: boolean; reserveFails?: boolean; ledger?: { at: number; cost: number; task?: string }[]; workspaceSpent?: number } = {}) {
   const rows: TraceRow[] = []; const logs: any[] = []; const calls: any[] = [];
   let t = Date.UTC(2026, 9, 11, 12, 0, 0);
   // The platform-wide ledger: every reserved or settled call's cost, with when it was made.
@@ -27,9 +27,11 @@ function rig(over: { chat?: AIProvider["chat"]; used?: number; countFails?: bool
       const today = ledger.filter((x) => x.at >= o.since.getTime());
       const used = today.reduce((n, x) => n + x.cost, 0), pool = today.filter((x) => o.poolTasks.includes(x.task ?? "research")).reduce((n, x) => n + x.cost, 0);
       if (used + r.costMicroUsd > o.overallMicroUsd || pool + r.costMicroUsd > o.poolMicroUsd) return null;
+      if (o.workspace && (over.workspaceSpent ?? 0) + r.costMicroUsd > o.workspace.maxMicroUsd) return "workspace";
       rows.push({ ...r }); ledger.push({ at: t, cost: r.costMicroUsd, task: r.task });
       return rows.length - 1;
     },
+    workspaceSpend: async () => over.workspaceSpent ?? 0,
     settle: async (id, r) => { if (over.settleFails) throw new Error("table missing"); Object.assign(rows[id], r); ledger[ledger.length - rows.length + id] = { ...ledger[ledger.length - rows.length + id], cost: r.costMicroUsd }; },
   };
   const deps: Partial<TraceDeps> = { provider, store, now: () => t, log: (k, f) => logs.push({ k, ...f }) };
@@ -153,6 +155,18 @@ describe("the platform-wide model budget (every workspace, one UTC day)", () => 
     expect(e).toBeInstanceOf(CapExceeded);
     expect(e).not.toBeInstanceOf(GlobalCapExceeded);
     expect(r.ledger).toHaveLength(0);
+  });
+  it("the workspace's 30-day spend ceiling: over it, refused with its own error, the provider is never called, nothing reserved", async () => {
+    const r = rig({ workspaceSpent: 1_499_999 });
+    const e = await tracedChat(CTX, MSGS, {}, r.deps, { ...ENV("100"), WORKSPACE_MONTHLY_SPEND_USD: "1.5" }).catch((x) => x);
+    expect(e).toBeInstanceOf(WorkspaceBudgetExceeded);
+    expect(e).toBeInstanceOf(CapExceeded); // so every caller that stops on a limit stops on this too
+    expect(e).not.toBeInstanceOf(GlobalCapExceeded);
+    expect(r.calls).toHaveLength(0);
+    expect(r.rows).toHaveLength(0);
+    // A higher ceiling (configurable) lets the same call through.
+    const ok = rig({ workspaceSpent: 1_499_999 });
+    await expect(tracedChat(CTX, MSGS, {}, ok.deps, { ...ENV("100"), WORKSPACE_MONTHLY_SPEND_USD: "3" })).resolves.toMatchObject({ content: "ok" });
   });
   it("the estimate grows with the prompt and the output budget asked for", () => {
     expect(estimateCallMicroUsd(MSGS, 1000)).toBeLessThan(estimateCallMicroUsd(MSGS, 8000));

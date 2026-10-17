@@ -20,6 +20,10 @@ function deps(over: Partial<UsageDeps> = {}) {
     countProviderCalls: async (o) => { calls.push(o); return 0; },
     platformSpend: async () => ({ all: 0, pool: 0 }),
     tier: async () => "pro",
+    prospectsHeld: async () => 0,
+    aiDrafts: async () => 0,
+    gmailSends: async () => 0,
+    workspaceSpend: async () => 0,
     ...over,
   };
   return { d, calls };
@@ -30,11 +34,22 @@ describe("AI Outbound usage: the plan's 30-day allowance (one credit = one searc
   const DAY = 24 * HOUR;
   const ran = (daysAgo: number) => ({ status: "done", counters: { searched: 8 }, createdAt: new Date(NOW.getTime() - daysAgo * DAY) });
 
-  it("each plan shows its own allowance and the most companies a search may look for", async () => {
-    for (const [tier, limit, maxCompanies, label] of [["free", 3, 10, "Free plan"], ["trial", 10, 25, "Pro trial"], ["pro", 25, 25, "Pro"]] as const) {
+  it("each plan shows its own four allowances, the most companies a search may look for, and the spend share", async () => {
+    const free = (n: number) => ({ used: 0, limit: n, remaining: n, nextFreesAt: null });
+    for (const [tier, limit, maxCompanies, label, prospects, drafts, sends] of [["free", 3, 10, "Free plan", 30, 3, 3], ["trial", 10, 10, "Pro trial", 100, 10, 10], ["pro", 10, 10, "Pro", 100, 10, 10]] as const) {
       const u = ok(await outboundUsage(ana, deps({ tier: async () => tier }).d));
-      expect(u.plan).toEqual({ tier, label, searches: { used: 0, limit, remaining: limit, nextFreesAt: null }, maxCompanies, windowDays: 30 });
+      expect(u.plan).toEqual({ tier, label, searches: free(limit), maxCompanies, windowDays: 30, prospects: free(prospects), drafts: free(drafts), sends: free(sends), spendPercent: 0 });
     }
+  });
+
+  it("prospects, drafts and sends are counted separately, and the spend shows as a share of the ceiling, never dollars", async () => {
+    const u = ok(await outboundUsage(ana, deps({ prospectsHeld: async () => 37, aiDrafts: async () => 10, gmailSends: async () => 4, workspaceSpend: async () => 750_000 }).d));
+    expect(u.plan.prospects).toMatchObject({ used: 37, limit: 100, remaining: 63 });
+    expect(u.plan.drafts).toMatchObject({ used: 10, limit: 10, remaining: 0 });
+    expect(u.plan.sends).toMatchObject({ used: 4, limit: 10, remaining: 6 });
+    expect(u.plan.spendPercent).toBe(50); // $0.75 of the $1.50 default
+    const unknown = ok(await outboundUsage(ana, deps({ aiDrafts: async () => { throw new Error("db"); } }).d));
+    expect(unknown.plan.drafts).toBeNull(); // couldn't be counted: unknown, never "plenty left"
   });
 
   it("free: three searches in 30 days use it up, and it says when the next frees up", async () => {

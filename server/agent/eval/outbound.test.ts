@@ -28,7 +28,7 @@ import { searchDiagnosticsDir } from "../../outbound/search-diagnostics";
 import { mkdtempSync, readFileSync, existsSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addToLeads, cancelRun, findContacts, generateAngle, getProspect, getRun, listRuns, parseIcp, prospectCard, researchProspect, startRun } from "../../outbound/service";
+import { addToLeads, cancelRun, findContacts, generateAngle, getProspect, getRun, listRuns, parseIcp, prospectCard, researchProspect, setProspectFeedback, startRun } from "../../outbound/service";
 import { LeaseLost, MAX_TOKENS, clearPageCache, enrichOne, pipelineDeps, researchOne, stepRun, type PipelineDeps } from "../../outbound/pipeline";
 import { outboundWorkflow } from "../../outbound/runner";
 import { angleSystemPrompt, angleUserMessage } from "../../outbound/prompts";
@@ -214,7 +214,7 @@ const cards = async (runId: string, u = user()) => { const r = await getRun(u, r
 const byName = (cs: any[], name: string) => cs.find((c) => c.name.startsWith(name));
 
 beforeEach(() => { useWorld(createWorld()); fakeWeb(); seedLead(world(), { companyName: "LeadCo", website: "https://leadco.com", domain: "leadco.com" }); searches = []; calls = { icp: 0, enrich: 0, signals: 0, angle: 0 }; script = {}; model(); clearPageCache(); vi.spyOn(console, "log").mockImplementation(() => {}); });
-afterEach(() => { for (const k of ["OUTBOUND_MONTHLY_SEARCHES_FREE", "OUTBOUND_MONTHLY_SEARCHES_TRIAL", "OUTBOUND_MONTHLY_SEARCHES_PRO", "SALES_DAILY_ENRICH_LIMIT", "OUTBOUND_DAILY_RUNS", "OUTBOUND_DAILY_SEARCHES", "OUTBOUND_DAILY_COMPANY_LOOKUPS", "OUTBOUND_GLOBAL_DAILY_SEARCHES", "LLM_GLOBAL_DAILY_SPEND_USD"]) delete process.env[k]; world().outbound.failReserve = false; });
+afterEach(() => { for (const k of ["OUTBOUND_MONTHLY_PROSPECTS_PRO", "OUTBOUND_MAX_COMPANIES_PRO", "WORKSPACE_MONTHLY_SPEND_USD", "OUTBOUND_MONTHLY_SEARCHES_FREE", "OUTBOUND_MONTHLY_SEARCHES_TRIAL", "OUTBOUND_MONTHLY_SEARCHES_PRO", "SALES_DAILY_ENRICH_LIMIT", "OUTBOUND_DAILY_RUNS", "OUTBOUND_DAILY_SEARCHES", "OUTBOUND_DAILY_COMPANY_LOOKUPS", "OUTBOUND_GLOBAL_DAILY_SEARCHES", "LLM_GLOBAL_DAILY_SPEND_USD"]) delete process.env[k]; world().outbound.failReserve = false; });
 
 describe("the definition-of-done run", () => {
   it("parses, searches several ways, normalizes, dedupes, verifies, enriches, researches, scores and ranks", async () => {
@@ -269,7 +269,10 @@ describe("the definition-of-done run", () => {
     const fs = world().outbound.findings.filter((f) => f.prospectId === world().outbound.prospects.find((p) => p.domain === "northwind.com")!.id);
     expect(fs.some((f) => /award-winning|Series A/i.test(f.value))).toBe(false);
     expect(fs.filter((f) => f.kind === "opportunity")).toHaveLength(1);
-    expect(fs.filter((f) => f.status === "confirmed").every((f) => f.quote && f.sourceUrl)).toBe(true);
+    // Every confirmed claim from page text carries its quote and source. A site observation (deterministic, from the markup,
+    // no model) may be an absence with nothing to quote; it still carries its source and what was checked.
+    expect(fs.filter((f) => f.status === "confirmed" && f.type !== "site_signal").every((f) => f.quote && f.sourceUrl)).toBe(true);
+    expect(fs.filter((f) => f.type === "site_signal").every((f) => f.sourceUrl && f.batch === "site_check" && ["no_viewport", "old_copyright"].includes(f.meta?.signal))).toBe(true);
   });
   it("a stale signal is no reason to reach out: the 2023 job post doesn't make Acme ready or score timing", async () => {
     const id = await start(); await drive(id);
@@ -1379,3 +1382,113 @@ describe("into Leads", () => {
     expect(await addToLeads(user(), parked.id, {}, deps())).toMatchObject({ ok: false, code: "rejected" });
   });
 });
+
+describe("plan allowances and the workspace spend ceiling", () => {
+  const icpOf = async () => { const p = await parseIcp(user(), REQUEST, deps()); if (!p.ok) throw new Error(p.code); return p; };
+  const startWith = async (industry: string, quantity = 3) => { const p = await icpOf(); return startRun(user(), { request: industry, icp: { ...p.icp, industry, quantity } }, {}, deps()); };
+
+  it("researched prospects: a new search is trimmed to what's left of the allowance, then refused, with its own message", async () => {
+    process.env.OUTBOUND_MONTHLY_PROSPECTS_PRO = "4";
+    const a = await startWith("SEO agency", 3) as any;
+    expect(a).toMatchObject({ ok: true }); expect(a.run.quantity).toBe(3);   // 3 held while it runs
+    const b = await startWith("PPC agency", 3) as any;
+    expect(b).toMatchObject({ ok: true }); expect(b.run.quantity).toBe(1);   // only 1 of 4 left
+    const c = await startWith("PR agency", 3) as any;
+    expect(c).toMatchObject({ ok: false, status: 429, code: "monthly_limit" });
+    expect(c.message).toMatch(/4 researched prospects included in Pro/);
+  });
+
+  it("a finished search is charged only what it really researched, never what it asked for", async () => {
+    process.env.OUTBOUND_MONTHLY_PROSPECTS_PRO = "5";
+    const id = await start(); const run = await drive(id);
+    const researched = Number((run!.counters as any).researched);
+    expect(researched).toBeLessThanOrEqual(run!.quantity);
+    const next = await startWith("PPC agency", 5) as any;
+    expect(next.run.quantity).toBe(5 - Math.min(run!.quantity, researched));
+  });
+
+  it("concurrent starts can't hold more researched prospects together than the allowance", async () => {
+    process.env.OUTBOUND_MONTHLY_PROSPECTS_PRO = "5";
+    const out = await Promise.all(["SEO", "PPC", "PR", "CRO"].map((k) => startWith(`${k} agency`, 3)));
+    const held = out.filter((r) => r.ok).reduce((n, r: any) => n + r.run.quantity, 0);
+    expect(held).toBeLessThanOrEqual(5);
+    expect(out.filter((r) => !r.ok).every((r: any) => r.code === "monthly_limit")).toBe(true);
+  });
+
+  it("a run researches in depth no more companies than it asked for", async () => {
+    const p = await icpOf();
+    const r = await startRun(user(), { request: "x", icp: { ...p.icp, quantity: 1 } }, {}, deps()) as any;
+    await drive(r.run.id);
+    // "done" also covers companies only scored at the end; researched in depth = has findings from the research step.
+    const mine = new Set(world().outbound.items.filter((i) => i.runId === r.run.id).map((i) => i.prospectId));
+    expect(new Set(world().outbound.findings.filter((f) => mine.has(f.prospectId) && f.batch === "research").map((f) => f.prospectId)).size).toBeLessThanOrEqual(1);
+  });
+
+  it("the workspace spend ceiling: a workspace over it makes no web search and no model call, and says why", async () => {
+    const p = await icpOf();
+    world().llmCalls.push({ id: 9_999, organizationId: ORG1, task: "enrich", ok: true, costMicroUsd: 1_600_000, createdAt: new Date() }); // $1.60 of the default $1.50
+    const before = { ...calls };
+    const r = await startRun(user(), { request: "x", icp: p.icp }, {}, deps()) as any;
+    const run = await drive(r.run.id);
+    expect(searches).toHaveLength(0);
+    expect(run).toMatchObject({ status: "done", errorCode: "workspace_budget" }); // a limit, said plainly: not "search unavailable"
+    expect(calls).toEqual(before);
+    // Another workspace is not affected by this one's spend.
+    expect(await parseIcp(OTHER(), REQUEST, deps())).toMatchObject({ ok: true });
+  });
+
+  it("the ceiling counts this workspace's spend in the last 30 days only", async () => {
+    // 31 days before both clocks in play (the pipeline's NOW, and the real one the model-call path reads).
+    world().llmCalls.push({ id: 9_998, organizationId: ORG1, task: "enrich", ok: true, costMicroUsd: 1_600_000, createdAt: new Date(Math.min(NOW.getTime(), Date.now()) - 31 * 86_400_000) });
+    const id = await start(); await drive(id);
+    expect(searches.length).toBeGreaterThan(0);
+  });
+});
+
+describe("website observations, contact status and feedback", () => {
+  it("each home page's markup is checked deterministically: observations with their source, kept apart from the facts", async () => {
+    page("northwind.com", "/", html("Northwind Digital", `<p>Northwind Digital is a digital marketing agency in Austin, Texas, United States. We are a team of 18 specialists helping B2B SaaS companies grow. ${filler}</p><footer>© 2019 Northwind Digital</footer>`, ["/about", "/careers", "/news", "/team"]).replace("<head>", '<head><meta name="viewport" content="width=device-width">'));
+    const id = await start(); await drive(id);
+    const nw = world().outbound.prospects.find((p) => p.domain === "northwind.com")!;
+    const obs = world().outbound.findings.filter((f) => f.prospectId === nw.id && f.type === "site_signal");
+    expect(obs.map((f) => f.meta.signal)).toEqual(["old_copyright"]);                     // it has a viewport tag
+    expect(obs[0]).toMatchObject({ kind: "fact", sourceUrl: "https://northwind.com/", sourceType: "website", batch: "site_check", quote: "© 2019" });
+    const acme = world().outbound.prospects.find((p) => p.domain === "acmegrowth.io")!;
+    expect(world().outbound.findings.filter((f) => f.prospectId === acme.id && f.type === "site_signal").map((f) => f.meta.signal)).toEqual(["no_viewport"]);
+    const brief = await getProspect(user(), nw.id, deps()) as any;
+    expect(brief.brief.prospect.siteSignals).toEqual(["The home page's copyright notice reads 2019"]);
+    // An observation never makes a prospect ready or adds a reason to reach out.
+    expect(brief.brief.prospect.blockers).not.toContain("site_signal");
+  });
+
+  it("contact status is kept apart from fit: verified only when a provider verified it, public when found on their site", () => {
+    const base = { organizationId: ORG1, prospectId: 1, status: "confirmed", sourceType: "website", quote: "q", contentHash: null, observedAt: null, confidence: "high", supportingIds: [], batch: "enrich", retrievedAt: NOW } as any;
+    const p = { id: 1, organizationId: ORG1, domain: "x.com", name: "X", website: "https://x.com", status: "verified", rejectReason: null, sources: [], profile: {}, fit: null, score: null, angle: null, ready: false, contentHash: null, verifiedAt: NOW, researchedAt: null, leadId: null, createdAt: NOW, updatedAt: NOW } as any;
+    expect(prospectCard(p, [], NOW).contact).toBe("none");
+    expect(prospectCard(p, [{ ...base, id: 1, kind: "fact", type: "business_email", value: "hi@x.com", sourceUrl: "https://x.com/contact", meta: {} }], NOW).contact).toBe("public");
+    expect(prospectCard(p, [{ ...base, id: 2, kind: "decision_maker", type: "Founder", value: "Ana, Founder", sourceUrl: null, sourceType: "provider", meta: { email: "ana@x.com", emailStatus: "unknown", title: "Founder" } }], NOW).contact).toBe("none"); // found by a provider, not verified
+    expect(prospectCard(p, [{ ...base, id: 3, kind: "decision_maker", type: "Founder", value: "Ana, Founder", sourceUrl: null, sourceType: "provider", meta: { email: "ana@x.com", emailStatus: "verified", title: "Founder" } }], NOW).contact).toBe("verified");
+  });
+
+  it("feedback: only a known verdict, only on the workspace's own prospects, and unavailable (not broken) before its table exists", async () => {
+    const id = await start(); await drive(id);
+    const nw = world().outbound.prospects.find((p) => p.domain === "northwind.com")!;
+    expect(await setProspectFeedback(user(), nw.id, "great", deps())).toMatchObject({ ok: false, status: 400 });
+    expect(await setProspectFeedback(OTHER(), nw.id, "relevant", deps())).toMatchObject({ ok: false, status: 404 });
+    expect(await setProspectFeedback(user(), nw.id, "relevant", deps())).toMatchObject({ ok: false, status: 503, code: "FEEDBACK_NOT_SETUP" });
+    expect((await getProspect(user(), nw.id, deps()) as any).brief.prospect.feedback).toBeNull(); // the page still works
+  });
+});
+
+describe("robots.txt", () => {
+  it("a site whose robots.txt disallows us is set aside with that reason, and none of its pages are read", async () => {
+    page("acmegrowth.io", "/robots.txt", "User-agent: *\nDisallow: /", 200, { "content-type": "text/plain" });
+    const id = await start(); await drive(id);
+    const acme = world().outbound.prospects.find((p) => p.domain === "acmegrowth.io")!;
+    expect(acme).toMatchObject({ status: "rejected", rejectReason: "robots_disallowed" });
+    expect(world().outbound.findings.filter((f) => f.prospectId === acme.id)).toHaveLength(0);
+    const nw = world().outbound.prospects.find((p) => p.domain === "northwind.com")!;
+    expect(nw.status).not.toBe("rejected"); // other sites are unaffected
+  });
+});
+

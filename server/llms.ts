@@ -103,7 +103,9 @@ ${link(pillar.shortLabel, pillar.path, "what freelance business management softw
 
 ## Who it is for
 
-${link("DealInSec for agencies and consultants", "/", "the homepage: finding clients with AI Outbound, then deal, quotation, agreement, invoice and payment tracking for small B2B service businesses")}
+${link("DealInSec homepage", "/", "what it does, how the workflow runs from prospect research to payment tracking, and who it is for: freelancers, consultants and small B2B service agencies")}
+${link("Plans and pricing", "/#pricing", "Free and Pro side by side, with the AI research allowances and how checkout and renewal work")}
+${link("Frequently asked questions", "/#faq", "direct answers on plans, AI research, guarantees, agreements, invoices and billing")}
 ${audiencePages.map((p) => link(p.shortLabel, p.path, AUDIENCE_DESCRIPTIONS[p.path])).join("\n")}
 
 ## Free tools
@@ -127,6 +129,7 @@ ${indiaPosts.map((p) => link(p.title, `/blog/${p.slug}`)).join("\n")}
 
 ## Optional
 
+${link("Refund policy", "/refund")}
 ${link("Privacy policy", "/privacy")}
 ${link("Terms", "/terms")}
 `;

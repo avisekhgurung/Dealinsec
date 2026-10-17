@@ -15,6 +15,8 @@ import { AUDIENCE_LINE, ONE_LINER, PRICING, PRODUCT_NAME, SUMMARY, SUPPORT_EMAIL
 export const SITE_ORIGIN = "https://www.dealinsec.com";
 export const ORGANIZATION_ID = `${SITE_ORIGIN}/#organization`;
 
+import { OUTBOUND_ALLOWANCE_DEFAULTS as OB, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
+
 const escapeAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const json = (data: unknown) => `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>`;
 
@@ -31,8 +33,8 @@ export function homeSchemas(): string {
       url: `${SITE_ORIGIN}/`,
       description: `${ONE_LINER} For ${AUDIENCE_LINE}. ${SUMMARY}`,
       offers: [
-        { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD", description: `${PRICING.freeMonthlyDeals} deals a month, each with its quotation, plus the leads pipeline and AI Outbound research within daily limits. Available in every country.` },
-        { "@type": "Offer", name: "Pro Monthly", price: String(PRICING.proMonthlyInr), priceCurrency: "INR", eligibleRegion: india },
+        { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD", description: `${OB.free.monthlySearches} AI Outbound searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each), the leads pipeline, and ${PRICING.freeMonthlyDeals} deals a month, each with its quotation. Available in every country.` },
+        { "@type": "Offer", name: "Pro Monthly", price: String(PRICING.proMonthlyInr), priceCurrency: "INR", eligibleRegion: india, description: `${OB.pro.monthlySearches} AI Outbound searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.pro.maxCompanies} companies each), unlimited deals, agreements, invoices and payment tracking. Paid monthly in India; it does not renew automatically.` },
       ],
       publisher: { "@id": ORGANIZATION_ID },
     }),

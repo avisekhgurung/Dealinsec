@@ -106,6 +106,13 @@ export const pgSendStore: SendStore = {
          WHERE c.provider = ${conn.provider} AND c.account_sub = ${conn.accountSub} AND j.message_id <> ${i.messageId}
            AND (j.status IN ('sending', 'uncertain') OR (j.status = 'sent' AND j.sent_at > ${at(new Date(i.now.getTime() - DAY_MS))}))`);
       if (Number((used.rows[0] as { n: unknown }).n) >= i.dailyCap) return { ok: false, code: "daily_cap" };
+      // 7b. the plan's sends for the workspace, across its mailboxes, under the workspace's lock (taken last, so no deadlock).
+      if (i.planCap) {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(${PLAN_SEND_LOCK}, hashtext(${i.orgId}))`);
+        const ws = await tx.execute(sql`SELECT count(*)::int AS n FROM ${mailSendJobs} WHERE organization_id = ${i.orgId} AND message_id <> ${i.messageId}
+          AND (status IN ('sending', 'uncertain') OR (status = 'sent' AND sent_at >= ${at(i.planCap.since)}))`);
+        if (Number((ws.rows[0] as { n: unknown }).n) >= i.planCap.max) return { ok: false, code: "plan_send_limit" };
+      }
       if (i.hold) await i.hold();
       // 8. reserve: a new job, or the next attempt of one that certainly didn't go out (same Message-ID).
       const lease = new Date(i.now.getTime() + i.leaseMs);
@@ -194,3 +201,13 @@ export const pgSendStore: SendStore = {
     });
   },
 };
+
+/** Messages this workspace handed to Gmail since `since`: in flight, or sent in the window (a failed send frees its slot). The plan's send allowance. */
+/** Serialises the plan's send allowance per workspace (reserve step 7b). */
+export const PLAN_SEND_LOCK = 7_310_032;
+
+export async function countWorkspaceSends(orgId: string, since: Date): Promise<number> {
+  const r = await db.execute(sql`SELECT count(*)::int AS n FROM ${mailSendJobs} WHERE organization_id = ${orgId}
+    AND (status IN ('sending', 'uncertain') OR (status = 'sent' AND sent_at >= ${since.toISOString()}::timestamp))`);
+  return Number((r.rows[0] as { n: unknown } | undefined)?.n ?? 0);
+}

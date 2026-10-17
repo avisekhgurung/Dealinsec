@@ -7,7 +7,7 @@ import { TRIAL_DAYS, users } from "./schema";
 describe("product facts agree with the code that charges and enforces them", () => {
   it("prices: the INR plans, the seat price and the free allowance", async () => {
     expect(PRICING.proMonthlyInr).toBe(GLOBAL_PLANS.INR.monthly!.amount);
-    expect(PRICING.proMonthlyInr).toBe(499); // the India launch price (Oct 2026)
+    expect(PRICING.proMonthlyInr).toBe(199); // the launch-test price (from 18 Oct 2026)
     expect("proYearlyInr" in PRICING).toBe(false); // one plan, monthly: no annual plan is sold
     expect(PRICING.trialDays).toBe(TRIAL_DAYS);
     expect(PRICING.freeMonthlyDeals).toBe((users.monthlyDealCredits as any).default);

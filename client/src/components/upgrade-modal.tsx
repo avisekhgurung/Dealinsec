@@ -5,7 +5,7 @@
  *   const { openUpgradeModal } = useUpgradeModal();
  *   openUpgradeModal({ feature: "agreements" });
  *
- * One path out: "Upgrade to Pro" → /pricing (monthly & annual choices). The
+ * One path out: "Upgrade to Pro" → /pricing (one monthly plan). The
  * prices shown are the live ones from /api/payments/config. Deal Boost is no
  * longer sold anywhere in the UI (the server SKU remains for existing boosts).
  */
@@ -24,7 +24,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePlanPrices, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
 import { hasLapsedTrial } from "@shared/schema";
 import { trackEvent } from "@/lib/analytics";
-import { OUTBOUND_ALLOWANCE_DEFAULTS } from "@shared/outbound-plans";
+import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
 
 export type UpgradeFeature = "deals" | "agreements" | "invoices" | "payment_tracking" | "outbound" | "seats";
 
@@ -44,20 +44,30 @@ export function useUpgradeModal(): UpgradeModalContextValue {
   return ctx;
 }
 
+const OB = OUTBOUND_ALLOWANCE_DEFAULTS;
+/** Per reason: a title, and what upgrading unlocks for exactly that. A limit says it is a limit; a Pro feature says what it does. */
+const FEATURE_TITLE: Record<UpgradeFeature, string> = {
+  deals: "You've used this month's free deals",
+  agreements: "Agreements and online signing are part of Pro",
+  invoices: "Invoices are part of Pro",
+  payment_tracking: "Payment tracking is part of Pro",
+  outbound: "You've used your free AI research searches",
+  seats: "Extra team seats need Pro",
+};
 const FEATURE_COPY: Record<UpgradeFeature, string> = {
-  deals: "Your free plan covers 4 deals a month — you've used them all.",
-  agreements: "Your quotation is ready to become a signed agreement — that's where Pro comes in.",
-  invoices: "Your agreement is signed — create the invoice and track payment with Pro.",
-  payment_tracking: "Track who's paid and who still owes you — part of Pro.",
-  outbound: `You've used this month's AI Outbound searches on the free plan. Pro includes ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.monthlySearches} a month.`,
+  deals: "The free plan includes 4 new deals a month, each with its quotation. Pro removes the limit, so every new client gets a deal and a quotation.",
+  agreements: "Turn this quotation into an agreement your client signs online, with an audit record of who signed and when.",
+  invoices: "Create the invoice straight from the agreement, as one invoice or an advance and a final payment, and track it to paid.",
+  payment_tracking: "See what's paid, pending and overdue across your invoices, with follow-ups drafted for anything late.",
+  outbound: `The free plan includes ${OB.free.monthlySearches} AI research searches every ${OUTBOUND_WINDOW_DAYS} days. Pro includes ${OB.pro.monthlySearches} (up to ${OB.pro.maxCompanies} companies each); more free up as earlier searches pass ${OUTBOUND_WINDOW_DAYS} days.`,
   seats: "Extra team seats are an add-on for DealInSec Pro.",
 };
 
 // Only what ships today. In-app invoices print your tax IDs but don't calculate tax, so they are never called
 // "GST-ready" (see shared/product-facts.ts).
 const proFeatures = (_india: boolean) => [
-  `AI Outbound: ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.monthlySearches} prospect searches a month, in any country`,
   "Unlimited deals & quotations",
+  `AI prospect research: ${OB.pro.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${OB.pro.maxCompanies} companies each`,
   "Agreements your client signs online, invoices and payment tracking",
   "Up to 5 team members — one plan, no separate CRM or AI fee",
 ];
@@ -100,12 +110,12 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
               <Crown className="w-6 h-6 text-amber-300" />
             </div>
             <DialogTitle className="text-center text-xl">
-              {trialEnded ? "Your 7-day trial has ended" : "Upgrade to Continue Closing Deals"}
+              {trialEnded ? "Your 7-day trial has ended" : FEATURE_TITLE[feature]}
             </DialogTitle>
             <DialogDescription className="text-center">
               {trialEnded
                 ? `${FEATURE_COPY[feature]} Your deals and documents are safe — upgrade to keep the full workflow you've been using.`
-                : `${FEATURE_COPY[feature]} You've reached your free monthly limit or this feature requires a Pro subscription.`}
+                : FEATURE_COPY[feature]}
             </DialogDescription>
           </DialogHeader>
 
@@ -124,6 +134,7 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
             <Button
               className="w-full h-12 text-base font-bold rounded-xl text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg shadow-emerald-500/30 relative"
               onClick={() => {
+                trackEvent("upgrade_clicked", { feature, source: "upgrade_modal" });
                 setOpen(false);
                 setLocation("/pricing");
               }}
@@ -140,7 +151,7 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
 
             {checkoutAvailable ? (
               <p className="text-[11px] text-center text-muted-foreground">
-                Paid monthly in India. It doesn&apos;t renew or charge automatically.
+                DealInSec charges {formatRupees(proMonthlyPrice)} at checkout and adds no tax on top. Paid monthly, it doesn&apos;t renew or charge automatically.
               </p>
             ) : (
               <p className="text-[11px] text-center text-muted-foreground flex items-center justify-center gap-1.5" data-testid="upgrade-modal-intl-soon">

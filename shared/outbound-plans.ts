@@ -7,24 +7,48 @@
  * checks their websites and researches the best ones. Allowances run over a rolling 30 days, on top of the daily limit
  * every workspace has.
  *
- * Sizing (Oct 2026, measured on production runs): a completed search cost $0.07 on average, $0.15 at the 90th
- * percentile (search provider + model calls), for about 22 companies requested. Pro's 25 searches a month is therefore
- * about $1.75 on average and under $4 at the 90th percentile, inside ₹499. Free and trial are small, real tastes.
+ * Sizing (measured on production runs, Oct 2026): a completed search cost $0.073 on average and $0.235 at the 90th
+ * percentile (search provider + model calls). At Pro's ₹199 (about $2.40), 10 searches a month is about $0.73 on
+ * average and about $2.35 at the 90th percentile; the earlier 25 (sized for ₹499) could cost more than the plan earns.
+ * The trial gets Pro's allowance; free is a small, real taste.
  */
 export type OutboundTier = "free" | "trial" | "pro";
 
 export interface OutboundAllowance {
   /** Searches per rolling 30 days. */
   monthlySearches: number;
-  /** The most companies one search may look for. */
+  /** The most companies one search may look for, and so the most it researches in depth. */
   maxCompanies: number;
+  /** Researched prospects per rolling 30 days: companies a search researched in depth (careers, news, team pages). */
+  monthlyProspects: number;
+  /** AI-written first messages per rolling 30 days (template follow-ups are not counted). */
+  monthlyDrafts: number;
+  /** Messages sent through a connected Gmail account per rolling 30 days, across the workspace. */
+  monthlySends: number;
 }
 
+/**
+ * Four separate allowances, each counted over the same rolling 30 days:
+ *   searches   one search that ran on the web (one that stopped before searching isn't counted)
+ *   prospects  a company a search researched in depth; a running search holds its requested number until it ends,
+ *              then only what it really researched counts (a search that found fewer is charged fewer)
+ *   drafts     an AI first message that was saved (a draft the checks rejected costs nothing)
+ *   sends      a message handed to Gmail (sending or sent; a send that certainly failed frees its slot)
+ * Pro's 10 searches of up to 10 companies make the 100-prospect allowance; a search often finds fewer than 10 that fit.
+ */
 export const OUTBOUND_ALLOWANCE_DEFAULTS: Readonly<Record<OutboundTier, OutboundAllowance>> = {
-  free: { monthlySearches: 3, maxCompanies: 10 },
-  trial: { monthlySearches: 10, maxCompanies: 25 },
-  pro: { monthlySearches: 25, maxCompanies: 25 },
+  free: { monthlySearches: 3, maxCompanies: 10, monthlyProspects: 30, monthlyDrafts: 3, monthlySends: 3 },
+  trial: { monthlySearches: 10, maxCompanies: 10, monthlyProspects: 100, monthlyDrafts: 10, monthlySends: 10 },
+  pro: { monthlySearches: 10, maxCompanies: 10, monthlyProspects: 100, monthlyDrafts: 10, monthlySends: 10 },
 };
+
+/**
+ * A workspace's AI and provider spend ceiling over the same rolling 30 days, in US dollars (WORKSPACE_MONTHLY_SPEND_USD).
+ * A safeguard against runaway cost, sized against Pro's ₹199 (about $2.40): at the measured $0.05–0.12 per 10-company
+ * search plus about $0.002 per draft, Pro's allowances fit well inside it. Every metered model call and web search
+ * reserves against it before it is made.
+ */
+export const WORKSPACE_MONTHLY_SPEND_USD_DEFAULT = 1.5;
 
 export const OUTBOUND_WINDOW_DAYS = 30;
 

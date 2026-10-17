@@ -60,6 +60,11 @@ export interface ReserveInput {
   /** Whether the do-not-contact list's tables exist (without them nothing can be on it). */
   checkList: boolean;
   dailyCap: number;
+  /**
+   * The plan's send allowance (shared/outbound-plans.ts): the workspace's messages in flight, or sent since `since`,
+   * across every mailbox, must be under `max`. Counted under a per-workspace lock taken after the mailbox lock.
+   */
+  planCap?: { since: Date; max: number };
   now: Date;
   leaseMs: number;
   /** Used only when the message has never had a job; a retry keeps the job's own Message-ID. */
@@ -71,7 +76,8 @@ export interface ReserveInput {
 export type ReserveRefusal =
   | "not_found" | "not_approved" | "already_sent" | "in_flight" | "changed" | "invalid_content" | "no_address"
   | "do_not_contact" | "suppressed" | "not_member" | "not_allowed" | "mailbox_unavailable" | "missing_send_scope" | "daily_cap"
-  | "followup_stopped"; // a follow-up whose conversation was answered, opted out, bounced, or is held for review
+  | "followup_stopped" // a follow-up whose conversation was answered, opted out, bounced, or is held for review
+  | "plan_send_limit"; // the plan's sends for the last 30 days are used
 
 export type Reservation =
   | { ok: true; job: SendJobView; mail: { subject: string; body: string; to: string } }

@@ -63,7 +63,7 @@ const status = (leadId: number) => world().leads.leads.find((x) => x.id === lead
 const code = (r: any) => (r.ok ? "ok" : r.code);
 
 beforeEach(() => { useWorld(createWorld()); prompts = []; reply(); vi.spyOn(console, "log").mockImplementation(() => {}); });
-afterEach(() => { delete process.env.SALES_DAILY_DRAFT_LIMIT; });
+afterEach(() => { delete process.env.SALES_DAILY_DRAFT_LIMIT; delete process.env.OUTBOUND_MONTHLY_DRAFTS_PRO; });
 
 describe("writing a draft", () => {
   it("stores one draft for review, addressed from the company's own site, and sends nothing", async () => {
@@ -465,3 +465,37 @@ describe("listing", () => {
     expect(r.messages.map((m: any) => m.id)).toEqual([m2.id, m1.id]);
   });
 });
+
+describe("the plan's AI-draft allowance (30 days)", () => {
+  it("counts saved AI drafts, refuses the next one BEFORE any model call, and says what the person can do instead", async () => {
+    process.env.OUTBOUND_MONTHLY_DRAFTS_PRO = "1";
+    const a = await researched();
+    const m = await draft(a.id);
+    await cancelMessage(user(), m.id);                     // a cancelled draft was still written: it counts
+    const b = await researched({ companyName: "Casa Beira", website: "https://casabeira.pt", domain: "casabeira.pt" });
+    const calls = prompts.length;
+    const r = await draftOutreach(user(), b.id) as any;
+    expect(r).toMatchObject({ ok: false, status: 429, code: "draft_allowance" });
+    expect(r.message).toMatch(/1 AI drafts included in Pro/);
+    expect(r.message).toMatch(/write this message yourself/);
+    expect(prompts.length).toBe(calls);                    // nothing paid for a draft that couldn't be saved
+  });
+
+  it("drafts written at the same moment can't pass it together", async () => {
+    process.env.OUTBOUND_MONTHLY_DRAFTS_PRO = "2";
+    const leads = await Promise.all(["Casa Um", "Casa Dois", "Casa Tres"].map((n, i) => researched({ companyName: n, website: `https://c${i}.pt`, domain: `c${i}.pt` })));
+    const out = await Promise.all(leads.map((l) => draftOutreach(user(), l.id)));
+    expect(out.filter((r) => r.ok)).toHaveLength(2);
+    expect(out.filter((r) => !r.ok).every((r: any) => r.code === "draft_allowance")).toBe(true);
+  });
+
+  it("template follow-ups and other workspaces' drafts don't count", async () => {
+    process.env.OUTBOUND_MONTHLY_DRAFTS_PRO = "1";
+    const a = await researched();
+    await messageStore.create({ orgId: ORG1, leadId: a.id, subject: "Following up", body: "Just following up.", bodyHash: "h", toAddress: "hello@casaalma.pt", toSource: "lead", researchId: null, claimIds: [], promptVersion: "followup-v1", by: "agent", userId: "system", now: new Date() });
+    world().messages.push({ id: 900, leadId: 999, organizationId: ORG2, direction: "out", status: "draft", promptVersion: "draft-v2", createdAt: new Date() } as any);
+    await cancelMessage(user(), world().messages.find((x) => x.promptVersion === "followup-v1")!.id);
+    expect(await draftOutreach(user(), a.id)).toMatchObject({ ok: true });
+  });
+});
+
