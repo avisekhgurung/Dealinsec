@@ -214,7 +214,7 @@ const cards = async (runId: string, u = user()) => { const r = await getRun(u, r
 const byName = (cs: any[], name: string) => cs.find((c) => c.name.startsWith(name));
 
 beforeEach(() => { useWorld(createWorld()); fakeWeb(); seedLead(world(), { companyName: "LeadCo", website: "https://leadco.com", domain: "leadco.com" }); searches = []; calls = { icp: 0, enrich: 0, signals: 0, angle: 0 }; script = {}; model(); clearPageCache(); vi.spyOn(console, "log").mockImplementation(() => {}); });
-afterEach(() => { for (const k of ["SALES_DAILY_ENRICH_LIMIT", "OUTBOUND_DAILY_RUNS", "OUTBOUND_DAILY_SEARCHES", "OUTBOUND_DAILY_COMPANY_LOOKUPS", "OUTBOUND_GLOBAL_DAILY_SEARCHES", "LLM_GLOBAL_DAILY_SPEND_USD"]) delete process.env[k]; world().outbound.failReserve = false; });
+afterEach(() => { for (const k of ["OUTBOUND_MONTHLY_SEARCHES_FREE", "OUTBOUND_MONTHLY_SEARCHES_TRIAL", "OUTBOUND_MONTHLY_SEARCHES_PRO", "SALES_DAILY_ENRICH_LIMIT", "OUTBOUND_DAILY_RUNS", "OUTBOUND_DAILY_SEARCHES", "OUTBOUND_DAILY_COMPANY_LOOKUPS", "OUTBOUND_GLOBAL_DAILY_SEARCHES", "LLM_GLOBAL_DAILY_SPEND_USD"]) delete process.env[k]; world().outbound.failReserve = false; });
 
 describe("the definition-of-done run", () => {
   it("parses, searches several ways, normalizes, dedupes, verifies, enriches, researches, scores and ranks", async () => {
@@ -342,6 +342,58 @@ describe("rules before spending", () => {
     expect(items.filter((i) => i.errorCode === "budget").length).toBeGreaterThanOrEqual(40 - 13);
     expect(world().outbound.prospects.filter((x) => x.verifiedAt).length).toBeLessThanOrEqual(13); // runBudget(1).verify
     expect(byName(world().outbound.prospects.filter((x) => x.verifiedAt), "Agency")).toBeTruthy();
+  });
+  it("the free plan: a small allowance of searches (refused as an upgrade, before anything is spent) and up to 10 companies each", async () => {
+    world().billing.set(ORG1, { id: "u1", plan: "free", planExpiresAt: null, trialEndsAt: null });
+    script.icp = () => ({ industry: "SEO agency", countries: ["CA"], quantity: 40 });
+    const p = await parseIcp(user(), "Find 40 SEO agencies in Canada", deps());
+    expect((p as any).icp.quantity).toBe(10); // capped at the plan's maximum before the person confirms
+    const r = await startRun(user(), { request: "x", icp: { ...(p as any).icp, quantity: 50 } }, {}, deps());
+    expect((r as any).run.quantity).toBe(10); // and again on the server, whatever the client sends
+    process.env.OUTBOUND_MONTHLY_SEARCHES_FREE = "1";
+    const before = searches.length;
+    const again = await startRun(user(), { request: "y", icp: { ...(p as any).icp, industry: "PPC agency" } }, {}, deps());
+    expect(again).toMatchObject({ ok: false, status: 402, code: "NO_CREDITS", feature: "outbound" });
+    expect(searches.length).toBe(before);
+    expect(world().outbound.runs).toHaveLength(1);
+  });
+  it("Pro and the trial get their own 30-day allowance; a used-up Pro allowance is a plain limit, not an upgrade", async () => {
+    process.env.OUTBOUND_MONTHLY_SEARCHES_PRO = "1";
+    await start();
+    script.icp = () => ({ industry: "SEO agency", countries: ["CA"], quantity: 5 });
+    const p = await parseIcp(user(), "Find 5 SEO agencies in Canada", deps());
+    expect((p as any).icp.quantity).toBe(5);
+    const again = await startRun(user(), { request: "x", icp: (p as any).icp }, {}, deps());
+    expect(again).toMatchObject({ ok: false, status: 429, code: "monthly_limit" });
+    // A trial workspace reads the trial allowance, not Pro's.
+    world().billing.set(ORG1, { id: "u1", plan: "free", planExpiresAt: null, trialEndsAt: new Date(Date.now() + 3 * 86_400_000) });
+    process.env.OUTBOUND_MONTHLY_SEARCHES_TRIAL = "5";
+    expect(await startRun(user(), { request: "x", icp: { ...(p as any).icp, industry: "PPC agency" } }, {}, deps())).toMatchObject({ ok: true });
+  });
+  it("prospect geography is the person's choice: every chosen country is searched, each with its own country filter", async () => {
+    const asked: { q: string; country?: string }[] = [];
+    const geo = deps({ searchProviders: async () => [{ name: "fake", label: "Fake", paid: false, supportsCountry: true, async search(q: string, o?: { country?: string }) { asked.push({ q, country: o?.country }); return RESULTS; } }] });
+    script.icp = () => ({ industry: "SEO agency", countries: ["US", "GB", "AE"], quantity: 10 });
+    const p = await parseIcp(user(), "Find 10 SEO agencies in the US, UK and UAE", geo);
+    const icp = (p as any).icp;
+    expect(icp.countries).toEqual(["US", "GB", "AE"]);
+    const r = await startRun(user({ country: "IN" }), { request: "x", icp }, {}, geo);
+    await drive((r as any).run.id, geo);
+    const placesSearched = new Set(asked.map((a) => a.country));
+    expect(placesSearched).toEqual(new Set(["US", "GB", "AE"]));
+    for (const a of asked) expect(a.q).toContain({ US: "United States", GB: "United Kingdom", AE: "United Arab Emirates" }[a.country!]);
+    expect(asked.some((a) => /India/.test(a.q) || a.country === "IN")).toBe(false); // the account's country is never added
+  });
+  it("no country chosen: a worldwide search (no place in the searches, no country filter), never the account's country", async () => {
+    const asked: { q: string; country?: string }[] = [];
+    const geo = deps({ searchProviders: async () => [{ name: "fake", label: "Fake", paid: false, supportsCountry: true, async search(q: string, o?: { country?: string }) { asked.push({ q, country: o?.country }); return RESULTS; } }] });
+    script.icp = () => ({ industry: "SEO agency", countries: [], targetMarket: ["SaaS"], quantity: 10 });
+    const p = await parseIcp(user({ country: "IN" }), "Find 10 SEO agencies that serve SaaS companies", geo);
+    expect((p as any).icp.countries).toEqual([]);
+    const r = await startRun(user({ country: "IN" }), { request: "x", icp: (p as any).icp }, {}, geo);
+    await drive((r as any).run.id, geo);
+    expect(asked.length).toBeGreaterThan(0);
+    expect(asked.every((a) => a.country === undefined && !/India/i.test(a.q))).toBe(true);
   });
   it("a workspace's daily run allowance is counted from the database and refused before anything is spent", async () => {
     process.env.OUTBOUND_DAILY_RUNS = "1";

@@ -177,7 +177,7 @@ function featureTable(cols: Col[]): string {
   <p class="muted" style="font-size:14px;margin-top:10px">"—" means the feature is not listed on that vendor's pricing page on the review date. It does not prove the product lacks it — check the vendor.</p>`;
 }
 
-const AVAILABILITY = `<div class="callout honest"><b>Where DealInSec's paid plan is available</b><p>The free plan (4 deals a month, each with its quotation) and the 7-day Pro trial are open in every country, with no card. Paid plans can currently be bought in India only (₹99/month or ₹999/year); we can't yet take payments from other countries, and we'll say so here as soon as that changes.</p></div>`;
+const AVAILABILITY = `<div class="callout honest"><b>Where DealInSec's paid plan is available</b><p>The free plan (4 deals a month, each with its quotation) and the 7-day Pro trial are open in every country, with no card. Paid plans can currently be bought in India only (₹499/month); we can't yet take payments from other countries, and we'll say so here as soon as that changes.</p></div>`;
 
 const METHODOLOGY = (vs: Vendor[]) => `<section><div class="wrap">
   <h2>How this comparison was made</h2>
@@ -313,7 +313,7 @@ export const COMPARISON_PAGES: CategoryPage[] = [
     <div class="ft"><b>HoneyBook</b><p><i>Best for:</i> client-services businesses that want proposals, contracts, invoices and lead forms in one place. <i>Pricing:</i> Starter $29/month, Essentials $59 ($49 billed yearly), Premium $129 ($109). <i>Trade-off:</i> card payments carry processing fees, and automation and scheduling start on Essentials.</p></div>
     <div class="ft"><b>Dubsado</b><p><i>Best for:</i> service businesses that lean on forms, client portals and workflows. <i>Pricing:</i> Starter $335/year, Premier $525/year. <i>Trade-off:</i> shown as annual prices, and unlimited lead forms, advanced scheduling and workflows are on Premier.</p></div>
     <div class="ft"><b>Indy</b><p><i>Best for:</i> solo freelancers who want a free tier to start. <i>Pricing:</i> Free (3 proposals, contracts, invoices and clients a month); Pro shown at $12.50/month against $300 billed every two years. <i>Trade-off:</i> the free plan is capped at three of each per month.</p></div>
-    <div class="ft"><b>DealInSec</b><p><i>Best for:</i> freelancers whose income comes from scoped client deals and who want the quotation, the signed agreement, the invoice and the follow-up on one record, with a check on the terms before sending. <i>Pricing:</i> free plan (4 deals a month with quotations); Pro at ₹99/month or ₹999/year, bought in India only today. <i>Trade-off:</i> no time tracking, client portal, accounting or online payment collection.</p></div>
+    <div class="ft"><b>DealInSec</b><p><i>Best for:</i> freelancers whose income comes from scoped client deals and who want the quotation, the signed agreement, the invoice and the follow-up on one record, with a check on the terms before sending. <i>Pricing:</i> free plan (4 deals a month with quotations); Pro at ₹499/month, bought in India only today. <i>Trade-off:</i> no time tracking, client portal, accounting or online payment collection.</p></div>
   </div>
   ${AVAILABILITY}
 </div></section>
@@ -388,7 +388,7 @@ ${METHODOLOGY(VENDORS)}`,
   <div class="tbl-scroll"><table class="cmp">
     <tr><th>Tool</th><th>Plan</th><th>Price</th><th>What you get</th></tr>
     <tr><td rowspan="2"><b>DealInSec</b><br><span class="muted" style="font-size:13px">7-day Pro trial, no card, in every country</span></td><td>Free</td><td>$0 / ₹0</td><td>4 deals a month, each with its quotation, in every country</td></tr>
-    <tr><td>Pro</td><td>₹99/month or ₹999/year (India only)</td><td>Unlimited deals, agreements with a signing link, invoices, payment tracking</td></tr>
+    <tr><td>Pro</td><td>₹499/month (India only)</td><td>Unlimited deals, agreements with a signing link, invoices, payment tracking</td></tr>
   </table></div>
   ${reviewedNote([vendor("bonsai")])}
   ${AVAILABILITY}
@@ -448,7 +448,7 @@ ${METHODOLOGY([vendor("bonsai")])}`,
       },
       {
         q: "Can I use DealInSec's paid plan outside India?",
-        a: "Not yet. The free plan and the 7-day Pro trial are open in every country, but paid plans can currently be bought in India only (₹99/month or ₹999/year).",
+        a: "Not yet. The free plan and the 7-day Pro trial are open in every country, but paid plans can currently be bought in India only (₹499/month).",
       },
     ],
   },
@@ -503,7 +503,7 @@ ${METHODOLOGY([vendor("bonsai")])}`,
 </div></section>
 <section><div class="wrap">
   <h2>Where it is available</h2>
-  <p class="sec-sub">The free plan (${PRICING.freeMonthlyDeals} deals a month, each with its quotation) and the ${PRICING.trialDays}-day Pro trial are open in every country, with no card. The paid Pro plan — ₹${PRICING.proMonthlyInr} a month or ₹${PRICING.proYearlyInr} a year — can currently be bought in India only. We can't yet take payments from other countries, and we will say so on this page when that changes. The <a href="/tools">free tools</a> need no account and don't store what you type on our servers.</p>
+  <p class="sec-sub">The free plan (${PRICING.freeMonthlyDeals} deals a month, each with its quotation) and the ${PRICING.trialDays}-day Pro trial are open in every country, with no card. The paid Pro plan — ₹${PRICING.proMonthlyInr} a month — can currently be bought in India only. We can't yet take payments from other countries, and we will say so on this page when that changes. The <a href="/tools">free tools</a> need no account and don't store what you type on our servers.</p>
 </div></section>
 <section><div class="wrap">
   <h2>How we write our guides</h2>

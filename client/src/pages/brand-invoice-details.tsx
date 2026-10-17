@@ -11,7 +11,9 @@ import { memberCan } from "@shared/permissions";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirm } from "@/components/confirm-dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Download, CheckCircle, Loader2, BellRing, Crown, Undo2 } from "lucide-react";
+import { ArrowLeft, Download, CheckCircle, Loader2, BellRing, Undo2 } from "lucide-react";
+import { WhatsAppShareButton } from "@/components/whatsapp-share";
+import { invoiceReminderMessage } from "@shared/whatsapp-share";
 import { InvoiceAttachments } from "@/components/invoice-attachments";
 import type { BrandInvoice, Deal, InvoiceLineItem } from "@shared/schema";
 import { useUpgradeModal } from "@/components/upgrade-modal";
@@ -498,21 +500,19 @@ export default function BrandInvoiceDetailsPage() {
             </div>
           )}
 
-          {/* Payment reminders — Pro feature, gated now, shipping soon */}
+          {/* A payment reminder the person sends themselves (WhatsApp, prefilled and editable). Nothing is sent
+              automatically; there are no scheduled reminders. */}
           {invoice.status === "Unpaid" && (
-            <button
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed border-violet-300/60 dark:border-violet-800/50 text-left opacity-80 hover:opacity-100 transition-opacity"
-              onClick={() => openUpgradeModal({ feature: "payment_tracking" })}
-              data-testid="button-payment-reminder"
-            >
-              <BellRing className="w-4 h-4 text-violet-500 flex-shrink-0" />
-              <span className="flex-1 text-sm font-medium text-muted-foreground">
-                Send Payment Reminder
-              </span>
-              <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-400">
-                <Crown className="w-3 h-3" /> Pro · Coming soon
-              </span>
-            </button>
+            <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/70" data-testid="payment-reminder">
+              <BellRing className="w-4 h-4 text-violet-500 flex-shrink-0" aria-hidden />
+              <span className="flex-1 text-sm text-muted-foreground">Remind {invoice.brandName} about this invoice</span>
+              <WhatsAppShareButton
+                what="invoice_reminder"
+                label="WhatsApp"
+                testId="button-payment-reminder"
+                message={invoiceReminderMessage({ client: invoice.brandName, invoiceNumber: invoice.invoiceNumber, amount: docFmt.money(invoice.dealAmountMinor), due: invoice.dueDate ? docDate(invoice.dueDate, loc) : null })}
+              />
+            </div>
           )}
         </div>
 

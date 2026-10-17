@@ -19,11 +19,35 @@ function deps(over: Partial<UsageDeps> = {}) {
     recentRuns: async () => [],
     countProviderCalls: async (o) => { calls.push(o); return 0; },
     platformSpend: async () => ({ all: 0, pool: 0 }),
+    tier: async () => "pro",
     ...over,
   };
   return { d, calls };
 }
 const ok = (r: any) => { if (!r.ok) throw new Error(JSON.stringify(r)); return r.usage; };
+
+describe("AI Outbound usage: the plan's 30-day allowance (one credit = one search that ran)", () => {
+  const DAY = 24 * HOUR;
+  const ran = (daysAgo: number) => ({ status: "done", counters: { searched: 8 }, createdAt: new Date(NOW.getTime() - daysAgo * DAY) });
+
+  it("each plan shows its own allowance and the most companies a search may look for", async () => {
+    for (const [tier, limit, maxCompanies, label] of [["free", 3, 10, "Free plan"], ["trial", 10, 25, "Pro trial"], ["pro", 25, 25, "Pro"]] as const) {
+      const u = ok(await outboundUsage(ana, deps({ tier: async () => tier }).d));
+      expect(u.plan).toEqual({ tier, label, searches: { used: 0, limit, remaining: limit, nextFreesAt: null }, maxCompanies, windowDays: 30 });
+    }
+  });
+
+  it("free: three searches in 30 days use it up, and it says when the next frees up", async () => {
+    const runs = [ran(2), ran(10), ran(25), { status: "done", counters: { searched: 0 }, createdAt: new Date(NOW.getTime() - DAY) }];
+    const u = ok(await outboundUsage(ana, deps({ tier: async () => "free", recentRuns: async () => runs as any }).d));
+    expect(u.plan.searches).toEqual({ used: 3, limit: 3, remaining: 0, nextFreesAt: new Date(NOW.getTime() + 5 * DAY).toISOString() });
+  });
+
+  it("a plan that can't be read counts as the free plan (never more than paid for)", async () => {
+    const u = ok(await outboundUsage(ana, deps({ tier: async () => { throw new Error("db"); } }).d));
+    expect(u.plan.tier).toBe("free");
+  });
+});
 
 describe("AI Outbound usage before a search", () => {
   it("a fresh workspace: every allowance available, included in the plan, the platform available", async () => {
@@ -48,7 +72,8 @@ describe("AI Outbound usage before a search", () => {
     const seen: string[] = [];
     const { d, calls } = deps({ recentRuns: async (orgId) => { seen.push(orgId); return []; } });
     ok(await outboundUsage(ana, d));
-    expect(seen).toEqual(["org-a"]);
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((o) => o === "org-a")).toBe(true); // today's count and the plan's 30-day count, both its own
     const own = calls.filter((c) => c.orgId);
     expect(own.every((c) => c.orgId === "org-a")).toBe(true);
     // the platform count is the only one without a workspace, and it uses the UTC day

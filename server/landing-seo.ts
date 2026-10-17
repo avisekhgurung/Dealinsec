@@ -47,7 +47,7 @@ export function landingSeoBody(): string {
 
   return `<div id="seo-fallback">
 <h1>Find Clients. Close Deals. Get Paid.</h1>
-<p>${ONE_LINER} It helps small SEO, marketing, growth, AI-automation, web and software agencies and B2B consultants research prospects that fit, run a clear pipeline, and turn won work into quotations, signed agreements and invoices, in one connected workspace. Free plan, ${PRICING.trialDays}-day Pro trial, no card needed.</p>
+<p>${ONE_LINER} Use AI to discover relevant prospects, prepare personalized outreach and manage the journey from conversation to payment. Built for SEO, marketing, growth, AI-automation, web and software agencies and B2B consultants in India finding clients in India and abroad (the US, the UK, Canada, Australia, the UAE and more). One plan: free to start, Pro ₹${PRICING.proMonthlyInr} a month, ${PRICING.trialDays}-day Pro trial, no card needed.</p>
 <p>The workflow: Find prospects, Qualify, Deal, Quotation, Agreement, Invoice, Payment tracking.</p>
 
 <h2>Made for founder-led agencies</h2>
@@ -76,7 +76,7 @@ export function landingSeoBody(): string {
 </ol>
 
 <h2>AI Outbound: find clients who fit, with the evidence</h2>
-<p>Describe the clients you want, like US dental groups opening new locations. DealInSec researches companies, checks each one against your ideal client and marks it qualified, partial, not a fit or not enough evidence, with the reasons. Evidence shows its source and how recent it is; guesses are labelled as guesses and gaps are shown, not filled in. Add the best prospects to your pipeline. AI drafts a first message; you approve every word, send it from your own email and mark it sent. Your do-not-contact list is checked before anything is drafted or approved. DealInSec doesn't send email for you and never contacts anyone on its own. Research has daily limits per workspace.</p>
+<p>Describe the clients you want, like US dental groups opening new locations, and choose where to look: an agency in India can search the United States, the United Kingdom, Canada, Australia, the UAE, India or worldwide. DealInSec researches companies, checks each one against your ideal client and marks it qualified, partial, not a fit or not enough evidence, with the reasons. Evidence shows its source and how recent it is; guesses are labelled as guesses and gaps are shown, not filled in. Add the best prospects to your pipeline. AI drafts a first message; you approve every word, send it from your own email and mark it sent. Your do-not-contact list is checked before anything is drafted or approved. DealInSec doesn't send email for you and never contacts anyone on its own. Each plan includes a number of AI Outbound searches a month (one credit per search); nothing is unlimited.</p>
 
 <h2>Know exactly what you're owed</h2>
 <p>Track every invoice from sent to paid: total invoiced, paid, pending and overdue at a glance. DealInSec tracks payments but does not process them; your client pays you directly and you mark the invoice paid. When something is late, Copilot drafts the follow-up and you review and send it.</p>
@@ -86,7 +86,7 @@ export function landingSeoBody(): string {
 
 <h2>One workspace, set up for how you bill</h2>
 <p><strong>Agencies in the United States</strong>: quote, agree and invoice in US dollars with your business details on every document; invoice numbers restart each calendar year; DealInSec doesn't calculate sales tax. Use the free plan and the 7-day Pro trial today; paid plans can't be bought from the US yet.</p>
-<p><strong>Agencies in India</strong>: quote, agree and invoice in rupees with your PAN and GSTIN on documents; invoice numbers follow the financial year from 1 April; in-app invoices aren't GST tax invoices, and the free GST invoice generator is built for those. Pro is ₹${PRICING.proMonthlyInr} a month or ₹${PRICING.proYearlyInr} a year, paid through Razorpay (UPI, cards or netbanking).</p>
+<p><strong>Agencies in India</strong>: quote, agree and invoice in rupees with your PAN and GSTIN on documents; invoice numbers follow the financial year from 1 April; in-app invoices aren't GST tax invoices, and the free GST invoice generator is built for those. Pro is ₹${PRICING.proMonthlyInr} a month, paid through Razorpay (UPI, cards or netbanking).</p>
 <p>Clients elsewhere? Bill in any of 50 currencies, including EUR, GBP, CAD, AUD and AED.</p>
 
 <h2>Built so you stay in charge</h2>
@@ -111,7 +111,7 @@ export function landingSeoBody(): string {
 ${guidesHtml()}
 
 <h2>Start simple. Grow when you need to.</h2>
-<p>The free plan is permanent and covers ${PRICING.freeMonthlyDeals} deals a month, each with its quotation, plus the leads pipeline and AI Outbound research within its daily limits. Every new account also starts with a ${PRICING.trialDays}-day Pro trial with no card, in every country. Pro adds unlimited deals, agreements your client signs online, invoices, payment tracking and up to 5 team members. In India, Pro is ₹${PRICING.proMonthlyInr} per month or ₹${PRICING.proYearlyInr} per year. In the United States and other countries the free plan and the trial are fully open; paid plans can't be bought from outside India yet. No platform fee on your deal value.</p>
+<p>The free plan is permanent and covers ${PRICING.freeMonthlyDeals} deals a month, each with its quotation, plus the leads pipeline and AI Outbound research within its daily limits. Every new account also starts with a ${PRICING.trialDays}-day Pro trial with no card, in every country. Pro adds unlimited deals, agreements your client signs online, invoices, payment tracking and up to 5 team members. In India, Pro is ₹${PRICING.proMonthlyInr} per month. In the United States and other countries the free plan and the trial are fully open; paid plans can't be bought from outside India yet. No platform fee on your deal value.</p>
 
 <h2>Frequently asked questions</h2>
 ${faqs}

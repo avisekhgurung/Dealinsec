@@ -363,3 +363,22 @@ describe("senior decision-maker titles", () => {
     expect(isSeniorDecisionMaker(null)).toBe(false);
   });
 });
+
+describe("prospect geography (the person's choice, never the account's country)", () => {
+  it("'us' as a word isn't the United States; 'US' is", async () => {
+    const { parseIcpFallback } = await import("./icp");
+    expect(parseIcpFallback("Find SEO agencies like us that serve SaaS companies")!.countries).toEqual([]);
+    expect(parseIcpFallback("Find US SEO agencies that serve SaaS companies")!.countries).toEqual(["US"]);
+    expect(parseIcpFallback("Find SEO agencies in the UK and Australia")!.countries.sort()).toEqual(["AU", "GB"]);
+  });
+  it("every chosen country is searched, interleaved; cities win over countries; nothing chosen is worldwide", async () => {
+    const { icpSchema, searchPlaces, searchStrategies, countryOfQuery } = await import("./icp");
+    const many = icpSchema.parse({ industry: "SEO agency", countries: ["US", "GB", "CA", "AU", "AE"] });
+    const qs = searchStrategies(many);
+    expect(qs.slice(0, 5).map((q) => countryOfQuery(q, many))).toEqual(["US", "GB", "CA", "AU", "AE"]);
+    expect(searchPlaces(icpSchema.parse({ industry: "SEO agency", countries: ["US"], locations: ["Austin, Texas"] }))).toEqual(["Austin, Texas"]);
+    const world = icpSchema.parse({ industry: "SEO agency" });
+    expect(searchPlaces(world)).toEqual([""]);
+    expect(searchStrategies(world).every((q) => countryOfQuery(q, world) === undefined)).toBe(true);
+  });
+});

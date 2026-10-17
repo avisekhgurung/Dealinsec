@@ -51,3 +51,31 @@ export function dismissGettingStarted(userId: string | null | undefined): void {
     // Not saved: the checklist is hidden for this visit only.
   }
 }
+
+/**
+ * Where the person wants to find clients (asked during onboarding): a country code from AI Outbound's list, or "WW"
+ * for worldwide. Only a starting suggestion: AI Outbound shows it as a removable chip when a request names no place,
+ * and it is never taken from the person's own account country.
+ */
+const targetKey = (userId: string) => `dis_target_market:${userId}`;
+export const TARGET_MARKETS = [
+  { code: "IN", label: "India" }, { code: "US", label: "United States" }, { code: "GB", label: "United Kingdom" }, { code: "CA", label: "Canada" },
+  { code: "AU", label: "Australia" }, { code: "AE", label: "UAE" }, { code: "WW", label: "Worldwide" },
+] as const;
+export type TargetMarket = (typeof TARGET_MARKETS)[number]["code"];
+const isTarget = (v: unknown): v is TargetMarket => TARGET_MARKETS.some((t) => t.code === v);
+
+export function getTargetMarket(userId: string | null | undefined): TargetMarket | null {
+  if (!userId) return null;
+  try { const v = localStorage.getItem(targetKey(userId)); return isTarget(v) ? v : null; } catch { return null; }
+}
+
+export function setTargetMarket(userId: string | null | undefined, market: TargetMarket | null): void {
+  if (!userId) return;
+  try {
+    if (market && isTarget(market)) localStorage.setItem(targetKey(userId), market);
+    else localStorage.removeItem(targetKey(userId));
+  } catch {
+    // Not saved: AI Outbound simply asks where to look.
+  }
+}

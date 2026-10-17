@@ -41,7 +41,6 @@ import {
   Megaphone,
   Calculator,
   ClipboardList,
-  Infinity as InfinityIcon,
   ShieldCheck,
   Radar,
   Navigation,
@@ -58,12 +57,14 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLocation, Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { trackEvent } from "@/lib/analytics";
+import { PRICING } from "@shared/product-facts";
+import { OUTBOUND_ALLOWANCE_DEFAULTS } from "@shared/outbound-plans";
 import { openConsentSettings } from "@/lib/consent";
 import { LandingCopilot } from "@/components/landing-copilot";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { BRAND_GRADIENT, GradientText, SectionHeader, fadeUp, stagger } from "@/components/landing-shared";
 import { LandingTryDemo } from "@/components/landing-try-demo";
-import { AudienceCards, CtaBanner, FaqSection, FeaturesSection, HeroSection, JourneySection, OneWorkspaceSection, OverviewSection } from "@/components/landing-redesign";
+import { AiOutboundSection, AudienceCards, CtaBanner, FaqSection, FeaturesSection, HeroSection, JourneySection, OneWorkspaceSection, OverviewSection } from "@/components/landing-redesign";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LANDING_FAQS } from "@shared/landing-faqs";
 import { rememberAudienceIntent } from "@/lib/audience-intent";
@@ -263,6 +264,7 @@ export default function LandingPage() {
 
       <main className="relative z-[1]">
         <HeroSection isAuthenticated={isAuthenticated} onPrimary={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))} />
+        <AiOutboundSection />
         <FeaturesSection />
         <JourneySection showDemo={!isAuthenticated} />
         <OneWorkspaceSection />
@@ -663,25 +665,20 @@ function NavMenu({ label, items }: { label: string; items: NavLink[] }) {
 }
 
 function PricingPreview({ onCTA }: { onCTA: () => void }) {
+  const free = OUTBOUND_ALLOWANCE_DEFAULTS.free, pro = OUTBOUND_ALLOWANCE_DEFAULTS.pro;
   const freePerks = [
-    "4 deals every month, each with a quotation",
+    `AI Outbound: ${free.monthlySearches} prospect searches a month, in any country`,
+    `${PRICING.freeMonthlyDeals} deals every month, each with a quotation`,
     "Leads pipeline with follow-ups",
-    "AI Outbound prospect research (daily limits)",
     "Quotation PDFs and share links",
   ];
   const proMonthlyPerks = [
+    `AI Outbound: ${pro.monthlySearches} prospect searches a month, up to ${pro.maxCompanies} companies each`,
     "Unlimited deals & quotations",
     "Agreements your client signs online",
-    "Invoices: advance, milestone or final",
-    "Payment tracking: paid, pending and overdue",
+    "Invoices and payment tracking",
     "Up to 5 team members",
-    "Priority email support",
-  ];
-  const proAnnualPerks = [
-    "Everything in Pro Monthly",
-    "Unlimited workflow for a full year",
-    "One payment — no monthly renewals",
-    "₹999 for the year instead of ₹1,188",
+    "One plan: no separate CRM or AI Outbound fee",
   ];
 
   return (
@@ -704,7 +701,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
             <Globe className="w-3.5 h-3.5" /> United States, India and everywhere else
           </p>
           <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            Every new account starts with a 7-day Pro trial, and the free plan stays free after it. Both are open in every country, with no card. <strong className="font-semibold text-neutral-800 dark:text-neutral-200">In India</strong>, Pro is paid in rupees at the prices below. <strong className="font-semibold text-neutral-800 dark:text-neutral-200">In the US and other countries</strong>, paid plans can&apos;t be bought yet, and we won&apos;t take a foreign card until they can.
+            Every new account starts with a {PRICING.trialDays}-day Pro trial, and the free plan stays free after it. Both are open in every country, with no card. <strong className="font-semibold text-neutral-800 dark:text-neutral-200">In India</strong>, Pro is paid in rupees at the price below — and AI Outbound finds clients in India, the US, the UK, Canada, Australia, the UAE and other countries. <strong className="font-semibold text-neutral-800 dark:text-neutral-200">In the US and other countries</strong>, paid plans can&apos;t be bought yet, and we won&apos;t take a foreign card until they can.
           </p>
         </motion.div>
 
@@ -713,7 +710,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, margin: "-80px" }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-8 max-w-6xl mx-auto"
+          className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-8 max-w-4xl mx-auto"
         >
           {/* Free tier */}
           <motion.div
@@ -772,7 +769,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                   >
                     <FileSignature className="w-4 h-4 text-white" />
                   </div>
-                  <p className="text-sm font-semibold">Pro · Monthly</p>
+                  <p className="text-sm font-semibold">DealInSec Pro</p>
                 </div>
               </div>
 
@@ -786,11 +783,11 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                     backgroundClip: "text",
                   }}
                 >
-                  ₹99
+                  ₹{PRICING.proMonthlyInr}
                 </span>
                 <span className="text-sm text-neutral-500">/ month</span>
               </div>
-              <p className="text-xs text-neutral-500 mt-1">Take the deal all the way to signed agreement, invoice and payment tracking.</p>
+              <p className="text-xs text-neutral-500 mt-1">Paid monthly in India. It doesn&apos;t renew or charge automatically — pay again to extend.</p>
 
               <ul className="mt-5 space-y-2.5">
                 {proMonthlyPerks.map((f) => (
@@ -807,7 +804,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
                 style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
                 data-testid="button-go-pro-monthly"
               >
-                Go Pro — ₹99/month
+                Go Pro — ₹{PRICING.proMonthlyInr}/month
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
 
@@ -826,46 +823,6 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
             </div>
           </motion.div>
 
-          {/* Pro Annual — ₹999/yr, i.e. ₹189 less than 12 × ₹99 */}
-          <motion.div
-            variants={fadeUp}
-            className="relative rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-7 flex flex-col"
-          >
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center">
-                  <InfinityIcon className="w-4 h-4 text-amber-600" />
-                </div>
-                <p className="text-sm font-semibold">Pro · Annual</p>
-              </div>
-              <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                Save ₹189
-              </span>
-            </div>
-            <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-4xl font-bold tracking-tight">₹999</span>
-              <span className="text-sm text-neutral-500">/ year</span>
-            </div>
-            <p className="text-xs text-neutral-500 mt-1">≈ ₹83/month — ₹189 less than paying ₹99 twelve times.</p>
-            <ul className="mt-5 space-y-2.5 flex-1">
-              {proAnnualPerks.map((f) => (
-                <li key={f} className="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-                  <Check className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <span>{f}</span>
-                </li>
-              ))}
-            </ul>
-            <Button
-              onClick={onCTA}
-              className="w-full mt-6 h-11 text-sm font-bold text-white border-0 shadow-md shadow-emerald-900/20"
-              style={{ background: "linear-gradient(135deg, #065F46 0%, #115E59 100%)" }}
-              data-testid="button-go-pro"
-            >
-              Go Pro Annual — ₹999/year
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-            <p className="text-[11px] text-neutral-500 text-center mt-3">One payment, not auto-renewing. A full year of the Pro workflow.</p>
-          </motion.div>
         </motion.div>
 
         {/* What's free vs. what needs Pro */}

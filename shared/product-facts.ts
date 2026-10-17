@@ -14,6 +14,9 @@
 import { GLOBAL_PLANS } from "./globalPlans";
 import { PRO_INCLUDED_SEATS } from "./permissions";
 import { TRIAL_DAYS } from "./schema";
+import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "./outbound-plans";
+
+const OB = OUTBOUND_ALLOWANCE_DEFAULTS;
 
 export const PRODUCT_NAME = "DealInSec";
 export const TAGLINE = "Find Clients. Close Deals. Get Paid.";
@@ -25,7 +28,7 @@ export const ONE_LINER =
 
 /** A short paragraph for summaries, meta descriptions and the top of AI-readable files. */
 export const SUMMARY =
-  "DealInSec helps founder-led agencies and consultants research real prospects, prepare and approve outreach, manage interested leads, and move each deal through quotations, agreements, invoices and payment tracking in one connected workspace. AI does the research and drafting; you review and approve before anything goes to a client.";
+  "Use AI to discover relevant prospects, prepare personalized outreach and manage the journey from conversation to payment. DealInSec helps founder-led agencies and consultants research real prospects, approve outreach, manage interested leads, and move each deal through quotations, agreements, invoices and payment tracking in one connected workspace, on one subscription. AI does the research and drafting; you review and approve before anything goes to a client.";
 
 /** The primary audience, in the order the homepage and assistants name it. About 1 to 10 people. */
 export const PRIMARY_AUDIENCE = [
@@ -40,12 +43,12 @@ export const PRIMARY_AUDIENCE = [
   "independent B2B consultants and specialist service providers",
 ] as const;
 export const AUDIENCE_LINE =
-  "founder-led B2B service businesses of about 1 to 10 people: digital marketing, SEO, growth, AI automation, web and software development, content and lead-generation agencies, and independent B2B consultants";
+  "founder-led B2B service businesses of about 1 to 10 people: digital marketing, SEO, growth, AI automation, web and software development, content and lead-generation agencies, independent B2B consultants, and solo founders starting a B2B service business";
 /** Kept, but never the headline: older pages and tools for these still exist. */
 export const SECONDARY_AUDIENCE = ["freelancers and independent professionals", "creators who do paid brand collaborations"] as const;
 
 export const MARKETS =
-  "Built for the United States and other international markets, and for India. Documents follow each workspace's country and currency (50 currencies are supported); the workflow is the same everywhere.";
+  "Launching first in India: plans are priced and paid in rupees, and onboarding, support and billing are set up for Indian agencies. Indian agencies can find clients in India and abroad: AI Outbound searches the United States, the United Kingdom, Canada, Australia, the UAE, India and other countries, whichever you choose, wherever your own business is. Workspaces in other countries can use the free plan and the trial; documents follow each workspace's country and currency (50 currencies are supported).";
 
 /** The intended connected workflow. Every stage below is live today (see CAPABILITIES for the details and limits). */
 export const WORKFLOW = ["Prospect", "Lead", "Deal", "Quotation", "Agreement", "Invoice", "Payment tracking"] as const;
@@ -64,7 +67,7 @@ export interface Capability {
 export const CAPABILITIES: readonly Capability[] = [
   {
     key: "ai_outbound", name: "AI Outbound (prospect research)", status: "live", plan: "all",
-    text: "Describe the companies you want to reach; you confirm the profile, then it searches the web, checks each company's own website against your ideal-client profile, looks for recent, dated reasons to reach out and named decision makers, and scores each one. Every finding shows its source and date; guesses and unknowns are labelled. Nothing is contacted and no lead is created until you add one. Each workspace has daily research limits (5 searches a day by default), and contact details aren't always available.",
+    text: `The hero feature. Describe the companies you want to reach and choose where (any countries, regions or cities: the US, the UK, Canada, Australia, the UAE, India and others, or worldwide); you confirm the profile, then it searches the web, checks each company's own website against your ideal-client profile, looks for recent, dated reasons to reach out and named decision makers, and scores each one. Every finding shows its source and date; guesses and unknowns are labelled, and thin markets are said plainly. Nothing is contacted and no lead is created until you add one. One credit is one search: the free plan includes ${OB.free.monthlySearches} a month (up to ${OB.free.maxCompanies} companies each), the trial ${OB.trial.monthlySearches}, and Pro ${OB.pro.monthlySearches} a month (up to ${OB.pro.maxCompanies} companies each), counted over ${OUTBOUND_WINDOW_DAYS} days, with at most 5 a day. Research is never unlimited, and contact details aren't always available.`,
   },
   {
     key: "outreach_drafts", name: "Outreach drafts with approval", status: "live", plan: "all",
@@ -139,16 +142,15 @@ export const PRICING = {
   freeMonthlyDeals: FREE_MONTHLY_DEALS,
   trialDays: TRIAL_DAYS,
   proMonthlyInr: inr.monthly!.amount,
-  proYearlyInr: inr.yearly.amount,
   extraSeatInr: EXTRA_SEAT_PRICE_INR,
   /** Who can buy a paid plan today. */
   checkout: "India only: paid plans are bought in Indian rupees through Razorpay (UPI, cards, netbanking) by a workspace in India. Outside India, including the United States, paid plans can't be bought yet; the free plan and the trial are open everywhere.",
 } as const;
 
 export const PRICING_LINES: readonly string[] = [
-  `Free plan: ${PRICING.freeMonthlyDeals} deals a month, each with its quotation, plus the leads pipeline and AI Outbound research within its daily limits. Permanent, no card.`,
-  `${PRICING.trialDays}-day Pro trial: every new account gets everything unlocked once it finishes setup, with no card. It ends on its own and moves you to the free plan; nothing is charged.`,
-  `Pro: unlimited deals, plus agreements with online signing, invoices, payment tracking and ${PRO_INCLUDED_SEATS} team members. In India, ${rupees(PRICING.proMonthlyInr)} a month or ${rupees(PRICING.proYearlyInr)} a year, paid once per term with no auto-renewal; extra team members are ${rupees(PRICING.extraSeatInr)} each a month.`,
+  `Free plan: ${OB.free.monthlySearches} AI Outbound searches a month (up to ${OB.free.maxCompanies} companies each), the leads pipeline, and ${PRICING.freeMonthlyDeals} deals a month, each with its quotation. Agreements, invoices and payment tracking are Pro. Permanent, no card.`,
+  `${PRICING.trialDays}-day Pro trial: every new account gets the Pro workflow once it finishes setup (with ${OB.trial.monthlySearches} AI Outbound searches), with no card. It ends on its own and moves you to the free plan; nothing is charged.`,
+  `DealInSec Pro: one plan that includes everything — AI Outbound with ${OB.pro.monthlySearches} searches a month (up to ${OB.pro.maxCompanies} companies each), the leads pipeline, unlimited deals, quotations, agreements with online signing, invoices, payment tracking and ${PRO_INCLUDED_SEATS} team members. ${rupees(PRICING.proMonthlyInr)} a month in India, paid once a month: it does not renew or charge automatically, you pay again to extend. There is no separate plan for AI Outbound or the CRM, and no annual plan. Extra team members are ${rupees(PRICING.extraSeatInr)} each a month.`,
   PRICING.checkout,
   "No platform fee or commission on your deal value.",
 ];
@@ -160,6 +162,7 @@ export const NEVER_CLAIM: readonly string[] = [
   "that it collects or processes client payments",
   "that AI reads or classifies Gmail messages",
   "that paid plans can be bought outside India",
+  "unlimited AI research, unlimited sending, or separate prices for AI Outbound or the CRM",
   "that Gmail is available to every workspace",
   "that its agreements are certified digital signatures, or that it is legally or tax compliant in any country",
   "integrations it does not have (Outlook, WhatsApp, Stripe, PayPal, Salesforce, HubSpot)",

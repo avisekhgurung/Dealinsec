@@ -11,13 +11,14 @@ describe("the client-work Copilot prompt is exactly the one that shipped", () =>
   // Hashes of the client-work prompt. A wording edit changes these on purpose
   // and should be a decision. Last decided 2026-10-17: the audience line moved
   // from solo freelancers to founder-led agencies and consultants
-  // (shared/product-facts.ts AUDIENCE_LINE); nothing else changed.
+  // (shared/product-facts.ts AUDIENCE_LINE); nothing else changed. Then 2026-10-17
+  // (India launch): solo founders starting a B2B service business joined that line.
   it("India", () => {
-    expect(sha(chatSystemPrompt(IN))).toBe("5f676506e0ecfb888ab03d53e061425647bb1eadbb6865d9d4e8a60ec43889bc");
+    expect(sha(chatSystemPrompt(IN))).toBe("76f7e59e60af011a9c13e07effbbb6ac98b832c96741235f1c3a4a239e5689bb");
     expect(chatSystemPrompt(IN, "client_work")).toBe(chatSystemPrompt(IN));
   });
   it("the neutral voice", () => {
-    expect(sha(chatSystemPrompt(US))).toBe("2755bd081b1a6053cc5273b03069af924835d9f712ff8876c54e13019b026b12");
+    expect(sha(chatSystemPrompt(US))).toBe("7a9bf2b7186babe63370903059d947a44dee7fad80058794e5c813ef99e1801a");
     expect(chatSystemPrompt(US, "client_work")).toBe(chatSystemPrompt(US));
   });
 });

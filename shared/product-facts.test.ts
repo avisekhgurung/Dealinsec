@@ -7,7 +7,8 @@ import { TRIAL_DAYS, users } from "./schema";
 describe("product facts agree with the code that charges and enforces them", () => {
   it("prices: the INR plans, the seat price and the free allowance", async () => {
     expect(PRICING.proMonthlyInr).toBe(GLOBAL_PLANS.INR.monthly!.amount);
-    expect(PRICING.proYearlyInr).toBe(GLOBAL_PLANS.INR.yearly.amount);
+    expect(PRICING.proMonthlyInr).toBe(499); // the India launch price (Oct 2026)
+    expect("proYearlyInr" in PRICING).toBe(false); // one plan, monthly: no annual plan is sold
     expect(PRICING.trialDays).toBe(TRIAL_DAYS);
     expect(PRICING.freeMonthlyDeals).toBe((users.monthlyDealCredits as any).default);
     const saved = { m: process.env.PRO_MONTHLY_PRICE, y: process.env.PRO_YEARLY_PRICE, s: process.env.EXTRA_SEAT_PRICE };
@@ -15,7 +16,6 @@ describe("product facts agree with the code that charges and enforces them", () 
     try {
       const rz = await import("../server/razorpayClient");
       expect(rz.getProMonthlyPrice()).toBe(PRICING.proMonthlyInr);
-      expect(rz.getProYearlyPrice()).toBe(PRICING.proYearlyInr);
       expect(rz.getExtraSeatPrice()).toBe(PRICING.extraSeatInr);
     } finally {
       if (saved.m !== undefined) process.env.PRO_MONTHLY_PRICE = saved.m;
@@ -27,6 +27,17 @@ describe("product facts agree with the code that charges and enforces them", () 
   it("checkout is India-only, as the order route enforces", () => {
     expect(PRICING.checkout).toMatch(/India only/);
     expect(PRICING_LINES.join(" ")).toMatch(/Outside India, including the United States, paid plans can't be bought yet/);
+  });
+
+  it("one subscription: AI Outbound allowances come from the shared plan definition, never unlimited, no separate CRM/AI plan", async () => {
+    const { OUTBOUND_ALLOWANCE_DEFAULTS } = await import("./outbound-plans");
+    const text = productFactsMarkdown().split("## Never say")[0]; // the "never claim" list names these on purpose
+    const ob = CAPABILITIES.find((c) => c.key === "ai_outbound")!.text;
+    for (const t of ["free", "trial", "pro"] as const) expect(ob).toContain(String(OUTBOUND_ALLOWANCE_DEFAULTS[t].monthlySearches));
+    expect(ob).toMatch(/the US, the UK, Canada, Australia, the UAE, India and others, or worldwide/);
+    expect(PRICING_LINES.join(" ")).toMatch(/There is no separate plan for AI Outbound or the CRM, and no annual plan/);
+    expect(text).not.toMatch(/unlimited (AI|research|searches|sending|prospect)/i);
+    expect(text).not.toMatch(/₹999|a year/);
   });
 
   it("seats and the workflow", () => {

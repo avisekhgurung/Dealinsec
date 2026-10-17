@@ -5,8 +5,6 @@ import {
   ArrowLeft,
   Check,
   Loader2,
-  Zap,
-  ArrowRight,
   Shield,
   Lock,
   Sparkles,
@@ -14,7 +12,6 @@ import {
   Rocket,
   Users,
   Globe,
-  Infinity as InfinityIcon,
 } from "lucide-react";
 import {
   hasActivePro,
@@ -32,6 +29,7 @@ import { queryClient } from "@/lib/queryClient";
 import { PaymentResult } from "@/components/payment-result";
 import { useRazorpayCheckout, type CheckoutPlan } from "@/hooks/use-razorpay-checkout";
 import { PLAN_PRICE_DEFAULTS, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
+import { OUTBOUND_ALLOWANCE_DEFAULTS } from "@shared/outbound-plans";
 import { useLocale } from "@/hooks/use-locale";
 import { trackEvent } from "@/lib/analytics";
 
@@ -66,9 +64,8 @@ export default function PricingPage() {
   const [purchasedPlan, setPurchasedPlan] = useState<CheckoutPlan>("pro_monthly");
 
   // Live pricing — driven by server env vars (PRO_MONTHLY_PRICE etc.)
-  // Defaults (₹99 / ₹999 / ₹99 per seat) are shared with the other surfaces.
+  // Defaults (₹499 Pro, ₹99 per extra seat) are shared with the other surfaces.
   const [proMonthlyPrice, setProMonthlyPrice] = useState<number>(PLAN_PRICE_DEFAULTS.proMonthlyPrice);
-  const [proYearlyPrice, setProYearlyPrice] = useState<number>(PLAN_PRICE_DEFAULTS.proYearlyPrice);
   const [extraSeatPrice, setExtraSeatPrice] = useState<number>(PLAN_PRICE_DEFAULTS.extraSeatPrice);
   const [seatQty, setSeatQty] = useState<number>(1);
   useEffect(() => {
@@ -76,7 +73,6 @@ export default function PricingPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((cfg) => {
         if (cfg?.proMonthlyPrice) setProMonthlyPrice(cfg.proMonthlyPrice);
-        if (cfg?.proYearlyPrice) setProYearlyPrice(cfg.proYearlyPrice);
         if (cfg?.extraSeatPrice) setExtraSeatPrice(cfg.extraSeatPrice);
       })
       .catch(() => {});
@@ -108,9 +104,6 @@ export default function PricingPage() {
   const boostExpiryLabel = user?.dealBoostExpiresAt
     ? new Date(user.dealBoostExpiresAt).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })
     : null;
-  // Annual vs 12 × monthly (₹1,188 − ₹999 = ₹189 at list prices). Always shown
-  // as a rupee amount — it is less than two months, so never "2 months free".
-  const yearlySavings = Math.max(0, proMonthlyPrice * 12 - proYearlyPrice);
 
   // On mount: persist ?redirect= param (used to hop back into the workflow
   // after an upgrade, e.g. /deals/12/contract)
@@ -135,9 +128,7 @@ export default function PricingPage() {
           description:
             plan === "extra_seat"
               ? `${seatQty} extra seat${seatQty > 1 ? "s" : ""} added for 1 month.`
-              : plan === "pro_monthly"
-              ? "DealInSec Pro is active — the full workflow is unlocked for 1 month."
-              : "DealInSec Pro is active — the full workflow is unlocked for 1 year.",
+              : "DealInSec Pro is active — AI Outbound and the full workflow are unlocked for 1 month.",
           variant: "success" as any,
         });
         const savedRedirect = localStorage.getItem(REDIRECT_KEY);
@@ -161,6 +152,7 @@ export default function PricingPage() {
   };
 
   const PRO_FEATURES = [
+    `AI Outbound: ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.monthlySearches} prospect searches a month, up to ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.maxCompanies} companies each, in any country`,
     "Unlimited deals & quotations",
     "Unlimited agreements your client signs online",
     // In-app invoices carry the country's tax IDs but are not GST tax invoices (see shared/landing-faqs.ts), so they
@@ -168,7 +160,7 @@ export default function PricingPage() {
     checkoutAvailable ? "Unlimited invoices with your PAN and GSTIN" : "Unlimited invoices",
     "Payment tracking — know who owes you",
     "Up to 5 team members",
-    "Priority email support",
+    "One plan: no separate CRM or AI Outbound fee",
   ];
 
   const successMessage =
@@ -314,8 +306,8 @@ export default function PricingPage() {
           </div>
         )}
 
-        {/* ── The 3 plans ── */}
-        <div className="grid lg:grid-cols-3 gap-4 lg:gap-5 items-stretch">
+        {/* ── The plans: Free and DealInSec Pro (one paid plan) ── */}
+        <div className="grid md:grid-cols-2 gap-4 lg:gap-5 items-stretch max-w-4xl mx-auto w-full">
 
           {/* Free */}
           <Card className="glass-card relative overflow-hidden flex flex-col p-5 lg:p-6">
@@ -324,13 +316,13 @@ export default function PricingPage() {
               <span className="text-4xl font-black text-foreground leading-none">{fmt(0)}</span>
               <span className="text-sm text-muted-foreground font-medium">/ forever</span>
             </div>
-            <p className="text-xs text-muted-foreground mb-4">Quote every new client or brand properly, free</p>
+            <p className="text-xs text-muted-foreground mb-4">Find your first clients and quote them properly, free</p>
             <ul className="space-y-2.5 mb-6 flex-1">
               {[
-                "4 deals every month",
-                "A professional quotation with each deal",
-                "Dashboard & pipeline overview",
-                "Quotation PDFs on your terms",
+                `AI Outbound: ${OUTBOUND_ALLOWANCE_DEFAULTS.free.monthlySearches} prospect searches a month, up to ${OUTBOUND_ALLOWANCE_DEFAULTS.free.maxCompanies} companies each`,
+                "Leads pipeline with follow-ups",
+                "4 deals every month, each with a quotation",
+                "Quotation PDFs and share links",
               ].map((f) => (
                 <li key={f} className="flex items-start gap-2.5 text-sm">
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center mt-px">
@@ -357,14 +349,14 @@ export default function PricingPage() {
             </div>
             <div className="relative p-5 lg:p-6 flex flex-col flex-1">
               <p className="text-[11px] uppercase tracking-[0.1em] font-bold text-emerald-600 dark:text-emerald-400 mb-1">
-                Pro · Monthly
+                DealInSec Pro
               </p>
               <div className="flex items-baseline gap-1 mb-1">
                 <span className="text-4xl font-black text-foreground leading-none">{fmt(proMonthlyPrice)}</span>
                 <span className="text-sm text-muted-foreground font-medium">/ month</span>
               </div>
               <p className="text-xs text-muted-foreground mb-4">
-                Quote, e-sign, invoice and track payment for every client or brand
+                Find clients, close deals and get paid. Paid monthly; it doesn&apos;t renew or charge automatically.
               </p>
               <ul className="space-y-2.5 mb-6 flex-1">
                 {PRO_FEATURES.map((f) => (
@@ -401,68 +393,6 @@ export default function PricingPage() {
             </div>
           </Card>
 
-          {/* Pro Annual — one payment, a little less than 12 × monthly */}
-          <Card className="glass-card border-primary/30 relative overflow-hidden flex flex-col shadow-xl shadow-primary/[0.08]">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.07] via-transparent to-emerald-500/[0.05] pointer-events-none" />
-            <div className="relative bg-gradient-to-r from-primary to-emerald-600 text-white px-4 py-1.5 text-center">
-              <span className="text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
-                <Zap className="w-3 h-3" /> {yearlySavings > 0 ? `Save ${fmt(yearlySavings)} a year` : "Pay once a year"}
-              </span>
-            </div>
-            <div className="relative p-5 lg:p-6 flex flex-col flex-1">
-              <p className="text-[11px] uppercase tracking-[0.1em] font-bold text-primary mb-1">
-                Pro · Annual
-              </p>
-              <div className="flex items-baseline gap-1 mb-1">
-                <span className="text-4xl font-black text-foreground leading-none">{fmt(proYearlyPrice)}</span>
-                <span className="text-sm text-muted-foreground font-medium">/ year</span>
-              </div>
-              <p className="text-xs text-muted-foreground mb-4">
-                ≈ {fmt(Math.round(proYearlyPrice / 12))}/month
-                {yearlySavings > 0 ? ` — save ${fmt(yearlySavings)} vs monthly` : ""}
-              </p>
-              <ul className="space-y-2.5 mb-6 flex-1">
-                {[
-                  "Everything in Pro Monthly",
-                  <span key="u" className="inline-flex items-center gap-1.5">
-                    Unlimited workflow for a full year <InfinityIcon className="w-3.5 h-3.5 text-primary" />
-                  </span>,
-                  "One payment — no monthly renewals",
-                  "Lock today's price for 12 months",
-                ].map((f, i) => (
-                  <li key={i} className="flex items-start gap-2.5 text-sm">
-                    <div className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center mt-px">
-                      <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" strokeWidth={3} />
-                    </div>
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              {checkoutAvailable ? (
-                <Button
-                  className="gradient-btn w-full text-white h-12 text-base font-bold rounded-xl shadow-lg shadow-primary/30"
-                  onClick={() => handlePurchase("pro_yearly")}
-                  disabled={isLoading}
-                  data-testid="button-buy-pro-yearly"
-                >
-                  {isLoading && activePlan === "pro_yearly" ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                      Opening checkout…
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="h-5 w-5 mr-2" />
-                      {proActive ? `Extend 1 year — ${fmt(proYearlyPrice)}` : `Go Annual — ${fmt(proYearlyPrice)}/year`}
-                      <ArrowRight className="h-4 w-4 ml-2" />
-                    </>
-                  )}
-                </Button>
-              ) : (
-                <CheckoutComingSoon testId="coming-soon-pro-yearly" />
-              )}
-            </div>
-          </Card>
         </div>
 
         {/* ── Extra seats (Deal Boost is retired — no card for it) ── */}
@@ -524,7 +454,7 @@ export default function PricingPage() {
               {
                 step: "4",
                 title: "Invoice & track payment",
-                desc: checkoutAvailable ? "Pro — GST-ready invoice + payment tracking" : "Pro — invoice + payment tracking",
+                desc: "Pro — invoice + payment tracking",
               },
             ].map(({ step, title, desc }) => (
               <div key={step} className="flex items-start gap-3">

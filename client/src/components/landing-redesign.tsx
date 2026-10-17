@@ -13,8 +13,10 @@ import { motion, useInView } from "framer-motion";
 import { Link } from "wouter";
 import {
   ArrowRight, Building2, Check, CheckCircle2, CreditCard, FileSignature, FileText, LayoutDashboard, LifeBuoy,
-  PlayCircle, Plus, ReceiptText, Search, Signature, Sparkles, UserRound, Users,
+  Globe2, Handshake, MailCheck, PlayCircle, Plus, ReceiptText, Search, ShieldCheck, Signature, Sparkles, UserRound, Users,
 } from "lucide-react";
+import { PRICING } from "@shared/product-facts";
+import { OUTBOUND_ALLOWANCE_DEFAULTS } from "@shared/outbound-plans";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { DealinsecMark, DealinsecWordmark } from "@/components/dealinsec-logo";
 import { trackEvent } from "@/lib/analytics";
@@ -138,7 +140,7 @@ export function HeroSection({ isAuthenticated, onPrimary }: { isAuthenticated: b
             Find Clients.<br />Close <span className={GREEN}>Deals.</span><br /><span className="dis-gradient-text">Get Paid.</span>
           </h1>
           <p style={{ animationDelay: "0.21s" }} className="dis-hero-in mt-5 max-w-lg text-base leading-relaxed text-neutral-600 sm:text-lg dark:text-neutral-400">
-            DealInSec helps small agencies and consultants research the right clients, send professional quotations, get agreements signed and track every payment, all in one place.
+            Use AI to discover relevant prospects, prepare personalized outreach and manage the journey from conversation to payment. Built for agencies in India finding clients in India and abroad.
           </p>
           <div style={{ animationDelay: "0.29s" }} className="dis-hero-in mt-7 flex flex-col gap-3 sm:flex-row">
             <button type="button" onClick={() => { trackEvent("hero_cta_click", { label: isAuthenticated ? "dashboard" : "start_free" }); onPrimary(); }} data-testid="button-hero-cta"
@@ -152,7 +154,7 @@ export function HeroSection({ isAuthenticated, onPrimary }: { isAuthenticated: b
             </a>
           </div>
           <ul style={{ animationDelay: "0.37s" }} className="dis-hero-in mt-6 flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-neutral-600 dark:text-neutral-400">
-            {["No credit card required", "Free plan: 4 deals a month", "Set up in minutes"].map((t) => (
+            {["No credit card required", "Free plan with AI Outbound", `One plan: ₹${PRICING.proMonthlyInr}/month`].map((t) => (
               <li key={t} className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-emerald-600" />{t}</li>
             ))}
           </ul>
@@ -169,7 +171,7 @@ export function HeroSection({ isAuthenticated, onPrimary }: { isAuthenticated: b
 /* ── Everything you need ─────────────────────────────────────────────────────────────── */
 
 const FEATURES = [
-  { Icon: Search, title: "Find prospects", text: "Discover companies that fit, with the evidence behind each one." },
+  { Icon: Search, title: "Find prospects", text: "AI Outbound finds companies that fit, in any country, with the evidence behind each one." },
   { Icon: Users, title: "Create deals", text: "Track every opportunity from first contact to won." },
   { Icon: FileText, title: "Send quotes", text: "Professional quotations in minutes, in your brand." },
   { Icon: Signature, title: "Sign agreements", text: "Get agreements signed online by your client." },
@@ -320,6 +322,47 @@ export function OneWorkspaceSection() {
             </div>
           </Reveal>
         </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── AI Outbound, the hero feature ─────────────────────────────────────────────────────── */
+
+const OUTBOUND_STEPS = [
+  { Icon: Globe2, title: "Choose who and where", text: "Describe your ideal client and pick the countries or cities. Your own location is never assumed." },
+  { Icon: ShieldCheck, title: "Research with evidence", text: "Each company's own website is checked against your profile. Facts carry their source and date; guesses are labelled." },
+  { Icon: MailCheck, title: "Approve the outreach", text: "AI drafts a first message from verified facts. You edit, approve and send it from your own email." },
+  { Icon: Handshake, title: "Turn replies into deals", text: "Interested companies become leads, then deals with a quotation, agreement and invoice." },
+];
+const TARGETS = ["United States", "United Kingdom", "Canada", "Australia", "UAE", "India", "Worldwide"];
+
+/** AI Outbound: where new clients come from. Every line is true of the product today (shared/product-facts.ts). */
+export function AiOutboundSection() {
+  const free = OUTBOUND_ALLOWANCE_DEFAULTS.free, pro = OUTBOUND_ALLOWANCE_DEFAULTS.pro;
+  return (
+    <section id="ai-outbound" className="scroll-mt-20 py-16 sm:py-20" data-testid="landing-ai-outbound">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <Reveal className="mx-auto max-w-3xl text-center">
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400">AI Outbound</p>
+          <h2 className="mt-2 text-3xl font-extrabold tracking-[-0.025em] text-balance sm:text-4xl">Find clients in India and abroad</h2>
+          <p className="mt-3 text-neutral-600 dark:text-neutral-400">An agency in Bengaluru can research companies in Texas, London or Dubai as easily as in Mumbai. You choose the market; DealInSec does the research and shows its work.</p>
+          <ul className="mt-5 flex flex-wrap justify-center gap-2" aria-label="Markets you can search">
+            {TARGETS.map((t) => <li key={t} className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">{t}</li>)}
+          </ul>
+        </Reveal>
+        <motion.ol initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={stagger} className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {OUTBOUND_STEPS.map(({ Icon, title, text }, n) => (
+            <motion.li key={title} variants={reveal} className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
+              <span className="flex items-center gap-2 text-xs font-bold text-emerald-700 dark:text-emerald-400"><Icon className="h-5 w-5" aria-hidden />Step {n + 1}</span>
+              <h3 className="mt-3 font-bold">{title}</h3>
+              <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{text}</p>
+            </motion.li>
+          ))}
+        </motion.ol>
+        <p className="mx-auto mt-6 max-w-3xl text-center text-xs text-neutral-500 dark:text-neutral-400">
+          Free includes {free.monthlySearches} searches a month; Pro (₹{PRICING.proMonthlyInr}/month) includes {pro.monthlySearches}, up to {pro.maxCompanies} companies each. Nothing is sent automatically, contact details aren&apos;t always available, and some markets have thinner coverage — DealInSec says so instead of filling gaps.
+        </p>
       </div>
     </section>
   );

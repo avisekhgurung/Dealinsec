@@ -24,8 +24,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePlanPrices, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
 import { hasLapsedTrial } from "@shared/schema";
 import { trackEvent } from "@/lib/analytics";
+import { OUTBOUND_ALLOWANCE_DEFAULTS } from "@shared/outbound-plans";
 
-export type UpgradeFeature = "deals" | "agreements" | "invoices" | "payment_tracking";
+export type UpgradeFeature = "deals" | "agreements" | "invoices" | "payment_tracking" | "outbound" | "seats";
 
 export interface UpgradeModalOptions {
   feature?: UpgradeFeature;
@@ -48,17 +49,17 @@ const FEATURE_COPY: Record<UpgradeFeature, string> = {
   agreements: "Your quotation is ready to become a signed agreement — that's where Pro comes in.",
   invoices: "Your agreement is signed — create the invoice and track payment with Pro.",
   payment_tracking: "Track who's paid and who still owes you — part of Pro.",
+  outbound: `You've used this month's AI Outbound searches on the free plan. Pro includes ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.monthlySearches} a month.`,
+  seats: "Extra team seats are an add-on for DealInSec Pro.",
 };
 
-// Only what ships today — reminders and custom branding are still "coming
-// soon" on /pricing, so they're not promised here.
-// "GST-ready" is India's promise; outside India the line drops the word, as
-// /pricing does.
-const proFeatures = (india: boolean) => [
+// Only what ships today. In-app invoices print your tax IDs but don't calculate tax, so they are never called
+// "GST-ready" (see shared/product-facts.ts).
+const proFeatures = (_india: boolean) => [
+  `AI Outbound: ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.monthlySearches} prospect searches a month, in any country`,
   "Unlimited deals & quotations",
-  india ? "Unlimited e-signed agreements & GST-ready invoices" : "Unlimited e-signed agreements & invoices",
-  "Payment tracking — see which client owes you what",
-  "Priority email support",
+  "Agreements your client signs online, invoices and payment tracking",
+  "Up to 5 team members — one plan, no separate CRM or AI fee",
 ];
 
 export function UpgradeModalProvider({ children }: { children: ReactNode }) {
@@ -70,7 +71,7 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const trialEnded = hasLapsedTrial(user);
   // Fetched only once the modal opens; the defaults are the list prices.
-  const { proMonthlyPrice, proYearlyPrice } = usePlanPrices({ enabled: open });
+  const { proMonthlyPrice } = usePlanPrices({ enabled: open });
   // Plans can only be bought from India until international checkout is live
   // (see usePlanCheckoutAvailable). Elsewhere the button still leads to
   // /pricing, which explains that, but it does not quote a rupee price nothing
@@ -139,7 +140,7 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
 
             {checkoutAvailable ? (
               <p className="text-[11px] text-center text-muted-foreground">
-                Or {formatRupees(proYearlyPrice)}/year on Pro Annual — one payment for the whole year.
+                Paid monthly in India. It doesn&apos;t renew or charge automatically.
               </p>
             ) : (
               <p className="text-[11px] text-center text-muted-foreground flex items-center justify-center gap-1.5" data-testid="upgrade-modal-intl-soon">

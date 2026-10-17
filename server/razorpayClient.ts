@@ -9,14 +9,16 @@
  *   RAZORPAY_KEY_SECRET      (private — server only)
  *   RAZORPAY_WEBHOOK_SECRET  (private — verifies webhook authenticity)
  *
- * Pricing (₹, env-overridable for test-mode runs):
- *   PRO_MONTHLY_PRICE (default 99)    — Pro, 1 month
- *   PRO_YEARLY_PRICE  (default 999)   — Pro, 1 year (≈ ₹83/month; ₹189 less
- *                                       than 12 × monthly — NOT "2 months free")
- *   EXTRA_SEAT_PRICE  (default 99)    — one extra seat, 1 month
- *   DEAL_BOOST_PRICE  (default 99)    — unlimited deals+quotations, 1 month.
- *                                       Retired from every UI surface; the SKU
- *                                       stays for cached clients and refunds.
+ * Pricing (₹, env-overridable for test-mode runs; a value that isn't a whole
+ * number of rupees ≥ 1 is ignored in favour of the default):
+ *   PRO_MONTHLY_PRICE (default 499)   — DealInSec Pro, 1 month. The ONE plan on
+ *                                       sale (India launch price, Oct 2026).
+ *   EXTRA_SEAT_PRICE  (default 99)    — one extra seat, 1 month (Pro add-on)
+ *   PRO_YEARLY_PRICE  (default 999)   — Pro Annual: NO LONGER SOLD (the order
+ *                                       route refuses it, see
+ *                                       server/billing/purchase-rules.ts); the
+ *                                       getter stays for old orders' records.
+ *   DEAL_BOOST_PRICE  (default 99)    — retired; refused the same way.
  * The client mirrors these defaults in client/src/hooks/use-plan-prices.ts.
  *
  * GLOBAL PRICING — NOT LIVE (Sep 2026). Every order this file creates is in ₹ on
@@ -64,26 +66,35 @@ export const PRO_MONTHLY_DAYS = 31;
 export const PRO_YEARLY_DAYS = 366;
 export const DEAL_BOOST_DAYS = 31;
 
-export function getProMonthlyPrice(): number {
-  return parseInt(process.env.PRO_MONTHLY_PRICE ?? "99", 10);
+/** A whole number of rupees from the environment, or the default (logged) when it isn't one. */
+function rupees(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const n = Number(raw);
+  if (Number.isInteger(n) && n >= 1) return n;
+  console.error(`[razorpay] ${name} is not a whole number of rupees; using the default ₹${fallback}`);
+  return fallback;
 }
 
-// Default is the ₹999/yr list price the site advertises — the marketing copy
-// and the charge must never disagree, so change both together.
-// PRO_YEARLY_PRICE still overrides it (e.g. ₹1 for test-mode runs).
+export function getProMonthlyPrice(): number {
+  return rupees("PRO_MONTHLY_PRICE", 499);
+}
+
+// Pro Annual is no longer sold (Oct 2026: one monthly plan). Kept for the records
+// of annual orders already completed.
 export function getProYearlyPrice(): number {
-  return parseInt(process.env.PRO_YEARLY_PRICE ?? "999", 10);
+  return rupees("PRO_YEARLY_PRICE", 999);
 }
 
 export function getDealBoostPrice(): number {
-  return parseInt(process.env.DEAL_BOOST_PRICE ?? "99", 10);
+  return rupees("DEAL_BOOST_PRICE", 99);
 }
 
 // Extra seats beyond the plan's included 5 (Pro): ₹99/seat/month.
 export const EXTRA_SEAT_DAYS = 31;
 
 export function getExtraSeatPrice(): number {
-  return parseInt(process.env.EXTRA_SEAT_PRICE ?? "99", 10);
+  return rupees("EXTRA_SEAT_PRICE", 99);
 }
 
 // GLOBAL_PLANS (the agreed international price list) now lives in
@@ -137,6 +148,18 @@ export async function createRazorpayOrder(args: CreateOrderArgs) {
     receipt: args.receipt,
     notes: args.notes,
   });
+}
+
+/** Razorpay's own record of a payment (status, amount in paise, currency, order). Read-only. */
+export async function fetchRazorpayPayment(paymentId: string): Promise<import("./billing/purchase-rules").RazorpayPayment> {
+  const p: any = await getClient().payments.fetch(paymentId);
+  return { id: String(p.id), order_id: p.order_id ?? null, status: String(p.status), amount: Number(p.amount), currency: String(p.currency), created_at: Number(p.created_at) || undefined };
+}
+
+/** Captures an authorized payment for exactly the amount it was authorized for (an account with manual capture). */
+export async function captureRazorpayPayment(paymentId: string, amountPaise: number): Promise<string> {
+  const p: any = await getClient().payments.capture(paymentId, amountPaise, "INR");
+  return String(p.status);
 }
 
 /**

@@ -11,7 +11,7 @@ export interface Icp {
   industry: string; keywords: string[]; countries: string[]; locations: string[]; employeeMin: number | null; employeeMax: number | null;
   targetMarket: string[]; roles: string[]; exclusions: string[]; quantity: number;
 }
-export interface ParsedIcp { icp: Icp; searches: string[]; description: string; source: "model" | "rules" }
+export interface ParsedIcp { icp: Icp; searches: string[]; description: string; source: "model" | "rules"; /** The country was filled in from the market chosen at setup (client-side, removable). */ fromSetup?: boolean }
 
 export interface Counters {
   searched: number; results: number; discovered: number; rejected: number; rejectedBy: Record<string, number>; verified: number; enriched: number;

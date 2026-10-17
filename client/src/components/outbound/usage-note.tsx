@@ -4,6 +4,7 @@
  * allowance as numbers (when the server could count them) and the platform's safety caps only as a state.
  */
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { AlertTriangle, Info } from "lucide-react";
 
 export const OUTBOUND_USAGE_URL = "/api/outbound/usage";
@@ -14,6 +15,8 @@ export interface OutboundUsage {
   searchReady: boolean;
   charge: "included";
   workspace: { searches: Allowance | null; webSearches: Allowance | null; contactLookups: Allowance | null };
+  /** The plan's 30-day allowance (absent from an older server). */
+  plan?: { tier: "free" | "trial" | "pro"; label: string; searches: Allowance | null; maxCompanies: number; windowDays: number };
   perSearch: { webSearches: number };
   platform: { state: "available" | "limited" | "paused" | "unknown"; resetsAt: string };
 }
@@ -31,6 +34,12 @@ const when = (iso: string) => {
 export function searchBlockedReason(u: OutboundUsage | undefined): string | null {
   if (!u) return null;
   if (!u.searchReady) return "Web search isn't set up on this server yet, so a search can't start.";
+  const m = u.plan?.searches;
+  if (m && m.remaining <= 0) {
+    return u.plan!.tier === "free"
+      ? `You've used the free plan's ${m.limit} AI Outbound searches for this ${u.plan!.windowDays}-day period. Upgrade to Pro for more.`
+      : `You've used the ${m.limit} searches included in ${u.plan!.label} for this ${u.plan!.windowDays}-day period.${m.nextFreesAt ? ` The next one frees up ${when(m.nextFreesAt)}.` : ""}`;
+  }
   const s = u.workspace.searches;
   if (s && s.remaining <= 0) return `You've used today's ${s.limit} searches.${s.nextFreesAt ? ` The next one frees up ${when(s.nextFreesAt)}.` : ""}`;
   if (u.platform.state === "paused") return `AI Outbound has reached today's limit across DealInSec. It starts again ${when(u.platform.resetsAt)}. This doesn't use any of your searches.`;
@@ -46,9 +55,13 @@ export function UsageNote({ usage }: { usage: OutboundUsage | undefined }) {
       <p className="flex items-start gap-1.5 text-muted-foreground">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
         <span>
-          Included in your plan, no extra charge.
-          {s && s.remaining > 0 && <> <strong className="font-semibold text-foreground" data-testid="outbound-searches-left">{s.remaining} of {s.limit} searches left</strong> today (rolling 24 hours).</>}
-          {" "}Each search runs up to {usage.perSearch.webSearches} web searches; one that stops before searching isn't counted.
+          {usage.plan ? <>{usage.plan.label}: </> : null}
+          {usage.plan?.searches
+            ? <><strong className="font-semibold text-foreground" data-testid="outbound-plan-left">{usage.plan.searches.remaining} of {usage.plan.searches.limit} searches left</strong> in the last {usage.plan.windowDays} days, up to {usage.plan.maxCompanies} companies each.</>
+            : <>Included in your plan, no extra charge.</>}
+          {s && s.remaining > 0 && <> <span data-testid="outbound-searches-left">{s.remaining} of {s.limit} left today.</span></>}
+          {" "}One search = one credit; a search that stops before searching isn&apos;t counted.
+          {usage.plan?.tier === "free" && <> <Link href="/pricing" className="font-semibold text-primary hover:underline" data-testid="outbound-upgrade">Pro includes more</Link>.</>}
         </span>
       </p>
       {blocked ? (

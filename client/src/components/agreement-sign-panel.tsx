@@ -22,6 +22,8 @@ import { memberCan } from "@shared/permissions";
 import { parseApiError } from "@/lib/api-error";
 import { trackEvent } from "@/lib/analytics";
 import { Check, Copy, FileSignature, Hourglass, Loader2, ShieldCheck, Upload, XCircle } from "lucide-react";
+import { WhatsAppShareButton } from "@/components/whatsapp-share";
+import { signingMessage } from "@shared/whatsapp-share";
 
 interface SignShareStatus {
   active: boolean;
@@ -175,6 +177,7 @@ export function AgreementSignPanel({
               {copied ? "Copied" : "Copy link"}
             </Button>
           </div>
+          <WhatsAppShareButton what="agreement" className="h-8" message={signingMessage({ url: `${window.location.origin}${data.url}` })} />
           <div className="flex items-center justify-between text-[11px] text-muted-foreground">
             <span>{data.viewCount ?? 0} view{data.viewCount === 1 ? "" : "s"}</span>
             {canManage ? (

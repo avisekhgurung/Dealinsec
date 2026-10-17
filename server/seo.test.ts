@@ -743,3 +743,15 @@ describe("the tools hub", () => {
     expect(html).toContain("Who are the tools for?");
   });
 });
+
+describe("one subscription at one price, on every public page (India launch, Oct 2026)", () => {
+  it("every DealInSec plan price is Pro at the charged monthly price; no annual plan, no Deal Boost, no separate AI or CRM plan", async () => {
+    const { PRICING } = await import("@shared/product-facts");
+    for (const [path, html] of htmlPages) {
+      const text = html.replace(/<[^>]+>/g, " ");
+      for (const m of text.matchAll(/\bPro\b[^.₹]{0,40}₹\s?([\d,]+)/g)) expect(Number(m[1].replace(/,/g, "")), `${path}: ${m[0]}`).toBe(PRICING.proMonthlyInr);
+      expect(text, path).not.toMatch(/Pro Annual|₹\s?999\b|Deal Boost|separate (AI Outbound|CRM) (plan|subscription) (is|costs)/);
+      for (const ld of jsonLdBlocks(html)) for (const o of [ld.offers ?? []].flat()) if (o.priceCurrency === "INR" && Number(o.price) > 0) expect(Number(o.price), path).toBe(PRICING.proMonthlyInr);
+    }
+  });
+});

@@ -108,6 +108,7 @@ export interface IStorage {
   updatePayuOrder(orderId: string, updates: Partial<PayuOrder>): Promise<PayuOrder | undefined>;
   completePayuOrderOnce(orderId: string, updates: Partial<PayuOrder>): Promise<PayuOrder | undefined>;
   markPayuOrderFailedIfPending(orderId: string): Promise<void>;
+  markPayuOrderReviewIfOpen(orderId: string, paymentId: string): Promise<boolean>;
   markPayuOrderRefundedOnce(orderId: string): Promise<PayuOrder | undefined>;
 
   createQuote(data: InsertQuote): Promise<Quote>;
@@ -700,6 +701,17 @@ export class DatabaseStorage implements IStorage {
     await db.update(payuOrders)
       .set({ status: "failed" })
       .where(sql`${payuOrders.orderId} = ${orderId} AND ${payuOrders.status} = 'pending'`);
+  }
+
+  async markPayuOrderReviewIfOpen(orderId: string, paymentId: string): Promise<boolean> {
+    // A payment arrived that must not grant automatically (too late for its order, or not matching it): money may
+    // have moved, so it is parked for a person to refund or apply. Only a pending/failed order moves; a completed or
+    // refunded one is never touched. 'needs_review' is not claimable by completePayuOrderOnce.
+    const rows = await db.update(payuOrders)
+      .set({ status: "needs_review", payuTxnId: paymentId })
+      .where(sql`${payuOrders.orderId} = ${orderId} AND ${payuOrders.status} IN ('pending', 'failed')`)
+      .returning({ id: payuOrders.id });
+    return rows.length > 0;
   }
 
   async markPayuOrderRefundedOnce(orderId: string): Promise<PayuOrder | undefined> {

@@ -54,7 +54,10 @@ import {
   createRazorpayOrder,
   verifyPaymentSignature,
   verifyWebhookSignature,
+  fetchRazorpayPayment,
+  captureRazorpayPayment,
 } from "./razorpayClient";
+import { paidAtOf, paymentDecision, refundIsFull, resolveSku, type RazorpayPayment } from "./billing/purchase-rules";
 import {
   sendEmail,
   paymentReceiptEmail,
@@ -2745,6 +2748,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // keeping it prevents an old tab showing one price and being charged
       // another.
       proPlanPrice: getProYearlyPrice(),
+      // What can be bought today: one monthly Pro plan, and extra seats for Pro.
+      plans: ["pro_monthly", "extra_seat"],
       razorpayEnabled: isRazorpayConfigured(),
     });
   });
@@ -2752,14 +2757,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Step 1: create an order. Frontend opens Razorpay Checkout with the
   // returned orderId + key. Reuses the payu_orders table for persistence.
   //
-  // Three SKUs (one-time payments; terms are non-auto-renewing):
-  //   { plan: "pro_monthly" } — ₹99, Pro for 1 month
-  //   { plan: "pro_yearly" }  — ₹999, Pro for 1 year
-  //   { plan: "deal_boost" }  — ₹99, unlimited deals+quotations for 1 month
-  //                             (retired from the UI; kept for cached clients)
-  // Defaults shown — live prices are env-driven (see razorpayClient.ts).
-  // Legacy bodies from cached clients are mapped: {plan:"pro"} → pro_yearly,
-  // {credits:n} → deal_boost.
+  // What can be bought (one-time payments; terms don't auto-renew), decided by
+  // resolveSku (server/billing/purchase-rules.ts):
+  //   { plan: "pro_monthly" } — DealInSec Pro for 1 month (₹499 by default)
+  //   { plan: "extra_seat", qty } — extra team seats for 1 month, Pro only
+  // Pro Annual, Deal Boost and the legacy bodies for them are refused (410), never
+  // swapped for another price. Live prices are env-driven (see razorpayClient.ts).
   app.post("/api/payments/razorpay/order", isAuthenticated, requireOrgPermission("billing.manage"), async (req: any, res) => {
     try {
       const userId = req.user.id;
@@ -2790,17 +2793,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      let sku: "pro_monthly" | "pro_yearly" | "deal_boost" | "extra_seat";
-      switch (req.body.plan) {
-        case "pro_monthly": sku = "pro_monthly"; break;
-        case "pro_yearly": sku = "pro_yearly"; break;
-        case "deal_boost": sku = "deal_boost"; break;
-        case "extra_seat": sku = "extra_seat"; break;
-        case "pro": sku = "pro_yearly"; break;          // legacy cached client
-        default:
-          if (req.body.credits) { sku = "deal_boost"; break; } // legacy cached client
-          return res.status(400).json({ error: "Unknown plan" });
-      }
+      const decided = resolveSku(req.body, hasProAccess(user));
+      if (!decided.ok) return res.status(decided.status).json({ code: decided.code, error: decided.error });
+      const sku = decided.sku;
 
       // Seat purchases carry a quantity (1–20); stored in the order's credits
       // column so the grant/refund paths know how many seats to apply.
@@ -2810,14 +2805,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const PRICES: Record<typeof sku, number> = {
         pro_monthly: getProMonthlyPrice(),
-        pro_yearly: getProYearlyPrice(),
-        deal_boost: getDealBoostPrice(),
         extra_seat: getExtraSeatPrice() * seatQty,
       };
       const DESCRIPTIONS: Record<typeof sku, string> = {
-        pro_monthly: "DealInSec Pro — Monthly (unlimited workflow)",
-        pro_yearly: "DealInSec Pro — 1 Year (unlimited workflow)",
-        deal_boost: "Deal Boost — unlimited deals & quotations for 1 month",
+        pro_monthly: "DealInSec Pro — 1 month",
         extra_seat: `${seatQty} extra team seat${seatQty > 1 ? "s" : ""} — 1 month`,
       };
       const amountInRupees = PRICES[sku];
@@ -2904,6 +2895,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // webhook and stomp 'failed' over a completed (already granted) order.
         await storage.markPayuOrderFailedIfPending(razorpay_order_id);
         return res.status(400).json({ error: "Signature verification failed" });
+      }
+
+      // A valid signature proves the checkout, not the money: confirm with
+      // Razorpay's own record that this payment is for this order, in INR, for
+      // exactly the amount we asked, captured, and made while the order was
+      // still fresh (purchase-rules.ts). If Razorpay can't be reached, nothing
+      // is granted here; the payment.captured webhook grants it instead.
+      let payment: RazorpayPayment;
+      try {
+        payment = await fetchRazorpayPayment(razorpay_payment_id);
+      } catch (fetchError) {
+        console.error("Razorpay verify: payment fetch failed", { orderId: razorpay_order_id, errorType: (fetchError as Error)?.name ?? "Error" });
+        return res.status(202).json({ success: false, pending: true, message: "Your payment is being confirmed. Pro switches on automatically within a few minutes." });
+      }
+      const decision = paymentDecision({ orderId: order.orderId, amount: order.amount, createdAt: order.createdAt }, payment, new Date());
+      if (!decision.grant) {
+        await storage.markPayuOrderReviewIfOpen(razorpay_order_id, razorpay_payment_id);
+        console.error("Razorpay verify: payment not granted", { orderId: razorpay_order_id, reason: decision.reason });
+        return res.status(409).json({ code: "PAYMENT_NEEDS_REVIEW", error: `We couldn't apply this payment automatically (${decision.reason.replace(/_/g, " ")}). Nothing more will be charged; email support@dealinsec.com and we'll sort it out or refund it.` });
+      }
+      if (decision.capture) {
+        try {
+          await captureRazorpayPayment(razorpay_payment_id, payment.amount);
+        } catch (captureError) {
+          console.error("Razorpay verify: capture failed", { orderId: razorpay_order_id, errorType: (captureError as Error)?.name ?? "Error" });
+          return res.status(202).json({ success: false, pending: true, message: "Your payment is being confirmed. Pro switches on automatically within a few minutes." });
+        }
       }
 
       // Atomic pending→completed claim: if the webhook got here first this
@@ -2997,12 +3015,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const event = JSON.parse(rawBody);
         // We care about successful payments
         if (event.event === "payment.captured" || event.event === "order.paid") {
-          const entity = event.payload?.payment?.entity || event.payload?.order?.entity;
-          const orderId = entity?.order_id || entity?.id;
+          // Only a payment entity can grant: it carries the amount, currency and
+          // status to check (an order.paid without one waits for payment.captured).
+          const entity = event.payload?.payment?.entity;
+          const orderId = entity?.order_id;
           const paymentId = entity?.id;
-          if (orderId) {
+          if (orderId && paymentId) {
             const order = await storage.getPayuOrder(orderId);
-            if (order) {
+            const payment: RazorpayPayment = { id: String(paymentId), order_id: String(orderId), status: String(entity.status), amount: Number(entity.amount), currency: String(entity.currency), created_at: Number(entity.created_at) || undefined };
+            const decision = order ? paymentDecision({ orderId: order.orderId, amount: order.amount, createdAt: order.createdAt }, payment, paidAtOf(payment, new Date())) : null;
+            if (order && decision && !decision.grant) {
+              if (await storage.markPayuOrderReviewIfOpen(orderId, String(paymentId))) {
+                console.error("Razorpay webhook: payment not granted", { orderId, reason: decision.reason });
+              }
+            } else if (order && decision?.grant && !decision.capture) {
               // Atomic claim — loses gracefully to the browser verify path.
               const updated = await storage.completePayuOrderOnce(orderId, {
                 payuTxnId: paymentId,
@@ -3026,9 +3052,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // payment bought. Atomic completed→refunded claim guards re-delivery.
         if (event.event === "refund.processed" || event.event === "payment.refunded") {
           const refundEntity = event.payload?.refund?.entity;
+          const paymentEntity = event.payload?.payment?.entity;
           const paymentId = refundEntity?.payment_id
-            || event.payload?.payment?.entity?.id;
-          if (paymentId) {
+            || paymentEntity?.id;
+          // A partial refund doesn't take the whole plan back: it is logged for a
+          // person to decide (purchase-rules.ts refundIsFull).
+          const full = event.event === "payment.refunded"
+            ? refundIsFull(paymentEntity?.amount_refunded, paymentEntity?.amount)
+            : refundIsFull(refundEntity?.amount, paymentEntity?.amount);
+          if (paymentId && !full) {
+            console.error("Razorpay webhook: partial refund, plan kept for review", { paymentId: String(paymentId) });
+          }
+          if (paymentId && full) {
             const order = await storage.getPayuOrderByPaymentId(paymentId);
             if (order) {
               const claimed = await storage.markPayuOrderRefundedOnce(order.orderId);

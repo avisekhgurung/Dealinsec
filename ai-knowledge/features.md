@@ -2,8 +2,10 @@
 
 ## Finding clients
 - AI Outbound (/outbound): describe who you want to reach ("US SEO agencies
-  with 5–30 employees serving SaaS"), confirm the profile it reads back, and
-  start a search. It finds real companies, checks each company's own website
+  with 5–30 employees serving SaaS"), confirm the profile it reads back (you
+  can add or remove countries and cities: the US, UK, Canada, Australia, UAE,
+  India and more, or leave it worldwide — your own account's country is never
+  assumed), and start a search. It finds real companies, checks each company's own website
   against your ideal-client profile, looks for dated reasons to reach out now
   and named decision makers, and scores each one (0–100, with the parts that
   are unknown shown as unknown). Every fact links to its source and date;

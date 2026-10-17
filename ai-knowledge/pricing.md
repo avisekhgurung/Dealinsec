@@ -4,8 +4,12 @@ The exact plans, prices and who can buy them are in product-facts (generated
 from the billing code) — always quote prices from there, never from memory.
 
 How billing works:
-- Paid plans are one-time payments for a fixed term (a month or a year), with
-  no auto-debit and no auto-renewal. Buy again to extend.
+- One subscription: DealInSec Pro, paid monthly. It is a one-time payment for a
+  month, with no auto-debit and no auto-renewal: pay again to extend. There is
+  no annual plan, and no separate plan for AI Outbound or the CRM.
+- AI Outbound credits: one credit is one search. Each plan's allowance is in
+  product-facts; unused searches don't carry over, and nothing is unlimited.
+- Pro Annual bought before October 2026 stays valid for its paid term.
 - Checkout is in Indian rupees through Razorpay (UPI, cards, netbanking) and
   is available only to workspaces in India for now. Outside India, including
   the United States, the free plan and the trial are open, but paid plans

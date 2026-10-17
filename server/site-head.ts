@@ -33,7 +33,6 @@ export function homeSchemas(): string {
       offers: [
         { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD", description: `${PRICING.freeMonthlyDeals} deals a month, each with its quotation, plus the leads pipeline and AI Outbound research within daily limits. Available in every country.` },
         { "@type": "Offer", name: "Pro Monthly", price: String(PRICING.proMonthlyInr), priceCurrency: "INR", eligibleRegion: india },
-        { "@type": "Offer", name: "Pro Annual", price: String(PRICING.proYearlyInr), priceCurrency: "INR", eligibleRegion: india },
       ],
       publisher: { "@id": ORGANIZATION_ID },
     }),

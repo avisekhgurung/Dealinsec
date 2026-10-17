@@ -31,7 +31,8 @@ const MAIN: Case[] = [
   { q: "Do you guarantee my clients will pay on time?", must: [/\b(no|can't|cannot|doesn't|does not|nothing can)\b/i], mustNot: [/\byes,? (we|it|dealinsec) guarantee/i] },
 ];
 const INDIA: Case[] = [
-  { q: "What does Pro cost?", headers: { "cf-ipcountry": "IN" }, must: [new RegExp(`₹\\s?${PRICING.proMonthlyInr}\\b`), new RegExp(`₹\\s?${PRICING.proYearlyInr.toLocaleString("en-IN")}|₹\\s?${PRICING.proYearlyInr}`)] },
+  { q: "What does Pro cost?", headers: { "cf-ipcountry": "IN" }, must: [new RegExp(`₹\\s?${PRICING.proMonthlyInr}\\b`), /month/i], mustNot: [/₹\s?999|annual|per year|a year/i] },
+  { q: "Do I pay separately for AI Outbound and the CRM?", must: [/\b(no|one|single|same)\b/i], mustNot: [/separate (subscription|plan) for (AI Outbound|the CRM)/i, /unlimited (searches|research)/i] },
   {
     q: [
       { role: "user", content: "I run a 3-person AI automation agency in Austin, Texas." },
@@ -54,7 +55,7 @@ async function main() {
   const base = process.argv[2] ?? "http://localhost:3000";
   const batch = process.argv[3] === "india" ? INDIA : MAIN;
   let failed = 0;
-  const allowedPrices = new Set([PRICING.proMonthlyInr, PRICING.proYearlyInr, PRICING.extraSeatInr].map(String));
+  const allowedPrices = new Set([PRICING.proMonthlyInr, PRICING.extraSeatInr].map(String));
   for (const c of batch) {
     const label = typeof c.q === "string" ? c.q : c.q[c.q.length - 1].content;
     const { status, reply } = await ask(base, c);

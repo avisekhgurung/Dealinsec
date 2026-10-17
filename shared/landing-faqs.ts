@@ -6,6 +6,7 @@
  * prices come from shared/product-facts.ts.
  */
 import { PRICING } from "./product-facts";
+import { OUTBOUND_ALLOWANCE_DEFAULTS as OB } from "./outbound-plans";
 
 export interface LandingFaq {
   q: string;
@@ -23,7 +24,7 @@ export const LANDING_FAQS: LandingFaq[] = [
   },
   {
     q: "Does DealInSec find clients for me?",
-    a: "AI Outbound helps you research them. Describe the clients you want and confirm the profile it builds; it then researches matching companies, checks each one against your profile and shows the evidence, with its source and how recent it is. Guesses are labelled as guesses, and anything it couldn't find is shown as unknown. You decide who goes into your pipeline. Research has daily limits per workspace, and contact details are not always available.",
+    a: "AI Outbound helps you research them. Describe the clients you want and confirm the profile it builds; it then researches matching companies, checks each one against your profile and shows the evidence, with its source and how recent it is. Guesses are labelled as guesses, and anything it couldn't find is shown as unknown. You decide who goes into your pipeline. You choose where to look: an agency in India can search the US, the UK, Canada, Australia, the UAE, India or worldwide. Each plan includes a number of searches a month (see “Is there a free plan?”), and contact details are not always available.",
   },
   {
     q: "Does DealInSec work with Gmail?",
@@ -63,7 +64,7 @@ export const LANDING_FAQS: LandingFaq[] = [
   },
   {
     q: "Is there a free plan?",
-    a: `Yes. The free plan is permanent and covers ${PRICING.freeMonthlyDeals} deals a month, each with a professional quotation, plus the leads pipeline and AI Outbound research within its daily limits. Every new account also starts with a ${PRICING.trialDays}-day Pro trial with everything unlocked and no card needed. Signed agreements, invoices and payment tracking are part of Pro. In India, Pro is ₹${PRICING.proMonthlyInr} a month or ₹${PRICING.proYearlyInr} a year, paid in rupees through Razorpay (UPI, cards or netbanking). In the United States and other countries outside India, paid plans can't be bought yet; the free plan and the trial are open everywhere. There are no platform fees on your deal value.`,
+    a: `Yes. The free plan is permanent and covers ${OB.free.monthlySearches} AI Outbound searches a month (up to ${OB.free.maxCompanies} companies each), the leads pipeline, and ${PRICING.freeMonthlyDeals} deals a month, each with a professional quotation. Every new account also starts with a ${PRICING.trialDays}-day Pro trial with everything unlocked and no card needed. DealInSec Pro is one plan with everything: ${OB.pro.monthlySearches} AI Outbound searches a month, unlimited deals, agreements, invoices and payment tracking — no separate fee for AI Outbound or the CRM. In India, Pro is ₹${PRICING.proMonthlyInr} a month, paid monthly with no auto-renewal, paid in rupees through Razorpay (UPI, cards or netbanking). In the United States and other countries outside India, paid plans can't be bought yet; the free plan and the trial are open everywhere. There are no platform fees on your deal value.`,
   },
   {
     q: "Can I cancel anytime?",

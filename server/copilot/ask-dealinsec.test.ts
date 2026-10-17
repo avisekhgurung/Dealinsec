@@ -52,7 +52,7 @@ describe("Ask DealInSec: what each suggested question retrieves", () => {
   it("the facts that answer each suggested question are in what it retrieves", () => {
     const expectations: Record<string, RegExp[]> = {
       "How can DealInSec help my SEO agency find clients?": [/AI Outbound/, /SEO/],
-      "How does AI Outbound work?": [/confirm the profile/, /source and date/, /daily research limits/],
+      "How does AI Outbound work?": [/confirm the profile/, /source and date/, /One credit is one search/],
       "Can I turn a prospect into a quotation and invoice?": [/Prospect → Lead → Deal → Quotation → Agreement → Invoice/],
       "Does DealInSec send emails automatically?": [/does not send emails, follow-ups or reminders on its own/],
       "Can I use DealInSec from the US or India?": [/United States/, /India only/],
@@ -67,7 +67,7 @@ describe("Ask DealInSec: what each suggested question retrieves", () => {
   it("prices come from the code: the retrieved facts quote exactly the charged amounts", () => {
     const k = retrieveKnowledge("What does it cost?", 4);
     expect(k).toContain(`₹${PRICING.proMonthlyInr} a month`);
-    expect(k).toContain(`₹${PRICING.proYearlyInr} a year`);
+    expect(k).not.toMatch(/₹999|Pro Annual|annual plan is/i);
   });
 });
 

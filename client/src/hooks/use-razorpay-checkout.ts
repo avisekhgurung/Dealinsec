@@ -3,7 +3,7 @@
  * verify on our server → invalidate user/credit queries.
  *
  * Used by the pricing page and the UpgradeModal. One-time payments only
- * (pro_monthly / pro_yearly / deal_boost — non-auto-renewing terms).
+ * (pro_monthly, extra_seat — non-auto-renewing terms).
  */
 import { useState, useCallback } from "react";
 import { queryClient } from "@/lib/queryClient";
@@ -36,7 +36,8 @@ function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
-export type CheckoutPlan = "pro_monthly" | "pro_yearly" | "deal_boost" | "extra_seat";
+/** What can be bought: DealInSec Pro (monthly) and, for Pro, extra seats. Annual and Deal Boost are no longer sold. */
+export type CheckoutPlan = "pro_monthly" | "extra_seat";
 
 export interface CheckoutCallbacks {
   onSuccess?: () => void;
@@ -95,7 +96,16 @@ export function useRazorpayCheckout() {
                 razorpay_signature: response.razorpay_signature,
               }),
             });
-            if (!verifyRes.ok) throw new Error("Verification failed");
+            const verified = await verifyRes.json().catch(() => ({}));
+            // The server grants only after Razorpay's own record matches the order. 409: it couldn't apply this
+            // payment automatically (a person will sort it out); 202 / success:false: still being confirmed (the
+            // webhook will grant it). Neither is a purchase yet.
+            if (verifyRes.status === 409) {
+              trackEvent("payment_failed", { plan, stage: "review" });
+              cbs.onError?.(verified.error || "We couldn't apply this payment automatically. Email support@dealinsec.com and we'll sort it out.");
+              return;
+            }
+            if (!verifyRes.ok || verified.success !== true) throw new Error("Verification pending");
 
             // GA4 ecommerce purchase — key conversion event. The order states
             // its own currency and amount in its minor units; reading both from

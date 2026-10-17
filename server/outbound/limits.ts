@@ -7,13 +7,26 @@
  *   OUTBOUND_DAILY_COMPANY_LOOKUPS company-data (Apollo) lookups per workspace per 24 h (default 100)
  * Model calls have their own per-task allowances (SALES_DAILY_<TASK>_LIMIT, shared/llm-cost.ts).
  *
+ * Per plan, over a rolling 30 days (shared/outbound-plans.ts; one credit = one search that ran on the web):
+ *   OUTBOUND_MONTHLY_SEARCHES_FREE / _TRIAL / _PRO   searches     (defaults 3 / 10 / 25)
+ *   OUTBOUND_MAX_COMPANIES_FREE / _TRIAL / _PRO      companies a single search may look for (defaults 10 / 25 / 25)
+ *
  * Platform-wide, every workspace together, per UTC day (on top of the above, never instead of it):
  *   OUTBOUND_GLOBAL_DAILY_SEARCHES search-provider calls                          (default 30: about 900 a month, inside Tavily's 1,000 free credits)
  *   LLM_GLOBAL_DAILY_SPEND_USD     model spend for every sales and outbound task  (default $1.00, shared/llm-cost.ts)
  */
+import { OUTBOUND_ALLOWANCE_DEFAULTS, type OutboundAllowance, type OutboundTier } from "@shared/outbound-plans";
+
 const int = (v: string | undefined, d: number) => { const n = Number(v); return Number.isInteger(n) && n >= 1 ? n : d; };
 export const dailyRunLimit = () => int(process.env.OUTBOUND_DAILY_RUNS, 5);
 export const dailySearchLimit = () => int(process.env.OUTBOUND_DAILY_SEARCHES, 60);
 export const dailyContactLimit = () => int(process.env.OUTBOUND_DAILY_CONTACT_LOOKUPS, 30);
 export const dailyCompanyLimit = () => int(process.env.OUTBOUND_DAILY_COMPANY_LOOKUPS, 100);
 export const globalSearchLimit = () => int(process.env.OUTBOUND_GLOBAL_DAILY_SEARCHES, 30);
+
+
+/** A plan's AI Outbound allowance: the shared defaults, each overridable by its environment variable. */
+export function outboundAllowance(tier: OutboundTier): OutboundAllowance {
+  const d = OUTBOUND_ALLOWANCE_DEFAULTS[tier], up = tier.toUpperCase();
+  return { monthlySearches: int(process.env[`OUTBOUND_MONTHLY_SEARCHES_${up}`], d.monthlySearches), maxCompanies: int(process.env[`OUTBOUND_MAX_COMPANIES_${up}`], d.maxCompanies) };
+}

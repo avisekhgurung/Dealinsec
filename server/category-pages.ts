@@ -14,7 +14,7 @@
  * /interior-design-software page is gone (301'd to the flagship elsewhere),
  * so nothing here may link to it. Pricing on every page: Free ₹0 (4 deals a
  * month, quotations only — agreements, invoices and payment tracking are Pro
- * via requirePro), Pro ₹99/month or ₹999/year. No founding offer, no Deal
+ * via requirePro), Pro ₹499/month. No founding offer, no Deal
  * Boost, no team seats in marketing copy.
  *
  * Same architecture as /tools and /blog: complete server-rendered HTML,
@@ -205,7 +205,7 @@ function ctaBand(region: "IN" | "global"): string {
       : "From the first prospect to the paid invoice: AI-assisted prospect research, then a quotation, an agreement signed online, invoices and payment tracking that always agree with each other. For small agencies, consultants and freelancers, wherever you bill from.";
   const note =
     region === "IN"
-      ? `No card required · Free plan after the trial · Pro ₹${PRICING.proMonthlyInr}/month or ₹${PRICING.proYearlyInr}/year`
+      ? `No card required · Free plan after the trial · Pro ₹${PRICING.proMonthlyInr}/month`
       : "No card required · Free plan and 7-day Pro trial in every country · Paid plans currently available in India";
   return `<div class="cta-band"><div class="wrap">
     <h2>${TAGLINE}</h2>
@@ -270,10 +270,10 @@ export const PAGES: CategoryPage[] = [
     region: "IN",
     metaTitle: "Freelancer Invoice Software for India — Quote, Sign, Get Paid",
     description:
-      "For India's freelancers: quotation, e-signed scope, advance & milestone invoices with your PAN/GSTIN, and payment reminders drafted in English or Hinglish — on one thread per client. Free plan; Pro ₹99/month.",
+      "For India's freelancers: quotation, e-signed scope, advance & milestone invoices with your PAN/GSTIN, and payment reminders drafted in English or Hinglish — on one thread per client. Free plan; Pro ₹499/month.",
     h1: "Invoice software for Indian freelancers who are tired of chasing payments",
-    sub: "For India's freelancers — designers, developers, writers, video editors & photographers, marketers and consultants. Quote the work, get the scope accepted in writing, bill the advance and milestones, and follow up on late payments — one thread per client, ₹99/month.",
-    chips: ["Advance + milestone billing", "Signed, timestamped scope", "Reminders in English or Hinglish", "Pro ₹99/month · free plan", "7-day trial · no card"],
+    sub: "For India's freelancers — designers, developers, writers, video editors & photographers, marketers and consultants. Quote the work, get the scope accepted in writing, bill the advance and milestones, and follow up on late payments — one thread per client, ₹499/month.",
+    chips: ["Advance + milestone billing", "Signed, timestamped scope", "Reminders in English or Hinglish", "Pro ₹499/month · free plan", "7-day trial · no card"],
     shortLabel: "Freelancer Invoice Software",
     sections: `
 <section><div class="wrap">
@@ -324,9 +324,9 @@ export const PAGES: CategoryPage[] = [
     <tr><td><b>The scope</b></td><td>Agreed in chat, argued about later</td><td>Accepted electronically, with revision limits &amp; exclusions</td></tr>
     <tr><td><b>Your details</b></td><td>PAN and GSTIN typed in again</td><td>PAN and GSTIN from your profile on every document — GST-ready</td></tr>
     <tr><td><b>Getting paid</b></td><td>You remember, then chase awkwardly</td><td>Overdue list, plus a drafted reminder in the tone you pick</td></tr>
-    <tr><td><b>Cost</b></td><td>—</td><td>Free plan for quotations; Pro ₹99/month or ₹999/year</td></tr>
+    <tr><td><b>Cost</b></td><td>—</td><td>Free plan for quotations; Pro ₹499/month</td></tr>
   </table></div>
-  <div class="callout honest"><b>What it costs, plainly</b><p>Free is ₹0: 4 deals a month, each with its quotation. Pro is ₹99/month, or ₹999/year (about ₹83/month — ₹189 less than paying monthly), and adds e-signed agreements, invoices, payment tracking and unlimited deals. Every account starts with a 7-day Pro trial, no card. DealInSec takes no percentage of your project value. Just need one invoice today? The <a href="/tools/gst-invoice-generator">free GST invoice generator</a> and <a href="/tools/quotation-maker">quotation maker</a> need no sign-up.</p></div>
+  <div class="callout honest"><b>What it costs, plainly</b><p>Free is ₹0: 4 deals a month, each with its quotation. Pro is ₹499/month, paid once a month with no auto-renewal, and adds AI Outbound with a larger research allowance, e-signed agreements, invoices, payment tracking and unlimited deals. Every account starts with a 7-day Pro trial, no card. DealInSec takes no percentage of your project value. Just need one invoice today? The <a href="/tools/gst-invoice-generator">free GST invoice generator</a> and <a href="/tools/quotation-maker">quotation maker</a> need no sign-up.</p></div>
   <p class="muted" style="font-size:14px;margin-top:10px">Guides: <a href="/blog/advance-payment-terms">advance payment terms</a> · <a href="/blog/payment-reminder-message-to-client">payment reminder messages</a> · <a href="/blog/how-to-make-a-quotation-online">making a quotation online</a>.</p>
 </div></section>`,
     faq: [
@@ -340,7 +340,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "How much does it cost?",
-        a: "Free is ₹0 for 4 deals a month, each with its quotation. Pro is ₹99/month or ₹999/year (about ₹83/month) and adds e-signed agreements, invoices, payment tracking and unlimited deals. Every new account gets a 7-day Pro trial with no card, and DealInSec takes no percentage of your project value.",
+        a: "Free is ₹0 for 4 deals a month, each with its quotation. Pro is ₹499/month and adds e-signed agreements, invoices, payment tracking and unlimited deals. Every new account gets a 7-day Pro trial with no card, and DealInSec takes no percentage of your project value.",
       },
       {
         q: "Can I take an advance and bill in milestones?",
@@ -367,10 +367,10 @@ export const PAGES: CategoryPage[] = [
     region: "IN",
     metaTitle: "Refrens Alternative for Freelancers in India",
     description:
-      "A Refrens alternative for Indian freelancers who want the whole client deal on one thread: quotation → e-signed scope → advance & milestone invoices → payment follow-up. Honest comparison. Pro ₹99/month; free 7-day trial, no card.",
+      "A Refrens alternative for Indian freelancers who want the whole client deal on one thread: quotation → e-signed scope → advance & milestone invoices → payment follow-up. Honest comparison. Pro ₹499/month; free 7-day trial, no card.",
     h1: "Looking for a Refrens alternative?",
     sub: "Refrens is a solid invoicing and quotation platform. DealInSec is built for a different job — running each client deal a freelancer takes on, from quotation to accepted scope to milestone invoices to getting paid, on one thread.",
-    chips: ["Built for freelancers", "Quote → signed scope → invoice", "Pro ₹99/month", "Free 7-day trial · no card"],
+    chips: ["Built for freelancers", "Quote → signed scope → invoice", "Pro ₹499/month", "Free 7-day trial · no card"],
     shortLabel: "Refrens Alternative",
     sections: `
 <section><div class="wrap">
@@ -392,7 +392,7 @@ export const PAGES: CategoryPage[] = [
     <tr><td><b>E-signed agreements</b></td><td>Focused on billing docs</td><td>Built in — acceptance recorded with an audit trail</td></tr>
     <tr><td><b>Scope-creep protection</b></td><td>—</td><td>Protection Check flags missing revision limits, exclusions, advance</td></tr>
     <tr><td><b>Payment chasing</b></td><td>Reminders</td><td>AI-drafted follow-ups (English or Hinglish), you send</td></tr>
-    <tr><td><b>Pricing</b></td><td>See their site</td><td>Free plan; Pro ₹99/month or ₹999/year</td></tr>
+    <tr><td><b>Pricing</b></td><td>See their site</td><td>Free plan; Pro ₹499/month</td></tr>
     <tr><td><b>Best for</b></td><td>Fast, broad invoicing &amp; accounting</td><td>Freelancers who want the scope signed and the payment followed up</td></tr>
   </table></div>
   <p class="muted" style="font-size:14px;margin-top:10px">Refrens is a capable product — check their site for current features and pricing. Pick the tool that matches how your work actually runs.</p>
@@ -400,7 +400,7 @@ export const PAGES: CategoryPage[] = [
     faq: [
       {
         q: "Is DealInSec a free Refrens alternative?",
-        a: "DealInSec has a free plan (4 deals a month, each with its quotation) and a 7-day Pro trial with no card, plus free no-sign-up tools (GST invoice, quotation maker, bill maker). Agreements, invoices and payment tracking are on Pro at ₹99/month or ₹999/year. It isn't a clone of Refrens, though — it's built to run the whole deal, not just billing, so compare on the job you need done.",
+        a: "DealInSec has a free plan (4 deals a month, each with its quotation) and a 7-day Pro trial with no card, plus free no-sign-up tools (GST invoice, quotation maker, bill maker). Agreements, invoices and payment tracking are on Pro at ₹499/month. It isn't a clone of Refrens, though — it's built to run the whole deal, not just billing, so compare on the job you need done.",
       },
       {
         q: "Why would a freelancer choose DealInSec over Refrens?",
@@ -419,10 +419,10 @@ export const PAGES: CategoryPage[] = [
     region: "IN",
     metaTitle: "Vyapar Alternative for Freelancers (India)",
     description:
-      "A Vyapar alternative for freelancers, not shops: DealInSec runs client deals — quotation, e-signed scope, milestone invoices and payment follow-up — instead of inventory-based GST billing. Honest comparison. Pro ₹99/month; free trial, no card.",
+      "A Vyapar alternative for freelancers, not shops: DealInSec runs client deals — quotation, e-signed scope, milestone invoices and payment follow-up — instead of inventory-based GST billing. Honest comparison. Pro ₹499/month; free trial, no card.",
     h1: "Looking for a Vyapar alternative?",
     sub: "Vyapar is excellent GST billing and inventory software for shops and product businesses. If you're a freelancer — you sell design, code, words, edits or advice, not stock — DealInSec is built for the way you actually get paid.",
-    chips: ["For freelancers, not shops", "Quote → signed scope → invoice", "Pro ₹99/month", "Free 7-day trial · no card"],
+    chips: ["For freelancers, not shops", "Quote → signed scope → invoice", "Pro ₹499/month", "Free 7-day trial · no card"],
     shortLabel: "Vyapar Alternative",
     sections: `
 <section><div class="wrap">
@@ -444,7 +444,7 @@ export const PAGES: CategoryPage[] = [
     <tr><td><b>GST tax invoices</b></td><td>Yes</td><td>Free GST invoice tool; in-app invoices record the deal value (not Rule-46 tax invoices)</td></tr>
     <tr><td><b>Quotation → agreement → invoice</b></td><td>Billing-centric</td><td>One connected thread with e-signed agreements</td></tr>
     <tr><td><b>Scope creep &amp; payment chasing</b></td><td>—</td><td>Protection Check + AI-drafted payment reminders</td></tr>
-    <tr><td><b>Pricing</b></td><td>See their site</td><td>Free plan; Pro ₹99/month or ₹999/year</td></tr>
+    <tr><td><b>Pricing</b></td><td>See their site</td><td>Free plan; Pro ₹499/month</td></tr>
   </table></div>
   <p class="muted" style="font-size:14px;margin-top:10px">Vyapar is a strong product for what it's built for — check their site for current features. The question is whether you sell stock or sell your work.</p>
 </div></section>`,
@@ -459,7 +459,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "I'm a freelancer, not a shop — which fits?",
-        a: "DealInSec. Freelance work is about scope, the client's acceptance and getting paid per milestone — not inventory. That's exactly what DealInSec is built for: a free plan for quotations, Pro at ₹99/month, and a 7-day trial with no card.",
+        a: "DealInSec. Freelance work is about scope, the client's acceptance and getting paid per milestone — not inventory. That's exactly what DealInSec is built for: a free plan for quotations, Pro at ₹499/month, and a 7-day trial with no card.",
       },
     ],
   },
@@ -470,10 +470,10 @@ export const PAGES: CategoryPage[] = [
     region: "IN",
     metaTitle: "Quotation Software for Freelancers in India",
     description:
-      "Online quotation software for Indian freelancers: itemised quotes with GST, revision rounds and advance terms, numbered PDFs in your name — and each accepted quote converts into an agreement and invoice. Free plan; Pro ₹99/month.",
+      "Online quotation software for Indian freelancers: itemised quotes with GST, revision rounds and advance terms, numbered PDFs in your name — and each accepted quote converts into an agreement and invoice. Free plan; Pro ₹499/month.",
     h1: "Quotation software that doesn't stop at the quotation",
     sub: "Make professional, numbered quotations for your clients in minutes — then convert the accepted quote into an e-signed agreement and an invoice with the same figures, automatically.",
-    chips: ["Made for freelancers", "GST-ready", "Free plan · 4 deals a month", "Pro ₹99/month"],
+    chips: ["Made for freelancers", "GST-ready", "Free plan · 4 deals a month", "Pro ₹499/month"],
     shortLabel: "Quotation Software",
     sections: `
 <section><div class="wrap">
@@ -513,7 +513,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "Is it built for freelancers in India?",
-        a: "Yes — it's made for India's freelancers: designers, developers, writers, video editors & photographers, marketers and consultants. Indian number formatting, GST-ready documents, your PAN/GSTIN on your papers, and pricing in rupees: a free plan, then Pro at ₹99/month or ₹999/year.",
+        a: "Yes — it's made for India's freelancers: designers, developers, writers, video editors & photographers, marketers and consultants. Indian number formatting, GST-ready documents, your PAN/GSTIN on your papers, and pricing in rupees: a free plan, then Pro at ₹499/month.",
       },
       {
         q: "What should a freelancer's quotation include?",
@@ -528,7 +528,7 @@ export const PAGES: CategoryPage[] = [
     region: "IN",
     metaTitle: "Contract Management Software for Freelancers in India",
     description:
-      "Contract management for Indian freelancers: agreements generated from accepted quotations, electronic acceptance with an audit record, statuses, and linked invoices. Pro ₹99/month; free 7-day trial, no card.",
+      "Contract management for Indian freelancers: agreements generated from accepted quotations, electronic acceptance with an audit record, statuses, and linked invoices. Pro ₹499/month; free 7-day trial, no card.",
     h1: "Contract management software for freelancers",
     sub: "Your agreement is generated from the accepted quotation — same scope, same figures — accepted electronically by your client with an audit record, and linked to the invoices it authorises.",
     chips: ["Electronic acceptance + audit record", "Made for freelancers", "Free 7-day trial · no card"],
@@ -560,7 +560,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "What does it cost?",
-        a: "Agreements are part of Pro: ₹99/month or ₹999/year, with unlimited deals, agreements, invoices and payment tracking. Every new account starts with a 7-day Pro trial with no card; after that the free plan covers 4 deals a month with quotations.",
+        a: "Agreements are part of Pro: ₹499/month, with unlimited deals, agreements, invoices and payment tracking. Every new account starts with a 7-day Pro trial with no card; after that the free plan covers 4 deals a month with quotations.",
       },
       {
         q: "Can my client sign without creating an account?",
@@ -607,7 +607,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "What happens after acceptance?",
-        a: "On Pro (₹99/month or ₹999/year), the accepted proposal becomes an agreement with the same figures, accepted electronically with an audit record, and then invoices — an advance/balance split or milestones — bounded by the agreement's value.",
+        a: "On Pro (₹499/month), the accepted proposal becomes an agreement with the same figures, accepted electronically with an audit record, and then invoices — an advance/balance split or milestones — bounded by the agreement's value.",
       },
     ],
   },
@@ -618,7 +618,7 @@ export const PAGES: CategoryPage[] = [
     region: "IN",
     metaTitle: "Invoice Management Software for Freelancers in India",
     description:
-      "Invoice management for Indian freelancers: invoices generated from agreements, consecutive numbering per financial year, paid/unpaid tracking with dates, and a dashboard of what to bill and chase. Pro ₹99/month; free 7-day trial.",
+      "Invoice management for Indian freelancers: invoices generated from agreements, consecutive numbering per financial year, paid/unpaid tracking with dates, and a dashboard of what to bill and chase. Pro ₹499/month; free 7-day trial.",
     h1: "Invoice management software that knows what you're owed",
     sub: "Invoices generated from the agreement — never more than it's worth — numbered consecutively per financial year, tracked from sent to paid, with a dashboard of what to bill and what to chase today.",
     chips: ["INV-series per financial year", "Paid/unpaid with dates", "Made for freelancers", "Free 7-day trial"],
@@ -650,7 +650,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "Is there a free plan?",
-        a: "The free plan covers 4 deals a month, each with its quotation. Invoices, agreements and payment tracking are Pro — ₹99/month, or ₹999/year (about ₹83/month). Every new account gets a 7-day Pro trial with no card, so you can raise real invoices before deciding.",
+        a: "The free plan covers 4 deals a month, each with its quotation. Invoices, agreements and payment tracking are Pro — ₹499/month. Every new account gets a 7-day Pro trial with no card, so you can raise real invoices before deciding.",
       },
       {
         q: "What do I do when a client hasn't paid?",
@@ -665,7 +665,7 @@ export const PAGES: CategoryPage[] = [
     region: "IN",
     metaTitle: "E-Signature for Freelancers in India",
     description:
-      "E-signature for Indian freelancers: your client accepts the agreement electronically with an audit record — who signed, when, with which signature — built into the quotation-to-invoice workflow. Honest about what it is. Pro ₹99/month; free 7-day trial.",
+      "E-signature for Indian freelancers: your client accepts the agreement electronically with an audit record — who signed, when, with which signature — built into the quotation-to-invoice workflow. Honest about what it is. Pro ₹499/month; free 7-day trial.",
     h1: "E-signature built into the deal, not bolted on",
     sub: "Your client accepts the agreement electronically with an audit record — who, when, which signature — and the signed document links straight to the quotation before it and the invoices after it.",
     chips: ["Audit record on the document", "Section 10A, IT Act 2000", "Free 7-day trial · no card"],
@@ -678,7 +678,7 @@ export const PAGES: CategoryPage[] = [
     <div class="ft"><b>Execution record on the face</b><p>The agreement prints who accepted it, when, and with which signature — plus your signature image and stamp where you've set them.</p></div>
     <div class="ft"><b>Client-friendly</b><p>Your client accepts electronically through a confirmation flow — the signed copy stays on record, and the printed document reflects the acceptance.</p></div>
     <div class="ft"><b>Signature binding</b><p>The signature captured at creation stays with the document — it doesn't change when someone else views or reprints it.</p></div>
-    <div class="ft"><b>Priced for a freelancer</b><p>E-sign is part of Pro — ₹99/month or ₹999/year, with a 7-day free trial — rather than a separate per-envelope bill in dollars.</p></div>
+    <div class="ft"><b>Priced for a freelancer</b><p>E-sign is part of Pro — ₹499/month, with a 7-day free trial — rather than a separate per-envelope bill in dollars.</p></div>
   </div>
   <div class="callout honest"><b>What this is — and isn't</b><p>Electronic contracts are recognised in India under Section 10A of the Information Technology Act, 2000, and DealInSec records electronic acceptance with an audit record. It is <b>not</b> a Digital Signature Certificate (DSC) or an Aadhaar eSign, and every agreement says so on its face. If a client or regulator specifically requires DSC/Aadhaar eSign, use those; for an everyday freelance scope, an accepted document with a clear audit record is the practical option. We are not a law firm — have important agreements reviewed by a lawyer.</p></div>
 </div></section>`,
@@ -697,7 +697,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "What does it cost?",
-        a: "E-signed agreements are part of Pro — ₹99/month or ₹999/year, with unlimited agreements. Every new account starts with a 7-day Pro trial with no card; the free plan after that covers 4 deals a month with quotations only.",
+        a: "E-signed agreements are part of Pro — ₹499/month, with unlimited agreements. Every new account starts with a 7-day Pro trial with no card; the free plan after that covers 4 deals a month with quotations only.",
       },
     ],
   },
@@ -948,8 +948,7 @@ export function renderCategoryPage(p: CategoryPage, siblings: RelatedLink[]): st
   const offers =
     p.region === "IN"
       ? [
-          { "@type": "Offer", name: "Pro Monthly", price: "99", priceCurrency: "INR", description: "Pro plan ₹99/month; free plan and 7-day trial available" },
-          { "@type": "Offer", name: "Pro Annual", price: "999", priceCurrency: "INR", description: "Pro plan ₹999/year (about ₹83/month)" },
+          { "@type": "Offer", name: "DealInSec Pro", price: String(PRICING.proMonthlyInr), priceCurrency: "INR", description: `Pro plan ₹${PRICING.proMonthlyInr}/month; free plan and ${PRICING.trialDays}-day trial available` },
         ]
       : // Never advertise a price that cannot be bought from where the reader is.
         [{ "@type": "Offer", name: "Free plan", price: "0", priceCurrency: "USD", description: "4 deals a month with quotations; 7-day Pro trial, in every country" }];

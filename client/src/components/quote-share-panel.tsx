@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { trackEvent } from "@/lib/analytics";
 import { ArrowRight, Check, Copy, Link2, Loader2, ShieldCheck, XCircle } from "lucide-react";
+import { WhatsAppShareButton } from "@/components/whatsapp-share";
+import { quotationMessage } from "@shared/whatsapp-share";
 import { Link } from "wouter";
 
 interface ShareStatus {
@@ -83,6 +85,7 @@ export function QuoteSharePanel({ dealId, party = "client" }: { dealId: number; 
               {copied ? "Copied" : `Copy ${Party} Link`}
             </Button>
           </div>
+          <WhatsAppShareButton what="quotation" className="h-8" message={quotationMessage({ url: `${window.location.origin}${data.url}` })} />
           <div className="flex items-center justify-between">
             <span
               className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full ${

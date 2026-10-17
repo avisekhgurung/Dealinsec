@@ -43,7 +43,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Can I save clients and send invoices directly?",
-    a: "This free tool creates one-off invoices. A DealInSec account keeps each client's quotation, agreement, invoice and payments on one thread — the free plan covers 4 deals a month with their quotations, and Pro (₹99/month, after a 7-day trial with no card) adds e-signed agreements, invoices and payment tracking.",
+    a: "This free tool creates one-off invoices. A DealInSec account keeps each client's quotation, agreement, invoice and payments on one thread — the free plan covers 4 deals a month with their quotations, and Pro (₹499/month, after a 7-day trial with no card) adds e-signed agreements, invoices and payment tracking.",
   },
 ];
 

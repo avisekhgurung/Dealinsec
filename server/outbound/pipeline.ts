@@ -14,7 +14,7 @@
 import { randomUUID } from "node:crypto";
 import { byResearchPriority, worthResearchingEarly, rankCandidates, collectCandidates, checkSite, emptyCounters, findingsAsClaims, readiness, runBudget, pickResearchLinks, SIGNAL_LABEL, timingOf, isDecisionMaker, type RejectReason, type RunCounters, type SearchHit, type FindingLike } from "@shared/prospect";
 import { contactFormFinding, normalizeEnrichment, normalizeResearch, type FactDraft } from "@shared/prospect-intel";
-import { industryMatched, isSeniorDecisionMaker, prospectFit, type Icp, type ProspectProfile } from "@shared/icp";
+import { COUNTRIES, countryOfQuery, industryMatched, isSeniorDecisionMaker, prospectFit, type Icp, type ProspectProfile } from "@shared/icp";
 import { scoreLead } from "@shared/lead-score";
 import { pickLinks, sameSite, type ResearchPage } from "@shared/research";
 import type { ProspectFindingRow, ProspectRow, ProspectRunRow } from "@shared/schema";
@@ -240,7 +240,7 @@ async function searchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps:
       const budget = runBudget(run.quantity);
       try {
         const results = await settledSearch(deps, reservation, provider.name, () =>
-          provider.search(next.q, { count: budget.resultsPerQuery, country: provider.supportsCountry ? icp.countries[0] : undefined }));
+          provider.search(next.q, { count: budget.resultsPerQuery, country: provider.supportsCountry ? countryOfQuery(next.q, icp) : undefined }));
         const at = deps.now().toISOString();
         const hits: SearchHit[] = results.map((r) => ({ ...r, provider: provider.name, query: next.q, at }));
         const { candidates, rejected, decisions } = collectCandidates(hits, icp);
@@ -433,7 +433,8 @@ export async function enrichOne(run: Pick<ProspectRunRow, "id" | "organizationId
             const pf: NewFinding[] = [];
             const add = (type: string, value?: string) => { if (value) pf.push({ kind: "fact", type, value, status: "inferred", sourceUrl: c.sourceUrl ?? null, sourceType: "provider", quote: null, confidence: "medium", meta: { provider: deps.company!.name } }); };
             add("team_size", c.employees); add("industry", c.industry); add("location", c.location);
-            const code = c.country && /^[A-Za-z]{2}$/.test(c.country) ? c.country.toUpperCase() : undefined; add("country", code);
+            // Apollo gives a full name ("United States"); a two-letter code is accepted too. Anything else is left out.
+            const code = c.country && /^[A-Za-z]{2}$/.test(c.country) ? c.country.toUpperCase() : c.country ? COUNTRIES[c.country.trim().toLowerCase()] : undefined; add("country", code);
             facts = [...facts, ...(await deps.store.saveStep({ orgId, prospectId: p.id, batch: "company", findings: pf, now }))];
           }
         } catch { /* a provider problem never blocks the run; the call is recorded */ }

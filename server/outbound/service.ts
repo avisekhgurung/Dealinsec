@@ -23,7 +23,9 @@ import { addClaim, addNote, createLead, fail, readGate, writeGate, type Result, 
 import { PROMPT_VERSIONS, angleSystemPrompt, angleUserMessage, icpSystemPrompt, icpUserMessage } from "./prompts";
 import { pipelineDeps, newRunId, researchOne, enrichOne, scoreProspect, type PipelineDeps, type QueryPlan, type RunCountersExt } from "./pipeline";
 import { prospectsTablesReady, RunActive } from "./store";
-import { dailyContactLimit, dailyRunLimit } from "./limits";
+import { dailyContactLimit, dailyRunLimit, outboundAllowance } from "./limits";
+import { outboundTier } from "./plan";
+import { OUTBOUND_WINDOW_DAYS, TIER_LABEL } from "@shared/outbound-plans";
 import { outboundRunner } from "./runner";
 import { costMicroUsd } from "./providers";
 
@@ -66,7 +68,8 @@ export async function parseIcp(user: Who, request: unknown, d: Partial<PipelineD
   }
   const merged = mergeIcp(modelOut, fallback);
   if (!merged) return fail(422, "unclear", "I couldn't tell what kind of company you want. Name the kind of business, for example \"digital marketing agencies\".");
-  const icp = withSavedExclusions(merged, saved);
+  const allowance = outboundAllowance(await outboundTier(user));
+  const icp = withSavedExclusions({ ...merged, quantity: Math.min(merged.quantity, allowance.maxCompanies) }, saved);
   const extra = Array.isArray(modelOut?.searches) ? (modelOut!.searches as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 4) : [];
   return { ok: true, icp, searches: searchStrategies(icp, extra), description: describeIcp(icp), source: modelOut ? "model" : "rules" };
 }
@@ -104,10 +107,18 @@ export async function startRun(user: Who, raw: { request?: unknown; icp?: unknow
   const parsed = icpSchema.safeParse(raw.icp);
   if (!parsed.success) return fail(400, "invalid", parsed.error.issues[0]?.message ?? "That profile isn't valid.");
   const orgId = user.organizationId!;
-  const icp = withSavedExclusions(parsed.data, await savedProfile(orgId));
+  // The plan decides how many searches a month and how many companies one search may look for (shared/outbound-plans.ts).
+  const tier = await outboundTier(user);
+  const allowance = outboundAllowance(tier);
+  const icp = withSavedExclusions({ ...parsed.data, quantity: Math.min(parsed.data.quantity, allowance.maxCompanies) }, await savedProfile(orgId));
   const providers = await deps.searchProviders();
   if (!providers.length) return fail(503, "DISCOVERY_NOT_SETUP", "Web search isn't set up on this server yet, so I can't search for companies.");
   const now = deps.now();
+  if ((await deps.store.countRunsSince(orgId, new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY))) >= allowance.monthlySearches) {
+    return tier === "free"
+      ? fail(402, "NO_CREDITS", `You've used the free plan's ${allowance.monthlySearches} AI Outbound searches for this 30-day period. Upgrade to Pro for more.`, { feature: "outbound" })
+      : fail(429, "monthly_limit", `You've used the ${allowance.monthlySearches} AI Outbound searches included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`);
+  }
   if ((await deps.store.countRunsSince(orgId, new Date(now.getTime() - DAY))) >= dailyRunLimit()) return fail(429, "daily_limit", `You've started today's ${dailyRunLimit()} prospect searches. Try again tomorrow.`);
   // The searches the person saw (and may have edited) are the plan, each re-checked; none given = the default strategies.
   const given = Array.isArray(raw.searches) ? (raw.searches as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 12) : [];

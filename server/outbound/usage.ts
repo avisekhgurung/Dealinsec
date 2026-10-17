@@ -19,7 +19,9 @@ import { runBudget } from "@shared/prospect";
 import { DEFAULT_QUANTITY } from "@shared/icp";
 import { db } from "../db";
 import { fail, readGate, type Result, type Who } from "../services/leads";
-import { dailyContactLimit, dailyRunLimit, dailySearchLimit, globalSearchLimit } from "./limits";
+import { dailyContactLimit, dailyRunLimit, dailySearchLimit, globalSearchLimit, outboundAllowance } from "./limits";
+import { outboundTier } from "./plan";
+import { OUTBOUND_WINDOW_DAYS, TIER_LABEL, type OutboundTier } from "@shared/outbound-plans";
 import { pipelineDeps, type PipelineDeps } from "./pipeline";
 import type { ProspectRunRow } from "@shared/schema";
 import { prospectsTablesReady } from "./store";
@@ -36,6 +38,9 @@ export interface OutboundUsage {
   /** Starting a search never takes money or credits; it uses the allowances below. */
   charge: "included";
   workspace: { searches: Allowance | null; webSearches: Allowance | null; contactLookups: Allowance | null };
+  /** The plan's allowance: searches in the last 30 days (one credit = one search that ran on the web), and the most
+   *  companies one search may look for. Null when it couldn't be counted. */
+  plan: { tier: OutboundTier; label: string; searches: Allowance | null; maxCompanies: number; windowDays: number };
   /** One search plans up to this many web searches (a search that finds enough stops early). */
   perSearch: { webSearches: number };
   platform: { state: PlatformState; resetsAt: string };
@@ -48,6 +53,8 @@ export interface UsageDeps {
   contactReady: () => boolean;
   /** Runs started in the window, newest first (enough of them to cover the allowance). */
   recentRuns: (orgId: string, since: Date, limit: number) => Promise<Pick<ProspectRunRow, "status" | "counters" | "createdAt">[]>;
+  /** The workspace's plan for AI Outbound. */
+  tier: (user: Who) => Promise<OutboundTier>;
   countProviderCalls: (o: { orgId?: string; operation: string; since: Date }) => Promise<number>;
   /** Model spend since `since`, every workspace: all of it, and the AI Outbound pool's. */
   platformSpend: (since: Date, pool: readonly string[]) => Promise<{ all: number; pool: number }>;
@@ -76,6 +83,14 @@ export async function outboundUsage(user: Who, d: Partial<UsageDeps> = {}): Prom
     const oldest = counted.length ? counted.reduce((a, r) => (r.createdAt < a ? r.createdAt : a), counted[0].createdAt) : null;
     return allowance(counted.length, limit, oldest ? new Date(new Date(oldest).getTime() + DAY) : null);
   });
+  const tier = (await safe(() => deps.tier(user))) ?? "free";
+  const planAllowance = outboundAllowance(tier);
+  const monthly = await safe(async () => {
+    const windowMs = OUTBOUND_WINDOW_DAYS * DAY;
+    const counted = (await deps.recentRuns(orgId, new Date(now.getTime() - windowMs), Math.max(40, planAllowance.monthlySearches + 5))).filter(runCountsTowardLimit);
+    const oldest = counted.length ? counted.reduce((a, r) => (r.createdAt < a ? r.createdAt : a), counted[0].createdAt) : null;
+    return allowance(counted.length, planAllowance.monthlySearches, oldest ? new Date(new Date(oldest).getTime() + windowMs) : null);
+  });
   const webSearches = await safe(async () => allowance(await deps.countProviderCalls({ orgId, operation: "search", since }), dailySearchLimit(), null));
   const contactLookups = deps.contactReady()
     ? await safe(async () => allowance(await deps.countProviderCalls({ orgId, operation: "contact", since }), dailyContactLimit(), null))
@@ -94,6 +109,7 @@ export async function outboundUsage(user: Who, d: Partial<UsageDeps> = {}): Prom
       searchReady: (await safe(deps.searchReady)) ?? false,
       charge: "included",
       workspace: { searches, webSearches, contactLookups },
+      plan: { tier, label: TIER_LABEL[tier], searches: monthly, maxCompanies: planAllowance.maxCompanies, windowDays: OUTBOUND_WINDOW_DAYS },
       perSearch: { webSearches: perSearch },
       platform: { state: state ?? "unknown", resetsAt: new Date(dayStart.getTime() + DAY).toISOString() },
     },
@@ -109,6 +125,7 @@ function defaultUsageDeps(): UsageDeps {
     searchReady: async () => (await pipe().searchProviders()).length > 0,
     contactReady: () => !!pipe().contact,
     recentRuns: (orgId, since, limit) => pipe().store.listRunsSince(orgId, since, limit),
+    tier: outboundTier,
     countProviderCalls: (o) => pipe().store.countProviderCalls(o),
     platformSpend: async (since, pool) => {
       const [r] = await db.select({

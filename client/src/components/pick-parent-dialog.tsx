@@ -232,13 +232,11 @@ export function PickParentDialog({
                   {kind === "agreement" ? "Agreements" : "Invoices"} are a Pro feature
                 </p>
                 <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
-                  {/* "GST-ready" is India's promise and Indian accounts keep reading
-                      it; elsewhere GST is not the tax, so it is not named. A user who
-                      already used their one-per-account trial isn't offered another —
-                      "unlocks" only applies while a trial is still available. */}
+                  {/* In-app invoices don't calculate tax, so they are never called "GST-ready". A user who already used
+                      their one-per-account trial isn't offered another. */}
                   {hasLapsedTrial(user) ? "Your 7-day trial has ended. Upgrade" : "Upgrade"} to Pro for the
                   full workflow — agreements,{" "}
-                  {moneySettings.country === "IN" ? "GST-ready invoices" : "invoices"} and payment tracking.
+                  invoices and payment tracking.
                 </p>
                 <Button
                   className="mt-4 gradient-btn text-white font-semibold"

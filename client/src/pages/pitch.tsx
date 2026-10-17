@@ -849,7 +849,7 @@ export default function PitchPage() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground mt-4">
-              Free plan: 4 deals a month, each with its quotation. Pro: ₹99/month or ₹999/year.
+              Free plan: 4 deals a month, each with its quotation. Pro: ₹499/month.
             </p>
             <div className="hidden print:block">
               <p className="font-bold text-lg">www.dealinsec.com</p>

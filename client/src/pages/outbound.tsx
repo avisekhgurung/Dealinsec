@@ -10,6 +10,8 @@ import { motion } from "framer-motion";
 import { AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, Loader2, Radar, Search, Sparkles, Square, X } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { trackEvent } from "@/lib/analytics";
+import { useUpgradeModal } from "@/components/upgrade-modal";
+import { isUpgradeError, parseApiError } from "@/lib/api-error";
 import { NotificationBell } from "@/components/notification-bell";
 import { FlowSteps, flowState } from "@/components/outbound/flow-steps";
 import { ProspectBrief } from "@/components/outbound/prospect-brief";
@@ -29,7 +31,9 @@ import { useToast } from "@/hooks/use-toast";
 import { leadCall, leadError } from "@/lib/leads";
 import { stagger, staggerItem, useCalmMotion } from "@/lib/motion";
 import { queryClient } from "@/lib/queryClient";
-import { ICP_URL, OUTBOUND_RUNS_URL, RUN_ERROR, RUN_STAGE_LABEL, countryName, runUrl, prospectUrl, type ParsedIcp, type ProspectCard as Card_, type RunView } from "@/lib/outbound";
+import { COUNTRY_NAME, ICP_URL, OUTBOUND_RUNS_URL, RUN_ERROR, RUN_STAGE_LABEL, countryName, runUrl, prospectUrl, type ParsedIcp, type ProspectCard as Card_, type RunView } from "@/lib/outbound";
+import { searchStrategies } from "@shared/icp";
+import { getTargetMarket } from "@/lib/first-goal";
 import { cn } from "@/lib/utils";
 import { memberCan } from "@shared/permissions";
 
@@ -147,6 +151,12 @@ function RunPanel({ id, canEdit, onOpen }: { id: string; canEdit: boolean; onOpe
           </div>
           {running && canEdit && <Button size="sm" variant="outline" onClick={() => cancel.mutate()} disabled={cancel.isPending} data-testid="run-cancel">{cancel.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Square className="mr-1.5 h-3.5 w-3.5" />}Stop</Button>}
         </div>
+        {run.status === "done" && good.length < 3 && (
+          // Honest about thin results: search coverage varies by market, and nothing is padded or invented to fill the list.
+          <p className="rounded-xl border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" role="status" data-testid="run-thin-market">
+            Only {good.length === 0 ? "no" : good.length} compan{good.length === 1 ? "y" : "ies"} passed the checks{run.icp.locations[0] || run.icp.countries.length ? ` in ${run.icp.locations[0] ?? run.icp.countries.map(countryName).join(", ")}` : ""}. Coverage of some markets and niches is thin: try a broader kind of business, a nearby city, or another country.
+          </p>
+        )}
         {stopped ? (
           <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200" role="status" data-testid="run-stopped">
             <p>{errorText ?? (run.status === "cancelled" ? "This search was stopped before it finished." : "This search stopped before it finished.")}</p>
@@ -224,6 +234,7 @@ function FirstSearch({ canEdit, onPick }: { canEdit: boolean; onPick: (example: 
 export default function OutboundPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { openUpgradeModal } = useUpgradeModal();
   const canEdit = memberCan(user as any, "deals.create");
   const [text, setText] = useState("");
   const [parsed, setParsed] = useState<ParsedIcp | null>(null);
@@ -247,22 +258,47 @@ export default function OutboundPage() {
 
   const parse = useMutation({
     mutationFn: () => leadCall<ParsedIcp>("POST", ICP_URL, { request: text }),
-    onSuccess: (r) => setParsed(r),
+    // A request that names no place starts from the market chosen at setup, as a visible, removable chip; "worldwide"
+    // (or no choice) leaves it worldwide. Never the person's own account country.
+    onSuccess: (r) => {
+      const target = getTargetMarket(user?.id);
+      if (target && target !== "WW" && !r.icp.countries.length && !r.icp.locations.length) {
+        const icp = { ...r.icp, countries: [target] };
+        setParsed({ ...r, icp, searches: searchStrategies(icp), fromSetup: true });
+      } else setParsed(r);
+    },
     onError: (e) => toast({ title: "I couldn't read that", description: leadError(e), variant: "destructive" }),
   });
   const start = useMutation({
     mutationFn: () => leadCall<{ run: RunView; existing: boolean }>("POST", OUTBOUND_RUNS_URL, { request: text, icp: parsed!.icp, searches: parsed!.searches }),
     onSuccess: (r) => { setRunId(r.run.id); setParsed(null); setText(""); if (view === "prospects") setView("searches"); if (r.existing) toast({ title: "That search is already running" }); void queryClient.invalidateQueries({ queryKey: [OUTBOUND_RUNS_URL] }); void queryClient.invalidateQueries({ queryKey: [OUTBOUND_USAGE_URL] }); },
     // A refusal (a limit reached meanwhile) refreshes the allowance shown, so the page and the server agree again.
-    onError: (e) => { toast({ title: "Couldn't start the search", description: leadError(e), variant: "destructive" }); void queryClient.invalidateQueries({ queryKey: [OUTBOUND_USAGE_URL] }); },
+    onError: (e) => {
+      // Out of the free plan's searches: the upgrade sheet, not an error.
+      if (isUpgradeError(parseApiError(e))) openUpgradeModal({ feature: "outbound" });
+      else toast({ title: "Couldn't start the search", description: leadError(e), variant: "destructive" });
+      void queryClient.invalidateQueries({ queryKey: [OUTBOUND_USAGE_URL] });
+    },
   });
   const icp = parsed?.icp;
-  const setQty = (n: number) => setParsed((p) => (p ? { ...p, icp: { ...p.icp, quantity: Math.max(1, Math.min(50, n || 1)) } } : p));
+  const setQty = (n: number) => setParsed((p) => (p ? { ...p, icp: { ...p.icp, quantity: Math.max(1, Math.min(maxCompanies, n || 1)) } } : p));
   const chip = (label: string, onRemove?: () => void) => <span key={label} className="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-1 text-xs">{label}{onRemove && <button onClick={onRemove} aria-label={`Remove ${label}`}><X className="h-3 w-3" /></button>}</span>;
 
   const off = notSetUp(runs.error);
   const usage = useOutboundUsage(canEdit && !off);
   const blocked = searchBlockedReason(usage.data?.usage);
+  // The most companies one search may look for on this plan (the server caps it the same way).
+  const maxCompanies = usage.data?.usage.plan?.maxCompanies ?? 50;
+  // Where to look is the person's choice (never their own account's country): editing it re-plans the searches with the
+  // same rules the server uses (shared/icp.ts searchStrategies).
+  const editPlaces = (patch: { countries?: string[]; locations?: string[] }) =>
+    setParsed((p) => { if (!p) return p; const next = { ...p.icp, ...patch }; return { ...p, icp: next, searches: searchStrategies(next) }; });
+  const [placeText, setPlaceText] = useState("");
+  const addLocation = () => {
+    const v = placeText.replace(/\s+/g, " ").trim().slice(0, 60);
+    if (v && icp && !icp.locations.includes(v) && icp.locations.length < 5) editPlaces({ locations: [...icp.locations, v] });
+    setPlaceText("");
+  };
   const firstTime = !!runs.data && runs.data.runs.length === 0;
   const pickExample = (x: string) => { setText(x); setParsed(null); inputRef.current?.focus(); };
 
@@ -317,15 +353,29 @@ export default function OutboundPage() {
                     <p className="text-sm font-medium">Here's what I'll look for. Change anything before I start.</p>
                     <div className="flex flex-wrap gap-1.5">
                       {chip(icp.industry)}
-                      {icp.countries.map((c) => chip(countryName(c)))}
-                      {icp.locations.map((l) => chip(l))}
+                      {icp.countries.map((c) => chip(countryName(c), () => editPlaces({ countries: icp.countries.filter((x) => x !== c) })))}
+                      {icp.locations.map((l) => chip(l, () => editPlaces({ locations: icp.locations.filter((x) => x !== l) })))}
+                      {!icp.countries.length && !icp.locations.length && chip("Anywhere (worldwide)")}
                       {(icp.employeeMin || icp.employeeMax) && chip(icp.employeeMin && icp.employeeMax ? `${icp.employeeMin}–${icp.employeeMax} people` : icp.employeeMax ? `up to ${icp.employeeMax} people` : `${icp.employeeMin}+ people`)}
                       {icp.targetMarket.map((m) => chip(`serves ${m}`))}
                       {icp.exclusions.map((x) => chip(`not ${x}`))}
                     </div>
+                    <div className="flex flex-wrap items-center gap-2" data-testid="outbound-places">
+                      <label className="sr-only" htmlFor="outbound-add-country">Add a country to search</label>
+                      <select id="outbound-add-country" value="" disabled={icp.countries.length >= 5} onChange={(e) => { const c = e.target.value; if (c && !icp.countries.includes(c)) editPlaces({ countries: [...icp.countries, c] }); }}
+                        className="h-8 rounded-md border bg-background px-2 text-xs" data-testid="outbound-add-country">
+                        <option value="">+ Add a country</option>
+                        {Object.entries(COUNTRY_NAME).filter(([c]) => !icp.countries.includes(c)).map(([c, n]) => <option key={c} value={c}>{n}</option>)}
+                      </select>
+                      <input value={placeText} onChange={(e) => setPlaceText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addLocation(); } }} onBlur={addLocation}
+                        placeholder="+ City or region (optional)" aria-label="Add a city or region" maxLength={60} disabled={icp.locations.length >= 5}
+                        className="h-8 w-48 rounded-md border bg-background px-2 text-xs" data-testid="outbound-add-location" />
+                    </div>
+                    {parsed.fromSetup && icp.countries.length > 0 && <p className="text-xs text-muted-foreground" data-testid="outbound-from-setup">The country comes from the market you chose at setup. Remove it to search worldwide.</p>}
+                    {!icp.countries.length && !icp.locations.length && <p className="text-xs text-muted-foreground" data-testid="outbound-worldwide">Searching worldwide. Pick a country (the US, the UK, Canada, Australia, the UAE, India…) for more relevant companies.</p>}
                     <p className="text-xs text-muted-foreground">Reaching: {icp.roles.slice(0, 4).join(", ") || "decision makers"} · {parsed.searches.length} searches planned{parsed.source === "rules" ? " · read by simple rules (the AI was unavailable)" : ""}</p>
                     <div className="flex flex-wrap items-center gap-3">
-                      <label className="flex items-center gap-2 text-sm">How many <input type="number" min={1} max={50} value={icp.quantity} onChange={(e) => setQty(Number(e.target.value))} className="w-16 rounded-md border bg-background px-2 py-1 text-sm" data-testid="outbound-quantity" /></label>
+                      <label className="flex items-center gap-2 text-sm">How many <input type="number" min={1} max={maxCompanies} value={icp.quantity} onChange={(e) => setQty(Number(e.target.value))} className="w-16 rounded-md border bg-background px-2 py-1 text-sm" data-testid="outbound-quantity" /></label>
                       <Button onClick={() => start.mutate()} disabled={start.isPending || !!blocked} className="gradient-btn text-white" data-testid="outbound-start">{start.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-1.5 h-4 w-4" />}Start search</Button>
                       <Button variant="ghost" onClick={() => setParsed(null)}>Change</Button>
                     </div>

@@ -49,7 +49,7 @@ describe("the homepage's structured data", () => {
 
   it("offers only what can be bought: free everywhere, paid plans in India at the charged prices", () => {
     const offers = blocks[0].offers;
-    expect(offers.map((o: any) => [o.name, o.price, o.priceCurrency])).toEqual([["Free", "0", "USD"], ["Pro Monthly", String(PRICING.proMonthlyInr), "INR"], ["Pro Annual", String(PRICING.proYearlyInr), "INR"]]);
+    expect(offers.map((o: any) => [o.name, o.price, o.priceCurrency])).toEqual([["Free", "0", "USD"], ["Pro Monthly", String(PRICING.proMonthlyInr), "INR"]]);
     for (const o of offers.slice(1)) expect(o.eligibleRegion).toEqual({ "@type": "Country", name: "India" });
   });
 
@@ -80,7 +80,7 @@ describe("AI-readable and crawlable product descriptions", () => {
   });
 
   it("quote only prices that can be charged", () => {
-    const allowed = new Set([PRICING.proMonthlyInr, PRICING.proYearlyInr, PRICING.extraSeatInr].map(String));
+    const allowed = new Set([PRICING.proMonthlyInr, PRICING.extraSeatInr].map(String));
     for (const [name, text] of sources) {
       for (const m of text.matchAll(/₹\s?([\d,]+)/g)) expect(allowed.has(m[1].replace(/,/g, "")), `${name}: ₹${m[1]}`).toBe(true);
       expect(text, name).not.toMatch(/\$\s?\d+\s*(\/|a |per )(month|year|yr|mo)/i); // no foreign plan price is buyable

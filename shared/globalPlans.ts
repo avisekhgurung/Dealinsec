@@ -34,8 +34,10 @@ const YEAR_DAYS = 366;
 const MONTH_DAYS = 31;
 
 export const GLOBAL_PLANS: Readonly<Record<string, { monthly?: PlanPrice; yearly: PlanPrice }>> = {
+  // India launch (Oct 2026): one plan, DealInSec Pro at ₹499 a month. The yearly row is the old Pro Annual list
+  // price, kept only as a record: it is not sold (server/billing/purchase-rules.ts refuses it).
   INR: {
-    monthly: { amount: 99, currency: "INR", days: MONTH_DAYS },
+    monthly: { amount: 499, currency: "INR", days: MONTH_DAYS },
     yearly: { amount: 999, currency: "INR", days: YEAR_DAYS },
   },
   USD: { yearly: { amount: 99, currency: "USD", days: YEAR_DAYS } },

@@ -40,7 +40,7 @@ export const COUNTRIES: Record<string, string> = {
   "uk": "GB", "u.k.": "GB", "united kingdom": "GB", "britain": "GB", "great britain": "GB", "england": "GB", "british": "GB",
   "india": "IN", "indian": "IN", "canada": "CA", "canadian": "CA", "australia": "AU", "australian": "AU", "germany": "DE", "german": "DE",
   "france": "FR", "french": "FR", "spain": "ES", "netherlands": "NL", "dutch": "NL", "ireland": "IE", "singapore": "SG", "uae": "AE",
-  "united arab emirates": "AE", "new zealand": "NZ", "south africa": "ZA", "portugal": "PT", "italy": "IT", "sweden": "SE", "brazil": "BR", "mexico": "MX", "japan": "JP",
+  "united arab emirates": "AE", "dubai": "AE", "abu dhabi": "AE", "new zealand": "NZ", "south africa": "ZA", "portugal": "PT", "italy": "IT", "sweden": "SE", "brazil": "BR", "mexico": "MX", "japan": "JP",
 };
 export const COUNTRY_NAME: Record<string, string> = {
   US: "United States", GB: "United Kingdom", IN: "India", CA: "Canada", AU: "Australia", DE: "Germany", FR: "France", ES: "Spain", NL: "Netherlands",
@@ -72,7 +72,8 @@ export function parseIcpFallback(request: string): Icp | null {
 
   const countries: string[] = [];
   for (const [name, code] of Object.entries(COUNTRIES).sort((a, b) => b[0].length - a[0].length)) {
-    const re = new RegExp(`(^|[^a-z.])${name.replace(/\./g, "\\.")}(?=$|[^a-z])`, "i");
+    // "us" is also a word ("agencies like us"): only the capitalised "US" names the country.
+    const re = name === "us" ? /(^|[^A-Za-z.])US(?=$|[^A-Za-z])/ : new RegExp(`(^|[^a-z.])${name.replace(/\./g, "\\.")}(?=$|[^a-z])`, "i");
     if (re.test(s)) { countries.push(code); s = s.replace(re, "$1 "); }
   }
 
@@ -172,8 +173,39 @@ export function queryKey(q: string): string {
  * Deterministic templates first; `extra` (model-proposed phrasings) only fill the remaining slots and pass the same
  * checks. Every query passes sanitizeQuery (no emails, phone numbers or links ever go to a search engine).
  */
+/**
+ * The places a search covers, in order: the regions/cities the person named, else every country they chose, else
+ * nowhere in particular (worldwide: the phrasings carry no place). The account's own country is never added.
+ */
+export function searchPlaces(i: Icp): string[] {
+  if (i.locations.length) return i.locations.slice(0, 5);
+  if (i.countries.length) return i.countries.slice(0, 5).map(countryLabel);
+  return [""];
+}
+
+/**
+ * Which country one planned search is for (the country whose name it carries), so a provider that filters by country
+ * gets the right one per search; with a single chosen country, that one. Undefined = no country filter (worldwide).
+ */
+export function countryOfQuery(q: string, i: Icp): string | undefined {
+  if (i.countries.length === 1) return i.countries[0];
+  const words = new Set(queryKey(q).split(" "));
+  // Every word of the country's name is in the search; the longest name wins ("United Arab Emirates" over "United States").
+  const hits = i.countries.filter((c) => queryKey(countryLabel(c)).split(" ").every((w) => words.has(w)));
+  return hits.sort((a, b) => countryLabel(b).length - countryLabel(a).length)[0];
+}
+
 export function searchStrategies(i: Icp, extra: string[] = [], max = MAX_QUERIES): string[] {
-  const place = i.locations[0] ?? (i.countries[0] ? countryLabel(i.countries[0]) : "");
+  // Every chosen place gets its own phrasings, interleaved so the first searches already cover all of them (with one
+  // place this is exactly the single-place plan).
+  const perPlace = searchPlaces(i).map((place) => phrasingsFor(i, place));
+  const t: string[] = [];
+  for (let r = 0; perPlace.some((xs) => r < xs.length); r++) for (const xs of perPlace) if (r < xs.length) t.push(xs[r]);
+  return pickSearches(t, extra, max);
+}
+
+/** The search phrasings for one place ("" = worldwide). */
+function phrasingsFor(i: Icp, place: string): string[] {
   const market = i.targetMarket[0] ?? "";
   const kinds = [i.industry, ...i.keywords].slice(0, 4);
   const small = i.employeeMax !== null && i.employeeMax <= 50;
@@ -207,6 +239,10 @@ export function searchStrategies(i: Icp, extra: string[] = [], max = MAX_QUERIES
     if (small) t.push(`boutique ${i.industry} ${place}`);
     for (const k of kinds.slice(2)) t.push(`${k} ${place}`);
   }
+  return t;
+}
+
+function pickSearches(t: string[], extra: string[], max: number): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   // One search per meaning: "digital marketing agencies for SaaS companies US" and "digital marketing agency for SaaS

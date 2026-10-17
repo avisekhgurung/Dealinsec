@@ -22,7 +22,7 @@ import { sameRegion } from "@shared/region";
 import { useLocation } from "wouter";
 import { postAuthDestination, hasPendingDealPrefill } from "@/lib/deal-prefill";
 import { trackEvent } from "@/lib/analytics";
-import { setFirstGoal } from "@/lib/first-goal";
+import { setFirstGoal, setTargetMarket, TARGET_MARKETS, type TargetMarket } from "@/lib/first-goal";
 import { destinationFor, type FirstGoal } from "@shared/getting-started";
 
 /**
@@ -120,6 +120,7 @@ export default function OnboardingPage() {
   const [describes, setDescribes] = useState<string | null>(null);
   // Optional: shapes where they land and the dashboard's "Get started" order.
   const [goal, setGoal] = useState<FirstGoal | null>(null);
+  const [market, setMarket] = useState<TargetMarket | "">("");
   // Signup already asked for the name: start from it rather than asking twice.
   const [fullName, setFullName] = useState(() => [user?.firstName, user?.lastName].filter(Boolean).join(" "));
   const [businessName, setBusinessName] = useState("");
@@ -267,6 +268,8 @@ export default function OnboardingPage() {
       trackEvent("onboarding_step_completed", { step: 3 });
       trackEvent("onboarding_completed", { goal: goal ?? "none" });
       setFirstGoal(user?.id, goal);
+      setTargetMarket(user?.id, market || null);
+      if (market) trackEvent("onboarding_target_market", { market });
       trackEvent("onboarding_goal_selected", { goal: goal ?? "none" });
 
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
@@ -412,6 +415,16 @@ export default function OnboardingPage() {
 
                   <motion.div variants={itemVariants}>
                     <FirstGoalPicker value={goal} onChange={setGoal} labelledBy="first-goal-heading" describedBy="first-goal-hint" idPrefix="onboarding-goal" />
+                  </motion.div>
+
+                  <motion.div variants={itemVariants} className="space-y-1.5">
+                    <label htmlFor="onboarding-target-market" className="text-base font-semibold tracking-tight">Where do you want to find clients?</label>
+                    <p className="text-xs text-muted-foreground">Optional. AI Outbound can search any of these, wherever your own business is; you can change it on every search.</p>
+                    <select id="onboarding-target-market" value={market} onChange={(e) => setMarket(e.target.value as TargetMarket | "")}
+                      className="h-10 w-full rounded-md border bg-background px-3 text-sm" data-testid="onboarding-target-market">
+                      <option value="">Decide later</option>
+                      {TARGET_MARKETS.map((t) => <option key={t.code} value={t.code}>{t.label}</option>)}
+                    </select>
                   </motion.div>
 
                   <motion.div variants={itemVariants} className="space-y-2">
