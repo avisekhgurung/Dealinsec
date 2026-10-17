@@ -6,11 +6,13 @@
  *   GET  /api/outreach/inbox/:threadId             one conversation, its messages and follow-ups
  *   POST /api/outreach/inbox/messages/:id/review   { decision: "confirm" | "dismiss" }
  *   POST /api/outreach/inbox/messages/:id/label    { label } a person's correction of the rules' label
+ *   POST /api/outreach/inbox/:threadId/deal        { dealTitle?, dealAmount? } an interested conversation's deal (once)
+ *   GET  /api/outreach/deals/:dealId/activity      a deal's lead, prospect, conversations and email timeline
  *
  * Changes are same-origin JSON (sameOriginJson). Responses are never cached (they hold message text).
  */
 import type { Express, NextFunction, Request, RequestHandler, Response } from "express";
-import { conversation, listInbox, relabelMessage, reviewMessage, reviewQueue } from "./inbox";
+import { conversation, createDealFromConversation, dealEmailActivity, listInbox, relabelMessage, reviewMessage, reviewQueue } from "./inbox";
 import type { ApplyDeps } from "./reply-apply";
 import { sameOriginJson } from "./routes";
 
@@ -37,6 +39,12 @@ export function registerInboxRoutes(app: Express, deps: { auth: RequestHandler; 
   });
   app.post("/api/outreach/inbox/messages/:id/review", noStore, deps.auth, sameOriginJson, (req: any, res) => {
     reviewMessage(req.user, idOf(req.params.id), req.body, deps.apply).then(send(res, "review"), fail(res, "review"));
+  });
+  app.post("/api/outreach/inbox/:threadId/deal", noStore, deps.auth, sameOriginJson, (req: any, res) => {
+    createDealFromConversation(req.user, idOf(req.params.threadId), req.body).then(send(res, "deal"), fail(res, "deal"));
+  });
+  app.get("/api/outreach/deals/:dealId/activity", noStore, deps.auth, (req: any, res) => {
+    dealEmailActivity(req.user, idOf(req.params.dealId)).then(send(res, "deal_activity"), fail(res, "deal_activity"));
   });
   app.post("/api/outreach/inbox/messages/:id/label", noStore, deps.auth, sameOriginJson, (req: any, res) => {
     relabelMessage(req.user, idOf(req.params.id), req.body, deps.apply).then(send(res, "label"), fail(res, "label"));

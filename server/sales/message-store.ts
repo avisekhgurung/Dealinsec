@@ -85,6 +85,13 @@ export interface MessageStore {
   /** Records what happened to a message, once per message and kind (a repeat answers created: false). */
   recordEvent(orgId: string, e: { leadId: number; messageId: number; kind: string; source: "manual" | "provider"; provider: string | null; providerMessageId: string | null; userId: string | null; now: Date }): Promise<{ created: boolean }>;
   eventsFor(orgId: string, messageIds: number[]): Promise<OutreachEventRow[]>;
+  /**
+   * Stops a lead's follow-up sequence for good (the lead was won, turned into a deal): every scheduled, held or drafted
+   * step is cancelled, an unsent follow-up draft with it, and the open "follow up" task closes. A draft already being
+   * sent, or sent, is left as it is. Draft rows are locked first (the order every outreach path uses), so a send of one
+   * either finished before this or sees it cancelled. Returns how many steps stopped; 0 without the follow-up tables.
+   */
+  stopLeadFollowups(o: { orgId: string; leadId: number; reason: string; now: Date }): Promise<number>;
 }
 
 export const messageStore: MessageStore = {
@@ -248,5 +255,32 @@ export const messageStore: MessageStore = {
   async eventsFor(orgId, messageIds) {
     if (!messageIds.length) return [];
     return db.select().from(outreachEvents).where(and(eq(outreachEvents.organizationId, orgId), inArray(outreachEvents.messageId, messageIds))).orderBy(outreachEvents.createdAt, outreachEvents.id);
+  },
+  async stopLeadFollowups(o) {
+    if (!(await mailSyncSchemaReady().catch(() => false))) return 0;
+    return db.transaction(async (tx) => {
+      const open = await tx.select().from(outreachFollowups)
+        .where(and(eq(outreachFollowups.organizationId, o.orgId), eq(outreachFollowups.leadId, o.leadId), inArray(outreachFollowups.status, ["scheduled", "held", "drafted"])))
+        .orderBy(outreachFollowups.id);
+      const draftIds = open.map((f) => f.draftMessageId).filter((x): x is number => !!x).sort((a, b) => a - b);
+      const drafts = draftIds.length
+        ? await tx.select().from(leadMessages).where(and(eq(leadMessages.organizationId, o.orgId), inArray(leadMessages.id, draftIds))).orderBy(leadMessages.id).for("update")
+        : [];
+      let n = 0;
+      for (const f of open) {
+        const d = f.draftMessageId ? drafts.find((x) => x.id === f.draftMessageId) : undefined;
+        if (d && d.status !== "draft" && d.status !== "approved" && d.status !== "cancelled") continue; // sending or sent: out of our hands
+        if (d && (d.status === "draft" || d.status === "approved")) {
+          await tx.update(leadMessages).set({ status: "cancelled", updatedAt: o.now }).where(eq(leadMessages.id, d.id));
+          await tx.insert(leadEvents).values({ leadId: o.leadId, organizationId: o.orgId, kind: "draft_cancelled", data: { messageId: d.id, why: o.reason }, actor: "user", actorUserId: null, createdAt: o.now });
+        }
+        await tx.update(outreachFollowups).set({ status: "cancelled", reason: o.reason, leaseUntil: null, updatedAt: o.now })
+          .where(and(eq(outreachFollowups.id, f.id), inArray(outreachFollowups.status, ["scheduled", "held", "drafted"])));
+        n++;
+      }
+      await tx.update(leadTickets).set({ status: "cancelled", doneAt: o.now })
+        .where(and(eq(leadTickets.organizationId, o.orgId), eq(leadTickets.leadId, o.leadId), eq(leadTickets.kind, "follow_up"), eq(leadTickets.status, "open")));
+      return n;
+    });
   },
 };

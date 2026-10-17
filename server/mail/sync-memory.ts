@@ -111,10 +111,10 @@ export class MemorySyncStore implements SyncStore {
     return t ? this.toLink(t) : null;
   }
 
-  async outreachTo(orgId: string, addresses: string[], since: Date): Promise<OutreachCandidate[]> {
+  async outreachTo(orgId: string, userId: string, addresses: string[], since: Date): Promise<OutreachCandidate[]> {
     const want = new Set(addresses.map((a) => a.toLowerCase()));
     return this.outreach
-      .filter((o) => o.organizationId === orgId && want.has(o.toAddress.toLowerCase()) && ["approved", "sending", "sent"].includes(o.status) && o.at >= since)
+      .filter((o) => o.organizationId === orgId && o.approvedBy === userId && want.has(o.toAddress.toLowerCase()) && ["approved", "sending", "sent"].includes(o.status) && o.at >= since)
       .map((o) => ({ leadId: o.leadId, leadMessageId: o.id, toAddress: o.toAddress.toLowerCase(), subject: o.subject, at: o.at }));
   }
 

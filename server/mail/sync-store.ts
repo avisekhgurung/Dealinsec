@@ -82,8 +82,11 @@ export interface SyncStore {
   threadLink(orgId: string, connectionId: number, providerThreadId: string): Promise<ConversationLink | null>;
   /** The conversation one of these Message-IDs (lower case, "<…>") belongs to: one we sent, or one already synced into a linked thread. */
   referenceLink(orgId: string, connectionId: number, rfcIds: string[]): Promise<ConversationLink | null>;
-  /** Outreach to these addresses in the organization, approved or sent since `since`. */
-  outreachTo(orgId: string, addresses: string[], since: Date): Promise<OutreachCandidate[]>;
+  /**
+   * Outreach to these addresses that THIS PERSON approved (or sent) since `since`: a mailbox only ever matches its own
+   * owner's outreach, so a reply in one teammate's Gmail can't be filed under another teammate's conversation.
+   */
+  outreachTo(orgId: string, userId: string, addresses: string[], since: Date): Promise<OutreachCandidate[]>;
   /** Addresses this person's outreach went to since `since` (the first pass searches the mailbox for these only). */
   recentOutreachAddresses(input: { orgId: string; userId: string; since: Date; limit: number }): Promise<string[]>;
   /** Gmail threads of this mailbox tied to conversations (for the first pass to read in full). */

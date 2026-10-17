@@ -161,6 +161,8 @@ export const messageStoreMock = () => {
     messagesTablesReady: async () => w().messagesReady,
     outreachSafetyReady: async () => w().outreachSafetyReady,
     messageStore: {
+      // The agent's world has no follow-up sequence (outreach_followups): nothing to stop.
+      stopLeadFollowups: async () => 0,
       create: async (m: Record<string, any>) => {
         if (w().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL");
         if (w().messages.some((x) => x.organizationId === m.orgId && x.leadId === m.leadId && x.direction === "out" && (x.status === "draft" || x.status === "approved"))) throw new DraftExists();

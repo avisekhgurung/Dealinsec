@@ -10,15 +10,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ExternalLink, Handshake, Inbox, Loader2, MailQuestion, RefreshCw, Search, Send, ShieldOff, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { useGmailStatus, useSyncGmail } from "@/lib/gmail";
-import { refreshInbox, useConversation, useInbox, useRelabel, useReviewDecision, useReviewQueue } from "@/lib/inbox";
+import { useConnectGmail, useGmailStatus, useSyncGmail } from "@/lib/gmail";
+import { refreshInbox, useConversation, useCreateDealFromReply, useInbox, useRelabel, useReviewDecision, useReviewQueue } from "@/lib/inbox";
+import { useMoney } from "@/hooks/use-locale";
+import { httpErrorKind } from "@shared/http-error-kind";
 import { leadError } from "@/lib/leads";
 import { cn } from "@/lib/utils";
-import { FOLLOWUP_STATUS_TEXT, INBOX_FILTERS, INBOX_FILTER_TEXT, REPLY_LABELS, REPLY_LABEL_TEXT, THREAD_STATUS_TEXT, type ConversationMessage, type InboxFilter, type InboxItem, type ReplyLabel, type ThreadStatus } from "@shared/inbox-view";
+import { FOLLOWUP_STATUS_TEXT, INBOX_FILTERS, INBOX_FILTER_TEXT, REPLY_LABELS, REPLY_LABEL_TEXT, THREAD_STATUS_TEXT, type ConversationMessage, type ConversationView, type InboxFilter, type InboxItem, type ReplyLabel, type ThreadStatus } from "@shared/inbox-view";
 import { REPLY_SYNC_TEXT } from "@shared/gmail-connect";
 
 const TONE: Record<ThreadStatus, string> = {
@@ -44,15 +48,35 @@ function StatusChip({ status }: { status: ThreadStatus }) {
 /** Gmail and reply sync, as far as the inbox is concerned: connected and syncing, or what to fix in Settings. */
 function SyncBar() {
   const { toast } = useToast();
-  const { data } = useGmailStatus();
+  const status = useGmailStatus();
   const sync = useSyncGmail();
-  if (!data) return null;
+  const connect = useConnectGmail();
+  const { data } = status;
+  if (status.isLoading) return <Skeleton className="h-9 w-full" aria-label="Checking your Gmail connection" data-testid="inbox-sync" data-state="loading" />;
+  if (!data) {
+    // Gmail isn't available to this workspace (404), or the check failed: say which, and offer a retry for a failure.
+    if (status.isError && httpErrorKind(status.error) === "not_found") return null;
+    return (
+      <p className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-3 text-sm" role="status" data-testid="inbox-sync" data-state="error">
+        Couldn't check your Gmail connection.
+        <Button size="sm" variant="outline" onClick={() => status.refetch()} disabled={status.isFetching}>{status.isFetching && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}Try again</Button>
+      </p>
+    );
+  }
   const rs = data.replySync;
   const settings = <Link href="/settings?tab=integrations" className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400">Settings</Link>;
   if (!data.connection) return <p className="rounded-lg border bg-muted/40 p-3 text-sm" data-testid="inbox-sync" data-state="disconnected">Connect your Gmail in {settings} to see replies to your outreach here.</p>;
   if (!rs?.available) return <p className="rounded-lg border bg-muted/40 p-3 text-sm" data-testid="inbox-sync" data-state="off">Reply sync isn't switched on for your workspace yet, so only conversations synced earlier appear here.</p>;
   if (rs.state === "needs_permission" || rs.state === "needs_reconnect") {
-    return <p className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/40" role="status" data-testid="inbox-sync" data-state={rs.state}><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden /><span>{REPLY_SYNC_TEXT[rs.state]} Go to {settings}.</span></p>;
+    return (
+      <div className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/40" role="status" data-testid="inbox-sync" data-state={rs.state}>
+        <span className="flex min-w-0 flex-1 items-start gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden /><span>{REPLY_SYNC_TEXT[rs.state]} Replies stop arriving here until then; nothing already synced is lost.</span></span>
+        <Button size="sm" variant="outline" disabled={connect.isPending} data-testid="inbox-reconnect"
+          onClick={() => connect.mutate(undefined, { onError: (e) => toast({ title: "Couldn't start reconnecting", description: leadError(e), variant: "destructive" }) })}>
+          {connect.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" aria-hidden />}Reconnect Gmail
+        </Button>
+      </div>
+    );
   }
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground" data-testid="inbox-sync" data-state={rs.state}>
@@ -122,6 +146,7 @@ function Row({ item, active, onOpen }: { item: InboxItem; active: boolean; onOpe
           <StatusChip status={item.status} />
           {item.replies > 0 && <span className="text-[11px] text-muted-foreground">{item.replies} repl{item.replies === 1 ? "y" : "ies"}</span>}
           {item.pendingReview > 0 && <span className="text-[11px] font-medium text-amber-700 dark:text-amber-400">review needed</span>}
+          {item.dealId && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400" data-testid="inbox-row-deal"><Handshake className="h-3 w-3" aria-hidden />Deal</span>}
           {f && <span className="text-[11px] text-muted-foreground">Follow-up {f.step}: {f.status === "scheduled" ? `due ${when(f.dueAt)}` : FOLLOWUP_STATUS_TEXT[f.status]?.toLowerCase()}</span>}
         </div>
       </button>
@@ -178,13 +203,83 @@ function Message({ m, canWrite }: { m: ConversationMessage; canWrite: boolean })
   );
 }
 
+/**
+ * "Review and create deal": the person checks the title and amount, then the lead becomes a deal linked to this
+ * conversation (and its prospect). Nothing is created until they press Create; asking twice gives the same deal.
+ */
+function CreateDealFromReply({ thread: t }: { thread: ConversationView["thread"] }) {
+  const { toast } = useToast();
+  const fmt = useMoney();
+  const [, setLocation] = useLocation();
+  const create = useCreateDealFromReply();
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState(`Work for ${t.company}`);
+  const [amount, setAmount] = useState(t.estimatedValue ? String(t.estimatedValue) : "");
+  const [error, setError] = useState<string | null>(null);
+  const value = Number(amount.replace(/,/g, ""));
+  const submit = () => {
+    setError(null);
+    if (!title.trim()) return setError("Give the deal a title.");
+    if (!(value > 0)) return setError("Enter the deal amount.");
+    create.mutate({ threadId: t.id, dealTitle: title.trim(), dealAmount: value }, {
+      onSuccess: (r) => {
+        setOpen(false);
+        toast(r.existing ? { title: "This lead already has a deal", description: "Opening it. No second deal was created." } : { title: "Deal created", description: "It's linked to this conversation. The lead is marked Won and its follow-ups have stopped." });
+        setLocation(r.route);
+      },
+      onError: (e) => setError(leadError(e)),
+    });
+  };
+  return (
+    <>
+      <Button size="sm" className="gradient-btn text-white" onClick={() => { setError(null); setOpen(true); }} data-testid="review-create-deal"><Handshake className="mr-1.5 h-4 w-4" aria-hidden />Review and create deal</Button>
+      <Dialog open={open} onOpenChange={(o) => !create.isPending && setOpen(o)}>
+        <DialogContent className="max-w-md" data-testid="deal-from-reply">
+          <DialogHeader>
+            <DialogTitle>Create a deal for {t.company}</DialogTitle>
+            <DialogDescription>They replied with interest. Check the details: you can change everything else on the deal afterwards.</DialogDescription>
+          </DialogHeader>
+          <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+            <div className="space-y-1.5">
+              <Label htmlFor="reply-deal-title">Deal title</Label>
+              <Input id="reply-deal-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} disabled={create.isPending} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="reply-deal-amount">Deal amount ({fmt.symbol})</Label>
+              <Input id="reply-deal-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))} placeholder="0" disabled={create.isPending} data-testid="reply-deal-amount" />
+              {!t.estimatedValue && <p className="text-[11px] text-muted-foreground">The lead has no estimated value in your workspace's currency, so enter the amount you agreed.</p>}
+            </div>
+            <ul className="space-y-1 rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+              <li>Contact: <span className="break-all text-foreground">{t.contact || "—"}</span></li>
+              <li>The lead is marked Won, and any follow-up drafts for it are stopped.</li>
+              <li>The deal keeps a link to this conversation and to the lead it came from.</li>
+            </ul>
+            {error && <p className="text-sm font-medium text-destructive" role="alert" data-testid="deal-from-reply-error">{error}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={create.isPending}>Cancel</Button>
+              <Button type="submit" className="gradient-btn text-white" disabled={create.isPending} data-testid="deal-from-reply-submit">{create.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Creating…</> : "Create deal"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function Conversation({ threadId, onBack }: { threadId: number; onBack: () => void }) {
   const q = useConversation(threadId);
   const head = useRef<HTMLHeadingElement>(null);
   useEffect(() => { if (q.data) head.current?.focus(); }, [q.data?.thread.id]);
   if (q.isLoading) return <div className="space-y-3 p-1" aria-busy="true"><Skeleton className="h-8 w-1/2" /><Skeleton className="h-28 w-full" /><Skeleton className="h-28 w-4/5" /></div>;
   if (q.isError || !q.data) {
-    return <div className="rounded-lg border p-4 text-sm" role="alert">That conversation couldn't be loaded. <Button size="sm" variant="outline" className="ml-2" onClick={() => q.refetch()}>Try again</Button></div>;
+    const gone = q.isError && httpErrorKind(q.error) === "not_found";
+    return (
+      <div className="rounded-lg border p-4 text-sm" role="alert" data-testid="conversation-error">
+        <Button variant="ghost" size="sm" className="-ml-2 mb-1 lg:hidden" onClick={onBack}><ArrowLeft className="mr-1 h-4 w-4" />Back</Button>
+        <p>{gone ? "That conversation isn't in your workspace, or it was removed when a Gmail was disconnected." : "That conversation couldn't be loaded."}</p>
+        {!gone && <Button size="sm" variant="outline" className="mt-2" onClick={() => q.refetch()} disabled={q.isFetching}>{q.isFetching && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}Try again</Button>}
+      </div>
+    );
   }
   const { thread: t, messages, followups, canWrite } = q.data;
   const next = THREAD_STATUS_TEXT[t.status];
@@ -201,7 +296,7 @@ function Conversation({ threadId, onBack }: { threadId: number; onBack: () => vo
       <div className="mb-4 flex flex-wrap gap-2">
         <Button asChild size="sm" variant="outline"><Link href={`/leads/${t.leadId}`}>Open the lead</Link></Button>
         {t.dealId ? <Button asChild size="sm" variant="outline"><Link href={`/deals/${t.dealId}`}><Handshake className="mr-1.5 h-4 w-4" aria-hidden />Open the deal</Link></Button>
-          : t.canConvert && t.status === "interested" && canWrite && <Button asChild size="sm" className="gradient-btn text-white" data-testid="review-create-deal"><Link href={`/leads/${t.leadId}?createDeal=1`}><Handshake className="mr-1.5 h-4 w-4" aria-hidden />Review and create deal</Link></Button>}
+          : t.canConvert && t.status === "interested" && canWrite && <CreateDealFromReply thread={t} />}
         {t.gmailUrl && <Button asChild size="sm" variant="outline"><a href={t.gmailUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />Reply in Gmail</a></Button>}
       </div>
       <ol className="space-y-3" aria-label="Messages, oldest first">{messages.map((m) => <Message key={m.id} m={m} canWrite={canWrite} />)}</ol>

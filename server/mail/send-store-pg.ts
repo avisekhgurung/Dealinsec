@@ -54,10 +54,12 @@ export const pgSendStore: SendStore = {
       if (msg.status !== "approved") return { ok: false, code: "not_approved", status: msg.status };
       // 1b. a follow-up: its sequence still open (no reply, opt-out or bounce applied; not held for review). Read under this
       //     message's lock, which reply-apply.ts takes before cancelling or holding it, so the two can't cross.
+      let isFollowup = false;
       if (await mailSyncSchemaReady().catch(() => false)) {
         const [f] = await tx.select({ status: outreachFollowups.status, root: outreachFollowups.rootMessageId }).from(outreachFollowups)
           .where(and(eq(outreachFollowups.organizationId, i.orgId), eq(outreachFollowups.draftMessageId, msg.id)));
         if (f && f.status !== "drafted") return { ok: false, code: "followup_stopped" };
+        isFollowup = !!f;
         if (f) {
           const answered = await tx.execute(sql`SELECT 1 FROM ${outreachEvents} e WHERE e.organization_id = ${i.orgId} AND e.message_id = ${f.root} AND e.kind IN ('replied', 'opted_out', 'bounced') LIMIT 1`);
           if (answered.rows.length) return { ok: false, code: "followup_stopped" };
@@ -69,9 +71,11 @@ export const pgSendStore: SendStore = {
       if (contentProblem(subject, body) || hashDraft(subject, body) !== msg.bodyHash) return { ok: false, code: "invalid_content" };
       const to = normalEmail(msg.toAddress);
       if (!to) return { ok: false, code: "no_address" };
-      // 3. the lead's do-not-contact flag, as it is now.
-      const [lead] = await tx.select({ dnc: leads.doNotContact }).from(leads).where(and(eq(leads.organizationId, i.orgId), eq(leads.id, msg.leadId))).for("share");
+      // 3. the lead's do-not-contact flag, as it is now; and a follow-up only while the lead is still being pursued
+      //    (a lead turned into a deal, being turned into one, or archived gets no more chasing).
+      const [lead] = await tx.select({ dnc: leads.doNotContact, dealId: leads.convertedDealId, converting: leads.converting, archivedAt: leads.archivedAt }).from(leads).where(and(eq(leads.organizationId, i.orgId), eq(leads.id, msg.leadId))).for("share");
       if (!lead || lead.dnc) return { ok: false, code: "do_not_contact" };
+      if (isFollowup && (lead.dealId || lead.converting || lead.archivedAt)) return { ok: false, code: "followup_stopped" };
       // 4. the address and its domain on the list, under their keys' locks (sorted).
       const keys = i.checkList ? suppressionKeys(to).sort((a, b) => addressLockKey(i.orgId, a).localeCompare(addressLockKey(i.orgId, b))) : [];
       for (const k of keys) await tx.execute(sql`SELECT pg_advisory_xact_lock(${OUTREACH_ADDRESS_LOCK}::int, hashtext(${addressLockKey(i.orgId, k)}))`);

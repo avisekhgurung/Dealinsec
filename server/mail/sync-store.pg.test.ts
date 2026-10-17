@@ -158,7 +158,9 @@ describe.skipIf(!URL_ || !loopback(URL_))("reply sync (real Postgres)", () => {
     expect(await store.threadLink(a.org, b.connId, "t-a")).toBeNull();
     expect(await store.referenceLink(b.org, b.connId, ["<only-a@acme.test>"])).toBeNull();
     expect(await store.referenceLink(a.org, a.connId, ["<ONLY-A@acme.test>"])).toMatchObject({ leadMessageId: a.msg });
-    expect((await store.outreachTo(b.org, ["shared@acme.test"], new Date(0))).map((c) => c.leadMessageId)).toEqual([b.msg]);
+    expect((await store.outreachTo(b.org, b.user, ["shared@acme.test"], new Date(0))).map((c) => c.leadMessageId)).toEqual([b.msg]);
+    // A mailbox matches only its own owner's outreach: a teammate in the same organization gets nothing.
+    expect(await store.outreachTo(b.org, a.user, ["shared@acme.test"], new Date(0))).toEqual([]);
     expect(await store.recentOutreachAddresses({ orgId: a.org, userId: a.user, since: new Date(0), limit: 10 })).toEqual(["shared@acme.test"]);
     expect(await store.known(b.org, b.connId, (await q.query(`SELECT provider_message_id p FROM mail_messages WHERE organization_id = $1`, [a.org])).rows.map((r: any) => r.p))).toEqual(new Set());
   });

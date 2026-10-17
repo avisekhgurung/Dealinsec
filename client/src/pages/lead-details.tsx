@@ -40,11 +40,8 @@ import { CLAIM_STATUS_HINT, CLAIM_STATUS_LABEL, claimProvenance, leadSource, los
 import type { ActionKey, NextAction } from "@shared/next-action";
 import { memberCan } from "@shared/permissions";
 import { CLAIM_STATUSES, TICKET_KINDS } from "@shared/leads";
+import { ACTIVITY_LABEL as EVENT_LABEL, activityActor, activityDetail, activityThreadId, conversationHref } from "@shared/activity-text";
 
-const EVENT_LABEL: Record<string, string> = {
-  created: "Lead added", updated: "Details updated", status_changed: "Stage changed", note: "Note", ticket_created: "Next step added",
-  ticket_done: "Next step closed", claim_added: "Fact recorded", converted: "Turned into a deal", archived: "Archived",
-};
 const CLAIM_STYLE: Record<string, string> = {
   confirmed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
   inferred: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
@@ -446,15 +443,19 @@ export default function LeadDetailsPage() {
             <ol className="space-y-3 border-l border-border pl-4">
               {data.events.map((e) => {
                 const d = (e.data ?? {}) as Record<string, any>;
+                const detail = activityDetail(e.kind, d, (s) => stageLabel(s as LeadStatus));
+                const thread = activityThreadId(d);
                 return (
                   <li key={e.id} className="relative" data-testid={`event-${e.kind}`}>
                     <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-border" />
-                    <p className="text-sm font-medium">
-                      {EVENT_LABEL[e.kind] ?? e.kind}
-                      {e.kind === "status_changed" && d.from && d.to ? `: ${stageLabel(d.from)} → ${stageLabel(d.to)}` : ""}
-                    </p>
+                    <p className="text-sm font-medium">{EVENT_LABEL[e.kind] ?? e.kind.replace(/_/g, " ")}</p>
+                    {detail && <p className="text-xs text-muted-foreground">{detail}</p>}
                     {e.kind === "note" && <p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">{String(d.text ?? "")}</p>}
-                    <p className="text-[11px] text-muted-foreground">{e.actor === "agent" ? "Agent" : "You"} · {dateLabel(e.createdAt, locale)}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {activityActor(e)} · {dateLabel(e.createdAt, locale)}
+                      {thread && <> · <Link href={conversationHref(thread)} className="text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400">View conversation</Link></>}
+                      {e.kind === "converted" && typeof d.dealId === "number" && <> · <Link href={`/deals/${d.dealId}`} className="text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400">Open the deal</Link></>}
+                    </p>
                   </li>
                 );
               })}

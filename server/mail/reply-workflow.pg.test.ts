@@ -113,7 +113,8 @@ describe.skipIf(!URL_ || !loopback(URL_))("reply workflow (real Postgres)", () =
     expect((await rows(`SELECT status FROM mail_threads WHERE organization_id = $1`, s.org))[0].status).toBe("interested");
     // The timeline carries ids only: nothing from the email (the AI agent reads the timeline).
     const ev = await rows(`SELECT kind, data FROM lead_events WHERE organization_id = $1 AND kind LIKE 'outreach_%'`, s.org);
-    expect(ev).toEqual([{ kind: "outreach_replied", data: { messageId: s.root, via: "gmail_sync" } }]);
+    // The rules' label and the conversation's ids, for the lead and deal timelines; never the words themselves.
+    expect(ev).toEqual([{ kind: "outreach_replied", data: { messageId: s.root, via: "gmail_sync", label: "interested", threadId: expect.any(Number), mailMessageId: expect.any(Number) } }]);
     expect(JSON.stringify(await rows(`SELECT data FROM lead_events WHERE organization_id = $1`, s.org))).not.toMatch(/talk|Sounds/);
   });
 

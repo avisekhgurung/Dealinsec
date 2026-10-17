@@ -2,7 +2,7 @@
 import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { leadCall } from "@/lib/leads";
-import type { ConversationView, InboxFilter, InboxList, ReplyLabel, ReviewItem } from "@shared/inbox-view";
+import type { ConversationView, DealEmailActivity, DealFromReplyInput, DealFromReplyResult, InboxFilter, InboxList, ReplyLabel, ReviewItem } from "@shared/inbox-view";
 
 export const INBOX_URL = "/api/outreach/inbox";
 const refresh = () => queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && ((q.queryKey[0] as string).startsWith(INBOX_URL) || (q.queryKey[0] as string).startsWith("/api/leads")) });
@@ -26,3 +26,13 @@ export const useRelabel = () => useMutation({
   onSuccess: () => { void refresh(); },
 });
 export const refreshInbox = refresh;
+
+/** "Review and create deal" on an interested conversation (once: asking again answers with the same deal). */
+export const useCreateDealFromReply = () => useMutation({
+  mutationFn: (v: { threadId: number } & DealFromReplyInput) => leadCall<DealFromReplyResult>("POST", `${INBOX_URL}/${v.threadId}/deal`, { ...(v.dealTitle ? { dealTitle: v.dealTitle } : {}), ...(v.dealAmount ? { dealAmount: v.dealAmount } : {}) }),
+  onSuccess: () => { void refresh(); void queryClient.invalidateQueries({ queryKey: ["/api/deals"] }); },
+});
+
+/** A deal's email story: the lead it came from, its prospect, conversations and timeline (deal page). */
+export const dealActivityUrl = (dealId: number) => `/api/outreach/deals/${dealId}/activity`;
+export const useDealEmailActivity = (dealId: number | null) => useQuery<DealEmailActivity>({ queryKey: [dealId ? dealActivityUrl(dealId) : "no-deal"], enabled: !!dealId, retry: false });

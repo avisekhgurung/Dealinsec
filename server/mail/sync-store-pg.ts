@@ -110,11 +110,11 @@ export const pgSyncStore: SyncStore = {
     return t ? linkOf(db, orgId, t) : null;
   },
 
-  async outreachTo(orgId, addresses, since): Promise<OutreachCandidate[]> {
+  async outreachTo(orgId, userId, addresses, since): Promise<OutreachCandidate[]> {
     const want = Array.from(new Set(addresses.map((a) => a.toLowerCase()))).slice(0, 60);
     if (!want.length) return [];
     const rows = await db.select({ id: leadMessages.id, leadId: leadMessages.leadId, to: leadMessages.toAddress, subject: leadMessages.subject, at: outreachAt }).from(leadMessages)
-      .where(and(eq(leadMessages.organizationId, orgId), eq(leadMessages.direction, "out"), inArray(leadMessages.status, OUTREACH_STATUSES),
+      .where(and(eq(leadMessages.organizationId, orgId), eq(leadMessages.approvedBy, userId), eq(leadMessages.direction, "out"), inArray(leadMessages.status, OUTREACH_STATUSES),
         anyOf(sql`lower(${leadMessages.toAddress})`, want), sql`${outreachAt} >= ${at(since)}`))
       .limit(200);
     return rows.map((r) => ({ leadId: r.leadId, leadMessageId: r.id, toAddress: (r.to ?? "").toLowerCase(), subject: r.subject ?? "", at: new Date(r.at) }));

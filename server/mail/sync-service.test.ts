@@ -249,6 +249,21 @@ describe("reply sync: organizations and mailboxes stay apart", () => {
     expect(w.store.messages.map((m) => [m.organizationId, m.connectionId])).toEqual([["org-a", w.mailbox.rows.find((r) => r.userId === "ana")!.id]]);
   });
 
+  it("a teammate in the SAME organization: Ben's mailbox never files mail under Ana's outreach (by address or by a hand-sent copy)", async () => {
+    const w = world();
+    await w.connect("ana", "org-a");
+    await w.connect("ben", "org-a");
+    w.outreach({ org: "org-a", by: "ana" });
+    await w.pass("ben");
+    const ben = w.fakeOf("ben");
+    // Jo writes to Ben; Ben's own copy of a mail to Jo with Ana's approved subject: neither is Ben's conversation.
+    ben.deliver({ from: "jo@acme.test", to: "ben@agency.test", subject: "hi", text: "hello ben" });
+    ben.deliver({ from: "Ben <ben@agency.test>", to: "jo@acme.test", subject: SUBJECT, text: "Hi Jo", labels: ["SENT"], messageId: "<ben-1@agency.test>" });
+    await w.pass("ben");
+    expect(w.store.messages).toEqual([]);
+    expect(w.store.threads).toEqual([]);
+  });
+
   it("a pass for someone else's connection does nothing", async () => {
     const w = world();
     const ana = await w.connect("ana", "org-a");

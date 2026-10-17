@@ -170,7 +170,7 @@ export async function syncMailbox(input: { orgId: string; userId: string; connec
       const thread = await deps.store.threadLink(input.orgId, input.connectionId, m.threadId);
       const reference: ConversationLink | null = thread ? null : await deps.store.referenceLink(input.orgId, input.connectionId, [m.inReplyTo, ...m.references].filter((x): x is string => !!x));
       const addrs = Array.from(new Set([m.from, ...m.to].filter((a): a is string => !!a))).slice(0, 30);
-      const candidates = addrs.length ? await deps.store.outreachTo(input.orgId, addrs, since) : [];
+      const candidates = addrs.length ? await deps.store.outreachTo(input.orgId, input.userId, addrs, since) : [];
       const d = decideMatch(m, { accountEmail, thread, reference, outreachTo: (a) => candidates.filter((c) => c.toAddress === a) });
       if (d.action === "ignore") { result.ignored++; return; }
       let body: { text: string | null; trimmed: boolean } = { text: null, trimmed: false };

@@ -133,7 +133,8 @@ export async function applyReply(orgId: string, mailMessageId: number, deps: App
     if (plan.event && root) {
       const ins = await tx.insert(outreachEvents).values({ organizationId: orgId, leadId: root.leadId, messageId: root.id, kind: plan.event, source: "provider", provider: "gmail", providerMessageId: m.providerMessageId, actorUserId: null, createdAt: now })
         .onConflictDoNothing().returning({ id: outreachEvents.id });
-      if (ins.length) await event(`outreach_${plan.event}`, { messageId: root.id, via: "gmail_sync" }); // ids only: no text from the email
+      // Ids and the label only: no text from the email (the AI agent can read the timeline).
+      if (ins.length) await event(`outreach_${plan.event}`, { messageId: root.id, via: "gmail_sync", label, threadId: m.threadId, mailMessageId: m.id });
     }
     if (plan.suppress) {
       const address = normalEmail(plan.suppress.address);

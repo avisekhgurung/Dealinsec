@@ -19,6 +19,7 @@ import { z } from "zod";
 import { buildDealCandidate, executeCreateDeal } from "../copilot/tools";
 import { agentLog } from "../agent/log";
 import { leadsStore as store } from "../leads/store";
+import { messageStore } from "../sales/message-store";
 import { LeadConflictError, type LeadDetail, type LeadRow } from "../leads/types";
 import { storage } from "../storage";
 import { isoDateInZone } from "@shared/invoice-numbering";
@@ -363,7 +364,10 @@ export function dealArgsForLead(lead: Lead, input: ConvertInput): Record<string,
  * The lead is claimed with one atomic UPDATE first, so two conversions racing
  * can never make two deals; the claim is released if the deal isn't created.
  */
-export async function convertToDeal(user: Who, id: number, raw: unknown, opts: { actor?: Actor } = {}): Promise<Result<{ lead: Lead; dealId: number; route: string; message: string }>> {
+/** Where a conversion was started from, recorded on the lead's "converted" entry (ids only, never message text). */
+export interface ConversionSource { via: "inbox"; threadId: number; mailMessageId: number | null; prospectId: number | null }
+
+export async function convertToDeal(user: Who, id: number, raw: unknown, opts: { actor?: Actor; source?: ConversionSource } = {}): Promise<Result<{ lead: Lead; dealId: number; route: string; message: string }>> {
   const gate = writeGate(user);
   if (gate) return gate;
   const parsed = convertSchema.safeParse(raw ?? {});
@@ -404,7 +408,14 @@ export async function convertToDeal(user: Who, id: number, raw: unknown, opts: {
     agentLog("error", { errorType: "ConversionUnlinked", organizationId: orgId, leadId: id, dealId });
     return fail(500, "unlinked", `The deal was created (#${dealId}) but the lead couldn't be linked to it. Open the deal from the Deals page.`, { dealId });
   }
-  await store.addEvent(orgId, id, { kind: "converted", data: { dealId }, actor: opts.actor ?? "user", actorUserId: user.id });
+  await store.addEvent(orgId, id, { kind: "converted", data: { dealId, ...(opts.source ?? {}) }, actor: opts.actor ?? "user", actorUserId: user.id });
+  // A won lead is no longer chased: its follow-up sequence stops (sending a follow-up also refuses for a converted lead,
+  // so a failure here leaves at most a draft nobody can send).
+  try {
+    await messageStore.stopLeadFollowups({ orgId, leadId: id, reason: "won", now: new Date() });
+  } catch (e) {
+    agentLog("error", { errorType: "FollowupStopFailed", organizationId: orgId, leadId: id, dealId });
+  }
   return { ok: true, lead: finished, dealId, route: result.route, message: result.message };
 }
 

@@ -73,8 +73,32 @@ export interface ConversationMessage {
   labelBy: string | null;
   review: { reason: string; state: string } | null;
 }
+/** "Review and create deal": what the person confirmed. The deal is created only from this request, never automatically. */
+export interface DealFromReplyInput { dealTitle?: string; dealAmount?: number }
+export interface DealFromReplyResult { dealId: number; route: string; existing: boolean }
+
+/** Lead-timeline entries about email (and the lead's stage), as the lead and deal pages show them. Ids and labels only. */
+export const EMAIL_EVENT_KINDS = [
+  "draft_created", "draft_approved", "draft_cancelled", "message_sent", "message_send_resolved", "message_send_late_confirmation",
+  "outreach_replied", "outreach_opted_out", "outreach_bounced", "reply_labelled", "reply_match_confirmed", "reply_match_dismissed",
+] as const;
+export interface ActivityEvent { id: number; kind: string; data: Record<string, unknown>; at: string; actor: string }
+/** A deal's email story: the lead it was won from, the prospect behind it, its conversations and their timeline. */
+export interface DealEmailActivity {
+  lead: { id: number; company: string; status: string } | null;
+  prospect: { id: number; name: string; domain: string } | null;
+  conversations: { threadId: number; status: ThreadStatus; subject: string; contact: string; lastMessageAt: string | null; replies: number }[];
+  events: ActivityEvent[];
+  /** False when this server has no reply-sync tables yet: conversations can't be shown, the timeline still can. */
+  inboxAvailable: boolean;
+}
+
 export interface ConversationView {
-  thread: { id: number; status: ThreadStatus; leadId: number; company: string; leadStatus: string; dealId: number | null; canConvert: boolean; contact: string; gmailUrl: string | null };
+  thread: {
+    id: number; status: ThreadStatus; leadId: number; company: string; leadStatus: string; dealId: number | null; canConvert: boolean; contact: string; gmailUrl: string | null;
+    /** The lead's estimated value in major units, offered as the deal amount: only when it is in the workspace's currency (never converted). */
+    estimatedValue: number | null;
+  };
   messages: ConversationMessage[];
   followups: { step: number; status: string; dueAt: string; reason: string | null; draftMessageId: number | null }[];
   canWrite: boolean;

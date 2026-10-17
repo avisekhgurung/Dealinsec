@@ -8,10 +8,10 @@
  */
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
-import { leadMessages, leads, mailboxConnections, mailMessages, mailSendJobs, mailThreads, outreachFollowups } from "@shared/schema";
-import { fail, readGate, writeGate, type Result, type Who } from "../services/leads";
+import { fromMinor, leadEvents, leadMessages, leads, mailboxConnections, mailMessages, mailSendJobs, mailThreads, outreachFollowups, prospects } from "@shared/schema";
+import { convertToDeal, fail, orgCurrency, readGate, writeGate, type Result, type Who } from "../services/leads";
 import { applyReply, releaseHolds, type ApplyDeps } from "./reply-apply";
-import { INBOX_FILTERS, REPLY_LABELS, type ConversationMessage, type ConversationView, type InboxFilter, type InboxItem, type ReplyLabel, type ReviewItem, type ThreadStatus } from "@shared/inbox-view";
+import { EMAIL_EVENT_KINDS, INBOX_FILTERS, REPLY_LABELS, type ActivityEvent, type ConversationMessage, type DealEmailActivity, type DealFromReplyResult, type ConversationView, type InboxFilter, type InboxItem, type ReplyLabel, type ReviewItem, type ThreadStatus } from "@shared/inbox-view";
 import { mailSyncSchemaReady } from "./status";
 
 const PAGE = 30;
@@ -119,6 +119,8 @@ export async function conversation(user: Who, threadId: number): Promise<Result<
     })),
   ].sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
   const live = !lead.archivedAt && !lead.converting && !lead.convertedDealId;
+  const currency = lead.estValueMinor && lead.currency ? await orgCurrency(user).catch(() => null) : null;
+  const estimatedValue = lead.estValueMinor && lead.currency && currency === lead.currency ? fromMinor(lead.estValueMinor, lead.currency) : null;
   return {
     ok: true,
     thread: {
@@ -127,6 +129,7 @@ export async function conversation(user: Who, threadId: number): Promise<Result<
       contact: String(ours.find((m) => m.id === t.leadMessageId)?.toAddress ?? "").toLowerCase(),
       // Only the mailbox's owner can open it in their own Gmail.
       gmailUrl: isOwner ? `https://mail.google.com/mail/u/?authuser=${encodeURIComponent(row.account)}#all/${encodeURIComponent(t.providerThreadId)}` : null,
+      estimatedValue,
     },
     messages,
     followups: follow.map((f) => ({ step: f.step, status: f.status, dueAt: f.dueAt.toISOString(), reason: f.reason, draftMessageId: f.draftMessageId })),
@@ -151,6 +154,8 @@ export async function reviewMessage(user: Who, mailMessageId: number, raw: unkno
       if (c?.userId !== user.id) return fail(404, "not_found", "That message isn't in your workspace."); // not even its existence
     }
     if (m.reviewState !== "pending") return { ok: true, state: m.reviewState };
+    // On the lead's timeline: who decided, and which message (ids only).
+    await tx.insert(leadEvents).values({ leadId: m.leadId, organizationId: r.orgId, kind: decision === "dismiss" ? "reply_match_dismissed" : "reply_match_confirmed", data: { mailMessageId: m.id }, actor: "user", actorUserId: user.id, createdAt: now });
     if (decision === "dismiss") {
       await tx.update(mailMessages).set({ reviewState: "dismissed" }).where(eq(mailMessages.id, m.id));
       await releaseHolds(tx, { orgId: r.orgId, leadMessageId: m.leadMessageId, now });
@@ -190,7 +195,86 @@ export async function relabelMessage(user: Who, mailMessageId: number, raw: unkn
   if (typeof label !== "string" || !LABELS.includes(label)) return fail(400, "invalid", "Choose one of the labels.");
   const [m] = await db.select().from(mailMessages).where(and(eq(mailMessages.organizationId, r.orgId), eq(mailMessages.id, mailMessageId), eq(mailMessages.direction, "in")));
   if (!m || (m.reviewReason === "address_only" && m.reviewState === "pending")) return fail(404, "not_found", "That message isn't in your workspace.");
-  await db.update(mailMessages).set({ classification: label, classifiedBy: "user", classifierVersion: null, appliedAt: null }).where(and(eq(mailMessages.id, m.id), eq(mailMessages.organizationId, r.orgId)));
+  if (m.classification === label && m.classifiedBy === "user") return { ok: true, label: label as ReplyLabel }; // nothing changed
+  await db.transaction(async (tx) => {
+    await tx.update(mailMessages).set({ classification: label, classifiedBy: "user", classifierVersion: null, appliedAt: null }).where(and(eq(mailMessages.id, m.id), eq(mailMessages.organizationId, r.orgId)));
+    await tx.insert(leadEvents).values({ leadId: m.leadId, organizationId: r.orgId, kind: "reply_labelled", data: { mailMessageId: m.id, from: m.classification, to: label }, actor: "user", actorUserId: user.id, createdAt: deps.now() });
+  });
   await applyReply(r.orgId, m.id, deps);
   return { ok: true, label: label as ReplyLabel };
+}
+
+/** The prospect (AI Outbound) a lead was added from, if any. Null without the prospect tables. */
+async function prospectOf(orgId: string, leadId: number): Promise<{ id: number; name: string; domain: string } | null> {
+  try {
+    const [p] = await db.select({ id: prospects.id, name: prospects.name, domain: prospects.domain }).from(prospects)
+      .where(and(eq(prospects.organizationId, orgId), eq(prospects.leadId, leadId))).orderBy(desc(prospects.id)).limit(1);
+    return p ?? null;
+  } catch { return null; }
+}
+
+/**
+ * "Review and create deal" on an interested conversation: its lead becomes a deal, with the title and amount the person
+ * confirmed. Everything else is the lead service's conversion (permissions, the free-plan credit, and the atomic claim
+ * that makes two clicks, two tabs or two teammates produce ONE deal); this adds only the conversation's checks and
+ * records which conversation, reply and prospect the deal came from. Asking again for an already-converted lead
+ * answers with its deal, never a second one.
+ */
+export async function createDealFromConversation(user: Who, threadId: number, raw: unknown): Promise<Result<DealFromReplyResult>> {
+  const r = await ready(user);
+  if (!r.ok) return r;
+  const g = writeGate(user);
+  if (g) return g;
+  const [row] = await db.select({ t: mailThreads, lead: leads }).from(mailThreads)
+    .innerJoin(leads, and(eq(leads.id, mailThreads.leadId), eq(leads.organizationId, mailThreads.organizationId)))
+    .where(and(eq(mailThreads.organizationId, r.orgId), eq(mailThreads.id, threadId)));
+  if (!row) return fail(404, "not_found", "That conversation isn't in your workspace.");
+  const { t, lead } = row;
+  if (lead.convertedDealId) return { ok: true, dealId: lead.convertedDealId, route: `/deals/${lead.convertedDealId}`, existing: true };
+  if (t.status !== "interested") {
+    return fail(409, "not_interested", "Only a conversation marked Interested can become a deal here. If the reply reads as interested, change its label first.");
+  }
+  const body = (raw ?? {}) as { dealTitle?: unknown; dealAmount?: unknown };
+  const input: Record<string, unknown> = {};
+  if (body.dealTitle !== undefined) input.dealTitle = body.dealTitle;
+  if (body.dealAmount !== undefined) input.dealAmount = body.dealAmount;
+  // The reply that said yes (the latest one read as interested, not dismissed), for the record.
+  const [yes] = await db.select({ id: mailMessages.id }).from(mailMessages)
+    .where(and(eq(mailMessages.organizationId, r.orgId), eq(mailMessages.threadId, t.id), eq(mailMessages.direction, "in"), eq(mailMessages.classification, "interested"), sql`${mailMessages.reviewState} IN ('none', 'confirmed')`))
+    .orderBy(desc(mailMessages.sentAt), desc(mailMessages.id)).limit(1);
+  const prospect = await prospectOf(r.orgId, lead.id);
+  const out = await convertToDeal(user, lead.id, input, { source: { via: "inbox", threadId: t.id, mailMessageId: yes?.id ?? null, prospectId: prospect?.id ?? null } });
+  if (out.ok) return { ok: true, dealId: out.dealId, route: out.route || `/deals/${out.dealId}`, existing: false };
+  // Lost a race to another click or teammate: their deal is the deal.
+  if (out.code === "already_converted" && typeof (out as { dealId?: unknown }).dealId === "number") {
+    const dealId = (out as unknown as { dealId: number }).dealId;
+    return { ok: true, dealId, route: `/deals/${dealId}`, existing: true };
+  }
+  return out;
+}
+
+/** A deal's email story (deal page): the lead it was won from, that lead's prospect, conversations and timeline. */
+export async function dealEmailActivity(user: Who, dealId: number): Promise<Result<DealEmailActivity>> {
+  const g = readGate(user);
+  if (g) return g;
+  const orgId = user.organizationId!;
+  const empty: DealEmailActivity = { lead: null, prospect: null, conversations: [], events: [], inboxAvailable: false };
+  const [lead] = await db.select().from(leads).where(and(eq(leads.organizationId, orgId), eq(leads.convertedDealId, dealId))).limit(1);
+  if (!lead) return { ok: true, ...empty };
+  const inboxAvailable = await mailSyncSchemaReady().catch(() => false);
+  const conversations: DealEmailActivity["conversations"] = [];
+  if (inboxAvailable) {
+    const rows = (await db.execute(sql`
+      SELECT t.id, t.status, m.subject, m.to_address, ${UTC(sql`t.last_message_at`)} AS last_message_at,
+             (SELECT count(*)::int FROM ${mailMessages} x WHERE x.thread_id = t.id AND x.direction = 'in') AS replies
+        FROM ${mailThreads} t JOIN ${leadMessages} m ON m.id = t.lead_message_id AND m.organization_id = t.organization_id
+       WHERE t.organization_id = ${orgId} AND t.lead_id = ${lead.id}
+       ORDER BY coalesce(t.last_message_at, t.created_at) DESC, t.id DESC LIMIT 10`)).rows as any[];
+    for (const x of rows) conversations.push({ threadId: Number(x.id), status: x.status as ThreadStatus, subject: x.subject ?? "", contact: String(x.to_address ?? "").toLowerCase(), lastMessageAt: iso(x.last_message_at), replies: Number(x.replies) });
+  }
+  const kinds = [...EMAIL_EVENT_KINDS, "status_changed", "converted"];
+  const ev = await db.select().from(leadEvents).where(and(eq(leadEvents.organizationId, orgId), eq(leadEvents.leadId, lead.id), inArray(leadEvents.kind, kinds)))
+    .orderBy(desc(leadEvents.createdAt), desc(leadEvents.id)).limit(40);
+  const events: ActivityEvent[] = ev.map((e) => ({ id: e.id, kind: e.kind, data: (e.data ?? {}) as Record<string, unknown>, at: e.createdAt.toISOString(), actor: e.actor }));
+  return { ok: true, lead: { id: lead.id, company: lead.companyName, status: lead.status }, prospect: await prospectOf(orgId, lead.id), conversations, events, inboxAvailable };
 }

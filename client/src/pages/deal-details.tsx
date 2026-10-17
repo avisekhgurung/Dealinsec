@@ -15,6 +15,7 @@ import { PlatformIcon } from "@/components/platform-icon";
 import { dealTypeMeta } from "@shared/dealTypeTaxonomy";
 import { engagementLabel, engagementModelMeta, serviceLabel } from "@shared/engagement";
 import { engagementDetailRows } from "@/components/deals/engagement-fields";
+import { DealEmailActivity } from "@/components/deals/email-activity";
 import { BottomNav } from "@/components/bottom-nav";
 import { useAuth } from "@/hooks/useAuth";
 import { useMoney } from "@/hooks/use-locale";
@@ -579,6 +580,9 @@ export default function DealDetailsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* ── Email: the lead and conversation this deal came from (only for a deal won from a lead) ── */}
+        <DealEmailActivity dealId={deal.id} locale={fmt.locale} />
 
         {/* ── Financial Summary + Deal Information (real data only) ── */}
         <div className="grid sm:grid-cols-2 gap-6">
