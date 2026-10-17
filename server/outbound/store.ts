@@ -21,10 +21,14 @@ export type ClaimedRun = ProspectRunRow & { fence: number };
 
 
 export class RunActive extends Error { constructor(public runId: string) { super("a run with this ICP is already in progress"); } }
+/** createRun refused: the workspace already has `max` counting runs since `since` (the limit at index `index`). */
+export class RunLimitReached extends Error { constructor(public index: number) { super("run limit reached"); } }
 
 export interface NewRun {
   id: string; orgId: string; userId: string; by: "user" | "agent"; request: string; icp: unknown; quantity: number;
   idemKey: string; queries: unknown[]; now: Date;
+  /** Checked under a per-workspace lock together with the insert, so concurrent starts can't both fit under a limit. */
+  limits?: { since: Date; max: number }[];
 }
 export interface NewFinding {
   kind: string; type: string; value: string; status: string; sourceUrl: string | null; sourceType: string; quote: string | null;
@@ -35,7 +39,7 @@ export interface NewFinding {
 export type ItemWithProspect = ProspectRunItemRow & { prospect: ProspectRow };
 
 export interface OutboundStore {
-  createRun(r: NewRun): Promise<ProspectRunRow>; // throws RunActive (the same ICP is already running)
+  createRun(r: NewRun): Promise<ProspectRunRow>; // throws RunActive (the same ICP is already running) or RunLimitReached
   getRun(orgId: string, id: string): Promise<ProspectRunRow | null>;
   listRuns(orgId: string, limit: number): Promise<ProspectRunRow[]>;
   /** Runs started since `since`, newest first, at most `limit` (the usage view's rolling window). */
@@ -104,15 +108,32 @@ async function withProspects(rows: ProspectRunItemRow[], orgId?: string): Promis
 
 /** Advisory-lock key for the platform-wide search budget (server/llm/trace-store.ts holds the model budget's). */
 export const GLOBAL_SEARCH_BUDGET_LOCK = 7_310_002;
+/** Advisory-lock namespace for starting a run; the second key is the workspace (hashtext of its id). */
+export const RUN_START_LOCK = 7_310_003;
+/** runCountsTowardLimit (shared/outbound-usage.ts), in SQL: a finished run that made no web search doesn't count. */
+const COUNTS_TOWARD_LIMIT = sql`(${prospectRuns.status} = 'running' OR COALESCE((${prospectRuns.counters}->>'searched')::int, 0) > 0)`;
 
 export const outboundStore: OutboundStore = {
   async createRun(r) {
     try {
-      const [row] = await db.insert(prospectRuns).values({
-        id: r.id, organizationId: r.orgId, createdByUser: r.userId, createdBy: r.by, request: r.request, icp: r.icp, quantity: r.quantity,
-        status: "running", stage: "search", counters: {}, queries: r.queries, idemKey: r.idemKey, createdAt: r.now, updatedAt: r.now,
-      }).returning();
-      return row;
+      return await db.transaction(async (tx) => {
+        // Count-then-insert under a lock per workspace (held for this short transaction only): two searches started at
+        // the same moment would otherwise both see room under the monthly or daily limit and both start.
+        if (r.limits?.length) {
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(${RUN_START_LOCK}, hashtext(${r.orgId}))`);
+          for (let i = 0; i < r.limits.length; i++) {
+            const l = r.limits[i];
+            const [c] = await tx.select({ n: sql<number>`count(*)::int` }).from(prospectRuns).where(and(
+              eq(prospectRuns.organizationId, r.orgId), gte(prospectRuns.createdAt, l.since), COUNTS_TOWARD_LIMIT));
+            if ((c?.n ?? 0) >= l.max) throw new RunLimitReached(i);
+          }
+        }
+        const [row] = await tx.insert(prospectRuns).values({
+          id: r.id, organizationId: r.orgId, createdByUser: r.userId, createdBy: r.by, request: r.request, icp: r.icp, quantity: r.quantity,
+          status: "running", stage: "search", counters: {}, queries: r.queries, idemKey: r.idemKey, createdAt: r.now, updatedAt: r.now,
+        }).returning();
+        return row;
+      });
     } catch (e) {
       if ((e as { code?: string })?.code === "23505") {
         const [active] = await db.select({ id: prospectRuns.id }).from(prospectRuns).where(and(eq(prospectRuns.organizationId, r.orgId), eq(prospectRuns.idemKey, r.idemKey), eq(prospectRuns.status, "running"))).limit(1);
@@ -132,10 +153,8 @@ export const outboundStore: OutboundStore = {
     return db.select().from(prospectRuns).where(and(eq(prospectRuns.organizationId, orgId), gte(prospectRuns.createdAt, since))).orderBy(desc(prospectRuns.createdAt)).limit(limit);
   },
   async countRunsSince(orgId, since) {
-    // runCountsTowardLimit (shared/outbound-usage.ts), in SQL: a finished run that made no web search doesn't count.
     const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(prospectRuns).where(and(
-      eq(prospectRuns.organizationId, orgId), gte(prospectRuns.createdAt, since),
-      sql`(${prospectRuns.status} = 'running' OR COALESCE((${prospectRuns.counters}->>'searched')::int, 0) > 0)`));
+      eq(prospectRuns.organizationId, orgId), gte(prospectRuns.createdAt, since), COUNTS_TOWARD_LIMIT));
     return r?.n ?? 0;
   },
   async claimRun(now, leaseMs) {

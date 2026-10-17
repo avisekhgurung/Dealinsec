@@ -22,7 +22,7 @@ import { profileStore } from "../leads/profile-store";
 import { addClaim, addNote, createLead, fail, readGate, writeGate, type Result, type Who } from "../services/leads";
 import { PROMPT_VERSIONS, angleSystemPrompt, angleUserMessage, icpSystemPrompt, icpUserMessage } from "./prompts";
 import { pipelineDeps, newRunId, researchOne, enrichOne, scoreProspect, type PipelineDeps, type QueryPlan, type RunCountersExt } from "./pipeline";
-import { prospectsTablesReady, RunActive } from "./store";
+import { prospectsTablesReady, RunActive, RunLimitReached } from "./store";
 import { dailyContactLimit, dailyRunLimit, outboundAllowance } from "./limits";
 import { outboundTier } from "./plan";
 import { OUTBOUND_WINDOW_DAYS, TIER_LABEL } from "@shared/outbound-plans";
@@ -114,12 +114,18 @@ export async function startRun(user: Who, raw: { request?: unknown; icp?: unknow
   const providers = await deps.searchProviders();
   if (!providers.length) return fail(503, "DISCOVERY_NOT_SETUP", "Web search isn't set up on this server yet, so I can't search for companies.");
   const now = deps.now();
-  if ((await deps.store.countRunsSince(orgId, new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY))) >= allowance.monthlySearches) {
-    return tier === "free"
+  // Checked here for a quick answer, and again by createRun under a per-workspace lock with the insert, so searches
+  // started at the same moment can't go past either limit together.
+  const limits = [
+    { since: new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY), max: allowance.monthlySearches },
+    { since: new Date(now.getTime() - DAY), max: dailyRunLimit() },
+  ];
+  const limitReached = (i: number) => i === 0
+    ? tier === "free"
       ? fail(402, "NO_CREDITS", `You've used the free plan's ${allowance.monthlySearches} AI Outbound searches for this 30-day period. Upgrade to Pro for more.`, { feature: "outbound" })
-      : fail(429, "monthly_limit", `You've used the ${allowance.monthlySearches} AI Outbound searches included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`);
-  }
-  if ((await deps.store.countRunsSince(orgId, new Date(now.getTime() - DAY))) >= dailyRunLimit()) return fail(429, "daily_limit", `You've started today's ${dailyRunLimit()} prospect searches. Try again tomorrow.`);
+      : fail(429, "monthly_limit", `You've used the ${allowance.monthlySearches} AI Outbound searches included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`)
+    : fail(429, "daily_limit", `You've started today's ${dailyRunLimit()} prospect searches. Try again tomorrow.`);
+  for (let i = 0; i < limits.length; i++) if ((await deps.store.countRunsSince(orgId, limits[i].since)) >= limits[i].max) return limitReached(i);
   // The searches the person saw (and may have edited) are the plan, each re-checked; none given = the default strategies.
   const given = Array.isArray(raw.searches) ? (raw.searches as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 12) : [];
   const max = runBudget(icp.quantity).queries;
@@ -130,10 +136,11 @@ export async function startRun(user: Who, raw: { request?: unknown; icp?: unknow
   const request = typeof raw.request === "string" && raw.request.trim() ? raw.request.trim().slice(0, 500) : describeIcp(icp);
   const idemKey = createHash("sha256").update(`${orgId}|${stable(icp)}`).digest("hex");
   try {
-    const run = await deps.store.createRun({ id: newRunId(), orgId, userId: user.id, by: opts.by ?? "user", request, icp, quantity: icp.quantity, idemKey, queries, now });
+    const run = await deps.store.createRun({ id: newRunId(), orgId, userId: user.id, by: opts.by ?? "user", request, icp, quantity: icp.quantity, idemKey, queries, now, limits });
     (deps.kick ?? (() => outboundRunner.kick()))();
     return { ok: true, run: runView(run), existing: false };
   } catch (e) {
+    if (e instanceof RunLimitReached) return limitReached(e.index);
     if (e instanceof RunActive) {
       const run = e.runId ? await deps.store.getRun(orgId, e.runId) : null;
       if (run) { (deps.kick ?? (() => outboundRunner.kick()))(); return { ok: true, run: runView(run), existing: true }; }

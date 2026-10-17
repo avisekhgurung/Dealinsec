@@ -59,7 +59,7 @@ function linkFor(a: Activity): string {
     case "quotation": return "/quotations";
     case "agreement": return a.entityId ? `/contracts/${a.entityId}` : "/contracts";
     case "invoice": return a.entityId ? `/brand-invoices/${a.entityId}` : "/invoices";
-    case "member": case "organization": return "/settings";
+    case "member": case "organization": case "payment": return "/settings";
     default: return "/dashboard";
   }
 }

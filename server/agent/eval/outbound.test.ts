@@ -370,6 +370,17 @@ describe("rules before spending", () => {
     process.env.OUTBOUND_MONTHLY_SEARCHES_TRIAL = "5";
     expect(await startRun(user(), { request: "x", icp: { ...(p as any).icp, industry: "PPC agency" } }, {}, deps())).toMatchObject({ ok: true });
   });
+  it("searches started at the same moment can't go past the allowance together: the limit is re-checked with the insert", async () => {
+    process.env.OUTBOUND_MONTHLY_SEARCHES_PRO = "2";
+    script.icp = () => ({ industry: "SEO agency", countries: ["CA"], quantity: 5 });
+    const p = await parseIcp(user(), "Find 5 SEO agencies in Canada", deps());
+    const icp = (p as any).icp;
+    // Five different profiles at once (different ICPs, so the same-ICP dedup doesn't hide the race).
+    const results = await Promise.all(["SEO", "PPC", "PR", "CRO", "Email"].map((k) => startRun(user(), { request: k, icp: { ...icp, industry: `${k} agency` } }, {}, deps())));
+    expect(results.filter((r) => r.ok)).toHaveLength(2);
+    expect(results.filter((r) => !r.ok).every((r) => (r as any).code === "monthly_limit")).toBe(true);
+    expect(world().outbound.runs).toHaveLength(2);
+  });
   it("prospect geography is the person's choice: every chosen country is searched, each with its own country filter", async () => {
     const asked: { q: string; country?: string }[] = [];
     const geo = deps({ searchProviders: async () => [{ name: "fake", label: "Fake", paid: false, supportsCountry: true, async search(q: string, o?: { country?: string }) { asked.push({ q, country: o?.country }); return RESULTS; } }] });

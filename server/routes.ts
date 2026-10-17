@@ -2,7 +2,7 @@ import { dealTypeForService, isEngagementModel, validateEngagement } from "@shar
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertFeedbackSchema, feedback, insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, organizations as organizationsTable, newsletterSubscribers, invoiceDocumentCategories, invoiceLineItemSchema, brandInvoiceTypeOptions, hasActivePro, hasActiveDealBoost, hasProAccess, hasActiveTrial, getTrialDaysLeft, getDealCredits, amountMinorSchema, getCurrency, fromMinor, toMinor, resolveLocaleSettings, CURRENCIES, type User, type Contract, type LocaleSettings, type CurrencyCode, type InvoiceLineItem } from "@shared/schema";
+import { insertFeedbackSchema, feedback, insertDealSchema, insertContractSchema, brandInvoices as brandInvoicesTable, organizations as organizationsTable, newsletterSubscribers, invoiceDocumentCategories, invoiceLineItemSchema, brandInvoiceTypeOptions, hasActivePro, hasActiveDealBoost, hasProAccess, hasActiveTrial, getTrialDaysLeft, getDealCredits, amountMinorSchema, getCurrency, fromMinor, toMinor, resolveLocaleSettings, CURRENCIES, type User, type PayuOrder, type Contract, type LocaleSettings, type CurrencyCode, type InvoiceLineItem } from "@shared/schema";
 import { documentLocaleSettings, formatMoney, splitMinor } from "@shared/money";
 import { isCountryCode, normalizeTimeZone } from "@shared/region";
 import { brandTermsForDeal, isAudience, normalizeAudience } from "@shared/audience";
@@ -57,7 +57,9 @@ import {
   fetchRazorpayPayment,
   captureRazorpayPayment,
 } from "./razorpayClient";
-import { paidAtOf, paymentDecision, refundIsFull, resolveSku, type RazorpayPayment } from "./billing/purchase-rules";
+import { resolveSku } from "./billing/purchase-rules";
+import { confirmCheckout, handleWebhookEvent, parseWebhook } from "./billing/razorpay-events";
+import { paymentEffects, paymentOrderStore, type GrantResult } from "./billing/payment-deps";
 import {
   sendEmail,
   paymentReceiptEmail,
@@ -65,54 +67,29 @@ import {
   inviteEmail,
 } from "./emails";
 
-// Deliver what a completed payment order bought. Shared by the browser verify
-// path and the webhook (whichever atomically claims the order first calls
-// this exactly once). Legacy purposes from orders created before the
-// subscription-first model ("pro_plan", "credits") are still honored.
-type GrantResult =
-  | { kind: "pro"; term: "monthly" | "yearly"; user?: import("@shared/schema").User }
-  | { kind: "boost"; user?: import("@shared/schema").User }
-  | { kind: "seats"; qty: number }
-  | { kind: "credits" };
-
-async function grantPurchase(
-  purpose: string,
-  userId: string,
-  legacyOrder?: { credits: number; amount: number },
-): Promise<GrantResult> {
-  switch (purpose) {
-    case "pro_monthly": {
-      const user = await storage.activateProPlan(userId, PRO_MONTHLY_DAYS, "monthly");
-      return { kind: "pro", term: "monthly", user };
-    }
-    case "pro_yearly":
-    case "pro_plan": { // legacy annual orders
-      const user = await storage.activateProPlan(userId, PRO_YEARLY_DAYS, "yearly");
-      return { kind: "pro", term: "yearly", user };
-    }
-    case "deal_boost": {
-      const user = await storage.activateDealBoost(userId, DEAL_BOOST_DAYS);
-      return { kind: "boost", user };
-    }
-    case "extra_seat": {
-      const buyer = await storage.getUser(userId);
-      const qty = Math.max(1, legacyOrder?.credits ?? 1);
-      if (!buyer?.organizationId) {
-        // Paid-but-undeliverable: throw so the caller reopens the order claim
-        // and a retry (or the webhook) can deliver once the org exists —
-        // never silently pocket the money.
-        throw new Error(`extra_seat grant: user ${userId} has no organization`);
-      }
-      await storage.activateExtraSeats(buyer.organizationId, qty, EXTRA_SEAT_DAYS);
-      return { kind: "seats", qty };
-    }
-    default: { // legacy "credits" orders in flight at deploy time
-      if (legacyOrder && legacyOrder.credits > 0) {
-        await storage.addPurchasedCredits(userId, legacyOrder.credits, "purchase", legacyOrder.amount);
-      }
-      return { kind: "credits" };
-    }
-  }
+/** Payment receipt email, best-effort. `order.amount` is WHOLE RUPEES: payu_orders was deliberately left out of the
+ *  minor-units migration (the Razorpay client converts it), so it goes in as amountRupees and the email converts once. */
+async function sendPurchaseReceipt(order: PayuOrder, paymentId: string, granted: GrantResult): Promise<void> {
+  const buyer = await storage.getUser(order.userId);
+  if (!buyer?.email) return;
+  const date = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  const fmt = (d: Date | string | null | undefined) =>
+    d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "";
+  const firstName = buyer.firstName || undefined;
+  const { subject, html } = granted.kind === "pro"
+    ? proPlanReceiptEmail({ firstName, amountRupees: order.amount, paymentId, date, term: granted.term, expiresOn: fmt(granted.user?.planExpiresAt) })
+    : paymentReceiptEmail({
+        firstName,
+        product: granted.kind === "boost"
+          ? "Deal Boost — unlimited deals & quotations for 1 month"
+          : granted.kind === "seats"
+          ? `${granted.qty} extra team seat${granted.qty > 1 ? "s" : ""} — 1 month`
+          : `${order.credits} Deal Credit${order.credits > 1 ? "s" : ""}`,
+        amountRupees: order.amount,
+        paymentId,
+        date,
+      });
+  void sendEmail({ to: buyer.email, subject, html });
 }
 
 // PayU config — read lazily so .env files loaded at runtime are picked up
@@ -2861,7 +2838,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Step 2: verify payment after Checkout success (called from the browser).
-  // This is the primary credit-grant path; the webhook is a backup.
+  // The fast path; the webhook grants the same payment if this can't (both go
+  // through server/billing/razorpay-events.ts, which claims an order once).
   app.post("/api/payments/razorpay/verify", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.id;
@@ -2869,272 +2847,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
         return res.status(400).json({ error: "Missing payment verification fields" });
       }
-
-      const order = await storage.getPayuOrder(razorpay_order_id);
-      if (!order) return res.status(404).json({ error: "Order not found" });
-      if (order.userId !== userId) return res.status(403).json({ error: "Order does not belong to you" });
-
-      // Idempotent — if already completed, just succeed
-      if (order.status === "completed") {
-        return res.json({ success: true, alreadyProcessed: true });
+      const outcome = await confirmCheckout(
+        { userId, orderId: String(razorpay_order_id), paymentId: String(razorpay_payment_id), signature: String(razorpay_signature) },
+        { store: paymentOrderStore, fx: paymentEffects, verifySignature: verifyPaymentSignature, fetchPayment: fetchRazorpayPayment, capturePayment: captureRazorpayPayment },
+      );
+      const pending = { success: false, pending: true, message: "Your payment is being confirmed. Pro switches on automatically within a few minutes." };
+      switch (outcome.kind) {
+        case "not_found": return res.status(404).json({ error: "Order not found" });
+        case "forbidden": return res.status(403).json({ error: "Order does not belong to you" });
+        case "already_processed": return res.json({ success: true, alreadyProcessed: true });
+        case "refunded": return res.status(409).json({ error: "This payment was refunded" });
+        case "bad_signature": return res.status(400).json({ error: "Signature verification failed" });
+        case "pending": return res.status(202).json(pending);
+        case "needs_review": return res.status(409).json({
+          code: "PAYMENT_NEEDS_REVIEW",
+          error: `We couldn't apply this payment automatically (${outcome.reason.replace(/_/g, " ")}). Nothing more will be charged; email support@dealinsec.com and we'll sort it out or refund it.`,
+        });
+        case "granted":
+          sendPurchaseReceipt(outcome.order, String(razorpay_payment_id), outcome.result).catch((e) => console.error("receipt email failed:", e));
+          return res.json({ success: true });
       }
-      // Refunded is terminal. The verify signature stays valid forever, so
-      // without this a buyer could replay it after a refund and get the
-      // entitlement re-granted on top of their money back.
-      if (order.status === "refunded") {
-        return res.status(409).json({ error: "This payment was refunded" });
-      }
-
-      const valid = verifyPaymentSignature({
-        orderId: razorpay_order_id,
-        paymentId: razorpay_payment_id,
-        signature: razorpay_signature,
-      });
-      if (!valid) {
-        // Guarded pending→failed only: an unguarded write here could race the
-        // webhook and stomp 'failed' over a completed (already granted) order.
-        await storage.markPayuOrderFailedIfPending(razorpay_order_id);
-        return res.status(400).json({ error: "Signature verification failed" });
-      }
-
-      // A valid signature proves the checkout, not the money: confirm with
-      // Razorpay's own record that this payment is for this order, in INR, for
-      // exactly the amount we asked, captured, and made while the order was
-      // still fresh (purchase-rules.ts). If Razorpay can't be reached, nothing
-      // is granted here; the payment.captured webhook grants it instead.
-      let payment: RazorpayPayment;
-      try {
-        payment = await fetchRazorpayPayment(razorpay_payment_id);
-      } catch (fetchError) {
-        console.error("Razorpay verify: payment fetch failed", { orderId: razorpay_order_id, errorType: (fetchError as Error)?.name ?? "Error" });
-        return res.status(202).json({ success: false, pending: true, message: "Your payment is being confirmed. Pro switches on automatically within a few minutes." });
-      }
-      const decision = paymentDecision({ orderId: order.orderId, amount: order.amount, createdAt: order.createdAt }, payment, new Date());
-      if (!decision.grant) {
-        await storage.markPayuOrderReviewIfOpen(razorpay_order_id, razorpay_payment_id);
-        console.error("Razorpay verify: payment not granted", { orderId: razorpay_order_id, reason: decision.reason });
-        return res.status(409).json({ code: "PAYMENT_NEEDS_REVIEW", error: `We couldn't apply this payment automatically (${decision.reason.replace(/_/g, " ")}). Nothing more will be charged; email support@dealinsec.com and we'll sort it out or refund it.` });
-      }
-      if (decision.capture) {
-        try {
-          await captureRazorpayPayment(razorpay_payment_id, payment.amount);
-        } catch (captureError) {
-          console.error("Razorpay verify: capture failed", { orderId: razorpay_order_id, errorType: (captureError as Error)?.name ?? "Error" });
-          return res.status(202).json({ success: false, pending: true, message: "Your payment is being confirmed. Pro switches on automatically within a few minutes." });
-        }
-      }
-
-      // Atomic pending→completed claim: if the webhook got here first this
-      // returns undefined and we skip the grant — no double credit / 732-day
-      // Pro term from one payment.
-      const updated = await storage.completePayuOrderOnce(razorpay_order_id, {
-        payuTxnId: razorpay_payment_id,
-        payuHash: razorpay_signature,
-        completedAt: new Date(),
-      });
-
-      if (updated) {
-        let granted;
-        try {
-          granted = await grantPurchase(updated.purpose, order.userId, order);
-        } catch (grantError) {
-          // The claim already marked the order completed; without this revert a
-          // transient grant failure would be permanent (paid, never delivered,
-          // and every webhook retry loses the claim). Reopen so a retry or the
-          // webhook can deliver.
-          await storage.updatePayuOrder(razorpay_order_id, { status: "pending" }).catch(() => {});
-          throw grantError;
-        }
-
-        // Payment receipt email — best-effort. `order.amount` is WHOLE RUPEES:
-        // payu_orders was deliberately left out of the minor-units migration
-        // (the Razorpay client converts it), so it goes in as amountRupees and
-        // the email converts once.
-        const buyer = await storage.getUser(order.userId);
-        if (buyer?.email) {
-          const date = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-          const fmt = (d: Date | string | null | undefined) =>
-            d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "";
-          const { subject, html } = granted.kind === "pro"
-            ? proPlanReceiptEmail({
-                firstName: buyer.firstName || undefined,
-                amountRupees: order.amount,
-                paymentId: razorpay_payment_id,
-                date,
-                term: granted.term,
-                expiresOn: fmt(granted.user?.planExpiresAt),
-              })
-            : granted.kind === "boost"
-            ? paymentReceiptEmail({
-                firstName: buyer.firstName || undefined,
-                product: "Deal Boost — unlimited deals & quotations for 1 month",
-                amountRupees: order.amount,
-                paymentId: razorpay_payment_id,
-                date,
-              })
-            : granted.kind === "seats"
-            ? paymentReceiptEmail({
-                firstName: buyer.firstName || undefined,
-                product: `${granted.qty} extra team seat${granted.qty > 1 ? "s" : ""} — 1 month`,
-                amountRupees: order.amount,
-                paymentId: razorpay_payment_id,
-                date,
-              })
-            : paymentReceiptEmail({
-                firstName: buyer.firstName || undefined,
-                product: `${order.credits} Deal Credit${order.credits > 1 ? "s" : ""}`,
-                amountRupees: order.amount,
-                paymentId: razorpay_payment_id,
-                date,
-              });
-          void sendEmail({ to: buyer.email, subject, html });
-        }
-      }
-
-      res.json({ success: true });
     } catch (error) {
-      console.error("Razorpay verify error:", error);
+      console.error("Razorpay verify error:", (error as Error)?.message ?? error);
       res.status(500).json({ error: "Failed to verify payment" });
     }
   });
 
-  // Step 3 (backup): webhook for server-to-server confirmation.
+  // Step 3 (backup): webhook for server-to-server confirmation and refunds.
   // The global express.json({ verify }) stashed the exact bytes on
-  // req.rawBody — we HMAC over those to verify authenticity.
+  // req.rawBody — the HMAC is over those, and a request without them is refused.
+  // Subscribe to: payment.captured (or order.paid), payment.failed,
+  // refund.processed and payment.refunded.
   app.post("/api/payments/razorpay/webhook", async (req: any, res) => {
-      try {
-        const signature = req.headers["x-razorpay-signature"] as string;
-        const rawBody: string = req.rawBody
-          ? req.rawBody.toString("utf8")
-          : JSON.stringify(req.body);
-
-        if (!verifyWebhookSignature(rawBody, signature)) {
-          return res.status(400).json({ error: "Invalid webhook signature" });
-        }
-
-        const event = JSON.parse(rawBody);
-        // We care about successful payments
-        if (event.event === "payment.captured" || event.event === "order.paid") {
-          // Only a payment entity can grant: it carries the amount, currency and
-          // status to check (an order.paid without one waits for payment.captured).
-          const entity = event.payload?.payment?.entity;
-          const orderId = entity?.order_id;
-          const paymentId = entity?.id;
-          if (orderId && paymentId) {
-            const order = await storage.getPayuOrder(orderId);
-            const payment: RazorpayPayment = { id: String(paymentId), order_id: String(orderId), status: String(entity.status), amount: Number(entity.amount), currency: String(entity.currency), created_at: Number(entity.created_at) || undefined };
-            const decision = order ? paymentDecision({ orderId: order.orderId, amount: order.amount, createdAt: order.createdAt }, payment, paidAtOf(payment, new Date())) : null;
-            if (order && decision && !decision.grant) {
-              if (await storage.markPayuOrderReviewIfOpen(orderId, String(paymentId))) {
-                console.error("Razorpay webhook: payment not granted", { orderId, reason: decision.reason });
-              }
-            } else if (order && decision?.grant && !decision.capture) {
-              // Atomic claim — loses gracefully to the browser verify path.
-              const updated = await storage.completePayuOrderOnce(orderId, {
-                payuTxnId: paymentId,
-                completedAt: new Date(),
-              });
-              if (updated) {
-                try {
-                  await grantPurchase(updated.purpose, order.userId, order);
-                } catch (grantError) {
-                  // Reopen the claim so Razorpay's webhook retry can deliver —
-                  // otherwise a transient grant failure is paid-but-never-delivered.
-                  await storage.updatePayuOrder(orderId, { status: "pending" }).catch(() => {});
-                  throw grantError;
-                }
-              }
-            }
-          }
-        }
-
-        // Refunds (issued from the Razorpay dashboard) — claw back what the
-        // payment bought. Atomic completed→refunded claim guards re-delivery.
-        if (event.event === "refund.processed" || event.event === "payment.refunded") {
-          const refundEntity = event.payload?.refund?.entity;
-          const paymentEntity = event.payload?.payment?.entity;
-          const paymentId = refundEntity?.payment_id
-            || paymentEntity?.id;
-          // A partial refund doesn't take the whole plan back: it is logged for a
-          // person to decide (purchase-rules.ts refundIsFull).
-          const full = event.event === "payment.refunded"
-            ? refundIsFull(paymentEntity?.amount_refunded, paymentEntity?.amount)
-            : refundIsFull(refundEntity?.amount, paymentEntity?.amount);
-          if (paymentId && !full) {
-            console.error("Razorpay webhook: partial refund, plan kept for review", { paymentId: String(paymentId) });
-          }
-          if (paymentId && full) {
-            const order = await storage.getPayuOrderByPaymentId(paymentId);
-            if (order) {
-              const claimed = await storage.markPayuOrderRefundedOnce(order.orderId);
-              if (claimed) {
-                // If the term this order granted has ALREADY fully lapsed
-                // (e.g. a January monthly refunded in June after the user
-                // re-subscribed), subtracting a term now would destroy the
-                // freshly paid current term instead of the refunded one. The
-                // entitlement already expired naturally — nothing to claw back.
-                const termDays: Record<string, number> = {
-                  pro_monthly: PRO_MONTHLY_DAYS,
-                  pro_yearly: PRO_YEARLY_DAYS,
-                  pro_plan: PRO_YEARLY_DAYS,
-                  deal_boost: DEAL_BOOST_DAYS,
-                  extra_seat: EXTRA_SEAT_DAYS,
-                };
-                const days = termDays[claimed.purpose];
-                let grantLapsed =
-                  days != null &&
-                  claimed.completedAt != null &&
-                  Date.now() - new Date(claimed.completedAt).getTime() > days * 86_400_000;
-
-                // Seat packs share ONE expiry (a top-up inherits the pack's
-                // existing end date), so purchase-age is the wrong signal —
-                // ask the organization when its current pack actually ends.
-                if (claimed.purpose === "extra_seat") {
-                  const seatBuyer = await storage.getUser(order.userId);
-                  const seatOrg = seatBuyer?.organizationId
-                    ? await storage.getOrganization(seatBuyer.organizationId)
-                    : null;
-                  grantLapsed = !seatOrg?.extraSeatsExpiresAt ||
-                    new Date(seatOrg.extraSeatsExpiresAt).getTime() <= Date.now();
-                }
-
-                if (grantLapsed) {
-                  console.log(`Refund for ${order.orderId} (${claimed.purpose}): granted term already lapsed — no clawback`);
-                } else {
-                  switch (claimed.purpose) {
-                    case "pro_monthly":
-                      await storage.revokeProPlan(order.userId, PRO_MONTHLY_DAYS);
-                      break;
-                    case "pro_yearly":
-                    case "pro_plan": // legacy annual orders
-                      await storage.revokeProPlan(order.userId, PRO_YEARLY_DAYS);
-                      break;
-                    case "deal_boost":
-                      await storage.revokeDealBoost(order.userId, DEAL_BOOST_DAYS);
-                      break;
-                    case "extra_seat": {
-                      const buyer = await storage.getUser(order.userId);
-                      if (buyer?.organizationId && order.credits > 0) {
-                        await storage.revokeExtraSeats(buyer.organizationId, order.credits);
-                      }
-                      break;
-                    }
-                    default: // legacy "credits" orders
-                      if (order.credits > 0) {
-                        await storage.addPurchasedCredits(order.userId, -order.credits, "refund", order.amount);
-                      }
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        res.json({ received: true });
-      } catch (error) {
-        console.error("Razorpay webhook error:", error);
-        res.status(500).json({ error: "Webhook processing failed" });
-      }
+    const parsed = parseWebhook(req.rawBody, req.headers["x-razorpay-signature"], verifyWebhookSignature);
+    if (!parsed.ok) return res.status(parsed.status).json({ error: parsed.error });
+    try {
+      const outcome = await handleWebhookEvent(parsed.event, paymentOrderStore, paymentEffects);
+      if (outcome.kind !== "ignored") console.log("Razorpay webhook:", parsed.event.event, outcome.kind);
+      if (outcome.kind === "granted") sendPurchaseReceipt(outcome.order, outcome.paymentId, outcome.result).catch((e) => console.error("receipt email failed:", e));
+      res.json({ received: true });
+    } catch (error) {
+      // 500 so Razorpay retries (a grant that couldn't deliver was reopened).
+      console.error("Razorpay webhook error:", parsed.event.event, (error as Error)?.message ?? error);
+      res.status(500).json({ error: "Webhook processing failed" });
+    }
   });
 
   // Newsletter / waitlist capture (public — from landing footer)

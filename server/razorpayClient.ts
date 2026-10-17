@@ -156,6 +156,16 @@ export async function fetchRazorpayPayment(paymentId: string): Promise<import(".
   return { id: String(p.id), order_id: p.order_id ?? null, status: String(p.status), amount: Number(p.amount), currency: String(p.currency), created_at: Number(p.created_at) || undefined };
 }
 
+/** The payments Razorpay holds for one order, read-only, reduced to status and amounts (never card, UPI, bank or
+ *  contact details). Used by the operator script to check a parked order before anyone acts on it. */
+export async function fetchRazorpayOrderPayments(orderId: string): Promise<(import("./billing/purchase-rules").RazorpayPayment & { amount_refunded: number; refund_status: string | null })[]> {
+  const r: any = await getClient().orders.fetchPayments(orderId);
+  return (r?.items ?? []).map((p: any) => ({
+    id: String(p.id), order_id: p.order_id ?? null, status: String(p.status), amount: Number(p.amount), currency: String(p.currency),
+    created_at: Number(p.created_at) || undefined, amount_refunded: Number(p.amount_refunded) || 0, refund_status: p.refund_status ?? null,
+  }));
+}
+
 /** Captures an authorized payment for exactly the amount it was authorized for (an account with manual capture). */
 export async function captureRazorpayPayment(paymentId: string, amountPaise: number): Promise<string> {
   const p: any = await getClient().payments.capture(paymentId, amountPaise, "INR");

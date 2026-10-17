@@ -110,6 +110,10 @@ export interface IStorage {
   markPayuOrderFailedIfPending(orderId: string): Promise<void>;
   markPayuOrderReviewIfOpen(orderId: string, paymentId: string): Promise<boolean>;
   markPayuOrderRefundedOnce(orderId: string): Promise<PayuOrder | undefined>;
+  reopenPayuOrderAfterFailedGrant(orderId: string, paymentId: string): Promise<boolean>;
+  closeUnfulfilledPayuOrderAsRefunded(orderId: string, paymentId: string): Promise<PayuOrder | undefined>;
+  completeReviewedPayuOrderOnce(orderId: string, paymentId: string): Promise<PayuOrder | undefined>;
+  returnPayuOrderToReview(orderId: string, paymentId: string): Promise<boolean>;
 
   createQuote(data: InsertQuote): Promise<Quote>;
   getQuoteByDealId(dealId: number): Promise<Quote | undefined>;
@@ -722,6 +726,49 @@ export class DatabaseStorage implements IStorage {
       .where(sql`${payuOrders.orderId} = ${orderId} AND ${payuOrders.status} = 'completed'`)
       .returning();
     return updated;
+  }
+
+  async reopenPayuOrderAfterFailedGrant(orderId: string, paymentId: string): Promise<boolean> {
+    // The claim marked the order completed but delivering it threw: reopen it so a retry or the webhook can deliver.
+    // Guarded on completed-by-this-payment, so it can never turn a refund that landed in between back into a
+    // claimable order (an unguarded write here would let a refunded payment be granted again).
+    const rows = await db.update(payuOrders)
+      .set({ status: "pending", completedAt: null })
+      .where(sql`${payuOrders.orderId} = ${orderId} AND ${payuOrders.status} = 'completed' AND ${payuOrders.payuTxnId} = ${paymentId}`)
+      .returning({ id: payuOrders.id });
+    return rows.length > 0;
+  }
+
+  async closeUnfulfilledPayuOrderAsRefunded(orderId: string, paymentId: string): Promise<PayuOrder | undefined> {
+    // A full refund for an order that never granted anything (its capture webhook hasn't arrived yet, or it was parked
+    // for review): close it as refunded, which is terminal, so a capture that arrives later can't grant a plan for
+    // money already returned. Nothing was granted, so there is nothing to claw back. A completed order is left to
+    // markPayuOrderRefundedOnce; an order already paid by a different payment is never touched.
+    const [updated] = await db.update(payuOrders)
+      .set({ status: "refunded", payuTxnId: paymentId })
+      .where(sql`${payuOrders.orderId} = ${orderId} AND ${payuOrders.status} IN ('pending', 'failed', 'needs_review')
+        AND (${payuOrders.payuTxnId} IS NULL OR ${payuOrders.payuTxnId} = ${paymentId})`)
+      .returning();
+    return updated;
+  }
+
+  async completeReviewedPayuOrderOnce(orderId: string, paymentId: string): Promise<PayuOrder | undefined> {
+    // A person decided to honour a parked payment (script/payment-orders.ts grant-reviewed): the same once-only claim
+    // as completePayuOrderOnce, but only from needs_review and only for the payment it was parked with.
+    const [updated] = await db.update(payuOrders)
+      .set({ status: "completed", completedAt: new Date() })
+      .where(sql`${payuOrders.orderId} = ${orderId} AND ${payuOrders.status} = 'needs_review' AND ${payuOrders.payuTxnId} = ${paymentId}`)
+      .returning();
+    return updated;
+  }
+
+  async returnPayuOrderToReview(orderId: string, paymentId: string): Promise<boolean> {
+    // Undo completeReviewedPayuOrderOnce when delivering failed, guarded like reopenPayuOrderAfterFailedGrant.
+    const rows = await db.update(payuOrders)
+      .set({ status: "needs_review", completedAt: null })
+      .where(sql`${payuOrders.orderId} = ${orderId} AND ${payuOrders.status} = 'completed' AND ${payuOrders.payuTxnId} = ${paymentId}`)
+      .returning({ id: payuOrders.id });
+    return rows.length > 0;
   }
 
   async getPayuOrderByPaymentId(paymentId: string): Promise<PayuOrder | undefined> {

@@ -268,6 +268,7 @@ const col30 = (v: unknown) => { if (typeof v === "string" && v.length > 30) thro
 
 export const outboundStoreMock = () => {
   class RunActive extends Error { constructor(public runId: string) { super("a run with this ICP is already in progress"); } }
+  class RunLimitReached extends Error { constructor(public index: number) { super("run limit reached"); } }
   let pseq = 0, iseq = 0, fseq = 0;
   const o = () => world().outbound;
   const ro = () => { if (world().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL"); };
@@ -276,12 +277,17 @@ export const outboundStoreMock = () => {
   const order = (a: any, b: any) => b.rank - a.rank || a.id - b.id;
   return {
     RunActive,
+    RunLimitReached,
     prospectsTablesReady: async () => o().ready && world().salesReady,
     outboundStore: {
       async createRun(r: any) {
         ro();
         const active = o().runs.find((x) => x.organizationId === r.orgId && x.idemKey === r.idemKey && x.status === "running");
         if (active) throw new RunActive(active.id);
+        // Same check as the real store's locked count-then-insert (no await in between here, so it is atomic too).
+        (r.limits ?? []).forEach((l: { since: Date; max: number }, i: number) => {
+          if (o().runs.filter((x) => x.organizationId === r.orgId && x.createdAt >= l.since && runCountsTowardLimit(x as any)).length >= l.max) throw new RunLimitReached(i);
+        });
         const row = { id: r.id, organizationId: r.orgId, createdByUser: r.userId, createdBy: r.by, request: r.request, icp: r.icp, quantity: r.quantity, status: "running", stage: "search", counters: {}, queries: r.queries, costMicroUsd: 0, errorCode: null, idemKey: r.idemKey, leaseUntil: null, attempts: 0, createdAt: r.now, updatedAt: r.now, finishedAt: null };
         o().runs.push(row);
         return copy(row);
