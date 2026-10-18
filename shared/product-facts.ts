@@ -14,6 +14,7 @@
 import { GLOBAL_PLANS } from "./globalPlans";
 import { PRO_INCLUDED_SEATS } from "./permissions";
 import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "./outbound-plans";
+import { LEAGUE_ALLOWANCE_DEFAULTS as LG, LEAGUE_LIMITS, LEAGUE_WINDOW_DAYS } from "./ai-league";
 
 const OB = OUTBOUND_ALLOWANCE_DEFAULTS;
 
@@ -64,6 +65,10 @@ export const CAPABILITIES: readonly Capability[] = [
   {
     key: "ai_outbound", name: "AI Outbound (prospect research)", status: "live", plan: "all",
     text: `The hero feature. Describe the companies you want to reach and choose where (any countries, regions or cities: the US, the UK, Canada, Australia, the UAE, India and others, or worldwide); you confirm the profile, then it searches the web, checks each company's own website against your ideal-client profile, looks for recent, dated reasons to reach out and named decision makers, and scores each one. For local businesses (dentists in Siliguri, cafes in Pune), it can instead list businesses in a city from Google Maps: the listings are shown for that search and not kept, you choose which listed websites DealInSec researches the same way, and you can save a business to Leads under the name you give it, with a link to its listing. A listing without a website says only that; it doesn't mean the business has no website or needs one. Every finding shows its source and date; guesses and unknowns are labelled, and thin markets are said plainly. Nothing is contacted and no lead is created until you add one. One credit is one search: the free plan includes ${OB.free.monthlySearches} a month (up to ${OB.free.maxCompanies} companies each), and Pro ${OB.pro.monthlySearches} a month (up to ${OB.pro.maxCompanies} companies each), counted over ${OUTBOUND_WINDOW_DAYS} days, with at most 5 a day. Research is never unlimited, and contact details aren't always available.`,
+  },
+  {
+    key: "ai_coworkers", name: "AI coworkers: Nibo, Mika and Zee (AI League)", status: "live", plan: "all",
+    text: `Three AI coworkers that do work in the background through the product's own features, as the signed-in person. Nibo runs an AI Outbound search, checks each company's own website and saves up to ${LEAGUE_LIMITS.leadsPerRun} qualified companies a task to Leads with their evidence and sources; his research always asks first because it uses a search. Mika drafts first emails from verified facts for leads you pick; nothing is sent, you approve the exact text and send it yourself. Zee briefs you from your own records: overdue invoices, follow-ups due, messages waiting, invoices due this week and agreements ready to invoice. Each has its own chat; they can ask each other for help, hand work to a teammate (always with your approval) and hold a short team huddle. Tasks keep running if you close the page and can be scheduled daily, on weekdays or weekly. The free plan includes ${LG.free.monthlyRuns} coworker tasks every ${LEAGUE_WINDOW_DAYS} days and Pro ${LG.pro.monthlyRuns}; each task also uses the allowance of the feature it runs. They never send, pay or sign anything.`,
   },
   {
     key: "outreach_drafts", name: "Outreach drafts with approval", status: "live", plan: "all",

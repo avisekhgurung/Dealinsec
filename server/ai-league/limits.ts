@@ -11,8 +11,10 @@
  */
 import type { OutboundTier } from "@shared/outbound-plans";
 
+import { LEAGUE_ALLOWANCE_DEFAULTS, LEAGUE_WINDOW_DAYS as WINDOW } from "@shared/ai-league";
+
 export interface LeagueAllowance { monthlyRuns: number; concurrent: number; schedules: number }
-const DEFAULTS: Record<"free" | "pro", LeagueAllowance> = { free: { monthlyRuns: 10, concurrent: 1, schedules: 1 }, pro: { monthlyRuns: 60, concurrent: 2, schedules: 5 } };
+const DEFAULTS: Record<"free" | "pro", LeagueAllowance> = LEAGUE_ALLOWANCE_DEFAULTS;
 const int = (v: string | undefined, d: number, max = 10_000) => { const n = Number(v); return v !== undefined && v.trim() !== "" && Number.isInteger(n) && n >= 0 && n <= max ? n : d; };
 
 export function leagueAllowance(tier: OutboundTier, env: NodeJS.ProcessEnv = process.env): LeagueAllowance {
@@ -24,4 +26,4 @@ export function leagueAllowance(tier: OutboundTier, env: NodeJS.ProcessEnv = pro
   };
 }
 export const runMaxMs = (env: NodeJS.ProcessEnv = process.env) => int(env.LEAGUE_RUN_MAX_MINUTES, 45, 600) * 60_000;
-export const LEAGUE_WINDOW_DAYS = 30;
+export const LEAGUE_WINDOW_DAYS = WINDOW;

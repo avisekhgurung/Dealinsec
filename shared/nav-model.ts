@@ -115,20 +115,24 @@ export function desktopNavSections(user: NavUser): NavSection[] {
   return sections(user, DESKTOP_GROUPS);
 }
 
-/** Mobile bar: four daily destinations, then "More" for the rest. */
-export const MOBILE_BAR_KEYS: readonly NavKey[] = ["home", "outbound", "leads", "deals"];
+/** Mobile bar: four daily destinations, then "More" for the rest. AI League (Nibo, Mika, Zee) is in the bar itself;
+ *  Deals moved into More, next to the documents and money it leads to. */
+export const MOBILE_BAR_KEYS: readonly NavKey[] = ["home", "league", "outbound", "leads"];
 export function mobileBarItems(user: NavUser): NavItem[] {
   return MOBILE_BAR_KEYS.map(navItem).filter((i) => canSeeNavItem(user, i));
 }
 
-export const MORE_GROUPS: readonly NavGroup[] = ["league", "documents", "money", "account"];
+export const MORE_GROUPS: readonly NavGroup[] = ["pipeline", "documents", "money", "account"];
+/** The More sheet: everything not already in the bar (Pipeline shows Deals; Leads is in the bar). */
 export function moreSheetSections(user: NavUser): NavSection[] {
-  return sections(user, MORE_GROUPS);
+  return sections(user, MORE_GROUPS)
+    .map((s) => ({ ...s, items: s.items.filter((i) => !MOBILE_BAR_KEYS.includes(i.key)) }))
+    .filter((s) => s.items.length > 0);
 }
 
 /** "More" is lit when the current route belongs to anything inside it —
  *  regardless of gating, so a deep link never leaves the bar with nothing lit
- *  for a reason the user can't see. */
+ *  for a reason the user can't see. A page whose tab is in the bar lights that tab, not More. */
 export function isMoreActive(path: string): boolean {
-  return NAV_ITEMS.some((i) => MORE_GROUPS.includes(i.group) && i.isActive(path));
+  return NAV_ITEMS.some((i) => MORE_GROUPS.includes(i.group) && !MOBILE_BAR_KEYS.includes(i.key) && i.isActive(path));
 }

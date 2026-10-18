@@ -18,7 +18,7 @@ import { COMPARISON_PAGES, VENDORS, registerComparisonPages, comparisonSitemapPa
 import { TOOLS, registerToolPages, toolSitemapPaths } from "./tools";
 import { CORE_JS as DUE_DATE_CORE_JS, EXAMPLE_INVOICE_DATE, FAQ as DUE_DATE_FAQ } from "./tools/invoice-due-date";
 import { EXAMPLES as DEAL_RISK_EXAMPLES, FAQ as DEAL_RISK_FAQ } from "./tools/deal-risk";
-import { landingSeoBody } from "./landing-seo";
+import { injectLandingSeo, landingSeoBody } from "./landing-seo";
 import { AUDIENCE_DESCRIPTIONS, COMPARISON_DESCRIPTIONS, TOOL_DESCRIPTIONS, llmsTxt } from "./llms";
 import { categorySitemapPaths } from "./category-pages";
 
@@ -828,6 +828,15 @@ describe("/ai-coworkers: Nibo, Mika and Zee, for India", () => {
     expect(page.description.length).toBeLessThan(200);
     const faq = jsonLdBlocks(html()).find((b) => b["@type"] === "FAQPage");
     expect(faq.mainEntity.map((q: any) => q.name)).toEqual(page.faq.map((f) => f.q));
+  });
+
+  it("the homepage's crawler copy and FAQ structured data introduce the AI team (what search and AI engines read)", () => {
+    const body = landingSeoBody();
+    expect(body).toContain("<h2>Your AI team: Nibo, Mika and Zee</h2>");
+    expect(body).toMatch(/never send, pay or sign anything/);
+    const page = injectLandingSeo('<html><head></head><body><div id="root"></div></body></html>');
+    const faq = jsonLdBlocks(page).find((b) => b["@type"] === "FAQPage");
+    expect(faq.mainEntity.map((q: any) => q.name)).toContain("What are Nibo, Mika and Zee?");
   });
 
   it("states the plan limits the product enforces, and that coworkers draft but never send", async () => {

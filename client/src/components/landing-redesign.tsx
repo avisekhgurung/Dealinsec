@@ -414,6 +414,83 @@ export function FeaturesSection() {
   );
 }
 
+/* ── The AI team: Nibo, Mika and Zee ──────────────────────────────────────────────────────── */
+// What each coworker really does (server/ai-league; the /ai-coworkers page says the same). Plain <img> with both sizes,
+// lazy: the homepage doesn't load the app's AI League code for three pictures.
+const TEAM = [
+  {
+    key: "nibo", name: "Nibo", role: "Finds your next clients", bar: "bg-blue-600", tint: "bg-blue-50 dark:bg-blue-950/40", fg: "text-blue-700 dark:text-blue-300",
+    line: "Describe who you want to work with. Nibo searches, reads each company's own website and saves the ones that fit.",
+    points: ["Evidence and the source page for every company", "Only qualified companies reach your leads", "Asks before it uses one of your searches"],
+  },
+  {
+    key: "mika", name: "Mika", role: "Writes your first messages", bar: "bg-rose-600", tint: "bg-rose-50 dark:bg-rose-950/40", fg: "text-rose-700 dark:text-rose-300",
+    line: "Mika drafts a short, specific first email for each lead from what was verified about them.",
+    points: ["Drafts only: nothing is sent for you", "You edit and approve the exact text", "Skips anyone on your do-not-contact list"],
+  },
+  {
+    key: "zee", name: "Zee", role: "Keeps you on top of money", bar: "bg-emerald-600", tint: "bg-emerald-50 dark:bg-emerald-950/40", fg: "text-emerald-700 dark:text-emerald-300",
+    line: "Zee tells you what needs you today, read from your own invoices, deals and follow-ups.",
+    points: ["Overdue invoices and what's due this week", "Follow-ups due and messages waiting", "Never invents a number: checked against your records"],
+  },
+] as const;
+
+export function AiTeamSection() {
+  return (
+    <section id="ai-team" className="scroll-mt-20 py-16 sm:py-20" data-testid="landing-ai-team">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <Reveal className="mx-auto max-w-3xl text-center">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"><Bot className="h-3.5 w-3.5" aria-hidden />AI coworkers</span>
+          <h2 className="mt-3 text-balance text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Meet your <span className={GREEN}>AI team</span></h2>
+          <p className="mt-3 text-neutral-600 dark:text-neutral-400">Three AI coworkers do the legwork in the background: Nibo finds clients, Mika writes first messages and Zee watches your money. They keep going when you close the page, and they ask before anything that matters.</p>
+        </Reveal>
+        <motion.ul initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={stagger} className="mt-10 grid gap-4 md:grid-cols-3">
+          {TEAM.map((m) => (
+            <motion.li key={m.key} variants={reveal} className="relative flex flex-col overflow-hidden rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60" data-testid={`landing-ai-${m.key}`}>
+              <span className={cn("absolute inset-x-0 top-0 h-1", m.bar)} aria-hidden />
+              <div className="flex items-center gap-4">
+                <span className={cn("flex h-24 w-24 shrink-0 items-center justify-center rounded-full", m.tint)}>
+                  <img src={`/ai-league/${m.key}-mascot.webp`} srcSet={`/ai-league/${m.key}-mascot-sm.webp 192w, /ai-league/${m.key}-mascot.webp 512w`} sizes="88px"
+                    width={88} height={88} loading="lazy" decoding="async" alt={`${m.name}, the DealInSec AI coworker who ${m.role.toLowerCase()}`} className="h-[88px] w-[88px] object-contain" />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-xl font-extrabold">{m.name}</h3>
+                  <p className={cn("text-sm font-semibold", m.fg)}>{m.role}</p>
+                </div>
+              </div>
+              <p className="mt-4 text-sm text-neutral-600 dark:text-neutral-400">{m.line}</p>
+              <ul className="mt-3 space-y-1.5 text-[13px] text-neutral-600 dark:text-neutral-400">
+                {m.points.map((p) => <li key={p} className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />{p}</li>)}
+              </ul>
+            </motion.li>
+          ))}
+        </motion.ul>
+        <Reveal className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="flex gap-3 rounded-2xl border border-neutral-200/80 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900/60">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white"><Sparkles className="h-5 w-5" aria-hidden /></span>
+            <div>
+              <h3 className="font-bold">Agent mode: just ask</h3>
+              <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">"Which invoices are overdue?" "Make a deal from this client email." Ask DealInSec in plain words; it works through your records and asks you to approve every change.</p>
+            </div>
+          </div>
+          <div className="flex gap-3 rounded-2xl border border-neutral-200/80 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900/60">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"><Users className="h-5 w-5" aria-hidden /></span>
+            <div>
+              <h3 className="font-bold">A team that talks it over</h3>
+              <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">Coworkers ask each other for help and hold a short team huddle on your question. Handing work from one to another always asks you first.</p>
+            </div>
+          </div>
+        </Reveal>
+        <p className="mt-6 text-center text-sm">
+          <a href="/ai-coworkers" onClick={() => trackEvent("landing_cta_click", { label: "ai_coworkers" })} className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:underline dark:text-emerald-400" data-testid="landing-ai-team-more">
+            How the AI coworkers work<ArrowRight className="h-4 w-4" aria-hidden />
+          </a>
+        </p>
+      </div>
+    </section>
+  );
+}
+
 /* ── Why keep it together ──────────────────────────────────────────────────────────────── */
 
 const SPREAD = [

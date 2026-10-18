@@ -97,7 +97,7 @@ function LeagueHome() {
         ) : (
           <>
             <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-            <SegmentedTabs label="AI League views" value={view} onChange={setView} className="w-max min-w-full sm:min-w-0"
+            <SegmentedTabs label="AI League views" value={view} onChange={setView} className="w-max min-w-full max-w-none sm:min-w-0 [&>button]:flex-auto [&>button]:shrink-0"
               tabs={[
                 { value: "team", label: <span className="whitespace-nowrap">Team</span>, testId: "league-view-team" },
                 { value: "activity", label: <span className="whitespace-nowrap">Activity</span>, testId: "league-view-activity" },

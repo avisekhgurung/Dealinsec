@@ -53,6 +53,16 @@ export const BOT_IDENTITY: Record<Bot, BotIdentity> = {
   },
 };
 
+/* ── plan limits ─────────────────────────────────────────────────────────── */
+
+/** AI League's default allowances per plan (the server applies LEAGUE_* env overrides: server/ai-league/limits.ts).
+ *  One source for the enforcement and for every public mention (product facts, the /ai-coworkers page). */
+export const LEAGUE_ALLOWANCE_DEFAULTS = {
+  free: { monthlyRuns: 10, concurrent: 1, schedules: 1 },
+  pro: { monthlyRuns: 60, concurrent: 2, schedules: 5 },
+} as const;
+export const LEAGUE_WINDOW_DAYS = 30;
+
 /* ── tasks ───────────────────────────────────────────────────────────────── */
 
 export const TASKS = ["nibo.find_clients", "mika.first_messages", "zee.briefing", "team.huddle"] as const;

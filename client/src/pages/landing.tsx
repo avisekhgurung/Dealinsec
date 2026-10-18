@@ -64,7 +64,7 @@ import { LandingCopilot } from "@/components/landing-copilot";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { BRAND_GRADIENT, GradientText, SectionHeader, fadeUp, stagger } from "@/components/landing-shared";
 import { LandingTryDemo } from "@/components/landing-try-demo";
-import { AudienceCards, CtaBanner, FaqSection, FeaturesSection, HeroSection, ManualWorkflowSection, WorkflowWalkthrough } from "@/components/landing-redesign";
+import { AiTeamSection, AudienceCards, CtaBanner, FaqSection, FeaturesSection, HeroSection, ManualWorkflowSection, WorkflowWalkthrough } from "@/components/landing-redesign";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LANDING_FAQS } from "@shared/landing-faqs";
 import { rememberAudienceIntent } from "@/lib/audience-intent";
@@ -97,6 +97,8 @@ const SERVER_ROUTE_PREFIXES = [
   "/freelance-business-management-software",
   "/bonsai-alternatives",
   "/bonsai-vs-dealinsec",
+  "/find-local-clients",
+  "/ai-coworkers",
 ];
 const isServerRoute = (href: string) => SERVER_ROUTE_PREFIXES.some((p) => href.startsWith(p));
 
@@ -105,6 +107,7 @@ type NavLink = { label: string; href: string; note?: string };
 const NAV_LINKS: (NavLink | { label: string; items: NavLink[] })[] = [
   { label: "Product", items: [
     { label: "Features", href: "#features", note: "Research, deals, quotations, agreements, invoices" },
+    { label: "AI team", href: "#ai-team", note: "Nibo, Mika and Zee, your AI coworkers" },
     { label: "Live demo", href: "#try", note: "Plan a search, read a reply, see what's next" },
     { label: "Who it's for", href: "#audiences", note: "Freelancers, consultants and small agencies" },
   ] },
@@ -264,6 +267,7 @@ export default function LandingPage() {
       <main className="relative z-[1]">
         <HeroSection isAuthenticated={isAuthenticated} onPrimary={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))} />
         <WorkflowWalkthrough />
+        <AiTeamSection />
         <FeaturesSection />
         <ManualWorkflowSection />
         <AudienceCards />

@@ -69,6 +69,9 @@ export function landingSeoBody(): string {
 <li><strong>A connected client workflow</strong>: the prospect becomes the lead, the lead the deal, and every document comes from that deal, so the scope and the numbers match.</li>
 </ul>
 
+<h2>Your AI team: Nibo, Mika and Zee</h2>
+<p>Three AI coworkers do the legwork in the background, through the same features you use yourself. <strong>Nibo</strong> researches companies that fit what you sell, checks each one's own website and saves the qualified ones to your leads with their evidence and sources. <strong>Mika</strong> drafts first messages from what was verified about each lead; you approve the exact text and send it yourself. <strong>Zee</strong> briefs you on overdue invoices, follow-ups due and what's coming up, from your own records. They keep working if you close the page, ask before anything that spends your allowance or changes something, and never send, pay or sign anything. Ask DealInSec anything in Agent mode for quick answers; hand longer work to the coworkers. <a href="/ai-coworkers">How the AI coworkers work</a>.</p>
+
 <h2>Why keep the client journey in one place</h2>
 <p>Prospects in browser tabs and spreadsheets, outreach in an inbox, quotations and agreements in documents, invoices in another tool and payments in a bank app means re-typing the client, the scope and the fee at every step. In DealInSec one record carries the client from research to payment. It doesn't replace accounting software.</p>
 

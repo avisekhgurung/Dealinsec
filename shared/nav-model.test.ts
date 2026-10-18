@@ -54,10 +54,11 @@ describe("active route", () => {
   });
 
   it("lights More only for routes inside the sheet", () => {
-    for (const p of ["/quotations", "/deals/abc/quote", "/contracts/abc", "/invoices", "/brand-invoices/new", "/profile", "/settings"]) {
+    // Deals lives in More on the phone bar (AI League took its place in the bar).
+    for (const p of ["/quotations", "/deals", "/deals/abc", "/deals/abc/quote", "/contracts/abc", "/invoices", "/brand-invoices/new", "/profile", "/settings"]) {
       expect(isMoreActive(p)).toBe(true);
     }
-    for (const p of ["/dashboard", "/outbound", "/leads/abc", "/deals", "/deals/abc", "/pricing", "/"]) {
+    for (const p of ["/dashboard", "/ai-league", "/ai-league/mika", "/outbound", "/leads/abc", "/pricing", "/"]) {
       expect(isMoreActive(p)).toBe(false);
     }
   });
@@ -88,15 +89,25 @@ describe("desktop sections", () => {
 });
 
 describe("mobile bar and More sheet", () => {
-  it("bar is Home, Outbound, Leads, Deals (More is added by the component)", () => {
-    expect(keys(mobileBarItems(OWNER))).toEqual(["home", "outbound", "leads", "deals"]);
-    expect(mobileBarItems(OWNER).map((i) => i.shortLabel)).toEqual(["Home", "Outbound", "Leads", "Deals"]);
+  it("bar is Home, AI League, Outbound, Leads (More is added by the component)", () => {
+    expect(keys(mobileBarItems(OWNER))).toEqual(["home", "league", "outbound", "leads"]);
+    expect(mobileBarItems(OWNER).map((i) => i.shortLabel)).toEqual(["Home", "AI League", "Outbound", "Leads"]);
   });
 
-  it("sheet groups AI League, Documents, Money and Account", () => {
+  it("sheet groups Pipeline (Deals), Documents, Money and Account, never repeating a bar item", () => {
     const s = moreSheetSections(OWNER);
-    expect(s.map((x) => x.label)).toEqual(["AI League", "Documents", "Money", "Account"]);
-    expect(s.map((x) => keys(x.items))).toEqual([["league"], ["quotations", "agreements"], ["invoices"], ["profile", "settings"]]);
+    expect(s.map((x) => x.label)).toEqual(["Pipeline", "Documents", "Money", "Account"]);
+    expect(s.map((x) => keys(x.items))).toEqual([["deals"], ["quotations", "agreements"], ["invoices"], ["profile", "settings"]]);
+    const inBar = new Set(keys(mobileBarItems(OWNER)));
+    expect(s.flatMap((x) => keys(x.items)).filter((k) => inBar.has(k))).toEqual([]);
+  });
+
+  it("More lights for deals, documents and account pages, not for a page whose tab is in the bar", () => {
+    expect(isMoreActive("/deals/12")).toBe(true);
+    expect(isMoreActive("/contracts")).toBe(true);
+    expect(isMoreActive("/settings")).toBe(true);
+    expect(isMoreActive("/leads/4")).toBe(false);
+    expect(isMoreActive("/ai-league/nibo")).toBe(false);
   });
 
   it("an invoices-only custom role keeps Home, Money and Account", () => {
@@ -107,8 +118,8 @@ describe("mobile bar and More sheet", () => {
 
   it("deal permissions light Pipeline and Quotations (same gate as today)", () => {
     const u = custom("deals.create");
-    expect(keys(mobileBarItems(u))).toEqual(["home", "outbound", "leads", "deals"]);
-    expect(moreSheetSections(u).map((x) => keys(x.items))).toEqual([["league"], ["quotations"], ["profile", "settings"]]);
+    expect(keys(mobileBarItems(u))).toEqual(["home", "league", "outbound", "leads"]);
+    expect(moreSheetSections(u).map((x) => keys(x.items))).toEqual([["deals"], ["quotations"], ["profile", "settings"]]);
   });
 
   it("Settings and Profile are always reachable", () => {

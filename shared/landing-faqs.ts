@@ -7,6 +7,7 @@
  */
 import { PRICING } from "./product-facts";
 import { OUTBOUND_ALLOWANCE_DEFAULTS as OB, OUTBOUND_WINDOW_DAYS } from "./outbound-plans";
+import { LEAGUE_ALLOWANCE_DEFAULTS as LG, LEAGUE_WINDOW_DAYS } from "./ai-league";
 
 export interface LandingFaq {
   q: string;
@@ -37,6 +38,10 @@ export const LANDING_FAQS: LandingFaq[] = [
   {
     q: "Can DealInSec find local businesses in my city?",
     a: "Yes. Choose Local businesses, type the kind of business and the city (for example dentists in Siliguri, coaching institutes in Kota or cafes in Pune), and DealInSec lists matching businesses from Google Maps, with their address, phone, website if listed, and a link to the listing. You can filter to listings with or without a website. The listings are shown for that search and not kept in DealInSec: you choose which websites it researches, the same way as any prospect, or save a business to Leads under the name you give it. One local search uses one AI Outbound search. A listing without a website only means none is listed; it doesn't prove the business has no website or needs one.",
+  },
+  {
+    q: "What are Nibo, Mika and Zee?",
+    a: `They are DealInSec's three AI coworkers. Nibo researches companies that fit what you sell and saves the qualified ones to your leads with evidence, Mika drafts first messages for you to approve and send yourself, and Zee briefs you on overdue invoices, follow-ups and what's due, from your own records. They work in the background, ask before anything that spends your allowance or changes something, and never send, pay or sign anything. The free plan includes ${LG.free.monthlyRuns} coworker tasks every ${LEAGUE_WINDOW_DAYS} days and Pro ${LG.pro.monthlyRuns}.`,
   },
   {
     q: "Does DealInSec guarantee customers or verified contact details?",
