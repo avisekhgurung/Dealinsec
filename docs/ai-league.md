@@ -9,6 +9,20 @@ agent (server/agent) for chat, and the existing durable Postgres workflow runner
 | Mika | Deal Specialist | `mika.first_messages`: first emails drafted by the outreach service for up to 5 leads, waiting for approval | reads leads, follow-ups, drafts, deals | send anything (drafts only; the person approves the exact text and sends) |
 | Zee | Business Guardian | `zee.briefing`: what needs the person today, from invoices, agreements, deals, follow-ups, outreach | reads money radar, pending work, invoices, quotations, agreements, follow-ups | change records, claim anything the records don't say |
 
+## Teamwork: the coworkers talk to each other
+
+Talking changes nothing; doing still asks. All of it is in `server/ai-league/team.ts` and `chat.ts`.
+
+| How | What happens | Bounds |
+|---|---|---|
+| **Ask a teammate** (`ask_teammate`, in any coworker's chat) | The teammate answers in its own voice from its OWN records, read through its own read tools as the person (Mika asking Zee never shows money to someone who can't see invoices). Shown as a "Nibo asked Mika" card. | Read-only; one model call with no tools, so a teammate can't consult further or act; at most `consultsPerReply` (2) per reply |
+| **Hand off work** (`handoff_<from>_to_<to>`) | Starts the teammate's task (Nibo → Mika: draft first messages for the leads Nibo found). The report lands in the teammate's chat. | **Always** an approval card ("Nibo asks Mika: …"), whatever the autonomy setting: it spends the teammate's allowance |
+| **Team huddle** (`team.huddle` task; the Team tab, a chat header, or `league_<bot>_huddle` in chat) | A background brainstorm: the lead opens, each coworker speaks once per round for two rounds, each turn a durable step, then the lead sums up with at most three next steps, each owned by one coworker | Counts as one AI League task; 7 model calls on the `team` AI allowance (`SALES_DAILY_TEAM_LIMIT`, default 60 calls a day per workspace; `SALES_TEAM_MODEL`) and the spend ceiling; an allowance refusal stops it with what was said |
+
+Every teammate reply passes the same check as Zee's summary: a figure that isn't in the records, the question or
+what was said before means that reply is left out (and marked), never shown. Records, topics and earlier turns reach
+the model only inside `<untrusted>` fences, and a teammate's answer reaches the asking coworker fenced too.
+
 ## Architecture
 
 ```

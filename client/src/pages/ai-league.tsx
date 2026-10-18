@@ -11,7 +11,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useRoute, useSearch } from "wouter";
-import { ArrowLeft, ChevronRight, ListChecks, Play, Sparkles } from "lucide-react";
+import { ArrowLeft, ChevronRight, ListChecks, MessagesSquare, Play, Sparkles } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
@@ -76,6 +76,7 @@ function LeagueHome() {
   const roster = useRoster();
   const approvals = useApprovals();
   const [dialog, setDialog] = useState<Bot | null>(null);
+  const [huddle, setHuddle] = useState(false);
   const waiting = approvals.data?.items.length ?? 0;
 
   return (
@@ -115,6 +116,14 @@ function LeagueHome() {
                       <CoworkerCard key={c.bot} card={c} onTask={() => setDialog(c.bot)} onOpenRun={setRunId} />
                     ))}
                 </section>
+                <section className="flex flex-col gap-3 rounded-2xl border bg-card p-4 sm:flex-row sm:items-center" aria-labelledby="huddle-h" data-testid="league-huddle">
+                  <span className="flex shrink-0 items-center -space-x-2" aria-hidden>{BOTS.map((b) => <Mascot key={b} bot={b} size={40} className="ring-2 ring-card" />)}</span>
+                  <div className="min-w-0 flex-1">
+                    <h2 id="huddle-h" className="text-sm font-semibold">Team huddle</h2>
+                    <p className="text-sm text-muted-foreground">Give the team a question. Nibo, Mika and Zee talk it over from their own records and come back with next steps. They also ask each other for help in their chats.</p>
+                  </div>
+                  <Button variant="outline" className="h-10 shrink-0" onClick={() => setHuddle(true)} data-testid="start-huddle"><MessagesSquare className="mr-1.5 h-4 w-4" />Start a huddle</Button>
+                </section>
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
                   <section className="rounded-2xl border bg-card p-4" aria-labelledby="recent-h">
                     <div className="mb-2 flex items-center justify-between"><h2 id="recent-h" className="text-sm font-semibold">Recent activity</h2><Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setView("activity")}>See all<ChevronRight className="ml-0.5 h-3.5 w-3.5" /></Button></div>
@@ -137,6 +146,7 @@ function LeagueHome() {
         )}
       </main>
       {dialog && <TaskDialog bot={dialog} open={!!dialog} onOpenChange={(o) => !o && setDialog(null)} onStarted={(r) => setRunId(r.id)} />}
+      {huddle && <TaskDialog bot="zee" huddle open={huddle} onOpenChange={setHuddle} onStarted={(r) => setRunId(r.id)} />}
       <RunSheet id={runId} onClose={() => setRunId(null)} />
       <BottomNav />
     </div>
@@ -239,6 +249,7 @@ function CoworkerChat({ bot }: { bot: Bot }) {
   const runs = useRuns({ bot });
   const [runId, setRunId] = useRunParam();
   const [dialog, setDialog] = useState(false);
+  const [huddle, setHuddle] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
   const card = roster.data?.bots.find((b) => b.bot === bot);
   // A reply may have started a task: show it in the task panel.
@@ -291,6 +302,7 @@ function CoworkerChat({ bot }: { bot: Bot }) {
               <p className={cn("truncate text-xs", id.accent.fg)}>{id.role}{card && card.status !== "available" ? ` · ${BOT_STATUS_LABEL[card.status]}` : ""}</p>
             </div>
             <Button size="sm" variant="outline" className="h-9 xl:hidden" onClick={() => setTasksOpen(true)} data-testid="open-tasks"><ListChecks className="mr-1.5 h-4 w-4" />Tasks{active ? " ·1" : ""}</Button>
+            <Button size="sm" variant="outline" className="hidden h-9 sm:inline-flex" onClick={() => setHuddle(true)} data-testid="chat-start-huddle"><MessagesSquare className="mr-1.5 h-4 w-4" />Huddle</Button>
             <Button size="sm" className={cn("hidden h-9 text-white sm:inline-flex", id.accent.bg)} onClick={() => setDialog(true)} data-testid="chat-start-task"><Play className="mr-1.5 h-3.5 w-3.5" />{bot === "zee" ? "Brief me" : "Start a task"}</Button>
           </header>
           <div className="relative flex min-h-0 flex-1 flex-col">
@@ -326,6 +338,7 @@ function CoworkerChat({ bot }: { bot: Bot }) {
         </SheetContent>
       </Sheet>
       {dialog && <TaskDialog bot={bot} open={dialog} onOpenChange={setDialog} onStarted={(r: RunView) => setRunId(r.id)} />}
+      {huddle && <TaskDialog bot={bot} huddle open={huddle} onOpenChange={setHuddle} onStarted={(r: RunView) => setRunId(r.id)} />}
       <RunSheet id={runId} onClose={() => setRunId(null)} />
     </div>
   );

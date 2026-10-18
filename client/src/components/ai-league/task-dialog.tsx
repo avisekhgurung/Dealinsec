@@ -14,7 +14,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useUpgradeModal } from "@/components/upgrade-modal";
 import { isUpgradeError, parseApiError } from "@/lib/api-error";
 import { leadError } from "@/lib/leads";
-import { BOT_IDENTITY, LEAGUE_LIMITS, TASK_LABEL, type Bot, type LeagueTask } from "@shared/ai-league";
+import { BOTS, BOT_IDENTITY, LEAGUE_LIMITS, TASK_LABEL, type Bot, type LeagueTask } from "@shared/ai-league";
+import { cn } from "@/lib/utils";
 import { refreshLeague, startTask, type RunView } from "@/lib/ai-league";
 import { Mascot } from "./mascot";
 
@@ -23,30 +24,33 @@ const SCOPE: Record<LeagueTask, string> = {
   "nibo.find_clients": "Runs an AI Outbound search (one of your plan's searches), checks each company's own website, and saves up to the number below of the qualified ones to Leads. No one is contacted.",
   "mika.first_messages": "Drafts first emails from what's verified about each lead. Nothing is sent: every draft waits for your approval in Outreach.",
   "zee.briefing": "Reads your invoices, agreements, deals, follow-ups and outreach and reports what needs you. Nothing is changed.",
+  "team.huddle": "Nibo, Mika and Zee each give their view from their own records, twice, then the lead sums up with next steps. About a minute; nothing is changed or sent.",
 };
 
-export function TaskDialog({ bot, open, onOpenChange, onStarted, initialRequest }: { bot: Bot; open: boolean; onOpenChange: (o: boolean) => void; onStarted: (run: RunView) => void; initialRequest?: string }) {
+/** A coworker's own task, or (`huddle`) a team huddle that coworker leads. */
+export function TaskDialog({ bot, open, onOpenChange, onStarted, initialRequest, huddle = false }: { bot: Bot; open: boolean; onOpenChange: (o: boolean) => void; onStarted: (run: RunView) => void; initialRequest?: string; huddle?: boolean }) {
   const { toast } = useToast();
   const { openUpgradeModal } = useUpgradeModal();
-  const task = TASK_OF[bot], id = BOT_IDENTITY[bot];
+  const [lead, setLead] = useState<Bot>(bot);
+  const task: LeagueTask = huddle ? "team.huddle" : TASK_OF[bot], id = BOT_IDENTITY[huddle ? lead : bot];
   const [request, setRequest] = useState(initialRequest ?? "");
   const [saveLeads, setSaveLeads] = useState(true);
   const [max, setMax] = useState(3);
   const start = useMutation({
-    mutationFn: () => startTask(task, task === "nibo.find_clients" ? { request, saveLeads, maxLeads: max } : task === "mika.first_messages" ? { max } : {}),
-    onSuccess: (r) => { void refreshLeague(); onOpenChange(false); onStarted(r.run); toast({ title: r.existing ? "Already running" : `${id.name} is on it`, description: "Progress shows here. It keeps going if you leave this page." }); },
+    mutationFn: () => startTask(task, task === "nibo.find_clients" ? { request, saveLeads, maxLeads: max } : task === "mika.first_messages" ? { max } : task === "team.huddle" ? { topic: request, lead } : {}),
+    onSuccess: (r) => { void refreshLeague(); onOpenChange(false); onStarted(r.run); toast({ title: r.existing ? "Already running" : huddle ? "The team is talking it over" : `${id.name} is on it`, description: "Progress shows here. It keeps going if you leave this page." }); },
     onError: (e) => { if (isUpgradeError(parseApiError(e))) { onOpenChange(false); openUpgradeModal({ feature: "outbound" }); } else toast({ title: "Couldn't start the task", description: leadError(e), variant: "destructive" }); },
   });
-  const ready = task !== "nibo.find_clients" || request.trim().length >= 8;
+  const ready = (task !== "nibo.find_clients" && task !== "team.huddle") || request.trim().length >= 8;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg" data-testid="task-dialog">
         <DialogHeader>
           <div className="flex items-center gap-3">
-            <Mascot bot={bot} size={40} />
+            <Mascot bot={huddle ? lead : bot} size={40} />
             <div className="text-left">
               <DialogTitle>{TASK_LABEL[task]}</DialogTitle>
-              <DialogDescription className="text-left">{id.name} · {id.role}</DialogDescription>
+              <DialogDescription className="text-left">{huddle ? `Led by ${id.name}, with the whole team` : `${id.name} · ${id.role}`}</DialogDescription>
             </div>
           </div>
         </DialogHeader>
@@ -64,6 +68,23 @@ export function TaskDialog({ bot, open, onOpenChange, onStarted, initialRequest 
                   </label>
                 )}
               </div>
+            </>
+          )}
+          {task === "team.huddle" && (
+            <>
+            <label className="flex flex-col gap-1.5 text-sm font-medium">What should the team think about?
+              <Textarea value={request} onChange={(e) => setRequest(e.target.value)} rows={3} maxLength={LEAGUE_LIMITS.requestChars} placeholder="How do we land 3 new clients this month?" data-testid="huddle-topic" />
+            </label>
+            <fieldset className="space-y-1.5">
+              <legend className="text-sm font-medium">Who leads and sums up?</legend>
+              <div className="grid grid-cols-3 gap-2">
+                {BOTS.map((b) => (
+                  <button key={b} type="button" onClick={() => setLead(b)} aria-pressed={lead === b} className={cn("flex items-center gap-2 rounded-lg border px-2 py-1.5 text-sm transition-colors", lead === b ? cn("border-transparent ring-2", BOT_IDENTITY[b].accent.ring, BOT_IDENTITY[b].accent.soft) : "hover:bg-muted/60")} data-testid={`huddle-lead-${b}`}>
+                    <Mascot bot={b} size={26} />{BOT_IDENTITY[b].name}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
             </>
           )}
           {task === "mika.first_messages" && (

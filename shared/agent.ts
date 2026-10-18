@@ -33,7 +33,7 @@ export interface ApprovalPreview {
   [k: string]: unknown;
 }
 
-export type CardKind = "approval" | "deal" | "findings" | "quotation" | "agreement" | "invoice" | "payment" | "lead" | "companies";
+export type CardKind = "approval" | "deal" | "findings" | "quotation" | "agreement" | "invoice" | "payment" | "lead" | "companies" | "teammate";
 
 /** A card the UI renders from structured data (never from model prose). */
 export interface AgentCard {
@@ -56,6 +56,7 @@ export function approvalStatusFromServer(status: string, expiresAt?: string | Da
 /* ── tools, in words ──────────────────────────────────────────────────── */
 
 const TOOL_LABELS: Record<string, string> = {
+  ask_teammate: "a teammate",
   get_workflow_status: "where the deal stands",
   search_deals: "your deals",
   search_quotations: "your quotations",

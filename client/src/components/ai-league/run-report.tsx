@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { BOT_IDENTITY, isTerminal } from "@shared/ai-league";
 import { leagueCall, refreshLeague, runUrl, useRun, when, type EventView, type RunView } from "@/lib/ai-league";
 import { leadError } from "@/lib/leads";
+import { Mascot } from "./mascot";
 
 const STATUS_TONE: Record<string, string> = {
   completed: "bg-emerald-50 text-emerald-800 ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900",
@@ -103,10 +104,10 @@ export function RunDetail({ id, onClose }: { id: string; onClose?: () => void })
         <ul className="divide-y rounded-lg border" data-testid="run-items">
           {r.items.slice(0, 40).map((it, i) => (
             <li key={i} className="flex gap-2.5 px-3 py-2.5 text-sm">
-              <span className="mt-0.5 shrink-0">{ITEM_ICON[it.status]}</span>
+              <span className="mt-0.5 shrink-0">{it.bot ? <Mascot bot={it.bot} size={26} /> : ITEM_ICON[it.status]}</span>
               <div className="min-w-0 flex-1">
-                {it.href ? <Link href={it.href} className="font-medium hover:underline">{it.title}</Link> : <span className="font-medium">{it.title}</span>}
-                {it.detail && <p className="text-xs text-muted-foreground">{it.detail}</p>}
+                {it.href ? <Link href={it.href} className={cn("font-medium hover:underline", it.bot && BOT_IDENTITY[it.bot].accent.fg)}>{it.title}</Link> : <span className={cn("font-medium", it.bot && BOT_IDENTITY[it.bot].accent.fg)}>{it.title}</span>}
+                {it.detail && <p className={it.bot ? "mt-0.5 text-sm text-foreground/90" : "text-xs text-muted-foreground"}>{it.detail}</p>}
                 {it.sources && it.sources.length > 0 && (
                   <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]">
                     {it.sources.slice(0, 3).map((s) => <a key={s} href={s} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex max-w-[16rem] items-center gap-1 truncate text-muted-foreground hover:text-foreground"><ExternalLink className="h-3 w-3 shrink-0" aria-hidden /><span className="truncate">{s.replace(/^https?:\/\/(www\.)?/, "")}</span></a>)}

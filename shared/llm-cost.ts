@@ -37,12 +37,12 @@ export function costMicroUsd(tokensIn: number, tokensOut: number, prices: Prices
 }
 
 /** What the sales features ask a model to do. Each can use a different model and has its own daily allowance. */
-export const LLM_TASKS = ["research", "draft", "classify", "negotiate", "icp", "enrich", "signals", "angle", "brief"] as const;
+export const LLM_TASKS = ["research", "draft", "classify", "negotiate", "icp", "enrich", "signals", "angle", "brief", "team"] as const;
 export type LlmTask = (typeof LLM_TASKS)[number];
 
-const MODEL_ENV: Record<LlmTask, string> = { research: "SALES_RESEARCH_MODEL", draft: "SALES_DRAFT_MODEL", classify: "SALES_CLASSIFY_MODEL", negotiate: "SALES_NEGOTIATE_MODEL", icp: "SALES_ICP_MODEL", enrich: "SALES_ENRICH_MODEL", signals: "SALES_SIGNALS_MODEL", angle: "SALES_ANGLE_MODEL", brief: "SALES_BRIEF_MODEL" };
-const LIMIT_ENV: Record<LlmTask, string> = { research: "SALES_DAILY_RESEARCH_LIMIT", draft: "SALES_DAILY_DRAFT_LIMIT", classify: "SALES_DAILY_CLASSIFY_LIMIT", negotiate: "SALES_DAILY_NEGOTIATE_LIMIT", icp: "SALES_DAILY_ICP_LIMIT", enrich: "SALES_DAILY_ENRICH_LIMIT", signals: "SALES_DAILY_SIGNALS_LIMIT", angle: "SALES_DAILY_ANGLE_LIMIT", brief: "SALES_DAILY_BRIEF_LIMIT" };
-const DEFAULT_LIMIT: Record<LlmTask, number> = { research: 20, draft: 40, classify: 200, negotiate: 20, icp: 60, enrich: 400, signals: 250, angle: 80, brief: 30 };
+const MODEL_ENV: Record<LlmTask, string> = { research: "SALES_RESEARCH_MODEL", draft: "SALES_DRAFT_MODEL", classify: "SALES_CLASSIFY_MODEL", negotiate: "SALES_NEGOTIATE_MODEL", icp: "SALES_ICP_MODEL", enrich: "SALES_ENRICH_MODEL", signals: "SALES_SIGNALS_MODEL", angle: "SALES_ANGLE_MODEL", brief: "SALES_BRIEF_MODEL", team: "SALES_TEAM_MODEL" };
+const LIMIT_ENV: Record<LlmTask, string> = { research: "SALES_DAILY_RESEARCH_LIMIT", draft: "SALES_DAILY_DRAFT_LIMIT", classify: "SALES_DAILY_CLASSIFY_LIMIT", negotiate: "SALES_DAILY_NEGOTIATE_LIMIT", icp: "SALES_DAILY_ICP_LIMIT", enrich: "SALES_DAILY_ENRICH_LIMIT", signals: "SALES_DAILY_SIGNALS_LIMIT", angle: "SALES_DAILY_ANGLE_LIMIT", brief: "SALES_DAILY_BRIEF_LIMIT", team: "SALES_DAILY_TEAM_LIMIT" };
+const DEFAULT_LIMIT: Record<LlmTask, number> = { research: 20, draft: 40, classify: 200, negotiate: 20, icp: 60, enrich: 400, signals: 250, angle: 80, brief: 30, team: 60 };
 
 /**
  * The task's own model (SALES_<TASK>_MODEL) if set, else DEFAULT_SALES_MODEL ("deepseek-flash", the DeepSeek Flash model, as the founder chose). Deliberately NOT the app-wide DEEPSEEK_MODEL:
@@ -59,7 +59,7 @@ const DEFAULT_LIMIT: Record<LlmTask, number> = { research: 20, draft: 40, classi
 export const DEFAULT_SALES_MODEL = "deepseek-flash";
 export const DEFAULT_MODEL: Record<LlmTask, string> = {
   research: DEFAULT_SALES_MODEL, draft: DEFAULT_SALES_MODEL, classify: DEFAULT_SALES_MODEL, negotiate: "deepseek-v4-pro",
-  icp: DEFAULT_SALES_MODEL, enrich: DEFAULT_SALES_MODEL, signals: DEFAULT_SALES_MODEL, angle: DEFAULT_SALES_MODEL, brief: DEFAULT_SALES_MODEL,
+  icp: DEFAULT_SALES_MODEL, enrich: DEFAULT_SALES_MODEL, signals: DEFAULT_SALES_MODEL, angle: DEFAULT_SALES_MODEL, brief: DEFAULT_SALES_MODEL, team: DEFAULT_SALES_MODEL,
 };
 export function modelFor(task: LlmTask, env: Env = process.env): string {
   const v = env[MODEL_ENV[task]]?.trim();

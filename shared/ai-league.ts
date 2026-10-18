@@ -5,6 +5,10 @@
  *   Nibo  Opportunity Hunter  finds companies with evidence (AI Outbound) and saves the qualified ones as leads
  *   Mika  Deal Specialist     drafts first messages from verified facts; nothing is sent without the person's approval
  *   Zee   Business Guardian   briefs the person on what needs them, from the records themselves
+ *
+ * They work as a team: in a chat a coworker can ask a teammate for help (a read-only answer from the teammate's own
+ * records) or hand work to a teammate (always with the person's approval), and a "team huddle" is a short background
+ * brainstorm between the three, ending in a summary and next steps. Talking changes nothing; doing still asks.
  */
 import { z } from "zod";
 
@@ -31,33 +35,44 @@ export const BOT_IDENTITY: Record<Bot, BotIdentity> = {
     pitch: "Finds companies that fit what you sell, checks each one's own website, and saves the qualified ones to Leads with the evidence.",
     voice: "curious, quick and evidence-first: says what was found and where, and plainly what wasn't",
     accent: { fg: "text-blue-700 dark:text-blue-300", bg: "bg-blue-600", ring: "ring-blue-500/40", soft: "bg-blue-50 dark:bg-blue-950/40" },
-    suggestions: ["Find 10 dental clinics in Siliguri that could use a better website", "Research 10 UK marketing agencies with 5–50 people", "Find US law firms with older websites"],
+    suggestions: ["Find 10 dental clinics in Siliguri that could use a better website", "Research 10 UK marketing agencies with 5–50 people", "Ask Mika how she would open with my newest leads"],
   },
   mika: {
     bot: "mika", name: "Mika", role: "Deal Specialist",
     pitch: "Writes first messages to your leads from what's been verified about them, and lines them up for your approval. Nothing is sent without you.",
     voice: "warm, thoughtful and professional: short, specific messages, never pushy, never invented",
     accent: { fg: "text-rose-700 dark:text-rose-300", bg: "bg-rose-600", ring: "ring-rose-500/40", soft: "bg-rose-50 dark:bg-rose-950/40" },
-    suggestions: ["Draft first messages for my newest researched leads", "Which leads are waiting on a follow-up?", "Summarize where my open deals stand"],
+    suggestions: ["Draft first messages for my newest researched leads", "Which leads are waiting on a follow-up?", "Ask Zee which clients owe us money before I follow up"],
   },
   zee: {
     bot: "zee", name: "Zee", role: "Business Guardian",
     pitch: "Briefs you on what needs you today, from your own records: overdue invoices, quotes waiting, follow-ups due.",
     voice: "calm, organized and reassuring: leads with what matters most and links to the record",
     accent: { fg: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-600", ring: "ring-emerald-500/40", soft: "bg-emerald-50 dark:bg-emerald-950/40" },
-    suggestions: ["Give me today's business briefing", "What's overdue right now?", "Which quotes are still waiting on a reply?"],
+    suggestions: ["Give me today's business briefing", "What's overdue right now?", "Hold a team huddle: how do we land 3 new clients this month?"],
   },
 };
 
 /* ── tasks ───────────────────────────────────────────────────────────────── */
 
-export const TASKS = ["nibo.find_clients", "mika.first_messages", "zee.briefing"] as const;
+export const TASKS = ["nibo.find_clients", "mika.first_messages", "zee.briefing", "team.huddle"] as const;
 export type LeagueTask = (typeof TASKS)[number];
-export const TASK_BOT: Record<LeagueTask, Bot> = { "nibo.find_clients": "nibo", "mika.first_messages": "mika", "zee.briefing": "zee" };
-export const TASK_LABEL: Record<LeagueTask, string> = { "nibo.find_clients": "Find potential clients", "mika.first_messages": "Draft first messages", "zee.briefing": "Business briefing" };
+/** The coworker a task belongs to. A huddle belongs to whoever leads it (see botForTask); "zee" is only its default. */
+export const TASK_BOT: Record<LeagueTask, Bot> = { "nibo.find_clients": "nibo", "mika.first_messages": "mika", "zee.briefing": "zee", "team.huddle": "zee" };
+export const botForTask = (task: LeagueTask, input: unknown): Bot => {
+  const lead = (input as { lead?: unknown } | null)?.lead;
+  return task === "team.huddle" && isBot(lead) ? lead : TASK_BOT[task];
+};
+export const TASK_LABEL: Record<LeagueTask, string> = { "nibo.find_clients": "Find potential clients", "mika.first_messages": "Draft first messages", "zee.briefing": "Business briefing", "team.huddle": "Team huddle" };
 
 /** Hard limits the server enforces whatever a model or a request says. */
-export const LEAGUE_LIMITS = { leadsPerRun: 5, draftsPerRun: 5, requestChars: 500 } as const;
+export const LEAGUE_LIMITS = {
+  leadsPerRun: 5, draftsPerRun: 5, requestChars: 500,
+  /** A huddle: each coworker speaks once per round, then the lead sums up. */
+  huddleRounds: 2,
+  /** Teammate consultations a coworker may make while answering one message (a teammate never consults further). */
+  consultsPerReply: 2,
+} as const;
 
 export const TASK_INPUT = {
   "nibo.find_clients": z.object({
@@ -72,6 +87,10 @@ export const TASK_INPUT = {
     max: z.number().int().min(1).max(LEAGUE_LIMITS.draftsPerRun).default(3),
   }).strict(),
   "zee.briefing": z.object({}).strict(),
+  "team.huddle": z.object({
+    topic: z.string().trim().min(8, "Say what the team should think about, for example \"How do we get 5 new dental clients this month?\"").max(LEAGUE_LIMITS.requestChars),
+    lead: z.enum(BOTS).default("zee"),
+  }).strict(),
 } as const satisfies Record<LeagueTask, z.ZodTypeAny>;
 export type TaskInput<T extends LeagueTask> = z.infer<(typeof TASK_INPUT)[T]>;
 export const isTask = (v: unknown): v is LeagueTask => typeof v === "string" && (TASKS as readonly string[]).includes(v);
@@ -94,7 +113,7 @@ export const BOT_STATUS_LABEL: Record<BotStatus, string> = { available: "Availab
 export interface LeagueReport {
   headline: string;
   counts: { label: string; value: number }[];
-  items: { title: string; detail?: string; href?: string; status: "done" | "skipped" | "failed" | "info" | "needs_you"; sources?: string[] }[];
+  items: { title: string; detail?: string; href?: string; status: "done" | "skipped" | "failed" | "info" | "needs_you"; sources?: string[]; /** Who said it (a huddle's turns and next steps). */ bot?: Bot }[];
   next?: { label: string; href: string } | null;
   /** Zee: a short summary written from the items above (never new facts). */
   summary?: string | null;

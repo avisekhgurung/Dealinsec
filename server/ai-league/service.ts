@@ -14,7 +14,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import {
-  BOTS, BOT_IDENTITY, RUN_STATUS_LABEL, TASK_BOT, TASK_INPUT, TASK_LABEL, isBot, isTask, nextRunAt, scheduleInput, validTimeZone,
+  BOTS, BOT_IDENTITY, RUN_STATUS_LABEL, TASK_INPUT, botForTask, TASK_LABEL, isBot, isTask, nextRunAt, scheduleInput, validTimeZone,
   type Bot, type BotStatus, type LeagueReport, type LeagueRunStatus, type LeagueTask,
 } from "@shared/ai-league";
 import { approvalStatusFromServer } from "@shared/agent";
@@ -42,10 +42,15 @@ export interface RunView {
   request: string | null; source: string; report: LeagueReport | null; errorCode: string | null; unread: boolean; cancelRequested: boolean;
   scheduleId: number | null; createdAt: string; startedAt: string | null; finishedAt: string | null; tokens: number;
 }
+/** What the person asked for: a search request, or a huddle's topic. */
+const requestOf = (input: unknown): string | null => {
+  const i = (input ?? {}) as { request?: unknown; topic?: unknown };
+  return typeof i.request === "string" ? i.request : typeof i.topic === "string" ? i.topic : null;
+};
 export const runView = (r: LeagueRunRow): RunView => ({
   id: r.id, bot: r.bot as Bot, task: r.task as LeagueTask, taskLabel: TASK_LABEL[r.task as LeagueTask] ?? r.task,
   status: r.status as LeagueRunStatus, statusLabel: RUN_STATUS_LABEL[r.status as LeagueRunStatus] ?? r.status, stage: r.stage,
-  request: typeof (r.input as { request?: unknown })?.request === "string" ? String((r.input as { request: string }).request) : null,
+  request: requestOf(r.input),
   source: r.source, report: (r.report as LeagueReport | null) ?? null, errorCode: r.errorCode,
   unread: !r.readAt && ["completed", "partial", "failed"].includes(r.status), cancelRequested: r.cancelRequested,
   scheduleId: r.scheduleId, createdAt: iso(r.createdAt)!, startedAt: iso(r.startedAt), finishedAt: iso(r.finishedAt), tokens: r.tokensIn + r.tokensOut,
@@ -77,7 +82,7 @@ export async function startLeagueRun(user: Who, task: unknown, rawInput: unknown
   const allowance = leagueAllowance(tier);
   try {
     const { run, existing } = await deps.store.createRun({
-      id: `lr_${randomUUID().replace(/-/g, "").slice(0, 24)}`, orgId, userId: user.id, bot: TASK_BOT[task], task, input: parsed.data, now,
+      id: `lr_${randomUUID().replace(/-/g, "").slice(0, 24)}`, orgId, userId: user.id, bot: botForTask(task, parsed.data), task, input: parsed.data, now,
       idemKey: (opts.idemKey ?? `once:${randomUUID()}`).slice(0, 80), source: opts.source, scheduleId: opts.scheduleId ?? null,
       limits: { monthly: { since: new Date(now.getTime() - LEAGUE_WINDOW_DAYS * DAY), max: allowance.monthlyRuns }, concurrent: allowance.concurrent },
     });
@@ -251,7 +256,7 @@ export async function createSchedule(user: Who, raw: unknown, d: Partial<LeagueD
   const weekday = p.data.frequency === "weekly" ? (p.data.weekday ?? 1) : null;
   const now = deps.now();
   const row = await deps.store.createSchedule({
-    organizationId: user.organizationId!, userId: user.id, bot: TASK_BOT[p.data.task], task: p.data.task, input: input.data, frequency: p.data.frequency,
+    organizationId: user.organizationId!, userId: user.id, bot: botForTask(p.data.task, input.data), task: p.data.task, input: input.data, frequency: p.data.frequency,
     timeOfDay: p.data.timeOfDay, weekday, timezone: p.data.timezone, status: "active",
     nextRunAt: nextRunAt({ frequency: p.data.frequency, timeOfDay: p.data.timeOfDay, weekday, timezone: p.data.timezone }, now), now,
   });

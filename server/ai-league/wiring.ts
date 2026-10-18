@@ -8,6 +8,8 @@ import type { TaskHandler } from "./tasks/types";
 import { niboTask } from "./tasks/nibo";
 import { mikaTask } from "./tasks/mika";
 import { localeOf, zeeTask } from "./tasks/zee";
+import { huddleTask } from "./team";
+import { CapExceeded, CapUnavailable } from "../llm/traced";
 
 export function buildHandlers(): Record<LeagueTask, TaskHandler> {
   return {
@@ -39,6 +41,16 @@ export function buildHandlers(): Record<LeagueTask, TaskHandler> {
           return r.content ? { text: r.content, tokensIn: r.usage?.inputTokens ?? 0, tokensOut: r.usage?.outputTokens ?? 0 } : null;
         } catch { return null; } // over budget or the model didn't answer: the plain summary stands
       },
+    }),
+    "team.huddle": huddleTask({
+      chat: async (ctx, messages, opts) => {
+        const { tracedChat } = await import("../llm/traced");
+        const { modelFor } = await import("@shared/llm-cost");
+        return tracedChat(ctx, messages, { maxTokens: opts.maxTokens, model: modelFor("team") });
+      },
+      tools: async () => (await import("../agent/tools")).AGENT_TOOLS,
+      // The workspace's allowance for team talk, the platform budget, or the spend ceiling: stop with what was said.
+      isLimit: (e) => e instanceof CapExceeded || e instanceof CapUnavailable,
     }),
   };
 }
