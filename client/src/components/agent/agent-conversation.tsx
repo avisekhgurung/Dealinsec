@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Phone, Sparkles } from "lucide-react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAudience } from "@/hooks/use-audience";
 import { useAuth } from "@/hooks/useAuth";
 import type { useAgent } from "@/hooks/use-agent";
@@ -21,6 +21,11 @@ function Empty({ onPaste, onPrompt, pasteLabel, prompts, onCall }: { onPaste: ()
       <h2 className="mt-4 text-2xl font-bold tracking-tight sm:text-3xl" data-testid="agent-greeting">{greetingFor(new Date().getHours())}{name ? `, ${name}` : ""}</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
         I can run AI Outbound searches for new companies, work your leads and close deals. Tell me what you need, or tap the mic. I ask before I change anything that matters.
+      </p>
+      {/* Ask here for answers and quick work; hand longer, background work to the coworkers (AI League). */}
+      <p className="mx-auto mt-2 max-w-md text-xs text-muted-foreground" data-testid="agent-league-hint">
+        Work that takes a while, like finding clients, drafting first messages or a daily briefing, can go to{" "}
+        <Link href="/ai-league" className="font-semibold text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400">Nibo, Mika and Zee</Link>. They keep going in the background and report back.
       </p>
       {onCall && (
         <button type="button" onClick={onCall} data-testid="starter-call"

@@ -25,6 +25,7 @@ import { dismissGettingStarted, getFirstGoal, isGettingStartedDismissed, setFirs
 import { listUrl, type LeadList } from "@/lib/leads";
 import { OUTBOUND_RUNS_URL } from "@/lib/outbound";
 import { cn } from "@/lib/utils";
+import { Mascot } from "@/components/ai-league/mascot";
 import { canSeeModule } from "@shared/permissions";
 import {
   FIRST_GOALS, FIRST_GOAL_META, checklistFor, checklistState, isFirstGoal,
@@ -51,6 +52,13 @@ function StepIcon({ done }: { done: boolean | null }) {
   if (done === null) return <CircleDashed className="h-5 w-5 text-muted-foreground/60" aria-hidden />;
   return <Circle className="h-5 w-5 text-muted-foreground/50" aria-hidden />;
 }
+
+/** What the coworkers do for each focus: only work they really do (see shared/ai-league.ts). */
+const LEAGUE_HINT: Record<FirstGoal, string> = {
+  find_clients: "Nibo can run the search and save qualified companies; Mika drafts first messages for you to approve.",
+  manage_deals: "Mika drafts first messages for your leads; Zee briefs you on follow-ups and what's due.",
+  get_paid: "Zee briefs you on overdue invoices, follow-ups and what's due this week, from your own records.",
+};
 
 export function GettingStarted() {
   const { user } = useAuth();
@@ -198,6 +206,22 @@ export function GettingStarted() {
 
           <ol className="mt-2 -mx-3 space-y-0.5">{core.map(row)}</ol>
           {extra.length > 0 && <ol className="mt-1 -mx-3 border-t border-border/60 pt-1">{extra.map(row)}</ol>}
+          {/* The AI coworkers, introduced where they help with the chosen focus. A pointer, not a step: it never counts. */}
+          {can.deals && (
+            <Link
+              href="/ai-league"
+              onClick={() => trackEvent("checklist_league_clicked", { goal: goalParam })}
+              className="-mx-3 mt-1 flex items-center gap-3 rounded-xl border-t border-border/60 px-3 pb-1 pt-3 transition-colors hover:bg-foreground/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              data-testid="getting-started-league"
+            >
+              <span className="flex shrink-0 -space-x-2" aria-hidden>{(["nibo", "mika", "zee"] as const).map((b) => <Mascot key={b} bot={b} size={28} className="ring-2 ring-card" />)}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold leading-tight">Meet your AI team</span>
+                <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{LEAGUE_HINT[goal ?? "get_paid"]}</span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            </Link>
+          )}
         </section>
       </CardContent>
     </Card>

@@ -4,6 +4,7 @@
  * it), or from their connected Gmail ("Send from my Gmail", gmail-send.tsx), which sends exactly the approved text once.
  * While a Gmail send is in flight or uncertain ("sending"), nothing else can send, change or discard the message.
  */
+import { trackEvent } from "@/lib/analytics";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Check, Copy, Loader2, Mail, Pencil, PenLine, Send, X } from "lucide-react";
@@ -48,8 +49,9 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
   const fail = (title: string) => (e: unknown) => toast({ title, description: leadError(e), variant: "destructive" });
   const draft = useMutation({ mutationFn: () => leadCall("POST", draftUrl(leadId), {}), onSuccess: done, onError: fail("Couldn't write the message") });
   const save = useMutation({ mutationFn: () => leadCall("PATCH", messageUrl(current!.id), { subject, body }), onSuccess: done, onError: fail("Couldn't save your changes") });
-  const approve = useMutation({ mutationFn: () => leadCall("POST", messageUrl(current!.id, "approve"), { bodyHash: current!.bodyHash }), onSuccess: done, onError: fail("Couldn't approve it") });
-  const sent = useMutation({ mutationFn: () => leadCall("POST", messageUrl(current!.id, "sent"), {}), onSuccess: () => { done(); toast({ title: "Recorded as sent", description: "A follow-up is set for four days from now." }); }, onError: fail("Couldn't record it") });
+  // Activation: a reviewed and approved draft (not merely generated), and a message recorded as sent.
+  const approve = useMutation({ mutationFn: () => leadCall("POST", messageUrl(current!.id, "approve"), { bodyHash: current!.bodyHash }), onSuccess: () => { trackEvent("outreach_draft_approved", { source: "lead", edited: !!current?.edited, by_ai: current?.createdBy === "agent" }); done(); }, onError: fail("Couldn't approve it") });
+  const sent = useMutation({ mutationFn: () => leadCall("POST", messageUrl(current!.id, "sent"), {}), onSuccess: () => { trackEvent("outreach_marked_sent", { source: "lead" }); done(); toast({ title: "Recorded as sent", description: "A follow-up is set for four days from now." }); }, onError: fail("Couldn't record it") });
   const cancel = useMutation({ mutationFn: () => leadCall("POST", messageUrl(current!.id, "cancel"), {}), onSuccess: done, onError: fail("Couldn't discard it") });
   // The approved text leaves the app only through the server, checked at that moment (the lead's do-not-contact flag, the
   // organization's list, the exact text approved): never from what this page happens to hold.

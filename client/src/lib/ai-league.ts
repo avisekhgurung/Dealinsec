@@ -1,4 +1,5 @@
 /** Client side of AI League (server/ai-league/routes.ts). Types mirror the server's views. */
+import { trackEvent } from "@/lib/analytics";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { AgentEndpoints } from "@/hooks/use-agent";
@@ -61,7 +62,9 @@ export async function leagueCall<T = any>(method: string, url: string, body?: un
 /** A fresh key per click, so a double click (or a retried request) starts the task once. */
 export const clientKey = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`).replace(/[^A-Za-z0-9_-]/g, "");
 
-export const startTask = (task: LeagueTask, input: Record<string, unknown>) => leagueCall<{ run: RunView; existing: boolean }>("POST", RUNS_URL, { task, input, clientKey: clientKey() });
+export const startTask = (task: LeagueTask, input: Record<string, unknown>) =>
+  leagueCall<{ run: RunView; existing: boolean }>("POST", RUNS_URL, { task, input, clientKey: clientKey() })
+    .then((r) => { if (!r.existing) trackEvent("league_task_started", { task, source: "page" }); return r; });
 
 /** A coworker's conversation, through the agent's own chat hook. */
 export const leagueEndpoints = (bot: Bot): AgentEndpoints => ({

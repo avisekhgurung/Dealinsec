@@ -2,6 +2,7 @@
  * AI League's secondary views: what's waiting for you (approvals), recurring tasks (schedules), what your coworkers
  * remember (memory), and the plan's allowance (usage). Every button does what the server does; nothing is simulated.
  */
+import { trackEvent } from "@/lib/analytics";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "wouter";
@@ -37,7 +38,7 @@ function ApprovalRow({ item }: { item: ApprovalItem }) {
   const id = BOT_IDENTITY[item.bot];
   const approve = useMutation({
     mutationFn: async () => {
-      if (item.kind === "draft") return leadCall("POST", `/api/sales/messages/${item.id}/approve`, { bodyHash: item.bodyHash });
+      if (item.kind === "draft") return leadCall("POST", `/api/sales/messages/${item.id}/approve`, { bodyHash: item.bodyHash }).then((r) => { trackEvent("outreach_draft_approved", { source: "ai_league", by_ai: true }); return r; });
       let final: { ok?: boolean; message?: string } | null = null;
       await postStream(`${LEAGUE}/approvals/${encodeURIComponent(item.id)}/approve`, undefined, { onEvent: (e) => { if (e.data?.final) final = e.data as { ok?: boolean; message?: string }; } });
       const f = final as { ok?: boolean; message?: string } | null;

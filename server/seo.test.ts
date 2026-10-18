@@ -807,6 +807,41 @@ describe("/find-local-clients: local business search, for India", () => {
   });
 });
 
+describe("/ai-coworkers: Nibo, Mika and Zee, for India", () => {
+  const P = "/ai-coworkers";
+  const html = () => pages.get(P) ?? "";
+  const text = () => stripJsonLd((html().match(/<main>([\s\S]*?)<\/main>/)?.[1] ?? "")).replace(/<[^>]+>/g, " ").replace(/&[a-z#0-9]+;/g, " ").replace(/\s+/g, " ").toLowerCase();
+
+  it("is registered as an India page, in the sitemap, matched by the SSR pattern, listed in llms.txt and linked from the homepage copy", () => {
+    expect(html().length).toBeGreaterThan(1000);
+    expect(PAGES.find((x) => x.path === P)?.region).toBe("IN");
+    expect(categorySitemapPaths()).toContain(P);
+    expect(SSR_PATH_PATTERN.test(P)).toBe(true);
+    expect(llmsTxt("https://www.dealinsec.com")).toContain(`https://www.dealinsec.com${P}`);
+    expect(landingSeoBody()).toContain(`href="${P}"`);
+  });
+
+  it("has one H1, its own canonical, and a FAQ that matches its markup", () => {
+    const page = PAGES.find((x) => x.path === P)!;
+    expect(html().match(/<h1[\s>]/g)?.length).toBe(1);
+    expect(html()).toContain(`<link rel="canonical" href="https://www.dealinsec.com${P}" />`);
+    expect(page.description.length).toBeLessThan(200);
+    const faq = jsonLdBlocks(html()).find((b) => b["@type"] === "FAQPage");
+    expect(faq.mainEntity.map((q: any) => q.name)).toEqual(page.faq.map((f) => f.q));
+  });
+
+  it("states the plan limits the product enforces, and that coworkers draft but never send", async () => {
+    const { leagueAllowance } = await import("./ai-league/limits");
+    const t = text();
+    expect(t).toContain(`${leagueAllowance("free").monthlyRuns}`);
+    expect(t).toContain(`${leagueAllowance("pro").monthlyRuns}`);
+    expect(t).toMatch(/nothing is sent/);
+    expect(t).toMatch(/send it yourself/);
+    expect(t).toMatch(/don.t guarantee clients/);
+    expect(t).not.toMatch(/(?<!don.t |not )guarantee[ds]? (clients|replies|leads|payments)|(?<!don.t )sends? (the |your )?(emails?|messages?) for you|the best\b|#1\b|autonomous/);
+  });
+});
+
 describe("no trial is offered anywhere public", () => {
   // DealInSec is Free + Pro: new accounts start on the free plan. Competitors' own trials (Bonsai, Indy…) are facts
   // about them and stay in the comparison tables.

@@ -36,6 +36,8 @@ import { esc, SITE_ORIGIN, LOGO_SVG, gaSnippet, COOKIE_FOOTER_LINKS } from "./to
 import { consentBanner } from "@shared/consent-script";
 import { PRICING, TAGLINE } from "@shared/product-facts";
 import { OUTBOUND_ALLOWANCE_DEFAULTS as OB, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
+import { LEAGUE_LIMITS } from "@shared/ai-league";
+import { leagueAllowance, LEAGUE_WINDOW_DAYS } from "./ai-league/limits";
 
 // ?ref=, not utm_*: an internal UTM would overwrite the organic session source in GA4.
 const SIGNUP = "/auth?mode=signup&ref=category";
@@ -181,6 +183,7 @@ function footer(region: "IN" | "global"): string {
       <a href="/for-freelancers">For Freelancers</a>
       <a href="/for-creators">For Creators</a>
       <a href="/find-local-clients">Find Local Clients</a>
+      <a href="/ai-coworkers">AI Coworkers</a>
       <a href="/tools/deal-risk-checker">Deal Risk Checker</a>
       <a href="/freelancer-invoice-software">Freelancer Invoice Software</a>
       <a href="/quotation-software">Quotation Software</a>
@@ -779,6 +782,82 @@ export const PAGES: CategoryPage[] = [
       {
         q: "What does local search cost?",
         a: `It is part of AI Outbound, with no separate price. One local search uses one AI Outbound search: the free plan includes ${OB.free.monthlySearches} every ${OUTBOUND_WINDOW_DAYS} days, and Pro, ₹${PRICING.proMonthlyInr} a month in India, includes ${OB.pro.monthlySearches}. Researching websites uses your plan's researched prospects. The free plan needs no card.`,
+      },
+    ],
+  },
+  /* ── /ai-coworkers — Nibo, Mika and Zee (AI League), for India ───────────────────────────────────────── */
+  // Every capability here is what server/ai-league does: Nibo's research always asks first and saves at most
+  // LEAGUE_LIMITS.leadsPerRun companies a task; Mika only drafts; Zee's summary is checked against the records; a hand-off
+  // always asks; the plan limits come from leagueAllowance(). Nothing here promises clients, replies or accuracy.
+  {
+    path: "/ai-coworkers",
+    region: "IN",
+    updated: "2026-10-19",
+    metaTitle: "AI Coworkers for Freelancers and Agencies: Nibo, Mika and Zee",
+    description:
+      "Three AI coworkers inside DealInSec: Nibo researches companies that fit, Mika drafts first messages you approve, Zee briefs you from your own records.",
+    h1: "AI coworkers that find clients, draft messages and watch your money",
+    sub: "Nibo researches companies that fit what you sell, Mika drafts first messages for you to approve, and Zee tells you what needs you today, from your own invoices, deals and follow-ups. They work in the background and ask before anything that spends your allowance or changes something.",
+    chips: ["Research with sources", "Drafts only, you send", "Briefings from your records", "Run in the background", "Free plan, no card"],
+    shortLabel: "AI Coworkers",
+    sections: `
+<section><div class="wrap">
+  <h2>Three coworkers, three jobs</h2>
+  <p class="sec-sub">Each one does real work through the same features you use yourself, as you, with your permissions. Their names and personalities are for you; the rules they follow are the product's.</p>
+  <div class="feat">
+    <div class="ft"><b>Nibo finds companies that fit</b><p>Describe who you want to work with. Nibo runs an AI Outbound search, checks each company's own website, scores it against your ideal client and saves up to ${LEAGUE_LIMITS.leadsPerRun} qualified companies to your leads, each with the evidence and the page it came from. Research always asks before it starts, because it uses one of your searches.</p></div>
+    <div class="ft"><b>Mika drafts first messages</b><p>For leads you pick, or your newest researched leads, Mika writes a short first email from what was verified about each company. Nothing is sent: you read it, edit it, approve the exact text and send it yourself from your own email. Leads marked do-not-contact are skipped.</p></div>
+    <div class="ft"><b>Zee briefs you on what needs you</b><p>Overdue invoices, follow-ups due, messages waiting for approval, invoices due this week and agreements ready to invoice, read from your own records. Zee's short summary is checked against those records: one that mentions a figure they don't contain is left out.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>How they work</h2>
+  <div class="feat">
+    <div class="ft"><b>Chat, or start a task</b><p>Ask a coworker in its own chat, or start a task from the AI League page. A task runs on the server, so it keeps going if you close the page, and reports back with what it did and links to the records.</p></div>
+    <div class="ft"><b>Approvals stay yours</b><p>Anything that spends your allowance or changes your records waits for your approval, and nothing is sent, paid or signed by a coworker. Handing work from one coworker to another asks you first too.</p></div>
+    <div class="ft"><b>They help each other</b><p>A coworker can ask a teammate for a view from the teammate's own records, or call a short team huddle where all three talk a question over and suggest next steps. Talking changes nothing.</p></div>
+    <div class="ft"><b>Schedules</b><p>Set a task to run every day, every weekday or every week at a time in your timezone, such as a weekday morning briefing from Zee.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>What each plan includes</h2>
+  <div class="tbl-scroll"><table class="cmp">
+    <tr><th></th><th>Free</th><th>Pro (₹${PRICING.proMonthlyInr} a month)</th></tr>
+    <tr><td><b>Coworker tasks every ${LEAGUE_WINDOW_DAYS} days</b></td><td>${leagueAllowance("free").monthlyRuns}</td><td>${leagueAllowance("pro").monthlyRuns}</td></tr>
+    <tr><td><b>Tasks working at once</b></td><td>${leagueAllowance("free").concurrent}</td><td>${leagueAllowance("pro").concurrent}</td></tr>
+    <tr><td><b>Recurring tasks</b></td><td>${leagueAllowance("free").schedules}</td><td>${leagueAllowance("pro").schedules}</td></tr>
+  </table></div>
+  <div class="callout honest"><b>What they don't do</b><p>They don't guarantee clients, replies or payments, and they don't send messages for you. A task also uses the allowance of the feature it runs: Nibo's research uses AI Outbound searches (the free plan includes ${OB.free.monthlySearches} every ${OUTBOUND_WINDOW_DAYS} days, Pro ${OB.pro.monthlySearches}) and Mika's drafts use your plan's AI drafts. AI can be wrong, so every report links to the records and sources it used.</p></div>
+</div></section>
+<section><div class="wrap">
+  <h2>Where the work goes next</h2>
+  <div class="rel-grid">
+    <a class="rel-card" href="/find-local-clients">Find local clients<span>Businesses in a city from Google Maps, researched with sources.</span></a>
+    <a class="rel-card" href="/quotation-software">Quotation software<span>A quote from the deal that the client accepts online.</span></a>
+    <a class="rel-card" href="/e-signature">Agreements signed online<span>The accepted quote becomes the agreement.</span></a>
+    <a class="rel-card" href="/freelancer-invoice-software">Invoices and payment tracking<span>Invoices from the agreement; see what is overdue.</span></a>
+  </div>
+</div></section>`,
+    faq: [
+      {
+        q: "What are Nibo, Mika and Zee?",
+        a: "Three AI coworkers inside DealInSec. Nibo researches companies that fit what you sell and saves the qualified ones to your leads with evidence, Mika drafts first messages for you to approve and send, and Zee briefs you on what needs you today from your own records.",
+      },
+      {
+        q: "Do they send emails or messages for me?",
+        a: "No. Mika writes drafts; you read them, change anything, approve the exact text and send it yourself from your own email. Nothing is sent, paid or signed by a coworker.",
+      },
+      {
+        q: "How do I know Nibo's research is right?",
+        a: "Every company Nibo saves comes with the evidence it found and the page it came from, and companies without enough evidence aren't saved as qualified. AI can still be wrong, so check the source before you reach out.",
+      },
+      {
+        q: "Can they work while I'm away?",
+        a: "Yes. A task runs on DealInSec's server, so it keeps going if you close the page, and the report appears in the coworker's chat and in your notifications. You can also schedule a task every day, every weekday or every week.",
+      },
+      {
+        q: "What does it cost?",
+        a: `The free plan, with no card, includes ${leagueAllowance("free").monthlyRuns} coworker tasks every ${LEAGUE_WINDOW_DAYS} days. Pro, ₹${PRICING.proMonthlyInr} a month in India, includes ${leagueAllowance("pro").monthlyRuns}. Each task also uses the allowance of the feature it runs, such as AI Outbound searches for Nibo's research.`,
       },
     ],
   },

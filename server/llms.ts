@@ -59,6 +59,8 @@ export const COMPARISON_DESCRIPTIONS: Record<string, string> = {
 export const AUDIENCE_DESCRIPTIONS: Record<string, string> = {
   "/find-local-clients":
     "how an agency in India finds local business clients: list businesses in a city from Google Maps (shown for the search, not kept), research the websites that fit with sources, and turn the right ones into leads, deals and paid invoices",
+  "/ai-coworkers":
+    "Nibo, Mika and Zee, three AI coworkers inside DealInSec: research of companies that fit with sources, first-message drafts the person approves and sends themselves, and briefings from the account's own records; tasks run in the background and anything that spends an allowance or changes records asks first",
   "/for-freelancers":
     "how a client deal runs from request to payment for freelancers and independent professionals: scope, quotation, agreement, invoice and payment tracking, with a Protection Check of the terms",
   "/for-creators":

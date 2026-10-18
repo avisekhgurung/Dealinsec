@@ -127,12 +127,13 @@ export function DesktopTopNav() {
         href="/pricing"
         data-testid="topnav-plan-chip"
         aria-label={label}
-        className={`dis-topnav-chip inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[12px] font-semibold whitespace-nowrap ${tone}`}
+        className={`dis-topnav-chip inline-flex items-center gap-1.5 h-8 px-2.5 xl:px-3 rounded-full text-[12px] font-semibold whitespace-nowrap ${tone}`}
       >
         {icon}
-        {/* The bar stops growing at 1600px, so the long wording appears only once it has reached full width. */}
+        {/* The bar stops growing at 1600px, so the long wording appears only once it has reached full width. Below xl
+            (1024–1279px) the chip is its icon (the tooltip and aria-label keep the words): the eight tabs need the room. */}
         <span className="hidden min-[1600px]:inline">{text}</span>
-        <span className="min-[1600px]:hidden tabular-nums">{short}</span>
+        <span className="hidden xl:inline min-[1600px]:hidden tabular-nums">{short}</span>
       </Link>
     </BarTip>
   );
@@ -200,7 +201,9 @@ export function DesktopTopNav() {
           <span aria-hidden="true" className="self-center h-8 w-px mr-1 bg-gradient-to-b from-white/0 via-white/20 to-white/0" />
 
           {/* ── Workspace tabs ── */}
-          <nav aria-label="Workspace" className="flex items-stretch min-w-0 pl-1">
+          {/* min-w-0 + overflow-x-auto: if the tabs ever outgrow the bar (a narrow window, a longer label), they scroll
+              under their own edge instead of sliding beneath the account controls. */}
+          <nav aria-label="Workspace" className="flex items-stretch min-w-0 pl-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {desktopNavSections(user as any).map((section, i) => (
               <Fragment key={section.group}>
                 {/* Group divider: costs 5px, so the bar is no wider than the old flat one. */}
@@ -214,11 +217,12 @@ export function DesktopTopNav() {
                         href={item.href}
                         data-testid={`topnav-${item.key}`}
                         aria-current={active ? "page" : undefined}
-                        className="dis-topnav-tab relative flex items-center gap-2 px-2.5 xl:px-4 text-[14px] font-semibold whitespace-nowrap outline-none focus-visible:bg-white/10"
+                        className="dis-topnav-tab relative flex shrink-0 items-center gap-2 px-2 xl:px-2.5 min-[1536px]:px-4 text-[14px] font-semibold whitespace-nowrap outline-none focus-visible:bg-white/10"
                       >
-                        {/* Short labels at lg ("Outbound", "Quotes") keep 1024px from overflowing. */}
-                        <span className="xl:hidden">{item.shortLabel}</span>
-                        <span className="hidden xl:inline">{item.label}</span>
+                        {/* Short labels ("Outbound", "Quotes") until the bar has room for the long ones: with eight tabs, the
+                            wordmark and the account controls, that is about 1536px (measured; 1280px overflowed). */}
+                        <span className="min-[1536px]:hidden">{item.shortLabel}</span>
+                        <span className="hidden min-[1536px]:inline">{item.label}</span>
                         {active && <motion.span layoutId="topnav-underline" className="dis-topnav-underline" transition={tSpring} aria-hidden="true" />}
                       </Link>
                     );

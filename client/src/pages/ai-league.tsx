@@ -85,7 +85,7 @@ function LeagueHome() {
         <div className="flex items-center justify-between gap-4 px-4 py-4 lg:mx-auto lg:max-w-[1400px] lg:px-8">
           <div className="min-w-0">
             <h1 className="text-xl font-bold tracking-tight lg:text-2xl">AI League</h1>
-            <p className="mt-0.5 hidden text-sm text-muted-foreground sm:block">Three AI coworkers who find clients, prepare first messages and keep you on top of your business. They work in the background and ask before anything that matters.</p>
+            <p className="mt-0.5 hidden text-sm text-muted-foreground sm:block">Three AI coworkers who find clients, prepare first messages and keep you on top of your business. They work in the background and ask before anything that matters. Need a quick answer instead? <Link href="/agent" className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400" data-testid="league-ask-agent">Ask DealInSec</Link>.</p>
           </div>
           <NotificationBell className="lg:hidden" />
         </div>
