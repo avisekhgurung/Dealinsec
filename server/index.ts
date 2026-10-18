@@ -402,6 +402,8 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
       log(`PayU configured: KEY=${!!process.env.PAYU_MERCHANT_KEY} SALT=${!!process.env.PAYU_SALT}`);
       // Resume any prospect run a restart or sleep interrupted (its lease has expired). Does nothing without the tables.
       import("./outbound/runner").then((m) => m.outboundRunner.kick()).catch(() => {});
+      // AI League: resume runs a restart interrupted and wake for the next scheduled task. Does nothing without the tables.
+      import("./ai-league/runtime").then((m) => m.kickLeague()).catch(() => {});
     },
   );
 })();

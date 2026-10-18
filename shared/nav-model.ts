@@ -1,7 +1,7 @@
 /**
  * Signed-in navigation model — the one list both bars read.
  *
- * The product has five areas, in workflow order: Home · AI Outbound ·
+ * The product has six areas, in workflow order: Home · AI League (Nibo, Mika, Zee) · AI Outbound ·
  * Pipeline (Leads, Deals) · Documents (Quotations, Agreements) · Money
  * (Invoices — payment status is tracked inside invoices). Account (Profile,
  * Settings) sits outside the five: on desktop it lives in the bar's right-hand
@@ -14,10 +14,10 @@
  */
 import { canSeeModule } from "./permissions";
 
-export type NavGroup = "home" | "outbound" | "pipeline" | "documents" | "money" | "account";
+export type NavGroup = "home" | "league" | "outbound" | "pipeline" | "documents" | "money" | "account";
 export type NavModule = "deals" | "quotations" | "agreements" | "invoices";
 export type NavKey =
-  | "home" | "outbound" | "leads" | "deals" | "quotations" | "agreements" | "invoices" | "profile" | "settings";
+  | "home" | "league" | "outbound" | "leads" | "deals" | "quotations" | "agreements" | "invoices" | "profile" | "settings";
 
 export interface NavItem {
   key: NavKey;
@@ -35,6 +35,7 @@ type NavUser = Parameters<typeof canSeeModule>[0];
 
 export const NAV_GROUP_LABELS: Record<NavGroup, string> = {
   home: "Home",
+  league: "AI League",
   outbound: "AI Outbound",
   pipeline: "Pipeline",
   documents: "Documents",
@@ -70,6 +71,7 @@ const def = (item: Omit<NavItem, "isActive">): NavItem => ({
 /** Every signed-in destination, in workflow order. */
 export const NAV_ITEMS: readonly NavItem[] = [
   def({ key: "home", label: "Home", shortLabel: "Home", href: "/dashboard", group: "home" }),
+  def({ key: "league", label: "AI League", shortLabel: "AI League", href: "/ai-league", group: "league", module: "deals" }),
   def({ key: "outbound", label: "AI Outbound", shortLabel: "Outbound", href: "/outbound", group: "outbound", module: "deals" }),
   def({ key: "leads", label: "Leads", shortLabel: "Leads", href: "/leads", group: "pipeline", module: "deals" }),
   def({ key: "deals", label: "Deals", shortLabel: "Deals", href: "/deals", group: "pipeline", module: "deals" }),
@@ -108,7 +110,7 @@ function sections(user: NavUser, groups: readonly NavGroup[]): NavSection[] {
 }
 
 /** Desktop tabs: the five areas, one click each. Account stays on the right. */
-export const DESKTOP_GROUPS: readonly NavGroup[] = ["home", "outbound", "pipeline", "documents", "money"];
+export const DESKTOP_GROUPS: readonly NavGroup[] = ["home", "league", "outbound", "pipeline", "documents", "money"];
 export function desktopNavSections(user: NavUser): NavSection[] {
   return sections(user, DESKTOP_GROUPS);
 }
@@ -119,7 +121,7 @@ export function mobileBarItems(user: NavUser): NavItem[] {
   return MOBILE_BAR_KEYS.map(navItem).filter((i) => canSeeNavItem(user, i));
 }
 
-export const MORE_GROUPS: readonly NavGroup[] = ["documents", "money", "account"];
+export const MORE_GROUPS: readonly NavGroup[] = ["league", "documents", "money", "account"];
 export function moreSheetSections(user: NavUser): NavSection[] {
   return sections(user, MORE_GROUPS);
 }

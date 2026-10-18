@@ -22,6 +22,7 @@ import { registerVoiceRoutes } from "./voice/routes";
 import { registerSalesRoutes } from "./sales/routes";
 import { registerOutboundRoutes } from "./outbound/routes";
 import { registerChannelRoutes } from "./channels/routes";
+import { registerAiLeagueRoutes } from "./ai-league/routes";
 import { disconnectMailboxesOf, registerGmail } from "./mail/register";
 import { reviseDraftQuote } from "./services/deals";
 import { notifyAgreementCreated } from "./services/agreements";
@@ -625,6 +626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerSalesRoutes(app);
   registerOutboundRoutes(app);
   registerChannelRoutes(app);
+  registerAiLeagueRoutes(app);
   registerGmail(app);
   registerQuoteShareRoutes(app);
   registerAgreementSignRoutes(app);

@@ -148,10 +148,17 @@ export class DbAgentStore implements AgentStore {
   }
 
   async listSessions(user: AgentUser, limit = 40) {
-    return db.select({
+    // AI League's coworker conversations are agent sessions too, but they live on the AI League page, not in this history.
+    let league: string[] = [];
+    try {
+      const { leagueStore, leagueTablesReady } = await import("../ai-league/store");
+      if (await leagueTablesReady()) league = await leagueStore.sessionIds(user.organizationId ?? "", user.id);
+    } catch { league = []; }
+    const rows = await db.select({
       id: agentSessions.id, title: agentSessions.title, state: agentSessions.state,
       dealId: agentSessions.dealId, updatedAt: agentSessions.updatedAt,
-    }).from(agentSessions).where(scope(user)).orderBy(desc(agentSessions.updatedAt)).limit(limit);
+    }).from(agentSessions).where(scope(user)).orderBy(desc(agentSessions.updatedAt)).limit(limit + league.length);
+    return rows.filter((r) => !league.includes(r.id)).slice(0, limit);
   }
 
   /** Messages plus the live status of every approval, so a reloaded page shows

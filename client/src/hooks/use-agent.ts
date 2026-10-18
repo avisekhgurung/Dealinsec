@@ -48,7 +48,22 @@ export interface UseAgentOptions {
   sessionId?: string | null;
   /** Called when a conversation is created or cleared, so the page can update its URL. */
   onSessionChange?: (id: string | null) => void;
+  /** Where the conversation lives. Defaults to Agent mode's own; AI League points these at a coworker's conversation. */
+  endpoints?: AgentEndpoints;
 }
+
+export interface AgentEndpoints {
+  transcript: (sessionId: string) => string;
+  messages: (sessionId: string) => string;
+  approve: (approvalId: string) => string;
+  reject: (approvalId: string) => string;
+}
+const AGENT_ENDPOINTS: AgentEndpoints = {
+  transcript: (id) => `/api/agent/sessions/${id}`,
+  messages: (id) => `/api/agent/sessions/${id}/messages`,
+  approve: (id) => `/api/agent/approvals/${id}/approve`,
+  reject: (id) => `/api/agent/approvals/${id}/reject`,
+};
 
 let keySeq = 0;
 const nextKey = () => `m${++keySeq}`;
@@ -74,6 +89,7 @@ function describeHttpError(err: unknown): string {
 
 export function useAgent(opts: UseAgentOptions = {}) {
   const { context, onSessionChange } = opts;
+  const endpoints = opts.endpoints ?? AGENT_ENDPOINTS;
   const [sessionId, setSessionId] = useState<string | null>(opts.sessionId ?? null);
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [approvals, setApprovals] = useState<Record<string, ApprovalView>>({});
@@ -112,7 +128,7 @@ export function useAgent(opts: UseAgentOptions = {}) {
   const loadTranscript = useCallback(async (id: string) => {
     setLoading(true);
     try {
-      const res = await apiRequest("GET", `/api/agent/sessions/${id}`);
+      const res = await apiRequest("GET", endpoints.transcript(id));
       const data = await res.json();
       setMessages((data.messages ?? []).map((m: any): ThreadMessage => ({ key: `s${m.id}`, role: m.role, content: m.content, cards: m.cards ?? [] })));
       const next: Record<string, ApprovalView> = {};
@@ -199,7 +215,7 @@ export function useAgent(opts: UseAgentOptions = {}) {
     };
 
     try {
-      await postStream(`/api/agent/sessions/${sid}/messages`, { text, context: ctxRef.current, channel: channelRef.current }, { signal: ac.signal, onEvent });
+      await postStream(endpoints.messages(sid), { text, context: ctxRef.current, channel: channelRef.current }, { signal: ac.signal, onEvent });
       if (!finished) throw new Error("stream ended early");
     } catch (err) {
       if (ac.signal.aborted && stoppedByUser.current) {
@@ -252,7 +268,7 @@ export function useAgent(opts: UseAgentOptions = {}) {
     trackEvent("agent_approval_granted", { tool });
     let final: { ok?: boolean; status?: number; message?: string; route?: string } | null = null;
     try {
-      await postStream(`/api/agent/approvals/${approvalId}/approve`, undefined, {
+      await postStream(endpoints.approve(approvalId), undefined, {
         onEvent: (e) => {
           if (e.type === "agent.message") {
             const cards = (e.data.cards as AgentCard[] | undefined) ?? [];
@@ -288,7 +304,7 @@ export function useAgent(opts: UseAgentOptions = {}) {
     rejecting.current.add(approvalId);
     let status: number | null = null;
     try {
-      status = (await apiRequest("POST", `/api/agent/approvals/${approvalId}/reject`)).status;
+      status = (await apiRequest("POST", endpoints.reject(approvalId))).status;
     } catch (e) {
       const m = /^(\d{3}):/.exec(String((e as Error)?.message ?? "")); // the request helper's "404: …"; none for a network failure
       status = m ? Number(m[1]) : null;

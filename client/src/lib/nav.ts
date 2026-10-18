@@ -13,12 +13,14 @@ import {
   Receipt,
   UserCircle,
   Settings,
+  Users2,
   type LucideIcon,
 } from "lucide-react";
 import type { NavKey } from "@shared/nav-model";
 
 export const NAV_ICONS: Record<NavKey, LucideIcon> = {
   home: Home,
+  league: Users2,
   outbound: Radar,
   leads: Target,
   deals: Briefcase,

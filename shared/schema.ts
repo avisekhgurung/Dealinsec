@@ -1872,3 +1872,115 @@ export const channelMessages = pgTable("channel_messages", {
   sentIdx: index("channel_messages_sent_idx").on(t.organizationId, t.channel, t.sentAt).where(sql`sent_via = 'api'`),
 }));
 export type ChannelMessageRow = typeof channelMessages.$inferSelect;
+
+// ── AI League: Nibo, Mika and Zee (server/ai-league; script/migrate-ai-league.ts, server/ai-league/ddl.ts) ──
+// Three coworker identities on the existing agent runtime. A coworker's chat is an agent session (league_threads links
+// it); a task is a durable league run driven by the Postgres workflow runner (server/workflow/runner.ts), so it keeps
+// going with the browser closed. Every row is scoped by organization AND user.
+
+/** One persistent conversation per person and coworker: the agent session that holds its messages. */
+export const leagueThreads = pgTable("league_threads", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  bot: varchar("bot", { length: 8 }).notNull(), // nibo | mika | zee
+  sessionId: varchar("session_id").notNull(),
+  lastReadAt: timestamp("last_read_at"),
+  createdAt: timestamp("created_at").notNull(),
+}, (t) => ({
+  botCk: check("league_threads_bot_ck", sql`bot IN ('nibo', 'mika', 'zee')`),
+  personBotUq: uniqueIndex("league_threads_person_bot_uq").on(t.organizationId, t.userId, t.bot),
+  sessionUq: uniqueIndex("league_threads_session_uq").on(t.sessionId),
+}));
+export type LeagueThreadRow = typeof leagueThreads.$inferSelect;
+
+/** A coworker's task: the job row itself (lease columns), its milestones and its final report. */
+export const leagueRuns = pgTable("league_runs", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  bot: varchar("bot", { length: 8 }).notNull(),
+  task: varchar("task", { length: 32 }).notNull(), // nibo.find_clients | mika.first_messages | zee.briefing
+  input: jsonb("input").$type<Record<string, unknown>>().notNull(),
+  status: varchar("status", { length: 20 }).notNull(), // queued | running | waiting | completed | partial | failed | cancelled
+  stage: varchar("stage", { length: 32 }).notNull().default("start"),
+  checkpoint: jsonb("checkpoint").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+  report: jsonb("report").$type<Record<string, unknown> | null>(),
+  errorCode: varchar("error_code", { length: 40 }),
+  idemKey: varchar("idem_key", { length: 80 }).notNull(),
+  scheduleId: integer("schedule_id"),
+  source: varchar("source", { length: 10 }).notNull().default("chat"), // chat | page | schedule
+  cancelRequested: boolean("cancel_requested").notNull().default(false),
+  attempts: integer("attempts").notNull().default(0),
+  leaseUntil: timestamp("lease_until"),
+  tokensIn: integer("tokens_in").notNull().default(0),
+  tokensOut: integer("tokens_out").notNull().default(0),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").notNull(),
+  startedAt: timestamp("started_at"),
+  finishedAt: timestamp("finished_at"),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  statusCk: check("league_runs_status_ck", sql`status IN ('queued', 'running', 'waiting', 'completed', 'partial', 'failed', 'cancelled')`),
+  botCk: check("league_runs_bot_ck", sql`bot IN ('nibo', 'mika', 'zee')`),
+  idemUq: uniqueIndex("league_runs_idem_uq").on(t.organizationId, t.idemKey),
+  personIdx: index("league_runs_person_idx").on(t.organizationId, t.userId, t.createdAt),
+  claimIdx: index("league_runs_claim_idx").on(t.status, t.leaseUntil),
+}));
+export type LeagueRunRow = typeof leagueRuns.$inferSelect;
+
+/** What happened during a run, in order: the truthful progress the person sees. No message text, no page text. */
+export const leagueRunEvents = pgTable("league_run_events", {
+  id: serial("id").primaryKey(),
+  runId: varchar("run_id", { length: 40 }).notNull(),
+  organizationId: varchar("organization_id").notNull(),
+  kind: varchar("kind", { length: 32 }).notNull(),
+  message: varchar("message", { length: 300 }).notNull(),
+  data: jsonb("data").$type<Record<string, unknown> | null>(),
+  createdAt: timestamp("created_at").notNull(),
+}, (t) => ({
+  runIdx: index("league_run_events_run_idx").on(t.runId, t.id),
+}));
+export type LeagueRunEventRow = typeof leagueRunEvents.$inferSelect;
+
+/** A recurring task. next_run_at is UTC; the time of day is in the person's IANA timezone. */
+export const leagueSchedules = pgTable("league_schedules", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  bot: varchar("bot", { length: 8 }).notNull(),
+  task: varchar("task", { length: 32 }).notNull(),
+  input: jsonb("input").$type<Record<string, unknown>>().notNull(),
+  frequency: varchar("frequency", { length: 10 }).notNull(), // daily | weekdays | weekly
+  timeOfDay: varchar("time_of_day", { length: 5 }).notNull(), // HH:MM
+  weekday: smallint("weekday"), // 0 = Sunday … 6, for weekly
+  timezone: varchar("timezone", { length: 64 }).notNull(),
+  status: varchar("status", { length: 10 }).notNull(), // active | paused
+  nextRunAt: timestamp("next_run_at"),
+  lastRunId: varchar("last_run_id", { length: 40 }),
+  lastRunAt: timestamp("last_run_at"),
+  leaseUntil: timestamp("lease_until"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  statusCk: check("league_schedules_status_ck", sql`status IN ('active', 'paused')`),
+  freqCk: check("league_schedules_freq_ck", sql`frequency IN ('daily', 'weekdays', 'weekly')`),
+  dueIdx: index("league_schedules_due_idx").on(t.status, t.nextRunAt),
+  personIdx: index("league_schedules_person_idx").on(t.organizationId, t.userId),
+}));
+export type LeagueScheduleRow = typeof leagueSchedules.$inferSelect;
+
+/** What a coworker remembers about the person: explicit preferences they can read, correct and delete. Context only, never authorization. */
+export const leagueMemory = pgTable("league_memory", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  bot: varchar("bot", { length: 8 }).notNull(), // nibo | mika | zee | all
+  key: varchar("key", { length: 40 }).notNull(),
+  value: varchar("value", { length: 500 }).notNull(),
+  source: varchar("source", { length: 16 }).notNull(), // you | task
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  keyUq: uniqueIndex("league_memory_key_uq").on(t.organizationId, t.userId, t.bot, t.key),
+}));
+export type LeagueMemoryRow = typeof leagueMemory.$inferSelect;

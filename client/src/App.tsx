@@ -30,6 +30,7 @@ const PublicSignPage          = lazy(() => import("@/pages/public-sign"));
 const OnboardingPage          = lazy(() => import("@/pages/onboarding"));
 const DashboardPage           = lazy(() => import("@/pages/dashboard"));
 const AgentPage               = lazy(() => import("@/pages/agent"));
+const AiLeaguePage            = lazy(() => import("@/pages/ai-league"));
 const DealsPage               = lazy(() => import("@/pages/deals"));
 const LeadsPage               = lazy(() => import("@/pages/leads"));
 const OutboundPage            = lazy(() => import("@/pages/outbound"));
@@ -198,8 +199,9 @@ function Router() {
       <AudienceAnalytics />
       {showShell && <DesktopTopNav />}
       {/* One way into the agent on every authed workspace page (not on print/full-bleed views, nor the agent page itself) */}
-      {showShell && uiMode !== "agent" && !location.startsWith("/agent") && isAuthenticated && <AgentModeFab />}
-      {showShell && uiMode === "agent" && !location.startsWith("/agent") && <BackToChat />}
+      {/* Not over a coworker's chat (AI League): its composer sits where the floating button would. */}
+      {showShell && uiMode !== "agent" && !location.startsWith("/agent") && !location.startsWith("/ai-league/") && isAuthenticated && <AgentModeFab />}
+      {showShell && uiMode === "agent" && !location.startsWith("/agent") && !location.startsWith("/ai-league/") && <BackToChat />}
       {/* Content sits below the desktop top bar via --dis-topnav-h
           (see .app-shell in index.css). */}
       <div className={showShell ? "app-shell" : ""}>
@@ -216,6 +218,8 @@ function Router() {
             <Route path="/reset-password"><Redirect to={home} /></Route>
             <Route path="/dashboard" component={DashboardPage} />
             <Route path="/agent/:id?" component={AgentPage} />
+            <Route path="/ai-league" component={AiLeaguePage} />
+            <Route path="/ai-league/:bot" component={AiLeaguePage} />
             <Route path="/outbound" component={OutboundPage} />
             <Route path="/leads" component={LeadsPage} />
             <Route path="/leads/:id" component={LeadDetailsPage} />

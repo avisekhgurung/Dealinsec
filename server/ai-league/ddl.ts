@@ -1,0 +1,95 @@
+/**
+ * The DDL for AI League (shared/schema.ts: leagueThreads, leagueRuns, leagueRunEvents, leagueSchedules, leagueMemory).
+ * One list, run by script/migrate-ai-league.ts and by the real-Postgres tests. PURELY ADDITIVE and idempotent.
+ */
+export const LEAGUE_TABLES = ["league_threads", "league_runs", "league_run_events", "league_schedules", "league_memory"] as const;
+
+export const LEAGUE_DDL: readonly string[] = [
+  `CREATE TABLE IF NOT EXISTS league_threads (
+    id serial PRIMARY KEY,
+    organization_id varchar NOT NULL,
+    user_id varchar NOT NULL,
+    bot varchar(8) NOT NULL,
+    session_id varchar NOT NULL,
+    last_read_at timestamp,
+    created_at timestamp NOT NULL,
+    CONSTRAINT league_threads_bot_ck CHECK (bot IN ('nibo', 'mika', 'zee'))
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS league_threads_person_bot_uq ON league_threads (organization_id, user_id, bot)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS league_threads_session_uq ON league_threads (session_id)`,
+  `CREATE TABLE IF NOT EXISTS league_runs (
+    id varchar(40) PRIMARY KEY,
+    organization_id varchar NOT NULL,
+    user_id varchar NOT NULL,
+    bot varchar(8) NOT NULL,
+    task varchar(32) NOT NULL,
+    input jsonb NOT NULL,
+    status varchar(20) NOT NULL,
+    stage varchar(32) NOT NULL DEFAULT 'start',
+    checkpoint jsonb NOT NULL DEFAULT '{}'::jsonb,
+    report jsonb,
+    error_code varchar(40),
+    idem_key varchar(80) NOT NULL,
+    schedule_id integer,
+    source varchar(10) NOT NULL DEFAULT 'chat',
+    cancel_requested boolean NOT NULL DEFAULT false,
+    attempts integer NOT NULL DEFAULT 0,
+    lease_until timestamp,
+    tokens_in integer NOT NULL DEFAULT 0,
+    tokens_out integer NOT NULL DEFAULT 0,
+    read_at timestamp,
+    created_at timestamp NOT NULL,
+    started_at timestamp,
+    finished_at timestamp,
+    updated_at timestamp NOT NULL,
+    CONSTRAINT league_runs_status_ck CHECK (status IN ('queued', 'running', 'waiting', 'completed', 'partial', 'failed', 'cancelled')),
+    CONSTRAINT league_runs_bot_ck CHECK (bot IN ('nibo', 'mika', 'zee'))
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS league_runs_idem_uq ON league_runs (organization_id, idem_key)`,
+  `CREATE INDEX IF NOT EXISTS league_runs_person_idx ON league_runs (organization_id, user_id, created_at)`,
+  `CREATE INDEX IF NOT EXISTS league_runs_claim_idx ON league_runs (status, lease_until)`,
+  `CREATE TABLE IF NOT EXISTS league_run_events (
+    id serial PRIMARY KEY,
+    run_id varchar(40) NOT NULL,
+    organization_id varchar NOT NULL,
+    kind varchar(32) NOT NULL,
+    message varchar(300) NOT NULL,
+    data jsonb,
+    created_at timestamp NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS league_run_events_run_idx ON league_run_events (run_id, id)`,
+  `CREATE TABLE IF NOT EXISTS league_schedules (
+    id serial PRIMARY KEY,
+    organization_id varchar NOT NULL,
+    user_id varchar NOT NULL,
+    bot varchar(8) NOT NULL,
+    task varchar(32) NOT NULL,
+    input jsonb NOT NULL,
+    frequency varchar(10) NOT NULL,
+    time_of_day varchar(5) NOT NULL,
+    weekday smallint,
+    timezone varchar(64) NOT NULL,
+    status varchar(10) NOT NULL,
+    next_run_at timestamp,
+    last_run_id varchar(40),
+    last_run_at timestamp,
+    lease_until timestamp,
+    created_at timestamp NOT NULL,
+    updated_at timestamp NOT NULL,
+    CONSTRAINT league_schedules_status_ck CHECK (status IN ('active', 'paused')),
+    CONSTRAINT league_schedules_freq_ck CHECK (frequency IN ('daily', 'weekdays', 'weekly'))
+  )`,
+  `CREATE INDEX IF NOT EXISTS league_schedules_due_idx ON league_schedules (status, next_run_at)`,
+  `CREATE INDEX IF NOT EXISTS league_schedules_person_idx ON league_schedules (organization_id, user_id)`,
+  `CREATE TABLE IF NOT EXISTS league_memory (
+    id serial PRIMARY KEY,
+    organization_id varchar NOT NULL,
+    user_id varchar NOT NULL,
+    bot varchar(8) NOT NULL,
+    key varchar(40) NOT NULL,
+    value varchar(500) NOT NULL,
+    source varchar(16) NOT NULL,
+    updated_at timestamp NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS league_memory_key_uq ON league_memory (organization_id, user_id, bot, key)`,
+];

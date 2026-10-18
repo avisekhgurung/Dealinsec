@@ -60,6 +60,8 @@ function linkFor(a: Activity): string {
     case "agreement": return a.entityId ? `/contracts/${a.entityId}` : "/contracts";
     case "invoice": return a.entityId ? `/brand-invoices/${a.entityId}` : "/invoices";
     case "member": case "organization": case "payment": return "/settings";
+    case "lead": return a.entityId ? `/leads/${a.entityId}` : "/leads";
+    case "ai_league_run": return a.entityId ? `/ai-league?run=${encodeURIComponent(a.entityId)}` : "/ai-league";
     default: return "/dashboard";
   }
 }

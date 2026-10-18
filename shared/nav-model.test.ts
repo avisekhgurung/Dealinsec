@@ -66,8 +66,8 @@ describe("active route", () => {
 describe("desktop sections", () => {
   it("shows every area in workflow order for built-in roles", () => {
     const s = desktopNavSections(OWNER);
-    expect(s.map((x) => x.label)).toEqual(["Home", "AI Outbound", "Pipeline", "Documents", "Money"]);
-    expect(s.flatMap((x) => keys(x.items))).toEqual(["home", "outbound", "leads", "deals", "quotations", "agreements", "invoices"]);
+    expect(s.map((x) => x.label)).toEqual(["Home", "AI League", "AI Outbound", "Pipeline", "Documents", "Money"]);
+    expect(s.flatMap((x) => keys(x.items))).toEqual(["home", "league", "outbound", "leads", "deals", "quotations", "agreements", "invoices"]);
   });
 
   it("drops modules a custom role can't see, and empty groups with them", () => {
@@ -93,10 +93,10 @@ describe("mobile bar and More sheet", () => {
     expect(mobileBarItems(OWNER).map((i) => i.shortLabel)).toEqual(["Home", "Outbound", "Leads", "Deals"]);
   });
 
-  it("sheet groups Documents, Money and Account", () => {
+  it("sheet groups AI League, Documents, Money and Account", () => {
     const s = moreSheetSections(OWNER);
-    expect(s.map((x) => x.label)).toEqual(["Documents", "Money", "Account"]);
-    expect(s.map((x) => keys(x.items))).toEqual([["quotations", "agreements"], ["invoices"], ["profile", "settings"]]);
+    expect(s.map((x) => x.label)).toEqual(["AI League", "Documents", "Money", "Account"]);
+    expect(s.map((x) => keys(x.items))).toEqual([["league"], ["quotations", "agreements"], ["invoices"], ["profile", "settings"]]);
   });
 
   it("an invoices-only custom role keeps Home, Money and Account", () => {
@@ -108,7 +108,7 @@ describe("mobile bar and More sheet", () => {
   it("deal permissions light Pipeline and Quotations (same gate as today)", () => {
     const u = custom("deals.create");
     expect(keys(mobileBarItems(u))).toEqual(["home", "outbound", "leads", "deals"]);
-    expect(moreSheetSections(u).map((x) => keys(x.items))).toEqual([["quotations"], ["profile", "settings"]]);
+    expect(moreSheetSections(u).map((x) => keys(x.items))).toEqual([["league"], ["quotations"], ["profile", "settings"]]);
   });
 
   it("Settings and Profile are always reachable", () => {
