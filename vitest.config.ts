@@ -7,6 +7,7 @@ import path from "path";
 // in-memory world: it replaces storage, billing, email and the model with
 // vi.mock, so no real database or network is ever reached.
 export default defineConfig({
-  resolve: { alias: { "@shared": path.resolve(import.meta.dirname, "shared") } },
-  test: { include: ["server/**/*.test.ts", "shared/**/*.test.ts"] },
+  resolve: { alias: { "@shared": path.resolve(import.meta.dirname, "shared"), "@": path.resolve(import.meta.dirname, "client/src") } },
+  // client/src/lib: pure browser-side logic only (parsing, scroll and keyboard rules), no DOM and no React.
+  test: { include: ["server/**/*.test.ts", "shared/**/*.test.ts", "client/src/lib/**/*.test.ts"] },
 });

@@ -3,19 +3,29 @@
  * server emitted (see shared/agent.ts), so there is no step here that didn't
  * happen and no timer pretending to be progress.
  */
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Loader2, X } from "lucide-react";
 import { fadeUp } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { ActivityStep } from "@shared/agent";
 
-export function ActivityStrip({ steps, onStop }: { steps: ActivityStep[]; onStop?: () => void }) {
+/** Waiting for the first real step: shown after a short delay, so a quick reply doesn't flash a placeholder. */
+const WAIT_DELAY_MS = 350;
+
+export function ActivityStrip({ steps, onStop, who }: { steps: ActivityStep[]; onStop?: () => void; who?: string }) {
   // The last few steps are enough; a long run doesn't need a wall of text.
   const shown = steps.slice(-5);
+  const [waited, setWaited] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setWaited(true), WAIT_DELAY_MS); return () => clearTimeout(t); }, []);
+  const current = steps.filter((s) => s.state === "active").at(-1);
+  if (!shown.length && !waited) return <span className="sr-only" role="status">{who ? `${who} is working` : "Working"}</span>;
   return (
-    <div className="rounded-2xl border border-border/70 bg-muted/30 px-3.5 py-3" role="status" aria-live="polite" data-testid="activity-strip">
+    <div className="rounded-2xl border border-border/70 bg-muted/30 px-3.5 py-3" data-testid="activity-strip">
+      {/* One short status line for screen readers (the current step), not every line of the list. */}
+      <span className="sr-only" role="status" aria-live="polite">{current ? current.label : who ? `${who} is working` : "Working"}</span>
       {/* Each real step slides in as its event arrives; the oldest leave as the list stays at five. */}
-      <ul className="space-y-1.5">
+      <ul className="space-y-1.5" aria-hidden>
         {shown.length === 0 && (
           <li className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Getting started</li>
         )}
@@ -31,7 +41,7 @@ export function ActivityStrip({ steps, onStop }: { steps: ActivityStep[]; onStop
         </AnimatePresence>
       </ul>
       {onStop && (
-        <button type="button" onClick={onStop} className="mt-2.5 text-[11px] font-semibold text-muted-foreground underline-offset-2 hover:text-foreground hover:underline" data-testid="agent-stop-link">
+        <button type="button" onClick={onStop} className="mt-2.5 rounded text-[11px] font-semibold text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60" data-testid="agent-stop-link">
           Stop
         </button>
       )}

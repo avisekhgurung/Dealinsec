@@ -151,9 +151,14 @@ export function useAgent(opts: UseAgentOptions = {}) {
   const setApproval = (id: string, v: ApprovalView) => setApprovals((cur) => ({ ...cur, [id]: v }));
 
   // ── send ─────────────────────────────────────────────────────────────────
-  const send = useCallback(async (raw: string) => {
+  /**
+   * Send a message. `accepted` is called once it is in the conversation (the message box clears only then); a
+   * refusal before that (no conversation could be opened, a send already on its way) leaves the person's text alone.
+   * Resolves to whether it was accepted.
+   */
+  const send = useCallback(async (raw: string, accepted?: () => void): Promise<boolean> => {
     const text = raw.trim();
-    if (!text || sendLock.current) return;
+    if (!text || sendLock.current) return false;
     sendLock.current = true;
     lastText.current = text;
     let sid = sessionId;
@@ -169,12 +174,14 @@ export function useAgent(opts: UseAgentOptions = {}) {
         onSessionChange?.(sid);
       }
     } catch (err) {
-      append({ role: "assistant", content: describeHttpError(err), cards: [], error: { retryText: text } });
+      // Sent from the message box (`accepted` given), the text is still there to send again: no second retry button.
+      append({ role: "assistant", content: describeHttpError(err), cards: [], ...(accepted ? {} : { error: { retryText: text } }) });
       sendLock.current = false;
-      return;
+      return false;
     }
 
     append({ role: "user", content: text, cards: [] });
+    accepted?.();
     trackEvent("agent_message_sent", { has_deal_context: !!ctxRef.current?.dealId, long_message: text.length >= 200 });
     const ac = new AbortController();
     stoppedByUser.current = false;
@@ -243,6 +250,7 @@ export function useAgent(opts: UseAgentOptions = {}) {
       abortRef.current = null;
       sendLock.current = false;
     }
+    return true;
   }, [sessionId, onSessionChange, loadTranscript]);
 
   const stoppedByUser = useRef(false);

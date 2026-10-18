@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sparkles, X, SendHorizonal, Loader2, ArrowRight } from "lucide-react";
+import { RichText } from "@/components/agent/rich-text";
 import { ASK_CTA_LABEL, ASK_CTA_TEXT, ASK_OPENER as OPENER, ASK_SUGGESTIONS as SUGGESTIONS } from "@shared/ask-dealinsec";
 
 interface Msg { role: "user" | "assistant"; content: string }
@@ -191,8 +192,8 @@ function Bubble({ role, content }: { role: "user" | "assistant"; content: string
       <span className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
         <Sparkles className="w-3.5 h-3.5" />
       </span>
-      <div className="max-w-[85%] rounded-2xl rounded-tl-md px-3.5 py-2 text-sm bg-neutral-100 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 whitespace-pre-wrap">
-        {content.split(/\*\*([^*]+)\*\*/g).map((p, i) => (i % 2 === 1 ? <b key={i}>{p}</b> : p))}
+      <div className="min-w-0 max-w-[85%] rounded-2xl rounded-tl-md px-3.5 py-2 text-sm bg-neutral-100 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200">
+        <RichText text={content} className="space-y-2 text-sm leading-relaxed" />
       </div>
     </div>
   );

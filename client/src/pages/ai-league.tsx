@@ -250,6 +250,8 @@ function CoworkerChat({ bot }: { bot: Bot }) {
   const [runId, setRunId] = useRunParam();
   const [dialog, setDialog] = useState(false);
   const [huddle, setHuddle] = useState(false);
+  const [seed, setSeed] = useState({ text: "", n: 0 });
+  const assistant = useMemo(() => ({ name: id.name, avatar: <Mascot bot={bot} size={28} /> }), [bot, id.name]);
   const [tasksOpen, setTasksOpen] = useState(false);
   const card = roster.data?.bots.find((b) => b.bot === bot);
   // A reply may have started a task: show it in the task panel.
@@ -272,7 +274,7 @@ function CoworkerChat({ bot }: { bot: Bot }) {
 
   return (
     <div className="flex h-[100dvh] min-h-0 flex-col bg-background lg:h-[calc(100dvh-var(--dis-topnav-h))]" data-testid={`league-chat-${bot}`}>
-      <div className="grid min-h-0 flex-1 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_22rem]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_22rem]">
         {/* Roster: a compact column on desktop */}
         <nav className="hidden border-r p-3 lg:block" aria-label="Coworkers">
           <Link href="/ai-league" className="mb-3 flex items-center gap-1.5 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" />AI League</Link>
@@ -293,7 +295,7 @@ function CoworkerChat({ bot }: { bot: Bot }) {
         </nav>
 
         {/* The conversation */}
-        <section className="flex min-h-0 flex-col" aria-label={`Chat with ${id.name}`}>
+        <section className="flex min-h-0 min-w-0 flex-col" aria-label={`Chat with ${id.name}`}>
           <header className="flex items-center gap-3 border-b px-4 py-3">
             <Link href="/ai-league" className="lg:hidden" aria-label="Back to AI League"><ArrowLeft className="h-5 w-5" /></Link>
             <Mascot bot={bot} size={44} state={agent.running ? "thinking" : mascotState(card?.status)} eager />
@@ -318,12 +320,21 @@ function CoworkerChat({ bot }: { bot: Bot }) {
                 </div>
               </div>
             ) : (
-              <Thread messages={agent.messages} approvals={agent.approvals} running={agent.running} steps={agent.steps}
+              <Thread messages={agent.messages} approvals={agent.approvals} running={agent.running} steps={agent.steps} assistant={assistant}
+                onEditLast={(t) => setSeed((x) => ({ text: t, n: x.n + 1 }))}
                 onStop={agent.stop} onRetry={agent.retry} onApprove={(a, t) => void agent.approve(a, t)} onDecline={(a, t) => void agent.reject(a, t)} />
             )}
           </div>
           <div className="border-t px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 sm:px-4">
-            <Composer onSend={(t) => void agent.send(t)} onStop={agent.stop} running={agent.running} placeholder={`Ask ${id.name}…`} draftFor={`league-${bot}`} />
+            {/* A background task keeps going after the chat answers: its real status, where the side panel isn't shown. */}
+            {active && (
+              <button type="button" onClick={() => setRunId(active.id)} className="mb-2 flex w-full items-center gap-2 rounded-xl border bg-muted/40 px-3 py-2 text-left text-xs transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 xl:hidden" data-testid="chat-active-task">
+                <StatusPill run={active} />
+                <span className="min-w-0 flex-1 truncate"><span className="font-medium">{active.taskLabel}</span>{active.request ? <span className="text-muted-foreground"> · {active.request}</span> : null}</span>
+                <span className="shrink-0 font-semibold text-foreground/80">View</span>
+              </button>
+            )}
+            <Composer onSend={(t, accepted) => agent.send(t, accepted)} onStop={agent.stop} running={agent.running} placeholder={`Ask ${id.name}…`} label={`Message ${id.name}`} draftFor={`league-${bot}`} seed={seed} />
           </div>
         </section>
 

@@ -87,6 +87,7 @@ export function AgentConversation({
         onApprove={agent.approve}
         onDecline={agent.reject}
         onEditDraft={editDraft}
+        onEditLast={(t) => setSeed((x) => ({ text: t, n: x.n + 1 }))}
         compact={compact}
         header={empty ? <>{beforeEmpty}{emptyState ?? <Empty onCall={onCall} onPaste={() => setSeed((x) => ({ text: s.paste, n: x.n + 1 }))} onPrompt={(t: string) => { if (!disabledReason) void agent.send(t); }} pasteLabel={s.pasteLabel} prompts={[...(extraPrompts ?? []), ...s.prompts].slice(0, 5)} />}</> : agent.loading ? (
           <div className="space-y-3" aria-busy="true"><div className="h-4 w-2/3 animate-pulse rounded bg-muted" /><div className="h-4 w-1/2 animate-pulse rounded bg-muted" /></div>
