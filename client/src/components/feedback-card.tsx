@@ -45,12 +45,12 @@ export function FeedbackCard() {
     },
     onSuccess: () => {
       setSent(true);
-      toast({ title: "Thank you!", description: "Your feedback went straight to the founder." });
+      toast({ title: "Thanks for your feedback", description: "We've received it, and the founder reads every message." });
     },
     onError: (err) => {
       toast({
-        title: "Could not send feedback",
-        description: parseApiError(err).error || "Please try again.",
+        title: "Couldn't send your feedback",
+        description: parseApiError(err).error || "It wasn't sent. Please try again.",
         variant: "destructive",
       });
     },
@@ -65,7 +65,7 @@ export function FeedbackCard() {
           </div>
           <h2 className="font-bold">Feedback sent</h2>
           <p className="text-sm text-muted-foreground mt-1 max-w-xs mx-auto">
-            It goes straight to the founder — every message gets read.
+            The founder reads every message.
           </p>
           <Button
             variant="outline" size="sm" className="mt-4"
@@ -87,7 +87,7 @@ export function FeedbackCard() {
           <div>
             <h2 className="font-bold text-lg">Rate &amp; suggest</h2>
             <p className="text-sm text-muted-foreground mt-0.5">
-              What should DealInSec do better? Your message goes straight to the founder.
+              What should DealInSec do better? The founder reads every message.
             </p>
           </div>
         </div>
@@ -164,7 +164,7 @@ export function FeedbackCard() {
             />
             <span className="text-xs leading-relaxed text-muted-foreground">
               <span className="font-medium text-foreground">DealInSec may publish this as a testimonial</span>{" "}
-              with my name and business type. Leave unticked to keep it private — it reaches the founder either way.
+              with my name and business type. Leave it unticked to keep it private; the founder still reads it.
             </span>
           </label>
         )}

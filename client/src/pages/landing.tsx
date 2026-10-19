@@ -99,6 +99,7 @@ const SERVER_ROUTE_PREFIXES = [
   "/bonsai-vs-dealinsec",
   "/find-local-clients",
   "/ai-coworkers",
+  "/crm-for-freelancers",
 ];
 const isServerRoute = (href: string) => SERVER_ROUTE_PREFIXES.some((p) => href.startsWith(p));
 
@@ -106,17 +107,18 @@ const isServerRoute = (href: string) => SERVER_ROUTE_PREFIXES.some((p) => href.s
 type NavLink = { label: string; href: string; note?: string };
 const NAV_LINKS: (NavLink | { label: string; items: NavLink[] })[] = [
   { label: "Product", items: [
-    { label: "Features", href: "#features", note: "Research, deals, quotations, agreements, invoices" },
-    { label: "AI team", href: "#ai-team", note: "Nibo, Mika and Zee, your AI coworkers" },
+    { label: "How it works", href: "#how", note: "From a potential client to a paid invoice" },
+    { label: "Features", href: "#features", note: "Leads, deals, quotations, agreements, invoices" },
     { label: "Live demo", href: "#try", note: "Plan a search, read a reply, see what's next" },
     { label: "Who it's for", href: "#audiences", note: "Freelancers, consultants and small agencies" },
   ] },
-  { label: "How it works", href: "#how" },
+  { label: "AI coworkers", href: "/ai-coworkers" },
   { label: "Pricing", href: "#pricing" },
   { label: "Resources", items: [
     { label: "Blog", href: "/blog" },
     { label: "Free tools", href: "/tools" },
     { label: "Deal risk checker", href: "/tools/deal-risk-checker" },
+    { label: "CRM for freelancers", href: "/crm-for-freelancers" },
     { label: "For freelancers", href: "/for-freelancers" },
     { label: "For creators", href: "/for-creators" },
     { label: "FAQ", href: "#faq" },
@@ -125,7 +127,7 @@ const NAV_LINKS: (NavLink | { label: string; items: NavLink[] })[] = [
 const flatNav = (links: typeof NAV_LINKS): NavLink[] => links.flatMap((l) => ("items" in l ? l.items : [l]));
 
 const DASHBOARD_LINKS = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Home", href: "/dashboard", icon: LayoutDashboard },
   { label: "Deals", href: "/deals", icon: Briefcase },
   { label: "Agreements", href: "/contracts", icon: FileCheck },
   { label: "Invoices", href: "/invoices", icon: Receipt },
@@ -519,7 +521,7 @@ function Header({
                     data-testid="button-go-dashboard"
                   >
                     <LayoutDashboard className="w-4 h-4 mr-1.5" />
-                    Dashboard
+                    Go to Home
                   </Button>
                 </Link>
                 <Button
@@ -540,7 +542,7 @@ function Header({
                   className="hidden sm:inline-flex h-9 px-4 text-sm font-medium"
                   data-testid="button-nav-signin"
                 >
-                  Sign in
+                  Log in
                 </Button>
                 <Button
                   onClick={() => { trackEvent("landing_cta_click", { location: "header", signed_in: false }); onAuthClick("signup"); }}
@@ -600,7 +602,7 @@ function Header({
                     }}
                     className="w-full h-10"
                   >
-                    Sign in
+                    Log in
                   </Button>
                   <Button
                     onClick={() => {
@@ -610,7 +612,7 @@ function Header({
                     className="w-full h-10 text-white border-0"
                     style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
                   >
-                    Start free
+                    Get started free
                   </Button>
                 </div>
               )}
@@ -687,8 +689,8 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader
           eyebrow="Pricing"
-          title="Start simple. Grow when you need to."
-          subtitle="Start free in any country. Upgrade when you need agreements, invoices, payment tracking and more AI research."
+          title="Start free. Upgrade when you need more."
+          subtitle="Manage leads, deals and quotations for free. Upgrade when you need agreements, invoices, payment tracking and more AI research."
         />
 
         {/* Honest currency note: only Indian accounts can be charged today. */}
@@ -741,9 +743,9 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
               onClick={onCTA}
               className="w-full mt-6 h-10 text-sm font-semibold bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700"
             >
-              Start free
+              Get started free
             </Button>
-            <p className="text-[11px] text-neutral-500 text-center mt-3">Free forever, no card. Upgrade to Pro any time.</p>
+            <p className="text-[11px] text-neutral-500 text-center mt-3">Free forever, no credit card required. Upgrade to Pro any time.</p>
           </motion.div>
 
           {/* Pro Monthly — recommended */}
@@ -854,11 +856,11 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
 /** The slim footer: the logo with its slogan, the main links, socials; then a quieter row of every page worth finding. */
 function Footer() {
   const main = [
-    { label: "Product", href: "#features" }, { label: "Pricing", href: "#pricing" }, { label: "Blog", href: "/blog" },
+    { label: "Product", href: "#features" }, { label: "AI coworkers", href: "/ai-coworkers" }, { label: "Pricing", href: "#pricing" }, { label: "Blog", href: "/blog" },
     { label: "Support", href: "mailto:support@dealinsec.com" }, { label: "Privacy", href: "/privacy" }, { label: "Terms", href: "/terms" },
   ];
   const more = [
-    { label: "For freelancers", href: "/for-freelancers" }, { label: "For creators", href: "/for-creators" }, { label: "Free tools", href: "/tools" },
+    { label: "CRM for freelancers", href: "/crm-for-freelancers" }, { label: "For freelancers", href: "/for-freelancers" }, { label: "For creators", href: "/for-creators" }, { label: "Free tools", href: "/tools" },
     { label: "Deal risk checker", href: "/tools/deal-risk-checker" }, { label: "Freelancer invoice software", href: "/freelancer-invoice-software" },
     { label: "Quotation software", href: "/quotation-software" }, { label: "Contract management", href: "/contract-management" },
     { label: "Proposal management", href: "/proposal-management" }, { label: "Invoice management", href: "/invoice-management" },

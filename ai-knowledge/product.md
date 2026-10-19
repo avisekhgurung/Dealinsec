@@ -3,7 +3,7 @@
 DealInSec is a client-acquisition and deal-to-payment workspace for
 freelancers, consultants and small B2B service agencies: AI-assisted prospect
 research, leads, deals, quotations, agreements, invoices and payment tracking
-in one place. Find Clients. Close Deals. Get Paid.
+in one place. Find clients. Win deals. Get paid.
 
 Who it is for: freelancers, solo consultants and small B2B service agencies of
 about 1 to 10 people, including web development and software services,

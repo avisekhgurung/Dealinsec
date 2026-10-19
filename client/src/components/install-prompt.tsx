@@ -87,7 +87,7 @@ export function InstallPrompt() {
             <button
               onClick={dismiss}
               className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center rounded-full text-muted-foreground hover:bg-muted transition-colors"
-              aria-label="Dismiss"
+              aria-label="Dismiss install prompt"
             >
               <X className="w-4 h-4" />
             </button>
@@ -100,12 +100,12 @@ export function InstallPrompt() {
                 <h3 className="text-sm font-bold text-foreground">Install DealInSec</h3>
                 {isIOS ? (
                   <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                    Tap <span className="font-semibold">Share</span> →{" "}
-                    <span className="font-semibold">Add to Home Screen</span> for the full app experience.
+                    Tap <span className="font-semibold">Share</span>, then{" "}
+                    <span className="font-semibold">Add to Home Screen</span>, to open DealInSec like an app.
                   </p>
                 ) : (
                   <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                    Add to your home screen for instant access, offline support, and a fullscreen app feel.
+                    Add DealInSec to your home screen to open it in one tap, full screen.
                   </p>
                 )}
 

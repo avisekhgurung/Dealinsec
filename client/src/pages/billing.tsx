@@ -163,7 +163,7 @@ export default function BillingPage() {
             <div>
               <h1 className="text-xl lg:text-2xl font-bold tracking-tight">Invoices</h1>
               <p className="hidden lg:block text-sm text-muted-foreground mt-0.5">
-                {brandInvoices.length} {brandInvoices.length === 1 ? "invoice" : "invoices"} total
+                Create invoices and keep track of what's been paid · {brandInvoices.length} {brandInvoices.length === 1 ? "invoice" : "invoices"}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -171,7 +171,7 @@ export default function BillingPage() {
               {canCreate && (
                 <Button className="hidden lg:inline-flex gradient-btn text-white lg:h-10 lg:px-5 lg:text-sm font-semibold" onClick={() => setPickOpen(true)} data-testid="button-new-invoice">
                   <Plus className="w-4 h-4 mr-1.5" />
-                  New Invoice
+                  New invoice
                 </Button>
               )}
               <NotificationBell className="lg:hidden" />
@@ -182,8 +182,8 @@ export default function BillingPage() {
           <div className="flex flex-col gap-3 lg:hidden">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input placeholder="Search by deal, brand, or invoice..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 pr-8 h-9 bg-white/50 dark:bg-white/5 rounded-xl text-sm" />
-              {search && <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2"><X className="w-3.5 h-3.5 text-muted-foreground" /></button>}
+              <Input placeholder={`Search by deal, ${audience.partyLower} or invoice number...`} aria-label="Search invoices" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 pr-8 h-9 bg-white/50 dark:bg-white/5 rounded-xl text-sm" />
+              {search && <button type="button" aria-label="Clear search" onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2"><X className="w-3.5 h-3.5 text-muted-foreground" /></button>}
             </div>
             <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
               {filters.map((f) => (
@@ -220,7 +220,7 @@ export default function BillingPage() {
             <CardContent className="py-12 text-center">
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 mx-auto mb-4"><Receipt className="w-8 h-8 text-muted-foreground" /></div>
               <h3 className="font-semibold mb-1">No invoices yet</h3>
-              <p className="text-sm text-muted-foreground mb-4">Invoices will appear here after signing agreements</p>
+              <p className="text-sm text-muted-foreground mb-4 max-w-sm mx-auto">Invoices are created from a signed agreement. Once your {audience.partyLower} signs, create the invoice from the agreement, then record the payment here when you receive it.</p>
             </CardContent>
           </Card>
         ) : (
@@ -245,7 +245,7 @@ export default function BillingPage() {
                 rowHref={(inv) => `/brand-invoices/${inv.id}`}
                 rowLabel={(inv) => `Invoice ${inv.invoiceNumber}, ${inv.brandName}`}
                 exportFileName="invoices"
-                emptyMessage="No invoices match your filters."
+                emptyMessage="No invoices match your search or filters. Clear them to see all invoices."
               />
             </div>
 
@@ -284,7 +284,7 @@ export default function BillingPage() {
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
-                                      <p className="text-sm font-medium truncate">{isSplit ? (isAdvance ? "Advance" : "Final") : "Full Invoice"}</p>
+                                      <p className="text-sm font-medium truncate">{isSplit ? (isAdvance ? "Advance" : "Final") : "Full invoice"}</p>
                                       {isSplit && invoice.splitPercentage && (
                                         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isAdvance ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400"}`}>{invoice.splitPercentage}%</span>
                                       )}
@@ -312,9 +312,9 @@ export default function BillingPage() {
                 <Card className="glass-card border-0">
                   <CardContent className="py-12 text-center">
                     <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 mx-auto mb-4"><Receipt className="w-8 h-8 text-muted-foreground" /></div>
-                    <h3 className="font-semibold mb-1">No matches found</h3>
-                    <p className="text-sm text-muted-foreground mb-4">Try a different search or filter</p>
-                    <Button variant="outline" onClick={() => { setSearch(""); setFilter("all"); }} className="glass-card">Clear Filters</Button>
+                    <h3 className="font-semibold mb-1">No invoices match</h3>
+                    <p className="text-sm text-muted-foreground mb-4">Try a different search or status, or clear the filters to see all invoices.</p>
+                    <Button variant="outline" onClick={() => { setSearch(""); setFilter("all"); }} className="glass-card">Clear filters</Button>
                   </CardContent>
                 </Card>
               )}

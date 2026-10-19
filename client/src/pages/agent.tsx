@@ -60,7 +60,7 @@ export default function AgentPage() {
   const { data: status } = useQuery<AgentStatus>({ queryKey: ["/api/agent/status"], staleTime: 60_000 });
   const unavailable = status && !status.enabled
     ? status.providerConfigured === false
-      ? "The AI service isn't set up on this server yet."
+      ? "The AI service isn't set up on this server yet, so the agent can't answer right now."
       : "The agent isn't switched on for this server yet."
     : null;
 
@@ -110,7 +110,7 @@ export default function AgentPage() {
           <div className="relative min-w-0 flex-1">
             {/* On a phone the switcher already says "Agent"; the buttons need the row more than a truncated title. */}
             <h1 className={`truncate text-base font-bold leading-tight ${focus ? "sr-only sm:not-sr-only" : ""}`}>DealInSec Agent</h1>
-            <p className="hidden truncate text-xs text-muted-foreground sm:block">Your deals, handled in one conversation</p>
+            <p className="hidden truncate text-xs text-muted-foreground sm:block">Ask about clients, deals, payments, or what to do next</p>
           </div>
           {canCall && !unavailable && (
             <button type="button" onClick={() => setCallOpen(true)} aria-label="Start a voice call" data-testid="agent-call"

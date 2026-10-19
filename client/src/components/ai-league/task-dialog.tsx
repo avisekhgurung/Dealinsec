@@ -22,10 +22,10 @@ import { campaignTimes, campaignTimesProblem, fromLocal, showTime } from "@share
 
 const TASK_OF: Record<Bot, LeagueTask> = { nibo: "nibo.find_clients", mika: "mika.first_messages", zee: "zee.briefing" };
 const SCOPE: Record<LeagueTask, string> = {
-  "nibo.find_clients": "Runs an AI Outbound search (one of your plan's searches), checks each company's own website, and saves up to the number below of the qualified ones to Leads. No one is contacted.",
-  "mika.first_messages": "Drafts first emails from what's verified about each lead. Nothing is sent: every draft waits for your approval in Outreach.",
-  "zee.briefing": "Reads your invoices, agreements, deals, follow-ups and outreach and reports what needs you. Nothing is changed.",
-  "team.huddle": "Nibo, Mika and Zee each give their view from their own records, twice, then the lead sums up with next steps. About a minute; nothing is changed or sent.",
+  "nibo.find_clients": "Uses one AI Outbound search from your plan, checks each company's own website, and saves up to the number above of the qualified ones to Leads, with evidence and sources. Nobody is contacted.",
+  "mika.first_messages": "Drafts first emails from what's verified about each lead. Nothing is sent: every draft waits for your approval in Outreach. Mika can prepare the draft. Copy it and send it through your email or messaging app.",
+  "zee.briefing": "Reads your own invoices, agreements, deals, follow-ups and outreach in DealInSec and reports what needs attention. Nothing is changed.",
+  "team.huddle": "Nibo, Mika and Zee each give their view from your workspace records, twice, then the lead sums up with suggested next steps. Nothing is changed or sent.",
   "nibo.campaign": "Runs on DealInSec's server, so you can close this page: one AI Outbound search at a time (each from your plan, up to 10 companies), qualified companies saved to Leads with evidence, and a report at the time you choose. Nobody is contacted.",
 };
 
@@ -56,7 +56,7 @@ export function TaskDialog({ bot, open, onOpenChange, onStarted, initialRequest,
   const start = useMutation({
     mutationFn: () => startTask(task, task === "nibo.campaign" ? campaign!.input : task === "nibo.find_clients" ? { request, saveLeads, maxLeads: max } : task === "mika.first_messages" ? { max } : task === "team.huddle" ? { topic: request, lead } : {}),
     onSuccess: (r) => { void refreshLeague(); onOpenChange(false); onStarted(r.run); toast({ title: r.existing ? "Already running" : huddle ? "The team is talking it over" : `${id.name} is on it`, description: "Progress shows here. It keeps going if you leave this page." }); },
-    onError: (e) => { if (isUpgradeError(parseApiError(e))) { onOpenChange(false); openUpgradeModal({ feature: "outbound" }); } else toast({ title: "Couldn't start the task", description: leadError(e), variant: "destructive" }); },
+    onError: (e) => { if (isUpgradeError(parseApiError(e))) { onOpenChange(false); openUpgradeModal({ feature: "outbound" }); } else toast({ title: "Couldn't start this task", description: leadError(e), variant: "destructive" }); },
   });
   const ready = ((task !== "nibo.find_clients" && task !== "team.huddle" && task !== "nibo.campaign") || request.trim().length >= 8) && !campaign?.problem;
   return (
@@ -74,7 +74,7 @@ export function TaskDialog({ bot, open, onOpenChange, onStarted, initialRequest,
         <form id="task-form" className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (ready && !start.isPending) start.mutate(); }}>
           {bot === "nibo" && !huddle && (
             <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="How Nibo should work">
-              {([["quick", "Quick search", "One search now, a few minutes"], ["campaign", "Campaign", "Many searches over hours, report at a set time"]] as const).map(([m, label, hint]) => (
+              {([["quick", "Quick search", "One search, starting now"], ["campaign", "Research campaign", "Several searches over hours, with a report at a time you choose"]] as const).map(([m, label, hint]) => (
                 <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} data-testid={`nibo-mode-${m}`}
                   className={cn("rounded-lg border px-3 py-2 text-left text-sm transition-colors", mode === m ? cn("border-transparent ring-2", id.accent.ring, id.accent.soft) : "hover:bg-muted/60")}>
                   <span className="block font-semibold">{label}</span><span className="block text-xs text-muted-foreground">{hint}</span>
@@ -84,8 +84,8 @@ export function TaskDialog({ bot, open, onOpenChange, onStarted, initialRequest,
           )}
           {task === "nibo.campaign" && (
             <>
-              <label className="flex flex-col gap-1.5 text-sm font-medium">Who are you looking for, and where?
-                <Textarea value={request} onChange={(e) => setRequest(e.target.value)} rows={3} maxLength={LEAGUE_LIMITS.requestChars} placeholder="Indian digital marketing agencies that may need web development" data-testid="campaign-request" />
+              <label className="flex flex-col gap-1.5 text-sm font-medium">Describe the type of client you're looking for, and where
+                <Textarea value={request} onChange={(e) => setRequest(e.target.value)} rows={3} maxLength={LEAGUE_LIMITS.requestChars} placeholder="For example: Indian digital marketing agencies that may need web development" data-testid="campaign-request" />
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1.5 text-sm font-medium">Qualified companies
@@ -102,14 +102,14 @@ export function TaskDialog({ bot, open, onOpenChange, onStarted, initialRequest,
                 </label>
               </div>
               <p className={cn("rounded-lg px-3 py-2 text-xs", campaign?.problem ? "bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300" : "bg-muted/60 text-muted-foreground")} role="status" data-testid="campaign-times">
-                {campaign?.problem ?? (campaign?.times && `Starts ${startLocal ? showTime(campaign.times.startAt, tz) : "now"} · research until ${showTime(campaign.times.workUntil, tz)} · report ${campaign.times.deliverAt ? showTime(campaign.times.deliverAt, tz) : "when it ends"} (${tz})`)}
+                {campaign?.problem ?? (campaign?.times && `Starts ${startLocal ? showTime(campaign.times.startAt, tz) : "now"} · researches until ${showTime(campaign.times.workUntil, tz)} at the latest · report ${campaign.times.deliverAt ? showTime(campaign.times.deliverAt, tz) : "when it ends"} (${tz})`)}
               </p>
             </>
           )}
           {task === "nibo.find_clients" && (
             <>
-              <label className="flex flex-col gap-1.5 text-sm font-medium">Who are you looking for, and where?
-                <Textarea value={request} onChange={(e) => setRequest(e.target.value)} rows={3} maxLength={LEAGUE_LIMITS.requestChars} placeholder={id.suggestions[0]} data-testid="task-request" />
+              <label className="flex flex-col gap-1.5 text-sm font-medium">Describe the type of client you're looking for, and where
+                <Textarea value={request} onChange={(e) => setRequest(e.target.value)} rows={3} maxLength={LEAGUE_LIMITS.requestChars} placeholder="For example: small businesses in Bengaluru that could use a website redesign" data-testid="task-request" />
               </label>
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2.5">
                 <label className="flex items-center gap-2 text-sm"><Switch checked={saveLeads} onCheckedChange={setSaveLeads} aria-label="Save qualified companies to Leads" />Save qualified companies to Leads</label>

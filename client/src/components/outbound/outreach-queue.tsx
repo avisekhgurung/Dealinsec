@@ -56,7 +56,7 @@ function Summary({ waiting, sent }: { waiting: QueueItem[] | undefined; sent: Qu
   const by = (items: QueueItem[] | undefined, st: string) => (items ? items.filter((i) => i.message.status === st).length : null);
   const rows: { status: QueueItem["message"]["status"]; label: string; n: number | null; hint?: string }[] = [
     { status: "draft", label: "Waiting for review", n: by(waiting, "draft") },
-    { status: "approved", label: "Approved · not sent", n: by(waiting, "approved"), hint: SEND_YOURSELF },
+    { status: "approved", label: "Approved, not sent", n: by(waiting, "approved"), hint: SEND_YOURSELF },
     { status: "sending", label: "Sending from Gmail · check needed", n: by(waiting, "sending") },
     { status: "sent", label: "Sent", n: by(sent, "sent") },
   ];
@@ -117,7 +117,7 @@ export function OutreachQueue({ canEdit, onShowReady }: { canEdit: boolean; /** 
       {notSetUp ? (
         <p className="rounded-2xl border px-4 py-8 text-center text-sm text-muted-foreground">Outreach drafts aren't set up on this server yet.</p>
       ) : q.isError ? (
-        <div className="rounded-2xl border border-destructive/40 px-4 py-6 text-center" role="alert"><p className="text-sm">{leadError(q.error, "The messages couldn't be loaded.")}</p><Button size="sm" variant="outline" className="mt-2" onClick={() => void q.refetch()}>Retry</Button></div>
+        <div className="rounded-2xl border border-destructive/40 px-4 py-6 text-center" role="alert"><p className="text-sm">{leadError(q.error, "The messages couldn't be loaded.")}</p><Button size="sm" variant="outline" className="mt-2" onClick={() => void q.refetch()}>Try again</Button></div>
       ) : !q.data ? (
         <ul className="divide-y rounded-xl border" aria-busy="true" aria-label="Loading messages">
           {[0, 1, 2].map((i) => (

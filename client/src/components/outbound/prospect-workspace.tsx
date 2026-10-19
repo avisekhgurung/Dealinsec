@@ -358,7 +358,7 @@ export function ProspectWorkspace({ canExport, onOpen, onPrepared }: { canExport
         <div className="rounded-2xl border border-destructive/40 px-4 py-8 text-center" role="alert" data-testid="workspace-error">
           <p className="text-sm font-medium">The prospects couldn't be loaded.</p>
           <p className="mt-1 text-xs text-muted-foreground">{apiFailure(q.error).status === 400 ? "One of the filters in the address isn't valid. Reset the filters." : "Nothing was changed. Try again."}</p>
-          <div className="mt-3 flex justify-center gap-2"><Button size="sm" variant="outline" onClick={() => void q.refetch()} data-testid="workspace-retry"><RotateCcw className="mr-1.5 h-4 w-4" />Retry</Button>{active && <Button size="sm" variant="ghost" onClick={reset}>Reset filters</Button>}</div>
+          <div className="mt-3 flex justify-center gap-2"><Button size="sm" variant="outline" onClick={() => void q.refetch()} data-testid="workspace-retry"><RotateCcw className="mr-1.5 h-4 w-4" />Try again</Button>{active && <Button size="sm" variant="ghost" onClick={reset}>Reset filters</Button>}</div>
         </div>
       ) : !data ? (
         <div className="divide-y rounded-xl border" aria-busy="true" aria-label="Loading prospects">

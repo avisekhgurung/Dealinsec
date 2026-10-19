@@ -303,7 +303,7 @@ export default function DealsPage() {
             <div>
               <h1 className="text-xl lg:text-2xl font-bold tracking-tight">Deals</h1>
               <p className="hidden lg:block text-sm text-muted-foreground mt-0.5">
-                {deals.length} {deals.length === 1 ? "deal" : "deals"} total
+                Track opportunities from first conversation to closed deal · {deals.length} {deals.length === 1 ? "deal" : "deals"}
               </p>
             </div>
             <div className="flex items-center gap-1.5">
@@ -312,7 +312,7 @@ export default function DealsPage() {
               <Link href="/deals/new">
                 <Button size="sm" className="gradient-btn text-white lg:h-10 lg:px-5 lg:text-sm" data-testid="button-new-deal">
                   <Plus className="w-4 h-4 mr-1 lg:mr-2" />
-                  <span className="lg:inline">New</span><span className="hidden lg:inline">&nbsp;Deal</span>
+                  <span className="lg:inline">Create</span><span className="hidden lg:inline">&nbsp;deal</span>
                 </Button>
               </Link>
             )}
@@ -326,12 +326,13 @@ export default function DealsPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search deals..."
+                aria-label="Search deals"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 pr-8 h-9 bg-white/50 dark:bg-white/5 rounded-xl text-sm"
               />
               {search && (
-                <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
+                <button type="button" aria-label="Clear search" onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
                   <X className="w-3.5 h-3.5 text-muted-foreground" />
                 </button>
               )}
@@ -412,7 +413,7 @@ export default function DealsPage() {
               <p className="text-sm text-muted-foreground mb-4">{audience.emptyState}</p>
               {canCreateDeal && (
                 <Link href="/deals/new">
-                  <Button className="gradient-btn text-white" data-testid="button-create-deal-empty"><Plus className="w-4 h-4 mr-2" />Create Deal</Button>
+                  <Button className="gradient-btn text-white" data-testid="button-create-deal-empty"><Plus className="w-4 h-4 mr-2" />Create deal</Button>
                 </Link>
               )}
             </CardContent>
@@ -448,7 +449,7 @@ export default function DealsPage() {
                 exportFileName="deals"
                 onImportClick={canCreateDeal ? () => setLocation("/deals/import") : undefined}
                 toolbarExtra={<DateRangeFilter value={dateRange} onChange={setDateRange} />}
-                emptyMessage="No deals match your filters."
+                emptyMessage="No deals match your search or filters. Clear them to see all your deals."
               />
             </div>
 
@@ -497,9 +498,9 @@ export default function DealsPage() {
                 <Card className="glass-card border-0">
                   <CardContent className="py-12 text-center">
                     <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted mx-auto mb-4"><Briefcase className="w-8 h-8 text-muted-foreground" /></div>
-                    <h3 className="font-semibold mb-1">No matches found</h3>
-                    <p className="text-sm text-muted-foreground mb-4">Try a different search or filter</p>
-                    <Button variant="outline" onClick={() => { setSearch(""); setFilter("all"); }}>Clear Filters</Button>
+                    <h3 className="font-semibold mb-1">No deals match</h3>
+                    <p className="text-sm text-muted-foreground mb-4">Try a different search or status, or clear the filters to see all your deals.</p>
+                    <Button variant="outline" onClick={() => { setSearch(""); setFilter("all"); }}>Clear filters</Button>
                   </CardContent>
                 </Card>
               )}

@@ -52,7 +52,7 @@ export function GmailCard() {
     connect.mutate(undefined, { onError: onError("Couldn't start connecting") });
   };
   const runVerify = () => verify.mutate(undefined, {
-    onSuccess: (r) => toast(r.result === "ok" ? { title: "Connection works" } : r.result === "temporarily_unavailable" ? { title: "Couldn't reach Google", description: "Nothing changed. Try again in a moment." } : r.result === "not_connected" ? { title: "Not connected" } : { title: "Reconnect needed", description: "See the card for why.", variant: "destructive" }),
+    onSuccess: (r) => toast(r.result === "ok" ? { title: "Connection works" } : r.result === "temporarily_unavailable" ? { title: "Couldn't reach Google", description: "Nothing changed. Try again in a moment." } : r.result === "not_connected" ? { title: "Gmail isn't connected" } : { title: "Reconnect needed", description: "The Gmail card shows why and what to do next.", variant: "destructive" }),
     onError: onError("Couldn't check the connection"),
   });
   const runSync = () => sync.mutate(undefined, {
@@ -79,8 +79,9 @@ export function GmailCard() {
           <div>
             <h2 className="flex items-center gap-2 text-lg font-bold"><Mail className="h-5 w-5" aria-hidden />Gmail</h2>
             <p className="text-sm text-muted-foreground">
-              Connect your own Gmail so approved messages can go out from your address{rs?.available ? ", and replies to your outreach show up in DealInSec" : ""}.
-              {!data.sendingEnabled && " Sending from DealInSec isn't switched on yet; connecting prepares it."}
+              {data.sendingEnabled
+                ? <>Connect your own Gmail so approved messages can go out from your address{rs?.available ? ", and replies to your outreach show up in DealInSec" : ""}.</>
+                : <>Gmail is in limited early access. {rs?.available ? "Connect it so replies to your outreach show up in DealInSec. " : ""}Sending email from DealInSec isn't switched on yet, so nothing is sent from your mailbox. Connecting now gets it ready.</>}
             </p>
           </div>
           {c && (
@@ -155,7 +156,7 @@ export function GmailCard() {
             <Button onClick={startConnect} disabled={busy} data-testid="gmail-connect">{connect.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Connect Gmail</Button>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground" data-testid="gmail-not-allowed">Your role doesn't include working on leads, so you can't connect a mailbox. Ask your organization owner.</p>
+          <p className="text-sm text-muted-foreground" data-testid="gmail-not-allowed">Your role doesn't include working on leads, so you can't connect a mailbox. Ask the workspace Owner.</p>
         )}
       </CardContent>
     </Card>

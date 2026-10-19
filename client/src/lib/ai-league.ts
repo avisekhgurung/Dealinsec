@@ -31,6 +31,13 @@ export interface ScheduleView { id: number; bot: Bot; task: LeagueTask; taskLabe
 export interface LeagueUsage { tier: string; windowDays: number; runs: { used: number; limit: number }; concurrent: number; schedules: { used: number; limit: number }; byBot: Record<string, number>; tokens: number; failed: number }
 export interface MemoryRow { id: number; bot: string; key: string; label: string; value: string; source: string; updatedAt: string | null }
 
+/** What a task's status reads as on screen (the enums are unchanged; see runStatusLabel in components/ai-league/run-report).
+ *  "waiting" is a task waiting on its own research or clock, never on the person: approvals are listed separately. */
+export const RUN_STATUS_TEXT = {
+  queued: "Queued", running: "In progress", researching: "In progress", scheduled: "Scheduled", reportScheduled: "Report scheduled",
+  completed: "Completed", partial: "Completed with limitations", failed: "Failed", cancelled: "Cancelled", stopping: "Stopping…",
+} as const;
+
 const isActive = (r: RunView | null | undefined) => !!r && !isTerminal(r.status);
 
 export const useLeagueStatus = () => useQuery<{ ready: boolean; providerConfigured: boolean }>({ queryKey: [STATUS_URL], retry: false, staleTime: 60_000 });

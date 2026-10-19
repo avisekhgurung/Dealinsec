@@ -1,5 +1,5 @@
 /**
- * The homepage sections ("Find Clients. Close Deals. Get Paid."): the hero, how it works (the five workflow stages on
+ * The homepage sections ("Find clients. Win deals. Get paid."): the hero, how it works (the five workflow stages on
  * one example client), what it does by outcome, why keep the journey in one place, who it's for, the closing call to
  * action and the FAQ. landing.tsx composes them with the header, demo, pricing and footer.
  *
@@ -144,29 +144,29 @@ export function HeroSection({ isAuthenticated, onPrimary }: { isAuthenticated: b
         <div className="min-w-0 max-w-xl">
           <p style={{ animationDelay: "0.05s" }} className="dis-hero-in inline-flex items-center gap-2 rounded-full border border-emerald-200/80 bg-white/80 px-3 py-1 text-[11.5px] font-semibold text-emerald-700 shadow-sm backdrop-blur dark:border-emerald-800/50 dark:bg-neutral-900/70 dark:text-emerald-300">
             <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60 motion-reduce:hidden" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" /></span>
-            For freelancers, consultants and small B2B service agencies
+            For freelancers and service providers in India
           </p>
           <h1 style={{ animationDelay: "0.13s" }} className="dis-hero-in mt-5 text-[2.75rem] font-extrabold leading-[1.02] tracking-[-0.035em] text-[#111B22] sm:text-6xl lg:text-[4.1rem] dark:text-white">
-            Find Clients.<br />Close <span className={GREEN}>Deals.</span><br /><span className="dis-gradient-text">Get Paid.</span>
+            Find clients.<br />Win <span className={GREEN}>deals.</span><br /><span className="dis-gradient-text">Get paid.</span>
           </h1>
           <p style={{ animationDelay: "0.21s" }} className="dis-hero-in mt-5 max-w-lg text-base leading-relaxed text-neutral-600 sm:text-lg dark:text-neutral-400">
-            DealInSec helps service businesses research prospects, manage deals, send quotations, create agreements, generate invoices and track payments in one connected workspace.
+            DealInSec is a simple business workspace for Indian freelancers and service providers. Track leads and deals, prepare quotations and agreements, create invoices and follow up on payments, with AI coworkers to help along the way.
           </p>
           <div style={{ animationDelay: "0.29s" }} className="dis-hero-in mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <button type="button" onClick={() => { trackEvent("hero_cta_click", { label: isAuthenticated ? "dashboard" : "start_free" }); onPrimary(); }} data-testid="button-hero-cta"
               className="group inline-flex h-12 items-center justify-center whitespace-nowrap rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-6 text-[15px] font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:shadow-emerald-600/40">
-              {isAuthenticated ? "Go to dashboard" : "Start Free"}<ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              {isAuthenticated ? "Go to Home" : "Get started free"}<ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
             <a href="#how" onClick={() => trackEvent("hero_cta_click", { label: "see_how" })} data-testid="link-hero-demo"
               className="inline-flex h-12 items-center justify-center whitespace-nowrap rounded-lg border border-neutral-200 bg-white px-5 text-[15px] font-semibold shadow-sm transition hover:border-emerald-300 dark:border-neutral-700 dark:bg-neutral-900">
-              <PlayCircle className="mr-2 h-5 w-5 text-emerald-600" />See How It Works
+              <PlayCircle className="mr-2 h-5 w-5 text-emerald-600" />See how it works
             </a>
           </div>
           <p style={{ animationDelay: "0.33s" }} className="dis-hero-in mt-4 flex items-start gap-2 text-sm font-medium text-neutral-800 dark:text-neutral-200" data-testid="hero-approval">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />AI researches and drafts; you approve every message. Nothing is sent automatically.
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />AI coworkers research and draft; you approve every message and send it yourself. Nothing is sent automatically.
           </p>
           <ul style={{ animationDelay: "0.37s" }} className="dis-hero-in mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-neutral-500 dark:text-neutral-400">
-            {[`Free: ${PRICING.freeMonthlyDeals} new deals a month with quotations`, `${OUTBOUND_ALLOWANCE_DEFAULTS.free.monthlySearches} AI research searches every ${OUTBOUND_WINDOW_DAYS} days`, `Pro ₹${PRICING.proMonthlyInr}/month in India`].map((t) => (
+            {["No credit card required", `Free: ${PRICING.freeMonthlyDeals} new deals a month with quotations`, `${OUTBOUND_ALLOWANCE_DEFAULTS.free.monthlySearches} AI research searches every ${OUTBOUND_WINDOW_DAYS} days`, `Pro ₹${PRICING.proMonthlyInr}/month in India`].map((t) => (
               <li key={t} className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-emerald-600" />{t}</li>
             ))}
           </ul>
@@ -355,7 +355,7 @@ export function WorkflowWalkthrough() {
 
 const OUTCOMES: { Icon: typeof Radar; title: string; plan: string; text: string; points: string[] }[] = [
   {
-    Icon: Radar, title: "Research prospects with AI", plan: "Free and Pro, with limits",
+    Icon: Radar, title: "Find opportunities", plan: "Free and Pro, with limits",
     text: "Describe the clients you want and where. AI Outbound searches the web, or lists local businesses in a city from Google Maps, and checks each company's own website against your profile.",
     points: ["Companies in any country, or local businesses in your city", "A score and the reasons for it", "Dated signals with their sources; guesses labelled", "First messages drafted from verified facts, approved by you"],
   },
@@ -365,19 +365,19 @@ const OUTCOMES: { Icon: typeof Radar; title: string; plan: string; text: string;
     points: ["Stages, next steps and follow-up dates", "Deals by engagement model: retainer, fixed price, hourly, milestones and more", "A dashboard of what needs you today"],
   },
   {
-    Icon: FileText, title: "Send quotations", plan: "Free and Pro",
+    Icon: FileText, title: "Send clear quotations", plan: "Free and Pro",
     text: "Generate a professional quotation from the deal and share a link your client can open and accept online.",
     points: ["Versioned when the scope changes", "Print or PDF", "Protection Check flags missing terms before you send"],
   },
   {
-    Icon: Signature, title: "Agreements and signatures", plan: "Pro",
+    Icon: Signature, title: "Prepare agreements", plan: "Pro",
     text: "Create the agreement from the deal with your terms, and send a link your client signs online.",
     points: ["Standard and custom terms", "An audit record of who signed and when", "Or upload a signed paper copy"],
   },
   {
-    Icon: ReceiptText, title: "Invoices and payment tracking", plan: "Pro",
+    Icon: ReceiptText, title: "Invoices and payment follow-ups", plan: "Pro",
     text: "Generate invoices from the agreement, single or split into an advance and a final payment, and track each to paid.",
-    points: ["Paid, pending and overdue at a glance", "Follow-up messages drafted for late invoices", "Your business and tax details printed"],
+    points: ["Paid, pending and overdue at a glance", "Payment reminders drafted for late invoices; you send them", "Your business and tax details printed"],
   },
 ];
 
@@ -386,8 +386,8 @@ export function FeaturesSection() {
     <section id="features" className="scroll-mt-20 py-16 sm:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <Reveal className="mx-auto max-w-3xl text-center">
-          <h2 className="text-balance text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Everything from first contact <span className={GREEN}>to final payment</span></h2>
-          <p className="mt-3 text-neutral-600 dark:text-neutral-400">Research prospects, manage the deal, and send the documents that get you paid. AI does the research and drafting; you approve everything that reaches a client.</p>
+          <h2 className="text-balance text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">One workspace for the <span className={GREEN}>client journey</span></h2>
+          <p className="mt-3 text-neutral-600 dark:text-neutral-400">Find opportunities, manage deals, prepare quotations and agreements, then create invoices and follow up on payments. AI coworkers help with research and drafts; you approve everything that reaches a client.</p>
         </Reveal>
         <motion.ul initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={stagger} className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {OUTCOMES.map(({ Icon, title, plan, text, points }) => (
@@ -419,18 +419,18 @@ export function FeaturesSection() {
 // lazy: the homepage doesn't load the app's AI League code for three pictures.
 const TEAM = [
   {
-    key: "nibo", name: "Nibo", role: "Finds your next clients", bar: "bg-blue-600", tint: "bg-blue-50 dark:bg-blue-950/40", fg: "text-blue-700 dark:text-blue-300",
-    line: "Describe who you want to work with. Nibo searches, reads each company's own website and saves the ones that fit.",
+    key: "nibo", name: "Nibo", role: "Opportunity Scout", does: "finds and researches potential clients", bar: "bg-blue-600", tint: "bg-blue-50 dark:bg-blue-950/40", fg: "text-blue-700 dark:text-blue-300",
+    line: "Find and research potential clients for your services. Describe who you want to work with; Nibo searches, reads each company's own website and saves the ones that fit.",
     points: ["Evidence and the source page for every company", "Only qualified companies reach your leads", "Asks before it uses one of your searches"],
   },
   {
-    key: "mika", name: "Mika", role: "Writes your first messages", bar: "bg-rose-600", tint: "bg-rose-50 dark:bg-rose-950/40", fg: "text-rose-700 dark:text-rose-300",
-    line: "Mika drafts a short, specific first email for each lead from what was verified about them.",
+    key: "mika", name: "Mika", role: "Deal Closer", does: "drafts outreach and follow-ups", bar: "bg-rose-600", tint: "bg-rose-50 dark:bg-rose-950/40", fg: "text-rose-700 dark:text-rose-300",
+    line: "Prepare personalised outreach and follow-ups. Mika drafts a short, specific first email for each lead from what was verified about them.",
     points: ["Drafts only: nothing is sent for you", "You edit and approve the exact text", "Skips anyone on your do-not-contact list"],
   },
   {
-    key: "zee", name: "Zee", role: "Keeps you on top of money", bar: "bg-emerald-600", tint: "bg-emerald-50 dark:bg-emerald-950/40", fg: "text-emerald-700 dark:text-emerald-300",
-    line: "Zee tells you what needs you today, read from your own invoices, deals and follow-ups.",
+    key: "zee", name: "Zee", role: "Business Guardian", does: "shows what needs your attention", bar: "bg-emerald-600", tint: "bg-emerald-50 dark:bg-emerald-950/40", fg: "text-emerald-700 dark:text-emerald-300",
+    line: "See what needs attention across your deals, follow-ups and payments. Zee reads your own invoices, deals and follow-ups and tells you what needs you today.",
     points: ["Overdue invoices and what's due this week", "Follow-ups due and messages waiting", "Never invents a number: checked against your records"],
   },
 ] as const;
@@ -441,8 +441,8 @@ export function AiTeamSection() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <Reveal className="mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"><Bot className="h-3.5 w-3.5" aria-hidden />AI coworkers</span>
-          <h2 className="mt-3 text-balance text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Meet your <span className={GREEN}>AI team</span></h2>
-          <p className="mt-3 text-neutral-600 dark:text-neutral-400">Three AI coworkers do the legwork in the background: Nibo finds clients, Mika writes first messages and Zee watches your money. They keep going when you close the page, and they ask before anything that matters.</p>
+          <h2 className="mt-3 text-balance text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Meet Nibo, Mika and Zee, <span className={GREEN}>your AI coworkers</span></h2>
+          <p className="mt-3 text-neutral-600 dark:text-neutral-400">Three AI coworkers help with the legwork in the background: Nibo researches potential clients, Mika drafts outreach and Zee shows what needs your attention. They keep working when you close the page, and they ask before anything that matters. AI results may be incomplete or inaccurate, so check important details before contacting a client.</p>
         </Reveal>
         <motion.ul initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={stagger} className="mt-10 grid gap-4 md:grid-cols-3">
           {TEAM.map((m) => (
@@ -451,7 +451,7 @@ export function AiTeamSection() {
               <div className="flex items-center gap-4">
                 <span className={cn("flex h-24 w-24 shrink-0 items-center justify-center rounded-full", m.tint)}>
                   <img src={`/ai-league/${m.key}-mascot.webp`} srcSet={`/ai-league/${m.key}-mascot-sm.webp 192w, /ai-league/${m.key}-mascot.webp 512w`} sizes="88px"
-                    width={88} height={88} loading="lazy" decoding="async" alt={`${m.name}, the DealInSec AI coworker who ${m.role.toLowerCase()}`} className="h-[88px] w-[88px] object-contain" />
+                    width={88} height={88} loading="lazy" decoding="async" alt={`${m.name}, the DealInSec AI coworker who ${m.does}`} className="h-[88px] w-[88px] object-contain" />
                 </span>
                 <div className="min-w-0">
                   <h3 className="text-xl font-extrabold">{m.name}</h3>
@@ -539,10 +539,10 @@ export function ManualWorkflowSection() {
 /* ── Who it's for ────────────────────────────────────────────────────────────────────── */
 
 const AUDIENCES = [
-  { Icon: UserRound, title: "Freelancers & solo consultants", text: "Find clients, quote them properly, get the scope signed and know what you're owed.", href: "/for-freelancers" },
-  { Icon: Building2, title: "Web development & software services", text: "Research accounts, scope builds as milestones and invoice each stage.", href: null },
-  { Icon: Users, title: "Digital marketing, SEO & growth agencies", text: "Find companies in your niche with evidence, then quote, sign and bill retainers.", href: null },
-  { Icon: Bot, title: "AI automation businesses", text: "Spot companies showing repetitive work publicly, such as support or operations hiring, with dated sources.", href: null },
+  { Icon: Building2, title: "Freelance web developers", text: "Research businesses in your city or niche, quote a build as milestones and invoice each stage.", href: "/for-freelancers" },
+  { Icon: Sparkles, title: "Designers and creatives", text: "Spell out deliverables and revision rounds in the quotation, get the agreement signed, then invoice.", href: "/for-freelancers" },
+  { Icon: Users, title: "Digital marketers and SEO consultants", text: "Find companies in your niche with evidence, then quote, sign and bill monthly retainers.", href: "/for-freelancers" },
+  { Icon: UserRound, title: "Independent consultants", text: "Turn a conversation into a deal, send a professional quotation and keep track of what you're owed.", href: "/for-freelancers" },
 ];
 
 export function AudienceCards() {
@@ -550,8 +550,8 @@ export function AudienceCards() {
     <section id="audiences" className="scroll-mt-20 py-16 sm:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <Reveal className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Built for service businesses</h2>
-          <p className="mt-3 text-neutral-600 dark:text-neutral-400">Freelancers, solo consultants and small B2B agencies of about 1 to 10 people, in India and beyond.</p>
+          <h2 className="text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Built for people who sell services</h2>
+          <p className="mt-3 text-neutral-600 dark:text-neutral-400">Freelancers and solo service providers first, and small agencies of up to about 10 people: web development, digital marketing, SEO, AI automation and other service businesses.</p>
         </Reveal>
         <motion.ul initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={stagger} className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {AUDIENCES.map(({ Icon, title, text, href }) => (
@@ -559,7 +559,7 @@ export function AudienceCards() {
               <Icon className="h-6 w-6 text-emerald-600" strokeWidth={1.8} aria-hidden />
               <h3 className="mt-3 font-bold">{title}</h3>
               <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{text}</p>
-              {href && <Link href={href} className="mt-3 inline-flex items-center text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-300">DealInSec for freelancers<ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>}
+              {href && <Link href={href} className="mt-3 inline-flex items-center text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-300">How freelancers use it<ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>}
             </motion.li>
           ))}
         </motion.ul>
@@ -579,12 +579,12 @@ export function CtaBanner({ isAuthenticated, onPrimary }: { isAuthenticated: boo
           <span aria-hidden="true" className="dis-orb absolute -bottom-20 -right-10 h-72 w-72 rounded-full bg-teal-300/25 blur-3xl" style={{ animationDelay: "2s" }} />
           <div className="relative">
             <h2 className="text-3xl font-extrabold leading-tight tracking-[-0.025em] sm:text-5xl">Find your next client.<br />Get paid for the last one.</h2>
-            <p className="mx-auto mt-4 max-w-xl text-emerald-50/90">Start free: research prospects, save leads, create deals and send quotations. Upgrade when you need agreements, invoices and payment tracking.</p>
+            <p className="mx-auto mt-4 max-w-xl text-emerald-50/90">Start free: research potential clients, save leads, create deals and send quotations. Upgrade when you need agreements, invoices and payment tracking.</p>
             <button type="button" onClick={onPrimary} data-testid="button-final-cta"
               className="group mt-7 inline-flex h-12 items-center rounded-lg bg-white px-6 text-sm font-semibold text-emerald-800 shadow-xl transition hover:bg-emerald-50">
-              {isAuthenticated ? "Go to dashboard" : "Start Free"}<ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              {isAuthenticated ? "Go to Home" : "Get started free"}<ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
-            <p className="mt-4 text-xs text-emerald-50/75">No credit card · Free plan · Pro ₹{PRICING.proMonthlyInr}/month in India</p>
+            <p className="mt-4 text-xs text-emerald-50/75">No credit card required · Free plan · Pro ₹{PRICING.proMonthlyInr}/month in India</p>
           </div>
         </Reveal>
       </div>

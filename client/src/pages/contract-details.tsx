@@ -151,7 +151,7 @@ export default function ContractDetailsPage() {
       });
     },
     onError: (err) => toast({
-      title: "Could not save the stamp details",
+      title: "Couldn't save the stamp details",
       description: parseApiError(err).error || "Please try again.",
       variant: "destructive",
     }),
@@ -187,8 +187,8 @@ export default function ContractDetailsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/contracts", params.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
       toast({
-        title: "Proof uploaded",
-        description: "Contract proof has been uploaded successfully.",
+        title: "Signed copy uploaded",
+        description: "It's saved with this agreement.",
       });
     },
     onError: (err: unknown) => {
@@ -233,7 +233,7 @@ export default function ContractDetailsPage() {
         return;
       }
       toast({
-        title: "Failed to delete invoice",
+        title: "Couldn't delete the invoice",
         description: parsed.error || "Please try again.",
         variant: "destructive",
       });
@@ -264,7 +264,7 @@ export default function ContractDetailsPage() {
         return;
       }
       toast({
-        title: "Failed to update amount",
+        title: "Couldn't update the amount",
         description: parsed.error || "Please try again.",
         variant: "destructive",
       });
@@ -278,8 +278,8 @@ export default function ContractDetailsPage() {
     const validTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
     if (!validTypes.includes(file.type)) {
       toast({
-        title: "Invalid file type",
-        description: "Please upload a PDF or image file.",
+        title: "This file type isn't supported",
+        description: "Upload a PDF, JPG, PNG or WebP file.",
         variant: "destructive",
       });
       return;
@@ -288,7 +288,7 @@ export default function ContractDetailsPage() {
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "File too large",
-        description: "Maximum file size is 5MB.",
+        description: "Choose a file under 5 MB.",
         variant: "destructive",
       });
       return;
@@ -323,7 +323,7 @@ export default function ContractDetailsPage() {
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-xl lg:text-lg font-bold lg:font-semibold truncate">Agreement Details</h1>
+          <h1 className="text-xl lg:text-lg font-bold lg:font-semibold truncate">Agreement details</h1>
         </div>
         {actions}
       </div>
@@ -352,7 +352,7 @@ export default function ContractDetailsPage() {
             kind={isError ? httpErrorKind(error) : "not_found"}
             what="agreement"
             backHref={backPath}
-            backLabel="Back to Agreements"
+            backLabel="Back to agreements"
             onRetry={() => refetch()}
             retrying={isFetching}
           />
@@ -447,22 +447,22 @@ export default function ContractDetailsPage() {
                   className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 no-default-hover-elevate no-default-active-elevate"
                 >
                   <Shield className="w-3 h-3 mr-1" />
-                  Exclusive Contract
+                  Exclusive agreement
                 </Badge>
               )}
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 py-4">
               <div className="rounded-xl border border-border/60 bg-card/40 p-3.5">
-                <p className="text-xs text-muted-foreground mb-1.5">Contract Value</p>
+                <p className="text-xs text-muted-foreground mb-1.5">Agreement value</p>
                 <p className="font-bold text-xl text-primary tabular-nums">{fmt.money(contract.contractValueMinor)}</p>
               </div>
               <div className="rounded-xl border border-border/60 bg-card/40 p-3.5">
-                <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Contract Period</p>
+                <p className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Agreement period</p>
                 <p className="font-semibold text-sm leading-snug">{formatDate(contract.startDate)} – {formatDate(contract.endDate)}</p>
               </div>
               <div className="rounded-xl border border-border/60 bg-card/40 p-3.5 col-span-2 lg:col-span-1">
-                <p className="text-xs text-muted-foreground mb-1.5">{contract.signedByBrand ? "Signed On" : "Created For"}</p>
+                <p className="text-xs text-muted-foreground mb-1.5">{contract.signedByBrand ? "Signed on" : "Deal"}</p>
                 <p className="font-semibold text-sm leading-snug flex items-center gap-1.5">
                   {contract.signedByBrand && contract.signedDate
                     ? <><CheckCircle className="w-4 h-4 text-emerald-500" /> {formatDate(contract.signedDate)}</>
@@ -502,7 +502,7 @@ export default function ContractDetailsPage() {
                       ? "text-emerald-700 dark:text-emerald-300"
                       : "text-amber-700 dark:text-amber-300"
                   }`}>
-                    {party} Authorization
+                    {party} signature
                   </p>
                   <p className={`text-xs ${
                     contract.signedByBrand
@@ -511,7 +511,7 @@ export default function ContractDetailsPage() {
                   }`}>
                     {contract.signedByBrand && contract.signedDate
                       ? `Signed on ${formatDate(contract.signedDate)}`
-                      : `Awaiting ${party.toLowerCase()} signature`}
+                      : `Waiting for the ${party.toLowerCase()} to sign`}
                   </p>
                 </div>
               </div>
@@ -538,12 +538,15 @@ export default function ContractDetailsPage() {
                 <div>
                   <dt className="text-muted-foreground">Signature on document</dt>
                   <dd className="font-semibold">
-                    {contract.signatureUrl ? "Captured at creation" : "Not captured"}
+                    {contract.signatureUrl ? "Added when the agreement was created" : "Not added"}
                   </dd>
                 </div>
               </dl>
               <p className="text-[11px] leading-relaxed text-muted-foreground">
                 {executionRecordDisclosure(fmt.settings.country)}
+              </p>
+              <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground" data-testid="text-agreement-legal-note">
+                This agreement template is provided for convenience and does not constitute legal advice. Review important terms with a qualified professional before use.
               </p>
             </div>
           </CardContent>
@@ -562,8 +565,8 @@ export default function ContractDetailsPage() {
                 <h3 className="text-white font-bold text-base">Agreement PDF</h3>
                 <p className="text-white/75 text-xs leading-snug">
                   {contract.signedByBrand
-                    ? "Signed — download the record for your files"
-                    : `Download & send to ${contract.brandName} for signing`}
+                    ? "Signed. Download a copy for your records."
+                    : `Preview or download it, and share the signing link with ${contract.brandName}.`}
                 </p>
               </div>
             </div>
@@ -578,7 +581,7 @@ export default function ContractDetailsPage() {
               data-testid="button-download-agreement-pdf"
             >
               <Download className="w-5 h-5 mr-2" />
-              View &amp; Download Agreement PDF
+              View and download PDF
             </Button>
           </CardContent>
         </Card>
@@ -588,7 +591,7 @@ export default function ContractDetailsPage() {
 
         <motion.section variants={fadeUp} className="space-y-3">
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Invoice for {party}
+              Invoices
             </h3>
 
             {/* Existing invoices — always visible when present */}
@@ -600,7 +603,7 @@ export default function ContractDetailsPage() {
                   </p>
                   {dealBrandInvoices.map(inv => {
                     const isEditing = editingInvoiceId === inv.id;
-                    const typeLabel = (inv as any).invoiceType === "advance" ? "Advance Invoice" : (inv as any).invoiceType === "final" ? "Final Invoice" : "Invoice";
+                    const typeLabel = (inv as any).invoiceType === "advance" ? "Advance invoice" : (inv as any).invoiceType === "final" ? "Final invoice" : "Invoice";
                     return (
                       <div key={inv.id} className="p-3 rounded-xl border bg-card shadow-sm space-y-2">
                         <div className="flex items-center justify-between gap-2">
@@ -660,7 +663,7 @@ export default function ContractDetailsPage() {
                                   onClick={async () => {
                                     const ok = await confirm({
                                       title: "Delete this invoice?",
-                                      description: `Invoice ${inv.invoiceNumber} for ${fmt.money(inv.dealAmountMinor)} will be permanently deleted. This cannot be undone.`,
+                                      description: `Invoice ${inv.invoiceNumber} for ${fmt.money(inv.dealAmountMinor)} will be permanently deleted. This can't be undone.`,
                                       confirmText: "Delete invoice",
                                       destructive: true,
                                     });
@@ -701,7 +704,7 @@ export default function ContractDetailsPage() {
                                 // `minor(n) < 1` also refuses "0.004", which
                                 // passes `n > 0` and would save a zero invoice.
                                 if (!Number.isFinite(n) || fmt.minor(n) < 1) {
-                                  toast({ title: "Invalid amount", description: "Enter a positive number.", variant: "destructive" });
+                                  toast({ title: "Enter a valid amount", description: "The amount must be greater than zero.", variant: "destructive" });
                                   return;
                                 }
                                 updateInvoiceAmount.mutate({ invoiceId: inv.id, amount: n, currency: (inv as { currency?: string | null }).currency });
@@ -744,13 +747,13 @@ export default function ContractDetailsPage() {
                     <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium text-sm">{hasInvoice ? "Generate another invoice" : `Generate Invoice for ${party}`}</p>
+                    <p className="font-medium text-sm">{hasInvoice ? "Create another invoice" : `Create an invoice for this ${party.toLowerCase()}`}</p>
                     <p className="text-xs text-muted-foreground">
                       {!isAgreementSigned(contract)
-                        ? "Send it for signature or upload a signed copy to enable billing"
+                        ? "You can create invoices once the agreement is signed online or you upload a signed copy."
                         : hasInvoice
-                        ? "Invoice amounts or terms changed? Create a new one anytime."
-                        : `Create a professional invoice to send to ${contract.brandName}`}
+                        ? "Need to bill a different amount or stage? Create another invoice."
+                        : `Create an invoice for ${contract.brandName} based on this agreement.`}
                     </p>
                   </div>
                 </div>
@@ -772,7 +775,7 @@ export default function ContractDetailsPage() {
                   data-testid="button-generate-brand-invoice"
                 >
                   <FileText className="w-4 h-4 mr-2" />
-                  {hasInvoice ? "Raise another invoice" : "Raise invoice"}
+                  {hasInvoice ? "Create another invoice" : "Create invoice"}
                 </Button>
                 <div className="grid grid-cols-2 gap-2">
                   <Button
@@ -813,7 +816,7 @@ export default function ContractDetailsPage() {
           {canAgree && fmt.ready && fmt.settings.country === "IN" && (
             <Card className="glass-card border-0">
               <CardContent className="p-5">
-                <h3 className="font-semibold mb-1 pb-2 border-b-2 border-emerald-500/60 inline-block">Stamp Duty</h3>
+                <h3 className="font-semibold mb-1 pb-2 border-b-2 border-emerald-500/60 inline-block">Stamp duty</h3>
                 <p className="text-xs text-muted-foreground mt-2 mb-4 leading-relaxed">
                   Bought an e-stamp for this agreement? Record its certificate number and it prints on the
                   document. DealInSec doesn't sell or pay stamp duty — buy it from{" "}
@@ -830,7 +833,7 @@ export default function ContractDetailsPage() {
                 </p>
                 {!canEditEstamp(contract) && (
                   <p className="text-xs text-muted-foreground mb-3" data-testid="text-estamp-locked">
-                    Signed by the client — the stamp details are now fixed.
+                    Signed by the {party.toLowerCase()}, so the stamp details can no longer be changed.
                   </p>
                 )}
                 <div className="space-y-3">
@@ -880,30 +883,30 @@ export default function ContractDetailsPage() {
 
           <Card className="glass-card border-0">
             <CardContent className="p-5">
-              <h3 className="font-semibold mb-4 pb-2 border-b-2 border-emerald-500/60 inline-block">Agreement Summary</h3>
+              <h3 className="font-semibold mb-4 pb-2 border-b-2 border-emerald-500/60 inline-block">Agreement summary</h3>
               <dl className="space-y-3 text-sm">
                 <div className="flex items-center justify-between gap-3">
                   <dt className="text-muted-foreground">Status</dt>
                   <dd><StatusBadge status={contract.status} size="compact" /></dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">Contract Value</dt>
+                  <dt className="text-muted-foreground">Agreement value</dt>
                   <dd className="font-bold tabular-nums">{fmt.money(contract.contractValueMinor)}</dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">Contract Period</dt>
+                  <dt className="text-muted-foreground">Agreement period</dt>
                   <dd className="font-medium text-right">{formatDate(contract.startDate)} – {formatDate(contract.endDate)}</dd>
                 </div>
                 {contract.signedDate && (
                   <div className="flex items-center justify-between gap-3">
-                    <dt className="text-muted-foreground">Signed On</dt>
+                    <dt className="text-muted-foreground">Signed on</dt>
                     <dd className="font-medium">{formatDate(contract.signedDate)}</dd>
                   </div>
                 )}
                 {deal && (
                   <>
                     <div className="flex items-center justify-between gap-3">
-                      <dt className="text-muted-foreground">Deal Type</dt>
+                      <dt className="text-muted-foreground">Deal type</dt>
                       <dd className="font-medium">{(deal as any).dealType || "Custom"}</dd>
                     </div>
                     <div className="flex items-center justify-between gap-3">
@@ -926,7 +929,7 @@ export default function ContractDetailsPage() {
 
           <section id="files-proof" className="space-y-3 scroll-mt-20">
             <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Files &amp; Proof
+              Signed copy and files
             </h3>
 
             <Card className="glass-card border-0">
@@ -941,7 +944,7 @@ export default function ContractDetailsPage() {
                         <p className="font-medium text-sm truncate" data-testid="text-proof-filename">
                           {contract.proofFileName}
                         </p>
-                        <p className="text-xs text-muted-foreground">Signed proof on file</p>
+                        <p className="text-xs text-muted-foreground">Signed copy on file</p>
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -968,7 +971,7 @@ export default function ContractDetailsPage() {
                 ) : !canAgree ? (
                   // The server's rule for POST /api/contracts/:id/proof (agreements.create), mirrored.
                   <p className="text-sm text-muted-foreground py-2" data-testid="text-proof-role">
-                    No signed copy on file. Your role can't upload one — ask your workspace owner.
+                    No signed copy on file. Your role can't upload one, so ask your workspace owner.
                   </p>
                 ) : (
                   <button
@@ -980,13 +983,13 @@ export default function ContractDetailsPage() {
                     {uploading ? (
                       <>
                         <Loader2 className="w-6 h-6 animate-spin" />
-                        <span className="text-sm">Uploading...</span>
+                        <span className="text-sm">Uploading…</span>
                       </>
                     ) : (
                       <>
                         <Upload className="w-6 h-6" />
-                        <span className="text-sm font-medium">Upload Files &amp; Proof</span>
-                        <span className="text-xs">PDF or Image (max 5MB)</span>
+                        <span className="text-sm font-medium">Upload a signed copy</span>
+                        <span className="text-xs">PDF or image, up to 5 MB</span>
                       </>
                     )}
                   </button>
@@ -1034,16 +1037,16 @@ function SignedNextStep({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-            <CheckCircle2 className="w-4 h-4" aria-hidden /> Signed{invoiced ? " and invoiced" : " — next, invoice it"}
+            <CheckCircle2 className="w-4 h-4" aria-hidden /> Signed{invoiced ? " and invoiced" : ". Next, create the invoice"}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
             {invoicesLoading
               ? "Checking for invoices…"
               : invoiced
-              ? `${invoices.length} invoice${invoices.length > 1 ? "s" : ""} raised for ${brandName}.`
+              ? `${invoices.length} invoice${invoices.length > 1 ? "s" : ""} created for ${brandName}.`
               : canInvoice
-              ? `Raise the invoice for ${brandName} from this agreement.`
-              : "Your role can't raise invoices. Ask someone with invoice access."}
+              ? `Create the invoice for ${brandName} from this agreement.`
+              : "Your role can't create invoices. Ask a teammate with invoice access."}
           </p>
         </div>
         {invoicesLoading ? (
@@ -1057,7 +1060,7 @@ function SignedNextStep({
         ) : canInvoice ? (
           <Link href={`/brand-invoices/new?contractId=${contractId}&mode=full`}>
             <Button size="sm" className="gradient-btn text-white" data-testid="button-next-raise-invoice">
-              <Receipt className="w-4 h-4 mr-1.5" /> Raise invoice <ArrowRight className="w-3.5 h-3.5 ml-1" />
+              <Receipt className="w-4 h-4 mr-1.5" /> Create invoice <ArrowRight className="w-3.5 h-3.5 ml-1" />
             </Button>
           </Link>
         ) : null}
@@ -1121,7 +1124,7 @@ function ActivityRail({ contractId }: { contractId: number }) {
   return (
     <Card className="glass-card border-0">
       <CardContent className="p-5">
-        <h3 className="font-semibold mb-4">Activity Timeline</h3>
+        <h3 className="font-semibold mb-4">Activity</h3>
         <ol className="space-y-3.5">
           {rows.map((a) => (
             <li key={a.id} className="flex items-start gap-2.5 text-sm">

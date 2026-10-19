@@ -43,7 +43,7 @@ import { memberCan } from "@shared/permissions";
 const EXAMPLES = [
   "Find 30 US digital marketing agencies with 5–30 employees that serve SaaS companies",
   "20 UK accounting firms that work with restaurants",
-  "Boutique hotels in Portugal with their own website",
+  "Interior design studios in Bengaluru with their own website",
 ];
 
 /**
@@ -71,8 +71,8 @@ const STAGES = [
 function Funnel({ run }: { run: RunView }) {
   const c = run.counters;
   const steps = [
-    { n: c.discovered ?? 0, label: "discovered" }, { n: c.verified ?? 0, label: "verified" }, { n: c.icpMatch ?? 0, label: "match your ICP" },
-    { n: c.signals ?? 0, label: "with a dated reason" }, { n: c.strongTiming ?? 0, label: "strong timing" }, { n: c.decisionMakers ?? 0, label: "with a decision maker" }, { n: c.ready ?? 0, label: "outreach-ready", strong: true },
+    { n: c.discovered ?? 0, label: "discovered" }, { n: c.verified ?? 0, label: "verified" }, { n: c.icpMatch ?? 0, label: "match your client profile" },
+    { n: c.signals ?? 0, label: "with a dated reason" }, { n: c.strongTiming ?? 0, label: "strong timing" }, { n: c.decisionMakers ?? 0, label: "with a decision maker" }, { n: c.ready ?? 0, label: "ready for outreach", strong: true },
   ];
   return (
     <dl className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-7" data-testid="funnel" aria-label="What this search counted so far">
@@ -149,9 +149,9 @@ function RunPanel({ id, canEdit, onOpen }: { id: string; canEdit: boolean; onOpe
             <p className="break-words text-sm font-semibold">{run.description}</p>
             <p className={cn("mt-1 flex items-center gap-1.5 text-sm", running ? "" : stopped ? "font-medium text-amber-800 dark:text-amber-300" : "text-muted-foreground")} data-testid="run-status" aria-live="polite">
               {running ? <><Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />{RUN_STAGE_LABEL[run.stage] ?? "Working"}…</>
-                : run.status === "done" ? <><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-hidden />Done · included in your plan</>
+                : run.status === "done" ? <><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-hidden />Completed · included in your plan</>
                 : run.status === "cancelled" ? <><Square className="h-3.5 w-3.5" aria-hidden />Stopped</>
-                : <><AlertTriangle className="h-3.5 w-3.5" aria-hidden />Couldn't finish</>}
+                : <><AlertTriangle className="h-3.5 w-3.5" aria-hidden />Couldn't complete this search</>}
             </p>
             {/* A finished search's own numbers, counted from the prospects shown below. */}
             {!running && good.length > 0 && (
@@ -184,6 +184,7 @@ function RunPanel({ id, canEdit, onOpen }: { id: string; canEdit: boolean; onOpe
         ) : null}
         {running && <StageTrack stage={run.stage} />}
         <Funnel run={run} />
+        {good.length > 0 && <p className="text-[11px] text-muted-foreground" data-testid="outbound-ai-disclaimer">AI results may be incomplete or inaccurate. Check important details before contacting a client.</p>}
       </CardContent></Card>
 
       {good.length === 0 && running && <p className="text-sm text-muted-foreground" aria-live="polite">Companies appear here as they are checked. This usually takes a minute or two.</p>}
@@ -232,7 +233,7 @@ function FirstSearch({ canEdit, onPick, onPreset }: { canEdit: boolean; onPick: 
   return (
     <div className="rounded-2xl border border-dashed px-5 py-10 text-center" data-testid="outbound-first-time">
       <Radar className="mx-auto mb-3 h-7 w-7 text-emerald-700 dark:text-emerald-400" aria-hidden />
-      <p className="font-semibold">{canEdit ? "Start with who you want to reach" : "No searches yet"}</p>
+      <p className="font-semibold">{canEdit ? "Start by describing the clients you want" : "No searches yet"}</p>
       <p className="mx-auto mt-1 max-w-lg text-sm text-muted-foreground">
         {canEdit ? "DealInSec searches the web (or Google Maps, for local businesses in a city), checks each company's own website and keeps only what it can back with evidence. Nothing is contacted: you choose who goes to Leads and what gets sent." : "Searches your team runs show up here, with the evidence behind each company. Nothing is contacted from here."}
       </p>
@@ -375,7 +376,7 @@ export default function OutboundPage() {
         <div className="flex items-center justify-between gap-4 px-4 py-4 lg:mx-auto lg:max-w-[1600px] lg:px-8">
           <div className="min-w-0">
             <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight lg:text-2xl"><Radar className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />AI Outbound</h1>
-            <p className="mt-0.5 hidden text-sm text-muted-foreground lg:block">Find and qualify new companies: who to contact, why now, and what to say. You can also ask Agent mode to run a search; it lands here.</p>
+            <p className="mt-0.5 hidden text-sm text-muted-foreground lg:block">Find potential clients for your services: companies that fit, a reason to get in touch now, and the evidence behind each one. You can also ask Agent mode or Nibo to run a search; the results show here.</p>
           </div>
           <NotificationBell className="lg:hidden" />
         </div>
@@ -404,9 +405,9 @@ export default function OutboundPage() {
                     onResearchStarted={(id) => { setRunId(id); if (view !== "searches") setView("searches"); setTimeout(() => document.getElementById("outbound-run")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150); }} />
                   <UsageNote usage={usage.data?.usage} mode="local" />
                 </> : <>
-                <label htmlFor="outbound-request" className="text-sm font-semibold">Tell me who you want to reach…</label>
+                <label htmlFor="outbound-request" className="text-sm font-semibold">Describe the type of client you're looking for</label>
                 <Textarea ref={inputRef} id="outbound-request" value={text} onChange={(e) => { setText(e.target.value); setParsed(null); }} rows={2} maxLength={500}
-                  placeholder="US SEO agencies with 5–30 employees serving SaaS companies" disabled={parse.isPending || start.isPending} data-testid="outbound-input" />
+                  placeholder="For example: US SEO agencies with 5–30 employees serving SaaS companies" disabled={parse.isPending || start.isPending} data-testid="outbound-input" />
                 {!text && !firstTime && !runs.isLoading && <div className="flex flex-wrap gap-2">
                   {EXAMPLES.map((x) => <button key={x} onClick={() => pickExample(x)} className="rounded-full border px-3 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">{x}</button>)}
                 </div>}
@@ -456,7 +457,7 @@ export default function OutboundPage() {
                 </>}
               </CardContent></Card>
             ) : (
-              <p className="text-sm text-muted-foreground">You can see searches your team ran. Ask your owner for permission to start one.</p>
+              <p className="text-sm text-muted-foreground">You can see searches your team ran. Ask the workspace owner for permission to start one.</p>
             )}
 
             <SegmentedTabs label="AI Outbound views" value={view} onChange={setView}

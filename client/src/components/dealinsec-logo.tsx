@@ -6,7 +6,7 @@
  *
  *   <DealinsecLogo />                      mark + wordmark, light or dark following the theme
  *   <DealinsecLogo withText={false} />     the mark alone (compact navigation, small icons)
- *   <DealinsecLogo tagline />              with "Find Clients. Close Deals. Get Paid." (landing, auth, footer)
+ *   <DealinsecLogo tagline />              with "Find clients. Win deals. Get paid." (landing, auth, footer)
  *   <DealinsecLogo tone="dark" />          for a dark neutral surface whatever the theme (the app bar)
  *   <DealinsecLogo tone="inverse" />       for a coloured (emerald) surface: white mark, white and pale-emerald wordmark
  *   variant "mono-light" / "mono-dark"     a single-colour mark: white for coloured backgrounds, charcoal for print
@@ -17,7 +17,7 @@ import { useId } from "react";
 import { Link } from "wouter";
 
 export const BRAND_NAME = "DealInSec";
-export const BRAND_SLOGAN = "Find Clients. Close Deals. Get Paid.";
+export const BRAND_SLOGAN = "Find clients. Win deals. Get paid.";
 
 type LogoSize = "xs" | "sm" | "md" | "lg" | "xl";
 type Tone = "auto" | "light" | "dark" | "inverse";

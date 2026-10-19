@@ -304,11 +304,11 @@ export default function BrandInvoiceNewPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/deals", contract?.dealId, "brand-invoices"] });
       if (result.split) {
-        toast({ title: "Invoices created", description: "Advance and final invoices generated." });
+        toast({ title: "Invoices created", description: "The advance and final invoices are ready. Record each payment when you receive it." });
         setLocation("/invoices");
         return;
       }
-      toast({ title: "Invoice created", description: `${result.data.invoiceNumber} is ready to send.` });
+      toast({ title: "Invoice created", description: `${result.data.invoiceNumber} is ready to download and share with your client.` });
       setLocation(`/brand-invoices/${result.data.id}`);
     },
     onError: (err) => {
@@ -318,7 +318,7 @@ export default function BrandInvoiceNewPage() {
         return;
       }
       toast({
-        title: "Could not create invoice",
+        title: "Couldn't create the invoice",
         description: parsed.error || "Please try again.",
         variant: "destructive",
       });
@@ -329,8 +329,8 @@ export default function BrandInvoiceNewPage() {
   if (!Number.isFinite(contractId)) {
     return (
       <EmptyShell
-        title="Pick an agreement first"
-        body="Invoices are raised from a signed agreement, so the client, amount and terms carry across."
+        title="Choose an agreement first"
+        body="Invoices are created from a signed agreement, so the client, amount and terms carry across."
         actionLabel="Go to invoices"
         onAction={() => setLocation("/invoices")}
       />
@@ -350,7 +350,7 @@ export default function BrandInvoiceNewPage() {
     return (
       <EmptyShell
         title="Agreement not found"
-        body="It may have been deleted, or it belongs to another organisation."
+        body="It may have been deleted, or it belongs to another workspace."
         actionLabel="Back to invoices"
         onAction={() => setLocation("/invoices")}
       />
@@ -360,8 +360,8 @@ export default function BrandInvoiceNewPage() {
     return (
       <EmptyShell
         icon={<Lock className="w-7 h-7 text-muted-foreground" />}
-        title="Your role can't raise invoices"
-        body="Ask your organisation owner for the invoice permission."
+        title="Your role can't create invoices"
+        body="Ask your workspace owner to give your role invoice access."
         actionLabel="Back to invoices"
         onAction={() => setLocation("/invoices")}
       />
@@ -372,11 +372,11 @@ export default function BrandInvoiceNewPage() {
     <div className="min-h-screen bg-background pb-28 lg:pb-10">
       <header className="glass-header sticky top-0 z-40">
         <div className="flex items-center gap-3 px-4 py-4 lg:max-w-[1600px] lg:mx-auto lg:px-8 lg:py-3.5">
-          <Button variant="ghost" size="icon" onClick={() => setLocation("/invoices")} data-testid="button-back">
+          <Button variant="ghost" size="icon" onClick={() => setLocation("/invoices")} aria-label="Back to invoices" data-testid="button-back">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div className="min-w-0">
-            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold leading-tight">New Invoice</h1>
+            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold leading-tight">New invoice</h1>
             <p className="text-xs text-muted-foreground truncate">
               {contract.brandName} · {contract.contractName}
             </p>
@@ -403,13 +403,13 @@ export default function BrandInvoiceNewPage() {
               </div>
               {!issuer.accountNumber && !issuer.bankName && (
                 <Notice tone="muted">
-                  No bank details on the account yet, so this invoice will print without payment
-                  instructions. Add them in Profile — clients pay faster when they don't have to ask.
+                  No bank details on your profile yet, so this invoice will print without payment
+                  instructions. Add them in your profile so your client knows where to pay.
                 </Notice>
               )}
               {fullyInvoiced && (
                 <Notice tone="danger">
-                  This agreement is fully invoiced. Raise a new agreement, or edit an existing invoice instead.
+                  This agreement is fully invoiced. Edit an existing invoice, or create a new deal and agreement for any extra work.
                 </Notice>
               )}
             </section>
@@ -462,7 +462,7 @@ export default function BrandInvoiceNewPage() {
                     data-testid="input-due-date"
                   />
                   <p className="text-[11px] text-muted-foreground">
-                    Payment Chaser counts overdue days from here.
+                    Payment follow-up drafts count overdue days from this date.
                   </p>
                 </div>
               </div>
@@ -665,8 +665,8 @@ export default function BrandInvoiceNewPage() {
 
                 {overBudget && (
                   <Notice tone="danger">
-                    That's {fmt.money(totalMinor - remainingMinor)} more than this agreement has left. Lower the amount, or raise a
-                    fresh agreement for the extra scope.
+                    That's {fmt.money(totalMinor - remainingMinor)} more than this agreement has left. Lower the amount, or create a
+                    new deal and agreement for the extra work.
                   </Notice>
                 )}
               </section>
@@ -698,8 +698,8 @@ export default function BrandInvoiceNewPage() {
                   </div>
                 </div>
                 <Notice tone="muted">
-                  Both invoices are created now, numbered in sequence, and split the deal value. Itemised lines and a
-                  due date apply to single invoices — use those for milestone billing.
+                  Both invoices are created now, numbered in sequence, and split the agreement value. Itemised lines and a
+                  due date are for single invoices, so use a single invoice for milestone billing.
                 </Notice>
               </section>
             )}
@@ -745,7 +745,7 @@ export default function BrandInvoiceNewPage() {
                     ))}
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-teal-600 mb-1">Bill To</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-teal-600 mb-1">Bill to</p>
                   <p className="font-bold">{contract.brandName}</p>
                   {deal?.dealTitle && <p className="text-muted-foreground mt-0.5">Re: {deal.dealTitle}</p>}
                 </div>

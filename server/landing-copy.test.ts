@@ -19,12 +19,13 @@ const sections = src["client/src/components/landing-redesign.tsx"];
 
 describe("homepage copy", () => {
   it("leads with the brand promise, says who it's for and what Free includes, with human approval beside the CTA", () => {
-    expect(sections).toContain("Find Clients.<br />Close <span");
-    expect(sections).toContain("For freelancers, consultants and small B2B service agencies");
-    expect(sections).toContain("DealInSec helps service businesses research prospects, manage deals, send quotations, create agreements, generate invoices and track payments in one connected workspace.");
-    expect(sections).toContain('"Start Free"');
-    expect(sections).toContain("See How It Works");
-    expect(sections).toContain("AI researches and drafts; you approve every message. Nothing is sent automatically.");
+    expect(sections).toContain("Find clients.<br />Win <span");
+    expect(sections).toContain("For freelancers and service providers in India");
+    expect(sections).toContain("DealInSec is a simple business workspace for Indian freelancers and service providers. Track leads and deals, prepare quotations and agreements, create invoices and follow up on payments, with AI coworkers to help along the way.");
+    expect(sections).toContain('"Get started free"');
+    expect(sections).toContain("See how it works");
+    expect(sections).toContain("No credit card required");
+    expect(sections).toContain("you approve every message and send it yourself. Nothing is sent automatically.");
     expect(sections).toMatch(/Free: \$\{PRICING\.freeMonthlyDeals\} new deals a month with quotations/);
   });
 
@@ -35,7 +36,9 @@ describe("homepage copy", () => {
   });
 
   it("keeps every audience, freelancers included", () => {
-    for (const a of ["Freelancers & solo consultants", "Web development & software services", "Digital marketing, SEO & growth agencies", "AI automation businesses"]) expect(sections, a).toContain(a);
+    for (const a of ["Freelance web developers", "Designers and creatives", "Digital marketers and SEO consultants", "Independent consultants"]) expect(sections, a).toContain(a);
+    // Small agencies stay named as the secondary audience.
+    expect(sections).toContain("small agencies of up to about 10 people: web development, digital marketing, SEO, AI automation");
     expect(sections).toContain('href: "/for-freelancers"');
   });
 

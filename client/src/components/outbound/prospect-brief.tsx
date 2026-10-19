@@ -123,7 +123,7 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit, focus = 
   const act = (action: string, body: Record<string, unknown> = {}, ok?: (r: any) => void) => useMutation({
     mutationFn: () => leadCall("POST", prospectUrl(id!, action), body),
     onSuccess: (r) => { refresh(); ok?.(r); },
-    onError: (e) => toast({ title: "That didn't work", description: leadError(e), variant: "destructive" }),
+    onError: (e) => toast({ title: "Couldn't complete that", description: leadError(e), variant: "destructive" }),
   });
   const research = act("research", { runId });
   const contacts = act("contacts", { runId }, (r) => toast({ title: r.found ? `Found ${r.found} ${r.found === 1 ? "person" : "people"}` : "No one found", description: "From the connected data provider; check before you write." }));
@@ -134,7 +134,7 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit, focus = 
   const verdict = useMutation({
     mutationFn: (value: ProspectFeedback | null) => leadCall("POST", prospectUrl(id!, "feedback"), { value }),
     onSuccess: (_r, value) => { refresh(); if (value) trackEvent("prospect_feedback", { value }); },
-    onError: (e) => toast({ title: "That didn't work", description: leadError(e), variant: "destructive" }),
+    onError: (e) => toast({ title: "Couldn't save your answer", description: leadError(e), variant: "destructive" }),
   });
   const b = q.data?.brief;
   const p = b?.prospect;
@@ -287,6 +287,7 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit, focus = 
 
             {(b.inferences.length > 0 || b.opportunities.length > 0) && (
               <Section title="Inferences · not confirmed" tone="inference">
+                <p className="text-[11px] text-muted-foreground" data-testid="brief-unverified-note">Some details couldn't be verified. Review before reaching out.</p>
                 {[...b.inferences, ...b.opportunities].map((e) => (
                   <div key={e.id} className="rounded-lg border border-dashed px-3 py-2 text-sm">
                     <p className="flex items-center gap-1.5 text-[11px] font-semibold text-violet-700 dark:text-violet-400"><Lightbulb className="h-3 w-3" />{e.label}{e.source === "provider" ? " · data provider" : ""}</p>
@@ -305,6 +306,7 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit, focus = 
             <Section title="Found through">
               <ul className="space-y-0.5 text-[11px] text-muted-foreground">{b.sources.slice(0, 5).map((s, i) => <li key={i} className="break-words">“{s.query}” · {s.provider}</li>)}</ul>
             </Section>
+            <p className="text-[11px] text-muted-foreground" data-testid="brief-ai-disclaimer">AI results may be incomplete or inaccurate. Check important details before contacting a client.</p>
           </div>
         )}
       </SheetContent>

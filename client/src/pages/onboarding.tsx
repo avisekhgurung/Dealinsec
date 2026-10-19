@@ -79,9 +79,9 @@ const FORM_RULES_BY_COUNTRY: Record<string, CountryFormRules> = {
 };
 
 const STEPS = [
-  { key: "role", label: "Role & Profile" },
-  { key: "personal", label: "Personal Info" },
-  { key: "regional", label: "Regional & Billing" },
+  { key: "role", label: "Your work" },
+  { key: "personal", label: "About you" },
+  { key: "regional", label: "Country & billing" },
 ] as const;
 
 /** Step content: slides in from the side it was navigated from and fades. The
@@ -156,7 +156,7 @@ export default function OnboardingPage() {
     const e: FieldErrors = {};
     if (which >= 0 && !audience) e.audience = "Choose the kind of work you do";
     if (which >= 1) {
-      if (!fullName.trim()) e.name = "Full name is required";
+      if (!fullName.trim()) e.name = "Enter your name";
       // Optional, but a number that IS typed must be one the country can dial.
       if (phone.trim() && !rules.phonePattern.test(rules.normalizePhone(phone, dialCode))) e.phone = rules.phoneInvalid;
     }
@@ -277,18 +277,18 @@ export default function OnboardingPage() {
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       const restoring = hasPendingDealPrefill() || hasPendingOutboundPrefill();
       toast({
-        title: "You're in!",
+        title: `You're all set, ${firstName}`,
         description: restoring
           ? "Picking up right where you left off."
-          : `We'll ask for ${rules.taxIdLabel}, bank & signature only when you need them.`,
+          : `Your workspace is ready. We'll ask for your ${rules.taxIdLabel}, bank details and signature only when you need them.`,
       });
       // A demo deal waiting to be finished wins over the goal: it is work the
       // person already started.
       setLocation(restoring ? postAuthDestination() : destinationFor(goal));
     } catch (error: any) {
       toast({
-        title: "Failed to save profile",
-        description: error.message || "Please try again",
+        title: "Couldn't save your details",
+        description: parseApiError(error).error || "Check your internet connection and try again.",
         variant: "destructive",
       });
     } finally {
@@ -401,10 +401,10 @@ export default function OnboardingPage() {
                 >
                   <motion.div variants={itemVariants} className="text-center">
                     <h1 id="first-goal-heading" ref={headingRef} tabIndex={-1} className="text-2xl font-bold tracking-tight outline-none">
-                      What do you want to do first?
+                      What would you like to do first?
                     </h1>
                     <p id="first-goal-hint" className="mt-1.5 text-sm text-muted-foreground">
-                      Optional. We&apos;ll start you there. You can change this later.
+                      Optional. This helps DealInSec show you the right tools from day one. You can change it later.
                     </p>
                   </motion.div>
 
@@ -486,18 +486,18 @@ export default function OnboardingPage() {
                 >
                   <motion.div variants={itemVariants} className="text-center">
                     <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-bold tracking-tight outline-none">
-                      Let&apos;s get you set up
+                      Let&apos;s set up your workspace
                     </h1>
-                    <p className="mt-1.5 text-sm text-muted-foreground">Enter the details that appear on your documents.</p>
+                    <p className="mt-1.5 text-sm text-muted-foreground">These details appear on your quotations, agreements and invoices.</p>
                   </motion.div>
 
                   <motion.div variants={itemVariants} className="space-y-2">
-                    <Label htmlFor="fullName">Full Name *</Label>
+                    <Label htmlFor="fullName">Your name *</Label>
                     <Input
                       id="fullName"
                       type="text"
                       autoComplete="name"
-                      placeholder="Enter your full name"
+                      placeholder="Your full name"
                       value={fullName}
                       onChange={(e) => { setFullName(e.target.value); if (errors.name) setErrors((x) => ({ ...x, name: undefined })); }}
                       aria-invalid={!!errors.name}
@@ -511,7 +511,7 @@ export default function OnboardingPage() {
 
                   <motion.div variants={itemVariants} className="space-y-2">
                     <div className="flex items-baseline justify-between">
-                      <Label htmlFor="phone">Phone Number</Label>
+                      <Label htmlFor="phone">Phone number</Label>
                       <span className="text-[11px] font-medium text-muted-foreground">Optional</span>
                     </div>
                     <div className="relative">
@@ -549,7 +549,7 @@ export default function OnboardingPage() {
 
                   <motion.div variants={itemVariants} className="space-y-2">
                     <div className="flex items-baseline justify-between">
-                      <Label htmlFor="businessName">Professional / Business Name</Label>
+                      <Label htmlFor="businessName">Business name</Label>
                       <span className="text-[11px] font-medium text-muted-foreground">Optional</span>
                     </div>
                     <Input
@@ -597,7 +597,7 @@ export default function OnboardingPage() {
                 >
                   <motion.div variants={itemVariants} className="text-center">
                     <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-bold tracking-tight outline-none">
-                      Regional &amp; Billing Preferences
+                      Country, currency and billing
                     </h1>
                     <p className="mt-1.5 text-sm text-muted-foreground">
                       Set your country and currency. Your documents follow its money, dates and tax.
@@ -610,7 +610,7 @@ export default function OnboardingPage() {
 
                   <motion.div variants={itemVariants} className="space-y-2">
                     <div className="flex items-baseline justify-between">
-                      <Label htmlFor="billingAddress">Billing Address</Label>
+                      <Label htmlFor="billingAddress">Billing address</Label>
                       <span className="text-[11px] font-medium text-muted-foreground">Optional · for invoices</span>
                     </div>
                     <Textarea

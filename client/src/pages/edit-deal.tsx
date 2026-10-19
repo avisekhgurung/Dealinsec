@@ -46,26 +46,26 @@ import { EngagementFields, ServiceSelect, draftForPick, draftToTerms, termsToDra
 import { ENGAGEMENT_MODELS, engagementModelMeta, isEngagementModel, suggestedValueMinor, validateEngagement, type EngagementModel } from "@shared/engagement";
 
 const formSchema = z.object({
-  brandName: z.string().min(1, "Client / brand name is required"),
-  dealTitle: z.string().min(1, "Deal title is required"),
+  brandName: z.string().min(1, "Enter the client or brand name"),
+  dealTitle: z.string().min(1, "Enter a title for this deal"),
   // Accept legacy types so pre-pivot deals can still be edited; the type
   // selector grid only offers the Phase-1 sectors.
   dealType: z.enum([...dealTypeOptions, ...brandDealTypeOptions, ...legacyDealTypeOptions] as [string, ...string[]]).default("Custom"),
   // MAJOR units, as a human types them. The column is `dealAmountMinor`; the
   // conversion happens once on seed and once on save, nowhere else.
-  dealAmount: z.coerce.number().positive("Deal amount must be positive"),
-  startDate: z.string().min(1, "Start date is required"),
-  endDate: z.string().min(1, "End date is required"),
+  dealAmount: z.coerce.number().positive("Enter a deal amount greater than zero"),
+  startDate: z.string().min(1, "Choose a start date"),
+  endDate: z.string().min(1, "Choose an end date"),
   brandUserId: z.string().optional().nullable(),
   deliverableMode: z.enum(["all", "any_one"]).optional().default("all"),
   deliverables: z.array(z.object({
     id: z.string(),
-    platform: z.string().min(1, "Category is required"),
-    contentType: z.string().min(1, "Output type is required"),
+    platform: z.string().min(1, "Choose a category"),
+    contentType: z.string().min(1, "Choose an output type"),
     quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
-    frequency: z.string().min(1, "Frequency is required"),
+    frequency: z.string().min(1, "Choose a frequency"),
     notes: z.string().optional(),
-  })).min(1, "At least one deliverable is required"),
+  })).min(1, "Add at least one deliverable"),
   standardTermIds: z.array(z.string()).optional().default([]),
   customTerms: z.string().optional().nullable(),
 });
@@ -248,7 +248,7 @@ export default function EditDealPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/deals", params.id] });
       toast({
         title: "Deal updated",
-        description: "Your deal has been updated.",
+        description: "Your changes are saved.",
       });
       setLocation(`/deals/${params.id}`);
     },
@@ -260,8 +260,8 @@ export default function EditDealPage() {
         return;
       }
       toast({
-        title: "Error",
-        description: err instanceof MoneyCurrencyPendingError ? err.message : "Failed to update deal. Please try again.",
+        title: "Couldn't save your changes",
+        description: err instanceof MoneyCurrencyPendingError ? err.message : "Nothing was saved. Please try again.",
         variant: "destructive",
       });
     },
@@ -277,7 +277,7 @@ export default function EditDealPage() {
     }
     // Sub-minor-unit amounts round to zero; caught here, not at the server.
     if (fmt.minor(data.dealAmount) < 1) {
-      form.setError("dealAmount", { message: "Deal amount must be positive" });
+      form.setError("dealAmount", { message: "Enter a deal amount greater than zero" });
       return;
     }
     // Checked as the server will check it: the deal as it will be saved.
@@ -330,11 +330,12 @@ export default function EditDealPage() {
             variant="ghost"
             size="icon"
             onClick={() => setLocation(`/deals/${params.id}`)}
+            aria-label="Back to deal"
             data-testid="button-back"
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Edit Deal</h1>
+          <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Edit deal</h1>
         </div>
       </header>
 
@@ -343,7 +344,7 @@ export default function EditDealPage() {
           <div className="flex items-start gap-3 rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4">
             <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
             <p className="text-sm text-yellow-700 dark:text-yellow-400">
-              Saving changes will mark the current quotation as revised. You can regenerate a new quote afterward.
+              Saving these changes marks the current quotation as revised. You can then create a new quotation from the deal page.
             </p>
           </div>
         )}
@@ -392,12 +393,12 @@ export default function EditDealPage() {
           <div className="flex items-baseline justify-between gap-3">
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-primary mb-1">
-                Deal Type
+                Deal type
               </div>
               <h2 className="text-base font-semibold text-foreground">Work category</h2>
             </div>
             <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-              Changing resets deliverables
+              Changing this resets the deliverables
             </span>
           </div>
 
@@ -456,7 +457,7 @@ export default function EditDealPage() {
 
         <section className="glass-card rounded-xl p-5 space-y-4">
           <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            {brandWording ? "Brand Details" : "Client Details"}
+            {brandWording ? "Brand details" : "Client details"}
           </h2>
 
           <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-x-5 lg:gap-y-4 lg:space-y-0">
@@ -482,7 +483,7 @@ export default function EditDealPage() {
 
             {brands.length > 0 && (
               <div className="space-y-2">
-                <Label>Assign to Brand Account (Optional)</Label>
+                <Label>Assign to a brand account (optional)</Label>
                 <Select
                   value={form.watch("brandUserId") || ""}
                   onValueChange={(value) => form.setValue("brandUserId", value === "none" ? undefined : value)}
@@ -500,16 +501,16 @@ export default function EditDealPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Assigning a brand account lets them view this deal
+                  The brand account you choose can view this deal.
                 </p>
               </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="dealTitle">Deal Title</Label>
+              <Label htmlFor="dealTitle">Deal title</Label>
               <Input
                 id="dealTitle"
-                placeholder="e.g., Summer Campaign 2024"
+                placeholder={brandWording ? "e.g., Autumn skincare launch — 2 Reels" : "e.g., Website redesign — 5 pages"}
                 className="h-12"
                 data-testid="input-deal-title"
                 {...form.register("dealTitle")}
@@ -522,7 +523,7 @@ export default function EditDealPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dealAmount">{modelMeta ? modelMeta.valueLabel : "Deal Amount"} ({fmt.symbol})</Label>
+              <Label htmlFor="dealAmount">{modelMeta ? modelMeta.valueLabel : "Deal amount"} ({fmt.symbol})</Label>
               <Input
                 id="dealAmount"
                 type="number"
@@ -556,7 +557,7 @@ export default function EditDealPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="startDate">Start Date</Label>
+                <Label htmlFor="startDate">Start date</Label>
                 <Input
                   id="startDate"
                   type="date"
@@ -572,7 +573,7 @@ export default function EditDealPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="endDate">{modelMeta?.kind === "recurring" ? "End of first term" : "End Date"}</Label>
+                <Label htmlFor="endDate">{modelMeta?.kind === "recurring" ? "End of first term" : "End date"}</Label>
                 <Input
                   id="endDate"
                   type="date"
@@ -689,7 +690,7 @@ export default function EditDealPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs">Notes (Optional)</Label>
+                    <Label className="text-xs">Notes (optional)</Label>
                     <Textarea
                       placeholder="Any specific requirements..."
                       className="min-h-[80px] resize-none"
@@ -709,7 +710,7 @@ export default function EditDealPage() {
               data-testid="button-add-deliverable"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add Deliverable
+              Add deliverable
             </Button>
           </div>
 
@@ -730,7 +731,7 @@ export default function EditDealPage() {
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-primary" />
             <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Terms &amp; Conditions
+              Terms and conditions
             </h2>
           </div>
 
@@ -778,7 +779,7 @@ export default function EditDealPage() {
                 Your own terms (optional)
               </Label>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Add as many clauses as you need — exclusivity, usage rights, posting schedule, revisions, etc.
+                Add as many clauses as you need: revision rounds, usage rights, exclusivity, schedules and so on.
               </p>
             </div>
 
@@ -840,17 +841,17 @@ export default function EditDealPage() {
             {updateDeal.isPending ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Saving...
+                Saving…
               </>
             ) : fmt.failed ? (
-              "Couldn't load your currency — try again"
+              "Couldn't load your currency. Try again"
             ) : !fmt.ready ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Loading currency…
               </>
             ) : (
-              "Save Changes"
+              "Save changes"
             )}
           </Button>
         </div>

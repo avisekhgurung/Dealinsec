@@ -84,7 +84,7 @@ function describeHttpError(err: unknown): string {
   if (err instanceof AgentHttpError) {
     if (err.code === "AGENT_NOT_SETUP" || err.status === 503) return err.message || "The agent isn't available right now.";
     if (err.status === 429) return err.message || "You've reached today's AI limit. It resets tomorrow.";
-    if (err.status === 401) return "You've been signed out. Sign in again to continue.";
+    if (err.status === 401) return "Your session has expired. Please log in again.";
     return err.message || "Something went wrong. Nothing was changed.";
   }
   return "I lost the connection. Nothing was changed. Check your connection and try again.";

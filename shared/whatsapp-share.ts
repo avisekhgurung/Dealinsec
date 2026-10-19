@@ -22,6 +22,8 @@ export function signingMessage(o: { client?: string | null; url: string }): stri
   return `${hi(o.client)}\n\nThe agreement for our work is ready. You can review and sign it online here (no account needed):\n${o.url}\n\nThank you!`;
 }
 
-export function invoiceReminderMessage(o: { client?: string | null; invoiceNumber: string; amount: string; due?: string | null }): string {
-  return `${hi(o.client)}\n\nA friendly reminder that invoice ${o.invoiceNumber} for ${o.amount}${o.due ? `, due ${o.due},` : ""} is still open. Could you let me know when I can expect the payment?\n\nThank you!`;
+/** `amount` arrives formatted in the invoice's own currency; `overdue` picks "was due" over "is due". */
+export function invoiceReminderMessage(o: { client?: string | null; invoiceNumber: string; amount: string; due?: string | null; overdue?: boolean }): string {
+  const when = o.due ? (o.overdue ? `was due on ${o.due}` : `is due on ${o.due}`) : "is still open";
+  return `${hi(o.client)}\n\nThis is a gentle reminder that invoice ${o.invoiceNumber} for ${o.amount} ${when}. Please let me know if you need any details or have already made the payment.\n\nThank you!`;
 }

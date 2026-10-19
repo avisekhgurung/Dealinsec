@@ -24,8 +24,8 @@ export function FollowUpsPanel({ max = 5, className }: { max?: number; className
   const { data } = useQuery<FollowUps>({ queryKey: [FOLLOWUPS_URL], enabled: allowed });
   const done = useMutation({
     mutationFn: (f: FollowUpView) => leadCall("PATCH", `/api/leads/${f.leadId}/tickets/${f.id}`, { status: "done" }),
-    onSuccess: () => { trackEvent("lead_ticket_done", { surface: "follow_ups" }); refreshLeads(); toast({ title: "Marked done" }); },
-    onError: (e) => toast({ title: "Couldn't do that", description: leadError(e), variant: "destructive" }),
+    onSuccess: () => { trackEvent("lead_ticket_done", { surface: "follow_ups" }); refreshLeads(); toast({ title: "Step marked done" }); },
+    onError: (e) => toast({ title: "Couldn't save that change", description: leadError(e), variant: "destructive" }),
   });
   if (!allowed || !data) return null;
 

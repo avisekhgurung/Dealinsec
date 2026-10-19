@@ -150,9 +150,9 @@ export function NotificationBell({ className = "" }: { className?: string }) {
         {activity.length === 0 ? (
           <div className="px-4 py-10 text-center">
             <Bell className="w-7 h-7 mx-auto text-muted-foreground/40 mb-2" />
-            <p className="text-sm font-medium">You're all caught up</p>
+            <p className="text-sm font-medium">No notifications yet</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Deals, agreements and payments will show up here.
+              Updates on deals, agreements and payments will show up here.
             </p>
           </div>
         ) : (

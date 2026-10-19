@@ -47,7 +47,7 @@ function slugify(s: string): string {
 
 const STEPS = [
   { label: "Deal", step: 1 },
-  { label: "Quote", step: 2 },
+  { label: "Quotation", step: 2 },
   { label: "Agreement", step: 3 },
   { label: "Invoice", step: 4 },
 ];
@@ -328,7 +328,7 @@ export default function QuotePreviewPage() {
             <Link href={`/deals/${params.id}`}>
               <Button variant="ghost" size="icon" aria-label="Back to the deal"><ArrowLeft className="w-5 h-5" /></Button>
             </Link>
-            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Quote Preview</h1>
+            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Quotation preview</h1>
           </div>
         </header>
         <main className="px-4 py-4 lg:max-w-4xl lg:mx-auto lg:px-8 lg:py-6">
@@ -349,7 +349,7 @@ export default function QuotePreviewPage() {
               kind={dealError ? httpErrorKind(dealErr) : "not_found"}
               what="quotation"
               backHref="/deals"
-              backLabel="Back to Deals"
+              backLabel="Back to deals"
               onRetry={() => refetchDeal()}
               retrying={dealFetching}
             />
@@ -377,9 +377,9 @@ export default function QuotePreviewPage() {
         <div className="flex items-center justify-between gap-3 px-4 py-4">
           <div className="flex items-center gap-3">
             <Link href={`/deals/${params.id}`}>
-              <Button variant="ghost" size="icon"><ArrowLeft className="w-5 h-5" /></Button>
+              <Button variant="ghost" size="icon" aria-label="Back to the deal"><ArrowLeft className="w-5 h-5" /></Button>
             </Link>
-            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Quote Preview</h1>
+            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Quotation preview</h1>
           </div>
           <Button variant="outline" size="sm" onClick={() => window.print()} className="flex items-center gap-1.5">
             <Download className="w-4 h-4" /> Download PDF
@@ -419,8 +419,8 @@ export default function QuotePreviewPage() {
           <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">This quote has been revised</p>
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">The deal details were updated. Go back to the deal page to generate a new quote.</p>
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">This quotation is out of date</p>
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">The deal was edited after this quotation was created. Go back to the deal and create a new quotation.</p>
             </div>
           </div>
         </div>
@@ -443,7 +443,7 @@ export default function QuotePreviewPage() {
             Pro/trial user proceeds straight through, no reason to mention it. */}
         {!hasProAccess(user) && (
           <p className="text-xs text-muted-foreground px-1 pt-4 print:hidden">
-            Your quotation is ready. Create the signed agreement, get it e-signed, and invoice — with Pro.
+            Your quotation is ready. With Pro, you can create an agreement from this deal, get it signed online and create invoices.
           </p>
         )}
 
@@ -454,7 +454,7 @@ export default function QuotePreviewPage() {
           </Button>
           <Link href={`/deals/${params.id}/contract`} className="flex-1">
             <Button className="w-full h-12 rounded-xl font-semibold gradient-btn text-white">
-              Proceed to Agreement <ArrowRight className="w-4 h-4 ml-2" />
+              Continue to agreement <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </Link>
         </div>

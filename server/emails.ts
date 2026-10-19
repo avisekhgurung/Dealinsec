@@ -114,7 +114,7 @@ function layout(opts: { preview: string; bodyHtml: string }): string {
         <tr>
           <td style="padding:20px 28px;border-top:1px solid ${COLORS.border};">
             <p style="margin:0 0 6px;color:${COLORS.muted};font-size:12px;line-height:1.5;">
-              DealInSec · Find Clients. Close Deals. Get Paid.
+              DealInSec · Find clients. Win deals. Get paid.
             </p>
             <p style="margin:0;color:${COLORS.muted};font-size:12px;">
               <a href="${base}" style="color:${COLORS.primary};text-decoration:none;">dealinsec.com</a>

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { BOT_IDENTITY, isTerminal } from "@shared/ai-league";
-import { leagueCall, refreshLeague, runUrl, useRun, when, type EventView, type RunView } from "@/lib/ai-league";
+import { RUN_STATUS_TEXT, leagueCall, refreshLeague, runUrl, useRun, when, type EventView, type RunView } from "@/lib/ai-league";
 import { leadError } from "@/lib/leads";
 import { Mascot } from "./mascot";
 import { showTime } from "@shared/league-campaign";
@@ -24,19 +24,33 @@ const STATUS_TONE: Record<string, string> = {
   running: "bg-sky-50 text-sky-800 ring-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:ring-sky-900",
   waiting: "bg-sky-50 text-sky-800 ring-sky-200 dark:bg-sky-950/40 dark:text-sky-300 dark:ring-sky-900",
 };
-export function StatusPill({ run }: { run: Pick<RunView, "status" | "statusLabel" | "cancelRequested"> }) {
+/** A task's status in plain words, from its status and stage only (a waiting task waits on its research or its clock). */
+export function runStatusLabel(run: Pick<RunView, "status" | "stage" | "statusLabel">): string {
+  switch (run.status) {
+    case "queued": return RUN_STATUS_TEXT.queued;
+    case "running": return RUN_STATUS_TEXT.running;
+    case "waiting": return run.stage === "start" ? RUN_STATUS_TEXT.scheduled : run.stage === "deliver" ? RUN_STATUS_TEXT.reportScheduled : RUN_STATUS_TEXT.researching;
+    case "completed": return RUN_STATUS_TEXT.completed;
+    case "partial": return RUN_STATUS_TEXT.partial;
+    case "failed": return RUN_STATUS_TEXT.failed;
+    case "cancelled": return RUN_STATUS_TEXT.cancelled;
+    default: return run.statusLabel;
+  }
+}
+
+export function StatusPill({ run }: { run: Pick<RunView, "status" | "stage" | "statusLabel" | "cancelRequested"> }) {
   const active = !isTerminal(run.status);
   return (
     <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1", STATUS_TONE[run.status])} data-testid="run-status">
       {active && <Loader2 className="h-3 w-3 motion-safe:animate-spin" aria-hidden />}
-      {run.cancelRequested && active ? "Stopping…" : run.statusLabel}
+      {run.cancelRequested && active ? RUN_STATUS_TEXT.stopping : runStatusLabel(run)}
     </span>
   );
 }
 
 const ITEM_ICON = {
   done: <Check className="h-3.5 w-3.5 text-emerald-600" aria-label="Done" />,
-  needs_you: <CircleDashed className="h-3.5 w-3.5 text-amber-600" aria-label="Needs you" />,
+  needs_you: <CircleDashed className="h-3.5 w-3.5 text-amber-600" aria-label="Waiting for your approval" />,
   skipped: <X className="h-3.5 w-3.5 text-muted-foreground" aria-label="Skipped" />,
   failed: <AlertTriangle className="h-3.5 w-3.5 text-red-600" aria-label="Failed" />,
   info: <span className="mx-1 h-1.5 w-1.5 rounded-full bg-muted-foreground/60" aria-hidden />,
@@ -67,8 +81,8 @@ export function RunDetail({ id, onClose }: { id: string; onClose?: () => void })
   const { toast } = useToast();
   const q = useRun(id);
   const fail = (title: string) => (e: unknown) => toast({ title, description: leadError(e), variant: "destructive" });
-  const cancel = useMutation({ mutationFn: () => leagueCall("POST", `${runUrl(id)}/cancel`), onSuccess: () => void refreshLeague(), onError: fail("Couldn't cancel") });
-  const retry = useMutation({ mutationFn: () => leagueCall<{ run: RunView }>("POST", `${runUrl(id)}/retry`), onSuccess: () => { void refreshLeague(); toast({ title: "Started again" }); }, onError: fail("Couldn't start it again") });
+  const cancel = useMutation({ mutationFn: () => leagueCall("POST", `${runUrl(id)}/cancel`), onSuccess: () => void refreshLeague(), onError: fail("Couldn't stop this task") });
+  const retry = useMutation({ mutationFn: () => leagueCall<{ run: RunView }>("POST", `${runUrl(id)}/retry`), onSuccess: () => { void refreshLeague(); toast({ title: "Started again" }); }, onError: fail("Couldn't start this task again") });
   if (q.isLoading) return <div className="space-y-2 p-1" aria-busy="true"><div className="h-4 w-1/2 animate-pulse rounded bg-muted" /><div className="h-16 animate-pulse rounded bg-muted" /></div>;
   if (q.isError || !q.data) return <p className="text-sm text-muted-foreground">{leadError(q.error, "This task couldn't be loaded.")}</p>;
   const { run, events } = q.data;
@@ -80,7 +94,7 @@ export function RunDetail({ id, onClose }: { id: string; onClose?: () => void })
       <header className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className={cn("text-[11px] font-semibold uppercase tracking-wider", id_.accent.fg)}>{id_.name} · {run.taskLabel}</p>
-          <h3 className="mt-0.5 text-base font-semibold leading-snug">{r?.headline ?? (active ? "Working on it…" : run.statusLabel)}</h3>
+          <h3 className="mt-0.5 text-base font-semibold leading-snug">{r?.headline ?? (active ? (run.status === "queued" ? "Waiting to start" : run.status === "waiting" && run.stage === "start" ? "Scheduled" : "In progress…") : run.status === "failed" ? (run.task === "zee.briefing" ? "Zee couldn't access this information right now. Try again later." : "Couldn't complete this task.") : runStatusLabel(run))}</h3>
           {run.request && <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">“{run.request}”</p>}
           {run.timing && (
             <p className="mt-1 text-xs text-muted-foreground" data-testid="run-timing">
@@ -90,7 +104,7 @@ export function RunDetail({ id, onClose }: { id: string; onClose?: () => void })
           )}
           {active && run.stage === "deliver" && run.timing?.deliverAt && (
             <p className="mt-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" data-testid="run-held">
-              The report is ready and saved; it will be delivered {showTime(new Date(run.timing.deliverAt), run.timing.timezone)}, as you asked.
+              The report is ready and saved. You'll get it {showTime(new Date(run.timing.deliverAt), run.timing.timezone)}, as you asked.
             </p>
           )}
         </div>
@@ -135,6 +149,12 @@ export function RunDetail({ id, onClose }: { id: string; onClose?: () => void })
         <Button asChild size="sm" className="gradient-btn text-white"><Link href={r.next.href} data-testid="run-next">{r.next.label}<ArrowRight className="ml-1.5 h-4 w-4" /></Link></Button>
       )}
       {r?.notes && r.notes.length > 0 && <ul className="space-y-1 text-xs text-muted-foreground">{r.notes.map((n) => <li key={n}>· {n}</li>)}</ul>}
+      {r && !active && (
+        // Once per report, small and muted: AI-written results (Nibo, Mika, a huddle) vs Zee's briefing from the records.
+        <p className="text-[11px] text-muted-foreground" data-testid="run-disclaimer">
+          {run.task === "zee.briefing" ? "Based on the latest information available in your workspace." : "AI results may be incomplete or inaccurate. Check important details before contacting a client."}
+        </p>
+      )}
       {r && !active && r.items.length > 0 && (
         <p className="flex flex-wrap items-center gap-2 text-xs" data-testid="run-downloads">
           <span className="text-muted-foreground">Download:</span>
@@ -146,7 +166,7 @@ export function RunDetail({ id, onClose }: { id: string; onClose?: () => void })
       {(active || !r) && events.length > 0 && <Timeline events={events} active={active} />}
 
       <div className="flex flex-wrap gap-2">
-        {active && <Button size="sm" variant="outline" onClick={() => cancel.mutate()} disabled={cancel.isPending || run.cancelRequested} data-testid="run-cancel"><Square className="mr-1.5 h-3.5 w-3.5" />{run.cancelRequested ? "Stopping…" : "Stop"}</Button>}
+        {active && <Button size="sm" variant="outline" onClick={() => cancel.mutate()} disabled={cancel.isPending || run.cancelRequested} data-testid="run-cancel"><Square className="mr-1.5 h-3.5 w-3.5" />{run.cancelRequested ? RUN_STATUS_TEXT.stopping : "Stop task"}</Button>}
         {["failed", "partial", "cancelled"].includes(run.status) && <Button size="sm" variant="outline" onClick={() => retry.mutate()} disabled={retry.isPending} data-testid="run-retry"><RotateCcw className="mr-1.5 h-3.5 w-3.5" />Try again</Button>}
       </div>
 
@@ -158,7 +178,7 @@ export function RunDetail({ id, onClose }: { id: string; onClose?: () => void })
           {run.startedAt && <><dt>Started</dt><dd>{when(run.startedAt)}</dd></>}
           {run.finishedAt && <><dt>Finished</dt><dd>{when(run.finishedAt)}</dd></>}
           {run.tokens > 0 && <><dt>AI tokens</dt><dd>{run.tokens.toLocaleString()} (an estimate of model use, not a bill)</dd></>}
-          {run.errorCode && <><dt>Reason code</dt><dd>{run.errorCode}</dd></>}
+          {run.errorCode && <><dt>Error code</dt><dd>{run.errorCode}</dd></>}
         </dl>
         {r && events.length > 0 && <div className="mt-3"><Timeline events={events} active={false} /></div>}
       </details>

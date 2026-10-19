@@ -27,18 +27,18 @@ export function WhatsappCard() {
   const connect = useMutation({
     mutationFn: () => leadCall("POST", WHATSAPP_URL, form),
     onSuccess: () => { setForm({ phoneNumberId: "", wabaId: "", accessToken: "" }); setOpen(false); refresh(); toast({ title: "WhatsApp Business connected" }); },
-    onError: (e) => toast({ title: "Not connected", description: leadError(e), variant: "destructive" }),
+    onError: (e) => toast({ title: "Couldn't connect WhatsApp Business", description: leadError(e), variant: "destructive" }),
   });
   const disconnect = useMutation({
     mutationFn: () => leadCall("DELETE", WHATSAPP_URL),
-    onSuccess: () => { refresh(); toast({ title: "Disconnected", description: "The access token was deleted from DealInSec. Revoke it in Meta Business Settings too." }); },
-    onError: (e) => toast({ title: "Couldn't disconnect", description: leadError(e), variant: "destructive" }),
+    onSuccess: () => { refresh(); toast({ title: "WhatsApp Business disconnected", description: "The access token was deleted from DealInSec. Revoke it in Meta Business Settings too." }); },
+    onError: (e) => toast({ title: "Couldn't disconnect WhatsApp Business", description: leadError(e), variant: "destructive" }),
   });
   const s = q.data, c = s?.connection;
-  const badge = !s ? null : !s.configured ? "Not switched on" : !c ? "Not connected" : c.status === "needs_attention" ? "Needs reconnecting" : "Connected";
+  const badge = !s ? null : !s.configured ? "Not available yet" : !c ? "Not connected" : c.status === "needs_attention" ? "Needs reconnecting" : "Connected";
   return (
     <SettingsSection title="WhatsApp Business" icon={MessageCircle} testId="integration-whatsapp"
-      description={!s ? "Loading…" : !s.configured ? `${s.reason ?? "Not switched on for your workspace."} Until then, you can still send messages from your own WhatsApp to people who agreed to hear from you.` : "Send approved messages from your business number through WhatsApp's official API, only to people who agreed to hear from you. Delivery, read receipts and replies show on the lead; WhatsApp bills your business account for each message."}
+      description={!s ? "Loading…" : !s.configured ? `${s.reason ?? "Not available for your workspace yet."} Until then, you can still send messages from your own WhatsApp to people who agreed to hear from you.` : "Send approved messages from your business number through WhatsApp's official API, only to people who agreed to hear from you. Delivery, read receipts and replies show on the lead; WhatsApp bills your business account for each message."}
       action={badge && <Badge variant={badge === "Connected" ? "default" : "outline"} className="font-medium" data-testid="whatsapp-status">{badge}</Badge>}>
       {s?.configured && c && (
         <div className="space-y-2 text-sm" data-testid="whatsapp-connection">

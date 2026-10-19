@@ -44,7 +44,7 @@ export function KnowledgeCard({ canEdit }: { canEdit: boolean }) {
   if (error && String((error as Error).message).includes("KNOWLEDGE_NOT_SETUP")) return null;
 
   const reset = () => { setTitle(""); setText(""); setUrl(""); setFile(null); if (fileRef.current) fileRef.current.value = ""; };
-  const onError = (e: unknown) => toast({ title: "Couldn't add it", description: parseApiError(e).error || "Try again.", variant: "destructive" });
+  const onError = (e: unknown) => toast({ title: "Couldn't add it", description: parseApiError(e).error || "Nothing was added. Please try again.", variant: "destructive" });
   const done = (what: string) => () => { reset(); toast({ title: `${what} added` }); };
 
   const submit = (e: React.FormEvent) => {
@@ -115,7 +115,7 @@ export function KnowledgeCard({ canEdit }: { canEdit: boolean }) {
             </Button>
           </form>
         )}
-        {!canEdit && <p className="text-xs text-muted-foreground">Only people who can change leads can add or remove knowledge.</p>}
+        {!canEdit && <p className="text-xs text-muted-foreground">Only people whose role lets them create deals can add or remove knowledge.</p>}
 
         <div className="space-y-2" data-testid="knowledge-list">
           {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
@@ -166,11 +166,11 @@ export function KnowledgeCard({ canEdit }: { canEdit: boolean }) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove “{removing?.title}”?</AlertDialogTitle>
-            <AlertDialogDescription>The assistant will no longer use it. This can't be undone; you can add it again.</AlertDialogDescription>
+            <AlertDialogDescription>The assistant will stop using it. This can't be undone, but you can add it again later.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep it</AlertDialogCancel>
-            <AlertDialogAction data-testid="knowledge-remove-confirm" onClick={() => removing && remove.mutate(removing.id, { onSuccess: () => toast({ title: "Removed" }), onError })}>Remove</AlertDialogAction>
+            <AlertDialogAction data-testid="knowledge-remove-confirm" onClick={() => removing && remove.mutate(removing.id, { onSuccess: () => toast({ title: "Removed from knowledge" }), onError: (e) => toast({ title: "Couldn't remove it", description: parseApiError(e).error || "It's still in your knowledge. Please try again.", variant: "destructive" }) })}>Remove</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

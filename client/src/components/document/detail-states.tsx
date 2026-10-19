@@ -203,8 +203,8 @@ export function DetailUnavailable({
               </p>
               <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
                 {kind === "forbidden"
-                  ? "Your role can't open this. Ask your workspace owner."
-                  : "It may have been deleted, or the link is wrong."}
+                  ? "Your role doesn't include access to this. Ask your workspace owner if you need it."
+                  : "It may have been deleted, or the link may be incorrect. Go back to the list to find it."}
               </p>
               {back}
             </div>

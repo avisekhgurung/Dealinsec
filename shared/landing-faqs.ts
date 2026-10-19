@@ -17,11 +17,11 @@ export interface LandingFaq {
 export const LANDING_FAQS: LandingFaq[] = [
   {
     q: "What is DealInSec?",
-    a: `DealInSec is a client-acquisition and deal-to-payment workspace for service businesses. It helps you research potential clients with AI, save them as leads, manage deals, send quotations, create agreements your client signs online, generate invoices and track payments, all from one connected record per client. Find Clients. Close Deals. Get Paid.`,
+    a: `DealInSec is a simple business workspace for freelancers and small service businesses, built first for India. It helps you find potential clients with AI-assisted research, save them as leads, manage deals, send quotations, create agreements your client signs online, create invoices and follow up on payments, all from one connected record per client. Find clients. Win deals. Get paid.`,
   },
   {
     q: "Who is DealInSec for?",
-    a: "Freelancers, solo consultants and small B2B service agencies of about 1 to 10 people, such as web development and software services, digital marketing, SEO, growth, AI automation, content and lead-generation businesses, in India and abroad. Creators can use it for paid brand collaborations too. Pro includes up to 5 team members; it is not built for large sales teams.",
+    a: "People who sell services to clients: freelance web developers, designers and creatives, digital marketers and SEO consultants, independent consultants and other solo service providers, plus small agencies of about 1 to 10 people, such as web development and software services, digital marketing, SEO, growth, AI automation, content and lead-generation businesses, in India and abroad. Creators can use it for paid brand collaborations too. Pro includes up to 5 team members; it is not built for large sales teams.",
   },
   {
     q: "What is included in the free plan?",

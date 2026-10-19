@@ -32,7 +32,7 @@ export function LeadImportDialog({ open, onOpenChange }: { open: boolean; onOpen
 
   const readFile = (file: File) => {
     if (!file.name.toLowerCase().endsWith(".csv")) {
-      toast({ title: "CSV only", description: "In Excel or Sheets, use Save as → CSV, or download our template.", variant: "destructive" });
+      toast({ title: "Please upload a CSV file", description: "In Excel or Google Sheets, use Save as → CSV, or download our template.", variant: "destructive" });
       return;
     }
     const reader = new FileReader();

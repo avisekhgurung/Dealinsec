@@ -18,7 +18,7 @@ const BARGE_KEY = "dis-voice-barge";
 
 const timeLabel = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 const hello = (hour: number, name?: string | null) =>
-  `${hour < 5 ? "Good evening" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"}${name ? `, ${name}` : ""}. How may I be of service?`;
+  `${hour < 5 ? "Good evening" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"}${name ? `, ${name}` : ""}. How can I help?`;
 
 export function VoiceCall({ agent, lang, firstName, onClose }: { agent: Agent; lang: string; firstName?: string | null; onClose: () => void }) {
   // On by default: the person comes first. Off only if a loudspeaker keeps fooling it.

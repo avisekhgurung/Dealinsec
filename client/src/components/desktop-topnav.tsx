@@ -276,12 +276,12 @@ export function DesktopTopNav() {
             <button
               onClick={handleLogout}
               data-testid="topnav-logout"
-              aria-label="Sign out"
-              title="Sign out"
+              aria-label="Log out"
+              title="Log out"
               className="dis-topnav-signout flex items-center gap-1.5 h-9 px-2.5 min-[1400px]:px-3 rounded-[10px] text-[13px] font-semibold whitespace-nowrap text-rose-200 hover:text-white"
             >
               <LogOut className="w-4 h-4" />
-              <span className="hidden min-[1400px]:inline">Sign out</span>
+              <span className="hidden min-[1400px]:inline">Log out</span>
             </button>
           </div>
         </div>

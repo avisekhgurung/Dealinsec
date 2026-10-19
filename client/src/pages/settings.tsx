@@ -1,5 +1,5 @@
 /**
- * Settings — Business profile, Team, Integrations, Plan & billing, Preferences, Activity log.
+ * Settings — Business details, Team, Integrations, Plan & billing, Preferences, Activity log.
  *
  * One page with a sticky left tab column (desktop) / scrolling tab strip (mobile). The open tab is in the URL
  * (?tab=<key>), and the return from Google's Gmail consent (?gmail=<outcome>) opens Integrations; the rules live in
@@ -199,9 +199,9 @@ export default function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/org/roles"] });
       queryClient.invalidateQueries({ queryKey: ["/api/org/members"] });
       setRoleDialogOpen(false);
-      toast({ title: editingRoleId ? "Role updated" : "Role created" });
+      toast({ title: editingRoleId ? "Role saved" : "Role created" });
     },
-    onError: (err) => toast({ title: "Could not save role", description: parseApiError(err).error || "Please try again.", variant: "destructive" }),
+    onError: (err) => toast({ title: "Couldn't save the role", description: parseApiError(err).error || "Nothing was changed. Please try again.", variant: "destructive" }),
   });
   const deleteRole = useMutation({
     mutationFn: async (id: string) => (await apiRequest("DELETE", `/api/org/roles/${id}`)).json(),
@@ -209,7 +209,7 @@ export default function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/org/roles"] });
       toast({ title: "Role deleted" });
     },
-    onError: (err) => toast({ title: "Could not delete role", description: parseApiError(err).error, variant: "destructive" }),
+    onError: (err) => toast({ title: "Couldn't delete the role", description: parseApiError(err).error || "The role is still there. If anyone has it, give them another role first, then try again.", variant: "destructive" }),
   });
 
   // ── Org profile edit ──
@@ -223,9 +223,9 @@ export default function SettingsPage() {
       })).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/org"] });
-      toast({ title: "Organization updated" });
+      toast({ title: "Business details saved" });
     },
-    onError: () => toast({ title: "Could not update organization", variant: "destructive" }),
+    onError: (err) => toast({ title: "Couldn't save your business details", description: parseApiError(err).error || "Your changes weren't saved. Please try again.", variant: "destructive" }),
   });
 
   // ── Work type ──
@@ -239,7 +239,7 @@ export default function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/org"] });
       toast({ title: "Work type updated" });
     },
-    onError: (err) => toast({ title: "Could not update work type", description: parseApiError(err).error, variant: "destructive" }),
+    onError: (err) => toast({ title: "Couldn't change the work type", description: parseApiError(err).error || "It wasn't changed. Please try again.", variant: "destructive" }),
   });
 
   // ── Country & currency ──
@@ -292,11 +292,11 @@ export default function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/org"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       setRegionDraft(null);
-      toast({ title: "Country & currency updated" });
+      toast({ title: "Country and currency saved" });
     },
     onError: (err) => toast({
-      title: "Could not update country & currency",
-      description: parseApiError(err).error || "Please try again.",
+      title: "Couldn't save country and currency",
+      description: parseApiError(err).error || "Nothing was changed. Please try again.",
       variant: "destructive",
     }),
   });
@@ -320,33 +320,34 @@ export default function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/org"] });
       setInviteOpen(false);
       setInviteEmail("");
-      toast({ title: "Invitation sent", description: `${inviteEmail.trim()} will get an email with a join link.` });
+      toast({ title: "Invitation created", description: `We're emailing ${inviteEmail.trim()} a link to join. If it doesn't arrive, use Resend under Pending invitations.` });
     },
     onError: (err) => {
       const parsed = parseApiError(err);
       const raw = err instanceof Error ? err.message : "";
       if (raw.includes("SEAT_LIMIT")) {
         setInviteOpen(false);
-        setSeatMessage(parsed.error || "Your plan's team limit is reached.");
+        setSeatMessage(parsed.error || "You've reached your plan's team limit.");
         setSeatDialogOpen(true);
         return;
       }
-      toast({ title: "Could not send invitation", description: parsed.error || "Please try again.", variant: "destructive" });
+      toast({ title: "Couldn't create the invitation", description: parsed.error || "No invitation was sent. Please try again.", variant: "destructive" });
     },
   });
 
   const resendInvite = useMutation({
     mutationFn: async (id: number) => (await apiRequest("POST", `/api/org/invitations/${id}/resend`)).json(),
-    onSuccess: () => toast({ title: "Invitation re-sent" }),
-    onError: () => toast({ title: "Could not resend", variant: "destructive" }),
+    onSuccess: () => toast({ title: "Sending the invitation again", description: "We're emailing the link again. It now works for the next 7 days." }),
+    onError: (err) => toast({ title: "Couldn't resend the invitation", description: parseApiError(err).error || "Please try again.", variant: "destructive" }),
   });
   const revokeInvite = useMutation({
     mutationFn: async (id: number) => (await apiRequest("DELETE", `/api/org/invitations/${id}`)).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/org/invitations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/org"] });
-      toast({ title: "Invitation revoked" });
+      toast({ title: "Invitation cancelled", description: "The join link no longer works." });
     },
+    onError: (err) => toast({ title: "Couldn't cancel the invitation", description: parseApiError(err).error || "The link may still work. Please try again.", variant: "destructive" }),
   });
 
   // ── Member management ──
@@ -357,9 +358,9 @@ export default function SettingsPage() {
       )).json(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/org/members"] });
-      toast({ title: "Role updated" });
+      toast({ title: "Role changed" });
     },
-    onError: (err) => toast({ title: "Could not change role", description: parseApiError(err).error, variant: "destructive" }),
+    onError: (err) => toast({ title: "Couldn't change the role", description: parseApiError(err).error || "Their role wasn't changed. Please try again.", variant: "destructive" }),
   });
   const removeMember = useMutation({
     mutationFn: async (id: string) => (await apiRequest("DELETE", `/api/org/members/${id}`)).json(),
@@ -368,7 +369,7 @@ export default function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/org"] });
       toast({ title: "Member removed" });
     },
-    onError: (err) => toast({ title: "Could not remove member", description: parseApiError(err).error, variant: "destructive" }),
+    onError: (err) => toast({ title: "Couldn't remove this member", description: parseApiError(err).error || "They still have access. Please try again.", variant: "destructive" }),
   });
 
   const TAB_ICONS: Record<SettingsTab, SettingsTabItem["icon"]> = {
@@ -385,7 +386,7 @@ export default function SettingsPage() {
   const openInvite = () =>
     seatsFree > 0
       ? setInviteOpen(true)
-      : (setSeatMessage(`Your current plan allows ${org?.seatLimit ?? 1} team member${(org?.seatLimit ?? 1) === 1 ? "" : "s"}. Upgrade your plan or purchase additional seats.`), setSeatDialogOpen(true));
+      : (setSeatMessage(`Your current plan allows ${org?.seatLimit ?? 1} team member${(org?.seatLimit ?? 1) === 1 ? "" : "s"}. Upgrade your plan or buy extra seats.`), setSeatDialogOpen(true));
 
 
   /** Erasure. The server anonymises the row rather than dropping it, because
@@ -402,8 +403,8 @@ export default function SettingsPage() {
     },
     onError: (err) => {
       toast({
-        title: "Could not delete your account",
-        description: parseApiError(err).error || "Please try again.",
+        title: "Couldn't delete your account",
+        description: parseApiError(err).error || "Your account wasn't deleted. Please try again.",
         variant: "destructive",
       });
     },
@@ -454,12 +455,12 @@ export default function SettingsPage() {
               <>
                 {orgError && !org ? (
                   <Card className="glass-card">
-                    <LoadError what="your business profile" onRetry={() => void refetchOrg()} retrying={orgFetching} />
+                    <LoadError what="your business details" onRetry={() => void refetchOrg()} retrying={orgFetching} />
                   </Card>
                 ) : (
                   <>
                     <SettingsSection
-                      title="Business profile"
+                      title="Business details"
                       description={<>
                         How your business is named inside DealInSec{isSolo ? "" : " and to your team"}. Freelancing under your
                         own name? Use it here. Your contact, tax and bank details for documents live in your{" "}
@@ -501,7 +502,7 @@ export default function SettingsPage() {
                               Save changes
                             </Button>
                           ) : (
-                            <PermissionNote>Only the Owner or an Admin can edit the business profile.</PermissionNote>
+                            <PermissionNote>Only the Owner or an Admin can edit the business details.</PermissionNote>
                           )}
                         </div>
                       )}
@@ -550,12 +551,12 @@ export default function SettingsPage() {
                           {regionLock === "has-deals" && (
                             <p className="text-xs text-muted-foreground" data-testid="region-locked">
                               Fixed once your first deal exists, so everything already quoted, signed and invoiced keeps
-                              printing exactly as it was issued. Need to change it? Email support@dealinsec.com.
+                              printing exactly as it was issued. To change it, email support@dealinsec.com.
                             </p>
                           )}
                           {regionLock === "unverifiable" && (
                             <p className="text-xs text-muted-foreground" data-testid="region-locked">
-                              We couldn't check whether this workspace has deals, so the country and currency stay locked. Refresh to try again.
+                              We couldn't check whether this workspace has deals, so the country and currency stay locked for now. Refresh the page to try again.
                             </p>
                           )}
                           {canEditOrg && isOwner && regionLock !== null && regionLock !== "checking" && !regionUnchanged && (
@@ -632,7 +633,7 @@ export default function SettingsPage() {
                       data-testid="button-invite-member"
                     >
                       <UserPlus className="w-4 h-4 mr-2" />
-                      Invite Member
+                      Invite member
                     </Button>
                   ) : undefined}
                 >
@@ -694,7 +695,7 @@ export default function SettingsPage() {
                               className="h-8 w-8 text-muted-foreground hover:text-rose-500"
                               aria-label={`Remove ${m.email}`}
                               onClick={async () => {
-                                if (await confirm({ title: `Remove ${m.email}?`, description: "They lose access immediately. Their records stay with the organization.", destructive: true, confirmText: "Remove" })) {
+                                if (await confirm({ title: `Remove ${m.email}?`, description: "They lose access to this workspace straight away. Anything they created stays in the workspace.", destructive: true, confirmText: "Remove" })) {
                                   removeMember.mutate(m.id);
                                 }
                               }}
@@ -738,7 +739,7 @@ export default function SettingsPage() {
                               onClick={() => resendInvite.mutate(inv.id)} data-testid={`resend-${inv.email}`}>
                               <RotateCw className="w-3.5 h-3.5" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-rose-500" title="Revoke" aria-label={`Revoke invitation to ${inv.email}`}
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-rose-500" title="Cancel invitation" aria-label={`Cancel invitation to ${inv.email}`}
                               onClick={() => revokeInvite.mutate(inv.id)}>
                               <Trash2 className="w-3.5 h-3.5" />
                             </Button>
@@ -753,7 +754,7 @@ export default function SettingsPage() {
                 {canManageTeam && (
                   <SettingsSection
                     title={<>Roles &amp; permissions</>}
-                    description="Every role is yours to shape — edit the defaults, delete them, or create your own with the exact permission mix."
+                    description="Edit the default roles, delete the ones you don't need, or create your own with exactly the permissions you want."
                     action={isOwner ? (
                       <Button
                         variant="outline"
@@ -762,7 +763,7 @@ export default function SettingsPage() {
                         data-testid="button-create-role"
                       >
                         <Plus className="w-4 h-4 mr-1.5" />
-                        Create Role
+                        Create role
                       </Button>
                     ) : undefined}
                   >
@@ -782,7 +783,7 @@ export default function SettingsPage() {
                                 </Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-rose-500" title="Delete role" aria-label={`Delete role ${r.name}`}
                                   onClick={async () => {
-                                    if (await confirm({ title: `Delete role "${r.name}"?`, description: "Members must be reassigned before a role can be deleted.", destructive: true, confirmText: "Delete" })) {
+                                    if (await confirm({ title: `Delete the role "${r.name}"?`, description: "This can't be undone. Anyone who still has this role must be given another role first.", destructive: true, confirmText: "Delete role" })) {
                                       deleteRole.mutate(r.id);
                                     }
                                   }}>
@@ -833,7 +834,7 @@ export default function SettingsPage() {
                           {activity.length ? "Nothing in this date range" : "No activity yet"}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {activity.length ? "Try a wider range." : "It starts recording from today."}
+                          {activity.length ? "Try a wider date range." : "Actions in this workspace will be recorded here."}
                         </p>
                       </div>
                     );
@@ -1003,8 +1004,8 @@ export default function SettingsPage() {
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-destructive">Delete my account</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Erases your personal details and signs you out for good. Financial records are kept for
-                        the statutory period, with your identity removed from them.
+                        Erases your personal details and logs you out for good. Financial records are kept for
+                        the period the law requires, with your identity removed from them.
                       </p>
                     </div>
                     <Button
@@ -1017,8 +1018,8 @@ export default function SettingsPage() {
                           title: "Delete your account?",
                           description:
                             accountCountry === "IN"
-                              ? "This cannot be undone. Your name, email, PAN, GSTIN, bank details and signature are erased, and you are signed out immediately. Download your data first if you want a copy."
-                              : "This cannot be undone. Your name, email, tax ID, bank details and signature are erased, and you are signed out immediately. Download your data first if you want a copy.",
+                              ? "This can't be undone. Your name, email, PAN, GSTIN, bank details and signature are erased, and you're logged out straight away. Download your data first if you want a copy."
+                              : "This can't be undone. Your name, email, tax ID, bank details and signature are erased, and you're logged out straight away. Download your data first if you want a copy.",
                           confirmText: "Delete my account",
                           cancelText: "Keep my account",
                           destructive: true,
@@ -1157,7 +1158,7 @@ export default function SettingsPage() {
               data-testid="button-send-invite"
             >
               {sendInvite.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Send Invitation
+              Send invitation
             </Button>
           </div>
         </DialogContent>
@@ -1178,7 +1179,7 @@ export default function SettingsPage() {
               <Label htmlFor="role-name">Role name</Label>
               <Input
                 id="role-name"
-                placeholder="e.g. Site Engineer, Junior Sales, Auditor"
+                placeholder="e.g. Site engineer, Junior sales, Auditor"
                 value={roleName}
                 maxLength={40}
                 onChange={(e) => setRoleName(e.target.value)}
@@ -1210,8 +1211,8 @@ export default function SettingsPage() {
                 ))}
               </div>
               <p className="px-3.5 py-2.5 text-[11px] text-muted-foreground bg-muted/30 border-t border-border/50">
-                Every active member can <b>view</b> the organization's records. Billing and
-                org deletion always stay with the owner.
+                Every active member can <b>view</b> the workspace's records. Billing and
+                deleting the workspace always stay with the Owner.
               </p>
             </div>
 
@@ -1239,18 +1240,18 @@ export default function SettingsPage() {
             {canBilling ? (
               <>
                 <Link href="/pricing">
-                  <Button className="w-full gradient-btn text-white">Upgrade Plan</Button>
+                  <Button className="w-full gradient-btn text-white">Upgrade plan</Button>
                 </Link>
                 <Link href="/pricing#seats">
                   <Button variant="outline" className="w-full">
                     {checkoutAvailable
-                      ? <>Buy Additional Seats — {formatRupees(extraSeatPrice)}/seat</>
+                      ? <>Buy extra seats — {formatRupees(extraSeatPrice)}/seat</>
                       : <>Additional seats — not available in your country yet</>}
                   </Button>
                 </Link>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">Ask your organization Owner to upgrade the plan or buy seats.</p>
+              <p className="text-sm text-muted-foreground">Ask the workspace Owner to upgrade the plan or buy extra seats.</p>
             )}
             <Button variant="ghost" className="w-full" onClick={() => setSeatDialogOpen(false)}>Cancel</Button>
           </div>

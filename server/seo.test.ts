@@ -696,11 +696,11 @@ describe("homepage crawler fallback: small agencies first, freelancers and creat
   const body = landingSeoBody();
 
   it("leads with the brand promise, freelancers, consultants and small agencies, and the whole workflow to payment tracking", () => {
-    expect(body).toContain("<h1>Find Clients. Close Deals. Get Paid.</h1>");
+    expect(body).toContain("<h1>Find clients. Win deals. Get paid.</h1>");
     expect(body.match(/<h1[\s>]/g)?.length).toBe(1);
-    expect(body).toContain("AI researches and drafts; you approve every message, and nothing is sent automatically.");
+    expect(body).toContain("AI researches and drafts; you approve every message and send it yourself, and nothing is sent automatically.");
     for (const step of ["Research a potential client", "Save the prospect and manage the lead", "Create a deal and send a quotation", "Create an agreement and collect a signature", "Generate an invoice and track payment"]) expect(body, step).toContain(step);
-    for (const kind of ["Freelancers and solo consultants", "Web development and software services", "Digital marketing, SEO and growth agencies", "AI automation businesses"]) expect(body, kind).toContain(kind);
+    for (const kind of ["Freelance web developers", "Designers and creatives", "Digital marketers and SEO consultants", "Independent consultants", "web development and software services, digital marketing, SEO and growth, AI automation"]) expect(body, kind).toContain(kind);
     // An inference is never presented as a verified need, and no outcome is promised.
     expect(body).toMatch(/Inferences are labelled as possible opportunities, not facts/);
     expect(body).toMatch(/doesn't guarantee clients, replies or meetings/);
@@ -804,6 +804,38 @@ describe("/find-local-clients: local business search, for India", () => {
     expect(t).toMatch(/doesn.t mean they need one/);
     expect(t).not.toMatch(/(?<!doesn.t |not )guarantee[ds]? (clients|replies|leads)|verified (phone|email|contact)s?(?! )|the best\b|#1\b/);
     expect(t).toMatch(/doesn.t guarantee clients/);
+  });
+});
+
+describe("/crm-for-freelancers: a simple CRM for Indian freelancers", () => {
+  const P = "/crm-for-freelancers";
+  const html = () => pages.get(P) ?? "";
+  const text = () => stripJsonLd((html().match(/<main>([\s\S]*?)<\/main>/)?.[1] ?? "")).replace(/<[^>]+>/g, " ").replace(/&[a-z#0-9]+;/g, " ").replace(/\s+/g, " ").toLowerCase();
+
+  it("is registered as an India page, in the sitemap, matched by the SSR pattern, listed in llms.txt and linked from the homepage copy", () => {
+    expect(html().length).toBeGreaterThan(1000);
+    expect(PAGES.find((x) => x.path === P)?.region).toBe("IN");
+    expect(categorySitemapPaths()).toContain(P);
+    expect(SSR_PATH_PATTERN.test(P)).toBe(true);
+    expect(llmsTxt("https://www.dealinsec.com")).toContain(`https://www.dealinsec.com${P}`);
+    expect(landingSeoBody()).toContain(`href="${P}"`);
+  });
+
+  it("has one H1, its own canonical, and a FAQ that matches its markup", () => {
+    const page = PAGES.find((x) => x.path === P)!;
+    expect(html().match(/<h1[\s>]/g)?.length).toBe(1);
+    expect(html()).toContain(`<link rel="canonical" href="https://www.dealinsec.com${P}" />`);
+    expect(page.description.length).toBeLessThan(200);
+    const faq = jsonLdBlocks(html()).find((b) => b["@type"] === "FAQPage");
+    expect(faq.mainEntity.map((q: any) => q.name)).toEqual(page.faq.map((f) => f.q));
+  });
+
+  it("says what it doesn't do: no client directory, no sending for you, Gmail limited", () => {
+    const t = text();
+    expect(t).toMatch(/no separate client directory/);
+    expect(t).toMatch(/doesn.t send emails or whatsapp messages for you/);
+    expect(t).toMatch(/limited early access/);
+    expect(t).not.toMatch(/(?<!doesn.t |not )guarantee[ds]? (clients|replies|leads)|sends? (follow-ups|reminders) automatically|gst-ready/);
   });
 });
 

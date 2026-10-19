@@ -20,12 +20,12 @@ function Empty({ onPaste, onPrompt, pasteLabel, prompts, onCall }: { onPaste: ()
       <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600/10 text-emerald-700 dark:text-emerald-400"><Sparkles className="h-6 w-6" /></span>
       <h2 className="mt-4 text-2xl font-bold tracking-tight sm:text-3xl" data-testid="agent-greeting">{greetingFor(new Date().getHours())}{name ? `, ${name}` : ""}</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-        I can run AI Outbound searches for new companies, work your leads and close deals. Tell me what you need, or tap the mic. I ask before I change anything that matters.
+        I can find potential clients with AI Outbound, look up your leads, deals and invoices, and prepare quotations, agreements, invoices and payment follow-ups for you to check. Tell me what you need, or tap the mic. I ask before I change anything that matters.
       </p>
       {/* Ask here for answers and quick work; hand longer, background work to the coworkers (AI League). */}
       <p className="mx-auto mt-2 max-w-md text-xs text-muted-foreground" data-testid="agent-league-hint">
-        Work that takes a while, like finding clients, drafting first messages or a daily briefing, can go to{" "}
-        <Link href="/ai-league" className="font-semibold text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400">Nibo, Mika and Zee</Link>. They keep going in the background and report back.
+        Work that takes a while, like researching potential clients, drafting first messages or a daily briefing, can go to your AI coworkers{" "}
+        <Link href="/ai-league" className="font-semibold text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400">Nibo, Mika and Zee</Link>. They keep working in the background and report back.
       </p>
       {onCall && (
         <button type="button" onClick={onCall} data-testid="starter-call"
@@ -108,11 +108,11 @@ export function AgentConversation({
             running={agent.running}
             disabled={!!disabledReason}
             seed={seed}
-            placeholder="Ask, or tap the mic…"
+            placeholder="Ask about deals, clients or payments…"
             voiceLang={voiceLang}
             draftFor={agent.sessionId}
           />
-          <p className="mt-1.5 text-center text-[11px] text-muted-foreground">Check what it prepares before you approve it.</p>
+          <p className="mt-1.5 text-center text-[11px] text-muted-foreground">AI results may be incomplete or inaccurate. Check what it prepares before you approve or share it.</p>
         </div>
       </div>
     </div>

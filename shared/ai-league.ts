@@ -2,8 +2,8 @@
  * DealInSec AI League: three coworkers, one runtime (server/ai-league). Pure: the server, the browser and the tests
  * read the same identities, task templates, statuses and schedule arithmetic.
  *
- *   Nibo  Opportunity Hunter  finds companies with evidence (AI Outbound) and saves the qualified ones as leads
- *   Mika  Deal Specialist     drafts first messages from verified facts; nothing is sent without the person's approval
+ *   Nibo  Opportunity Scout   finds companies with evidence (AI Outbound) and saves the qualified ones as leads
+ *   Mika  Deal Closer         drafts first messages from verified facts; nothing is sent: the person approves and sends it themselves
  *   Zee   Business Guardian   briefs the person on what needs them, from the records themselves
  *
  * They work as a team: in a chat a coworker can ask a teammate for help (a read-only answer from the teammate's own
@@ -31,15 +31,15 @@ export interface BotIdentity {
 
 export const BOT_IDENTITY: Record<Bot, BotIdentity> = {
   nibo: {
-    bot: "nibo", name: "Nibo", role: "Opportunity Hunter",
+    bot: "nibo", name: "Nibo", role: "Opportunity Scout",
     pitch: "Finds companies that fit what you sell, checks each one's own website, and saves the qualified ones to Leads with the evidence.",
     voice: "curious, quick and evidence-first: says what was found and where, and plainly what wasn't",
     accent: { fg: "text-blue-700 dark:text-blue-300", bg: "bg-blue-600", ring: "ring-blue-500/40", soft: "bg-blue-50 dark:bg-blue-950/40" },
     suggestions: ["Find 10 dental clinics in Siliguri that could use a better website", "Research 10 UK marketing agencies with 5–50 people", "Ask Mika how she would open with my newest leads"],
   },
   mika: {
-    bot: "mika", name: "Mika", role: "Deal Specialist",
-    pitch: "Writes first messages to your leads from what's been verified about them, and lines them up for your approval. Nothing is sent without you.",
+    bot: "mika", name: "Mika", role: "Deal Closer",
+    pitch: "Writes first messages to your leads from what's been verified about them, and lines them up for your approval. Nothing is sent for you: you copy the approved text and send it yourself.",
     voice: "warm, thoughtful and professional: short, specific messages, never pushy, never invented",
     accent: { fg: "text-rose-700 dark:text-rose-300", bg: "bg-rose-600", ring: "ring-rose-500/40", soft: "bg-rose-50 dark:bg-rose-950/40" },
     suggestions: ["Draft first messages for my newest researched leads", "Which leads are waiting on a follow-up?", "Ask Zee which clients owe us money before I follow up"],
@@ -132,12 +132,12 @@ export type LeagueRunStatus = (typeof RUN_STATUSES)[number];
 export const TERMINAL: readonly LeagueRunStatus[] = ["completed", "partial", "failed", "cancelled"];
 export const isTerminal = (s: string) => (TERMINAL as readonly string[]).includes(s);
 export const RUN_STATUS_LABEL: Record<LeagueRunStatus, string> = {
-  queued: "Queued", running: "Working", waiting: "Waiting on research", completed: "Done", partial: "Partly done", failed: "Didn't finish", cancelled: "Cancelled",
+  queued: "Queued", running: "In progress", waiting: "In progress", completed: "Completed", partial: "Completed with limitations", failed: "Failed", cancelled: "Cancelled",
 };
 
 /** A coworker's state for the roster, from real rows only. */
 export type BotStatus = "available" | "working" | "needs_you" | "attention";
-export const BOT_STATUS_LABEL: Record<BotStatus, string> = { available: "Available", working: "Working", needs_you: "Waiting for you", attention: "Needs attention" };
+export const BOT_STATUS_LABEL: Record<BotStatus, string> = { available: "Available", working: "Working", needs_you: "Waiting for your approval", attention: "Needs attention" };
 
 /** What every report says, whatever the task: counts that come from what was done, never estimates. */
 export interface LeagueReport {

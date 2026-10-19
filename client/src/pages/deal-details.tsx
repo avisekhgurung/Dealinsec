@@ -27,6 +27,7 @@ import { ArrowLeft, Calendar, FileCheck, CheckCircle, Loader2, FileText, Receipt
 import { hasProAccess, STANDARD_TERMS } from "@shared/schema";
 import { memberCan } from "@shared/permissions";
 import { isAgreementSigned } from "@shared/agreement-lifecycle";
+import { dealAudienceLabels } from "@shared/audience";
 import { httpErrorKind } from "@shared/http-error-kind";
 import { WORKFLOW_STEPS, workflowPosition } from "@shared/deal-view";
 import type { Deal, Contract, Quote, BrandInvoice } from "@shared/schema";
@@ -111,8 +112,8 @@ export default function DealDetailsPage() {
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to generate quote. Please try again.",
+        title: "Couldn't create the quotation",
+        description: "Nothing was changed. Please try again.",
         variant: "destructive",
       });
     },
@@ -129,14 +130,14 @@ export default function DealDetailsPage() {
       // The suggested next step reads the deal's status: a completed deal has none.
       queryClient.invalidateQueries({ queryKey: [`/api/copilot/deal-intel/${params.id}`] });
       toast({
-        title: "Deal completed",
-        description: "The deal has been marked as completed.",
+        title: "Deal marked as completed. Congratulations!",
+        description: "Its quotation, agreement and invoices stay linked to this deal.",
       });
     },
     onError: () => {
       toast({
-        title: "Error",
-        description: "Failed to complete deal. Please try again.",
+        title: "Couldn't mark the deal as completed",
+        description: "Nothing was changed. Please try again.",
         variant: "destructive",
       });
     },
@@ -152,7 +153,7 @@ export default function DealDetailsPage() {
       setShowSplitInput(false);
       toast({
         title: "Split invoices created",
-        description: `Advance (${splitPercentage}%) and Final (${100 - splitPercentage}%) invoices generated.`,
+        description: `An advance invoice (${splitPercentage}%) and a final invoice (${100 - splitPercentage}%) were created for this deal.`,
       });
     },
     onError: (err) => {
@@ -162,8 +163,8 @@ export default function DealDetailsPage() {
         return;
       }
       toast({
-        title: "Error",
-        description: "Failed to create split invoices. Please try again.",
+        title: "Couldn't create split invoices",
+        description: "Nothing was changed. Please try again.",
         variant: "destructive",
       });
     },
@@ -218,7 +219,7 @@ export default function DealDetailsPage() {
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <h1 className="text-xl lg:text-lg font-bold lg:font-semibold truncate flex-1">Deal Details</h1>
+        <h1 className="text-xl lg:text-lg font-bold lg:font-semibold truncate flex-1">Deal details</h1>
         {actions}
       </div>
     </header>
@@ -246,7 +247,7 @@ export default function DealDetailsPage() {
             kind={isError ? httpErrorKind(error) : "not_found"}
             what="deal"
             backHref={backPath}
-            backLabel="Back to Deals"
+            backLabel="Back to deals"
             onRetry={() => refetch()}
             retrying={isFetching}
           />
@@ -305,7 +306,7 @@ export default function DealDetailsPage() {
                 { label: "Duration", icon: Calendar, value: `${formatDate(deal.startDate)} – ${formatDate(deal.endDate)}` },
                 deal.engagementModel
                   ? { label: "Engagement", icon: Briefcase, value: [engagementLabel(deal.engagementModel, deal.engagementTerms), serviceLabel(deal.serviceCategory)].filter(Boolean).join(" · ") }
-                  : { label: "Deal Type", icon: Briefcase, value: `${(dealTypeMeta as any)[(deal as any).dealType]?.emoji ?? "·"} ${(deal as any).dealType || "Custom"}${deal.serviceCategory ? ` · ${serviceLabel(deal.serviceCategory)}` : ""}` },
+                  : { label: "Deal type", icon: Briefcase, value: `${(dealTypeMeta as any)[(deal as any).dealType]?.emoji ?? "·"} ${(deal as any).dealType || "Custom"}${deal.serviceCategory ? ` · ${serviceLabel(deal.serviceCategory)}` : ""}` },
                 { label: "Deliverables", icon: ListChecks, value: `${deal.deliverables.length} item${deal.deliverables.length !== 1 ? "s" : ""} · ${(deal as any).deliverableMode === "any_one" ? "any one" : "all required"}` },
               ] as const).map((f) => (
                 <div key={f.label} className="rounded-xl border border-border/60 bg-card/40 px-3.5 py-3 min-w-0">
@@ -369,7 +370,7 @@ export default function DealDetailsPage() {
                   <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
                     <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                     <p className="text-xs text-amber-700 dark:text-amber-400">
-                      Deal was edited. Previous quote is outdated — please generate a new one.
+                      This deal was edited after its quotation was created. Create a new quotation so the two match.
                     </p>
                   </div>
                 )}
@@ -385,12 +386,12 @@ export default function DealDetailsPage() {
                     {generateQuote.isPending ? (
                       <>
                         <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                        Generating Quote...
+                        Creating quotation…
                       </>
                     ) : (
                       <>
                         <FileText className="w-5 h-5 mr-2" />
-                        Generate Quote
+                        Create quotation
                       </>
                     )}
                   </Button>
@@ -405,7 +406,7 @@ export default function DealDetailsPage() {
                         data-testid="button-create-contract"
                       >
                         <FileCheck className="w-5 h-5 mr-2" />
-                        Create Agreement
+                        Create agreement
                         <span className="ml-auto text-xs bg-white/20 rounded-full px-2 py-0.5">Pro</span>
                       </Button>
                     </Link>
@@ -416,7 +417,7 @@ export default function DealDetailsPage() {
                       data-testid="button-create-contract-upgrade"
                     >
                       <FileCheck className="w-5 h-5 mr-2" />
-                      Create Agreement
+                      Create agreement
                       <span className="ml-auto flex items-center gap-1 text-xs bg-white/20 rounded-full px-2 py-0.5">
                         <Crown className="w-3 h-3" /> Pro
                       </span>
@@ -430,13 +431,13 @@ export default function DealDetailsPage() {
                     {contract ? (
                       <Link href={`/contracts/${contract.id}`} className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 flex-1 rounded-lg -m-1 p-1 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-colors cursor-pointer" data-testid="link-view-agreement">
                         <CheckCircle className="w-5 h-5 flex-shrink-0" />
-                        <span className="font-medium text-sm flex-1">Agreement Created</span>
+                        <span className="font-medium text-sm flex-1">Agreement created</span>
                         <ChevronRight className="w-4 h-4 flex-shrink-0 opacity-70" />
                       </Link>
                     ) : (
                       <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 flex-1">
                         <CheckCircle className="w-5 h-5 flex-shrink-0" />
-                        <span className="font-medium text-sm">Agreement Created</span>
+                        <span className="font-medium text-sm">Agreement created</span>
                       </div>
                     )}
                     {contract && (
@@ -458,7 +459,7 @@ export default function DealDetailsPage() {
                       data-testid="button-generate-invoice-upgrade"
                     >
                       <Receipt className="w-5 h-5 mr-2" />
-                      Generate Invoice
+                      Create invoice
                       <span className="ml-auto flex items-center gap-1 text-xs bg-white/20 rounded-full px-2 py-0.5">
                         <Crown className="w-3 h-3" /> Pro
                       </span>
@@ -473,7 +474,7 @@ export default function DealDetailsPage() {
                         data-testid="button-generate-invoice"
                       >
                         <Receipt className="w-5 h-5 mr-2" />
-                        Generate Single Invoice
+                        Create single invoice
                       </Button>
                     </Link>
 
@@ -485,7 +486,7 @@ export default function DealDetailsPage() {
                         data-testid="button-split-invoice"
                       >
                         <Scissors className="w-5 h-5 mr-2" />
-                        Split Invoice (Advance + Final)
+                        Split invoice (advance + final)
                       </Button>
                     ) : (
                       <div className="space-y-2 p-3 rounded-xl border border-border bg-muted/50">
@@ -512,10 +513,10 @@ export default function DealDetailsPage() {
                             {splitInvoices.isPending ? (
                               <>
                                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Creating...
+                                Creating…
                               </>
                             ) : (
-                              "Create Split Invoices"
+                              "Create split invoices"
                             )}
                           </Button>
                           <Button
@@ -540,9 +541,9 @@ export default function DealDetailsPage() {
                           <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
                           <span className="font-medium text-sm flex-1">
                             {(inv as any).invoiceType === "advance"
-                              ? "Advance Invoice"
+                              ? "Advance invoice"
                               : (inv as any).invoiceType === "final"
-                              ? "Final Invoice"
+                              ? "Final invoice"
                               : "Invoice"}
                           </span>
                           <StatusBadge status={inv.status} />
@@ -566,12 +567,12 @@ export default function DealDetailsPage() {
                   {completeDeal.isPending ? (
                     <>
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Completing...
+                      Saving…
                     </>
                   ) : (
                     <>
                       <CheckCircle className="w-5 h-5 mr-2" />
-                      Mark as Completed
+                      Mark as completed
                     </>
                   )}
                 </Button>
@@ -602,28 +603,28 @@ export default function DealDetailsPage() {
                 return (
                   <>
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold">Financial Summary</h3>
+                      <h3 className="font-semibold">Financial summary</h3>
                       {dealBrandInvoices.length > 0 && (
                         <Link href="/invoices" className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1">
-                          View Invoices <ChevronRight className="w-3 h-3" />
+                          View invoices <ChevronRight className="w-3 h-3" />
                         </Link>
                       )}
                     </div>
                     {dealBrandInvoices.length === 0 ? (
                       <div className="py-6 text-center">
                         <Receipt className="w-7 h-7 mx-auto text-muted-foreground/40 mb-2" />
-                        <p className="text-sm text-muted-foreground">No invoices raised yet.</p>
-                        <p className="text-xs text-muted-foreground/80 mt-0.5">Invoices appear here once the agreement is signed.</p>
+                        <p className="text-sm text-muted-foreground">No invoices yet.</p>
+                        <p className="text-xs text-muted-foreground/80 mt-0.5">Once the agreement is signed, you can create an invoice for this deal.</p>
                       </div>
                     ) : (
                       <>
                         <div className="flex items-end justify-between gap-3 mb-2">
                           <div>
-                            <p className="text-xs text-muted-foreground">Deal Value</p>
+                            <p className="text-xs text-muted-foreground">Deal value</p>
                             <p className="font-bold text-lg tabular-nums">{fmt.money(deal.dealAmountMinor)}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-muted-foreground">Total Invoiced</p>
+                            <p className="text-xs text-muted-foreground">Total invoiced</p>
                             <p className="font-bold text-lg tabular-nums">{fmt.money(totalInvoicedMinor)}</p>
                           </div>
                           <span className="text-xs font-bold px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 tabular-nums">
@@ -658,7 +659,7 @@ export default function DealDetailsPage() {
           <Card className="glass-card border-0">
             <CardContent className="p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">Deal Information</h3>
+                <h3 className="font-semibold">Deal information</h3>
                 <button
                   type="button"
                   onClick={() => {
@@ -675,7 +676,7 @@ export default function DealDetailsPage() {
               </div>
               <dl className="space-y-3 text-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">Client</dt>
+                  <dt className="text-muted-foreground">{dealAudienceLabels((deal as any).dealType).party}</dt>
                   <dd className="font-medium truncate">{deal.brandName}</dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
@@ -705,11 +706,11 @@ export default function DealDetailsPage() {
                   </div>
                 ))}
                 <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">Start Date</dt>
+                  <dt className="text-muted-foreground">Start date</dt>
                   <dd className="font-medium">{formatDate(deal.startDate)}</dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <dt className="text-muted-foreground">{engagementModelMeta(deal.engagementModel)?.kind === "recurring" ? "End of first term" : "End Date"}</dt>
+                  <dt className="text-muted-foreground">{engagementModelMeta(deal.engagementModel)?.kind === "recurring" ? "End of first term" : "End date"}</dt>
                   <dd className="font-medium">{formatDate(deal.endDate)}</dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
@@ -723,10 +724,10 @@ export default function DealDetailsPage() {
 
         <section className="space-y-3">
           <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            Deliverables ({completedIds.size}/{deal.deliverables.length} Completed)
+            Deliverables ({completedIds.size}/{deal.deliverables.length} done)
             {(deal as any).deliverableMode === "any_one" && (
               <span className="ml-2 text-xs text-amber-600 dark:text-amber-400 normal-case font-normal">
-                (Brand chooses one)
+                ({dealAudienceLabels((deal as any).dealType).party} chooses one)
               </span>
             )}
           </h3>
@@ -748,7 +749,10 @@ export default function DealDetailsPage() {
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
                       <button
+                        type="button"
                         onClick={() => toggleDeliverable(deliverable.id)}
+                        aria-pressed={isCompleted}
+                        aria-label={`${isCompleted ? "Mark as not done" : "Mark as done"}: ${deliverable.platform}`}
                         className={`flex items-center justify-center w-6 h-6 rounded-md border-2 transition-all mt-2 flex-shrink-0 ${
                           isCompleted
                             ? "bg-emerald-500 border-emerald-500 text-white"
@@ -800,9 +804,9 @@ export default function DealDetailsPage() {
             <section className="space-y-3">
               <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
                 <ScrollText className="w-3.5 h-3.5" />
-                Terms &amp; Conditions
+                Terms and conditions
                 <span className="normal-case font-normal text-xs text-muted-foreground/80">
-                  ({standardTerms.length + customTerms.length} — applied to quotation &amp; agreement)
+                  ({standardTerms.length + customTerms.length}, used in the quotation and agreement)
                 </span>
               </h3>
               <Card className="glass-card border-0">
@@ -839,14 +843,14 @@ export default function DealDetailsPage() {
         <section className="space-y-3">
           <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-2">
             <Zap className="w-3.5 h-3.5" />
-            Quick Actions
+            Quick actions
           </h3>
           <Card className="glass-card border-0">
             <CardContent className="p-3 grid grid-cols-2 gap-2">
               {deal.status === "Pending" && (
                 <Link href={`/deals/${deal.id}/edit`} className="col-span-1">
                   <Button variant="outline" className="w-full h-10 justify-start font-semibold text-sm" data-testid="qa-edit-deal">
-                    <Pencil className="w-4 h-4 mr-2 text-muted-foreground" /> Edit Deal
+                    <Pencil className="w-4 h-4 mr-2 text-muted-foreground" /> Edit deal
                   </Button>
                 </Link>
               )}
@@ -963,7 +967,7 @@ function DealIntelCards({ dealId, existingTerms }: { dealId: number; existingTer
       return res.json();
     },
     onSuccess: (d: any) => setSuggested(d.termsBlock || d.note || ""),
-    onError: () => toast({ title: "Couldn't get suggestions right now", variant: "destructive" }),
+    onError: () => toast({ title: "Couldn't get suggestions right now", description: "Please try again in a moment.", variant: "destructive" }),
   });
 
   const addTerms = useMutation({
@@ -1050,10 +1054,10 @@ function DealIntelCards({ dealId, existingTerms }: { dealId: number; existingTer
               />
               {suggested !== null && (
                 <div className="mt-3 rounded-lg border border-border/60 bg-muted/40 p-2.5">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Suggested terms — review before using</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Suggested terms: review before using</p>
                   <p className="text-xs whitespace-pre-line mb-2.5">{suggested}</p>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="h-7 text-[11px] font-bold flex-1" onClick={() => { navigator.clipboard.writeText(suggested); toast({ title: "Copied" }); }}>
+                    <Button size="sm" variant="outline" className="h-7 text-[11px] font-bold flex-1" onClick={() => { navigator.clipboard.writeText(suggested); toast({ title: "Terms copied" }); }}>
                       <Copy className="w-3 h-3 mr-1" /> Copy
                     </Button>
                     {canEdit && (
@@ -1063,7 +1067,7 @@ function DealIntelCards({ dealId, existingTerms }: { dealId: number; existingTer
                       </Button>
                     )}
                   </div>
-                  {!canEdit && <p className="text-[10px] text-muted-foreground mt-1.5">This deal is past editing — carry these into your next quotation revision.</p>}
+                  {!canEdit && <p className="text-[10px] text-muted-foreground mt-1.5">Only pending deals can be edited. Copy these terms to use them later.</p>}
                 </div>
               )}
             </CardContent>

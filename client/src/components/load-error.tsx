@@ -17,7 +17,7 @@ export function LoadError({ what, onRetry, retrying, compact }: { what: string; 
       <div className={compact ? "min-w-0 flex-1" : ""}>
         <p className="font-semibold">Couldn't load {what}</p>
         <p className={compact ? "text-muted-foreground" : "mx-auto mt-1 max-w-sm text-sm text-muted-foreground"}>
-          Nothing was changed. Check your connection, then try again.
+          Nothing was changed. Check your internet connection and try again.
         </p>
       </div>
       {onRetry && (

@@ -10,7 +10,7 @@ export function BriefingStart({ onFollowUp }: { onFollowUp: (invoiceNumber: stri
   const { isAuthenticated } = useAuth();
   const { money } = useMoney();
   const [, setLocation] = useLocation();
-  const { data, isLoading } = useQuery<Briefing>({
+  const { data, isLoading, isError } = useQuery<Briefing>({
     queryKey: ["/api/copilot/briefing"],
     queryFn: getQueryFn({ on401: "returnNull" }) as any,
     enabled: isAuthenticated,
@@ -18,7 +18,7 @@ export function BriefingStart({ onFollowUp }: { onFollowUp: (invoiceNumber: stri
   });
   return (
     <div className="mx-auto w-full max-w-3xl px-3 pt-4" data-testid="agent-briefing">
-      <BriefingPanel briefing={data} loading={isLoading} money={money} go={setLocation} onFollowUp={onFollowUp} />
+      <BriefingPanel briefing={data} loading={isLoading} error={isError} money={money} go={setLocation} onFollowUp={onFollowUp} />
     </div>
   );
 }

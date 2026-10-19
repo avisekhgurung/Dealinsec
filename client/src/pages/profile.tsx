@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Upload, ArrowLeft, Edit, LogOut, CreditCard, Copy, Share2, User, Mail, Phone, FileText, Building, MapPin, PenTool, Sparkles, Landmark, Hash, Camera, Crown, Check, Stamp, Settings as SettingsIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { parseApiError } from "@/lib/api-error";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocale, useMoney } from "@/hooks/use-locale";
 import { useLocation, Link } from "wouter";
@@ -25,6 +26,15 @@ import { bankRoutingLabel, taxIdLabel } from "@shared/invoice-tax";
 
 /** Shared with the invoice, which prints this field under the same label. */
 const routingLabel = bankRoutingLabel;
+
+/** What a failed save or upload tells the user: the server's own reason when it gave one, otherwise what happened. */
+function profileErrorText(error: any, fallback: string): string {
+  const parsed = parseApiError(error);
+  if (parsed.error) return parsed.error;
+  if (error instanceof TypeError) return "Couldn't reach DealInSec. Check your internet connection and try again.";
+  if (parsed.status) return fallback;
+  return error?.message || fallback;
+}
 
 // ─── Account-setup stepper ───────────────────────────────────────────────────
 // Clickable progress: each step jumps STRAIGHT into edit mode at its section.
@@ -187,7 +197,7 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      toast({ title: "Invalid File", description: "Please upload an image file (JPG, PNG, etc.)", variant: "destructive" });
+      toast({ title: "That file isn't an image", description: "Choose a JPG or PNG image of your stamp.", variant: "destructive" });
       return;
     }
     setSealFile(file);
@@ -201,8 +211,8 @@ export default function ProfilePage() {
     if (file) {
       if (!file.type.startsWith("image/")) {
         toast({
-          title: "Invalid File",
-          description: "Please upload an image file (JPG, PNG, etc.)",
+          title: "That file isn't an image",
+          description: "Choose a JPG or PNG image of your signature.",
           variant: "destructive",
         });
         return;
@@ -222,7 +232,7 @@ export default function ProfilePage() {
       queryClient.clear();
       window.location.href = "/";
     } catch (error) {
-      toast({ title: "Failed to logout", variant: "destructive" });
+      toast({ title: "Couldn't log out", description: "Couldn't reach DealInSec. Check your internet connection and try again.", variant: "destructive" });
     }
   };
 
@@ -236,7 +246,7 @@ export default function ProfilePage() {
         const sealForm = new FormData();
         sealForm.append("seal", sealFile);
         const sealRes = await fetch("/api/profile/seal", { method: "POST", body: sealForm, credentials: "include" });
-        if (!sealRes.ok) throw new Error("Failed to upload seal");
+        if (!sealRes.ok) throw new Error("Your company stamp couldn't be uploaded, so your profile wasn't saved. Use a JPG or PNG image and try again.");
         companySealPath = (await sealRes.json()).path;
       }
 
@@ -248,7 +258,7 @@ export default function ProfilePage() {
           body: formData,
           credentials: "include",
         });
-        if (!uploadRes.ok) throw new Error("Failed to upload signature");
+        if (!uploadRes.ok) throw new Error("Your signature couldn't be uploaded, so your profile wasn't saved. Use a JPG or PNG image and try again.");
         const uploadData = await uploadRes.json();
         digitalSignaturePath = uploadData.path;
       }
@@ -274,12 +284,12 @@ export default function ProfilePage() {
       });
 
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      toast({ title: "Profile updated successfully!" });
+      toast({ title: "Profile saved" });
       setIsEditing(false);
     } catch (error: any) {
       toast({
-        title: "Failed to update profile",
-        description: error.message || "Please try again",
+        title: "Couldn't save your profile",
+        description: profileErrorText(error, "Your changes weren't saved. Please try again."),
         variant: "destructive",
       });
     } finally {
@@ -340,7 +350,7 @@ export default function ProfilePage() {
               {uploadingCover ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Uploading...
+                  Uploading…
                 </>
               ) : (
                 <>
@@ -360,11 +370,11 @@ export default function ProfilePage() {
               const file = e.target.files?.[0];
               if (!file) return;
               if (!file.type.startsWith("image/")) {
-                toast({ title: "Invalid file", description: "Upload an image.", variant: "destructive" });
+                toast({ title: "That file isn't an image", description: "Choose a JPG or PNG image.", variant: "destructive" });
                 return;
               }
               if (file.size > 5 * 1024 * 1024) {
-                toast({ title: "File too large", description: "Max 5MB.", variant: "destructive" });
+                toast({ title: "That image is too large", description: "Choose an image under 5 MB.", variant: "destructive" });
                 return;
               }
               setUploadingCover(true);
@@ -376,11 +386,11 @@ export default function ProfilePage() {
                   body: formData,
                   credentials: "include",
                 });
-                if (!res.ok) throw new Error("Upload failed");
+                if (!res.ok) throw new Error("Please try again with a JPG or PNG image under 5 MB.");
                 await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-                toast({ title: "Cover updated" });
+                toast({ title: "Cover image updated" });
               } catch (err: any) {
-                toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+                toast({ title: "Couldn't upload the cover image", description: profileErrorText(err, "Please try again."), variant: "destructive" });
               } finally {
                 setUploadingCover(false);
                 if (coverInputRef.current) coverInputRef.current.value = "";
@@ -413,7 +423,7 @@ export default function ProfilePage() {
                 data-testid="button-edit-profile"
               >
                 <Edit className="h-4 w-4 mr-1.5" />
-                Edit Profile
+                Edit profile
               </Button>
             )}
             <Link href="/settings">
@@ -434,10 +444,10 @@ export default function ProfilePage() {
               className="text-white bg-black/25 hover:bg-black/45 backdrop-blur-sm rounded-full h-9 px-3.5 font-semibold"
               onClick={handleLogout}
               data-testid="button-logout"
-              aria-label="Sign out"
+              aria-label="Log out"
             >
               <LogOut className="h-4 w-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Sign out</span>
+              <span className="hidden sm:inline">Log out</span>
             </Button>
           </div>
         </div>
@@ -491,11 +501,11 @@ export default function ProfilePage() {
               const file = e.target.files?.[0];
               if (!file) return;
               if (!file.type.startsWith("image/")) {
-                toast({ title: "Invalid file", description: "Upload an image.", variant: "destructive" });
+                toast({ title: "That file isn't an image", description: "Choose a JPG or PNG image.", variant: "destructive" });
                 return;
               }
               if (file.size > 5 * 1024 * 1024) {
-                toast({ title: "File too large", description: "Max 5MB.", variant: "destructive" });
+                toast({ title: "That image is too large", description: "Choose an image under 5 MB.", variant: "destructive" });
                 return;
               }
               setUploadingPhoto(true);
@@ -507,11 +517,11 @@ export default function ProfilePage() {
                   body: formData,
                   credentials: "include",
                 });
-                if (!res.ok) throw new Error("Upload failed");
+                if (!res.ok) throw new Error("Please try again with a JPG or PNG image under 5 MB.");
                 await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
                 toast({ title: "Profile photo updated" });
               } catch (err: any) {
-                toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+                toast({ title: "Couldn't upload the profile photo", description: profileErrorText(err, "Please try again."), variant: "destructive" });
               } finally {
                 setUploadingPhoto(false);
                 if (photoInputRef.current) photoInputRef.current.value = "";
@@ -544,9 +554,9 @@ export default function ProfilePage() {
           <div className="glass-card rounded-2xl p-5 lg:p-7 space-y-5 lg:max-w-3xl lg:mx-auto" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border) / 0.5)" }}>
             <div className="flex items-center gap-2 mb-1">
               <Edit className="h-4 w-4 text-primary" />
-              <h3 className="font-semibold text-lg">Edit Profile</h3>
+              <h3 className="font-semibold text-lg">Edit profile</h3>
             </div>
-            <p className="text-sm text-muted-foreground -mt-3">Update your profile information</p>
+            <p className="text-sm text-muted-foreground -mt-3">Keep these up to date. They appear on the agreements and invoices you send.</p>
 
             <section id="profile-section-identity" className="scroll-mt-24 space-y-4">
               <div className="flex items-center gap-2 pt-1">
@@ -555,7 +565,7 @@ export default function ProfilePage() {
               </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="firstName">First name</Label>
                 <Input
                   id="firstName"
                   value={firstName}
@@ -564,7 +574,7 @@ export default function ProfilePage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label htmlFor="lastName">Last name</Label>
                 <Input
                   id="lastName"
                   value={lastName}
@@ -575,7 +585,7 @@ export default function ProfilePage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
+              <Label htmlFor="phone">Phone number</Label>
               <Input
                 id="phone"
                 type="tel"
@@ -601,7 +611,7 @@ export default function ProfilePage() {
               </div>
             {isIndia && (
             <div className="space-y-2">
-              <Label htmlFor="panNumber">PAN Number</Label>
+              <Label htmlFor="panNumber">PAN</Label>
               <Input
                 id="panNumber"
                 value={panNumber}
@@ -615,7 +625,7 @@ export default function ProfilePage() {
 
             {isIndia ? (
             <div className="space-y-2">
-              <Label htmlFor="gstNumber">GST Number</Label>
+              <Label htmlFor="gstNumber">GSTIN <span className="font-normal text-muted-foreground">(optional)</span></Label>
               <Input
                 id="gstNumber"
                 value={gstNumber}
@@ -643,7 +653,7 @@ export default function ProfilePage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="billingAddress">Billing Address</Label>
+              <Label htmlFor="billingAddress">Billing address</Label>
               <Textarea
                 id="billingAddress"
                 value={billingAddress}
@@ -662,12 +672,12 @@ export default function ProfilePage() {
                 <Landmark className="h-4 w-4 text-primary" />
                 <div>
                   <h4 className="font-semibold text-sm">Bank details</h4>
-                  <p className="text-xs text-muted-foreground">Required for invoices — used to receive payments from brands.</p>
+                  <p className="text-xs text-muted-foreground">Needed for invoices, so your clients and brands know where to pay you.</p>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="accountHolderName">Account Holder Name</Label>
+                <Label htmlFor="accountHolderName">Account holder name</Label>
                 <Input
                   id="accountHolderName"
                   value={accountHolderName}
@@ -678,7 +688,7 @@ export default function ProfilePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="accountNumber">Account Number</Label>
+                <Label htmlFor="accountNumber">Account number</Label>
                 {isIndia ? (
                 <Input
                   id="accountNumber"
@@ -733,7 +743,7 @@ export default function ProfilePage() {
                 </div>
                 )}
                 <div className="space-y-2">
-                  <Label htmlFor="bankName">Bank Name</Label>
+                  <Label htmlFor="bankName">Bank name</Label>
                   <Input
                     id="bankName"
                     value={bankName}
@@ -749,8 +759,8 @@ export default function ProfilePage() {
               <div className="flex items-center gap-2 pt-1">
                 <PenTool className="h-4 w-4 text-primary" />
                 <div>
-                  <h4 className="font-semibold text-sm">Digital Signature</h4>
-                  <p className="text-xs text-muted-foreground">Auto-applied to every agreement you create.</p>
+                  <h4 className="font-semibold text-sm">Digital signature</h4>
+                  <p className="text-xs text-muted-foreground">Added automatically to every agreement you create.</p>
                 </div>
               </div>
               <div className="border-2 border-dashed border-border rounded-xl p-4">
@@ -786,7 +796,7 @@ export default function ProfilePage() {
                       data-testid="button-upload-signature"
                     >
                       <Upload className="h-4 w-4 mr-2" />
-                      Upload Signature
+                      Upload signature
                     </Button>
                     <input
                       ref={fileInputRef}
@@ -804,7 +814,7 @@ export default function ProfilePage() {
               <div className="flex items-center gap-2 pt-1">
                 <Stamp className="h-4 w-4 text-primary" />
                 <div>
-                  <h4 className="font-semibold text-sm">Company Stamp <span className="font-normal text-muted-foreground">(optional)</span></h4>
+                  <h4 className="font-semibold text-sm">Company stamp <span className="font-normal text-muted-foreground">(optional)</span></h4>
                   <p className="text-xs text-muted-foreground">
                     Your business rubber stamp. Printed beside your signature on agreements and invoices.
                   </p>
@@ -830,14 +840,14 @@ export default function ProfilePage() {
                       data-testid="button-upload-seal"
                     >
                       <Upload className="h-4 w-4 mr-2" />
-                      Upload Stamp
+                      Upload stamp
                     </Button>
                     <input ref={sealInputRef} type="file" accept="image/*" onChange={handleSealUpload} className="hidden" />
                   </div>
                 )}
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                This is your own business stamp — it is not stamp duty. Stamp duty is paid separately to the
+                This is your own business stamp, not stamp duty. Stamp duty is paid separately to the
                 government; you can record an e-stamp certificate on each agreement.
               </p>
             </section>
@@ -858,7 +868,7 @@ export default function ProfilePage() {
                 disabled={isLoading}
                 data-testid="button-save-profile"
               >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save changes"}
               </Button>
             </div>
           </div>
@@ -869,7 +879,7 @@ export default function ProfilePage() {
             <div className="glass-card rounded-2xl p-5 border-0" style={{ background: "linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.8) 100%)" }}>
               <div className="flex items-center gap-2 mb-4">
                 <User className="h-4 w-4 text-primary" />
-                <h3 className="font-semibold">Personal Info</h3>
+                <h3 className="font-semibold">Personal info</h3>
               </div>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
@@ -877,7 +887,7 @@ export default function ProfilePage() {
                     <User className="h-4 w-4 text-primary" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">Full Name</p>
+                    <p className="text-xs text-muted-foreground">Full name</p>
                     <p className="font-medium truncate">{fullName}</p>
                   </div>
                 </div>
@@ -906,7 +916,7 @@ export default function ProfilePage() {
             <div className="glass-card rounded-2xl p-5 border-0" style={{ background: "linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.8) 100%)" }}>
               <div className="flex items-center gap-2 mb-4">
                 <Building className="h-4 w-4 text-primary" />
-                <h3 className="font-semibold">Business Info</h3>
+                <h3 className="font-semibold">Business info</h3>
               </div>
               <div className="space-y-3">
                 {isIndia && (
@@ -915,7 +925,7 @@ export default function ProfilePage() {
                     <FileText className="h-4 w-4 text-primary" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">PAN Number</p>
+                    <p className="text-xs text-muted-foreground">PAN</p>
                     <p className="font-medium" data-testid="text-pan">{user?.panNumber || "Not set"}</p>
                   </div>
                 </div>
@@ -925,7 +935,7 @@ export default function ProfilePage() {
                     <FileText className="h-4 w-4 text-primary" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">{isIndia ? "GST Number" : taxIdLabel(docCountry)}</p>
+                    <p className="text-xs text-muted-foreground">{isIndia ? "GSTIN" : taxIdLabel(docCountry)}</p>
                     <p className="font-medium" data-testid="text-gst">{user?.gstNumber || "Not set"}</p>
                   </div>
                 </div>
@@ -934,9 +944,9 @@ export default function ProfilePage() {
                     <MapPin className="h-4 w-4 text-primary" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">Billing Address</p>
+                    <p className="text-xs text-muted-foreground">Billing address</p>
                     <p className="font-medium whitespace-pre-wrap" data-testid="text-billing-address">
-                      {(user as any)?.billingAddress || "Not provided"}
+                      {(user as any)?.billingAddress || "Not set"}
                     </p>
                   </div>
                 </div>
@@ -948,7 +958,7 @@ export default function ProfilePage() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Landmark className="h-4 w-4 text-primary" />
-                  <h3 className="font-semibold">Bank Details</h3>
+                  <h3 className="font-semibold">Bank details</h3>
                 </div>
                 {!(user as any)?.accountNumber && (
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-amber-600 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 px-2 py-0.5 rounded">
@@ -962,7 +972,7 @@ export default function ProfilePage() {
                     <User className="h-4 w-4 text-primary" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">Account Holder</p>
+                    <p className="text-xs text-muted-foreground">Account holder</p>
                     <p className="font-medium" data-testid="text-account-holder">{(user as any)?.accountHolderName || "Not set"}</p>
                   </div>
                 </div>
@@ -971,7 +981,7 @@ export default function ProfilePage() {
                     <Hash className="h-4 w-4 text-primary" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">Account Number</p>
+                    <p className="text-xs text-muted-foreground">Account number</p>
                     <p className="font-medium font-mono" data-testid="text-account-number">
                       {(user as any)?.accountNumber
                         ? `${"•".repeat(Math.max(0, (user as any).accountNumber.length - 4))}${(user as any).accountNumber.slice(-4)}`
@@ -993,7 +1003,7 @@ export default function ProfilePage() {
                     <Building className="h-4 w-4 text-primary" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">Bank Name</p>
+                    <p className="text-xs text-muted-foreground">Bank name</p>
                     <p className="font-medium" data-testid="text-bank-name">{(user as any)?.bankName || "Not set"}</p>
                   </div>
                 </div>
@@ -1005,7 +1015,7 @@ export default function ProfilePage() {
               <div className="glass-card rounded-2xl p-5 border-0" style={{ background: "linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.8) 100%)" }}>
                 <div className="flex items-center gap-2 mb-4">
                   <PenTool className="h-4 w-4 text-primary" />
-                  <h3 className="font-semibold">Digital Signature</h3>
+                  <h3 className="font-semibold">Digital signature</h3>
                 </div>
                 <div className="rounded-xl bg-white p-4 flex items-center justify-center">
                   <img
@@ -1024,7 +1034,7 @@ export default function ProfilePage() {
               <div className="glass-card rounded-2xl p-5 border-0" style={{ background: "linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.8) 100%)" }}>
                 <div className="flex items-center gap-2 mb-4">
                   <Stamp className="h-4 w-4 text-primary" />
-                  <h3 className="font-semibold">Company Stamp</h3>
+                  <h3 className="font-semibold">Company stamp</h3>
                 </div>
                 <div className="rounded-xl bg-white p-4 flex items-center justify-center">
                   <img
@@ -1083,7 +1093,7 @@ export default function ProfilePage() {
                       data-testid="button-upgrade"
                     >
                       <CreditCard className="h-4 w-4 mr-2" />
-                      {hasActivePro(user) ? "Manage Plan" : "Upgrade"}
+                      {hasActivePro(user) ? "Manage plan" : "Upgrade"}
                     </Button>
                   </Link>
                 </div>

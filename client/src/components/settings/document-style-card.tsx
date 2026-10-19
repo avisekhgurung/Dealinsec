@@ -25,7 +25,7 @@ export function DocumentStyleCard({ canEdit }: { canEdit: boolean }) {
     onError: (e) => {
       const msg = parseApiError(e).error ?? "";
       if (/already how/.test(msg)) { toast({ title: "Nothing changed" }); return; }
-      toast({ title: "Couldn't save", description: msg || "Try again.", variant: "destructive" });
+      toast({ title: "Couldn't save the document style", description: msg || "Nothing was changed. Please try again.", variant: "destructive" });
     },
   });
 

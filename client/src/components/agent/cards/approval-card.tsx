@@ -50,7 +50,7 @@ export function ApprovalCard({
 
   return (
     <CardShell
-      label={status === "done" ? "Done" : status === "declined" ? "Declined" : status === "expired" ? "Expired" : "Needs your approval"}
+      label={status === "done" ? "Approved" : status === "declined" ? "Declined" : status === "expired" ? "Expired" : status === "executing" ? "In progress" : "Waiting for your approval"}
       icon={status === "done" ? <Check className="h-3 w-3" /> : status === "declined" || status === "expired" ? <X className="h-3 w-3" /> : <ShieldCheck className="h-3 w-3" />}
       tone={status === "done" ? "emerald" : status === "declined" || status === "expired" ? "neutral" : important ? "amber" : "emerald"}
       testId="approval-card"
@@ -99,7 +99,7 @@ export function ApprovalCard({
         )}
         {(status === "expired" || status === "declined") && (
           <p className="text-xs text-muted-foreground">
-            {status === "expired" ? "This request expired. Ask me again and I'll prepare it fresh." : "You declined this. Nothing was changed."}
+            {status === "expired" ? "This request expired. Ask again and it will be prepared fresh." : "You declined this. Nothing was changed."}
           </p>
         )}
         {status === "done" && view?.route && (

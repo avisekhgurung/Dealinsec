@@ -587,10 +587,10 @@ function ctaBand(): string {
   return `<div class="cta-band"><div class="wrap">
     <div class="cta-ico">${clock}</div>
     <div class="cta-copy">
-      <h2>Find Clients. Close Deals. Get Paid.</h2>
+      <h2>Find clients. Win deals. Get paid.</h2>
       <p>For small agencies, consultants and freelancers, wherever you bill from: research prospects with evidence, then quotation, an agreement signed online, invoice and payment tracking for each client, in your own currency. Free to start, with no card, in every country. Paid plans can currently be bought in India (₹${PRICING.proMonthlyInr}/month).</p>
     </div>
-    <a class="btn" href="${APP_LINK}" data-cta>Start free →</a>
+    <a class="btn" href="${APP_LINK}" data-cta>Get started free →</a>
   </div></div>`;
 }
 
@@ -644,7 +644,7 @@ function footer(): string {
       ${SOCIALS}
     </div>
     ${consentBanner()}
-    <div class="muted">© ${y} DealInSec — find clients, close deals and get paid. For small agencies, consultants and freelancers. These free tools run in your browser; nothing you enter is stored on our servers.</div>
+    <div class="muted">© ${y} DealInSec — find clients, win deals and get paid. For freelancers, consultants and small agencies. These free tools run in your browser; nothing you enter is stored on our servers.</div>
   </div></footer>`;
 }
 

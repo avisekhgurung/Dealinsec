@@ -112,11 +112,11 @@ export default function LeadDetailsPage() {
   useEffect(() => { setDealAmount(lead?.estValueMinor ? input(lead.estValueMinor) : ""); }, [lead?.id, lead?.estValueMinor]);
 
   const done = (title: string) => { refreshLeads(); toast({ title }); };
-  const fail = (e: unknown) => toast({ title: "Couldn't do that", description: leadError(e), variant: "destructive" });
+  const fail = (e: unknown) => toast({ title: "Couldn't save that change", description: leadError(e), variant: "destructive" });
 
   const move = useMutation({
     mutationFn: (v: { status: LeadStatus; lostReason?: string }) => leadCall("POST", `/api/leads/${id}/move`, v),
-    onSuccess: (_r, v) => { trackEvent("lead_stage_changed", { to_stage: v.status }); setLostFor(false); setLostReason(""); done(`Moved to ${stageLabel(v.status)}`); },
+    onSuccess: (_r, v) => { trackEvent("lead_stage_changed", { to_stage: v.status }); setLostFor(false); setLostReason(""); done(`Lead moved to ${stageLabel(v.status)}`); },
     onError: fail,
   });
   const addNote = useMutation({ mutationFn: () => leadCall("POST", `/api/leads/${id}/notes`, { text: note }), onSuccess: () => { setNote(""); done("Note added"); }, onError: fail });
@@ -126,7 +126,7 @@ export default function LeadDetailsPage() {
   });
   const closeTicket = useMutation({
     mutationFn: (v: { tid: number; status: "done" | "cancelled" }) => leadCall("PATCH", `/api/leads/${id}/tickets/${v.tid}`, { status: v.status }),
-    onSuccess: (_r, v) => { if (v.status === "done") trackEvent("lead_ticket_done"); done(v.status === "done" ? "Marked done" : "Cancelled"); }, onError: fail,
+    onSuccess: (_r, v) => { if (v.status === "done") trackEvent("lead_ticket_done"); done(v.status === "done" ? "Step marked done" : "Step cancelled"); }, onError: fail,
   });
   const addClaim = useMutation({
     mutationFn: () => leadCall("POST", `/api/leads/${id}/claims`, {
@@ -153,8 +153,8 @@ export default function LeadDetailsPage() {
       const amount = Number(dealAmount.replace(/,/g, ""));
       return leadCall<{ dealId: number; route: string }>("POST", `/api/leads/${id}/convert`, { ...(amount > 0 ? { dealAmount: amount } : {}), ...(dealTitle.trim() ? { dealTitle: dealTitle.trim() } : {}) });
     },
-    onSuccess: (r) => { trackEvent("lead_converted"); refreshLeads(); setDealOpen(false); toast({ title: "Deal created", description: "The lead is marked Won." }); setLocation(r.route || `/deals/${r.dealId}`); },
-    onError: (e) => setDealError(leadError(e, "Couldn't create the deal.")),
+    onSuccess: (r) => { trackEvent("lead_converted"); refreshLeads(); setDealOpen(false); toast({ title: "Deal created", description: "The lead is now marked as won. Next, prepare a quotation from the deal." }); setLocation(r.route || `/deals/${r.dealId}`); },
+    onError: (e) => setDealError(leadError(e, "Couldn't create the deal. Please try again.")),
   });
 
   const backBar = (
@@ -279,7 +279,7 @@ export default function LeadDetailsPage() {
                 </div>
                 {data.canConvert && (
                   <Button className="gradient-btn w-full text-white sm:w-auto" onClick={() => { setDealError(null); setDealOpen(true); }} data-testid="button-create-deal">
-                    <Handshake className="mr-1.5 h-4 w-4" />Won it: create the deal
+                    <Handshake className="mr-1.5 h-4 w-4" />Mark won and create deal
                   </Button>
                 )}
               </div>
@@ -358,7 +358,7 @@ export default function LeadDetailsPage() {
                 </form>
               </CardContent></Card>
             )}
-            {openTickets.length === 0 && <p className="px-1 text-sm text-muted-foreground">No open steps.{open ? " Add the next thing to do on this lead." : ""}</p>}
+            {openTickets.length === 0 && <p className="px-1 text-sm text-muted-foreground">No open steps.{open ? " Add the next thing you plan to do for this lead." : ""}</p>}
             <ul className="space-y-2">
               {openTickets.map((t) => (
                 <li key={t.id} className="flex items-center justify-between gap-3 rounded-xl border bg-background p-3" data-testid={`ticket-${t.id}`}>
@@ -468,7 +468,7 @@ export default function LeadDetailsPage() {
 
       <Dialog open={lostFor} onOpenChange={setLostFor}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Mark as lost</DialogTitle><DialogDescription>You can reopen it later. A short reason helps you remember why.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Mark {lead.companyName} as lost?</DialogTitle><DialogDescription>You can reopen this lead later. A short reason helps you remember what happened.</DialogDescription></DialogHeader>
           <Input placeholder="Reason (optional)" value={lostReason} maxLength={300} onChange={(e) => setLostReason(e.target.value)} data-testid="input-lost-reason" />
           <DialogFooter><Button variant="outline" onClick={() => setLostFor(false)}>Cancel</Button>
             <Button disabled={move.isPending} onClick={() => move.mutate({ status: "lost", ...(lostReason.trim() ? { lostReason: lostReason.trim() } : {}) })} data-testid="button-confirm-lost">Mark lost</Button></DialogFooter>
@@ -477,7 +477,7 @@ export default function LeadDetailsPage() {
 
       <Dialog open={dealOpen} onOpenChange={setDealOpen}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Create the deal</DialogTitle><DialogDescription>This creates a pending deal for {lead.companyName} and marks the lead Won. Nothing is sent to them.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Create deal from this lead</DialogTitle><DialogDescription>This creates a pending deal for {lead.companyName} and marks the lead as won. Nothing is sent to the client.</DialogDescription></DialogHeader>
           <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); setDealError(null); convert.mutate(); }}>
             <div className="space-y-1.5"><Label htmlFor="deal-amount" className="text-xs">Deal amount *</Label>
               <Input id="deal-amount" inputMode="decimal" value={dealAmount} onChange={(e) => setDealAmount(e.target.value)} placeholder="50000" data-testid="input-deal-amount" /></div>

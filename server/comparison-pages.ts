@@ -461,7 +461,7 @@ ${METHODOLOGY([vendor("bonsai")])}`,
     description:
       "About DealInSec: a client-acquisition and deal-to-payment workspace for freelancers, consultants and small B2B service agencies. Who makes it, what it does and doesn't do, where paid plans are available, and how our guides are written.",
     h1: "About DealInSec",
-    sub: `${ONE_LINER} It helps founder-led agencies and consultants find clients, close deals and get paid — built and run by an independent founder.`,
+    sub: `${ONE_LINER} It helps freelancers, consultants and small agencies find clients, win deals and get paid — built and run by an independent founder.`,
     chips: ["Independent founder", "Agencies and consultants in any country", "50 currencies", "Free plan, no card"],
     shortLabel: "About DealInSec",
     extraJsonLd: [

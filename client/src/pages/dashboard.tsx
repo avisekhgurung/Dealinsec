@@ -58,7 +58,7 @@ function TeamSeatsCard() {
         <Link href="/settings">
           <Button variant="outline" size="sm" className="flex-shrink-0" data-testid="dashboard-invite-member">
             <UserPlus2 className="w-3.5 h-3.5 mr-1.5" />
-            Invite Member
+            Invite member
           </Button>
         </Link>
       </CardContent>
@@ -125,7 +125,7 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
             </p>
           </div>
           <Link href="/pricing">
-            <Button variant="outline" size="sm" className="flex-shrink-0">Go Pro</Button>
+            <Button variant="outline" size="sm" className="flex-shrink-0">Upgrade to Pro</Button>
           </Link>
         </CardContent>
       </Card>
@@ -149,7 +149,7 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
             Free plan
           </p>
           <p className="text-xs text-muted-foreground">
-            Upgrade for unlimited deals, signed agreements, invoices &amp; payment tracking
+            Upgrade to Pro for unlimited deals, agreements with online signing, invoices and payment tracking
           </p>
         </div>
         <Link href="/pricing" onClick={() => trackEvent("upgrade_clicked", { source: "dashboard" })}>
@@ -573,7 +573,7 @@ export default function DashboardPage() {
   // Invoices recorded as paid (never "issued" = paid); see shared/invoice-stats.ts.
   const invStats = invoiceStats(brandInvoices);
   // A role without invoice access gets 403; anything else is a load failure. Either way the number is unknown, not 0.
-  const invoicesUnavailable = invoicesFailed ? (String((invoicesError as Error | null)?.message ?? "").startsWith("403") ? "no access" : "couldn't load") : undefined;
+  const invoicesUnavailable = invoicesFailed ? (String((invoicesError as Error | null)?.message ?? "").startsWith("403") ? "No access" : "Couldn't load") : undefined;
   // Minor units throughout; formatted only where they reach the screen.
   const totalRevenueMinor = deals
     .filter(d => d.status === "Completed" || d.status === "Active")
@@ -606,14 +606,14 @@ export default function DashboardPage() {
   const profileChecklist = useMemo(() => [
     // Deep links land straight in EDIT mode on the right section — never on
     // the read-only page with an Edit button to hunt for.
-    { key: "billingAddress",     label: "Billing address",  icon: MapPin,      done: Boolean(user?.billingAddress),     href: "/profile?edit=1&section=business",  hint: "Appears on every invoice" },
+    { key: "billingAddress",     label: "Billing address",  cta: "Add billing address", icon: MapPin,      done: Boolean(user?.billingAddress),     href: "/profile?edit=1&section=business",  hint: "Printed on every invoice" },
     // PAN is an Indian tax ID. Outside India profile.tsx hides the field, so
     // the task could never be completed and would nag forever.
     ...(fmt.settings.country === "IN"
-      ? [{ key: "panNumber",     label: "PAN number",       icon: FileText,    done: Boolean(user?.panNumber),          href: "/profile?edit=1&section=business",  hint: "Required for contracts & GST" }]
+      ? [{ key: "panNumber",     label: "PAN number",       cta: "Add PAN number", icon: FileText,    done: Boolean(user?.panNumber),          href: "/profile?edit=1&section=business",  hint: "Printed on your agreements" }]
       : []),
-    { key: "digitalSignature",   label: "Digital signature",icon: PenTool,     done: Boolean(user?.digitalSignature),   href: "/profile?edit=1&section=signature", hint: "Auto-applied on agreements" },
-    { key: "bank",               label: "Bank details",     icon: Landmark,    done: Boolean(user?.accountNumber && user?.ifscCode && user?.accountHolderName), href: "/profile?edit=1&section=bank", hint: "So clients can pay you" },
+    { key: "digitalSignature",   label: "Signature",        cta: "Add your signature", icon: PenTool,     done: Boolean(user?.digitalSignature),   href: "/profile?edit=1&section=signature", hint: "Added to your agreements for you" },
+    { key: "bank",               label: "Bank details",     cta: "Add bank details", icon: Landmark,    done: Boolean(user?.accountNumber && user?.ifscCode && user?.accountHolderName), href: "/profile?edit=1&section=bank", hint: "Printed on invoices so clients know where to pay" },
   ], [fmt.settings.country, user?.billingAddress, user?.panNumber, user?.digitalSignature, user?.accountNumber, user?.ifscCode, user?.accountHolderName]);
 
   const profileDone = profileChecklist.filter(i => i.done).length;
@@ -674,7 +674,7 @@ export default function DashboardPage() {
                       </span>
                     </div>
                     <p className="text-xs lg:text-sm text-muted-foreground leading-snug">
-                      Add these so your first deal, contract & invoice go through without interruption.
+                      Add these details once and every agreement and invoice you create will include them.
                     </p>
                   </div>
                 </div>
@@ -743,7 +743,7 @@ export default function DashboardPage() {
                     className="mt-3 lg:mt-4 w-full sm:w-auto gradient-btn text-white"
                     data-testid="complete-profile-cta"
                   >
-                    Complete {profileIncomplete[0].label.toLowerCase()}
+                    {profileIncomplete[0].cta}
                     <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
                 </Link>
@@ -761,14 +761,14 @@ export default function DashboardPage() {
         <UserCircle className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
         <p className="min-w-[11rem] flex-1 text-sm font-semibold text-foreground">
           Finish your profile <span className="tabular-nums text-amber-700 dark:text-amber-400">({profileDone}/{profileTotal})</span>
-          <span className="ml-2 hidden font-normal text-muted-foreground sm:inline">so invoices and agreements go through without interruption</span>
+          <span className="ml-2 hidden font-normal text-muted-foreground sm:inline">so your agreements and invoices include your business details</span>
         </p>
         <div className="hidden h-1.5 w-28 overflow-hidden rounded-full bg-amber-200/60 dark:bg-amber-900/40 sm:block" aria-hidden="true">
           <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500" style={{ width: `${profilePct}%` }} />
         </div>
         <Link href={profileIncomplete[0].href} className="order-last w-full sm:order-none sm:w-auto">
           <Button size="sm" className="gradient-btn w-full text-white sm:w-auto" data-testid="complete-profile-cta">
-            Complete {profileIncomplete[0].label.toLowerCase()}
+            {profileIncomplete[0].cta}
             <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         </Link>
@@ -794,22 +794,22 @@ export default function DashboardPage() {
         <section className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4">
           <StatCard title="Deals" value={totalDeals} icon={Briefcase}
             tone="amber" href="/deals" loading={isLoading}
-            sub={dealsThisMonth > 0 ? `${dealsThisMonth} this month` : totalDeals > 0 ? "in your pipeline" : "none yet"}
+            sub={dealsThisMonth > 0 ? `${dealsThisMonth} this month` : totalDeals > 0 ? "in your pipeline" : "None yet"}
             trendUp={dealsThisMonth > 0} />
           <StatCard title="Quotations" value={quotes.length} icon={FileText}
             tone="slate" href="/quotations" loading={isLoading}
-            sub={quotesThisMonth > 0 ? `${quotesThisMonth} this month` : quotes.length > 0 ? "issued so far" : "none yet"}
+            sub={quotesThisMonth > 0 ? `${quotesThisMonth} this month` : quotes.length > 0 ? "created so far" : "None yet"}
             trendUp={quotesThisMonth > 0} />
           <StatCard title="Agreements" value={signedContracts} icon={FileCheck}
             tone="blue" href="/contracts" loading={isLoading}
-            sub={allSigned ? "All signed" : signedContracts > 0 ? `${signedContracts} signed` : "none yet"} />
-          <StatCard title="Paid Invoices" value={invStats.paid} icon={Receipt}
+            sub={allSigned ? "All signed" : signedContracts > 0 ? `${signedContracts} signed` : contracts.length > 0 ? "None signed yet" : "None yet"} />
+          <StatCard title="Paid invoices" value={invStats.paid} icon={Receipt}
             tone="emerald" href="/invoices" loading={isLoading} unavailable={invoicesUnavailable}
             sub={paidInvoicesSubline(invStats)}
             trendUp={invStats.overdue === 0 && invStats.paidThisWeek > 0} />
           <div className="col-span-2 lg:col-span-1">
           <StatCard
-            title="Pipeline Value"
+            title="Pipeline value"
             value={totalRevenueMinor + pendingRevenueMinor}
             format={(n) => moneyFrame(n, totalRevenueMinor + pendingRevenueMinor, fmt)}
             icon={pipelineIcon(fmt)}
@@ -817,7 +817,7 @@ export default function DashboardPage() {
             href="/deals"
             loading={isLoading}
             sub={totalRevenueMinor > 0
-              ? `${compactMoney(totalRevenueMinor, fmt)} earned${pendingRevenueMinor > 0 ? ` · ${compactMoney(pendingRevenueMinor, fmt)} due` : ""}`
+              ? `${compactMoney(totalRevenueMinor, fmt)} confirmed${pendingRevenueMinor > 0 ? ` · ${compactMoney(pendingRevenueMinor, fmt)} pending` : ""}`
               : pendingRevenueMinor > 0
                 ? `${compactMoney(pendingRevenueMinor, fmt)} pending`
                 : `${activeDealsCount} active deal${activeDealsCount !== 1 ? "s" : ""}`}
@@ -845,9 +845,9 @@ export default function DashboardPage() {
               <CardContent className="p-4 lg:p-6">
                 <div className="flex items-center justify-between mb-3 lg:mb-4 flex-wrap gap-2">
                   <div>
-                    <h3 className="text-sm lg:text-base font-semibold text-foreground">Deal Status</h3>
+                    <h3 className="text-sm lg:text-base font-semibold text-foreground">Deal status</h3>
                     <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">
-                      Distribution of {totalDeals} deal{totalDeals !== 1 ? "s" : ""} by status
+                      Your {totalDeals} deal{totalDeals !== 1 ? "s" : ""} by status
                     </p>
                   </div>
                   <Link href="/deals">
@@ -926,19 +926,19 @@ export default function DashboardPage() {
                 {/* Revenue trend — single series, the title names it */}
                 <Card className="glass-card border-0 lg:col-span-2">
                   <CardHeader className="pb-1 px-4 pt-4 lg:px-6 lg:pt-6">
-                    <CardTitle className="text-sm lg:text-base font-semibold">Revenue Trend</CardTitle>
-                    <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Deal value by start month · last 6 months</p>
+                    <CardTitle className="text-sm lg:text-base font-semibold">Deal value by month</CardTitle>
+                    <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Total deal value by start month · last 6 months</p>
                   </CardHeader>
                   <CardContent className="px-2 pb-4 lg:px-4 lg:pb-6">
                     {!revenue.some((r) => r.amount > 0) ? (
                       <ChartEmpty
                         icon={TrendingUp}
-                        title="No revenue yet"
-                        hint="Your deal values chart here month by month once you create your first deal."
+                        title="No deal value yet"
+                        hint="Create your first deal to see its value here, month by month."
                         cta={canCreateDeal ? (
                           <Link href="/deals/new">
                             <Button size="sm" className="gradient-btn text-white h-8 text-xs font-semibold">
-                              <Plus className="w-3.5 h-3.5 mr-1" /> New Deal
+                              <Plus className="w-3.5 h-3.5 mr-1" /> Create deal
                             </Button>
                           </Link>
                         ) : undefined}
@@ -958,7 +958,7 @@ export default function DashboardPage() {
                           <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false}
                             tickFormatter={(v: number) => compactAmount(v, fmt)} />
                           <Tooltip content={<CustomTooltip format={fmt.money} />} />
-                          <Area type="monotone" dataKey="amount" name="Revenue" stroke="#059669" strokeWidth={2}
+                          <Area type="monotone" dataKey="amount" name="Deal value" stroke="#059669" strokeWidth={2}
                             fill="url(#dis-rev-fill)" dot={{ r: 3, fill: "#059669", strokeWidth: 2, stroke: "hsl(var(--background))" }}
                             activeDot={{ r: 5 }} />
                         </AreaChart>
@@ -972,20 +972,20 @@ export default function DashboardPage() {
                 <Card className="glass-card border-0">
                   <CardHeader className="pb-1 px-4 pt-4 lg:px-6 lg:pt-6">
                     <div className="flex items-center justify-between gap-2">
-                      <CardTitle className="text-sm lg:text-base font-semibold">Monthly Activity</CardTitle>
+                      <CardTitle className="text-sm lg:text-base font-semibold">Monthly activity</CardTitle>
                       <span className="flex items-center gap-3 text-[10px] font-medium text-muted-foreground">
                         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-[#059669]" /> Deals</span>
-                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-[#F59E0B]" /> Quotes</span>
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-[#F59E0B]" /> Quotations</span>
                       </span>
                     </div>
-                    <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Created per month · last 6 months</p>
+                    <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Deals and quotations created · last 6 months</p>
                   </CardHeader>
                   <CardContent className="px-2 pb-4 lg:px-4 lg:pb-6">
                     {!activity.some((m) => m.deals + m.quotations > 0) ? (
                       <ChartEmpty
                         icon={Briefcase}
-                        title="Nothing this half-year"
-                        hint="Deals you create and quotations you generate are counted here by month."
+                        title="No activity in the last 6 months"
+                        hint="Create a deal or a quotation and it will be counted here by month."
                       />
                     ) : (
                     <div className="h-[200px] lg:h-[230px]">
@@ -1010,8 +1010,8 @@ export default function DashboardPage() {
                 <CardContent className="p-4 lg:p-6">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h3 className="text-sm lg:text-base font-semibold text-foreground">Pipeline Conversion</h3>
-                      <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">How deals progress through the workflow</p>
+                      <h3 className="text-sm lg:text-base font-semibold text-foreground">Pipeline conversion</h3>
+                      <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">How many of your deals reach each stage</p>
                     </div>
                     <ArrowUpRight className="w-4 h-4 text-muted-foreground/50 hidden lg:block" />
                   </div>
@@ -1020,7 +1020,7 @@ export default function DashboardPage() {
                       compact
                       icon={FileCheck}
                       title="Your pipeline starts with a deal"
-                      hint="Deal → Quotation → Agreement → Invoice → Paid. Conversion between stages shows here."
+                      hint="Deal → Quotation → Agreement → Invoice → Paid. Create a deal to see how many reach each stage."
                     />
                   ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 lg:gap-4">
@@ -1072,7 +1072,7 @@ export default function DashboardPage() {
               const unpaidCount = brandInvoices.length - paidCount;
               const moneyPie = totalInvoiceValueMinor > 0
                 ? [
-                    { name: "Received", value: paidValueMinor, fill: "#10B981", count: paidCount },
+                    { name: "Paid", value: paidValueMinor, fill: "#10B981", count: paidCount },
                     { name: "Pending",  value: unpaidValueMinor, fill: "#F59E0B", count: unpaidCount },
                   ].filter(s => s.value > 0)
                 : [];
@@ -1084,8 +1084,8 @@ export default function DashboardPage() {
                     return (
                     <Card className="glass-card border-0">
                       <CardHeader className="pb-1 px-4 pt-4 lg:px-6 lg:pt-6">
-                        <CardTitle className="text-sm lg:text-base font-semibold">Deliverables by Category</CardTitle>
-                        <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Deliverables across platforms / categories</p>
+                        <CardTitle className="text-sm lg:text-base font-semibold">Deliverables by category</CardTitle>
+                        <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">How your deliverables split across categories</p>
                       </CardHeader>
                       <CardContent className="px-4 pb-5 lg:px-6 lg:pb-6">
                         <div className="flex flex-col xl:flex-row items-center gap-4 xl:gap-6">
@@ -1129,9 +1129,9 @@ export default function DashboardPage() {
                   {moneyPie.length > 0 && (
                     <Card className="glass-card border-0">
                       <CardHeader className="pb-1 px-4 pt-4 lg:px-6 lg:pt-6">
-                        <CardTitle className="text-sm lg:text-base font-semibold">Invoice Status</CardTitle>
+                        <CardTitle className="text-sm lg:text-base font-semibold">Invoice status</CardTitle>
                         <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">
-                          Invoices by amount · {brandInvoices.length} total
+                          By amount · {brandInvoices.length} invoice{brandInvoices.length !== 1 ? "s" : ""}
                         </p>
                       </CardHeader>
                       <CardContent className="px-4 pb-5 lg:px-6 lg:pb-6">
@@ -1203,8 +1203,8 @@ export default function DashboardPage() {
           <Card className="glass-card border-0 overflow-hidden">
             <div className="flex items-center justify-between px-4 pt-4 pb-2 lg:px-5 lg:pt-5">
               <div>
-                <h2 className="text-sm lg:text-base font-semibold text-foreground">Recent Deals</h2>
-                <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Your latest pipeline activity</p>
+                <h2 className="text-sm lg:text-base font-semibold text-foreground">Recent deals</h2>
+                <p className="text-[11px] lg:text-xs text-muted-foreground mt-0.5">Your latest deals</p>
               </div>
               <Link href="/deals">
                 <Button variant="ghost" size="sm" className="text-primary text-xs lg:text-sm h-7 lg:h-8 hover:text-primary">
@@ -1284,6 +1284,7 @@ export default function DashboardPage() {
             <h1 className="text-lg lg:text-2xl font-bold tracking-tight">
               {greeting}, {firstNameOnly}
             </h1>
+            <p className="hidden sm:block text-sm text-muted-foreground">Here's what needs your attention today.</p>
           </div>
           <div className="flex items-center gap-2 lg:gap-3">
             {/* Secondary, desktop only: mobile already has Outbound in the bottom bar. */}
@@ -1315,6 +1316,7 @@ export default function DashboardPage() {
               variant="ghost"
               size="icon"
               onClick={handleLogout}
+              aria-label="Log out"
               data-testid="button-logout"
               className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 lg:hidden"
             >
@@ -1329,7 +1331,7 @@ export default function DashboardPage() {
           // Everything that counts or charts deals is left out until they load.
           <>
             <Card className="glass-card">
-              <LoadError what="your dashboard" compact onRetry={() => void refetchDeals()} retrying={dealsFetching} />
+              <LoadError what="your deals" compact onRetry={() => void refetchDeals()} retrying={dealsFetching} />
             </Card>
             <GettingStarted />
             {profileStripEl}

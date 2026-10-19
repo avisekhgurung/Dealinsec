@@ -24,11 +24,18 @@ import { cn } from "@/lib/utils";
 import { BOTS, BOT_IDENTITY, BOT_STATUS_LABEL, isBot, isTerminal, type Bot } from "@shared/ai-league";
 import { leagueCall, leagueEndpoints, refreshLeague, runUrl, useApprovals, useLeagueStatus, useRoster, useRuns, when, type BotCard, type RunView } from "@/lib/ai-league";
 import { Mascot, MascotEmpty, mascotState } from "@/components/ai-league/mascot";
-import { RunDetail, StatusPill } from "@/components/ai-league/run-report";
+import { RunDetail, StatusPill, runStatusLabel } from "@/components/ai-league/run-report";
 import { TaskDialog } from "@/components/ai-league/task-dialog";
 import { ApprovalsPanel, MemoryPanel, SchedulesPanel } from "@/components/ai-league/panels";
 
 type View = "team" | "activity" | "waiting" | "schedules" | "memory";
+/** Mika never sends: said wherever her drafts are offered. */
+const MIKA_SEND_NOTE = "Mika can prepare the draft. Copy it and send it through your email or messaging app.";
+const CHAT_PLACEHOLDER: Record<Bot, string> = {
+  nibo: "Describe the type of client you're looking for…",
+  mika: "Ask Mika to draft a first message…",
+  zee: "Ask Zee what needs attention today…",
+};
 const VIEWS: View[] = ["team", "activity", "waiting", "schedules", "memory"];
 
 export default function AiLeaguePage() {
@@ -85,7 +92,7 @@ function LeagueHome() {
         <div className="flex items-center justify-between gap-4 px-4 py-4 lg:mx-auto lg:max-w-[1400px] lg:px-8">
           <div className="min-w-0">
             <h1 className="text-xl font-bold tracking-tight lg:text-2xl">AI League</h1>
-            <p className="mt-0.5 hidden text-sm text-muted-foreground sm:block">Three AI coworkers who find clients, prepare first messages and keep you on top of your business. They work in the background and ask before anything that matters. Need a quick answer instead? <Link href="/agent" className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400" data-testid="league-ask-agent">Ask DealInSec</Link>.</p>
+            <p className="mt-0.5 hidden text-sm text-muted-foreground sm:block">Your AI coworkers. Get help from Nibo, Mika and Zee: Nibo finds and researches potential clients, Mika prepares outreach drafts for you to check and send yourself, and Zee shows what needs attention across your deals, follow-ups and payments. They work in the background and ask before anything that matters. Need a quick answer instead? <Link href="/agent" className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400" data-testid="league-ask-agent">Ask DealInSec</Link>.</p>
           </div>
           <NotificationBell className="lg:hidden" />
         </div>
@@ -93,7 +100,7 @@ function LeagueHome() {
 
       <main className="space-y-5 px-4 py-5 lg:mx-auto lg:max-w-[1400px] lg:px-8 lg:py-6">
         {status.data && !status.data.ready ? (
-          <div className="rounded-2xl border px-6 py-12 text-center" data-testid="league-not-setup"><p className="font-semibold">AI League isn't switched on yet</p><p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">This workspace's server hasn't been set up for it. Everything else in DealInSec works as usual.</p></div>
+          <div className="rounded-2xl border px-6 py-12 text-center" data-testid="league-not-setup"><p className="font-semibold">AI League isn't switched on yet</p><p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">It hasn't been set up on this server yet. Everything else in DealInSec works as usual.</p></div>
         ) : (
           <>
             <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
@@ -101,7 +108,7 @@ function LeagueHome() {
               tabs={[
                 { value: "team", label: <span className="whitespace-nowrap">Team</span>, testId: "league-view-team" },
                 { value: "activity", label: <span className="whitespace-nowrap">Activity</span>, testId: "league-view-activity" },
-                { value: "waiting", label: <span className="inline-flex items-center gap-1.5 whitespace-nowrap">Waiting{waiting > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white tabular-nums">{waiting}</span>}</span>, testId: "league-view-waiting" },
+                { value: "waiting", label: <span className="inline-flex items-center gap-1.5 whitespace-nowrap">Approvals{waiting > 0 && <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold text-white tabular-nums">{waiting}</span>}</span>, testId: "league-view-waiting" },
                 { value: "schedules", label: <span className="whitespace-nowrap">Schedules</span>, testId: "league-view-schedules" },
                 { value: "memory", label: <span className="whitespace-nowrap"><span className="sm:hidden">Memory</span><span className="hidden sm:inline">Memory &amp; usage</span></span>, testId: "league-view-memory" },
               ]} />
@@ -120,7 +127,7 @@ function LeagueHome() {
                   <span className="flex shrink-0 items-center -space-x-2" aria-hidden>{BOTS.map((b) => <Mascot key={b} bot={b} size={40} className="ring-2 ring-card" />)}</span>
                   <div className="min-w-0 flex-1">
                     <h2 id="huddle-h" className="text-sm font-semibold">Team huddle</h2>
-                    <p className="text-sm text-muted-foreground">Give the team a question. Nibo, Mika and Zee talk it over from their own records and come back with next steps. They also ask each other for help in their chats.</p>
+                    <p className="text-sm text-muted-foreground">Give the team a question. Nibo, Mika and Zee talk it over using your workspace records and come back with suggested next steps. Nothing is changed or sent. They also ask each other for help in their chats.</p>
                   </div>
                   <Button variant="outline" className="h-10 shrink-0" onClick={() => setHuddle(true)} data-testid="start-huddle"><MessagesSquare className="mr-1.5 h-4 w-4" />Start a huddle</Button>
                 </section>
@@ -130,9 +137,9 @@ function LeagueHome() {
                     <RunList limit={6} onOpen={setRunId} empty="Nothing yet. Start a task with any coworker above, or open a chat and ask in your own words." />
                   </section>
                   <section className="rounded-2xl border bg-card p-4" aria-labelledby="waiting-h">
-                    <div className="mb-2 flex items-center justify-between"><h2 id="waiting-h" className="text-sm font-semibold">Waiting for you</h2>{waiting > 0 && <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setView("waiting")}>Review<ChevronRight className="ml-0.5 h-3.5 w-3.5" /></Button>}</div>
+                    <div className="mb-2 flex items-center justify-between"><h2 id="waiting-h" className="text-sm font-semibold">Waiting for your approval</h2>{waiting > 0 && <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setView("waiting")}>Review<ChevronRight className="ml-0.5 h-3.5 w-3.5" /></Button>}</div>
                     {approvals.isLoading ? <div className="h-14 animate-pulse rounded bg-muted" /> : waiting === 0
-                      ? <p className="text-sm text-muted-foreground">Nothing needs your go-ahead right now.</p>
+                      ? <p className="text-sm text-muted-foreground">Nothing is waiting for your approval.</p>
                       : <ul className="space-y-2">{approvals.data!.items.slice(0, 4).map((a) => <li key={`${a.kind}${a.id}`} className="flex items-center gap-2.5 text-sm"><Mascot bot={a.bot} size={24} /><span className="min-w-0 flex-1 truncate">{a.title}</span></li>)}</ul>}
                   </section>
                 </div>
@@ -173,6 +180,7 @@ function CoworkerCard({ card, onTask, onOpenRun }: { card: BotCard; onTask: () =
         </div>
       </div>
       <p className="text-sm text-muted-foreground">{id.pitch}</p>
+      {card.bot === "mika" && <p className="text-xs text-muted-foreground" data-testid="mika-send-yourself">{MIKA_SEND_NOTE}</p>}
       <div className="min-h-[2.5rem] text-xs">
         {card.activeRun ? (
           <button type="button" onClick={() => onOpenRun(card.activeRun!.id)} className="flex w-full items-center gap-2 rounded-lg bg-muted/60 px-2.5 py-2 text-left hover:bg-muted" data-testid="coworker-active">
@@ -181,7 +189,7 @@ function CoworkerCard({ card, onTask, onOpenRun }: { card: BotCard; onTask: () =
         ) : card.lastRun ? (
           <button type="button" onClick={() => onOpenRun(card.lastRun!.id)} className="flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-muted/60">
             {card.unread > 0 && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-sky-500" aria-label="New report" />}
-            <span className="min-w-0 flex-1"><span className="line-clamp-2">{card.lastRun.report?.headline ?? card.lastRun.statusLabel}</span><span className="text-muted-foreground"> · {when(card.lastRun.finishedAt ?? card.lastRun.createdAt)}</span></span>
+            <span className="min-w-0 flex-1"><span className="line-clamp-2">{card.lastRun.report?.headline ?? runStatusLabel(card.lastRun)}</span><span className="text-muted-foreground"> · {when(card.lastRun.finishedAt ?? card.lastRun.createdAt)}</span></span>
           </button>
         ) : <p className="px-2.5 py-2 text-muted-foreground">No tasks yet.</p>}
         {card.nextSchedule && <p className="px-2.5 text-muted-foreground">Next scheduled: {when(card.nextSchedule)}</p>}
@@ -229,7 +237,7 @@ function ActivityView({ onOpen }: { onOpen: (id: string) => void }) {
         <select id="f-bot" className={field} value={bot} onChange={(e) => setBot(e.target.value as Bot | "")}><option value="">All coworkers</option>{BOTS.map((b) => <option key={b} value={b}>{BOT_IDENTITY[b].name}</option>)}</select>
         <label className="sr-only" htmlFor="f-status">Status</label>
         <select id="f-status" className={field} value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">Any status</option><option value="queued,running,waiting">Working</option><option value="completed">Done</option><option value="partial">Partly done</option><option value="failed">Didn't finish</option><option value="cancelled">Cancelled</option>
+          <option value="">Any status</option><option value="queued,running,waiting">Queued or in progress</option><option value="completed">Completed</option><option value="partial">Completed with limitations</option><option value="failed">Failed</option><option value="cancelled">Cancelled</option>
         </select>
         <label className="sr-only" htmlFor="f-days">Period</label>
         <select id="f-days" className={field} value={days} onChange={(e) => setDays(Number(e.target.value))}><option value={7}>Last 7 days</option><option value={30}>Last 30 days</option><option value={90}>Last 90 days</option></select>
@@ -266,8 +274,8 @@ function CoworkerChat({ bot }: { bot: Bot }) {
     <div className="space-y-4">
       {active && <div className="rounded-xl border p-3"><RunDetail id={active.id} /></div>}
       <div>
-        <div className="mb-1 flex items-center justify-between"><h2 className="text-sm font-semibold">{id.name}'s tasks</h2><Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setDialog(true)}><Play className="mr-1 h-3 w-3" />New</Button></div>
-        <RunList bot={bot} limit={8} onOpen={setRunId} empty="No tasks yet. Ask in the chat, or start one." />
+        <div className="mb-1 flex items-center justify-between"><h2 className="text-sm font-semibold">{id.name}'s tasks</h2><Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setDialog(true)}><Play className="mr-1 h-3 w-3" />New task</Button></div>
+        <RunList bot={bot} limit={8} onOpen={setRunId} empty="No tasks yet. Ask in the chat, or start a new task." />
       </div>
     </div>
   );
@@ -314,6 +322,7 @@ function CoworkerChat({ bot }: { bot: Bot }) {
                 <div className="max-w-md space-y-1">
                   <p className="font-semibold">Hi, I'm {id.name}.</p>
                   <p className="text-sm text-muted-foreground">{id.pitch}</p>
+                  {bot === "mika" && <p className="text-xs text-muted-foreground">{MIKA_SEND_NOTE}</p>}
                 </div>
                 <div className="flex max-w-xl flex-wrap justify-center gap-2">
                   {id.suggestions.map((s) => <button key={s} type="button" onClick={() => void agent.send(s)} className={cn("rounded-full border px-3 py-1.5 text-left text-xs transition-colors hover:bg-muted", id.accent.fg)} data-testid="chat-suggestion"><Sparkles className="mr-1 inline h-3 w-3" aria-hidden />{s}</button>)}
@@ -334,7 +343,7 @@ function CoworkerChat({ bot }: { bot: Bot }) {
                 <span className="shrink-0 font-semibold text-foreground/80">View</span>
               </button>
             )}
-            <Composer onSend={(t, accepted) => agent.send(t, accepted)} onStop={agent.stop} running={agent.running} placeholder={`Ask ${id.name}…`} label={`Message ${id.name}`} draftFor={`league-${bot}`} seed={seed} />
+            <Composer onSend={(t, accepted) => agent.send(t, accepted)} onStop={agent.stop} running={agent.running} placeholder={CHAT_PLACEHOLDER[bot]} label={`Message ${id.name}`} draftFor={`league-${bot}`} seed={seed} />
           </div>
         </section>
 

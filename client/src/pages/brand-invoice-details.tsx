@@ -14,6 +14,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Download, CheckCircle, Loader2, BellRing, Undo2 } from "lucide-react";
 import { WhatsAppShareButton } from "@/components/whatsapp-share";
 import { invoiceReminderMessage } from "@shared/whatsapp-share";
+import { paymentState } from "@shared/paymentState";
 import { InvoiceAttachments } from "@/components/invoice-attachments";
 import type { BrandInvoice, Deal, InvoiceLineItem } from "@shared/schema";
 import { useUpgradeModal } from "@/components/upgrade-modal";
@@ -91,8 +92,8 @@ export default function BrandInvoiceDetailsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices", id] });
       toast({
-        title: "Payment reversed",
-        description: "The invoice is Unpaid again and back in your outstanding total.",
+        title: "Marked as unpaid",
+        description: "The invoice is unpaid again and counts towards your outstanding total.",
       });
     },
     onError: (err) => {
@@ -100,7 +101,7 @@ export default function BrandInvoiceDetailsPage() {
         openUpgradeModal({ feature: "payment_tracking" });
         return;
       }
-      toast({ title: "Could not reverse the payment", variant: "destructive" });
+      toast({ title: "Couldn't mark the invoice as unpaid", description: "Nothing was changed. Please try again.", variant: "destructive" });
     },
   });
 
@@ -113,14 +114,14 @@ export default function BrandInvoiceDetailsPage() {
       trackEvent("payment_marked_paid", { audience: audienceForDealType(deal?.dealType) });
       queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices"] });
       queryClient.invalidateQueries({ queryKey: ["/api/brand-invoices", id] });
-      toast({ title: "Invoice marked as paid" });
+      toast({ title: "Invoice marked as paid", description: "The payment is recorded. DealInSec doesn't collect or check payments, so this is your own record." });
     },
     onError: (err) => {
       if (isUpgradeError(parseApiError(err))) {
         openUpgradeModal({ feature: "payment_tracking" });
         return;
       }
-      toast({ title: "Failed to update", variant: "destructive" });
+      toast({ title: "Couldn't mark the invoice as paid", description: "Nothing was changed. Please try again.", variant: "destructive" });
     },
   });
 
@@ -162,7 +163,7 @@ export default function BrandInvoiceDetailsPage() {
               kind={isError ? httpErrorKind(error) : "not_found"}
               what="invoice"
               backHref="/invoices"
-              backLabel="Back to Invoices"
+              backLabel="Back to invoices"
               onRetry={() => refetch()}
               retrying={isFetching}
             />
@@ -408,14 +409,14 @@ export default function BrandInvoiceDetailsPage() {
         <header className="glass-header sticky top-0 z-40 print:hidden">
           <div className="flex items-center justify-between gap-3 px-4 py-4">
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => setLocation("/invoices")}>
+              <Button variant="ghost" size="icon" onClick={() => setLocation("/invoices")} aria-label="Back to invoices">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Invoice</h1>
             </div>
             <Button onClick={() => window.print()} className="gradient-btn text-white">
               <Download className="w-4 h-4 mr-2" />
-              Export PDF
+              Download PDF
             </Button>
           </div>
         </header>
@@ -448,12 +449,12 @@ export default function BrandInvoiceDetailsPage() {
               {markPaid.isPending ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Updating...
+                  Saving…
                 </>
               ) : (
                 <>
                   <CheckCircle className="w-5 h-5 mr-2" />
-                  Mark as Paid
+                  Mark as paid
                 </>
               )}
             </Button>
@@ -461,7 +462,7 @@ export default function BrandInvoiceDetailsPage() {
             <div className="rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30">
               <div className="flex items-center justify-center gap-2 py-3">
                 <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                <span className="font-semibold text-emerald-700 dark:text-emerald-300">{dealAudienceLabels(deal?.dealType).payment} received</span>
+                <span className="font-semibold text-emerald-700 dark:text-emerald-300">{dealAudienceLabels(deal?.dealType).payment} marked as received</span>
               </div>
               {canRecordPayment && (
                 <div className="px-3 pb-3 text-center">
@@ -479,7 +480,7 @@ export default function BrandInvoiceDetailsPage() {
                                 between text and an expression, which printed "its₹65,000". */}
                             {invoice.invoiceNumber} goes back to Unpaid and its{" "}
                             {docFmt.money(invoice.dealAmountMinor)} returns to your
-                            outstanding total. Use this if you marked it paid by mistake — the change is
+                            outstanding total. Use this if you marked it paid by mistake. The change is
                             recorded in your activity log either way.
                           </>
                         ),
@@ -505,12 +506,15 @@ export default function BrandInvoiceDetailsPage() {
           {invoice.status === "Unpaid" && (
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/70" data-testid="payment-reminder">
               <BellRing className="w-4 h-4 text-violet-500 flex-shrink-0" aria-hidden />
-              <span className="flex-1 text-sm text-muted-foreground">Remind {invoice.brandName} about this invoice</span>
+              <span className="flex-1 min-w-0 text-sm">
+                <span className="block font-medium">Prepare payment reminder</span>
+                <span className="block text-xs text-muted-foreground">Opens WhatsApp with a message to {invoice.brandName} that you can edit and send yourself.</span>
+              </span>
               <WhatsAppShareButton
                 what="invoice_reminder"
                 label="WhatsApp"
                 testId="button-payment-reminder"
-                message={invoiceReminderMessage({ client: invoice.brandName, invoiceNumber: invoice.invoiceNumber, amount: docFmt.money(invoice.dealAmountMinor), due: invoice.dueDate ? docDate(invoice.dueDate, loc) : null })}
+                message={invoiceReminderMessage({ client: invoice.brandName, invoiceNumber: invoice.invoiceNumber, amount: docFmt.money(invoice.dealAmountMinor), due: invoice.dueDate ? docDate(invoice.dueDate, loc) : null, overdue: paymentState(invoice) === "overdue" })}
               />
             </div>
           )}

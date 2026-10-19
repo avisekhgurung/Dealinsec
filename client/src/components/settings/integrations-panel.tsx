@@ -58,8 +58,8 @@ export function IntegrationsPanel() {
         <UnavailableIntegration
           name="Gmail"
           icon={Mail}
-          status="Not switched on"
-          description="Not switched on for your workspace, so there is nothing to connect. Connecting your own Gmail lets approved messages go out from your address."
+          status="Early access"
+          description="Gmail is in limited early access and isn't switched on for your workspace yet, so there's nothing to connect here."
           testId="gmail-unavailable"
         />
       )}
@@ -71,7 +71,7 @@ export function IntegrationsPanel() {
           name="Microsoft 365 / Outlook"
           icon={Inbox}
           status="Not available yet"
-          description="Would let approved messages go out from your own Microsoft 365 or Outlook address."
+          description="Connecting Microsoft 365 or Outlook isn't available yet."
           testId="integration-outlook"
         />
         <UnavailableIntegration

@@ -26,9 +26,9 @@ const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frida
 export function ApprovalsPanel() {
   const q = useApprovals();
   if (q.isLoading) return <div className="h-24 animate-pulse rounded-xl bg-muted" aria-busy="true" />;
-  if (q.isError) return <Empty>{leadError(q.error, "What's waiting couldn't be loaded.")}</Empty>;
+  if (q.isError) return <Empty>{leadError(q.error, "Your approvals couldn't be loaded. Try again in a moment.")}</Empty>;
   const items = q.data?.items ?? [];
-  if (!items.length) return <MascotEmpty>Nothing is waiting for you. When a coworker needs your go-ahead (a search that uses your allowance, a draft to approve), it shows here.</MascotEmpty>;
+  if (!items.length) return <MascotEmpty>Nothing is waiting for your approval. When a coworker needs your go-ahead (a search that uses your allowance, a draft to check), it shows here.</MascotEmpty>;
   return <ul className="space-y-3" data-testid="approvals-list">{items.map((i) => <ApprovalRow key={`${i.kind}-${i.id}`} item={i} />)}</ul>;
 }
 
@@ -45,12 +45,12 @@ function ApprovalRow({ item }: { item: ApprovalItem }) {
       if (!f || f.ok === false) throw new Error(f?.message ?? "It didn't go through. Nothing was changed.");
       return f;
     },
-    onSuccess: () => { setDone(item.kind === "draft" ? "Approved. Send it from the lead page." : "Approved. It's running."); void refreshLeague(); },
-    onError: (e) => toast({ title: "Not approved", description: e instanceof Error && !(e as any).status ? e.message : leadError(e), variant: "destructive" }),
+    onSuccess: () => { setDone(item.kind === "draft" ? "Approved. Nothing has been sent: open the lead, copy the text and send it from your own email, then mark it sent." : "Approved. The task has started."); void refreshLeague(); },
+    onError: (e) => toast({ title: "Couldn't approve this", description: e instanceof Error && !(e as any).status ? e.message : leadError(e), variant: "destructive" }),
   });
   const reject = useMutation({
     mutationFn: () => item.kind === "draft" ? leadCall("POST", `/api/sales/messages/${item.id}/cancel`, {}) : leagueCall("POST", `${LEAGUE}/approvals/${encodeURIComponent(item.id)}/reject`),
-    onSuccess: () => { setDone(item.kind === "draft" ? "Draft discarded." : "Declined. Nothing happened."); void refreshLeague(); },
+    onSuccess: () => { setDone(item.kind === "draft" ? "Draft discarded." : "Declined. Nothing was changed."); void refreshLeague(); },
     onError: (e) => toast({ title: "Couldn't decline", description: leadError(e), variant: "destructive" }),
   });
   const expired = item.expiresAt && new Date(item.expiresAt).getTime() < Date.now();
@@ -60,7 +60,7 @@ function ApprovalRow({ item }: { item: ApprovalItem }) {
         <Mascot bot={item.bot} size={32} />
         <div className="min-w-0 flex-1 space-y-2">
           <div>
-            <p className={cn("text-[11px] font-semibold uppercase tracking-wider", id.accent.fg)}>{id.name} · {item.kind === "draft" ? "Draft to approve" : "Needs your go-ahead"}</p>
+            <p className={cn("text-[11px] font-semibold uppercase tracking-wider", id.accent.fg)}>{id.name} · {item.kind === "draft" ? "Draft to approve" : "Waiting for your approval"}</p>
             <p className="text-sm font-medium">{item.title}</p>
           </div>
           {item.lines.length > 0 && <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">{item.lines.map((l) => <div key={l.label} className="contents"><dt className="text-muted-foreground">{l.label}</dt><dd className="break-words">{l.value}</dd></div>)}</dl>}
@@ -71,11 +71,12 @@ function ApprovalRow({ item }: { item: ApprovalItem }) {
             </div>
           )}
           {expired && <p className="text-xs text-amber-700 dark:text-amber-400">This request has expired. Ask again in the chat.</p>}
+          {item.kind === "draft" && !done && <p className="text-[11px] text-muted-foreground">Approving doesn't send anything. Copy the approved text and send it through your email or messaging app.</p>}
           {done ? <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400" role="status">{done}</p> : (
             <div className="flex flex-wrap gap-2">
               <Button size="sm" className="h-9" disabled={approve.isPending || !!expired} onClick={() => approve.mutate()} data-testid="approval-approve">{approve.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1.5 h-3.5 w-3.5" />}{item.kind === "draft" ? "Approve this text" : "Approve"}</Button>
               <Button size="sm" variant="ghost" className="h-9" disabled={reject.isPending} onClick={() => reject.mutate()} data-testid="approval-reject"><X className="mr-1.5 h-3.5 w-3.5" />{item.kind === "draft" ? "Discard" : "Decline"}</Button>
-              {item.href && <Button size="sm" variant="outline" className="h-9" asChild><Link href={item.href}>{item.kind === "draft" ? "Edit or send on the lead" : "Open the chat"}</Link></Button>}
+              {item.href && <Button size="sm" variant="outline" className="h-9" asChild><Link href={item.href}>{item.kind === "draft" ? "Edit or copy on the lead" : "Open the chat"}</Link></Button>}
             </div>
           )}
         </div>
@@ -99,7 +100,7 @@ export function SchedulesPanel() {
   });
   const patch = useMutation({ mutationFn: (v: { id: number; status: "active" | "paused" }) => leagueCall("PATCH", `${SCHEDULES_URL}/${v.id}`, { status: v.status }), onSuccess: () => void refreshLeague(), onError: fail("Couldn't change it") });
   const del = useMutation({ mutationFn: (id: number) => leagueCall("DELETE", `${SCHEDULES_URL}/${id}`), onSuccess: () => void refreshLeague(), onError: fail("Couldn't delete it") });
-  const runNow = useMutation({ mutationFn: (id: number) => leagueCall("POST", `${SCHEDULES_URL}/${id}/run`), onSuccess: () => { void refreshLeague(); toast({ title: "Started now" }); }, onError: fail("Couldn't start it") });
+  const runNow = useMutation({ mutationFn: (id: number) => leagueCall("POST", `${SCHEDULES_URL}/${id}/run`), onSuccess: () => { void refreshLeague(); toast({ title: "Task started" }); }, onError: fail("Couldn't start this task") });
   const field = "h-9 rounded-md border bg-background px-2 text-sm";
   return (
     <div className="space-y-4" data-testid="schedules-panel">
@@ -119,10 +120,10 @@ export function SchedulesPanel() {
           <Input type="time" value={form.timeOfDay} onChange={(e) => setForm({ ...form, timeOfDay: e.target.value })} className="h-9" />
         </label>
         <Button type="submit" className="h-9 sm:col-span-2 lg:col-span-1" disabled={create.isPending || (form.task === "nibo.find_clients" && form.request.trim().length < 8)} data-testid="schedule-create">{create.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <CalendarClock className="mr-1.5 h-4 w-4" />}Add schedule</Button>
-        {form.task === "nibo.find_clients" && <label className="flex flex-col gap-1 text-xs font-medium sm:col-span-2 lg:col-span-5">Who to look for<Input value={form.request} onChange={(e) => setForm({ ...form, request: e.target.value })} maxLength={500} placeholder={BOT_IDENTITY.nibo.suggestions[0]} className="h-9" /></label>}
-        <p className="text-[11px] text-muted-foreground sm:col-span-2 lg:col-span-5">Times are in your timezone ({tz}). If DealInSec is offline when a run is due, it runs once when it's back; missed runs aren't replayed one by one.</p>
+        {form.task === "nibo.find_clients" && <label className="flex flex-col gap-1 text-xs font-medium sm:col-span-2 lg:col-span-5">Describe the type of client you're looking for<Input value={form.request} onChange={(e) => setForm({ ...form, request: e.target.value })} maxLength={500} placeholder="For example: small businesses in Bengaluru that could use a website redesign" className="h-9" /></label>}
+        <p className="text-[11px] text-muted-foreground sm:col-span-2 lg:col-span-5">Times are in your timezone ({tz}). If DealInSec is offline when a task is due, it runs once when it's back; missed runs aren't repeated one by one.</p>
       </form>
-      {q.isLoading ? <div className="h-16 animate-pulse rounded-xl bg-muted" /> : !q.data?.schedules.length ? <MascotEmpty bots={["zee"]}>No recurring tasks yet. A weekday briefing from Zee at 9am is a good first one.</MascotEmpty> : (
+      {q.isLoading ? <div className="h-16 animate-pulse rounded-xl bg-muted" /> : !q.data?.schedules.length ? <MascotEmpty bots={["zee"]}>No scheduled tasks yet. A weekday briefing from Zee at 9 am is a good first one.</MascotEmpty> : (
         <ul className="divide-y rounded-xl border bg-card" data-testid="schedules-list">
           {q.data.schedules.map((s) => (
             <li key={s.id} className="flex flex-wrap items-center gap-3 px-3.5 py-3">
@@ -159,7 +160,7 @@ export function MemoryPanel() {
       <section className="space-y-3 rounded-xl border bg-card p-4" data-testid="memory-panel">
         <div>
           <h3 className="text-sm font-semibold">What your coworkers remember</h3>
-          <p className="text-xs text-muted-foreground">Preferences they read before they work. They're context, never permission: a coworker still can't do anything its tools and your role don't allow. Never store passwords or keys here.</p>
+          <p className="text-xs text-muted-foreground">Preferences they read before they work. They're context, never permission: a coworker still can't do anything its tools and your role don't allow. Never save passwords or keys here.</p>
         </div>
         {q.isLoading ? <div className="h-24 animate-pulse rounded bg-muted" /> : (
           <ul className="space-y-3">
@@ -187,7 +188,7 @@ export function MemoryPanel() {
         {!usage ? <div className="h-20 animate-pulse rounded bg-muted" /> : (
           <>
             <Meter label={`Tasks in the last ${usage.windowDays} days`} used={usage.runs.used} limit={usage.runs.limit} />
-            <Meter label="Recurring tasks" used={usage.schedules.used} limit={usage.schedules.limit} />
+            <Meter label="Scheduled tasks" used={usage.schedules.used} limit={usage.schedules.limit} />
             <ul className="space-y-1 text-xs text-muted-foreground">
               {BOTS.map((b) => <li key={b} className="flex justify-between"><span>{BOT_IDENTITY[b].name}</span><span className="tabular-nums">{usage.byBot[b] ?? 0} tasks</span></li>)}
               <li className="flex justify-between"><span>At once</span><span className="tabular-nums">up to {usage.concurrent}</span></li>

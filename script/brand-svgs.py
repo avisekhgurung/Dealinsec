@@ -56,12 +56,12 @@ def horizontal(tone):
 
 def lockup(tone):
     t = TONES[tone]
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 76" fill="none" role="img" aria-label="DealInSec. Find Clients. Close Deals. Get Paid.">{TITLE}
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 76" fill="none" role="img" aria-label="DealInSec. Find clients. Win deals. Get paid.">{TITLE}
   <defs>{mark_defs("k")}
     <linearGradient id="kw" x1="0" y1="14" x2="0" y2="46" gradientUnits="userSpaceOnUse"><stop stop-color="{t["w1"]}"/><stop offset="1" stop-color="{t["w2"]}"/></linearGradient></defs>
   <g transform="scale(1.1875)">{mark_paths("k")}</g>
   <text x="92" y="46" font-family="{FONT}" font-size="44" font-weight="800" letter-spacing="-1.5" textLength="205" lengthAdjust="spacingAndGlyphs"><tspan fill="{t["deal"]}">Deal</tspan><tspan fill="url(#kw)">InSec</tspan></text>
-  <text x="93" y="66" font-family="{FONT}" font-size="10.5" font-weight="500" letter-spacing=".6" textLength="186" lengthAdjust="spacing" fill="{t["tag"]}">Find Clients. Close Deals. Get Paid.</text>
+  <text x="93" y="66" font-family="{FONT}" font-size="10.5" font-weight="500" letter-spacing=".6" textLength="186" lengthAdjust="spacing" fill="{t["tag"]}">Find clients. Win deals. Get paid.</text>
 </svg>'''
 
 write("dealinsec-logo.svg", horizontal("light"))

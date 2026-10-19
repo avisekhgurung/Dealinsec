@@ -269,20 +269,20 @@ export default function DealsImportPage() {
 
   const readFile = (file: File) => {
     if (!file.name.toLowerCase().endsWith(".csv")) {
-      toast({ title: "CSV only", description: "Download the template and fill it in — Excel/Sheets can save as CSV.", variant: "destructive" });
+      toast({ title: "Please upload a CSV file", description: "Download the template and fill it in. Excel and Google Sheets can both save as CSV.", variant: "destructive" });
       return;
     }
     // Amounts are converted as the file is read, so the org's currency must be
     // known first — see useMoney().ready. Practically always already true.
     if (!fmt.ready) {
-      toast({ title: "One moment", description: "Still loading your organisation's currency — try the file again in a second.", variant: "destructive" });
+      toast({ title: "Still loading your currency", description: "Nothing was imported. Try the file again in a moment.", variant: "destructive" });
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
       const records = parseCsv(String(reader.result ?? ""));
       if (!records.length) {
-        toast({ title: "No rows found", description: "The file seems empty — keep the header row and add your deals under it.", variant: "destructive" });
+        toast({ title: "No rows found", description: "The file looks empty. Keep the header row and add your deals below it.", variant: "destructive" });
         return;
       }
       setFileName(file.name);
@@ -295,7 +295,7 @@ export default function DealsImportPage() {
 
   const runImport = async () => {
     if (!fmt.ready || parsedCurrency !== fmt.currency) {
-      toast({ title: "Please re-upload the file", description: "Your organisation's currency changed since the file was checked — nothing was imported.", variant: "destructive" });
+      toast({ title: "Please re-upload the file", description: "Your workspace currency changed after the file was checked, so nothing was imported.", variant: "destructive" });
       return;
     }
     setImporting(true);
@@ -326,7 +326,7 @@ export default function DealsImportPage() {
           stoppedForCredits = true;
           out.push({ row: d.row, title: d.dealTitle, ok: false, reason: "Monthly deal limit reached" });
         } else {
-          out.push({ row: d.row, title: d.dealTitle, ok: false, reason: parsedErr.error || "Could not create" });
+          out.push({ row: d.row, title: d.dealTitle, ok: false, reason: parsedErr.error || "Couldn't create this deal" });
         }
       }
     }
@@ -336,7 +336,7 @@ export default function DealsImportPage() {
     setImporting(false);
     const ok = out.filter((r) => r.ok).length;
     if (stoppedForCredits) {
-      toast({ title: `Imported ${ok} deal${ok !== 1 ? "s" : ""} — monthly limit reached`, description: "Your plan's deal allowance ran out mid-import.", variant: "destructive" });
+      toast({ title: `Imported ${ok} deal${ok !== 1 ? "s" : ""}. Monthly deal limit reached`, description: "Your plan's deal allowance ran out during the import. The remaining rows weren't created.", variant: "destructive" });
       openUpgradeModal({ feature: "deals" });
     } else {
       toast({ title: `Imported ${ok} of ${valid.length} deal${valid.length !== 1 ? "s" : ""}` });
@@ -352,7 +352,7 @@ export default function DealsImportPage() {
           </Link>
           <h1 className="text-xl lg:text-2xl font-bold tracking-tight">Import deals</h1>
           <p className="hidden lg:block text-sm text-muted-foreground mt-0.5">
-            Create many deals at once from the DealInSec CSV template — every field, up to {DELIVERABLE_BLOCKS} deliverables per deal.
+            Create many deals at once from the DealInSec CSV template, with up to {DELIVERABLE_BLOCKS} deliverables per deal.
           </p>
         </div>
       </header>
@@ -360,10 +360,10 @@ export default function DealsImportPage() {
       <main className="px-4 py-6 space-y-5 animate-fade-in lg:max-w-4xl lg:mx-auto lg:px-8 lg:py-8">
         {/* Mode tabs — CSV here, single-deal form is the other path */}
         <div className="flex gap-2">
-          <span className="px-3.5 py-2 rounded-xl text-sm font-bold text-white gradient-btn">CSV — bulk upload</span>
+          <span className="px-3.5 py-2 rounded-xl text-sm font-bold text-white gradient-btn">Import from CSV</span>
           <Link href="/deals/new">
             <button className="px-3.5 py-2 rounded-xl text-sm font-semibold border border-border text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors">
-              Single deal — form
+              Create one deal
             </button>
           </Link>
         </div>
@@ -377,8 +377,8 @@ export default function DealsImportPage() {
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm lg:text-base">1 · Download the CSV template</p>
               <p className="text-xs lg:text-sm text-muted-foreground mt-0.5 leading-relaxed">
-                All deal fields plus {DELIVERABLE_BLOCKS} deliverable blocks (scope, type, qty, frequency, notes) —
-                only the first deliverable is required. Two example rows included; replace them with your deals.
+                All deal fields plus {DELIVERABLE_BLOCKS} deliverable blocks (scope, type, quantity, frequency, notes).
+                Only the first deliverable is required. Two example rows are included; replace them with your own deals.
               </p>
             </div>
             <Button variant="outline" className="shrink-0 font-semibold border-primary/40 text-primary" onClick={downloadTemplate} data-testid="download-template">
@@ -392,7 +392,7 @@ export default function DealsImportPage() {
           <CardContent className="p-5 lg:p-6">
             <p className="font-semibold text-sm lg:text-base mb-1">2 · Upload your filled CSV</p>
             <p className="text-xs lg:text-sm text-muted-foreground mb-4">
-              We'll show a review of every row — nothing is created until you confirm.
+              You'll see every row to review first. Nothing is created until you confirm.
             </p>
             <div
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -514,7 +514,7 @@ export default function DealsImportPage() {
               </ul>
               <Link href="/deals">
                 <Button className="gradient-btn text-white font-semibold">
-                  Go to Deals <ChevronRight className="w-4 h-4 ml-1" />
+                  Go to deals <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
               </Link>
             </CardContent>

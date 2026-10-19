@@ -19,12 +19,16 @@ import { LEAGUE_ALLOWANCE_DEFAULTS as LG, LEAGUE_LIMITS, LEAGUE_WINDOW_DAYS } fr
 const OB = OUTBOUND_ALLOWANCE_DEFAULTS;
 
 export const PRODUCT_NAME = "DealInSec";
-export const TAGLINE = "Find Clients. Close Deals. Get Paid.";
+export const TAGLINE = "Find clients. Win deals. Get paid.";
 export const SUPPORT_EMAIL = "support@dealinsec.com";
 
 /** One sentence: what it is. */
 export const ONE_LINER =
-  "DealInSec is a client-acquisition and deal-to-payment workspace for freelancers, consultants and small B2B service agencies: AI-assisted prospect research, leads, deals, quotations, agreements, invoices and payment tracking in one place.";
+  "DealInSec is a simple business workspace for freelancers, consultants and small service agencies, built first for India: find clients with AI-assisted research, manage leads and deals, send quotations and agreements, create invoices and follow up on payments in one place.";
+
+/** The line under the headline: the client journey in one place, and what the AI coworkers help with. */
+export const SUPPORTING_LINE =
+  "Manage your client journey in one place, with AI coworkers to help you research opportunities, prepare outreach and see what needs attention.";
 
 /** A short paragraph for summaries, meta descriptions and the top of AI-readable files. */
 export const SUMMARY =

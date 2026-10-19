@@ -212,7 +212,7 @@ function header(): string {
       <a href="/">Product</a>
       <a href="mailto:support@dealinsec.com">Contact</a>
     </nav>
-    <a class="btn" href="${SIGNUP}" data-cta>Start free →</a>
+    <a class="btn" href="${SIGNUP}" data-cta>Get started free →</a>
   </div></header>`;
 }
 
@@ -239,7 +239,7 @@ function ctaBand(): string {
   return `<div class="cta-band"><div class="wrap">
     <h2>${TAGLINE}</h2>
     <p>DealInSec helps small agencies and consultants research prospects with evidence, then turns each won deal into a quotation, an agreement signed online and invoices that always agree with each other — and shows who hasn't paid.</p>
-    <a class="btn" href="${SIGNUP}" data-cta>Start free →</a>
+    <a class="btn" href="${SIGNUP}" data-cta>Get started free →</a>
     <span class="sub-note">No card required · Free plan in every country</span>
   </div></div>`;
 }

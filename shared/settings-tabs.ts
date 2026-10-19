@@ -5,7 +5,7 @@
  * Deep links: /settings?tab=<key> opens that tab (a few friendly aliases too, e.g. ?tab=billing). The return from
  * Google's Gmail consent (/settings?gmail=<outcome>, see server/mail/routes.ts) always opens Integrations, because
  * that is where the Gmail card lives and it reads the outcome from the URL itself. A tab the member may not see, or
- * an unknown key, falls back to Business profile.
+ * an unknown key, falls back to Business details.
  */
 
 export const SETTINGS_TABS = ["organization", "team", "integrations", "subscription", "preferences", "activity"] as const;
@@ -14,7 +14,7 @@ export type SettingsTab = (typeof SETTINGS_TABS)[number];
 export const DEFAULT_SETTINGS_TAB: SettingsTab = "organization";
 
 export const SETTINGS_TAB_META: Record<SettingsTab, { label: string; description: string }> = {
-  organization: { label: "Business profile", description: "Your business name, work type, country and how your documents look." },
+  organization: { label: "Business details", description: "Your business name, work type, country and how your documents look." },
   team: { label: "Team", description: "Who works in this workspace and what each person can do." },
   integrations: { label: "Integrations", description: "DealInSec only connects what you approve, and you can disconnect any time." },
   subscription: { label: "Plan & billing", description: "Your plan and, for teams, your seats." },
@@ -65,7 +65,7 @@ export function requestedSettingsTab(search: string): SettingsTab | null {
   return normalizeSettingsTab(params.get("tab"));
 }
 
-/** The tab to show: the requested one when this member can see it, otherwise Business profile. */
+/** The tab to show: the requested one when this member can see it, otherwise Business details. */
 export function pickSettingsTab(requested: SettingsTab | null, visible: readonly SettingsTab[]): SettingsTab {
   return requested && visible.includes(requested) ? requested : DEFAULT_SETTINGS_TAB;
 }
@@ -77,7 +77,7 @@ export function resolveSettingsTab(search: string, visible: readonly SettingsTab
 
 /**
  * The query string that records `tab`, keeping every other parameter (including a ?gmail outcome the Gmail card has
- * not read yet). Business profile is the default, so it leaves ?tab out. Returns "" or a string starting with "?".
+ * not read yet). Business details is the default, so it leaves ?tab out. Returns "" or a string starting with "?".
  */
 export function settingsTabSearch(search: string, tab: SettingsTab): string {
   const params = new URLSearchParams(search);

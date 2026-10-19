@@ -138,7 +138,7 @@ export default function PricingPage() {
       onPendingVerification: () => {
         toast({
           title: "Verification pending",
-          description: "Payment received — your plan will activate shortly. Refresh in a moment.",
+          description: "We've received your payment and are confirming it with Razorpay. Your plan will activate shortly; refresh in a moment.",
           variant: "destructive",
         });
       },
@@ -150,13 +150,13 @@ export default function PricingPage() {
   };
 
   const PRO_FEATURES = [
-    "Unlimited deals & quotations",
+    "Unlimited deals and quotations",
     `AI prospect research: ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.maxCompanies} companies each, in any country`,
     "Unlimited agreements your client signs online",
     // In-app invoices carry the country's tax IDs but are not GST tax invoices (see shared/landing-faqs.ts), so they
     // are never described as "GST-ready".
     checkoutAvailable ? "Unlimited invoices with your PAN and GSTIN" : "Unlimited invoices",
-    "Payment tracking — know who owes you",
+    "Payment tracking: see who still owes you",
     "Up to 5 team members",
     "One plan: no separate CRM or AI Outbound fee",
   ];
@@ -176,7 +176,7 @@ export default function PricingPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
         </Link>
-        <h1 className="text-xl lg:text-2xl font-semibold flex-1">Plans &amp; Billing</h1>
+        <h1 className="text-xl lg:text-2xl font-semibold flex-1">Plan &amp; billing</h1>
         {/* Plan pill — Pro wears the brand pairing: emerald + gold crown */}
         {proActive ? (
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
@@ -446,12 +446,12 @@ export default function PricingPage() {
           <h3 className="text-sm font-semibold">How it works</h3>
           <div className="space-y-3">
             {[
-              { step: "1", title: "Create a Deal", desc: "Free plan covers 4 deals every month" },
-              { step: "2", title: "Generate its Quotation", desc: "Included with the deal — no extra cost" },
-              { step: "3", title: "Sign the Agreement", desc: "Pro — scope & terms your client or brand signs online" },
+              { step: "1", title: "Create a deal", desc: "Free plan covers 4 deals every month" },
+              { step: "2", title: "Send its quotation", desc: "Included with the deal — no extra cost" },
+              { step: "3", title: "Get the agreement signed", desc: "Pro — scope & terms your client or brand signs online" },
               {
                 step: "4",
-                title: "Invoice & track payment",
+                title: "Invoice and track payment",
                 desc: "Pro — invoice + payment tracking",
               },
             ].map(({ step, title, desc }) => (

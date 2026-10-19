@@ -12,6 +12,7 @@ import { Loader2, KeyRound, Eye, EyeOff } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
+import { authErrorMessage } from "@/lib/auth-copy";
 
 export default function ResetPasswordPage() {
   const [, setLocation] = useLocation();
@@ -34,19 +35,19 @@ export default function ResetPasswordPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirm) {
-      toast({ title: "Passwords don't match", variant: "destructive" });
+      toast({ title: "Passwords don't match", description: "Type the same new password in both fields.", variant: "destructive" });
       return;
     }
     setIsLoading(true);
     try {
       await apiRequest("POST", "/api/auth/reset-password", { email, token, password });
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      toast({ title: "Password updated", description: "You're signed in with your new password." });
+      toast({ title: "Your password has been updated", description: "You're now logged in with your new password." });
       setLocation("/dashboard");
     } catch (error: any) {
       toast({
-        title: "Could not reset password",
-        description: error.message || "This link may have expired — request a new one.",
+        title: "Couldn't reset your password",
+        description: authErrorMessage(error, "reset"),
         variant: "destructive",
       });
     } finally {
@@ -102,7 +103,7 @@ export default function ResetPasswordPage() {
               </div>
               <Button type="submit" className="w-full h-11 gradient-btn text-white font-bold" disabled={isLoading} data-testid="button-reset-password">
                 {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Update password &amp; sign in
+                Update password &amp; log in
               </Button>
             </form>
           </>

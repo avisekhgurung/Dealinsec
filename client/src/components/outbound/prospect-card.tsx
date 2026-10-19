@@ -139,7 +139,7 @@ export function ProspectCard({ p, onOpen, onEvidence, onAdd, adding, canEdit }: 
 
       <div className="mt-auto flex flex-wrap items-center gap-2 border-t pt-3">
         <motion.button type="button" {...press} onClick={onEvidence ?? onOpen} className="mr-auto inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground underline-offset-2 hover:bg-muted hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60" aria-label={`Show the evidence for ${p.name} (${p.evidenceCount})`} data-testid="prospect-evidence">
-          <Link2 className="h-3.5 w-3.5" aria-hidden />{p.evidenceCount} evidence
+          <Link2 className="h-3.5 w-3.5" aria-hidden />Evidence ({p.evidenceCount})
         </motion.button>
         <Button size="sm" variant="outline" onClick={onOpen} data-testid="prospect-brief">AI brief</Button>
         {p.leadId ? (

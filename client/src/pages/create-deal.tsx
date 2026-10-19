@@ -63,22 +63,22 @@ const isPickable = (t: string | null | undefined): t is PickerType =>
 // adding the major one keeps the two from ever being confused: there is no
 // point in this file where a value of the wrong unit would still typecheck.
 const formSchema = insertDealSchema.omit({ userId: true, dealAmountMinor: true }).extend({
-  brandName: z.string().min(1, "Client / brand name is required"),
-  dealTitle: z.string().min(1, "Deal title is required"),
+  brandName: z.string().min(1, "Enter the client or brand name"),
+  dealTitle: z.string().min(1, "Enter a title for this deal"),
   dealType: z.enum(PICKABLE).default(dealTypeOptions[0]),
-  dealAmount: z.coerce.number().positive("Deal amount must be positive"),
-  startDate: z.string().min(1, "Start date is required"),
-  endDate: z.string().min(1, "End date is required"),
+  dealAmount: z.coerce.number().positive("Enter a deal amount greater than zero"),
+  startDate: z.string().min(1, "Choose a start date"),
+  endDate: z.string().min(1, "Choose an end date"),
   brandUserId: z.string().optional().nullable(),
   deliverableMode: z.enum(["all", "any_one"]).optional().default("all"),
   deliverables: z.array(z.object({
     id: z.string(),
-    platform: z.string().min(1, "Category is required"),
-    contentType: z.string().min(1, "Output type is required"),
+    platform: z.string().min(1, "Choose a category"),
+    contentType: z.string().min(1, "Choose an output type"),
     quantity: z.coerce.number().min(1, "Quantity must be at least 1"),
-    frequency: z.string().min(1, "Frequency is required"),
+    frequency: z.string().min(1, "Choose a frequency"),
     notes: z.string().optional(),
-  })).min(1, "At least one deliverable is required"),
+  })).min(1, "Add at least one deliverable"),
   standardTermIds: z.array(z.string()).optional().default([]),
   customTerms: z.string().optional().nullable(),
 });
@@ -279,7 +279,7 @@ export default function CreateDealPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/deals"] });
       toast({
         title: "Deal created",
-        description: "Your deal has been created successfully.",
+        description: "Your deal is saved. Next, prepare a quotation for it.",
       });
       // Journey continuation: when the user arrived from a "New quotation /
       // New agreement" picker, don't park them on deal details — carry them
@@ -308,8 +308,8 @@ export default function CreateDealPage() {
         return;
       }
       toast({
-        title: "Error",
-        description: "Failed to create deal. Please try again.",
+        title: "Couldn't create the deal",
+        description: "Nothing was saved. Please try again.",
         variant: "destructive",
       });
     },
@@ -328,7 +328,7 @@ export default function CreateDealPage() {
     // currency like JPY) rounds to zero minor units. Caught here rather than
     // at the server, where "positive" has already been satisfied by 0.004.
     if (fmt.minor(data.dealAmount) < 1) {
-      form.setError("dealAmount", { message: "Deal amount must be positive" });
+      form.setError("dealAmount", { message: "Enter a deal amount greater than zero" });
       return;
     }
     // The same rules the server applies, so a refusal shows on the field now.
@@ -429,12 +429,13 @@ export default function CreateDealPage() {
             variant="ghost"
             size="icon"
             onClick={() => (step === "form" ? setStep("type") : setLocation("/deals"))}
+            aria-label={step === "form" ? "Back to deal type" : "Back to deals"}
             data-testid="button-back"
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">
-            {step === "type" ? "New Deal" : "Create Deal"}
+            {step === "type" ? "New deal" : "Create deal"}
           </h1>
         </div>
       </header>
@@ -568,7 +569,7 @@ export default function CreateDealPage() {
 
             {brands.length > 0 && (
               <div className="space-y-2">
-                <Label>Assign to Brand Account (Optional)</Label>
+                <Label>Assign to a brand account (optional)</Label>
                 <Select
                   value={form.watch("brandUserId") || ""}
                   onValueChange={(value) => form.setValue("brandUserId", value === "none" ? undefined : value)}
@@ -586,13 +587,13 @@ export default function CreateDealPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Assigning a brand account lets them view this deal
+                  The brand account you choose can view this deal.
                 </p>
               </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="dealTitle">Deal Title</Label>
+              <Label htmlFor="dealTitle">Deal title</Label>
               <Input
                 id="dealTitle"
                 placeholder={isBrandDeal ? "e.g., Autumn skincare launch — 2 Reels" : "e.g., Website redesign — 5 pages"}
@@ -618,7 +619,7 @@ export default function CreateDealPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dealAmount">{modelMeta ? modelMeta.valueLabel : "Deal Amount"} ({fmt.symbol})</Label>
+              <Label htmlFor="dealAmount">{modelMeta ? modelMeta.valueLabel : "Deal amount"} ({fmt.symbol})</Label>
               <Input
                 id="dealAmount"
                 type="number"
@@ -652,7 +653,7 @@ export default function CreateDealPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="startDate">Start Date</Label>
+                <Label htmlFor="startDate">Start date</Label>
                 <Input
                   id="startDate"
                   type="date"
@@ -668,7 +669,7 @@ export default function CreateDealPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="endDate">{recurringKind ? "End of first term" : "End Date"}</Label>
+                <Label htmlFor="endDate">{recurringKind ? "End of first term" : "End date"}</Label>
                 <Input
                   id="endDate"
                   type="date"
@@ -779,7 +780,7 @@ export default function CreateDealPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-xs">Notes (Optional)</Label>
+                    <Label className="text-xs">Notes (optional)</Label>
                     <Textarea
                       placeholder="Any specific requirements..."
                       className="min-h-[80px] resize-none"
@@ -799,7 +800,7 @@ export default function CreateDealPage() {
               data-testid="button-add-deliverable"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add Deliverable
+              Add deliverable
             </Button>
           </div>
 
@@ -816,7 +817,7 @@ export default function CreateDealPage() {
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-primary" />
             <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Terms &amp; Conditions
+              Terms and conditions
             </h2>
           </div>
 
@@ -864,7 +865,7 @@ export default function CreateDealPage() {
                 Your own terms (optional)
               </Label>
               <p className="text-[11px] text-muted-foreground mt-0.5">
-                Add as many clauses as you need — revision rounds, advance payment, usage rights, exclusivity, etc.
+                Add as many clauses as you need: revision rounds, advance payment, usage rights, exclusivity and so on.
               </p>
             </div>
 
@@ -926,17 +927,17 @@ export default function CreateDealPage() {
             {createDeal.isPending ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Creating...
+                Creating deal…
               </>
             ) : fmt.failed ? (
-              "Couldn't load your currency — try again"
+              "Couldn't load your currency. Try again"
             ) : !fmt.ready ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Loading currency…
               </>
             ) : (
-              "Create Deal"
+              "Create deal"
             )}
           </Button>
         </div>

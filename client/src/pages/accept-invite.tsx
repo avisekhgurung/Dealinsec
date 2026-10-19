@@ -49,13 +49,17 @@ export default function AcceptInvitePage() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || "Could not accept the invitation");
+        throw new Error(body.error || "The invitation couldn't be accepted. Please try again.");
       }
       await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      toast({ title: `Welcome to ${invite?.orgName}! 🎉` });
+      toast({ title: `Welcome to ${invite?.orgName}` });
       setLocation("/dashboard");
     } catch (err: any) {
-      toast({ title: "Could not join", description: err.message, variant: "destructive" });
+      toast({
+        title: "Couldn't join the workspace",
+        description: err instanceof TypeError ? "Couldn't reach DealInSec. Check your internet connection and try again." : err.message,
+        variant: "destructive",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -79,7 +83,7 @@ export default function AcceptInvitePage() {
               </div>
               <h1 className="text-lg font-bold">This invitation isn't valid</h1>
               <p className="text-sm text-muted-foreground">
-                It may have expired or been revoked. Ask your organization owner to send a new one.
+                It may have expired or been cancelled. Ask the person who invited you to send a new one.
               </p>
             </div>
           ) : (
@@ -120,7 +124,7 @@ export default function AcceptInvitePage() {
                 </div>
                 <Button type="submit" className="w-full h-11 gradient-btn text-white font-semibold" disabled={submitting} data-testid="button-accept-invite">
                   {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  Accept Invitation & Join
+                  Accept and join
                 </Button>
               </form>
             </>

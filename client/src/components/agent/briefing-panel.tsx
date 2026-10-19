@@ -20,11 +20,6 @@ export interface Briefing {
 }
 
 
-function greeting(): string {
-  const h = new Date().getHours();
-  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
-}
-
 /**
  * While the briefing is computed: its shape, and one honest line. (It used to rotate "Reviewing your deals…",
  * "Checking payments…" on a timer, which claimed steps nobody was reporting.)
@@ -42,10 +37,12 @@ function StagedLoading() {
 }
 
 export function BriefingPanel({
-  briefing, loading, money, go, onFollowUp,
+  briefing, loading, error, money, go, onFollowUp,
 }: {
   briefing: Briefing | undefined;
   loading: boolean;
+  /** The briefing couldn't be loaded: said plainly, never shown as "all clear". */
+  error?: boolean;
   money: (minor: number) => string;
   go: (to: string) => void;
   /** "Prepare Follow-up" on the worst overdue invoice. */
@@ -58,23 +55,27 @@ export function BriefingPanel({
     <>
     {/* ── Daily briefing (deterministic) ── */}
     {loading && <StagedLoading />}
+    {!loading && !briefing && error && (
+      <p className="rounded-xl border border-dashed px-3.5 py-3 text-xs text-muted-foreground" role="status" data-testid="briefing-unavailable">
+        Your briefing couldn't load right now. Try again later.
+      </p>
+    )}
 
     {briefing && (
       <div className="space-y-2.5" data-testid="copilot-briefing">
-        <p className="text-sm font-semibold px-0.5">
-          {greeting()}, {briefing.greetingName} 👋
-        </p>
+        <p className="text-sm font-semibold px-0.5">Today's business briefing</p>
         <p className="text-xs text-muted-foreground px-0.5 -mt-1.5">
           {allClear
-            ? "I've reviewed your deals — everything looks protected."
-            : `I've reviewed your active deals. ${briefing.attentionCount} thing${briefing.attentionCount !== 1 ? "s" : ""} need${briefing.attentionCount === 1 ? "s" : ""} your attention.`}
+            ? "Nothing needs your attention in your invoices and agreements right now."
+            : `${briefing.attentionCount} thing${briefing.attentionCount !== 1 ? "s" : ""} in your invoices and agreements need${briefing.attentionCount === 1 ? "s" : ""} your attention.`}
+          {" "}Based on the latest information available in your workspace.
         </p>
 
         {allClear && (
           <div className="rounded-xl border border-emerald-300/50 dark:border-emerald-800/50 bg-emerald-500/[0.05] p-3.5 flex items-center gap-3">
             <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0" />
             <p className="text-xs text-muted-foreground">
-              No overdue payments, nothing waiting to be invoiced. Create your next deal and I'll watch it end to end.
+              No overdue invoices, nothing due this week and nothing waiting to be invoiced.
             </p>
           </div>
         )}
@@ -94,7 +95,7 @@ export function BriefingPanel({
             <div className="flex flex-wrap gap-1.5">
               {worstOverdue && (
                 <Button size="sm" className="h-7 text-xs font-bold gradient-btn text-white" onClick={() => onFollowUp(worstOverdue.invoiceNumber)} data-testid="briefing-chaser">
-                  Prepare Follow-up
+                  Prepare payment follow-up
                 </Button>
               )}
               <Button size="sm" variant="outline" className="h-7 text-xs font-semibold" onClick={() => go("/invoices")}>
@@ -131,14 +132,14 @@ export function BriefingPanel({
             </div>
             <p className="text-xs text-muted-foreground">
               {radar.dueThisWeek.invoices.slice(0, 2).map((i) => i.brandName).join(", ")}
-              {radar.dueThisWeek.count > 2 ? ` +${radar.dueThisWeek.count - 2} more` : ""} — watching these for you.
+              {radar.dueThisWeek.count > 2 ? ` +${radar.dueThisWeek.count - 2} more` : ""}
             </p>
           </div>
         )}
 
         {briefing.nextActions.length > 0 && (
           <div className="rounded-xl border border-border/60 p-3.5">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Next best actions</p>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Suggested next steps</p>
             <ul className="space-y-1.5">
               {briefing.nextActions.slice(0, 3).map((a) => (
                 <li key={a.dealId}>

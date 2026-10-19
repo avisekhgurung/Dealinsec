@@ -121,7 +121,7 @@ export function DataTable<TData>({
   onImportClick,
   toolbarExtra,
   initialPageSize = 10,
-  emptyMessage = "No results.",
+  emptyMessage = "Nothing matches your search or filters.",
   serialNumbers = true,
   columnFilterRow = false,
 }: DataTableProps<TData>) {

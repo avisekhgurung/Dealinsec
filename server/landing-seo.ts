@@ -19,7 +19,7 @@
 
 import { LANDING_FAQS } from "@shared/landing-faqs";
 import { guidesHtml } from "./blog";
-import { ONE_LINER, PRICING, WORKFLOW } from "@shared/product-facts";
+import { ONE_LINER, PRICING, SUPPORTING_LINE, TAGLINE, WORKFLOW } from "@shared/product-facts";
 import { OUTBOUND_ALLOWANCE_DEFAULTS as OB, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
 
 const FAQS = LANDING_FAQS;
@@ -47,8 +47,8 @@ export function landingSeoBody(): string {
   ).join("");
 
   return `<div id="seo-fallback">
-<h1>Find Clients. Close Deals. Get Paid.</h1>
-<p>${ONE_LINER} DealInSec helps service businesses research prospects, manage deals, send quotations, create agreements, generate invoices and track payments in one connected workspace. AI researches and drafts; you approve every message, and nothing is sent automatically. Free plan: ${PRICING.freeMonthlyDeals} new deals a month with quotations, the lead pipeline and ${OB.free.monthlySearches} AI research searches every ${OUTBOUND_WINDOW_DAYS} days. Pro: ₹${PRICING.proMonthlyInr} a month in India.</p>
+<h1>${TAGLINE}</h1>
+<p>${ONE_LINER} ${SUPPORTING_LINE} AI researches and drafts; you approve every message and send it yourself, and nothing is sent automatically. Free plan: ${PRICING.freeMonthlyDeals} new deals a month with quotations, the lead pipeline and ${OB.free.monthlySearches} AI research searches every ${OUTBOUND_WINDOW_DAYS} days. Pro: ₹${PRICING.proMonthlyInr} a month in India.</p>
 
 <h2>How it works: from a potential client to a paid invoice</h2>
 <ol>
@@ -75,18 +75,18 @@ export function landingSeoBody(): string {
 <h2>Why keep the client journey in one place</h2>
 <p>Prospects in browser tabs and spreadsheets, outreach in an inbox, quotations and agreements in documents, invoices in another tool and payments in a bank app means re-typing the client, the scope and the fee at every step. In DealInSec one record carries the client from research to payment. It doesn't replace accounting software.</p>
 
-<h2>Who DealInSec is for</h2>
-<p>Freelancers, solo consultants and small B2B service agencies of about 1 to 10 people, in India and abroad:</p>
+<h2>Built for people who sell services</h2>
+<p>Freelancers and solo service providers first, and small agencies of up to about 10 people (web development and software services, digital marketing, SEO and growth, AI automation and other service businesses), in India and abroad. See <a href="/for-freelancers">DealInSec for freelancers and consultants</a>.</p>
 <ul>
-<li><strong>Freelancers and solo consultants</strong>: find clients, quote them properly, get the scope signed and know what you're owed. See <a href="/for-freelancers">DealInSec for freelancers and consultants</a>.</li>
-<li><strong>Web development and software services</strong>: research accounts, scope builds as milestones and invoice each stage.</li>
-<li><strong>Digital marketing, SEO and growth agencies</strong>: find companies in your niche with evidence, then quote, sign and bill retainers.</li>
-<li><strong>AI automation businesses</strong>: spot companies showing repetitive work publicly, such as support or operations hiring, with dated sources.</li>
+<li><strong>Freelance web developers</strong>: research businesses in your city or niche, quote a build as milestones and invoice each stage.</li>
+<li><strong>Designers and creatives</strong>: spell out deliverables and revision rounds in the quotation, get the agreement signed, then invoice.</li>
+<li><strong>Digital marketers and SEO consultants</strong>: find companies in your niche with evidence, then quote, sign and bill monthly retainers.</li>
+<li><strong>Independent consultants</strong>: turn a conversation into a deal, send a professional quotation and keep track of what you're owed.</li>
 </ul>
 <p>Doing brand deals? <a href="/for-creators">DealInSec for creators</a>. Not sure what a client's message leaves out? The free <a href="/tools/deal-risk-checker">Deal Risk Checker</a> lists what is missing, with no account.</p>
 
-<h2>Know exactly what you're owed</h2>
-<p>Track every invoice from sent to paid: total invoiced, paid, pending and overdue at a glance. DealInSec tracks payments but does not process them; your client pays you directly and you mark the invoice paid. When something is late, Copilot drafts the follow-up and you review and send it.</p>
+<h2>Create invoices. Track payments. Follow up professionally.</h2>
+<p>Track every invoice from sent to paid: total invoiced, paid, pending and overdue at a glance. DealInSec tracks payments but does not process them; your client pays you directly and you mark the invoice paid. When something is late, AI drafts a polite payment reminder and you review and send it yourself.</p>
 
 <h2>Look professional from the first quote to the final invoice</h2>
 <p>Give every client a clear, consistent experience with a professional quotation, agreement and invoice, all generated from the same deal.</p>
@@ -111,19 +111,19 @@ export function landingSeoBody(): string {
 <a href="/tools/proforma-invoice-generator">proforma invoice</a> — free in your browser, no account needed. There is also an <a href="/tools/invoice-format/for-freelancers">invoice format for freelancers</a>. Country tools: a <a href="/tools/gst-invoice-generator">GST invoice</a> with CGST, SGST and IGST computed and a <a href="/tools/gst-calculator">GST calculator</a> for India, and a <a href="/tools/uk-late-payment-calculator">UK late payment calculator</a> that works out the statutory interest and compensation you can claim when a UK client pays late.</p>
 
 <h2>What DealInSec covers</h2>
-<p><a href="/for-freelancers">For freelancers</a> · <a href="/for-creators">For creators</a> · <a href="/find-local-clients">Find local business clients</a> · <a href="/ai-coworkers">AI coworkers (Nibo, Mika and Zee)</a> · <a href="/freelancer-invoice-software">Freelancer invoice software</a> · <a href="/quotation-software">quotation software</a> · <a href="/proposal-management">proposal management</a> · <a href="/contract-management">contract management</a> · <a href="/e-signature">e-signature</a> · <a href="/invoice-management">invoice management</a> · <a href="/freelance-business-management-software">freelance business management software</a> · <a href="/bonsai-alternatives">Bonsai alternatives</a> · <a href="/bonsai-vs-dealinsec">Bonsai vs DealInSec</a> · <a href="/refrens-alternative">Refrens alternative</a> · <a href="/vyapar-alternative">Vyapar alternative</a> — one thread per deal, from first quote to final payment.</p>
+<p><a href="/for-freelancers">For freelancers</a> · <a href="/crm-for-freelancers">CRM for freelancers in India</a> · <a href="/for-creators">For creators</a> · <a href="/find-local-clients">Find local business clients</a> · <a href="/ai-coworkers">AI coworkers (Nibo, Mika and Zee)</a> · <a href="/freelancer-invoice-software">Freelancer invoice software</a> · <a href="/quotation-software">quotation software</a> · <a href="/proposal-management">proposal management</a> · <a href="/contract-management">contract management</a> · <a href="/e-signature">e-signature</a> · <a href="/invoice-management">invoice management</a> · <a href="/freelance-business-management-software">freelance business management software</a> · <a href="/bonsai-alternatives">Bonsai alternatives</a> · <a href="/bonsai-vs-dealinsec">Bonsai vs DealInSec</a> · <a href="/refrens-alternative">Refrens alternative</a> · <a href="/vyapar-alternative">Vyapar alternative</a> — one thread per deal, from first quote to final payment.</p>
 
 <h2>Guides</h2>
 <p>From the <a href="/blog">DealInSec blog</a>:</p>
 ${guidesHtml()}
 
-<h2>Start simple. Grow when you need to.</h2>
+<h2>Start free. Upgrade when you need more.</h2>
 <p>The free plan is permanent: ${OB.free.monthlySearches} AI Outbound searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each), the leads pipeline, and ${PRICING.freeMonthlyDeals} deals a month, each with its quotation. It needs no card, in every country. Pro is ₹${PRICING.proMonthlyInr} a month in India and includes ${OB.pro.monthlySearches} AI searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.pro.maxCompanies} companies each), unlimited deals, agreements your client signs online, invoices, payment tracking and up to 5 team members. Searches are counted over a rolling ${OUTBOUND_WINDOW_DAYS} days, with at most 5 a day; when you reach the limit, more become available as earlier searches pass ${OUTBOUND_WINDOW_DAYS} days, and nothing is unlimited. Pro is paid once a month with no auto-renewal: pay again to extend, or it returns to the free plan. In the United States and other countries the free plan is open; paid plans can't be bought from outside India yet. No platform fee on your deal value.</p>
 
 <h2>Frequently asked questions</h2>
 ${faqs}
 
-<p><a href="/auth?mode=signup">Start for free</a> · <a href="/#pricing">Pricing</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
+<p><a href="/auth?mode=signup">Get started free</a> · <a href="/#pricing">Pricing</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
 </div>`;
 }
 

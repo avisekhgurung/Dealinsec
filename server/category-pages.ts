@@ -167,15 +167,15 @@ function header(): string {
       <a href="/blog">Blog</a>
       <a href="/#pricing">Pricing</a>
     </nav>
-    <a class="btn" href="${SIGNUP}">Start free →</a>
+    <a class="btn" href="${SIGNUP}">Get started free →</a>
   </div></header>`;
 }
 
 function footer(region: "IN" | "global"): string {
   const tagline =
     region === "IN"
-      ? "find clients, close deals and get paid. For small agencies, consultants and freelancers in India: prospect research, then quotation, agreement signed online, invoice and payment tracking."
-      : "find clients, close deals and get paid. For small agencies, consultants and freelancers wherever they bill from: prospect research, then quotation, agreement signed online, invoice and payment tracking.";
+      ? "find clients, win deals and get paid. For freelancers, consultants and small agencies in India: prospect research, then quotation, agreement signed online, invoice and payment tracking."
+      : "find clients, win deals and get paid. For freelancers, consultants and small agencies wherever they bill from: prospect research, then quotation, agreement signed online, invoice and payment tracking.";
   return `<footer class="site"><div class="wrap">
     <div class="links">
       <a href="/">Product</a>
@@ -215,7 +215,7 @@ function ctaBand(region: "IN" | "global"): string {
   return `<div class="cta-band"><div class="wrap">
     <h2>${TAGLINE}</h2>
     <p>${sub}</p>
-    <a class="btn" href="${SIGNUP}" data-cta>Start free →</a>
+    <a class="btn" href="${SIGNUP}" data-cta>Get started free →</a>
     <span class="sub-note">${note}</span>
   </div></div>`;
 }
@@ -327,7 +327,7 @@ export const PAGES: CategoryPage[] = [
     <tr><th></th><th>Invoice generator + WhatsApp</th><th>DealInSec</th></tr>
     <tr><td><b>The offer</b></td><td>A quote retyped every time</td><td>Quotation generated from the deal, carried into the invoice</td></tr>
     <tr><td><b>The scope</b></td><td>Agreed in chat, argued about later</td><td>Accepted electronically, with revision limits &amp; exclusions</td></tr>
-    <tr><td><b>Your details</b></td><td>PAN and GSTIN typed in again</td><td>PAN and GSTIN from your profile on every document — GST-ready</td></tr>
+    <tr><td><b>Your details</b></td><td>PAN and GSTIN typed in again</td><td>PAN and GSTIN from your profile on every document (in-app invoices are not GST tax invoices)</td></tr>
     <tr><td><b>Getting paid</b></td><td>You remember, then chase awkwardly</td><td>Overdue list, plus a drafted reminder in the tone you pick</td></tr>
     <tr><td><b>Cost</b></td><td>—</td><td>Free plan for quotations; Pro ₹199/month</td></tr>
   </table></div>
@@ -475,10 +475,10 @@ export const PAGES: CategoryPage[] = [
     region: "IN",
     metaTitle: "Quotation Software for Freelancers in India",
     description:
-      "Online quotation software for Indian freelancers: itemised quotes with GST, revision rounds and advance terms, numbered PDFs in your name — and each accepted quote converts into an agreement and invoice. Free plan; Pro ₹199/month.",
-    h1: "Quotation software that doesn't stop at the quotation",
-    sub: "Make professional, numbered quotations for your clients in minutes — then convert the accepted quote into an e-signed agreement and an invoice with the same figures, automatically.",
-    chips: ["Made for freelancers", "GST-ready", "Free plan · 4 deals a month", "Pro ₹199/month"],
+      "Quotation software for Indian freelancers: itemised quotations with revision rounds and advance terms, a link your client can accept online, and the agreement and invoice from the same deal. Free plan; Pro ₹199/month.",
+    h1: "Send clear quotations that help you win work",
+    sub: "Make professional, numbered quotations for your clients in minutes and share a link they can open and accept online. When they say yes, create the agreement and the invoice from the same deal, with the same figures.",
+    chips: ["Made for freelancers", "Accepted online", "Free plan · 4 deals a month", "Pro ₹199/month"],
     shortLabel: "Quotation Software",
     sections: `
 <section><div class="wrap">
@@ -488,7 +488,7 @@ export const PAGES: CategoryPage[] = [
     <div class="ft"><b>Itemised, numbered, consistent</b><p>Quotations are generated from the deal record — deliverables, quantities, rates, terms — with a stable QT-series number and a clean PDF that carries your name, not ours.</p></div>
     <div class="ft"><b>Revisions with history</b><p>Client negotiated? Issue a revised version. The version the client accepted is the one your agreement and invoice inherit.</p></div>
     <div class="ft"><b>Terms that carry forward</b><p>Advance percentage, balance timeline, revision rounds, validity — set once on the deal, printed on the quotation, carried into the agreement so the documents never contradict each other.</p></div>
-    <div class="ft"><b>Quotation tracking</b><p>See which quotations are outstanding, accepted or expiring from the dashboard — the follow-up happens before the validity runs out.</p></div>
+    <div class="ft"><b>Quotation tracking</b><p>See which shared quotations your client hasn't accepted yet, right on the dashboard, so you know whom to follow up with.</p></div>
   </div>
   <div class="callout honest"><b>Just need one quotation right now?</b><p>Use the <a href="/tools/quotation-maker">free online quotation maker</a> — no sign-up, GST-ready, instant PDF. The software is for when you're quoting new clients every month, not once a year.</p></div>
 </div></section>
@@ -496,7 +496,7 @@ export const PAGES: CategoryPage[] = [
   <h2>Quotation software vs Excel</h2>
   <div class="tbl-scroll"><table class="cmp">
     <tr><th></th><th>Excel / Word</th><th>DealInSec</th></tr>
-    <tr><td><b>Math &amp; GST</b></td><td>Manual — the classic source of embarrassing errors</td><td>Computed, with Indian formatting (₹1,35,000)</td></tr>
+    <tr><td><b>Totals</b></td><td>Manual — the classic source of embarrassing errors</td><td>Computed, with Indian formatting (₹1,35,000)</td></tr>
     <tr><td><b>Numbering</b></td><td>Whatever you remember to type</td><td>Stable series, per record</td></tr>
     <tr><td><b>After acceptance</b></td><td>Retype everything into a contract, then again into an invoice</td><td>One click — agreement and invoice inherit the figures</td></tr>
     <tr><td><b>Follow-up</b></td><td>Memory</td><td>Dashboard shows outstanding and expiring quotations</td></tr>
@@ -514,11 +514,11 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "Does it handle GST on quotations?",
-        a: "Yes — quotations can show GST so the client sees the final payable amount. Note that a quotation is not a tax document; tax applies on the invoice. For a GST tax invoice with CGST/SGST/IGST computation, use the free GST invoice generator.",
+        a: "Quotations print your GSTIN and say the amounts are subject to applicable taxes, but DealInSec doesn't calculate GST on quotations or in-app invoices. A quotation isn't a tax document; if you're GST-registered and need CGST/SGST/IGST computed on an invoice, use the free GST invoice generator.",
       },
       {
         q: "Is it built for freelancers in India?",
-        a: "Yes — it's made for India's freelancers: designers, developers, writers, video editors & photographers, marketers and consultants. Indian number formatting, GST-ready documents, your PAN/GSTIN on your papers, and pricing in rupees: a free plan, then Pro at ₹199/month.",
+        a: "Yes — it's made for India's freelancers: designers, developers, writers, video editors & photographers, marketers and consultants. Indian number formatting, your PAN and GSTIN on your documents, and pricing in rupees: a free plan, then Pro at ₹199/month.",
       },
       {
         q: "What should a freelancer's quotation include?",
@@ -624,7 +624,7 @@ export const PAGES: CategoryPage[] = [
     metaTitle: "Invoice Management Software for Freelancers in India",
     description:
       "Invoice management for Indian freelancers: invoices generated from agreements, consecutive numbering per financial year, paid/unpaid tracking with dates, and a dashboard of what to bill and chase. Pro ₹199/month; free plan.",
-    h1: "Invoice management software that knows what you're owed",
+    h1: "Create invoices. Track payments. Follow up professionally.",
     sub: "Invoices generated from the agreement — never more than it's worth — numbered consecutively per financial year, tracked from sent to paid, with a dashboard of what to bill and what to chase today.",
     chips: ["INV-series per financial year", "Paid/unpaid with dates", "Made for freelancers", "Free plan"],
     shortLabel: "Invoice Management",
@@ -785,6 +785,86 @@ export const PAGES: CategoryPage[] = [
       },
     ],
   },
+  /* ── /crm-for-freelancers — a simple CRM for Indian freelancers (leads, deals, follow-ups, documents) ── */
+  // Every claim is a shipped feature: lead stages, next steps and follow-up dates, facts with sources, the do-not-contact
+  // list, a won lead becoming a deal, the dashboard's Today list, quotations accepted online. There is no separate
+  // client directory: a client's details live on the lead and the deal, and the page says so.
+  {
+    path: "/crm-for-freelancers",
+    region: "IN",
+    updated: "2026-10-19",
+    metaTitle: "CRM for Freelancers in India | Manage Clients & Deals",
+    description:
+      "A simple CRM for Indian freelancers. Manage leads and deals, follow up on time, send quotations and invoice clients from one workspace. Free plan; Pro ₹199/month.",
+    h1: "A simple CRM for freelancers in India",
+    sub: "Keep every potential client, conversation and deal in one place. Know whom to follow up with today, send a quotation from the deal, and carry the same details through to the agreement and the invoice.",
+    chips: ["Leads and deals", "Follow-up dates and next steps", "Quotations accepted online", `Free plan · ${PRICING.freeMonthlyDeals} deals a month`, `Pro ₹${PRICING.proMonthlyInr}/month`],
+    shortLabel: "CRM for Freelancers",
+    sections: `
+<section><div class="wrap">
+  <h2>Why freelancers lose track of clients</h2>
+  <p class="sec-sub">Most freelancers don't need a big sales CRM. They need to remember who asked for a quote, what was promised, when to follow up and what is still unpaid. When that lives across WhatsApp chats, an email inbox and a spreadsheet, good enquiries go cold and invoices wait.</p>
+  <div class="feat">
+    <div class="ft"><b>Enquiries go cold</b><p>A client asks for a price on Monday; by Friday the conversation is buried under twenty others and nobody followed up.</p></div>
+    <div class="ft"><b>Details get re-typed</b><p>The client's name, the scope and the fee are typed again for the quotation, again for the agreement and again for the invoice, and the numbers drift.</p></div>
+    <div class="ft"><b>Nobody knows what's next</b><p>Without a next step and a date on each client, the day starts with scrolling instead of working.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>What the DealInSec CRM does</h2>
+  <p class="sec-sub">Built around the way a freelancer actually wins and bills work, from first enquiry to paid invoice.</p>
+  <div class="feat">
+    <div class="ft"><b>A lead pipeline</b><p>Save each potential client as a lead and move it through stages: new, researching, qualified, contacted, replied, meeting, proposal, then won or lost. Each lead keeps its next step, a follow-up date, notes and the facts you found, with their sources.</p></div>
+    <div class="ft"><b>Deals for the work you win</b><p>A won lead becomes a deal in one step. The deal records the client, the engagement model (fixed price, retainer, hourly, milestones and more), the service, the value and the dates. You can also import existing deals from a CSV file.</p></div>
+    <div class="ft"><b>What needs you today</b><p>The dashboard lists follow-ups due, quotations your client hasn't accepted yet, agreements waiting for a signature, work ready to invoice and invoices that are overdue, built from your own records.</p></div>
+    <div class="ft"><b>Documents from the same deal</b><p>Send a quotation your client can open and accept online. On Pro, create the agreement your client signs online and the invoices, with the same figures, and record payments as they arrive.</p></div>
+    <div class="ft"><b>Find new clients</b><p>AI Outbound researches companies that fit what you sell, or lists local businesses in a city from Google Maps, with sources for what it finds. The free plan includes ${OB.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days.</p></div>
+    <div class="ft"><b>Do-not-contact, respected</b><p>Add an email address or a whole domain once and DealInSec won't draft or approve messages to it.</p></div>
+  </div>
+  <div class="callout honest"><b>What it doesn't do</b><p>There is no separate client directory: a client's details live on their lead and their deals. DealInSec doesn't send emails or WhatsApp messages for you, doesn't schedule meetings, isn't a contact database and doesn't replace your accounting software. Connecting Gmail is in limited early access, so it isn't available to every workspace yet.</p></div>
+</div></section>
+<section><div class="wrap">
+  <h2>Spreadsheet vs DealInSec</h2>
+  <div class="tbl-scroll"><table class="cmp">
+    <tr><th></th><th>Spreadsheet and chats</th><th>DealInSec</th></tr>
+    <tr><td><b>Follow-ups</b></td><td>Whatever you remember</td><td>A follow-up date and next step on every lead, listed when due</td></tr>
+    <tr><td><b>Quotation</b></td><td>A separate document, typed again</td><td>Generated from the deal; your client accepts it online</td></tr>
+    <tr><td><b>Agreement and invoice</b></td><td>More documents, more re-typing</td><td>From the same deal, with the same figures (Pro)</td></tr>
+    <tr><td><b>What's unpaid</b></td><td>Checked in your bank app</td><td>Paid, pending and overdue invoices at a glance (Pro)</td></tr>
+  </table></div>
+</div></section>
+<section><div class="wrap">
+  <h2>Related</h2>
+  <div class="rel-grid">
+    <a class="rel-card" href="/quotation-software">Quotation software<span>Clear quotations your client accepts online.</span></a>
+    <a class="rel-card" href="/invoice-management">Invoices and payment follow-ups<span>See what is paid, pending and overdue.</span></a>
+    <a class="rel-card" href="/find-local-clients">Find local clients<span>Businesses in your city, from Google Maps.</span></a>
+    <a class="rel-card" href="/ai-coworkers">AI coworkers<span>Nibo, Mika and Zee help with research and drafts.</span></a>
+  </div>
+</div></section>`,
+    faq: [
+      {
+        q: "Do freelancers really need a CRM?",
+        a: "If you handle more than a few enquiries a month, yes, but a simple one. What matters is knowing who each potential client is, what you quoted, when to follow up and what is unpaid. DealInSec keeps exactly that, and generates the quotation, agreement and invoice from the same deal.",
+      },
+      {
+        q: "Is there a separate list of clients?",
+        a: "Not a separate directory. Potential clients are leads, and the people and businesses you work with are recorded on their deals, so their quotations, agreements and invoices stay together.",
+      },
+      {
+        q: "Does DealInSec send follow-up messages for me?",
+        a: "No. It reminds you when a follow-up is due and AI can draft the message, but you approve it and send it yourself from your own email or WhatsApp. Nothing is sent automatically.",
+      },
+      {
+        q: "What does it cost?",
+        a: `The free plan, with no credit card, includes the lead pipeline, ${PRICING.freeMonthlyDeals} deals a month with their quotations and ${OB.free.monthlySearches} AI Outbound searches every ${OUTBOUND_WINDOW_DAYS} days. Pro is ₹${PRICING.proMonthlyInr} a month in India and adds unlimited deals, agreements signed online, invoices, payment tracking and team members.`,
+      },
+      {
+        q: "Can I bring my existing deals?",
+        a: "Yes. Download the CSV template on the import page, fill in your deals and import them; each one goes through the same checks as a deal you create by hand.",
+      },
+    ],
+  },
   /* ── /ai-coworkers — Nibo, Mika and Zee (AI League), for India ───────────────────────────────────────── */
   // Every capability here is what server/ai-league does: Nibo's research always asks first and saves at most
   // LEAGUE_LIMITS.leadsPerRun companies a task; Mika only drafts; Zee's summary is checked against the records; a hand-off
@@ -796,7 +876,7 @@ export const PAGES: CategoryPage[] = [
     metaTitle: "AI Coworkers for Freelancers and Agencies: Nibo, Mika and Zee",
     description:
       "Three AI coworkers inside DealInSec: Nibo researches companies that fit, Mika drafts first messages you approve, Zee briefs you from your own records.",
-    h1: "AI coworkers that find clients, draft messages and watch your money",
+    h1: "AI coworkers for your business workflow",
     sub: "Nibo researches companies that fit what you sell, Mika drafts first messages for you to approve, and Zee tells you what needs you today, from your own invoices, deals and follow-ups. They work in the background and ask before anything that spends your allowance or changes something.",
     chips: ["Research with sources", "Drafts only, you send", "Briefings from your records", "Run in the background", "Free plan, no card"],
     shortLabel: "AI Coworkers",
@@ -1158,7 +1238,7 @@ export function renderCategoryPage(p: CategoryPage, siblings: RelatedLink[]): st
   <h1>${esc(p.h1)}</h1>
   <p class="sub">${esc(p.sub)}</p>
   <div class="hero-ctas">
-    <a class="btn" href="${SIGNUP}" data-cta>Start free →</a>
+    <a class="btn" href="${SIGNUP}" data-cta>Get started free →</a>
     <a class="btn ghost" href="/tools">Try the free tools</a>
   </div>
   <div class="chips">${chips}</div>

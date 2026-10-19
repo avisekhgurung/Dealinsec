@@ -12,6 +12,7 @@ import { Loader2, MailCheck, ArrowLeft } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
+import { authErrorMessage } from "@/lib/auth-copy";
 
 export default function ForgotPasswordPage() {
   const { toast } = useToast();
@@ -26,7 +27,7 @@ export default function ForgotPasswordPage() {
       await apiRequest("POST", "/api/auth/forgot-password", { email: email.trim() });
       setSent(true);
     } catch (error: any) {
-      toast({ title: "Something went wrong", description: error.message || "Please try again.", variant: "destructive" });
+      toast({ title: "Couldn't send the reset link", description: authErrorMessage(error, "forgot"), variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -51,7 +52,7 @@ export default function ForgotPasswordPage() {
             </p>
             <Link href="/auth?mode=signin">
               <Button variant="outline" className="mt-6 font-semibold" data-testid="back-to-signin">
-                <ArrowLeft className="w-4 h-4 mr-2" /> Back to sign in
+                <ArrowLeft className="w-4 h-4 mr-2" /> Back to log in
               </Button>
             </Link>
           </div>
@@ -59,11 +60,11 @@ export default function ForgotPasswordPage() {
           <>
             <h1 className="text-xl font-bold">Reset your password</h1>
             <p className="text-sm text-muted-foreground mt-1 mb-6">
-              Enter your account email and we'll send you a reset link.
+              Enter your registered email address and we'll send you a reset link.
             </p>
             <form onSubmit={submit} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="fp-email">Email</Label>
+                <Label htmlFor="fp-email">Email address</Label>
                 <Input id="fp-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" data-testid="input-email" />
               </div>
               <Button type="submit" className="w-full h-11 gradient-btn text-white font-bold" disabled={isLoading || !email.trim()} data-testid="button-send-reset">
@@ -73,7 +74,7 @@ export default function ForgotPasswordPage() {
             </form>
             <p className="text-sm text-muted-foreground mt-5 text-center">
               Remembered it?{" "}
-              <Link href="/auth?mode=signin" className="font-semibold text-primary hover:underline">Sign in</Link>
+              <Link href="/auth?mode=signin" className="font-semibold text-primary hover:underline">Log in</Link>
             </p>
           </>
         )}

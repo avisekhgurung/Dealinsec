@@ -48,7 +48,7 @@ export interface RunView {
 /** A waiting campaign says what it waits for: its start, or its delivery time (the report is already saved). */
 const statusLabelOf = (r: LeagueRunRow): string =>
   r.status === "waiting" && r.stage === "start" ? "Scheduled"
-    : r.status === "waiting" && r.stage === "deliver" ? "Report ready"
+    : r.status === "waiting" && r.stage === "deliver" ? "Report scheduled"
       : RUN_STATUS_LABEL[r.status as LeagueRunStatus] ?? r.status;
 
 /** What the person asked for: a search request, or a huddle's topic. */

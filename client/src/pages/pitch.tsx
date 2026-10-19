@@ -857,7 +857,7 @@ export default function PitchPage() {
           </section>
 
           <footer className="text-center py-6 text-sm text-muted-foreground border-t print:py-2">
-            <p>DealInSec - find better clients, close deals, get paid</p>
+            <p>DealInSec - find clients, win deals, get paid</p>
             <p className="mt-1">Quote it. Sign it. Invoice it. Get paid.</p>
           </footer>
 

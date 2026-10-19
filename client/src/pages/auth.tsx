@@ -27,6 +27,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { trackEvent } from "@/lib/analytics";
 import { postAuthDestination } from "@/lib/deal-prefill";
+import { authErrorMessage } from "@/lib/auth-copy";
 
 /** The whole journey: find the client, then get paid. Short labels so all six fit a phone. */
 const PIPELINE = [
@@ -39,9 +40,9 @@ const PIPELINE = [
 ];
 
 const PROOF_POINTS = [
+  "Built for freelancers and service providers in India",
   "Agreements carry a signed execution record",
-  "Built for small agencies and consultants in the US and India",
-  "Free plan, no card. Pro when you need it",
+  "Free plan, no credit card required. Pro when you need it",
 ];
 
 /** Security facts, each one verifiable in the code — see the PRIVACY policy. */
@@ -106,8 +107,8 @@ export default function AuthPage() {
       setLocation(postAuthDestination());
     } catch (error: any) {
       toast({
-        title: mode === "signup" ? "Signup failed" : "Sign in failed",
-        description: error.message || (mode === "signup" ? "Could not create account" : "Invalid email or password"),
+        title: mode === "signup" ? "Couldn't create your account" : "Couldn't log you in",
+        description: authErrorMessage(error, mode === "signup" ? "signup" : "login"),
         variant: "destructive",
       });
     } finally {
@@ -143,7 +144,7 @@ export default function AuthPage() {
           </p>
           <h2 className="text-[26px] leading-[1.15] font-bold tracking-tight">
             Find clients.<br />
-            <span className="text-emerald-300">Close deals. Get paid.</span>
+            <span className="text-emerald-300">Win deals. Get paid.</span>
           </h2>
 
           <div className="flex items-center gap-1 mt-5">
@@ -195,13 +196,13 @@ export default function AuthPage() {
               </div>
 
               <h1 className="text-2xl font-bold tracking-tight" data-testid="auth-heading">
-                {mode === "signup" ? "Create your account" : "Welcome back"}
+                {mode === "signup" ? "Create your free account" : "Welcome back"}
                 <span className="ml-1.5" aria-hidden="true">{mode === "signup" ? "✨" : "👋"}</span>
               </h1>
               <p className="text-sm text-muted-foreground mt-1.5 mb-6">
                 {mode === "signup"
-                  ? "Start on the free plan. No card needed."
-                  : "Sign in to continue to your workspace."}
+                  ? "Start managing leads, deals, quotations and invoices in one place. No credit card required."
+                  : "Log in to manage your clients, deals and payments."}
               </p>
 
               <Button
@@ -250,7 +251,7 @@ export default function AuthPage() {
                 )}
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="auth-email">Email</Label>
+                  <Label htmlFor="auth-email">Email address</Label>
                   <div className="relative">
                     <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" aria-hidden="true" />
                     <Input
@@ -269,7 +270,7 @@ export default function AuthPage() {
 
                 <div className="space-y-1.5">
                   <div className="flex items-baseline justify-between">
-                    <Label htmlFor="auth-password">Password</Label>
+                    <Label htmlFor="auth-password">{mode === "signup" ? "Create password" : "Password"}</Label>
                     {mode === "signin" && (
                       <Link
                         href="/forgot-password"
@@ -291,6 +292,7 @@ export default function AuthPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder={mode === "signup" ? "At least 6 characters" : "Your password"}
+                      aria-describedby={mode === "signup" ? "auth-password-hint" : undefined}
                       autoComplete={mode === "signup" ? "new-password" : "current-password"}
                       data-testid="input-password"
                     />
@@ -305,6 +307,7 @@ export default function AuthPage() {
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
+                  {mode === "signup" && <p id="auth-password-hint" className="text-xs text-muted-foreground">Use at least 6 characters.</p>}
                 </div>
 
                 <Button
@@ -320,7 +323,7 @@ export default function AuthPage() {
                   ) : (
                     <Lock className="w-4 h-4 mr-2" />
                   )}
-                  {mode === "signup" ? "Create free account" : "Sign in"}
+                  {mode === "signup" ? "Create account" : "Log in"}
                 </Button>
               </form>
 
@@ -328,7 +331,7 @@ export default function AuthPage() {
                 {mode === "signup" ? (
                   <>Already have an account?{" "}
                     <button type="button" className="font-semibold text-primary hover:underline" onClick={() => setMode("signin")} data-testid="switch-signin">
-                      Sign in
+                      Log in
                     </button>
                   </>
                 ) : (
@@ -353,8 +356,8 @@ export default function AuthPage() {
             </div>
 
             <p className="text-[11px] text-muted-foreground text-center mt-5">
-              By continuing you agree to our{" "}
-              <Link href="/terms" className="underline hover:text-foreground">Terms</Link> and{" "}
+              {mode === "signup" ? "By creating an account, you agree to our" : "By continuing, you agree to our"}{" "}
+              <Link href="/terms" className="underline hover:text-foreground">Terms of Service</Link> and{" "}
               <Link href="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>.
             </p>
           </div>
@@ -378,12 +381,12 @@ export default function AuthPage() {
           </p>
           <h2 className="text-3xl xl:text-[40px] font-bold text-white leading-[1.12] tracking-tight">
             Find clients.<br />
-            <span className="text-emerald-300">Close deals. Get paid.</span>
+            <span className="text-emerald-300">Win deals. Get paid.</span>
           </h2>
           <p className="text-emerald-100/70 mt-4 text-sm leading-relaxed">
-            For small SEO, marketing, growth and AI-automation agencies, consultants and
-            freelancers: research prospects with evidence, run a clear pipeline, then quote,
-            get the agreement signed, invoice and track payment, all from the same deal.
+            For freelancers, consultants and small agencies: find potential clients with
+            evidence, track leads and deals, then quote, get the agreement signed, invoice
+            and follow up on payments, all from the same deal.
           </p>
 
           <div className="flex items-center gap-1.5 xl:gap-2 mt-9">

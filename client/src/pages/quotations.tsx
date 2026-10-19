@@ -96,8 +96,8 @@ const makeColumns = (fmt: MoneyFormat, party = "Client"): ColumnDef<QuoteTableRo
   },
   {
     id: "issued",
-    header: "Issued",
-    meta: { label: "Issued", exportValue: (r: QuoteRow) => (r.createdAt ? String(r.createdAt) : "") },
+    header: "Created",
+    meta: { label: "Created", exportValue: (r: QuoteRow) => (r.createdAt ? String(r.createdAt) : "") },
     accessorFn: (r) => (r.createdAt ? new Date(r.createdAt as any).getTime() : 0),
     cell: ({ row }) => <span className="text-muted-foreground whitespace-nowrap">{fmtDate(row.original.createdAt, fmt.locale)}</span>,
   },
@@ -147,7 +147,7 @@ export default function QuotationsPage() {
             <div>
               <h1 className="text-xl lg:text-2xl font-bold tracking-tight">Quotations</h1>
               <p className="hidden lg:block text-sm text-muted-foreground mt-0.5">
-                {quotes.length} {quotes.length === 1 ? "quotation" : "quotations"} issued by your team
+                Create, share, and track quotations for your services · {quotes.length} {quotes.length === 1 ? "quotation" : "quotations"}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -172,6 +172,7 @@ export default function QuotationsPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <Input
             placeholder={`Search by ${audience.partyLower}, deal or quotation number…`}
+            aria-label="Search quotations"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 pr-9"
@@ -205,7 +206,7 @@ export default function QuotationsPage() {
               rowLabel={(r) => `Quotation ${r.quoteNo}${r.clientName ? `, ${r.clientName}` : ""}`}
               exportFileName="quotations"
               toolbarExtra={<DateRangeFilter value={dateRange} onChange={setDateRange} />}
-              emptyMessage="No quotations match your filters."
+              emptyMessage="No quotations match your search or filters. Clear them to see all quotations."
             />
           </div>
         )}
@@ -225,16 +226,18 @@ export default function QuotationsPage() {
                   <FileText className="w-6 h-6 text-muted-foreground" />
                 </div>
                 <p className="font-semibold">
-                  {search ? "No quotations match that search" : "No quotations yet"}
+                  {search ? "No quotations match that search" : quotes.length > 0 ? "No quotations in this date range" : "No quotations yet"}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
                   {search
-                    ? `Try a different ${audience.partyLower} or deal name.`
-                    : "Open a deal and generate its quotation — it'll appear here for the whole team."}
+                    ? `Try a different ${audience.partyLower} or deal name, or a quotation number.`
+                    : quotes.length > 0
+                    ? "Choose a different date range to see your other quotations."
+                    : "Every quotation is created from a deal. Choose a deal to create your first one, then share the link with your client."}
                 </p>
                 {!search && canCreate && (
                   <Button size="sm" className="mt-4 gradient-btn text-white" onClick={() => setPickOpen(true)}>
-                    Create a quotation
+                    New quotation
                   </Button>
                 )}
               </div>
@@ -242,7 +245,7 @@ export default function QuotationsPage() {
               <>
                 {/* Desktop column headers */}
                 <div className="hidden lg:grid grid-cols-[0.8fr_1.3fr_1.5fr_0.9fr_0.6fr_0.9fr_auto] gap-4 px-5 py-2.5 border-b border-border/60 bg-muted/30">
-                  {["Quotation No.", audience.party, "Deal", "Value", "Version", "Issued", ""].map((h, i) => (
+                  {["Quotation No.", audience.party, "Deal", "Value", "Version", "Created", ""].map((h, i) => (
                     <span key={i} className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                       {h}
                     </span>

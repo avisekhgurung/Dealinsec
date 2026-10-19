@@ -20,10 +20,10 @@ export function TeammateCard({ card }: { card: AgentCard }) {
           <Mascot bot={to} size={28} />
           <p className={cn("min-w-0 flex-1 rounded-lg px-2.5 py-1.5", t.accent.soft)}>
             <span className={cn("font-medium", t.accent.fg)}>{t.name}:</span>{" "}
-            {typeof answer === "string" && answer ? answer : dropped ? "Left out: the answer mentioned a figure that isn't in the records." : "Had nothing to add."}
+            {typeof answer === "string" && answer ? answer : dropped ? "Not shown: the answer mentioned a figure that isn't in your records." : "Had nothing to add."}
           </p>
         </div>
-        <p className="text-[11px] text-muted-foreground">Advice from {t.name}'s records. Nothing was changed.</p>
+        <p className="text-[11px] text-muted-foreground">Advice from your workspace records. Nothing was changed.</p>
       </div>
     </CardShell>
   );

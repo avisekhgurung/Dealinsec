@@ -157,7 +157,7 @@ function SuccessContent({
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.45 }}
         >
-          Payment Successful!
+          Payment successful
         </motion.h2>
         <motion.p
           className="text-sm text-muted-foreground mt-1.5"
@@ -198,7 +198,7 @@ function SuccessContent({
             className={continueLabel ? "w-full h-11" : "gradient-btn w-full text-white h-11 font-semibold"}
             onClick={onClose}
           >
-            {continueLabel ? "Stay on Pricing" : "Done"}
+            {continueLabel ? "Stay on pricing" : "Done"}
           </Button>
         </motion.div>
       </div>
@@ -246,13 +246,13 @@ function ErrorContent({
         className="text-2xl font-bold text-foreground mt-5"
         initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
       >
-        Payment Failed
+        Payment failed
       </motion.h2>
       <motion.p
         className="text-sm text-muted-foreground mt-1.5"
         initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
       >
-        {errorReason || "Your payment couldn't be processed. No money was deducted — please try again."}
+        {errorReason || "Your payment didn't go through. Please try again."}
       </motion.p>
 
       <motion.div
@@ -262,7 +262,7 @@ function ErrorContent({
         {onRetry && (
           <Button className="gradient-btn w-full text-white h-11 font-semibold" onClick={onRetry}>
             <RotateCcw className="w-4 h-4 mr-2" />
-            Try Again
+            Try again
           </Button>
         )}
         <Button variant="outline" className="w-full h-11" onClick={onClose}>

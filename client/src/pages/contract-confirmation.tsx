@@ -111,7 +111,7 @@ export default function ContractConfirmationPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      toast({ title: "Invalid file", description: "Upload an image (PNG/JPG).", variant: "destructive" });
+      toast({ title: "This file type isn't supported", description: "Upload your signature as a PNG or JPG image.", variant: "destructive" });
       return;
     }
     setSignatureFile(file);
@@ -222,8 +222,8 @@ export default function ContractConfirmationPage() {
         setLocation(`/deals/${params.id}`);
       } else {
         toast({
-          title: "Error",
-          description: "Failed to create agreement. Please try again.",
+          title: "Couldn't create the agreement",
+          description: "Nothing was created. Please try again.",
           variant: "destructive",
         });
       }
@@ -275,7 +275,7 @@ export default function ContractConfirmationPage() {
   if (!deal) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Deal not found</p>
+        <p className="text-muted-foreground px-6 text-center">Deal not found. It may have been deleted, or the link may be incorrect.</p>
       </div>
     );
   }
@@ -291,11 +291,12 @@ export default function ContractConfirmationPage() {
               variant="ghost"
               size="icon"
               onClick={() => setLocation(`/deals/${params.id}`)}
+              aria-label="Back to deal"
               data-testid="button-back-deal"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Create Agreement</h1>
+            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Create agreement</h1>
           </div>
         </header>
         <main className="px-4 py-8 max-w-lg mx-auto animate-fade-in lg:max-w-4xl lg:px-8">
@@ -307,7 +308,7 @@ export default function ContractConfirmationPage() {
               <div>
                 <h2 className="text-lg font-bold">Agreement already created</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  This deal already has an agreement — a deal can have only one.
+                  This deal already has an agreement. Each deal can have only one.
                 </p>
               </div>
               <div className="flex flex-col gap-2 pt-2">
@@ -316,14 +317,14 @@ export default function ContractConfirmationPage() {
                   onClick={() => setLocation(`/contracts/${existingContract.id}`)}
                   data-testid="button-view-existing-agreement"
                 >
-                  View Agreement
+                  View agreement
                 </Button>
                 <Button
                   variant="outline"
                   className="w-full h-12 rounded-xl"
                   onClick={() => setLocation(`/deals/${params.id}`)}
                 >
-                  Back to Deal
+                  Back to deal
                 </Button>
               </div>
             </CardContent>
@@ -348,11 +349,12 @@ export default function ContractConfirmationPage() {
               variant="ghost"
               size="icon"
               onClick={() => setLocation(`/deals/${params.id}`)}
+              aria-label="Back to deal"
               data-testid="button-back-deal"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Create Agreement</h1>
+            <h1 className="text-xl lg:text-lg font-bold lg:font-semibold">Create agreement</h1>
 
             {/* Pro pill in header — agreements are a Pro feature. Trialists
                 see "Trial" so paid and trial never look the same. */}
@@ -424,7 +426,7 @@ export default function ContractConfirmationPage() {
                   </p>
                 </div>
                 <div className="flex-shrink-0 text-right">
-                  <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">cost</div>
+                  <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Cost</div>
                   <div className="text-lg font-black text-emerald-700 dark:text-emerald-300">{fmt.money(0)}</div>
                 </div>
               </div>
@@ -449,7 +451,7 @@ export default function ContractConfirmationPage() {
               <Card className={`glass-card ${issues.length ? "border-amber-300/60 dark:border-amber-900/50" : "border-emerald-300/50 dark:border-emerald-800/50"}`}>
                 <CardContent className="p-4">
                   <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2.5">
-                    Deal Safety Check {issues.length === 0 && "— all clear"}
+                    Deal safety check{issues.length === 0 && ": all clear"}
                   </p>
                   <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-1.5 mb-1">
                     {checks.map((c) => (
@@ -468,7 +470,7 @@ export default function ContractConfirmationPage() {
                   </ul>
                   {issues.length > 0 && (
                     <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-2">
-                      Recommended: fix {issues.length === 1 ? "this" : "these"} before creating — each "Add it" ticks the matching standard term below.
+                      Recommended: fix {issues.length === 1 ? "this" : "these"} before you create the agreement. Each "Add it" ticks the matching standard term below.
                     </p>
                   )}
                 </CardContent>
@@ -515,12 +517,14 @@ export default function ContractConfirmationPage() {
             </Card>
           )}
 
+          {/* Only when the agreement will be created as exclusive (the same rule as `exclusive` in the create call). */}
+          {exclusiveDeal && (
           <Card className="glass-card border-amber-200/50 dark:border-amber-900/40 bg-amber-50/30 dark:bg-amber-950/10">
             <CardContent className="p-4">
               <div className="flex gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold text-amber-900 dark:text-amber-200 text-sm">Important Notice</p>
+                  <p className="font-semibold text-amber-900 dark:text-amber-200 text-sm">Important notice</p>
                   <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed mt-0.5">
                     This agreement is <strong>EXCLUSIVE for its scope</strong>. While it runs, you
                     won't deliver the same work to a direct competitor of this client for this
@@ -530,6 +534,7 @@ export default function ContractConfirmationPage() {
               </div>
             </CardContent>
           </Card>
+          )}
 
           {/* Honesty, outside India only: the Indian clauses are the ones this
               product was built around; everywhere else the agreement carries a
@@ -545,7 +550,7 @@ export default function ContractConfirmationPage() {
 
           <Card className="glass-card border-0">
             <CardContent className="p-5 space-y-3">
-              <h3 className="font-semibold text-sm">Agreement Details</h3>
+              <h3 className="font-semibold text-sm">Agreement details</h3>
               <div className="space-y-2.5 text-sm">
                 {[
                   { label: "Client", value: deal.brandName },
@@ -555,7 +560,7 @@ export default function ContractConfirmationPage() {
                     label: "Period",
                     value: `${new Date(deal.startDate).toLocaleDateString(fmt.locale, { day: "numeric", month: "short" })} – ${new Date(deal.endDate).toLocaleDateString(fmt.locale, { day: "numeric", month: "short", year: "numeric" })}`,
                   },
-                  { label: "Deliverables", value: `${deal.deliverables.length} items` },
+                  { label: "Deliverables", value: `${deal.deliverables.length} item${deal.deliverables.length !== 1 ? "s" : ""}` },
                 ].map(({ label, value, bold }) => (
                   <div key={label} className="flex justify-between gap-4">
                     <span className="text-muted-foreground">{label}</span>
@@ -569,13 +574,13 @@ export default function ContractConfirmationPage() {
           {(needsBillingAddress || needsPan || needsSignature) && (
             <Card className="glass-card border-0">
               <CardContent className="p-5 space-y-4">
-                <h3 className="font-semibold text-sm">Complete Your Profile</h3>
-                <p className="text-xs text-muted-foreground">Required for the agreement document — saved to your profile so we won't ask again.</p>
+                <h3 className="font-semibold text-sm">Complete your profile</h3>
+                <p className="text-xs text-muted-foreground">Needed for the agreement document. We save these to your profile, so you won't be asked again.</p>
 
                 {needsBillingAddress && (
                   <div className="space-y-1.5">
                     <Label htmlFor="billingAddress" className="text-sm font-medium">
-                      Billing Address <span className="text-red-500">*</span>
+                      Billing address <span className="text-red-500">*</span>
                     </Label>
                     <Input
                       id="billingAddress"
@@ -591,7 +596,7 @@ export default function ContractConfirmationPage() {
                 {needsPan && (
                   <div className="space-y-1.5">
                     <Label htmlFor="panNumber" className="text-sm font-medium">
-                      PAN Number <span className="text-red-500">*</span>
+                      PAN number <span className="text-red-500">*</span>
                     </Label>
                     <Input
                       id="panNumber"
@@ -662,7 +667,7 @@ export default function ContractConfirmationPage() {
                             <Upload className="w-3.5 h-3.5 mr-2" />
                             Upload signature
                           </Button>
-                          <p className="text-[11px] text-muted-foreground">PNG or JPG — appears on the agreement PDF</p>
+                          <p className="text-[11px] text-muted-foreground">PNG or JPG. It appears on the agreement PDF.</p>
                           <input
                             ref={signatureInputRef}
                             type="file"
@@ -684,7 +689,7 @@ export default function ContractConfirmationPage() {
             <CardContent className="p-5 space-y-4">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-primary" />
-                <h3 className="font-semibold text-sm">Terms &amp; Conditions</h3>
+                <h3 className="font-semibold text-sm">Terms and conditions</h3>
               </div>
               <p className="text-xs text-muted-foreground -mt-2">
                 These appear on the agreement PDF. Adjust the standard terms or add your own below.
@@ -720,7 +725,7 @@ export default function ContractConfirmationPage() {
                 <div>
                   <Label className="text-xs font-semibold">Your own terms (optional)</Label>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Add clauses specific to this agreement — exclusivity, usage rights, posting schedule, revisions, etc.
+                    Add clauses specific to this agreement: exclusivity, usage rights, schedules, revisions and so on.
                   </p>
                 </div>
 
@@ -799,12 +804,12 @@ export default function ContractConfirmationPage() {
               {createContract.isPending ? (
                 <>
                   <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Creating Agreement…
+                  Creating agreement…
                 </>
               ) : (
                 <>
                   <PenLine className="w-5 h-5 mr-2" />
-                  Create Agreement
+                  Create agreement
                 </>
               )}
             </Button>

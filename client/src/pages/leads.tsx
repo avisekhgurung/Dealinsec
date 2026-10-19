@@ -155,7 +155,7 @@ export default function LeadsPage() {
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <h1 className="text-xl font-bold tracking-tight lg:text-2xl">Leads</h1>
-              <p className="mt-0.5 hidden text-sm text-muted-foreground lg:block">{totalAll} {totalAll === 1 ? "company" : "companies"} in your pipeline</p>
+              <p className="mt-0.5 hidden text-sm text-muted-foreground lg:block">Potential clients you're working to win · {totalAll} in your pipeline</p>
             </div>
             <div className="flex items-center gap-2">
               <NotificationBell className="lg:hidden" />
@@ -188,7 +188,7 @@ export default function LeadsPage() {
             <span className="min-w-0 flex-1 break-words text-muted-foreground">
               {hasCriteria(ideal.data.profile)
                 ? <>Looking for: <span className="font-medium text-foreground">{[...ideal.data.profile.targetIndustries, ...ideal.data.profile.targetLocations].join(", ") || "any client"}</span>{ideal.data.profile.minDealMinor && ideal.data.profile.currency ? <> · from {formatMoney(ideal.data.profile.minDealMinor, ideal.data.profile.currency, locale)}</> : null}</>
-                : "Tell us who you want to win, and each lead is checked against it."}
+                : "Describe your ideal client and DealInSec will check each lead against it."}
             </span>
             {canEdit && <Button variant="ghost" size="sm" className="h-8" onClick={() => setIdealOpen(true)} data-testid="button-ideal-client">{hasCriteria(ideal.data.profile) ? "Edit" : "Set ideal client"}</Button>}
           </div>
@@ -228,7 +228,7 @@ export default function LeadsPage() {
                 <div className="px-6 py-14 text-center" data-testid="leads-empty">
                   <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted"><Target className="h-6 w-6 text-muted-foreground" aria-hidden /></div>
                   <p className="font-semibold">No leads yet</p>
-                  <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">Add the companies you want to win, import a list, or let AI Outbound find them. Work each one with a next step, and turn it into a deal when it closes.</p>
+                  <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">Leads are potential clients. Add one yourself, import a CSV, or find companies with AI Outbound. Give each lead a next step, and turn it into a deal when you win the work.</p>
                   <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                     {canEdit && <Button size="sm" className="gradient-btn text-white" onClick={() => setAddOpen(true)}>Add your first lead</Button>}
                     {canEdit && <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}><FileUp className="mr-1.5 h-4 w-4" />Import a CSV</Button>}
