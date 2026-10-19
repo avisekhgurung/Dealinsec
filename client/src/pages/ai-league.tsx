@@ -320,7 +320,7 @@ function CoworkerChat({ bot }: { bot: Bot }) {
                 </div>
               </div>
             ) : (
-              <Thread messages={agent.messages} approvals={agent.approvals} running={agent.running} steps={agent.steps} assistant={assistant}
+              <Thread messages={agent.messages} approvals={agent.approvals} running={agent.running} steps={agent.steps} live={agent.live} assistant={assistant}
                 onEditLast={(t) => setSeed((x) => ({ text: t, n: x.n + 1 }))}
                 onStop={agent.stop} onRetry={agent.retry} onApprove={(a, t) => void agent.approve(a, t)} onDecline={(a, t) => void agent.reject(a, t)} />
             )}

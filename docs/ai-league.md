@@ -92,16 +92,62 @@ These are settings, not a validated pricing model: each task also spends the und
 searches and researched prospects, AI drafts), and the workspace's $1.50 30-day AI spend ceiling applies to every model
 call. Nothing is unlimited.
 
-## Running the worker on Render
+## Research campaigns (Nibo, over hours)
 
-There is no separate worker service: like AI Outbound's prospect runs, the league runner lives in the web process
-(server/index.ts kicks it at boot; every start, cancel and page view kicks it; it re-checks at least every 5 minutes
-while runs or schedules exist). Work is durable because the state is in Postgres, not in memory.
+`nibo.campaign` (server/ai-league/tasks/campaign.ts; times in shared/league-campaign.ts). "Work tonight: find 50 Indian
+digital marketing agencies that may need web development, save the qualified ones, report at 8 AM IST."
 
-**Requirement:** the Render web service must be an always-on instance (a paid instance type). A free instance sleeps
-when idle: queued tasks and due schedules then wait until the next request wakes it (they are not lost, and run once on
-wake). If AI League ever needs to scale beyond one instance, the claim is already safe across processes (leases and
-`FOR UPDATE SKIP LOCKED`); a dedicated worker would run the same `kickLeague()` loop.
+- **Three times, stored as UTC instants:** start (now or scheduled), work-until (no new search starts after it; default
+  15 minutes before delivery so the report is on time), deliver-at. A hard stop caps every campaign at 24 hours. Times
+  are checked when the task is created (too soon, more than 7 days ahead, work after delivery, longer than 24 hours)
+  and the person is told immediately.
+- **Batches:** one AI Outbound search per batch (each from the plan's allowance, up to 10 companies), at most 10 per
+  campaign. A country-wide profile moves city by city (Mumbai, Bengaluru, Delhi NCR, Pune…) so batches find different
+  companies. Results are de-duplicated by domain across batches and against Leads; only "ready"/"qualified" companies
+  count, and they are saved through AI Outbound's add-to-Leads with their evidence.
+- **Durability:** each stage is a checkpointed step; waiting for the start, for a search (checked every 30 s) or for
+  the delivery time parks the run, so nothing polls in between and a restart resumes from the checkpoint. A failed
+  search is skipped; an allowance running out, the search cap or the work-until time stops new research; companies
+  already found are still kept and saved.
+- **Report before delivery:** the report is written and saved (`report_ready` event) at the end of research, held, and
+  delivered at the requested time, complete or partial with its coverage and every limitation stated. Notifications:
+  the in-app bell (`notified` event) and, with `LEAGUE_EMAIL_REPORTS=true`, an email to the account's own address
+  (`emailed` / `email_failed`; a failed email never re-runs the research). CSV and Markdown downloads:
+  `GET /api/ai-league/runs/:id/report.csv|.md` (your own tasks only; CSV formula cells are neutralised).
+- **From chat:** `league_nibo_campaign` takes local wall-clock times (`deliverLocal: "2026-10-20T08:00"`); the server
+  converts them in the person's timezone (their setting, else Asia/Kolkata) and the approval card shows them back
+  ("Report Tue 20 Oct, 08:00 IST"). It always asks first. From the page: Nibo → Start a task → Campaign.
+- **What 50 companies needs:** about 5 searches of 10 companies each, *if* about half qualify. Pro has 10 searches and
+  100 researched companies per 30 days; Free has 3 and 30, so a 50-company campaign on Free ends partial by design.
+
+## The background worker (Render)
+
+`server/worker.ts` runs every durable job (AI League tasks, schedules and campaigns; AI Outbound searches) in its own
+always-on process, independent of browsers, requests and the web service.
+
+- Jobs are Postgres rows claimed with a lease (`FOR UPDATE SKIP LOCKED`), checkpointed after each step and fenced, so
+  two workers never hold one job and a restart, deploy or crash resumes from the last checkpoint (at-least-once steps,
+  effectively-once internal writes: run creation, lead saves and report delivery are keyed or fenced).
+- It kicks the runners every 30 s as a safety net (they also wake themselves for parked jobs), logs a JSON heartbeat
+  every minute (uptime, busy runners, memory), logs the database host it uses (never credentials), and on SIGTERM stops
+  claiming and gives in-flight steps up to 25 s; anything unfinished resumes on the next worker.
+- **Set `BACKGROUND_WORKER=external` on both services** once the worker runs: the web service then records jobs but
+  never works them (server/workflow/runner.ts `backgroundWorkIsElsewhere`). Without it (today), the web process works
+  jobs itself, as before, and then needs an always-on instance.
+
+Render setup (do this in the Render dashboard; render.yaml is unchanged so nothing is created by a push):
+
+1. New → Background Worker, same repository and branch, runtime Node.
+2. Build command `npm install && npm run build`; start command `npm run worker`.
+3. Environment: the same values as the web service (at least `DATABASE_URL`, `DEEPSEEK_API_KEY`, the AI Outbound
+   search keys such as `TAVILY_API_KEY` and `FIRECRAWL_API_KEY` if used, `MAILBOX_TOKEN_KEYS`, `SESSION_SECRET` is not
+   needed), plus `BACKGROUND_WORKER=external`. Optional: `LEAGUE_EMAIL_REPORTS=true` with `RESEND_API_KEY`.
+4. Add `BACKGROUND_WORKER=external` to the web service and redeploy it.
+5. Instance: the smallest paid always-on instance is enough to start (one process, one job slice at a time per runner);
+   check current prices on render.com/pricing (not verified here: the page renders client-side).
+6. Neon: the worker opens its own small connection pool; keep the total within the Neon plan's connection limit.
+
+Local: `npm run dev:worker` (uses `.env`; prefix `DATABASE_URL=…` to point at a local database, as the dev server does).
 
 ## Tests
 
@@ -124,6 +170,11 @@ wake). If AI League ever needs to scale beyond one instance, the claim is alread
 - Run progress is polled (every 2.5 s while a task works), not streamed; chat replies stream (SSE).
 - Notifications are the activity log the bell already reads; there's no email digest yet.
 - Nibo uses AI Outbound's web search; the Google Maps "local businesses" search isn't wired into Nibo yet.
+- Not built: browser automation (Playwright) and MCP connections. Both need infrastructure or credentials this
+  repository doesn't have (a Docker-based Render service with Chromium's system libraries; vetted MCP servers with
+  per-workspace authorization); see the coworker platform handoff. Research uses AI Outbound's search and website
+  reading, which already validates URLs and treats page text as untrusted.
+- Campaigns can't be scheduled as routines yet (their times are absolute); quick tasks can.
 
 ## Mascots
 

@@ -300,6 +300,25 @@ export function proPlanReceiptEmail(args: {
   return { subject, html };
 }
 
+// ── AI League reports ──────────────────────────────────────────────────
+// A coworker's report is ready (server/ai-league/runtime.ts). Everything shown is escaped: a headline can carry
+// company names that came from the web. Only counts and a link: the report itself stays in the app.
+const escHtml = (t: string) => t.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+export function leagueReportEmail(args: { coworker: string; taskLabel: string; headline: string; counts: { label: string; value: number }[]; runId: string; partial: boolean }): { subject: string; html: string } {
+  const subject = `${args.coworker}: ${args.taskLabel} report is ready${args.partial ? " (partial)" : ""}`.slice(0, 140);
+  const html = layout({
+    preview: escHtml(args.headline).slice(0, 140),
+    bodyHtml: `
+      ${heading(`${escHtml(args.coworker)}'s report is ready`)}
+      ${para(`<strong>${escHtml(args.taskLabel)}</strong>: ${escHtml(args.headline)}`)}
+      ${args.counts.length ? infoCard(args.counts.slice(0, 6).map((c) => infoRow(escHtml(c.label), String(c.value))).join("")) : ""}
+      ${args.partial ? para("This report is partial: it says what was covered and why it stopped.") : ""}
+      ${button("Open the report", `${appUrl()}/ai-league?run=${encodeURIComponent(args.runId)}`)}
+    `,
+  });
+  return { subject, html };
+}
+
 // ── The USER's money ───────────────────────────────────────────────────
 // Minor units, formatted in the ORGANISATION's currency — the same locale
 // the agreement and the invoice were printed in. Pass

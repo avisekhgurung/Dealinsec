@@ -24,8 +24,14 @@ import { leagueStore, leagueTablesReady, RunLimit, type ClaimedLeagueRun, type L
 import { runMaxMs } from "./limits";
 import type { TaskCtx, TaskHandler } from "./tasks/types";
 
+/** LEAGUE_EMAIL_REPORTS=true: email campaign and scheduled-task reports (needs RESEND_API_KEY, server/emails.ts). */
+export const emailReports = (env: NodeJS.ProcessEnv = process.env) => env.LEAGUE_EMAIL_REPORTS === "true";
 export const LEASE_MS = 90_000;
 export const MAX_CLAIMS = 400;
+/** A research campaign follows searches for hours (a check every 30 s): it may be claimed far more often. */
+export const MAX_CLAIMS_CAMPAIGN = 4000;
+/** Tasks that keep their own clock (start, work-until, delivery and a hard stop: shared/league-campaign.ts). */
+const OWN_CLOCK = new Set(["nibo.campaign"]);
 const MAX_ERRORS = 3;
 
 export interface RuntimeDeps {
@@ -58,7 +64,7 @@ export function leagueWorkflow(deps: () => RuntimeDeps): Workflow<ClaimedLeagueR
       const d = deps();
       if (!(await d.ready().catch(() => false))) return null;
       const run = await d.store.claim(now, LEASE_MS);
-      if (run && run.attempts > MAX_CLAIMS) {
+      if (run && run.attempts > (OWN_CLOCK.has(run.task) ? MAX_CLAIMS_CAMPAIGN : MAX_CLAIMS)) {
         await finish(d, run, "failed", { headline: "This task got stuck and was stopped. Nothing more will happen on it.", counts: [], items: [] }, "stuck");
         return null;
       }
@@ -78,7 +84,7 @@ export function leagueWorkflow(deps: () => RuntimeDeps): Workflow<ClaimedLeagueR
           await finish(d, run, "cancelled", { headline: "Cancelled. Anything already saved stays; nothing more will happen.", counts: [], items: [], next: null }, null);
           return "done";
         }
-        if (fresh.startedAt && now.getTime() - new Date(fresh.startedAt).getTime() > d.maxMs) {
+        if (!OWN_CLOCK.has(fresh.task) && fresh.startedAt && now.getTime() - new Date(fresh.startedAt).getTime() > d.maxMs) {
           await finish(d, run, "partial", { headline: "Stopped: this task ran past its time limit. What was done so far is kept.", counts: [], items: [], next: null }, "time_limit");
           return "done";
         }
@@ -98,7 +104,9 @@ export function leagueWorkflow(deps: () => RuntimeDeps): Workflow<ClaimedLeagueR
         const out = await d.handlers[fresh.task].step(ctx, fresh.stage === "start" || !fresh.stage ? "start" : fresh.stage);
         if (lost) return "done";
         if (out.kind === "finish") { await finish(d, run, out.status, out.report, out.errorCode ?? null, usage); return "done"; }
-        const ok = await d.store.save(run.id, run.fence, { status: out.kind === "wait" ? "waiting" : "running", stage: out.stage, checkpoint: out.checkpoint ?? ctx.checkpoint, tokensIn: usage.i, tokensOut: usage.o }, d.now());
+        // A step that worked ends any run of errors: retries count consecutive failures, not a night's worth of blips.
+        const { errors: _cleared, ...checkpoint } = (out.checkpoint ?? ctx.checkpoint) as Record<string, unknown>;
+        const ok = await d.store.save(run.id, run.fence, { status: out.kind === "wait" ? "waiting" : "running", stage: out.stage, checkpoint, tokensIn: usage.i, tokensOut: usage.o }, d.now());
         if (!ok) return "done";
         return out.kind === "wait" ? { wait: out.until } : "more";
       } finally {
@@ -159,11 +167,25 @@ export function realRuntimeDeps(): RuntimeDeps {
     notify: async (run, status, report) => {
       const { storage } = await import("../storage");
       const bot = BOT_IDENTITY[run.bot as Bot];
+      // Email, when switched on, for the work people walk away from (campaigns, scheduled tasks): to the account's own
+      // address, counts and a link only. Tracked as its own event; a failed email never re-runs the work.
+      if (emailReports() && (OWN_CLOCK.has(run.task) || run.source === "schedule")) {
+        const user = await storage.getUser(run.userId).catch(() => undefined);
+        const { sendEmail, leagueReportEmail } = await import("../emails");
+        const mail = leagueReportEmail({ coworker: bot?.name ?? "AI League", taskLabel: TASK_LABEL[run.task as LeagueTask] ?? run.task, headline: report.headline, counts: report.counts, runId: run.id, partial: status !== "completed" });
+        let sent = false;
+        for (let attempt = 0; attempt < 3 && !sent && user?.email; attempt++) {
+          sent = await sendEmail({ to: user.email, ...mail });
+          if (!sent && attempt < 2) await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+        }
+        await leagueStore.addEvent({ runId: run.id, orgId: run.organizationId, kind: sent ? "emailed" : "email_failed", message: sent ? "Report emailed to you" : "The report email couldn't be sent; the report is here in the app", now: new Date() }).catch(() => {});
+      }
       await storage.logActivity({
         organizationId: run.organizationId, userId: run.userId, userName: bot?.name ?? "AI League",
         action: status === "completed" ? "finished a task" : status === "partial" ? "partly finished a task" : status === "cancelled" ? "cancelled a task" : "couldn't finish a task",
         entityType: "ai_league_run", entityId: run.id, detail: truncate(`${TASK_LABEL[run.task as LeagueTask] ?? run.task}: ${report.headline}`, 250),
       });
+      await leagueStore.addEvent({ runId: run.id, orgId: run.organizationId, kind: "notified", message: "You were notified in the app", now: new Date() }).catch(() => {});
     },
     now: () => new Date(),
     maxMs: runMaxMs(),

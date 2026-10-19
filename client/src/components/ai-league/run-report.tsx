@@ -13,6 +13,7 @@ import { BOT_IDENTITY, isTerminal } from "@shared/ai-league";
 import { leagueCall, refreshLeague, runUrl, useRun, when, type EventView, type RunView } from "@/lib/ai-league";
 import { leadError } from "@/lib/leads";
 import { Mascot } from "./mascot";
+import { showTime } from "@shared/league-campaign";
 
 const STATUS_TONE: Record<string, string> = {
   completed: "bg-emerald-50 text-emerald-800 ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900",
@@ -81,6 +82,17 @@ export function RunDetail({ id, onClose }: { id: string; onClose?: () => void })
           <p className={cn("text-[11px] font-semibold uppercase tracking-wider", id_.accent.fg)}>{id_.name} · {run.taskLabel}</p>
           <h3 className="mt-0.5 text-base font-semibold leading-snug">{r?.headline ?? (active ? "Working on it…" : run.statusLabel)}</h3>
           {run.request && <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">“{run.request}”</p>}
+          {run.timing && (
+            <p className="mt-1 text-xs text-muted-foreground" data-testid="run-timing">
+              {run.timing.startAt && active && run.stage === "start" ? `Starts ${showTime(new Date(run.timing.startAt), run.timing.timezone)} · ` : ""}
+              {run.timing.deliverAt ? `Report due ${showTime(new Date(run.timing.deliverAt), run.timing.timezone)}` : "Report when the research ends"}
+            </p>
+          )}
+          {active && run.stage === "deliver" && run.timing?.deliverAt && (
+            <p className="mt-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" data-testid="run-held">
+              The report is ready and saved; it will be delivered {showTime(new Date(run.timing.deliverAt), run.timing.timezone)}, as you asked.
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <StatusPill run={run} />
@@ -123,6 +135,13 @@ export function RunDetail({ id, onClose }: { id: string; onClose?: () => void })
         <Button asChild size="sm" className="gradient-btn text-white"><Link href={r.next.href} data-testid="run-next">{r.next.label}<ArrowRight className="ml-1.5 h-4 w-4" /></Link></Button>
       )}
       {r?.notes && r.notes.length > 0 && <ul className="space-y-1 text-xs text-muted-foreground">{r.notes.map((n) => <li key={n}>· {n}</li>)}</ul>}
+      {r && !active && r.items.length > 0 && (
+        <p className="flex flex-wrap items-center gap-2 text-xs" data-testid="run-downloads">
+          <span className="text-muted-foreground">Download:</span>
+          <a href={`${runUrl(id)}/report.csv`} className="rounded-md border px-2 py-1 font-medium hover:bg-muted" download>CSV</a>
+          <a href={`${runUrl(id)}/report.md`} className="rounded-md border px-2 py-1 font-medium hover:bg-muted" download>Markdown</a>
+        </p>
+      )}
 
       {(active || !r) && events.length > 0 && <Timeline events={events} active={active} />}
 

@@ -29,6 +29,18 @@ user (web today; voice / email later)
 - **No personal text in logs or audit rows** (`log.ts`: `safeFields`,
   `summarizeArgs`; tool results are stored as a length only).
 
+## Streaming replies, pinned and renamed conversations
+
+- **Word by word (web chat only):** the provider streams when given `onText` (server/copilot/provider.ts
+  `readChatStream`); the loop batches the pieces (~40 ms) into `agent.text_delta` events `{ step, text }`. A step that
+  goes on to call tools was a preamble: the browser drops it when the next step's text starts. The final
+  `agent.message` is always the saved, authoritative reply. A streamed call is never retried once text was shown. If a
+  reply stops (Stop, a provider error, the time limit) the text already shown is saved with the reason after it.
+- **Pinned conversations:** their own table `agent_session_pins` (server/agent/pins.ts), applied with
+  `npx tsx --env-file=.env script/migrate-agent-pins.ts`. Until then the list works and pinning answers 503. At most 10
+  per person; deleting a conversation removes its pin. **Rename:** `PATCH /api/agent/sessions/:id { title }` (the
+  automatic title is only set while a conversation has none, so a rename sticks).
+
 ## Adding a tool
 
 1. Write it in `tools/` as an `AgentTool`: `name`, `description`, zod `input`,

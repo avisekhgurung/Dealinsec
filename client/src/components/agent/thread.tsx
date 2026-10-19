@@ -56,12 +56,14 @@ function UserMessage({ text, canEdit, onEdit }: { text: string; canEdit: boolean
  * new arrives below. Content that grows after it renders (a card, a code block) keeps a following reader at the bottom.
  */
 export function Thread({
-  messages, approvals, running, steps, onStop, onRetry, onApprove, onDecline, onEditDraft, onEditLast, compact, header, footer, assistant = DEFAULT_ASSISTANT,
+  messages, approvals, running, steps, live = "", onStop, onRetry, onApprove, onDecline, onEditDraft, onEditLast, compact, header, footer, assistant = DEFAULT_ASSISTANT,
 }: {
   messages: ThreadMessage[];
   approvals: Record<string, ApprovalView>;
   running: boolean;
   steps: ActivityStep[];
+  /** The reply as it streams in (replaced by the saved message when it arrives). */
+  live?: string;
   onStop: () => void;
   onRetry: () => void;
   onApprove: (approvalId: string, tool: string) => void;
@@ -104,7 +106,7 @@ export function Thread({
     if (what === "follow") toBottom();
     else if (what === "mark-new") setJump("new");
   }, [messages, toBottom]); // eslint-disable-line react-hooks/exhaustive-deps
-  useLayoutEffect(() => { if (following.current) toBottom(); }, [steps.length, running, toBottom]);
+  useLayoutEffect(() => { if (following.current) toBottom(); }, [steps.length, running, live.length, toBottom]);
 
   // Anything that changes height later (cards loading, images, a folded message opening) keeps a follower pinned.
   useEffect(() => {
@@ -178,7 +180,14 @@ export function Thread({
           {running && (
             <div className="flex items-start gap-2.5">
               <span className="mt-0.5 shrink-0" aria-hidden>{assistant.avatar}</span>
-              <div className="min-w-0 flex-1"><ActivityStrip steps={steps} onStop={onStop} who={assistant.name} /></div>
+              <div className="min-w-0 flex-1">
+                {/* The reply as it is written. aria-busy on the log keeps screen readers from reading every piece;
+                    the finished message is announced once it arrives. */}
+                {live && <div className="dis-streaming" data-testid="agent-live"><RichText text={live} /></div>}
+                {(!live || steps.some((s) => s.state === "active")) && (
+                  <div className={live ? "mt-2" : undefined}><ActivityStrip steps={steps} onStop={onStop} who={assistant.name} /></div>
+                )}
+              </div>
             </div>
           )}
           {footer}

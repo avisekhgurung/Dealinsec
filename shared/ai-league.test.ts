@@ -40,7 +40,7 @@ describe("tasks: the server's bounds, whatever is asked", () => {
     expect(TASK_INPUT["mika.first_messages"].safeParse({ max: 9 }).success).toBe(false);
     expect(TASK_INPUT["mika.first_messages"].safeParse({ leadIds: [1, 2, 3, 4, 5, 6] }).success).toBe(false);
     expect(TASK_INPUT["zee.briefing"].safeParse({ anything: 1 }).success).toBe(false);
-    expect(LEAGUE_LIMITS).toEqual({ leadsPerRun: 5, draftsPerRun: 5, requestChars: 500, huddleRounds: 2, consultsPerReply: 2 });
+    expect(LEAGUE_LIMITS).toEqual({ leadsPerRun: 5, draftsPerRun: 5, requestChars: 500, huddleRounds: 2, consultsPerReply: 2, campaignTarget: 50, campaignSearches: 10, campaignMaxHours: 24, campaignHorizonDays: 7 });
   });
 
   it("three distinct coworkers; terminal states are terminal", () => {

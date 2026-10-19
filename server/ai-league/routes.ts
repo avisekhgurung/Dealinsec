@@ -15,6 +15,7 @@
  *   GET    /api/ai-league/runs                          activity (?bot, status, task, days)
  *   GET    /api/ai-league/runs/:id                      a run, its milestones and report
  *   POST   /api/ai-league/runs/:id/read | cancel | retry
+ *   GET    /api/ai-league/runs/:id/report.csv | report.md   the stored report as a file (your own tasks only)
  *   GET    /api/ai-league/schedules · POST · PATCH /:id · DELETE /:id · POST /:id/run
  *   GET    /api/ai-league/usage
  *   GET    /api/ai-league/memory · PUT · DELETE /:id
@@ -144,6 +145,20 @@ export function registerAiLeagueRoutes(app: Express) {
     res.setHeader("Cache-Control", "no-store");
     send(res, await svc.getRun(req.user, id), (r) => ({ run: r.run, events: r.events }));
   }));
+  for (const fmt of ["csv", "md"] as const) {
+    app.get(`/api/ai-league/runs/:id/report.${fmt}`, isAuthenticated, guarded(`league_report_${fmt}`, async (req, res) => {
+      const id = runId(req.params.id); if (!id) return res.status(404).json({ code: "not_found", error: "That task isn't in your workspace." });
+      const r = await svc.getRun(req.user, id);
+      if (!r.ok) return res.status(r.status).json({ code: r.code, error: r.message });
+      if (!r.run.report) return res.status(409).json({ code: "no_report", error: "This task has no report yet." });
+      const { reportCsv, reportMarkdown } = await import("./report-files");
+      const name = `${r.run.taskLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${id.slice(3, 11)}.${fmt}`;
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
+      if (fmt === "csv") return res.type("text/csv; charset=utf-8").send(reportCsv(r.run.report));
+      res.type("text/markdown; charset=utf-8").send(reportMarkdown(r.run.report, { title: r.run.taskLabel, coworker: r.run.bot, finishedAt: r.run.finishedAt }));
+    }));
+  }
   for (const action of ["read", "cancel", "retry"] as const) {
     app.post(`/api/ai-league/runs/:id/${action}`, isAuthenticated, sameOriginJson, guarded(`league_run_${action}`, async (req, res) => {
       const id = runId(req.params.id); if (!id) return res.status(404).json({ code: "not_found", error: "That task isn't in your workspace." });

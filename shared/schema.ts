@@ -1069,6 +1069,17 @@ export const agentSessions = pgTable("agent_sessions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+/** A pinned Agent mode conversation (server/agent/pins.ts; script/migrate-agent-pins.ts). Its own table, so the
+ *  conversations table and every query on it are unchanged. */
+export const agentSessionPins = pgTable("agent_session_pins", {
+  sessionId: varchar("session_id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  pinnedAt: timestamp("pinned_at").notNull(),
+}, (t) => ({
+  personIdx: index("agent_session_pins_person_idx").on(t.organizationId, t.userId, t.pinnedAt),
+}));
+
 export const agentMessages = pgTable("agent_messages", {
   id: serial("id").primaryKey(),
   sessionId: varchar("session_id").notNull(),

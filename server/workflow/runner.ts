@@ -48,6 +48,10 @@ export interface Runner {
   idle(): Promise<void>;
 }
 
+/** True in the web service when a dedicated worker process runs the background jobs. */
+export const backgroundWorkIsElsewhere = (env: NodeJS.ProcessEnv = process.env) =>
+  env.BACKGROUND_WORKER === "external" && env.DEALINSEC_PROCESS !== "worker";
+
 export function createRunner<J>(wf: Workflow<J>, opts: RunnerOptions = {}): Runner {
   const sliceMs = opts.sliceMs ?? 25_000;
   const now = opts.now ?? Date.now;
@@ -87,6 +91,9 @@ export function createRunner<J>(wf: Workflow<J>, opts: RunnerOptions = {}): Runn
 
   const runner: Runner = {
     kick() {
+      // With a dedicated worker (BACKGROUND_WORKER=external), the web service leaves background work to it: requests
+      // still record jobs in Postgres, and the worker (server/worker.ts) claims them.
+      if (backgroundWorkIsElsewhere()) return;
       if (loop) return;
       loop = (async () => {
         try {

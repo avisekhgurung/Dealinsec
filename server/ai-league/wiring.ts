@@ -9,6 +9,7 @@ import { niboTask } from "./tasks/nibo";
 import { mikaTask } from "./tasks/mika";
 import { localeOf, zeeTask } from "./tasks/zee";
 import { huddleTask } from "./team";
+import { campaignTask } from "./tasks/campaign";
 import { CapExceeded, CapUnavailable } from "../llm/traced";
 
 export function buildHandlers(): Record<LeagueTask, TaskHandler> {
@@ -41,6 +42,13 @@ export function buildHandlers(): Record<LeagueTask, TaskHandler> {
           return r.content ? { text: r.content, tokensIn: r.usage?.inputTokens ?? 0, tokensOut: r.usage?.outputTokens ?? 0 } : null;
         } catch { return null; } // over budget or the model didn't answer: the plain summary stands
       },
+    }),
+    "nibo.campaign": campaignTask({
+      parseIcp: async (u, request) => (await import("../outbound/service")).parseIcp(u as any, request),
+      startRun: async (u, raw, opts) => (await import("../outbound/service")).startRun(u as any, raw, opts),
+      getRun: async (u, id) => (await import("../outbound/service")).getRun(u as any, id),
+      addToLeads: async (u, id) => (await import("../outbound/service")).addToLeads(u as any, id),
+      cancelRun: async (u, id) => (await import("../outbound/service")).cancelRun(u as any, id),
     }),
     "team.huddle": huddleTask({
       chat: async (ctx, messages, opts) => {

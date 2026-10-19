@@ -1021,3 +1021,20 @@ button:not(:disabled):active,
   0% { transform: scale(1); opacity: 0.9; }
   100% { transform: scale(1.22); opacity: 0; }
 }
+
+/* A reply streaming in (thread.tsx): a soft caret after the last line being written. Reduced motion keeps it still. */
+.dis-streaming > div > :is(p, ul, ol, blockquote):last-child::after,
+.dis-streaming > div > :is(ul, ol):last-child > li:last-child::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: currentColor;
+  opacity: 0.6;
+  animation: dis-caret 1s steps(2, start) infinite;
+}
+.dis-streaming > div > :is(ul, ol):last-child::after { content: none; }
+@keyframes dis-caret { to { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .dis-streaming * { animation: none !important; } }

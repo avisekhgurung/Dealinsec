@@ -18,6 +18,7 @@ import { BOTS, BOT_IDENTITY, LEAGUE_LIMITS, TASK_LABEL, type Bot, type LeagueTas
 import { cn } from "@/lib/utils";
 import { refreshLeague, startTask, type RunView } from "@/lib/ai-league";
 import { Mascot } from "./mascot";
+import { campaignTimes, campaignTimesProblem, fromLocal, showTime } from "@shared/league-campaign";
 
 const TASK_OF: Record<Bot, LeagueTask> = { nibo: "nibo.find_clients", mika: "mika.first_messages", zee: "zee.briefing" };
 const SCOPE: Record<LeagueTask, string> = {
@@ -25,6 +26,7 @@ const SCOPE: Record<LeagueTask, string> = {
   "mika.first_messages": "Drafts first emails from what's verified about each lead. Nothing is sent: every draft waits for your approval in Outreach.",
   "zee.briefing": "Reads your invoices, agreements, deals, follow-ups and outreach and reports what needs you. Nothing is changed.",
   "team.huddle": "Nibo, Mika and Zee each give their view from their own records, twice, then the lead sums up with next steps. About a minute; nothing is changed or sent.",
+  "nibo.campaign": "Runs on DealInSec's server, so you can close this page: one AI Outbound search at a time (each from your plan, up to 10 companies), qualified companies saved to Leads with evidence, and a report at the time you choose. Nobody is contacted.",
 };
 
 /** A coworker's own task, or (`huddle`) a team huddle that coworker leads. */
@@ -32,16 +34,31 @@ export function TaskDialog({ bot, open, onOpenChange, onStarted, initialRequest,
   const { toast } = useToast();
   const { openUpgradeModal } = useUpgradeModal();
   const [lead, setLead] = useState<Bot>(bot);
-  const task: LeagueTask = huddle ? "team.huddle" : TASK_OF[bot], id = BOT_IDENTITY[huddle ? lead : bot];
   const [request, setRequest] = useState(initialRequest ?? "");
+  // Nibo: one quick search, or a campaign that runs on the server for hours and reports at a set time.
+  const [mode, setMode] = useState<"quick" | "campaign">("quick");
+  const task: LeagueTask = huddle ? "team.huddle" : bot === "nibo" && mode === "campaign" ? "nibo.campaign" : TASK_OF[bot], id = BOT_IDENTITY[huddle ? lead : bot];
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata";
+  const [target, setTarget] = useState(10);
+  const [searches, setSearches] = useState(3);
+  const [deliverLocal, setDeliverLocal] = useState("");
+  const [startLocal, setStartLocal] = useState("");
+  const campaign = (() => {
+    if (task !== "nibo.campaign") return null;
+    const deliverAt = deliverLocal ? fromLocal(deliverLocal, tz) : null;
+    const startAt = startLocal ? fromLocal(startLocal, tz) : null;
+    const input = { request, target, maxSearches: searches, saveLeads: true, startAt: startAt?.toISOString() ?? null, workUntil: null, deliverAt: deliverAt?.toISOString() ?? null, timezone: tz };
+    const problem = campaignTimesProblem(input, new Date());
+    return { input, problem, times: problem ? null : campaignTimes(input, new Date()) };
+  })();
   const [saveLeads, setSaveLeads] = useState(true);
   const [max, setMax] = useState(3);
   const start = useMutation({
-    mutationFn: () => startTask(task, task === "nibo.find_clients" ? { request, saveLeads, maxLeads: max } : task === "mika.first_messages" ? { max } : task === "team.huddle" ? { topic: request, lead } : {}),
+    mutationFn: () => startTask(task, task === "nibo.campaign" ? campaign!.input : task === "nibo.find_clients" ? { request, saveLeads, maxLeads: max } : task === "mika.first_messages" ? { max } : task === "team.huddle" ? { topic: request, lead } : {}),
     onSuccess: (r) => { void refreshLeague(); onOpenChange(false); onStarted(r.run); toast({ title: r.existing ? "Already running" : huddle ? "The team is talking it over" : `${id.name} is on it`, description: "Progress shows here. It keeps going if you leave this page." }); },
     onError: (e) => { if (isUpgradeError(parseApiError(e))) { onOpenChange(false); openUpgradeModal({ feature: "outbound" }); } else toast({ title: "Couldn't start the task", description: leadError(e), variant: "destructive" }); },
   });
-  const ready = (task !== "nibo.find_clients" && task !== "team.huddle") || request.trim().length >= 8;
+  const ready = ((task !== "nibo.find_clients" && task !== "team.huddle" && task !== "nibo.campaign") || request.trim().length >= 8) && !campaign?.problem;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg" data-testid="task-dialog">
@@ -55,6 +72,40 @@ export function TaskDialog({ bot, open, onOpenChange, onStarted, initialRequest,
           </div>
         </DialogHeader>
         <form id="task-form" className="space-y-4" onSubmit={(e) => { e.preventDefault(); if (ready && !start.isPending) start.mutate(); }}>
+          {bot === "nibo" && !huddle && (
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="How Nibo should work">
+              {([["quick", "Quick search", "One search now, a few minutes"], ["campaign", "Campaign", "Many searches over hours, report at a set time"]] as const).map(([m, label, hint]) => (
+                <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)} data-testid={`nibo-mode-${m}`}
+                  className={cn("rounded-lg border px-3 py-2 text-left text-sm transition-colors", mode === m ? cn("border-transparent ring-2", id.accent.ring, id.accent.soft) : "hover:bg-muted/60")}>
+                  <span className="block font-semibold">{label}</span><span className="block text-xs text-muted-foreground">{hint}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {task === "nibo.campaign" && (
+            <>
+              <label className="flex flex-col gap-1.5 text-sm font-medium">Who are you looking for, and where?
+                <Textarea value={request} onChange={(e) => setRequest(e.target.value)} rows={3} maxLength={LEAGUE_LIMITS.requestChars} placeholder="Indian digital marketing agencies that may need web development" data-testid="campaign-request" />
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="flex flex-col gap-1.5 text-sm font-medium">Qualified companies
+                  <Input type="number" min={1} max={LEAGUE_LIMITS.campaignTarget} value={target} onChange={(e) => setTarget(Math.max(1, Math.min(LEAGUE_LIMITS.campaignTarget, Number(e.target.value) || 1)))} className="h-9" data-testid="campaign-target" />
+                </label>
+                <label className="flex flex-col gap-1.5 text-sm font-medium">Searches, at most
+                  <Input type="number" min={1} max={LEAGUE_LIMITS.campaignSearches} value={searches} onChange={(e) => setSearches(Math.max(1, Math.min(LEAGUE_LIMITS.campaignSearches, Number(e.target.value) || 1)))} className="h-9" data-testid="campaign-searches" />
+                </label>
+                <label className="flex flex-col gap-1.5 text-sm font-medium">Report by (optional)
+                  <Input type="datetime-local" value={deliverLocal} onChange={(e) => setDeliverLocal(e.target.value)} className="h-9" data-testid="campaign-deliver" />
+                </label>
+                <label className="flex flex-col gap-1.5 text-sm font-medium">Start at (optional)
+                  <Input type="datetime-local" value={startLocal} onChange={(e) => setStartLocal(e.target.value)} className="h-9" data-testid="campaign-start" />
+                </label>
+              </div>
+              <p className={cn("rounded-lg px-3 py-2 text-xs", campaign?.problem ? "bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300" : "bg-muted/60 text-muted-foreground")} role="status" data-testid="campaign-times">
+                {campaign?.problem ?? (campaign?.times && `Starts ${startLocal ? showTime(campaign.times.startAt, tz) : "now"} · research until ${showTime(campaign.times.workUntil, tz)} · report ${campaign.times.deliverAt ? showTime(campaign.times.deliverAt, tz) : "when it ends"} (${tz})`)}
+              </p>
+            </>
+          )}
           {task === "nibo.find_clients" && (
             <>
               <label className="flex flex-col gap-1.5 text-sm font-medium">Who are you looking for, and where?

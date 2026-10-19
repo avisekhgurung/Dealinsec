@@ -31,6 +31,7 @@ import type {
 export const APPROVAL_TTL_MS = 30 * 60_000;
 const MAX_CALLS_PER_STEP = 6;
 const TOOL_RESULT_CAP = 3000;
+const TEXT_FLUSH_MS = 40;
 
 export interface RunDeps {
   provider: AIProvider;
@@ -109,7 +110,23 @@ export async function runAgent(
   const toolsUsed: string[] = [];
   const setState = (s: AgentState) => store.setSessionState(input.sessionId, s).catch(() => {});
 
+  // The reply, streamed: the model's text arrives in pieces, batched (~40 ms) into agent.text_delta events tagged with
+  // the model step. A step that goes on to call tools was a preamble; the browser drops it when the next step's text
+  // starts, and the final agent.message replaces whatever was streamed. Web only (a voice call speaks whole replies).
+  let live = "", pending = "", liveStep = 0;
+  let flushTimer: ReturnType<typeof setTimeout> | null = null;
+  const flushText = () => {
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+    if (pending) { emit("agent.text_delta", { step: liveStep, text: pending }); pending = ""; }
+  };
+  const onText = input.channel === "web" ? (d: string) => {
+    live += d;
+    pending += d;
+    if (!flushTimer) flushTimer = setTimeout(flushText, TEXT_FLUSH_MS);
+  } : undefined;
+
   const finish = async (status: RunStatus, errorCode?: string | null) => {
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
     clearTimeout(timer);
     signal?.removeEventListener("abort", onAbort);
     const latencyMs = Date.now() - t0;
@@ -117,9 +134,11 @@ export async function runAgent(
     agentLog("agent_run", { runId, sessionId: input.sessionId, organizationId: input.user.organizationId, userId: input.user.id, status, steps, tokensIn, tokensOut, latencyMs, tools: toolsUsed.length, errorCode: errorCode ?? undefined });
   };
 
-  const fail = async (code: string, message: string, status: RunStatus = "failed"): Promise<RunResult> => {
+  /** `partial`: reply text the person already saw streaming before it stopped; kept, with the reason after it. */
+  const fail = async (code: string, message: string, status: RunStatus = "failed", partial = ""): Promise<RunResult> => {
     const suffix = mutated ? " The changes made before this point are saved." : " Nothing was changed.";
-    const reply = `${message}${suffix}`;
+    const said = partial.trim();
+    const reply = said ? `${said}\n\n_${message}${suffix}_` : `${message}${suffix}`;
     await store.addMessage({ sessionId: input.sessionId, runId, role: "assistant", content: reply, cards: cards.length ? cards : null }).catch(() => {});
     await setState(status === "cancelled" ? "WAITING_FOR_USER" : "FAILED");
     if (status === "cancelled") emit("agent.failed", { code, message: "Stopped.", cancelled: true });
@@ -251,7 +270,10 @@ export async function runAgent(
     for (let step = 0; step < maxSteps; step++) {
       if (ac.signal.aborted) throw new ProviderError("aborted", "aborted");
       steps++;
-      const result = await provider.chat(messages, specs, { signal: ac.signal, maxTokens: deps.maxTokens ?? 900 });
+      liveStep = step;
+      live = "";
+      const result = await provider.chat(messages, specs, { signal: ac.signal, maxTokens: deps.maxTokens ?? 900, onText });
+      flushText();
       tokensIn += result.usage?.inputTokens ?? 0;
       tokensOut += result.usage?.outputTokens ?? 0;
 
@@ -295,13 +317,13 @@ export async function runAgent(
     return { runId, status, reply, cards, approvalIds };
   } catch (err) {
     if ((err instanceof ProviderError && err.code === "aborted") || (ac.signal.aborted && ac.signal.reason === "client")) {
-      return fail("cancelled", "Stopped.", "cancelled");
+      return fail("cancelled", "Stopped.", "cancelled", live);
     }
     if (ac.signal.aborted && ac.signal.reason === "budget") {
-      return fail("run_timeout", "That took longer than I'm allowed to spend on one request.");
+      return fail("run_timeout", "That took longer than I'm allowed to spend on one request.", "failed", live);
     }
     const { code, message } = describeProviderFailure(err);
     agentLog("error", { runId, errorCode: code, errorType: (err as Error)?.name ?? "Error" });
-    return fail(code, message);
+    return fail(code, message, "failed", live);
   }
 }

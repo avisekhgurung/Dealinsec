@@ -65,15 +65,15 @@ export const LEAGUE_WINDOW_DAYS = 30;
 
 /* ── tasks ───────────────────────────────────────────────────────────────── */
 
-export const TASKS = ["nibo.find_clients", "mika.first_messages", "zee.briefing", "team.huddle"] as const;
+export const TASKS = ["nibo.find_clients", "mika.first_messages", "zee.briefing", "team.huddle", "nibo.campaign"] as const;
 export type LeagueTask = (typeof TASKS)[number];
 /** The coworker a task belongs to. A huddle belongs to whoever leads it (see botForTask); "zee" is only its default. */
-export const TASK_BOT: Record<LeagueTask, Bot> = { "nibo.find_clients": "nibo", "mika.first_messages": "mika", "zee.briefing": "zee", "team.huddle": "zee" };
+export const TASK_BOT: Record<LeagueTask, Bot> = { "nibo.find_clients": "nibo", "mika.first_messages": "mika", "zee.briefing": "zee", "team.huddle": "zee", "nibo.campaign": "nibo" };
 export const botForTask = (task: LeagueTask, input: unknown): Bot => {
   const lead = (input as { lead?: unknown } | null)?.lead;
   return task === "team.huddle" && isBot(lead) ? lead : TASK_BOT[task];
 };
-export const TASK_LABEL: Record<LeagueTask, string> = { "nibo.find_clients": "Find potential clients", "mika.first_messages": "Draft first messages", "zee.briefing": "Business briefing", "team.huddle": "Team huddle" };
+export const TASK_LABEL: Record<LeagueTask, string> = { "nibo.find_clients": "Find potential clients", "mika.first_messages": "Draft first messages", "zee.briefing": "Business briefing", "team.huddle": "Team huddle", "nibo.campaign": "Research campaign" };
 
 /** Hard limits the server enforces whatever a model or a request says. */
 export const LEAGUE_LIMITS = {
@@ -82,6 +82,12 @@ export const LEAGUE_LIMITS = {
   huddleRounds: 2,
   /** Teammate consultations a coworker may make while answering one message (a teammate never consults further). */
   consultsPerReply: 2,
+  /** A research campaign (Nibo, over hours): at most this many qualified companies, AI Outbound searches, and hours. */
+  campaignTarget: 50,
+  campaignSearches: 10,
+  campaignMaxHours: 24,
+  /** How far ahead a campaign may be scheduled to start or deliver. */
+  campaignHorizonDays: 7,
 } as const;
 
 export const TASK_INPUT = {
@@ -97,6 +103,20 @@ export const TASK_INPUT = {
     max: z.number().int().min(1).max(LEAGUE_LIMITS.draftsPerRun).default(3),
   }).strict(),
   "zee.briefing": z.object({}).strict(),
+  "nibo.campaign": z.object({
+    request: z.string().trim().min(8, "Say who you're looking for and where, for example \"Indian digital marketing agencies that may need web development\".").max(LEAGUE_LIMITS.requestChars),
+    /** Qualified companies wanted. */
+    target: z.number().int().min(1).max(LEAGUE_LIMITS.campaignTarget).default(10),
+    /** At most this many AI Outbound searches (each from the plan's allowance, up to 10 companies each). */
+    maxSearches: z.number().int().min(1).max(LEAGUE_LIMITS.campaignSearches).default(5),
+    saveLeads: z.boolean().default(true),
+    /** UTC instants (ISO). null = start now / work until done / deliver when done. See shared/league-campaign.ts. */
+    startAt: z.string().datetime().nullable().default(null),
+    workUntil: z.string().datetime().nullable().default(null),
+    deliverAt: z.string().datetime().nullable().default(null),
+    /** IANA timezone the person gave the times in (reports and messages use it). */
+    timezone: z.string().min(3).max(64).default("Asia/Kolkata"),
+  }).strict(),
   "team.huddle": z.object({
     topic: z.string().trim().min(8, "Say what the team should think about, for example \"How do we get 5 new dental clients this month?\"").max(LEAGUE_LIMITS.requestChars),
     lead: z.enum(BOTS).default("zee"),

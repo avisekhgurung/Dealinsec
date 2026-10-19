@@ -19,6 +19,7 @@ export interface RunView {
   id: string; bot: Bot; task: LeagueTask; taskLabel: string; status: LeagueRunStatus; statusLabel: string; stage: string;
   request: string | null; source: string; report: LeagueReport | null; errorCode: string | null; unread: boolean; cancelRequested: boolean;
   scheduleId: number | null; createdAt: string; startedAt: string | null; finishedAt: string | null; tokens: number;
+  timing: { startAt: string | null; deliverAt: string | null; timezone: string } | null;
 }
 export interface EventView { id: number; kind: string; message: string; href: string | null; at: string }
 export interface BotCard { bot: Bot; status: BotStatus; activeRun: RunView | null; lastRun: RunView | null; unread: number; nextSchedule: string | null; waiting: number }

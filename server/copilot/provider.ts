@@ -7,6 +7,7 @@
  * adding a provider means implementing `chat()` — nothing else in the
  * Copilot changes. The API key never leaves the server.
  */
+import { createSseParser } from "@shared/sse";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -29,6 +30,9 @@ export interface ChatOptions {
   maxTokens?: number;
   /** Use this model for this one call instead of the configured one (a small, fast job that a reasoning model does badly). */
   model?: string;
+  /** Stream the reply: called with each piece of the answer's text as it arrives (never the model's reasoning, never
+   *  tool-call arguments). The promise still resolves to the complete result. Without it the call is not streamed. */
+  onText?: (delta: string) => void;
 }
 
 export type ProviderErrorCode = "timeout" | "rate_limited" | "upstream" | "invalid_response" | "aborted";
@@ -54,6 +58,8 @@ export interface AIProvider {
 }
 
 const TIMEOUT_MS = 45_000;
+/** A streamed reply may take longer than one answer in one piece, as long as text keeps arriving. */
+const STREAM_MAX_MS = 180_000;
 const RETRY_DELAY_MS = 600;
 
 class DeepSeekProvider implements AIProvider {
@@ -71,11 +77,14 @@ class DeepSeekProvider implements AIProvider {
    *  abort (the user has already waited, or has gone), and never for a 4xx
    *  that retrying cannot fix. */
   async chat(messages: ChatMessage[], tools: readonly any[], opts: ChatOptions = {}): Promise<ChatResult> {
+    // Once a streamed reply has shown text, a retry would show it twice: only a call that showed nothing is retried.
+    let shown = false;
+    const run = opts.onText ? { ...opts, onText: (d: string) => { shown = true; opts.onText!(d); } } : opts;
     try {
-      return await this.once(messages, tools, opts);
+      return await this.once(messages, tools, run);
     } catch (err) {
       const retryable = err instanceof ProviderError && (err.code === "rate_limited" || (err.code === "upstream" && (err.status ?? 500) >= 500));
-      if (!retryable || opts.signal?.aborted) throw err;
+      if (!retryable || opts.signal?.aborted || shown) throw err;
       await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
       return this.once(messages, tools, opts);
     }
@@ -83,7 +92,10 @@ class DeepSeekProvider implements AIProvider {
 
   private async once(messages: ChatMessage[], tools: readonly any[], opts: ChatOptions): Promise<ChatResult> {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort("timeout"), TIMEOUT_MS);
+    // Streaming: an idle timeout (reset by every chunk) under an overall cap. Otherwise one timeout for the answer.
+    let timer = setTimeout(() => controller.abort("timeout"), TIMEOUT_MS);
+    const cap = opts.onText ? setTimeout(() => controller.abort("timeout"), STREAM_MAX_MS) : null;
+    const bump = () => { clearTimeout(timer); timer = setTimeout(() => controller.abort("timeout"), TIMEOUT_MS); };
     const onAbort = () => controller.abort("aborted");
     opts.signal?.addEventListener("abort", onAbort, { once: true });
     if (opts.signal?.aborted) onAbort();
@@ -108,6 +120,7 @@ class DeepSeekProvider implements AIProvider {
               tools: tools.length ? tools : undefined,
               temperature: 0.3,
               max_tokens: opts.maxTokens ?? 700,
+              ...(opts.onText ? { stream: true, stream_options: { include_usage: true } } : {}),
             }),
           },
         );
@@ -120,6 +133,15 @@ class DeepSeekProvider implements AIProvider {
       if (!res.ok) {
         const body = await res.text().catch(() => "");
         throw new ProviderError(res.status === 429 ? "rate_limited" : "upstream", `deepseek ${res.status}: ${body.slice(0, 200)}`, res.status);
+      }
+      if (opts.onText) {
+        try {
+          return await readChatStream(res, opts.onText, bump);
+        } catch (err) {
+          if (err instanceof ProviderError) throw err;
+          if (controller.signal.aborted) throw new ProviderError(controller.signal.reason === "timeout" ? "timeout" : "aborted", "deepseek stream did not complete");
+          throw new ProviderError("upstream", "deepseek stream broke off", 503);
+        }
       }
       const data: any = await res.json().catch(() => null);
       if (!data || !Array.isArray(data.choices)) throw new ProviderError("invalid_response", "deepseek returned an unreadable response");
@@ -141,9 +163,57 @@ class DeepSeekProvider implements AIProvider {
       };
     } finally {
       clearTimeout(timer);
+      if (cap) clearTimeout(cap);
       opts.signal?.removeEventListener("abort", onAbort);
     }
   }
+}
+
+/**
+ * Read an OpenAI-compatible streamed chat completion (Server-Sent Events): text deltas go to `onText` as they arrive,
+ * tool calls are assembled from their fragments by index, and usage comes from the final chunk. Malformed frames are
+ * skipped; a stream that ends with neither text nor tool calls is an unreadable response.
+ */
+export async function readChatStream(res: Response, onText: (delta: string) => void, onChunk: () => void = () => {}): Promise<ChatResult> {
+  if (!res.body) throw new ProviderError("invalid_response", "deepseek returned no stream");
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let content = "";
+  let usage: { inputTokens: number; outputTokens: number } | undefined;
+  let sawFrame = false;
+  const calls: { id?: string; name: string; args: string }[] = [];
+  const parser = createSseParser((m) => {
+    if (m.data === "[DONE]") return;
+    let j: any;
+    try { j = JSON.parse(m.data); } catch { return; }
+    sawFrame = true;
+    if (j?.usage) usage = { inputTokens: Number(j.usage.prompt_tokens) || 0, outputTokens: Number(j.usage.completion_tokens) || 0 };
+    const d = j?.choices?.[0]?.delta;
+    if (!d) return;
+    if (typeof d.content === "string" && d.content) { content += d.content; onText(d.content); }
+    for (const t of Array.isArray(d.tool_calls) ? d.tool_calls : []) {
+      const i = Number.isInteger(t?.index) ? t.index : calls.length;
+      calls[i] ??= { name: "", args: "" };
+      if (t.id) calls[i].id = t.id;
+      if (t.function?.name) calls[i].name += t.function.name;
+      if (t.function?.arguments) calls[i].args += t.function.arguments;
+    }
+  });
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    onChunk();
+    parser.push(decoder.decode(value, { stream: true }));
+  }
+  parser.push(decoder.decode());
+  parser.flush();
+  if (!sawFrame) throw new ProviderError("invalid_response", "deepseek returned an unreadable stream");
+  const toolCalls = calls.filter(Boolean).map((c, i) => {
+    let parsed: any = {};
+    try { parsed = JSON.parse(c.args || "{}"); } catch { parsed = { __invalid: true }; }
+    return { id: c.id ?? `call_${i}`, name: c.name, arguments: parsed };
+  });
+  return { content: content || null, toolCalls, usage };
 }
 
 export const aiProvider = new DeepSeekProvider();

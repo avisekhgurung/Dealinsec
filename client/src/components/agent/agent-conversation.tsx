@@ -87,6 +87,7 @@ export function AgentConversation({
         approvals={agent.approvals}
         running={agent.running}
         steps={agent.steps}
+        live={agent.live}
         onStop={agent.stop}
         onRetry={agent.retry}
         onApprove={agent.approve}

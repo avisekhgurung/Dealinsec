@@ -8,6 +8,8 @@
  *   GET    /api/agent/sessions                  the caller's conversations
  *   GET    /api/agent/sessions/:id              transcript + live approval statuses
  *   DELETE /api/agent/sessions/:id              delete a conversation
+ *   PATCH  /api/agent/sessions/:id              { title } rename it
+ *   PUT    /api/agent/sessions/:id/pin          { pinned } pin it to the top of the list (or unpin)
  *   POST   /api/agent/sessions/:id/messages     one run, streamed as Server-Sent Events
  *   POST   /api/agent/approvals/:id/approve     execute an approved action (streamed)
  *   POST   /api/agent/approvals/:id/reject      decline it
@@ -137,6 +139,26 @@ export function registerAgentRoutes(app: Express) {
     const ok = await agentStore.deleteSession(req.user, req.params.id);
     if (!ok) return res.status(404).json({ error: "Conversation not found" });
     res.json({ ok: true });
+  });
+
+  app.patch("/api/agent/sessions/:id", ...guard, async (req: any, res) => {
+    const { renameBody } = await import("./pins");
+    const body = renameBody.safeParse(req.body ?? {});
+    if (!body.success) return res.status(400).json({ field: "title", error: body.error.issues[0]?.message ?? "Give the conversation a name." });
+    const ok = await agentStore.renameSession(req.user, String(req.params.id).slice(0, 64), body.data.title);
+    if (!ok) return res.status(404).json({ error: "Conversation not found" });
+    res.json({ ok: true, title: body.data.title });
+  });
+
+  app.put("/api/agent/sessions/:id/pin", ...guard, async (req: any, res) => {
+    const { pinBody, PIN_LIMIT } = await import("./pins");
+    const body = pinBody.safeParse(req.body ?? {});
+    if (!body.success) return res.status(400).json({ error: "Invalid request." });
+    const r = await agentStore.setPinned(req.user, String(req.params.id).slice(0, 64), body.data.pinned);
+    if (r === "not_found") return res.status(404).json({ error: "Conversation not found" });
+    if (r === "limit") return res.status(409).json({ code: "pin_limit", error: `You can pin up to ${PIN_LIMIT} conversations. Unpin one first.` });
+    if (r === "unavailable") return res.status(503).json({ code: "PINS_NOT_SETUP", error: "Pinning isn't set up on this server yet." });
+    res.json({ ok: true, pinned: body.data.pinned });
   });
 
   // The web adapter: the browser's text in, the agent's events out as SSE. All

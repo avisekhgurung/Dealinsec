@@ -22,6 +22,7 @@ import type { LeagueRunEventRow, LeagueRunRow, LeagueScheduleRow } from "@shared
 import { fail, readGate, writeGate, type Result, type Who } from "../services/leads";
 import { outboundTier } from "../outbound/plan";
 import { leagueAllowance, LEAGUE_WINDOW_DAYS } from "./limits";
+import { campaignTimesProblem } from "@shared/league-campaign";
 import { leagueStore, leagueTablesReady, RunLimit, type LeagueStore } from "./store";
 
 const DAY = 86_400_000;
@@ -41,7 +42,15 @@ export interface RunView {
   id: string; bot: Bot; task: LeagueTask; taskLabel: string; status: LeagueRunStatus; statusLabel: string; stage: string;
   request: string | null; source: string; report: LeagueReport | null; errorCode: string | null; unread: boolean; cancelRequested: boolean;
   scheduleId: number | null; createdAt: string; startedAt: string | null; finishedAt: string | null; tokens: number;
+  /** A campaign's own clock (start, report due, the timezone they were given in); null for other tasks. */
+  timing: { startAt: string | null; deliverAt: string | null; timezone: string } | null;
 }
+/** A waiting campaign says what it waits for: its start, or its delivery time (the report is already saved). */
+const statusLabelOf = (r: LeagueRunRow): string =>
+  r.status === "waiting" && r.stage === "start" ? "Scheduled"
+    : r.status === "waiting" && r.stage === "deliver" ? "Report ready"
+      : RUN_STATUS_LABEL[r.status as LeagueRunStatus] ?? r.status;
+
 /** What the person asked for: a search request, or a huddle's topic. */
 const requestOf = (input: unknown): string | null => {
   const i = (input ?? {}) as { request?: unknown; topic?: unknown };
@@ -49,12 +58,17 @@ const requestOf = (input: unknown): string | null => {
 };
 export const runView = (r: LeagueRunRow): RunView => ({
   id: r.id, bot: r.bot as Bot, task: r.task as LeagueTask, taskLabel: TASK_LABEL[r.task as LeagueTask] ?? r.task,
-  status: r.status as LeagueRunStatus, statusLabel: RUN_STATUS_LABEL[r.status as LeagueRunStatus] ?? r.status, stage: r.stage,
+  status: r.status as LeagueRunStatus, statusLabel: statusLabelOf(r), stage: r.stage,
   request: requestOf(r.input),
   source: r.source, report: (r.report as LeagueReport | null) ?? null, errorCode: r.errorCode,
   unread: !r.readAt && ["completed", "partial", "failed"].includes(r.status), cancelRequested: r.cancelRequested,
   scheduleId: r.scheduleId, createdAt: iso(r.createdAt)!, startedAt: iso(r.startedAt), finishedAt: iso(r.finishedAt), tokens: r.tokensIn + r.tokensOut,
+  timing: r.task === "nibo.campaign" ? timingOf(r.input) : null,
 });
+const timingOf = (input: unknown) => {
+  const i = (input ?? {}) as { startAt?: unknown; deliverAt?: unknown; timezone?: unknown };
+  return { startAt: typeof i.startAt === "string" ? i.startAt : null, deliverAt: typeof i.deliverAt === "string" ? i.deliverAt : null, timezone: typeof i.timezone === "string" ? i.timezone : "Asia/Kolkata" };
+};
 export interface EventView { id: number; kind: string; message: string; href: string | null; at: string }
 const SAFE_HREF = /^\/[A-Za-z0-9/_\-?=&%.]{0,200}$/;
 export const eventView = (e: LeagueRunEventRow): EventView => {
@@ -77,6 +91,11 @@ export async function startLeagueRun(user: Who, task: unknown, rawInput: unknown
   if (!isTask(task)) return fail(400, "invalid", "That isn't a task a coworker can do.");
   const parsed = (TASK_INPUT[task] as z.ZodTypeAny).safeParse(rawInput ?? {});
   if (!parsed.success) return fail(400, "invalid", parsed.error.issues[0]?.message ?? "That task's details aren't valid.");
+  // A campaign's times are checked here, before anything is stored: the person is told now, not at midnight.
+  if (task === "nibo.campaign") {
+    const problem = campaignTimesProblem(parsed.data, deps.now());
+    if (problem) return fail(400, "invalid_times", problem);
+  }
   const now = deps.now(), orgId = user.organizationId!;
   const tier = await deps.tier(user).catch(() => "free" as const);
   const allowance = leagueAllowance(tier);

@@ -65,6 +65,9 @@ const AGENT_ENDPOINTS: AgentEndpoints = {
   reject: (id) => `/api/agent/approvals/${id}/reject`,
 };
 
+/** How often streamed text is shown (ms): smooth to read, without a render for every piece. */
+const LIVE_RENDER_MS = 33;
+
 let keySeq = 0;
 const nextKey = () => `m${++keySeq}`;
 
@@ -96,6 +99,22 @@ export function useAgent(opts: UseAgentOptions = {}) {
   const [running, setRunning] = useState(false);
   const [steps, setSteps] = useState<ActivityStep[]>([]);
   const [loading, setLoading] = useState(false);
+  // The reply as it streams (agent.text_delta). Held in a ref and shown at most ~30 times a second, so a fast stream
+  // doesn't re-render the thread for every piece. A timer, not requestAnimationFrame: frames stop in a tab that isn't
+  // being painted, and the text must still be current when the person looks back. The final agent.message replaces it.
+  const [live, setLive] = useState("");
+  const liveRef = useRef({ step: -1, text: "" });
+  const liveFrame = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showLive = () => {
+    if (liveFrame.current) return;
+    liveFrame.current = setTimeout(() => { liveFrame.current = null; setLive(liveRef.current.text); }, LIVE_RENDER_MS);
+  };
+  const clearLive = () => {
+    if (liveFrame.current) clearTimeout(liveFrame.current);
+    liveFrame.current = null;
+    liveRef.current = { step: -1, text: "" };
+    setLive("");
+  };
 
   const abortRef = useRef<AbortController | null>(null);
   const sendLock = useRef(false);
@@ -120,6 +139,7 @@ export function useAgent(opts: UseAgentOptions = {}) {
     if (id === sessionId || (id !== null && id === createdHere.current)) return;
     createdHere.current = null;
     abortRef.current?.abort();
+    clearLive();
     setSessionId(id);
     if (!id) { setMessages([]); setApprovals({}); setSteps([]); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -193,6 +213,14 @@ export function useAgent(opts: UseAgentOptions = {}) {
     let mutated = false;
     let finished = false;
     const onEvent = (e: AgentEvent) => {
+      if (e.type === "agent.text_delta") {
+        const step = Number(e.data.step ?? 0), piece = typeof e.data.text === "string" ? e.data.text : "";
+        // A new model step: the previous step's text was a preamble before using tools; start again.
+        if (step !== liveRef.current.step) liveRef.current = { step, text: "" };
+        liveRef.current.text += piece;
+        showLive();
+        return;
+      }
       stepsRef.current = reduceSteps(stepsRef.current, e);
       setSteps(stepsRef.current);
       switch (e.type) {
@@ -205,6 +233,7 @@ export function useAgent(opts: UseAgentOptions = {}) {
         case "agent.needs_confirmation": trackEvent("agent_approval_requested", { tool: String(e.data.tool ?? "") }); break;
         case "agent.executing": mutated = true; break;
         case "agent.message": {
+          clearLive();
           const cards = (e.data.cards as AgentCard[] | undefined) ?? [];
           for (const c of cards) if (c.kind === "approval") setApproval(String(c.data.approvalId), { status: "pending" });
           append({ role: "assistant", content: String(e.data.text ?? ""), cards, steps: stepsRef.current.map((s) => (s.state === "active" ? { ...s, state: "done" as const } : s)) });
@@ -213,6 +242,7 @@ export function useAgent(opts: UseAgentOptions = {}) {
         case "agent.completed": finished = true; trackEvent("agent_run_completed", { status: String(e.data.status ?? "") }); break;
         case "agent.failed":
           finished = true;
+          clearLive(); // the failure's text carries what was already shown
           if (!e.data.cancelled) {
             trackEvent("agent_run_failed", { code: String(e.data.code ?? "") });
             append({ role: "assistant", content: String(e.data.message ?? "That didn't work. Nothing was changed."), cards: [], error: { retryText: text } });
@@ -226,9 +256,10 @@ export function useAgent(opts: UseAgentOptions = {}) {
       if (!finished) throw new Error("stream ended early");
     } catch (err) {
       if (ac.signal.aborted && stoppedByUser.current) {
-        // The person pressed Stop. Say so now; then show the server's own record, which says whether anything
-        // finished before the stop (it is saved as the run ends, a moment after the connection closes).
-        append({ role: "assistant", content: "Stopped.", cards: [] });
+        // The person pressed Stop. Keep what they already saw, say so now; then show the server's own record, which
+        // says whether anything finished before the stop (it is saved as the run ends, a moment after the connection closes).
+        const shown = liveRef.current.text.trim();
+        append({ role: "assistant", content: shown ? `${shown}\n\n_Stopped._` : "Stopped.", cards: [] });
         if (sid) { const id = sid; setTimeout(() => { if (abortRef.current === null) void loadTranscript(id); }, 900); }
       } else if (ac.signal.aborted) {
         // Closed for another reason (opening another conversation, leaving the page): nothing to show here.
@@ -242,6 +273,7 @@ export function useAgent(opts: UseAgentOptions = {}) {
         if (sid) await loadTranscript(sid);
       }
     } finally {
+      clearLive();
       if (mutated) void REFRESH_ALL();
       void queryClient.invalidateQueries({ queryKey: ["/api/agent/sessions"] });
       setRunning(false);
@@ -327,6 +359,7 @@ export function useAgent(opts: UseAgentOptions = {}) {
   // ── conversations ────────────────────────────────────────────────────────
   const reset = useCallback(() => {
     abortRef.current?.abort();
+    clearLive();
     createdHere.current = null;
     setSessionId(null);
     setMessages([]);
@@ -335,7 +368,7 @@ export function useAgent(opts: UseAgentOptions = {}) {
     onSessionChange?.(null);
   }, [onSessionChange]);
 
-  useEffect(() => () => abortRef.current?.abort(), []);
+  useEffect(() => () => { abortRef.current?.abort(); if (liveFrame.current) clearTimeout(liveFrame.current); }, []);
 
-  return { sessionId, messages, approvals, running, steps, loading, send, stop, retry, approve, reject, reset, setChannel };
+  return { sessionId, messages, approvals, running, steps, live, loading, send, stop, retry, approve, reject, reset, setChannel };
 }

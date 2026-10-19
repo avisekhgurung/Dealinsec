@@ -8,10 +8,12 @@
 import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
-  agentApprovals, agentMessages, agentRuns, agentSessions, agentSettings, agentToolCalls,
+  agentApprovals, agentMessages, agentRuns, agentSessionPins, agentSessions, agentSettings, agentToolCalls,
   type AgentSession,
 } from "@shared/schema";
 import { normalizeAutonomy } from "./policy";
+import { tablesReadyCheck } from "../leads/ready";
+import { AGENT_PIN_TABLES, PIN_LIMIT, orderSessions } from "./pins";
 import type { AgentCard, AgentState, AgentStore, AgentUser, ApprovalRecord, AutonomyLevel, ClaimResult } from "./types";
 
 const TABLES = ["agent_sessions", "agent_messages", "agent_runs", "agent_tool_calls", "agent_approvals", "agent_settings"];
@@ -42,6 +44,10 @@ export function agentTablesReady(): Promise<boolean> {
   })();
   return inflight;
 }
+
+/** Pinned conversations need script/migrate-agent-pins.ts; until then nothing is pinned and pinning says so. */
+export const agentPinsReady = tablesReadyCheck([...AGENT_PIN_TABLES]);
+const pinsReady = () => agentPinsReady().catch(() => false);
 
 const scope = (user: AgentUser) => and(
   eq(agentSessions.organizationId, user.organizationId ?? ""),
@@ -154,11 +160,45 @@ export class DbAgentStore implements AgentStore {
       const { leagueStore, leagueTablesReady } = await import("../ai-league/store");
       if (await leagueTablesReady()) league = await leagueStore.sessionIds(user.organizationId ?? "", user.id);
     } catch { league = []; }
-    const rows = await db.select({
+    const cols = {
       id: agentSessions.id, title: agentSessions.title, state: agentSessions.state,
       dealId: agentSessions.dealId, updatedAt: agentSessions.updatedAt,
-    }).from(agentSessions).where(scope(user)).orderBy(desc(agentSessions.updatedAt)).limit(limit + league.length);
-    return rows.filter((r) => !league.includes(r.id)).slice(0, limit);
+    };
+    const rows = await db.select(cols).from(agentSessions).where(scope(user)).orderBy(desc(agentSessions.updatedAt)).limit(limit + league.length);
+    const recent = rows.filter((r) => !league.includes(r.id)).slice(0, limit);
+    // Pinned first, including a pinned conversation older than the recent window.
+    const pins = new Map<string, Date>();
+    if (await pinsReady()) {
+      const pinRows = await db.select({ sessionId: agentSessionPins.sessionId, pinnedAt: agentSessionPins.pinnedAt }).from(agentSessionPins)
+        .where(and(eq(agentSessionPins.organizationId, user.organizationId ?? ""), eq(agentSessionPins.userId, user.id))).limit(PIN_LIMIT);
+      for (const p of pinRows) if (!league.includes(p.sessionId)) pins.set(p.sessionId, p.pinnedAt);
+    }
+    const missing = Array.from(pins.keys()).filter((id) => !recent.some((r) => r.id === id));
+    const older = missing.length ? await db.select(cols).from(agentSessions).where(and(scope(user), inArray(agentSessions.id, missing))) : [];
+    return orderSessions([...recent, ...older], pins);
+  }
+
+  /** Rename one of the person's own conversations. */
+  async renameSession(user: AgentUser, id: string, title: string): Promise<boolean> {
+    const r = await db.update(agentSessions).set({ title: title.slice(0, 120) }).where(and(eq(agentSessions.id, id), scope(user))).returning({ id: agentSessions.id });
+    return r.length > 0;
+  }
+
+  /** Pin or unpin one of the person's own conversations (at most PIN_LIMIT pinned). */
+  async setPinned(user: AgentUser, id: string, pinned: boolean): Promise<"ok" | "not_found" | "limit" | "unavailable"> {
+    if (!(await pinsReady())) return "unavailable";
+    const session = await this.getSession(user, id);
+    if (!session) return "not_found";
+    const mine = and(eq(agentSessionPins.organizationId, user.organizationId ?? ""), eq(agentSessionPins.userId, user.id));
+    if (!pinned) {
+      await db.delete(agentSessionPins).where(and(eq(agentSessionPins.sessionId, id), mine));
+      return "ok";
+    }
+    const existing = await db.select({ sessionId: agentSessionPins.sessionId }).from(agentSessionPins).where(mine);
+    if (existing.some((p) => p.sessionId === id)) return "ok";
+    if (existing.length >= PIN_LIMIT) return "limit";
+    await db.insert(agentSessionPins).values({ sessionId: id, organizationId: user.organizationId ?? "", userId: user.id, pinnedAt: new Date() }).onConflictDoNothing();
+    return "ok";
   }
 
   /** Messages plus the live status of every approval, so a reloaded page shows
@@ -191,6 +231,7 @@ export class DbAgentStore implements AgentStore {
       await tx.delete(agentMessages).where(eq(agentMessages.sessionId, id));
       await tx.delete(agentSessions).where(eq(agentSessions.id, id));
     });
+    if (await pinsReady()) await db.delete(agentSessionPins).where(eq(agentSessionPins.sessionId, id)).catch(() => {});
     return true;
   }
 

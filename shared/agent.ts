@@ -13,6 +13,8 @@ export const AGENT_EVENT_TYPES = [
   "agent.tool_started", "agent.tool_progress", "agent.tool_completed", "agent.tool_failed",
   "agent.finding", "agent.needs_confirmation", "agent.executing",
   "agent.message", "agent.completed", "agent.failed",
+  // A piece of the reply's text as the model writes it: { step, text }. The final agent.message is authoritative.
+  "agent.text_delta",
 ] as const;
 export type AgentEventType = (typeof AGENT_EVENT_TYPES)[number];
 
