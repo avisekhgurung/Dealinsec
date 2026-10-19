@@ -708,7 +708,7 @@ describe("homepage crawler fallback: small agencies first, freelancers and creat
 
   it("states the AI research allowances the server enforces, the price and the checkout terms", async () => {
     const { OUTBOUND_ALLOWANCE_DEFAULTS: OB } = await import("@shared/outbound-plans");
-    expect(body).toContain(`${OB.free.monthlySearches} AI Outbound searches every 30 days (up to ${OB.free.maxCompanies} companies each)`);
+    expect(body).toContain(`${OB.free.monthlySearches} Client Radar searches every 30 days (up to ${OB.free.maxCompanies} companies each)`);
     expect(body).toContain(`${OB.pro.monthlySearches} AI searches every 30 days (up to ${OB.pro.maxCompanies} companies each)`);
     const { PRICING } = await import("@shared/product-facts");
     expect(body).toContain(`₹${PRICING.proMonthlyInr} a month`);
@@ -767,7 +767,7 @@ describe("one subscription at one price, on every public page (India launch, Oct
     for (const [path, html] of htmlPages) {
       const text = html.replace(/<[^>]+>/g, " ");
       for (const m of text.matchAll(/\bPro\b[^.₹]{0,40}₹\s?([\d,]+)/g)) expect(Number(m[1].replace(/,/g, "")), `${path}: ${m[0]}`).toBe(PRICING.proMonthlyInr);
-      expect(text, path).not.toMatch(/Pro Annual|₹\s?999\b|Deal Boost|separate (AI Outbound|CRM) (plan|subscription) (is|costs)/);
+      expect(text, path).not.toMatch(/Pro Annual|₹\s?999\b|Deal Boost|separate (Client Radar|CRM) (plan|subscription) (is|costs)/);
       for (const ld of jsonLdBlocks(html)) for (const o of [ld.offers ?? []].flat()) if (o.priceCurrency === "INR" && Number(o.price) > 0) expect(Number(o.price), path).toBe(PRICING.proMonthlyInr);
     }
   });
@@ -864,7 +864,7 @@ describe("/ai-coworkers: Nibo, Mika and Zee, for India", () => {
 
   it("the homepage's crawler copy and FAQ structured data introduce the AI team (what search and AI engines read)", () => {
     const body = landingSeoBody();
-    expect(body).toContain("<h2>Your AI team: Nibo, Mika and Zee</h2>");
+    expect(body).toContain("<h2>The Nest, your AI team: Nibo, Mika and Zee</h2>");
     expect(body).toMatch(/never send, pay or sign anything/);
     const page = injectLandingSeo('<html><head></head><body><div id="root"></div></body></html>');
     const faq = jsonLdBlocks(page).find((b) => b["@type"] === "FAQPage");

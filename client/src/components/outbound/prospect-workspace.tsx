@@ -347,7 +347,7 @@ export function ProspectWorkspace({ canExport, onOpen, onPrepared }: { canExport
       )}
 
       {notSetUp ? (
-        <p className="rounded-2xl border px-4 py-10 text-center text-sm text-muted-foreground">AI Outbound isn't switched on for this workspace yet.</p>
+        <p className="rounded-2xl border px-4 py-10 text-center text-sm text-muted-foreground">Client Radar isn't switched on for this workspace yet.</p>
       ) : q.isError && !data && apiFailure(q.error).status === 403 ? (
         // A permission refusal: retrying can't help, so say why instead.
         <div className="rounded-2xl border px-4 py-8 text-center" role="alert" data-testid="workspace-forbidden">

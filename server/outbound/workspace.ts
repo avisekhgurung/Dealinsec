@@ -21,7 +21,7 @@ import { pipelineDeps, type PipelineDeps } from "./pipeline";
 import { evidenceOf, prospectCard } from "./service";
 import { prospectsTablesReady } from "./store";
 
-const NOT_SETUP = () => fail(503, "PROSPECTS_NOT_SETUP", "AI Outbound isn't set up on this server yet.");
+const NOT_SETUP = () => fail(503, "PROSPECTS_NOT_SETUP", "Client Radar isn't set up on this server yet.");
 async function ready(): Promise<boolean> { try { return await prospectsTablesReady(); } catch { return false; } }
 const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : null);
 

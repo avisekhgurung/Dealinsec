@@ -1,5 +1,5 @@
 /**
- * Replays one saved AI Outbound run through the real pipeline, offline: the verified companies with their saved search
+ * Replays one saved Client Radar run through the real pipeline, offline: the verified companies with their saved search
  * rank, what the model said about each site (saved findings), the run's average tokens per call and the real model
  * budget reservation (tracedChat + the atomic reserve). No search, no model, no network. Skipped unless pointed at a
  * run in the LOCAL test database (the saved evidence names real companies, so it never lives in the repository):

@@ -1,5 +1,5 @@
 /**
- * AI Outbound: the functions the REST routes and the agent's tools call. Permissions follow the lead pipeline
+ * Client Radar: the functions the REST routes and the agent's tools call. Permissions follow the lead pipeline
  * (read = whoever may read deals; anything that spends or writes = whoever may create deals). A run, a prospect or a
  * finding in another workspace answers "not found", like one that does not exist.
  *
@@ -31,11 +31,11 @@ import { outboundRunner } from "./runner";
 import { costMicroUsd } from "./providers";
 
 const DAY = 86_400_000;
-const NOT_SETUP = () => fail(503, "PROSPECTS_NOT_SETUP", "AI Outbound isn't set up on this server yet.");
+const NOT_SETUP = () => fail(503, "PROSPECTS_NOT_SETUP", "Client Radar isn't set up on this server yet.");
 async function ready(): Promise<boolean> { try { return await prospectsTablesReady(); } catch { return false; } }
 const capFail = (e: unknown, task: Parameters<typeof dailyLimit>[0]) =>
   e instanceof WorkspaceBudgetExceeded ? fail(429, "workspace_budget", "This workspace's AI usage for the last 30 days has reached its limit. What's already found and saved stays; it frees up as earlier usage passes 30 days.")
-  : e instanceof GlobalCapExceeded ? fail(429, "global_limit", "Today's AI Outbound budget for everyone on DealInSec is used up. Lead research and drafting are not affected. It resets at midnight UTC.")
+  : e instanceof GlobalCapExceeded ? fail(429, "global_limit", "Today's Client Radar budget for everyone on DealInSec is used up. Lead research and drafting are not affected. It resets at midnight UTC.")
   : e instanceof CapExceeded ? fail(429, "daily_limit", `You've used today's AI allowance for this (${dailyLimit(task)} a day). Try again tomorrow.`)
     : e instanceof CapUnavailable ? NOT_SETUP() : null;
 
@@ -82,7 +82,7 @@ export interface RunView {
   id: string; status: string; stage: string; request: string; icp: Icp; description: string; quantity: number;
   counters: RunCountersExt; costUsd: number; errorCode: string | null; createdAt: string; finishedAt: string | null;
   queries: { q: string; provider: string; done: boolean; ok?: boolean; results?: number; error?: string }[];
-  /** Who started it: the person on the AI Outbound page, or the agent on their behalf (after their approval). */
+  /** Who started it: the person on the Client Radar page, or the agent on their behalf (after their approval). */
   by: "user" | "agent";
 }
 const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : null);
@@ -127,10 +127,10 @@ export async function startRun(user: Who, raw: { request?: unknown; icp?: unknow
   const limitReached = (i: number) => i === 0 || i === limits.length
     ? tier === "free"
       ? fail(402, "NO_CREDITS", i === 0
-        ? `You've used the free plan's ${allowance.monthlySearches} AI Outbound searches for this 30-day period. Upgrade to Pro for more.`
+        ? `You've used the free plan's ${allowance.monthlySearches} Client Radar searches for this 30-day period. Upgrade to Pro for more.`
         : `You've used the free plan's ${allowance.monthlyProspects} researched prospects for this 30-day period. Upgrade to Pro for more.`, { feature: "outbound" })
       : fail(429, "monthly_limit", i === 0
-        ? `You've used the ${allowance.monthlySearches} AI Outbound searches included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`
+        ? `You've used the ${allowance.monthlySearches} Client Radar searches included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`
         : `You've used the ${allowance.monthlyProspects} researched prospects included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`)
     : fail(429, "daily_limit", `You've started today's ${dailyRunLimit()} prospect searches. Try again tomorrow.`);
   for (let i = 0; i < limits.length; i++) if ((await deps.store.countRunsSince(orgId, limits[i].since)) >= limits[i].max) return limitReached(i);
@@ -501,6 +501,6 @@ export async function addToLeads(user: Who, id: number, raw: { contactFindingId?
     const confirmed = f.status === "confirmed" && !!f.sourceUrl && !!f.quote && f.quote.length >= 8 && (f.type !== "contact_form" || isContactFormRoute(likeOf(f)));
     await addClaim(user, leadId, { field, value: value.slice(0, 400), status: confirmed ? "confirmed" : "inferred", ...(f.sourceUrl ? { evidenceUrl: f.sourceUrl } : {}), ...(f.quote && f.quote.length >= 8 ? { evidenceSnippet: f.quote.slice(0, 500) } : {}) }, { actor: "agent" });
   }
-  await addNote(user, leadId, `Added from AI Outbound${score ? ` (score ${score.total}/100)` : ""}. Evidence copied to Facts.`, { actor: "user" });
+  await addNote(user, leadId, `Added from Client Radar${score ? ` (score ${score.total}/100)` : ""}. Evidence copied to Facts.`, { actor: "user" });
   return { ok: true, leadId, existing: false };
 }

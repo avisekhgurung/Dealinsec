@@ -1,5 +1,5 @@
 /**
- * Starting AI Outbound runs against a REAL Postgres: concurrent starts in one workspace can't go past its limit
+ * Starting Client Radar runs against a REAL Postgres: concurrent starts in one workspace can't go past its limit
  * together (createRun re-counts under a per-workspace advisory lock with the insert), and another workspace is not
  * held up by it.
  *

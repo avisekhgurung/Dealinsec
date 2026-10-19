@@ -1,5 +1,5 @@
 /**
- * The outreach inbox (AI Outbound → Inbox): every conversation Gmail reply sync linked to an outreach, what each
+ * The outreach inbox (Client Radar → Inbox): every conversation Gmail reply sync linked to an outreach, what each
  * reply says (labelled by fixed rules, or by you; never by AI), and what to do next. Replies are plain text shown as
  * text. Messages matched only by their sender's address wait in "Might be for your leads", visible to you alone.
  *

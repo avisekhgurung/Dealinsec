@@ -62,7 +62,7 @@ describe.skipIf(!URL_ || !loopback(URL_))("reply to deal (real Postgres)", () =>
   /** A member as the session loads them (the conversion reads plan, role and locale from the row). */
   const member = async (id: string) => (await storage.getUser(id)) as any;
 
-  /** An organization (its owner on Pro, so no credit is spent), the owner's Gmail, a lead at Acme found by AI Outbound, and an outreach sent `sentAt`. */
+  /** An organization (its owner on Pro, so no credit is spent), the owner's Gmail, a lead at Acme found by Client Radar, and an outreach sent `sentAt`. */
   async function seed(o: { sentAt?: Date; estValueMinor?: number } = {}) {
     const org = `t-${randomBytes(5).toString("hex")}`; orgs.push(org);
     const ana = `u-${randomBytes(4).toString("hex")}`;

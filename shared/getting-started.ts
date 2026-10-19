@@ -98,7 +98,7 @@ export function checklistFor(goal: FirstGoal | null, facts: Facts, can: Checklis
   };
   const discoverSearch: Draft = {
     id: "run_search", module: "outbound", href: "/outbound", done: has(facts.outboundRuns), discovery: true,
-    title: "Find new clients with AI Outbound",
+    title: "Find new clients with Client Radar",
     detail: "Research companies that fit what you do, with evidence for why now.",
   };
 
@@ -108,7 +108,7 @@ export function checklistFor(goal: FirstGoal | null, facts: Facts, can: Checklis
       {
         id: "run_search", module: "outbound", href: "/outbound", done: has(facts.outboundRuns),
         title: "Run your first client search",
-        detail: "Describe who you want to work with. AI Outbound finds companies that fit and shows the evidence.",
+        detail: "Describe who you want to work with. Client Radar finds companies that fit and shows the evidence.",
       },
       {
         id: "add_lead", module: "leads", href: "/leads", done: has(facts.leads),

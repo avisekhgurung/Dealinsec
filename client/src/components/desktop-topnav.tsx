@@ -2,7 +2,7 @@
  * Desktop top navigation — a raised, lit bar across the top of the workspace.
  *
  * Replaced the left sidebar (Sep 2026, founder's call): the product's five
- * areas — Home · AI Outbound · Pipeline (Leads, Deals) · Documents
+ * areas — Home · Client Radar · Pipeline (Leads, Deals) · Documents
  * (Quotations, Agreements) · Money (Invoices) — sit in the bar as one-click
  * tabs, grouped by thin dividers (items, groups and active rules come from
  * @shared/nav-model, shared with the mobile bar). The account controls sit on
@@ -219,7 +219,7 @@ export function DesktopTopNav() {
                         aria-current={active ? "page" : undefined}
                         className="dis-topnav-tab relative flex shrink-0 items-center gap-2 px-2 xl:px-2.5 min-[1536px]:px-4 text-[14px] font-semibold whitespace-nowrap outline-none focus-visible:bg-white/10"
                       >
-                        {/* Short labels ("Outbound", "Quotes") until the bar has room for the long ones: with eight tabs, the
+                        {/* Short labels ("Radar", "Quotes") until the bar has room for the long ones: with eight tabs, the
                             wordmark and the account controls, that is about 1536px (measured; 1280px overflowed). */}
                         <span className="min-[1536px]:hidden">{item.shortLabel}</span>
                         <span className="hidden min-[1536px]:inline">{item.label}</span>

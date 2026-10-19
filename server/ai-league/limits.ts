@@ -1,7 +1,7 @@
 /**
  * AI League's own allowances, per plan, all overridable from the environment (the ₹199 Pro price is a hypothesis, so
  * these are settings, not code). Each task ALSO spends the allowance of the feature it uses, enforced there as before:
- * Nibo's research uses AI Outbound's searches and researched prospects, Mika's drafts the plan's AI drafts, Zee's
+ * Nibo's research uses Client Radar's searches and researched prospects, Mika's drafts the plan's AI drafts, Zee's
  * summary a small model call under the workspace spend ceiling. Nothing here is unlimited.
  *
  *   LEAGUE_MONTHLY_RUNS_FREE / _PRO     tasks started in a rolling 30 days      (defaults 10 / 60)

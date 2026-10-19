@@ -532,7 +532,7 @@ export default function DashboardPage() {
   const audience = useAudience();
   const fmt = useMoney();
   const canCreateDeal = memberCan(user as any, "deals.create");
-  // AI Outbound sits under the deals module in the nav (shared/nav-model.ts), so the same check decides its shortcut.
+  // Client Radar sits under the deals module in the nav (shared/nav-model.ts), so the same check decides its shortcut.
   const canSeeOutbound = canSeeModule(user as any, "deals");
   const displayName = user?.firstName && user?.lastName
     ? `${user.firstName} ${user.lastName}`
@@ -1287,7 +1287,7 @@ export default function DashboardPage() {
             <p className="hidden sm:block text-sm text-muted-foreground">Here's what needs your attention today.</p>
           </div>
           <div className="flex items-center gap-2 lg:gap-3">
-            {/* Secondary, desktop only: mobile already has Outbound in the bottom bar. */}
+            {/* Secondary, desktop only: mobile already has Client Radar in the bottom bar. */}
             {canSeeOutbound && (
               <Link href="/outbound" className="hidden lg:block">
                 <Button size="sm" variant="outline" className="font-semibold" data-testid="header-find-prospects">

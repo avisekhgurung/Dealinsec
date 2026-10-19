@@ -41,7 +41,7 @@ const leadSpec = z.object({
   tickets: z.array(z.object({ title: z.string(), dueInDays: z.number().int().optional() })).default([]),
 });
 
-/** A company a prospect search already found (AI Outbound), in run "pr_seed1", with whatever the case wants it to carry. */
+/** A company a prospect search already found (Client Radar), in run "pr_seed1", with whatever the case wants it to carry. */
 const prospectSpec = z.object({
   ref, name: z.string(), domain: z.string(),
   status: z.enum(["enriched", "qualified", "ready", "rejected"]).default("enriched"),

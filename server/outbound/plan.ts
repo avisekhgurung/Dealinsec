@@ -1,5 +1,5 @@
 /**
- * Which AI Outbound allowance a workspace has: its billing owner's plan, read the way every other entitlement is
+ * Which Client Radar allowance a workspace has: its billing owner's plan, read the way every other entitlement is
  * (server/entitlements.ts getBillingUser): paid Pro → "pro", an active trial → "trial", anything else → "free".
  */
 import { hasActivePro, hasActiveTrial, type User } from "@shared/schema";

@@ -1,5 +1,5 @@
 /**
- * Where the person is in AI Outbound, from real state only: what they've typed and confirmed, the selected search's
+ * Where the person is in Client Radar, from real state only: what they've typed and confirmed, the selected search's
  * status and stage, whether its prospects reached Leads, and the outreach queue counts this session has loaded.
  * A step is checked only when the thing it names has actually happened; nothing advances on a timer.
  *

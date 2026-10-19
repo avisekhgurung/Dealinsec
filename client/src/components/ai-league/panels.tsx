@@ -193,7 +193,7 @@ export function MemoryPanel() {
               {BOTS.map((b) => <li key={b} className="flex justify-between"><span>{BOT_IDENTITY[b].name}</span><span className="tabular-nums">{usage.byBot[b] ?? 0} tasks</span></li>)}
               <li className="flex justify-between"><span>At once</span><span className="tabular-nums">up to {usage.concurrent}</span></li>
             </ul>
-            <p className="text-[11px] text-muted-foreground">Each task also uses the allowance of what it does: Nibo's research counts toward AI Outbound searches, Mika's drafts toward your AI drafts. Nothing is unlimited.</p>
+            <p className="text-[11px] text-muted-foreground">Each task also uses the allowance of what it does: Nibo's research counts toward Client Radar searches, Mika's drafts toward your AI drafts. Nothing is unlimited.</p>
           </>
         )}
       </section>

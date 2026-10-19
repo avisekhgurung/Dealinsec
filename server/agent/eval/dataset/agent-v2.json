@@ -126,7 +126,7 @@
     },
     {
       "id": "lead-find-without-names",
-      "description": "Asked to find companies, it prepares an AI Outbound search for approval and adds nothing yet",
+      "description": "Asked to find companies, it prepares an Client Radar search for approval and adds nothing yet",
       "tags": [
         "leads",
         "discovery",

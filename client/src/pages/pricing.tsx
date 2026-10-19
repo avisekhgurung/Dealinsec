@@ -126,7 +126,7 @@ export default function PricingPage() {
           description:
             plan === "extra_seat"
               ? `${seatQty} extra seat${seatQty > 1 ? "s" : ""} added for 1 month.`
-              : "DealInSec Pro is active — AI Outbound and the full workflow are unlocked for 1 month.",
+              : "DealInSec Pro is active — Client Radar and the full workflow are unlocked for 1 month.",
           variant: "success" as any,
         });
         const savedRedirect = localStorage.getItem(REDIRECT_KEY);
@@ -158,7 +158,7 @@ export default function PricingPage() {
     checkoutAvailable ? "Unlimited invoices with your PAN and GSTIN" : "Unlimited invoices",
     "Payment tracking: see who still owes you",
     "Up to 5 team members",
-    "One plan: no separate CRM or AI Outbound fee",
+    "One plan: no separate CRM or Client Radar fee",
   ];
 
   const successMessage =

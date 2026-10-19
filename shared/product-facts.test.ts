@@ -29,13 +29,13 @@ describe("product facts agree with the code that charges and enforces them", () 
     expect(PRICING_LINES.join(" ")).toMatch(/Outside India, including the United States, paid plans can't be bought yet/);
   });
 
-  it("one subscription: AI Outbound allowances come from the shared plan definition, never unlimited, no separate CRM/AI plan", async () => {
+  it("one subscription: Client Radar allowances come from the shared plan definition, never unlimited, no separate CRM/AI plan", async () => {
     const { OUTBOUND_ALLOWANCE_DEFAULTS } = await import("./outbound-plans");
     const text = productFactsMarkdown().split("## Never say")[0]; // the "never claim" list names these on purpose
     const ob = CAPABILITIES.find((c) => c.key === "ai_outbound")!.text;
     for (const t of ["free", "trial", "pro"] as const) expect(ob).toContain(String(OUTBOUND_ALLOWANCE_DEFAULTS[t].monthlySearches));
     expect(ob).toMatch(/the US, the UK, Canada, Australia, the UAE, India and others, or worldwide/);
-    expect(PRICING_LINES.join(" ")).toMatch(/There is no separate plan for AI Outbound or the CRM, and no annual plan/);
+    expect(PRICING_LINES.join(" ")).toMatch(/There is no separate plan for Client Radar or the CRM, and no annual plan/);
     expect(text).not.toMatch(/unlimited (AI|research|searches|sending|prospect)/i);
     expect(text).not.toMatch(/₹999|a year/);
   });
@@ -49,7 +49,7 @@ describe("product facts agree with the code that charges and enforces them", () 
     expect(NEVER_CLAIM.join(" ")).toMatch(/business directory/);
     const faq = LANDING_FAQS.find((f) => /local businesses in my city/.test(f.q))!;
     expect(faq.a).toMatch(/not kept in DealInSec/);
-    expect(faq.a).toMatch(/One local search uses one AI Outbound search/);
+    expect(faq.a).toMatch(/One local search uses one Client Radar search/);
   });
 
   it("no trial: new accounts start on the free plan, and no public answer offers a trial", async () => {

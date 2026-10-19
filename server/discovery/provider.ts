@@ -1,5 +1,5 @@
 /**
- * The web search providers behind AI Outbound. Keys are read at call time and never
+ * The web search providers behind Client Radar. Keys are read at call time and never
  * leave the server. The default single provider:
  *   DISCOVERY_PROVIDER=langsearch|brave   (explicit), otherwise
  *   LANGSEARCH_API_KEY set -> LangSearch (free, no card), otherwise
@@ -22,7 +22,7 @@ export function activeProviderName(env: NodeJS.ProcessEnv = process.env): Provid
 }
 
 /**
- * Every search provider that has a key, for the AI Outbound engine, which may spread its queries over several.
+ * Every search provider that has a key, for the Client Radar engine, which may spread its queries over several.
  * OUTBOUND_SEARCH_PROVIDERS=tavily,brave picks and orders them; otherwise the configured discovery provider alone.
  */
 export async function outboundSearchProviders(env: NodeJS.ProcessEnv = process.env): Promise<DiscoveryProvider[]> {

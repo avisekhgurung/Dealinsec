@@ -3,7 +3,7 @@
  * jobs the web service records in Postgres, so they don't depend on a browser, a request or a web instance that sleeps.
  *
  *   AI League tasks and schedules (server/ai-league/runtime.ts): coworker tasks, research campaigns, deliveries
- *   AI Outbound prospect runs (server/outbound/runner.ts): the searches Nibo's tasks start
+ *   Client Radar prospect runs (server/outbound/runner.ts): the searches Nibo's tasks start
  *
  * Every job is a Postgres row claimed with a lease (FOR UPDATE SKIP LOCKED) and checkpointed after each step, so a
  * restart, a deploy or a crash resumes from the last checkpoint; two workers never hold one job. Set

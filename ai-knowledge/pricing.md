@@ -6,8 +6,8 @@ from the billing code) — always quote prices from there, never from memory.
 How billing works:
 - One subscription: DealInSec Pro, paid monthly. It is a one-time payment for a
   month, with no auto-debit and no auto-renewal: pay again to extend. There is
-  no annual plan, and no separate plan for AI Outbound or the CRM.
-- AI Outbound credits: one credit is one search. Each plan's allowance is in
+  no annual plan, and no separate plan for Client Radar or the CRM.
+- Client Radar credits: one credit is one search. Each plan's allowance is in
   product-facts; unused searches don't carry over, and nothing is unlimited.
 - Pro Annual bought before October 2026 stays valid for its paid term.
 - Checkout is in Indian rupees through Razorpay (UPI, cards, netbanking) and

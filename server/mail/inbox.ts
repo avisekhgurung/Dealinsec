@@ -1,5 +1,5 @@
 /**
- * The outreach inbox (AI Outbound → Inbox): conversations Gmail reply sync linked to outreach, one conversation's
+ * The outreach inbox (Client Radar → Inbox): conversations Gmail reply sync linked to outreach, one conversation's
  * messages, and the review queue. Reads the reply-sync tables; never a mailbox, never a model.
  *
  * Who sees what (the 14 Oct decision): a conversation is visible to members who may view leads (the Deals module), like
@@ -204,7 +204,7 @@ export async function relabelMessage(user: Who, mailMessageId: number, raw: unkn
   return { ok: true, label: label as ReplyLabel };
 }
 
-/** The prospect (AI Outbound) a lead was added from, if any. Null without the prospect tables. */
+/** The prospect (Client Radar) a lead was added from, if any. Null without the prospect tables. */
 async function prospectOf(orgId: string, leadId: number): Promise<{ id: number; name: string; domain: string } | null> {
   try {
     const [p] = await db.select({ id: prospects.id, name: prospects.name, domain: prospects.domain }).from(prospects)

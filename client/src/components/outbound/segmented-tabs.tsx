@@ -1,5 +1,5 @@
 /**
- * A small segmented tab bar for AI Outbound's views. The active tab is always visible as text and weight, and an
+ * A small segmented tab bar for Client Radar's views. The active tab is always visible as text and weight, and an
  * indicator slides to it (framer layoutId, unique per instance so two bars on one page never share an indicator).
  * Arrow keys move between tabs, one tab stop for the whole bar.
  */

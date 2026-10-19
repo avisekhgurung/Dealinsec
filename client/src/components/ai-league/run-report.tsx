@@ -173,7 +173,7 @@ export function RunDetail({ id, onClose }: { id: string; onClose?: () => void })
       <details className="rounded-lg border px-3 py-2 text-xs text-muted-foreground">
         <summary className="cursor-pointer select-none font-medium text-foreground/80">Details</summary>
         <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-          <dt>Started from</dt><dd>{run.source === "schedule" ? "A schedule" : run.source === "chat" ? `Chat with ${id_.name}` : "The AI League page"}</dd>
+          <dt>Started from</dt><dd>{run.source === "schedule" ? "A schedule" : run.source === "chat" ? `Chat with ${id_.name}` : "The Nest"}</dd>
           <dt>Queued</dt><dd>{when(run.createdAt)}</dd>
           {run.startedAt && <><dt>Started</dt><dd>{when(run.startedAt)}</dd></>}
           {run.finishedAt && <><dt>Finished</dt><dd>{when(run.finishedAt)}</dd></>}

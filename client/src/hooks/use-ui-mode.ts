@@ -1,6 +1,6 @@
 /**
  * Which face of the product the person lives in:
- *   "agent"  a full-screen chat (and voice) that drives the same features: AI Outbound searches, leads, deals; ask, approve
+ *   "agent"  a full-screen chat (and voice) that drives the same features: Client Radar searches, leads, deals; ask, approve
  *   "app"    the dashboard and its pages (the SaaS)
  * Remembered on this device and kept in step across tabs. It decides where `/`
  * lands and whether the navigation bars are drawn; it never changes what any

@@ -1,5 +1,5 @@
 /**
- * Search diagnostics for AI Outbound: where results are thrown away between the search provider and the sites the run
+ * Search diagnostics for Client Radar: where results are thrown away between the search provider and the sites the run
  * checks. Pure, and privacy-safe by construction: a record holds only a query's number, each result's rank, its
  * registrable domain, whether it was a home or an inner page, and what the filters decided. Never a title, a snippet, a
  * URL path or query string, the query's text (it is built from the user's request), an email, a phone number or a key.

@@ -33,8 +33,8 @@ export function homeSchemas(): string {
       url: `${SITE_ORIGIN}/`,
       description: `${ONE_LINER} For ${AUDIENCE_LINE}. ${SUMMARY}`,
       offers: [
-        { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD", description: `${OB.free.monthlySearches} AI Outbound searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each), the leads pipeline, and ${PRICING.freeMonthlyDeals} deals a month, each with its quotation. Available in every country.` },
-        { "@type": "Offer", name: "Pro Monthly", price: String(PRICING.proMonthlyInr), priceCurrency: "INR", eligibleRegion: india, description: `${OB.pro.monthlySearches} AI Outbound searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.pro.maxCompanies} companies each), unlimited deals, agreements, invoices and payment tracking. Paid monthly in India; it does not renew automatically.` },
+        { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD", description: `${OB.free.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each), the leads pipeline, and ${PRICING.freeMonthlyDeals} deals a month, each with its quotation. Available in every country.` },
+        { "@type": "Offer", name: "Pro Monthly", price: String(PRICING.proMonthlyInr), priceCurrency: "INR", eligibleRegion: india, description: `${OB.pro.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.pro.maxCompanies} companies each), unlimited deals, agreements, invoices and payment tracking. Paid monthly in India; it does not renew automatically.` },
       ],
       publisher: { "@id": ORGANIZATION_ID },
     }),
@@ -58,7 +58,7 @@ export interface PageHead { title: string; description: string; /** "noindex, fo
 export const SPA_PAGE_HEADS: Readonly<Record<string, PageHead>> = {
   "/pitch": {
     title: "DealInSec product overview — from prospect to payment",
-    description: "A one-page overview of DealInSec: AI Outbound prospect research, leads, deals, quotations, agreements signed online, invoices and payment tracking for small B2B agencies and consultants.",
+    description: "A one-page overview of DealInSec: Client Radar prospect research, leads, deals, quotations, agreements signed online, invoices and payment tracking for small B2B agencies and consultants.",
     // A printable sales overview with illustrative figures, not a page to rank: kept out of search and the sitemap.
     robots: "noindex, follow",
   },

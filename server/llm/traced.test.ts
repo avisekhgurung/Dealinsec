@@ -174,11 +174,11 @@ describe("the platform-wide model budget (every workspace, one UTC day)", () => 
   });
 });
 
-/* ── option (a): AI Outbound and the other metered features have separate allocations under one hard ceiling ── */
-describe("separate allocations: AI Outbound can't use up the budget for lead research and drafting", () => {
+/* ── option (a): Client Radar and the other metered features have separate allocations under one hard ceiling ── */
+describe("separate allocations: Client Radar can't use up the budget for lead research and drafting", () => {
   const OUT: TraceCtx = { task: "enrich", orgId: "org-1", promptVersion: "e1" };
   const today = Date.UTC(2026, 9, 11, 1);
-  it("defaults: $1.00 overall, $0.50 for AI Outbound (icp, enrich, signals, angle), $0.50 for the rest; a pool can never exceed the overall ceiling", () => {
+  it("defaults: $1.00 overall, $0.50 for Client Radar (icp, enrich, signals, angle), $0.50 for the rest; a pool can never exceed the overall ceiling", () => {
     expect(budgetPoolOf("enrich")).toBe("outbound"); expect(budgetPoolOf("signals")).toBe("outbound"); expect(budgetPoolOf("icp")).toBe("outbound"); expect(budgetPoolOf("angle")).toBe("outbound");
     expect(budgetPoolOf("research")).toBe("sales"); expect(budgetPoolOf("draft")).toBe("sales"); expect(budgetPoolOf("classify")).toBe("sales"); expect(budgetPoolOf("negotiate")).toBe("sales");
     expect(poolDailySpendMicroUsd("outbound", {})).toBe(500_000);
@@ -187,14 +187,14 @@ describe("separate allocations: AI Outbound can't use up the budget for lead res
     expect(poolDailySpendMicroUsd("sales", { LLM_SALES_DAILY_SPEND_USD: "abc" })).toBe(500_000);
     expect(poolDailySpendMicroUsd("outbound", { LLM_OUTBOUND_DAILY_SPEND_USD: "0.2" })).toBe(200_000);
   });
-  it("AI Outbound has used its $0.50: outbound calls are refused (its own code), lead research still runs", async () => {
+  it("Client Radar has used its $0.50: outbound calls are refused (its own code), lead research still runs", async () => {
     const r = rig({ ledger: [{ at: today, cost: 499_000, task: "signals" }] });
     const e = await tracedChat(OUT, MSGS, {}, r.deps, {}).catch((x) => x);
     expect(e).toBeInstanceOf(GlobalCapExceeded);
     expect(e.pool).toBe("outbound");
     await expect(tracedChat(CTX, MSGS, {}, r.deps, {})).resolves.toMatchObject({ content: "ok" });
   });
-  it("lead research and drafting have used their $0.50: they are refused, AI Outbound still runs", async () => {
+  it("lead research and drafting have used their $0.50: they are refused, Client Radar still runs", async () => {
     const r = rig({ ledger: [{ at: today, cost: 499_000, task: "research" }] });
     const e = await tracedChat({ ...CTX, task: "draft" }, MSGS, {}, r.deps, {}).catch((x) => x);
     expect(e).toBeInstanceOf(GlobalCapExceeded);

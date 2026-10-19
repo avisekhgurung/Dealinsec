@@ -1,5 +1,5 @@
 /**
- * The AI Outbound agent tools through the real loop, policy, approvals and services (in-memory world, scripted model).
+ * The Client Radar agent tools through the real loop, policy, approvals and services (in-memory world, scripted model).
  * Each case pins down a boundary: what always asks, what can never be done by the agent, that a hostile website can't
  * steer it, and that nothing becomes a lead or an email without the person.
  */
@@ -161,7 +161,7 @@ describe("hardening from the audit", () => {
   });
 });
 
-describe("create_lead never recreates a company AI Outbound already found", () => {
+describe("create_lead never recreates a company Client Radar already found", () => {
   it("a prospect named to create_lead is redirected to add_prospect_to_leads (no card, no lead); matching by name or by website", async () => {
     seedRun();
     for (const args of [{ companyName: "Northwind Digital" }, { companyName: "northwind digital" }, { companyName: "Anything", website: "https://www.northwind.com/about" }]) {

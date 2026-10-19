@@ -30,7 +30,7 @@ function deps(over: Partial<UsageDeps> = {}) {
 }
 const ok = (r: any) => { if (!r.ok) throw new Error(JSON.stringify(r)); return r.usage; };
 
-describe("AI Outbound usage: the plan's 30-day allowance (one credit = one search that ran)", () => {
+describe("Client Radar usage: the plan's 30-day allowance (one credit = one search that ran)", () => {
   const DAY = 24 * HOUR;
   const ran = (daysAgo: number) => ({ status: "done", counters: { searched: 8 }, createdAt: new Date(NOW.getTime() - daysAgo * DAY) });
 
@@ -64,7 +64,7 @@ describe("AI Outbound usage: the plan's 30-day allowance (one credit = one searc
   });
 });
 
-describe("AI Outbound usage before a search", () => {
+describe("Client Radar usage before a search", () => {
   it("a fresh workspace: every allowance available, included in the plan, the platform available", async () => {
     const u = ok(await outboundUsage(ana, deps().d));
     expect(u).toMatchObject({ charge: "included", searchReady: true, perSearch: { webSearches: 8 }, platform: { state: "available", resetsAt: "2026-10-17T00:00:00.000Z" } });
@@ -123,7 +123,7 @@ describe("AI Outbound usage before a search", () => {
     expect(u.workspace.contactLookups).toMatchObject({ used: 7, limit: 30, remaining: 23 });
   });
 
-  it("refuses without leads access or before AI Outbound is set up", async () => {
+  it("refuses without leads access or before Client Radar is set up", async () => {
     expect(await outboundUsage({ id: "x", organizationId: null } as any, deps().d)).toMatchObject({ ok: false, status: 403 });
     expect(await outboundUsage(ana, deps({ tablesReady: async () => false }).d)).toMatchObject({ ok: false, status: 503 });
   });

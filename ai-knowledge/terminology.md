@@ -1,7 +1,7 @@
 # Terminology
 
-- Prospect: a company AI Outbound found and checked; not yet in your pipeline.
-- AI Outbound: the prospect research feature (/outbound): searches, prospects, outreach and (where Gmail is on) the inbox.
+- Prospect: a company Client Radar found and checked; not yet in your pipeline.
+- Client Radar: the prospect research feature (/outbound): searches, prospects, outreach and (where Gmail is on) the inbox.
 - Lead: a company you are pursuing, with a stage, next steps, facts and messages.
 - Do-not-contact list: addresses and domains DealInSec will never let you message.
 - Deal: one client engagement (client, engagement model, service, value, dates, deliverables).

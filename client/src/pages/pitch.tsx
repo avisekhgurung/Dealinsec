@@ -63,7 +63,7 @@ export default function PitchPage() {
               DealInSec
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto print:text-base">
-              Find clients with AI Outbound, then run each deal through
+              Find clients with Client Radar, then run each deal through
               quotation, agreement, invoice and payment tracking. Figures below
               are illustrative.
             </p>

@@ -75,7 +75,7 @@ const listLeadsTool: AgentTool<{ status?: LeadStatus; query?: string; limit?: nu
     if (!r.ok) return failFrom(r);
     const counts = LEAD_STATUSES.filter((s) => r.counts[s]).map((s) => `${stageLabel(s)} ${r.counts[s]}`).join(", ") || "none yet";
     if (!r.rows.length) {
-      // A company that isn't a lead may be a PROSPECT AI Outbound found: say so here, where the agent is looking.
+      // A company that isn't a lead may be a PROSPECT Client Radar found: say so here, where the agent is looking.
       const found = query ? await prospectsNamed(who(ctx).organizationId, query) : [];
       const hint = found.length
         ? `\nBut ${found.length === 1 ? "a prospect" : "prospects"} from a prospect search match${found.length === 1 ? "es" : ""} "${query}":\n${found.map((p) => `- [${p.id}] ${p.name} (${p.domain})${p.leadId ? ` — already lead ${p.leadId}` : p.aside ? ` — set aside (${p.aside})` : ""}`).join("\n")}\nUse get_prospect_intelligence for what is known, and add_prospect_to_leads (not create_lead) to add one.`
@@ -148,7 +148,7 @@ const createLeadTool: AgentTool<z.infer<z.ZodObject<typeof leadFields>>> = {
   input: z.object(leadFields),
   authorize: canWrite,
   async prepare(ctx, input) {
-    // A company AI Outbound already found is added with its evidence (add_prospect_to_leads), never again from just its name.
+    // A company Client Radar already found is added with its evidence (add_prospect_to_leads), never again from just its name.
     const hit = await prospectMatch(who(ctx).organizationId, { companyName: String(input.companyName ?? ""), website: input.website });
     if (hit && !hit.leadId) {
       return hit.rejectLabel

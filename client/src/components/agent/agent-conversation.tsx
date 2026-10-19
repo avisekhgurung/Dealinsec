@@ -20,7 +20,7 @@ function Empty({ onPaste, onPrompt, pasteLabel, prompts, onCall }: { onPaste: ()
       <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600/10 text-emerald-700 dark:text-emerald-400"><Sparkles className="h-6 w-6" /></span>
       <h2 className="mt-4 text-2xl font-bold tracking-tight sm:text-3xl" data-testid="agent-greeting">{greetingFor(new Date().getHours())}{name ? `, ${name}` : ""}</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-        I can find potential clients with AI Outbound, look up your leads, deals and invoices, and prepare quotations, agreements, invoices and payment follow-ups for you to check. Tell me what you need, or tap the mic. I ask before I change anything that matters.
+        I can find potential clients with Client Radar, look up your leads, deals and invoices, and prepare quotations, agreements, invoices and payment follow-ups for you to check. Tell me what you need, or tap the mic. I ask before I change anything that matters.
       </p>
       {/* Ask here for answers and quick work; hand longer, background work to the coworkers (AI League). */}
       <p className="mx-auto mt-2 max-w-md text-xs text-muted-foreground" data-testid="agent-league-hint">

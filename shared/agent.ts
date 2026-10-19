@@ -93,7 +93,7 @@ const TOOL_LABELS: Record<string, string> = {
   get_ideal_client: "your ideal client",
   update_ideal_client: "your ideal client",
   assess_lead_fit: "how well the lead fits",
-  // Retired 16 Oct 2026 (company finding is AI Outbound now); kept so saved conversations still read well.
+  // Retired 16 Oct 2026 (company finding is Client Radar now); kept so saved conversations still read well.
   find_companies: "the company search",
   revise_quotation: "the quotation changes",
   revise_agreement: "the agreement changes",

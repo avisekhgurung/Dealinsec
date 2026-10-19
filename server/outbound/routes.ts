@@ -1,5 +1,5 @@
 /**
- * AI Outbound: HTTP surface (all under /api/outbound, all authenticated). Thin: parse, call the service, map the
+ * Client Radar: HTTP surface (all under /api/outbound, all authenticated). Thin: parse, call the service, map the
  * Result to HTTP. A run or prospect in another workspace answers 404.
  *
  *   POST /api/outbound/icp                       read a sentence into a structured ICP (the person confirms it)

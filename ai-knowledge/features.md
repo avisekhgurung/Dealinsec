@@ -1,7 +1,7 @@
 # Feature highlights
 
 ## Finding clients
-- AI Outbound (/outbound): describe who you want to reach ("US SEO agencies
+- Client Radar (/outbound): describe who you want to reach ("US SEO agencies
   with 5–30 employees serving SaaS"), confirm the profile it reads back (you
   can add or remove countries and cities: the US, UK, Canada, Australia, UAE,
   India and more, or leave it worldwide — your own account's country is never

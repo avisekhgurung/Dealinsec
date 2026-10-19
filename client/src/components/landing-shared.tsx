@@ -1,5 +1,32 @@
 import { motion } from "framer-motion";
 
+/**
+ * Scroll to a section of this page ("#ai-team") under the sticky header (every section has scroll-mt-20), smoothly
+ * unless the person prefers reduced motion, and put the hash in the address bar without a second jump. Returns false
+ * when there is no such section, so the caller can let the browser handle the link.
+ */
+export function scrollToSection(hash: string): boolean {
+  const el = typeof document !== "undefined" ? document.getElementById(hash.replace(/^#/, "")) : null;
+  if (!el) return false;
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  if (window.location.hash !== hash) window.history.replaceState(null, "", hash);
+  return true;
+}
+
+/**
+ * onClick for an in-page <a href="#…">: scrolls with scrollToSection instead of the browser's jump. `delay` lets a
+ * closing menu finish first (a collapsing mobile menu moves the page under the scroll). New-tab clicks are left alone.
+ */
+export function onSectionLinkClick(e: React.MouseEvent<HTMLAnchorElement>, delay = 0) {
+  const href = e.currentTarget.getAttribute("href") ?? "";
+  if (!href.startsWith("#") || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+  if (!document.getElementById(href.slice(1))) return;
+  e.preventDefault();
+  if (delay > 0) window.setTimeout(() => scrollToSection(href), delay);
+  else scrollToSection(href);
+}
+
 export const BRAND_GRADIENT = "linear-gradient(135deg, #059669 0%, #0D9488 100%)";
 
 export const fadeUp = {

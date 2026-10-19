@@ -44,14 +44,14 @@ export interface World {
   messages: Row[]; messagesReady: boolean;
   /** The do-not-contact list and outcome events; outreachSafetyFail makes the list unreadable (a database error). */
   suppressions: Row[]; outreachEvents: Row[]; outreachSafetyReady: boolean; outreachSafetyFail?: boolean;
-  /** AI Outbound: runs, prospects, run items, findings, provider calls, and whether the tables exist. */
+  /** Client Radar: runs, prospects, run items, findings, provider calls, and whether the tables exist. */
   /** failReserve: the platform-wide budget can't be counted (the database is down for that query). */
   outbound: { runs: Row[]; prospects: Row[]; items: Row[]; findings: Row[]; providerCalls: Row[]; ready: boolean; failReserve?: boolean };
   /** Test hook: the next outbound saveStep throws (a crash inside the transaction). */
   outboundFailNextSave?: boolean;
   /** Knowledge: sources, passages and picture bytes (all with their organization), and the pages the fake web serves. */
   knowledge: { sources: Row[]; chunks: Row[]; files: Map<string, Row>; web: Record<string, { status: number; headers: Record<string, string>; body: string }>; dns: Record<string, string[]> };
-  /** The fake web search behind AI Outbound: what it returns and what it was asked. */
+  /** The fake web search behind Client Radar: what it returns and what it was asked. */
   discovery: { configured: boolean; results: { title: string; url: string; snippet?: string }[]; queries: string[]; countries: (string | undefined)[]; error: string | null; provider: { label: string; paid: boolean; supportsCountry: boolean } };
 }
 

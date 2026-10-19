@@ -45,7 +45,7 @@ const defaults = (): LocalDeps => ({
   now: () => new Date(), kick: () => outboundRunner.kick(),
 });
 
-const NOT_SETUP = () => fail(503, "PROSPECTS_NOT_SETUP", "AI Outbound isn't set up on this server yet.");
+const NOT_SETUP = () => fail(503, "PROSPECTS_NOT_SETUP", "Client Radar isn't set up on this server yet.");
 const LOCAL_NOT_SETUP = () => fail(503, "LOCAL_NOT_SETUP", "Local business search isn't switched on yet. Search for companies online meanwhile.");
 async function ready(): Promise<boolean> { try { return await prospectsTablesReady(); } catch { return false; } }
 
@@ -54,8 +54,8 @@ export const localSearchReady = (d: Partial<LocalDeps> = {}) => !!({ ...defaults
 
 function limitFail(tier: OutboundTier, monthly: number, i: number) {
   if (i === 0) return tier === "free"
-    ? fail(402, "NO_CREDITS", `You've used the free plan's ${monthly} AI Outbound searches for this 30-day period. Upgrade to Pro for more.`, { feature: "outbound" })
-    : fail(429, "monthly_limit", `You've used the ${monthly} AI Outbound searches included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`);
+    ? fail(402, "NO_CREDITS", `You've used the free plan's ${monthly} Client Radar searches for this 30-day period. Upgrade to Pro for more.`, { feature: "outbound" })
+    : fail(429, "monthly_limit", `You've used the ${monthly} Client Radar searches included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`);
   if (i === 1) return fail(429, "daily_limit", `You've started today's ${dailyRunLimit()} prospect searches. Try again tomorrow.`);
   return tier === "free"
     ? fail(402, "NO_CREDITS", "You've used the free plan's researched prospects for this 30-day period. Upgrade to Pro for more.", { feature: "outbound" })

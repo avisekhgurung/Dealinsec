@@ -7,7 +7,7 @@ export const ASK_OPENER =
 
 export const ASK_SUGGESTIONS = [
   "How can DealInSec help my SEO agency find clients?",
-  "How does AI Outbound work?",
+  "How does Client Radar work?",
   "Can I turn a prospect into a quotation and invoice?",
   "Does DealInSec send emails automatically?",
   "Can I use DealInSec from the US or India?",

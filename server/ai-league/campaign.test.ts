@@ -1,5 +1,5 @@
 /**
- * Nibo's research campaign with fake AI Outbound services and a fake clock: the runtime's part (carry the checkpoint,
+ * Nibo's research campaign with fake Client Radar services and a fake clock: the runtime's part (carry the checkpoint,
  * advance time to each wait) is played by `drive`. What it proves: a scheduled start waits; batches move city by city;
  * results are de-duplicated across batches and against Leads; the target, the search cap, the plan's allowance and the
  * execution deadline each stop new research honestly; the report is saved before delivery and delivered at the time asked.
@@ -131,12 +131,12 @@ describe("Nibo's research campaign", () => {
   });
 
   it("the plan's allowance running out stops new searches and the report says so (partial, not failed)", async () => {
-    const f = fakeDeps({ batches: [[card(1, "b1.in")]], startResults: { 1: { ok: false, status: 429, code: "monthly_limit", message: "you've used the 10 AI Outbound searches in your plan" } } });
+    const f = fakeDeps({ batches: [[card(1, "b1.in")]], startResults: { 1: { ok: false, status: 429, code: "monthly_limit", message: "you've used the 10 Client Radar searches in your plan" } } });
     const { out } = await drive(f.deps, { request: "Indian digital marketing agencies", target: 5, maxSearches: 5 });
     if (out.kind !== "finish") throw new Error();
     expect(out.status).toBe("partial");
     expect(out.report.headline).toBe("Saved 1 of the 5 qualified companies asked for");
-    expect(out.report.notes?.join(" ")).toMatch(/Coverage is partial: research stopped because you've used the 10 AI Outbound searches/);
+    expect(out.report.notes?.join(" ")).toMatch(/Coverage is partial: research stopped because you've used the 10 Client Radar searches/);
   });
 
   it("the execution deadline cancels a running search, keeps what it found and still delivers on time", async () => {

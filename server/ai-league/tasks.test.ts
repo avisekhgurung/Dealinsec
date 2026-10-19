@@ -42,7 +42,7 @@ function nibo(prospects: any[], over: Partial<NiboDeps> & { status?: string } = 
 }
 
 describe("Nibo: find potential clients", () => {
-  it("starts the AI Outbound search and parks until it's done (no worker held while waiting)", async () => {
+  it("starts the Client Radar search and parks until it's done (no worker held while waiting)", async () => {
     const { task } = nibo([], { status: "running" });
     const { c, events } = ctx("nibo.find_clients", { request: "dentists in Siliguri", saveLeads: true, maxLeads: 3 });
     const parsed = await task.step(c, "start");
@@ -55,7 +55,7 @@ describe("Nibo: find potential clients", () => {
     expect(again.kind).toBe("wait");
   });
 
-  it("a retried launch sends the saved profile again (AI Outbound finds the same search), never a fresh parse", async () => {
+  it("a retried launch sends the saved profile again (Client Radar finds the same search), never a fresh parse", async () => {
     const sent: unknown[] = []; let parses = 0;
     const { task } = nibo([], { parseIcp: async () => { parses++; return { ok: true, icp: { industry: `dentists ${parses}` }, searches: ["q"], description: "d" }; }, startRun: async (_u, raw) => { sent.push(raw.icp); return { ok: true, existing: sent.length > 1, run: { id: "pr_1" } as any }; } });
     const { c } = ctx("nibo.find_clients", { request: "dentists in Siliguri" });

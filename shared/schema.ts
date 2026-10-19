@@ -1471,7 +1471,7 @@ export const outreachEvents = pgTable("outreach_events", {
 export type OutreachEventRow = typeof outreachEvents.$inferSelect;
 
 
-// ── AI Outbound: prospect discovery and intelligence (docs/ai-outbound-engine-architecture.md) ──
+// ── Client Radar: prospect discovery and intelligence (docs/ai-outbound-engine-architecture.md) ──
 // A search result is NOT a lead. A run discovers companies (prospects), verifies and researches them, and the person
 // adds the good ones to Leads. All five tables are additive (script/migrate-prospects.ts); timestamps are written from
 // the application in UTC. Every query is scoped by organization.

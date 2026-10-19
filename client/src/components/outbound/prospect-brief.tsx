@@ -87,7 +87,7 @@ function Qualification({ b }: { b: Brief }) {
         <p>A verified email alone doesn't make a prospect ready, and readiness doesn't mean the contact is verified.</p>
       </StateRow>
       <StateRow title="Outreach eligibility" state={p.leadId ? "partial" : "unknown"} label={p.leadId ? "Decided on the lead" : "Not assessed here"}>
-        <p>{p.leadId ? "Outreach is drafted and approved on the lead, where do-not-contact and approval rules apply." : "Nothing is sent from AI Outbound. Add it to Leads to draft outreach for your approval; consent and do-not-contact are checked there."}</p>
+        <p>{p.leadId ? "Outreach is drafted and approved on the lead, where do-not-contact and approval rules apply." : "Nothing is sent from Client Radar. Add it to Leads to draft outreach for your approval; consent and do-not-contact are checked there."}</p>
       </StateRow>
     </Section>
   );

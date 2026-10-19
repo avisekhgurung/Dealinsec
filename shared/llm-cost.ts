@@ -87,7 +87,7 @@ export function globalDailySpendMicroUsd(env: Env = process.env): number {
 export const utcDayStart = (at: number | Date): Date => { const d = new Date(at); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); };
 
 /**
- * Two allocations under the platform-wide ceiling, each enforced on its own, so AI Outbound can never use up what lead
+ * Two allocations under the platform-wide ceiling, each enforced on its own, so Client Radar can never use up what lead
  * research and drafting need (and the reverse):
  *   outbound  icp, enrich, signals, angle             LLM_OUTBOUND_DAILY_SPEND_USD (default $0.50)
  *   sales     every other metered task (research, draft, classify, negotiate)  LLM_SALES_DAILY_SPEND_USD (default $0.50)

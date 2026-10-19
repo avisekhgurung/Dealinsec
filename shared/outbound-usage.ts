@@ -1,5 +1,5 @@
 /**
- * The rules behind the AI Outbound usage view (server/outbound/usage.ts), kept pure so they can be tested and shared
+ * The rules behind the Client Radar usage view (server/outbound/usage.ts), kept pure so they can be tested and shared
  * with the store's SQL and the test world.
  */
 
@@ -14,7 +14,7 @@ export const runCountsTowardLimit = (r: { status: string; counters: unknown }): 
 
 export type PlatformState = "available" | "limited" | "paused" | "unknown";
 
-/** Under a fifth of the AI Outbound model budget left reads as "limited". */
+/** Under a fifth of the Client Radar model budget left reads as "limited". */
 export const LIMITED_SHARE = 0.2;
 
 /**

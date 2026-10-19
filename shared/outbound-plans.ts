@@ -1,8 +1,8 @@
 /**
- * AI Outbound research allowances per plan: the one definition the server enforces (server/outbound/limits.ts reads
+ * Client Radar research allowances per plan: the one definition the server enforces (server/outbound/limits.ts reads
  * these as defaults, each overridable by an environment variable) and every pricing surface quotes.
  *
- * One credit = one AI Outbound search: a search that actually ran on the web (a search that stopped before searching
+ * One credit = one Client Radar search: a search that actually ran on the web (a search that stopped before searching
  * doesn't count; shared/outbound-usage.ts runCountsTowardLimit). Each search looks for up to `maxCompanies` companies,
  * checks their websites and researches the best ones. Allowances run over a rolling 30 days, on top of the daily limit
  * every workspace has.

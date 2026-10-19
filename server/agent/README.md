@@ -104,11 +104,11 @@ Nothing in `loop.ts`, `policy.ts` or the tools changes for a new channel
 checks the runs are identical). `wiring.ts` supplies the real database, model
 and tools; tests inject fakes.
 
-## Finding companies (AI Outbound)
+## Finding companies (Client Radar)
 
 The agent has ONE way to find new companies: `discover_prospects` (`tools/outbound.ts`), which starts the same AI
 Outbound search the `/outbound` page runs (`server/outbound/service.ts`), with `by: "agent"`. It always asks, runs in
 the background, creates no leads, and its result links to `/outbound?run=<id>`, where the search is marked "Started
 from Agent". The old quick web search (`find_companies`) was retired on 16 Oct 2026 because it gave thinner, unchecked
-results than AI Outbound for the same request. Search providers and their environment (`LANGSEARCH_API_KEY`,
+results than Client Radar for the same request. Search providers and their environment (`LANGSEARCH_API_KEY`,
 `BRAVE_SEARCH_API_KEY`, …) live in `server/discovery/*`; see `docs/ai-engineering/03-finding-companies.md`.

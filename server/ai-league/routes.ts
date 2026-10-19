@@ -85,7 +85,7 @@ export function registerAiLeagueRoutes(app: Express) {
   app.get("/api/ai-league/bots/:bot/conversation", isAuthenticated, guarded("league_conversation", async (req, res) => {
     const bot = botOf(req, res); if (!bot) return;
     const t = await thread(req, bot);
-    if (!t) return res.status(503).json({ code: "LEAGUE_NOT_SETUP", error: "AI League isn't set up on this server yet." });
+    if (!t) return res.status(503).json({ code: "LEAGUE_NOT_SETUP", error: "The Nest isn't set up on this server yet." });
     const { agentStore } = await import("../agent/store");
     const transcript = await agentStore.transcript(t.session);
     res.setHeader("Cache-Control", "no-store");
@@ -97,7 +97,7 @@ export function registerAiLeagueRoutes(app: Express) {
     const body = messageBody.safeParse(req.body ?? {});
     if (!body.success) return res.status(400).json({ error: "Type a message (up to 4,000 characters)." });
     const t = await thread(req, bot);
-    if (!t) return res.status(503).json({ code: "LEAGUE_NOT_SETUP", error: "AI League isn't set up on this server yet." });
+    if (!t) return res.status(503).json({ code: "LEAGUE_NOT_SETUP", error: "The Nest isn't set up on this server yet." });
     const { converse } = await import("../agent/conversation");
     const { leagueConversationDeps } = await import("./chat");
     const deps = await leagueConversationDeps(bot);

@@ -27,7 +27,7 @@ export class CapExceeded extends Error {
 export class CapUnavailable extends Error { constructor() { super("the daily allowance could not be checked"); } }
 /**
  * The platform-wide model budget for today (every workspace together) is used up: the task's own allocation (`pool`:
- * AI Outbound or the other metered features) or the overall ceiling. It IS a CapExceeded, so every caller that already
+ * Client Radar or the other metered features) or the overall ceiling. It IS a CapExceeded, so every caller that already
  * stops cleanly on a workspace's limit stops on this too; `code` tells the two apart.
  */
 /**
@@ -41,7 +41,7 @@ export class WorkspaceBudgetExceeded extends CapExceeded {
 
 export class GlobalCapExceeded extends CapExceeded {
   readonly code = "global_limit";
-  constructor(task: LlmTask, limitMicroUsd: number, readonly pool: BudgetPool = budgetPoolOf(task)) { super(task, limitMicroUsd, limitMicroUsd); this.message = `today's platform-wide AI budget for ${pool === "outbound" ? "AI Outbound" : "lead research and drafting"} is used up`; }
+  constructor(task: LlmTask, limitMicroUsd: number, readonly pool: BudgetPool = budgetPoolOf(task)) { super(task, limitMicroUsd, limitMicroUsd); this.message = `today's platform-wide AI budget for ${pool === "outbound" ? "Client Radar" : "lead research and drafting"} is used up`; }
 }
 
 /** An output budget asked for when the caller sets none: the reservation must not be smaller than what a call could cost. */

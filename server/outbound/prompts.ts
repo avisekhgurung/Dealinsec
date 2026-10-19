@@ -1,5 +1,5 @@
 /**
- * What the AI Outbound models are told. Web pages, search snippets and stored findings are untrusted data: each is
+ * What the Client Radar models are told. Web pages, search snippets and stored findings are untrusted data: each is
  * fenced, and every prompt says never to follow them. Bump the version whenever a prompt's text changes: every call
  * records it (llm_calls), so a change in results can be tied to a change in the prompt.
  */

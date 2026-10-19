@@ -1,5 +1,5 @@
 /**
- * AI League: Nibo, Mika and Zee, three AI coworkers inside DealInSec.
+ * The Nest (route /ai-league): My AI Team, Nibo, Mika and Zee, three AI coworkers inside DealInSec.
  *
  *   /ai-league           the team: each coworker's real state, what's waiting for you, recent activity; and the
  *                        Activity, Waiting, Schedules and Memory views
@@ -23,6 +23,7 @@ import { useAgent } from "@/hooks/use-agent";
 import { cn } from "@/lib/utils";
 import { BOTS, BOT_IDENTITY, BOT_STATUS_LABEL, isBot, isTerminal, type Bot } from "@shared/ai-league";
 import { leagueCall, leagueEndpoints, refreshLeague, runUrl, useApprovals, useLeagueStatus, useRoster, useRuns, when, type BotCard, type RunView } from "@/lib/ai-league";
+import { NEST_TEAM_IMAGE } from "@/lib/plush";
 import { Mascot, MascotEmpty, mascotState } from "@/components/ai-league/mascot";
 import { RunDetail, StatusPill, runStatusLabel } from "@/components/ai-league/run-report";
 import { TaskDialog } from "@/components/ai-league/task-dialog";
@@ -91,8 +92,9 @@ function LeagueHome() {
       <header className="glass-header sticky top-0 z-40 lg:border-b lg:border-neutral-200/60 dark:lg:border-neutral-800/60">
         <div className="flex items-center justify-between gap-4 px-4 py-4 lg:mx-auto lg:max-w-[1400px] lg:px-8">
           <div className="min-w-0">
-            <h1 className="text-xl font-bold tracking-tight lg:text-2xl">AI League</h1>
-            <p className="mt-0.5 hidden text-sm text-muted-foreground sm:block">Your AI coworkers. Get help from Nibo, Mika and Zee: Nibo finds and researches potential clients, Mika prepares outreach drafts for you to check and send yourself, and Zee shows what needs attention across your deals, follow-ups and payments. They work in the background and ask before anything that matters. Need a quick answer instead? <Link href="/agent" className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400" data-testid="league-ask-agent">Ask DealInSec</Link>.</p>
+            <h1 className="text-xl font-bold tracking-tight lg:text-2xl">The Nest <span aria-hidden>🪺</span></h1>
+            <p className="mt-0.5 text-sm font-medium text-foreground/80">My AI Team · Find clients. Win deals. Get paid.</p>
+
           </div>
           <NotificationBell className="lg:hidden" />
         </div>
@@ -100,11 +102,11 @@ function LeagueHome() {
 
       <main className="space-y-5 px-4 py-5 lg:mx-auto lg:max-w-[1400px] lg:px-8 lg:py-6">
         {status.data && !status.data.ready ? (
-          <div className="rounded-2xl border px-6 py-12 text-center" data-testid="league-not-setup"><p className="font-semibold">AI League isn't switched on yet</p><p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">It hasn't been set up on this server yet. Everything else in DealInSec works as usual.</p></div>
+          <div className="rounded-2xl border px-6 py-12 text-center" data-testid="league-not-setup"><p className="font-semibold">The Nest isn't switched on yet</p><p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">It hasn't been set up on this server yet. Everything else in DealInSec works as usual.</p></div>
         ) : (
           <>
             <div className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-            <SegmentedTabs label="AI League views" value={view} onChange={setView} className="w-max min-w-full max-w-none sm:min-w-0 [&>button]:flex-auto [&>button]:shrink-0"
+            <SegmentedTabs label="The Nest views" value={view} onChange={setView} className="w-max min-w-full max-w-none sm:min-w-0 [&>button]:flex-auto [&>button]:shrink-0"
               tabs={[
                 { value: "team", label: <span className="whitespace-nowrap">Team</span>, testId: "league-view-team" },
                 { value: "activity", label: <span className="whitespace-nowrap">Activity</span>, testId: "league-view-activity" },
@@ -116,6 +118,7 @@ function LeagueHome() {
 
             {view === "team" && (
               <>
+                <NestWelcome />
                 <section className="grid gap-4 md:grid-cols-3" aria-label="Your coworkers" data-testid="league-roster">
                   {roster.isLoading
                     ? BOTS.map((b) => <div key={b} className="h-56 animate-pulse rounded-2xl border bg-muted/40" />)
@@ -160,6 +163,45 @@ function LeagueHome() {
   );
 }
 
+/** The team picture and what each coworker is for: the first thing on the Team view. */
+const WELCOME_KEY = "dis_nest_welcome_hidden";
+function NestWelcome() {
+  // Remembered per browser; storage can be unavailable (private windows), which just shows the card again.
+  const [hidden, setHidden] = useState(() => { try { return localStorage.getItem(WELCOME_KEY) === "1"; } catch { return false; } });
+  const hide = () => { setHidden(true); try { localStorage.setItem(WELCOME_KEY, "1"); } catch { /* not stored */ } };
+  if (hidden) return null;
+  return (
+    <section className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-[#fbf4ec] via-card to-card dark:from-amber-950/20" aria-labelledby="nest-welcome-h" data-testid="nest-welcome">
+      <button type="button" onClick={hide} className="absolute right-2 top-2 z-10 rounded-full bg-background/85 px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur hover:text-foreground" data-testid="nest-welcome-hide">Hide</button>
+      <div className="grid items-center gap-0 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <img {...NEST_TEAM_IMAGE} sizes="(min-width: 768px) 560px, 100vw" loading="eager" decoding="async" draggable={false}
+          className="aspect-[3/2] h-auto w-full select-none object-cover md:max-h-[300px]" />
+        <div className="space-y-3 p-4 sm:p-5">
+          <div>
+            <h2 id="nest-welcome-h" className="text-lg font-bold tracking-tight">Welcome to The Nest <span aria-hidden>🪺</span></h2>
+            <p className="text-sm text-muted-foreground">Your AI team works in the background and asks before anything that matters. Need a quick answer instead? <Link href="/agent" className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400" data-testid="league-ask-agent">Ask DealInSec</Link>.</p>
+          </div>
+          <ul className="space-y-2 text-sm">
+            {BOTS.map((b) => (
+              <li key={b} className="flex items-start gap-2.5">
+                <Mascot bot={b} size={32} />
+                <span><b className={BOT_IDENTITY[b].accent.fg}>{BOT_IDENTITY[b].name} {BOT_IDENTITY[b].emoji} · {BOT_IDENTITY[b].role}</b><span className="block text-muted-foreground">{NEST_LINE[b]}</span></span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** One line each, for the welcome card. */
+const NEST_LINE: Record<Bot, string> = {
+  nibo: "Finds potential clients and researches businesses.",
+  mika: "Drafts personalised outreach and follow-ups for you to send.",
+  zee: "Helps you organise tasks, payments and business updates.",
+};
+
 function CoworkerCard({ card, onTask, onOpenRun }: { card: BotCard; onTask: () => void; onOpenRun: (id: string) => void }) {
   const id = BOT_IDENTITY[card.bot];
   const state = card.lastRun && !card.activeRun && card.status === "available" && card.unread > 0 && card.lastRun.status === "completed" ? "done" : mascotState(card.status);
@@ -170,7 +212,7 @@ function CoworkerCard({ card, onTask, onOpenRun }: { card: BotCard; onTask: () =
         <Mascot bot={card.bot} state={state} size={72} label={`${id.name}, ${id.role}`} eager />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-semibold">{id.name}</h2>
+            <h2 className="text-base font-semibold">{id.name} <span aria-hidden>{id.emoji}</span></h2>
             <span className={cn("inline-flex items-center gap-1.5 text-[11px] font-medium", card.status === "attention" ? "text-red-700 dark:text-red-400" : card.status === "needs_you" ? "text-amber-700 dark:text-amber-400" : card.status === "working" ? id.accent.fg : "text-muted-foreground")} data-testid="coworker-status">
               <span className={cn("h-1.5 w-1.5 rounded-full", card.status === "attention" ? "bg-red-500" : card.status === "needs_you" ? "bg-amber-500" : card.status === "working" ? `${id.accent.bg} motion-safe:animate-pulse` : "bg-emerald-500")} aria-hidden />
               {BOT_STATUS_LABEL[card.status]}{card.waiting > 0 ? ` · ${card.waiting}` : ""}
@@ -285,7 +327,7 @@ function CoworkerChat({ bot }: { bot: Bot }) {
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_22rem]">
         {/* Roster: a compact column on desktop */}
         <nav className="hidden border-r p-3 lg:block" aria-label="Coworkers">
-          <Link href="/ai-league" className="mb-3 flex items-center gap-1.5 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" />AI League</Link>
+          <Link href="/ai-league" className="mb-3 flex items-center gap-1.5 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"><ArrowLeft className="h-3.5 w-3.5" />The Nest</Link>
           <ul className="space-y-1">
             {BOTS.map((b) => {
               const c = roster.data?.bots.find((x) => x.bot === b);
@@ -305,10 +347,10 @@ function CoworkerChat({ bot }: { bot: Bot }) {
         {/* The conversation */}
         <section className="flex min-h-0 min-w-0 flex-col" aria-label={`Chat with ${id.name}`}>
           <header className="flex items-center gap-3 border-b px-4 py-3">
-            <Link href="/ai-league" className="lg:hidden" aria-label="Back to AI League"><ArrowLeft className="h-5 w-5" /></Link>
-            <Mascot bot={bot} size={44} state={agent.running ? "thinking" : mascotState(card?.status)} eager />
+            <Link href="/ai-league" className="lg:hidden" aria-label="Back to The Nest"><ArrowLeft className="h-5 w-5" /></Link>
+            <Mascot bot={bot} size={44} state={agent.running ? "thinking" : mascotState(card?.status)} speaking={agent.running && !!agent.live} eager />
             <div className="min-w-0 flex-1">
-              <h1 className="text-base font-semibold leading-tight">{id.name}</h1>
+              <h1 className="text-base font-semibold leading-tight">{id.name} <span aria-hidden>{id.emoji}</span></h1>
               <p className={cn("truncate text-xs", id.accent.fg)}>{id.role}{card && card.status !== "available" ? ` · ${BOT_STATUS_LABEL[card.status]}` : ""}</p>
             </div>
             <Button size="sm" variant="outline" className="h-9 xl:hidden" onClick={() => setTasksOpen(true)} data-testid="open-tasks"><ListChecks className="mr-1.5 h-4 w-4" />Tasks{active ? " ·1" : ""}</Button>
@@ -320,7 +362,7 @@ function CoworkerChat({ bot }: { bot: Bot }) {
               <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center" data-testid="chat-empty">
                 <Mascot bot={bot} size={112} label={`${id.name}, ${id.role}`} eager />
                 <div className="max-w-md space-y-1">
-                  <p className="font-semibold">Hi, I'm {id.name}.</p>
+                  <p className="font-semibold">Hi, I'm {id.name} {id.emoji}, your {id.role.toLowerCase()}.</p>
                   <p className="text-sm text-muted-foreground">{id.pitch}</p>
                   {bot === "mika" && <p className="text-xs text-muted-foreground">{MIKA_SEND_NOTE}</p>}
                 </div>

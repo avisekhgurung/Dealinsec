@@ -1022,6 +1022,45 @@ button:not(:disabled):active,
   100% { transform: scale(1.22); opacity: 0; }
 }
 
+/* The Nest: the plush coworkers' life (components/ai-league/nest-character.tsx). Transforms only, so nothing
+   reflows; the body carries the state, the face carries each character's habit, so the two never fight over one
+   transform. Reduced motion holds everything still: the pose and the badges still tell the state. */
+.nest-body { transform-origin: 50% 85%; transition: transform .35s ease, filter .35s ease; }
+.nest-idle { animation: nest-float 4.8s ease-in-out infinite; }
+.nest-thinking { animation: nest-sway 1.7s ease-in-out infinite; }
+.nest-speak { animation: nest-talk .42s ease-in-out infinite; }
+.nest-success { animation: nest-hop .9s cubic-bezier(.3,.7,.4,1) 1, nest-float 4.8s ease-in-out .9s infinite; }
+.nest-waiting { transform: translateY(-2%) scale(1.035); }
+.nest-error { transform: translateY(3%) rotate(-3deg); filter: saturate(.55) brightness(.97); }
+.nest-face { transform-origin: 50% 80%; }
+.nest-habit-nibo { animation: nest-tilt 7s ease-in-out infinite; }
+.nest-habit-mika { animation: nest-squish 6s ease-in-out infinite; }
+.nest-habit-zee { animation: nest-bob 6.5s ease-in-out infinite; }
+.nest-pose-in { animation: nest-pose-in .35s ease-out; }
+.nest-prop-busy { animation: nest-wiggle 1.2s ease-in-out infinite; }
+.nest-prop-pop { animation: nest-pop .6s cubic-bezier(.3,1.6,.5,1) 1; }
+@keyframes nest-float { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-4%) scale(1.015); } }
+@keyframes nest-sway { 0%, 100% { transform: rotate(-2.5deg); } 50% { transform: rotate(2.5deg) translateY(-1.5%); } }
+@keyframes nest-talk { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035, .975) translateY(1%); } }
+@keyframes nest-hop {
+  0% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-14%) scale(1.05); }
+  55% { transform: translateY(0) scale(1.05, .95); }
+  75% { transform: translateY(-4%) scale(1); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes nest-tilt { 0%, 64%, 100% { transform: rotate(0); } 72% { transform: rotate(-5deg); } 84% { transform: rotate(3deg); } 92% { transform: rotate(0); } }
+@keyframes nest-squish { 0%, 78%, 100% { transform: translateY(0) scale(1); } 84% { transform: scale(1.04, .95); } 90% { transform: translateY(-5%) scale(.98, 1.03); } 95% { transform: translateY(0) scale(1); } }
+@keyframes nest-bob { 0%, 100% { transform: rotate(0) translateY(0); } 50% { transform: rotate(1.5deg) translateY(-2%); } }
+@keyframes nest-pose-in { from { opacity: .35; transform: scale(.97); } to { opacity: 1; transform: scale(1); } }
+@keyframes nest-wiggle { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg) translateY(-6%); } }
+@keyframes nest-pop { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.18); opacity: 1; } 100% { transform: scale(1); } }
+/* The homepage's team cards: a gentle float only. */
+.nest-float-soft { animation: nest-float 5.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .nest-char *, .nest-float-soft { animation: none !important; transition: none !important; }
+}
+
 /* A reply streaming in (thread.tsx): a soft caret after the last line being written. Reduced motion keeps it still. */
 .dis-streaming > div > :is(p, ul, ol, blockquote):last-child::after,
 .dis-streaming > div > :is(ul, ol):last-child > li:last-child::after {

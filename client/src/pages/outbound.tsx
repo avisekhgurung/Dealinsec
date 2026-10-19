@@ -1,5 +1,5 @@
 /**
- * AI Outbound: say who you want to reach; DealInSec finds real companies, checks their websites, reads what they say,
+ * Client Radar: say who you want to reach; DealInSec finds real companies, checks their websites, reads what they say,
  * looks for reasons to reach out now, scores each one with the same 100-point score as a lead, and shows only what it
  * can back with evidence. Nothing is contacted. The good ones are added to Leads by you.
  */
@@ -268,12 +268,12 @@ export default function OutboundPage() {
   const search = useSearch();
   const [location, navigate] = useLocation();
   const viewParam = new URLSearchParams(search).get("view");
-  // ?run=<id>: open that search (the agent's "Open in AI Outbound" link).
+  // ?run=<id>: open that search (the agent's "Open in Client Radar" link).
   const runParam = new URLSearchParams(search).get("run");
   useEffect(() => { if (runParam) setRunId(runParam); }, [runParam]);
   const view = viewParam === "prospects" || viewParam === "outreach" || viewParam === "inbox" ? viewParam : "searches";
   const setView = (v: "prospects" | "searches" | "outreach" | "inbox") => navigate(v === "searches" ? location : `${location}?view=${v}`, { replace: true });
-  // AI Outbound opened (counts only; which view, never a search or a company).
+  // Client Radar opened (counts only; which view, never a search or a company).
   useEffect(() => { trackEvent("outbound_opened", { view }); }, []);
   const runs = useQuery<{ runs: RunView[] }>({ queryKey: [OUTBOUND_RUNS_URL], retry: false, refetchInterval: (q) => (q.state.data?.runs.some((r) => r.status === "running") ? 5000 : false) });
   // Open the most recent run on arrival, once.
@@ -375,7 +375,7 @@ export default function OutboundPage() {
       <header className="glass-header sticky top-0 z-40 lg:border-b lg:border-neutral-200/60 dark:lg:border-neutral-800/60">
         <div className="flex items-center justify-between gap-4 px-4 py-4 lg:mx-auto lg:max-w-[1600px] lg:px-8">
           <div className="min-w-0">
-            <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight lg:text-2xl"><Radar className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />AI Outbound</h1>
+            <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight lg:text-2xl">Client Radar <span aria-hidden>🔎</span></h1>
             <p className="mt-0.5 hidden text-sm text-muted-foreground lg:block">Find potential clients for your services: companies that fit, a reason to get in touch now, and the evidence behind each one. You can also ask Agent mode or Nibo to run a search; the results show here.</p>
           </div>
           <NotificationBell className="lg:hidden" />
@@ -384,7 +384,7 @@ export default function OutboundPage() {
 
       <main className="animate-fade-in space-y-5 px-4 py-5 lg:mx-auto lg:max-w-[1600px] lg:px-8 lg:py-6">
         {off ? (
-          <div className="rounded-2xl border px-6 py-14 text-center"><p className="font-semibold">AI Outbound isn't switched on yet</p><p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">This workspace is still being set up for it. Try again shortly.</p></div>
+          <div className="rounded-2xl border px-6 py-14 text-center"><p className="font-semibold">Client Radar isn't switched on yet</p><p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">This workspace is still being set up for it. Try again shortly.</p></div>
         ) : (
           <>
             <FlowSteps state={flow} />
@@ -460,7 +460,7 @@ export default function OutboundPage() {
               <p className="text-sm text-muted-foreground">You can see searches your team ran. Ask the workspace owner for permission to start one.</p>
             )}
 
-            <SegmentedTabs label="AI Outbound views" value={view} onChange={setView}
+            <SegmentedTabs label="Client Radar views" value={view} onChange={setView}
               tabs={[{ value: "searches", label: "Searches", testId: "view-searches" }, { value: "prospects", label: "All prospects", testId: "view-prospects" }, { value: "outreach", label: "Outreach", testId: "view-outreach" }, { value: "inbox", label: "Inbox", testId: "view-inbox" }]} />
 
             {view === "inbox" ? <OutreachInbox />

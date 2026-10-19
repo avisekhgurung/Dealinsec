@@ -414,7 +414,7 @@ export default function OnboardingPage() {
 
                   <motion.div variants={itemVariants} className="space-y-1.5">
                     <label htmlFor="onboarding-target-market" className="text-base font-semibold tracking-tight">Where do you want to find clients?</label>
-                    <p className="text-xs text-muted-foreground">Optional. AI Outbound can search any of these, wherever your own business is; you can change it on every search.</p>
+                    <p className="text-xs text-muted-foreground">Optional. Client Radar can search any of these, wherever your own business is; you can change it on every search.</p>
                     <select id="onboarding-target-market" value={market} onChange={(e) => setMarket(e.target.value as TargetMarket | "")}
                       className="h-10 w-full rounded-md border bg-background px-3 text-sm" data-testid="onboarding-target-market">
                       <option value="">Decide later</option>

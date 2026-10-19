@@ -54,7 +54,7 @@ describe("active route", () => {
   });
 
   it("lights More only for routes inside the sheet", () => {
-    // Deals lives in More on the phone bar (AI League took its place in the bar).
+    // Deals lives in More on the phone bar (The Nest took its place in the bar).
     for (const p of ["/quotations", "/deals", "/deals/abc", "/deals/abc/quote", "/contracts/abc", "/invoices", "/brand-invoices/new", "/profile", "/settings"]) {
       expect(isMoreActive(p)).toBe(true);
     }
@@ -67,7 +67,7 @@ describe("active route", () => {
 describe("desktop sections", () => {
   it("shows every area in workflow order for built-in roles", () => {
     const s = desktopNavSections(OWNER);
-    expect(s.map((x) => x.label)).toEqual(["Home", "AI League", "AI Outbound", "Pipeline", "Documents", "Money"]);
+    expect(s.map((x) => x.label)).toEqual(["Home", "The Nest", "Client Radar", "Pipeline", "Documents", "Money"]);
     expect(s.flatMap((x) => keys(x.items))).toEqual(["home", "league", "outbound", "leads", "deals", "quotations", "agreements", "invoices"]);
   });
 
@@ -89,9 +89,9 @@ describe("desktop sections", () => {
 });
 
 describe("mobile bar and More sheet", () => {
-  it("bar is Home, AI League, Outbound, Leads (More is added by the component)", () => {
+  it("bar is Home, The Nest, Radar, Leads (More is added by the component)", () => {
     expect(keys(mobileBarItems(OWNER))).toEqual(["home", "league", "outbound", "leads"]);
-    expect(mobileBarItems(OWNER).map((i) => i.shortLabel)).toEqual(["Home", "AI League", "Outbound", "Leads"]);
+    expect(mobileBarItems(OWNER).map((i) => i.shortLabel)).toEqual(["Home", "The Nest", "Radar", "Leads"]);
   });
 
   it("sheet groups Pipeline (Deals), Documents, Money and Account, never repeating a bar item", () => {

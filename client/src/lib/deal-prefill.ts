@@ -19,7 +19,7 @@ export function hasPendingDealPrefill(): boolean {
 
 /** Where a successful auth (signup, login, or onboarding completion) should
  *  land: the create-deal form (which will consume and clear the prefill) if a
- *  demo deal is waiting, AI Outbound if the demo's client search is waiting,
+ *  demo deal is waiting, Client Radar if the demo's client search is waiting,
  *  otherwise the ordinary dashboard. */
 export function postAuthDestination(): "/deals/new" | "/outbound" | "/dashboard" {
   if (hasPendingDealPrefill()) return "/deals/new";

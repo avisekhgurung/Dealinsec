@@ -1,6 +1,6 @@
 /**
  * The outreach angle stored for the prospect a lead came from, for the first-message draft. Imported lazily by
- * server/sales/outreach.ts so that drafting never depends on AI Outbound being set up: null whenever there is none.
+ * server/sales/outreach.ts so that drafting never depends on Client Radar being set up: null whenever there is none.
  */
 import { REJECT_LABEL, domainOf, type RejectReason } from "@shared/prospect";
 import { outboundStore, prospectsTablesReady } from "./store";
@@ -20,9 +20,9 @@ export async function angleForLead(orgId: string, leadId: number): Promise<LeadA
 export interface ProspectMatch { id: number; name: string; leadId: number | null; rejectLabel: string | null }
 
 /**
- * Is this company already one of the prospects AI Outbound found? Used by the older create_lead tool, so a company that
+ * Is this company already one of the prospects Client Radar found? Used by the older create_lead tool, so a company that
  * has a prospect (with its evidence, or the reason it was set aside) is never created again from just its name.
- * null whenever AI Outbound isn't set up.
+ * null whenever Client Radar isn't set up.
  */
 export async function prospectMatch(orgId: string, c: { companyName: string; website?: string | null }): Promise<ProspectMatch | null> {
   try {
@@ -35,7 +35,7 @@ export async function prospectMatch(orgId: string, c: { companyName: string; web
   } catch { return null; }
 }
 
-/** Prospects whose name or domain contains what the user typed, for pointing from a failed lead search to them. [] when AI Outbound isn't set up. */
+/** Prospects whose name or domain contains what the user typed, for pointing from a failed lead search to them. [] when Client Radar isn't set up. */
 export async function prospectsNamed(orgId: string, text: string): Promise<{ id: number; name: string; domain: string; leadId: number | null; aside: string | null }[]> {
   try {
     const t = text.trim();

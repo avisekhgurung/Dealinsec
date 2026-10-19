@@ -6,7 +6,7 @@ import { LEAD_SOURCES, LEAD_STATUSES } from "./leads";
 
 describe("leadSource", () => {
   it("names every real source in words", () => {
-    expect(leadSource("outbound").label).toBe("AI Outbound");
+    expect(leadSource("outbound").label).toBe("Client Radar");
     expect(leadSource("import").label).toBe("Imported");
     expect(leadSource("manual", { mine: true }).label).toBe("Added by you");
     expect(leadSource("agent").label).toBe("Added by the agent");
@@ -19,7 +19,7 @@ describe("leadSource", () => {
   });
 
   it("says where an outbound lead came from without claiming when it was found", () => {
-    expect(leadSource("outbound").origin).toBe("Found by AI Outbound, added");
+    expect(leadSource("outbound").origin).toBe("Found by Client Radar, added");
     expect(leadSource("import").origin).toBe("Imported");
   });
 

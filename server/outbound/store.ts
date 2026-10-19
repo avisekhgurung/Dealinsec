@@ -1,5 +1,5 @@
 /**
- * Database store for AI Outbound. Tests replace this module (eval/world-mocks.ts). Every query that a person's
+ * Database store for Client Radar. Tests replace this module (eval/world-mocks.ts). Every query that a person's
  * request can reach is scoped by organization. The runner's claim is deliberately global (it serves every
  * workspace) and returns the run, whose organization then scopes everything else.
  */

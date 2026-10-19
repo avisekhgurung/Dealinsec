@@ -46,7 +46,7 @@ export function searchBlockedReason(u: OutboundUsage | undefined, mode: "web" | 
   const m = u.plan?.searches;
   if (m && m.remaining <= 0) {
     return u.plan!.tier === "free"
-      ? `You've used the free plan's ${m.limit} AI Outbound searches for this ${u.plan!.windowDays}-day period. Upgrade to Pro for more.`
+      ? `You've used the free plan's ${m.limit} Client Radar searches for this ${u.plan!.windowDays}-day period. Upgrade to Pro for more.`
       : `You've used the ${m.limit} searches included in ${u.plan!.label} for this ${u.plan!.windowDays}-day period.${m.nextFreesAt ? ` The next one frees up ${when(m.nextFreesAt)}.` : ""}`;
   }
   const pr = u.plan?.prospects;
@@ -58,7 +58,7 @@ export function searchBlockedReason(u: OutboundUsage | undefined, mode: "web" | 
   if ((u.plan?.spendPercent ?? 0) >= 100) return `This workspace's AI usage for the last ${u.plan!.windowDays} days has reached its limit. It frees up as earlier usage passes ${u.plan!.windowDays} days.`;
   const s = u.workspace.searches;
   if (s && s.remaining <= 0) return `You've used today's ${s.limit} searches.${s.nextFreesAt ? ` The next one frees up ${when(s.nextFreesAt)}.` : ""}`;
-  if (mode === "web" && u.platform.state === "paused") return `AI Outbound has reached today's limit across DealInSec. It starts again ${when(u.platform.resetsAt)}. This doesn't use any of your searches.`;
+  if (mode === "web" && u.platform.state === "paused") return `Client Radar has reached today's limit across DealInSec. It starts again ${when(u.platform.resetsAt)}. This doesn't use any of your searches.`;
   return null;
 }
 
@@ -97,7 +97,7 @@ export function UsageNote({ usage, mode = "web" }: { usage: OutboundUsage | unde
       ) : mode === "web" && usage.platform.state === "limited" ? (
         <p className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400" data-testid="outbound-limited">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-          AI Outbound is busy across DealInSec today, so a search may stop early with fewer companies. Full capacity returns {when(usage.platform.resetsAt)}.
+          Client Radar is busy across DealInSec today, so a search may stop early with fewer companies. Full capacity returns {when(usage.platform.resetsAt)}.
         </p>
       ) : null}
     </div>

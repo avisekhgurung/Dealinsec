@@ -247,9 +247,9 @@ describe("the ideal client and the fit check", () => {
 });
 
 describe("finding companies", () => {
-  // One engine: the agent finds companies only through AI Outbound (discover_prospects), the same search the
-  // AI Outbound page runs, so a request gives the same checked, scored results wherever it was asked.
-  it("has no separate quick web search; company finding is AI Outbound's prospect search", () => {
+  // One engine: the agent finds companies only through Client Radar (discover_prospects), the same search the
+  // Client Radar page runs, so a request gives the same checked, scored results wherever it was asked.
+  it("has no separate quick web search; company finding is Client Radar's prospect search", () => {
     const names = AGENT_TOOLS.map((t) => t.name);
     expect(names).not.toContain("find_companies");
     expect(names).toContain("discover_prospects");

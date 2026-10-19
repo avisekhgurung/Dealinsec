@@ -1,14 +1,14 @@
 /**
- * Nibo, "find potential clients": the same AI Outbound search the /outbound page runs (by "agent"), then the qualified
+ * Nibo, "find potential clients": the same Client Radar search the /outbound page runs (by "agent"), then the qualified
  * companies saved to Leads, at most LEAGUE_LIMITS.leadsPerRun.
  *
  *   start       read the request into a profile (parse_icp); the profile is checkpointed
- *   launch      start the search from the saved profile (AI Outbound's own allowances apply; a retry finds the same search)
+ *   launch      start the search from the saved profile (Client Radar's own allowances apply; a retry finds the same search)
  *   researching wait for the search: it is its own durable job; this run is parked between checks, not polling a worker
  *   saving      pick the qualified ones (ready, then qualified; never "not a fit" or "insufficient evidence"), skip those
- *               already in Leads, add the rest through AI Outbound's add-to-Leads (which de-duplicates on the domain)
+ *               already in Leads, add the rest through Client Radar's add-to-Leads (which de-duplicates on the domain)
  *
- * Evidence is AI Outbound's: every saved lead links to its company and its why-now source. Nothing is invented: a
+ * Evidence is Client Radar's: every saved lead links to its company and its why-now source. Nothing is invented: a
  * company without a verified email stays without one.
  */
 import { BOT_IDENTITY, LEAGUE_LIMITS, type LeagueReport, type TaskInput } from "@shared/ai-league";
@@ -43,7 +43,7 @@ export function niboTask(deps: NiboDeps): TaskHandler {
         const parsed = await deps.parseIcp(ctx.user, input.request);
         if (!parsed.ok) return failed(`I couldn't start the research: ${parsed.message}`, LIMIT_CODES.has(parsed.code) ? "limit" : parsed.code.slice(0, 40));
         await ctx.event("understood", `Looking for: ${parsed.description}`.slice(0, 300));
-        // The profile is saved before the search starts: a retried launch sends the SAME profile, which AI Outbound
+        // The profile is saved before the search starts: a retried launch sends the SAME profile, which Client Radar
         // recognizes as the search already running (its idempotency key), instead of a re-parse starting a second search.
         return { kind: "continue", stage: "launch", checkpoint: { ...cp, icp: parsed.icp, searches: parsed.searches } };
       }
@@ -52,7 +52,7 @@ export function niboTask(deps: NiboDeps): TaskHandler {
         const searches = Array.isArray(cp.searches) ? (cp.searches as string[]) : [];
         const started = await deps.startRun(ctx.user, { request: input.request, icp: cp.icp, searches }, { by: "agent" });
         if (!started.ok) return failed(`I couldn't start the research: ${started.message}`, LIMIT_CODES.has(started.code) ? "limit" : started.code.slice(0, 40));
-        await ctx.event("research_started", started.existing ? "That search was already running; following it" : "Research started in AI Outbound", { href: runLink(started.run.id) });
+        await ctx.event("research_started", started.existing ? "That search was already running; following it" : "Research started in Client Radar", { href: runLink(started.run.id) });
         return { kind: "wait", stage: "researching", until: new Date(ctx.now().getTime() + CHECK_EVERY_MS), checkpoint: { ...cp, outboundRunId: started.run.id, lastCounters: "" } };
       }
 
@@ -98,7 +98,7 @@ export function niboTask(deps: NiboDeps): TaskHandler {
         const sources = [p.whyNow?.url, p.website].filter((u): u is string => !!u);
         if (saved.has(p.id)) items.unshift({ title: `${p.name} (${p.domain})`, detail: [p.classificationLabel, p.whyNow ? `${p.whyNow.label}: ${p.whyNow.value}` : null, p.contact === "none" ? "No contact found yet" : p.contact === "verified" ? "Verified email" : "Public contact found"].filter(Boolean).join(" · "), href: `/leads/${leadId}`, status: "done", sources });
         else if (p.leadId) items.push({ title: `${p.name} (${p.domain})`, detail: "Already in your Leads", href: `/leads/${p.leadId}`, status: "skipped", sources });
-        else items.push({ title: `${p.name} (${p.domain})`, detail: input.saveLeads === false ? `${p.classificationLabel}: left in AI Outbound for you to pick` : `${p.classificationLabel}: not saved (this task saves up to ${max})`, href: runLink(id), status: "info", sources });
+        else items.push({ title: `${p.name} (${p.domain})`, detail: input.saveLeads === false ? `${p.classificationLabel}: left in Client Radar for you to pick` : `${p.classificationLabel}: not saved (this task saves up to ${max})`, href: runLink(id), status: "info", sources });
       }
       const c = r.run.counters;
       const rejected = Object.values(c.rejectedBy ?? {}).reduce((a: number, b) => a + Number(b || 0), 0);
@@ -109,7 +109,7 @@ export function niboTask(deps: NiboDeps): TaskHandler {
           { label: "Saved to Leads", value: saved.size }, { label: "Already in Leads", value: already.length }, { label: "Set aside", value: rejected },
         ],
         items,
-        next: saved.size ? { label: `Ask ${BOT_IDENTITY.mika.name} to draft first messages`, href: "/ai-league/mika" } : { label: "Open the search in AI Outbound", href: runLink(id) },
+        next: saved.size ? { label: `Ask ${BOT_IDENTITY.mika.name} to draft first messages`, href: "/ai-league/mika" } : { label: "Open the search in Client Radar", href: runLink(id) },
         notes: [
           ...(stoppedBy ? [`Stopped saving: ${stoppedBy}`] : []),
           ...(r.run.status !== "done" ? [`The search ended as "${r.run.status}"${r.run.errorCode ? ` (${r.run.errorCode})` : ""}, so this covers what it found before then.`] : []),

@@ -29,7 +29,7 @@ export interface LeadSourceView {
  */
 export function leadSource(source: string | null | undefined, opts: { mine?: boolean } = {}): LeadSourceView {
   switch (source) {
-    case "outbound": return { key: "outbound", label: "AI Outbound", origin: "Found by AI Outbound, added" };
+    case "outbound": return { key: "outbound", label: "Client Radar", origin: "Found by Client Radar, added" };
     case "import": return { key: "import", label: "Imported", origin: "Imported" };
     case "agent": return { key: "agent", label: "Added by the agent", origin: "Added by the agent" };
     case "manual": {

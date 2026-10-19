@@ -91,7 +91,7 @@ export function llmsTxt(origin: string): string {
 - Maker: DealInSec is a sole proprietorship of Avisekh Gurung, based in Darjeeling, India.
 - Contact: ${SUPPORT_EMAIL}
 - Who it is for: ${AUDIENCE_LINE}. ${MARKETS} Also used by ${SECONDARY_AUDIENCE.join(" and ")}.
-- The connected workflow: ${WORKFLOW.join(" → ")}. AI Outbound is where new clients start; a won lead becomes a deal that carries through to payment tracking.
+- The connected workflow: ${WORKFLOW.join(" → ")}. Client Radar is where new clients start; a won lead becomes a deal that carries through to payment tracking.
 - Available now:
 ${capability("live")}
 - Limited availability:

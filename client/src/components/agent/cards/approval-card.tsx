@@ -104,7 +104,7 @@ export function ApprovalCard({
         )}
         {status === "done" && view?.route && (
           <Link href={view.route} className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:underline dark:text-emerald-400" data-testid="approval-open">
-            {view.route.startsWith("/outbound") ? "Open in AI Outbound" : "Open it"} <ArrowRight className="h-3 w-3" />
+            {view.route.startsWith("/outbound") ? "Open in Client Radar" : "Open it"} <ArrowRight className="h-3 w-3" />
           </Link>
         )}
 

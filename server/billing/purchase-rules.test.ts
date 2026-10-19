@@ -15,7 +15,7 @@ describe("what can be bought: one Pro plan, seats only for Pro", () => {
     expect(resolveSku({ plan: "extra_seat" }, true)).toEqual({ ok: true, sku: "extra_seat" });
     expect(resolveSku({ plan: "extra_seat" }, false)).toMatchObject({ ok: false, status: 403, code: "UPGRADE_REQUIRED" });
   });
-  it("anything else is unknown, and there is no separate AI Outbound or CRM plan", () => {
+  it("anything else is unknown, and there is no separate Client Radar or CRM plan", () => {
     for (const plan of ["ai_outbound", "crm", "pro_499", undefined]) expect(resolveSku({ plan }, true)).toMatchObject({ ok: false });
   });
 });

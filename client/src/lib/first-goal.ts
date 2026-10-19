@@ -53,8 +53,8 @@ export function dismissGettingStarted(userId: string | null | undefined): void {
 }
 
 /**
- * Where the person wants to find clients (asked during onboarding): a country code from AI Outbound's list, or "WW"
- * for worldwide. Only a starting suggestion: AI Outbound shows it as a removable chip when a request names no place,
+ * Where the person wants to find clients (asked during onboarding): a country code from Client Radar's list, or "WW"
+ * for worldwide. Only a starting suggestion: Client Radar shows it as a removable chip when a request names no place,
  * and it is never taken from the person's own account country.
  */
 const targetKey = (userId: string) => `dis_target_market:${userId}`;
@@ -76,6 +76,6 @@ export function setTargetMarket(userId: string | null | undefined, market: Targe
     if (market && isTarget(market)) localStorage.setItem(targetKey(userId), market);
     else localStorage.removeItem(targetKey(userId));
   } catch {
-    // Not saved: AI Outbound simply asks where to look.
+    // Not saved: Client Radar simply asks where to look.
   }
 }

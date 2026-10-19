@@ -1,20 +1,20 @@
 /**
- * Nibo, "research campaign" (nibo.campaign): many AI Outbound searches over hours, toward a target number of qualified
+ * Nibo, "research campaign" (nibo.campaign): many Client Radar searches over hours, toward a target number of qualified
  * companies, reported at a requested time. Each stage is one durable step of the league runtime (checkpointed, retried,
  * resumable after a restart); waiting for the start, for a search, or for the delivery time parks the run.
  *
  *   start        wait until the scheduled start (parked; nothing polls)
  *   plan         read the request into a profile once (parse_icp) and save it: retries re-use it, never re-parse
  *   batch        stop starting searches at the execution deadline, the target, the search cap or the plan's
- *                allowance; otherwise start the next AI Outbound search (one city per batch for a country-wide profile)
+ *                allowance; otherwise start the next Client Radar search (one city per batch for a country-wide profile)
  *   researching  follow the search (it is its own durable job); at the execution deadline it is cancelled and what
  *                it found is kept
  *   collect      keep only qualified companies (ready, qualified), de-duplicated by domain across batches; save them
- *                to Leads through AI Outbound's add-to-Leads (which de-duplicates against Leads too)
+ *                to Leads through Client Radar's add-to-Leads (which de-duplicates against Leads too)
  *   report       write the report from what really happened and save it BEFORE delivery (report_ready)
  *   deliver      wait until the delivery time if the report is early, then finish: the runtime notifies once
  *
- * Evidence is AI Outbound's own (each company's page, the dated reason, the source URL). A search that fails, a site
+ * Evidence is Client Radar's own (each company's page, the dated reason, the source URL). A search that fails, a site
  * that can't be read or an allowance that runs out is reported as a limitation, never hidden; a company without
  * enough evidence is never counted as qualified.
  */
@@ -34,7 +34,7 @@ export const CAMPAIGN_CHECK_MS = 30_000;
 const LIMIT_CODES = new Set(["NO_CREDITS", "monthly_limit", "daily_limit", "global_limit", "workspace_budget"]);
 const runLink = (id: string) => `/outbound?run=${encodeURIComponent(id)}`;
 
-/** One qualified company, kept compactly in the checkpoint (the evidence itself stays on the AI Outbound prospect). */
+/** One qualified company, kept compactly in the checkpoint (the evidence itself stays on the Client Radar prospect). */
 export interface CampaignRow {
   name: string; domain: string; website: string | null; classification: string; score: number | null;
   whyNow: { label: string; value: string; url: string | null } | null; contact: string; leadId: number | null;
@@ -155,7 +155,7 @@ export function campaignTask(deps: CampaignDeps): TaskHandler {
         }
         for (const p of fresh) { const d = domainKey(p.domain); if (d) seen[d] = true; }
         const setAside = (cp.setAside ?? 0) + Math.max(0, fresh.length - good.length);
-        // Found = new companies this batch (de-duplicated); researched = what AI Outbound itself says it researched.
+        // Found = new companies this batch (de-duplicated); researched = what Client Radar itself says it researched.
         const found = (cp.found ?? 0) + fresh.length;
         const runResearched = Number((r.run.counters as { researched?: unknown }).researched);
         const researched = (cp.researched ?? 0) + (Number.isFinite(runResearched) ? Math.min(runResearched, fresh.length) : fresh.length);
@@ -209,11 +209,11 @@ export function campaignReport(input: TaskInput<"nibo.campaign">, cp: Checkpoint
       sources: [r.whyNow?.url, r.website].filter((u): u is string => !!u),
     }));
   const notes = [
-    `Found ${cp.found ?? cp.researched ?? 0} new ${(cp.found ?? cp.researched) === 1 ? "company" : "companies"} across ${searches} ${searches === 1 ? "search" : "searches"} (${cp.researched ?? 0} researched in depth by AI Outbound); ${cp.setAside ?? 0} didn't qualify or lacked evidence and were set aside.`,
+    `Found ${cp.found ?? cp.researched ?? 0} new ${(cp.found ?? cp.researched) === 1 ? "company" : "companies"} across ${searches} ${searches === 1 ? "search" : "searches"} (${cp.researched ?? 0} researched in depth by Client Radar); ${cp.setAside ?? 0} didn't qualify or lacked evidence and were set aside.`,
     ...(cp.stoppedBy ? [`Coverage is partial: research stopped because ${cp.stoppedBy}.`] : []),
     ...(cp.failedBatches ? [`${cp.failedBatches} ${cp.failedBatches === 1 ? "search" : "searches"} failed and were skipped; the rest is unaffected.`] : []),
     ...(deliverAt ? [`Delivered ${showTime(now < deliverAt ? deliverAt : now, tz)} (report due ${showTime(deliverAt, tz)}).`] : []),
-    "Each company's evidence and source are on its AI Outbound prospect. Contact details are only what a company publishes or a provider verifies; none are guessed.",
+    "Each company's evidence and source are on its Client Radar prospect. Contact details are only what a company publishes or a provider verifies; none are guessed.",
   ];
   return {
     headline,

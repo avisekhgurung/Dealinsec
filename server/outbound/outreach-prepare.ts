@@ -1,5 +1,5 @@
 /**
- * "Prepare drafts" for prospects the person selected in the AI Outbound workspace: for each Ready prospect with an
+ * "Prepare drafts" for prospects the person selected in the Client Radar workspace: for each Ready prospect with an
  * address to write to, add it to Leads (the existing path, with its evidence) and write ONE first-message draft (the
  * existing drafting, grounded in the lead's confirmed facts and checked by code). Nothing is sent or approved here:
  * every draft waits in the outreach queue for a person to read, edit and approve.
@@ -27,7 +27,7 @@ export async function prepareOutreach(user: Who, raw: unknown, d: Partial<Pipeli
   if (gate) return gate;
   const parsed = prepareRequestSchema.safeParse(raw);
   if (!parsed.success) return fail(400, "invalid", `Select between 1 and ${PREPARE_MAX} prospects.`);
-  try { if (!(await prospectsTablesReady())) return fail(503, "PROSPECTS_NOT_SETUP", "AI Outbound isn't set up on this server yet."); } catch { return fail(503, "PROSPECTS_NOT_SETUP", "AI Outbound isn't set up on this server yet."); }
+  try { if (!(await prospectsTablesReady())) return fail(503, "PROSPECTS_NOT_SETUP", "Client Radar isn't set up on this server yet."); } catch { return fail(503, "PROSPECTS_NOT_SETUP", "Client Radar isn't set up on this server yet."); }
   if (inFlight.has(user.id)) return fail(429, "prepare_in_progress", "Drafts are already being prepared. Wait for them to finish.");
   inFlight.add(user.id);
   try {

@@ -33,7 +33,7 @@ Classification key: **C** copy only · **N** navigation / IA · **S** SEO / meta
 - `/dashboard` (Home)
 - `/ai-league[/:bot]` (Nibo, Mika, Zee)
 - `/agent/:id?` (Agent mode, "Ask DealInSec")
-- `/outbound` (AI Outbound)
+- `/outbound` (Client Radar)
 - `/leads`, `/leads/:id`
 - `/deals`, `/deals/new`, `/deals/import`, `/deals/:id`, `/deals/:id/edit`, `/deals/:id/quote`, `/deals/:id/contract`
 - `/quotations`
@@ -57,7 +57,7 @@ Pages in the brief's suggested navigation that **do not exist**: Clients, Tasks,
 | Agreements (Pro) | Online signing link with an audit record; electronic acceptance, not a certified digital signature | Signed (when the record says so) | Certified/legally guaranteed signature, legal advice |
 | Invoices (Pro) | Single or split; from the agreement; the user marks paid; no tax calculation; not GST tax invoices | Paid, Pending, Overdue | Payment collection, payment links, partial payments, GST invoice |
 | Payment follow-ups | AI drafts; the user copies and sends | "Prepare payment reminder" | "Reminder sent", automatic reminders |
-| Nibo | AI Outbound search; checks companies' own websites; saves qualified ones to Leads with sources; campaigns | Finds and researches potential clients | Guaranteed leads, verified contacts |
+| Nibo | Client Radar search; checks companies' own websites; saves qualified ones to Leads with sources; campaigns | Finds and researches potential clients | Guaranteed leads, verified contacts |
 | Mika | Drafts first messages; nothing sent | Prepares drafts you approve and send yourself | Send, delivered, follow-up sequences |
 | Zee | Briefs from the workspace's own records | Today's business briefing | Bank-account access, invented totals |
 | Sign-up | Free plan at ₹0, permanent, no card; Google sign-in exists | "Get started free", "No credit card required" | Trial (removed 18 Oct) |
@@ -150,7 +150,7 @@ Pages in the brief's suggested navigation that **do not exist**: Clients, Tasks,
 - **Error toast:** "Couldn't save your details" / "Check your internet connection and try again."
 - **Schema:** no fields or steps were added. The existing goal options (Find new clients / Manage active deals / Send quotations and get paid) already match the brief.
 
-### Core app screens, AI League, Agent mode, AI Outbound, Settings
+### Core app screens, AI League, Agent mode, Client Radar, Settings
 Done by focused passes; per-file details are in `docs/india-market-copy-progress.md`. Summary:
 - **AI task statuses** are now one vocabulary, in both client and server (`shared/ai-league.ts` RUN_STATUS_LABEL): Queued, Scheduled, In progress, Completed, Completed with limitations, Failed, Cancelled, plus "Waiting for your approval" for approvals.
   - "Report ready" (shown while a report was still held back) is now "Report scheduled".
@@ -199,10 +199,10 @@ Done by focused passes; per-file details are in `docs/india-market-copy-progress
 
 ## 6. Decisions recorded
 
-- **Navigation kept as is:** Home · AI League · AI Outbound · Leads · Deals · Quotations · Agreements · Invoices. The phone bar is Home · AI League · Outbound · Leads · More.
-  - The brief's Money/AI Workspace grouping would rename or move items that pricing, product facts and tests use ("AI Outbound"). It could also bring back the 1024–1535 px desktop overflow fixed on 19 October.
+- **Navigation kept as is:** Home · AI League · Client Radar · Leads · Deals · Quotations · Agreements · Invoices. The phone bar is Home · AI League · Outbound · Leads · More.
+  - The brief's Money/AI Workspace grouping would rename or move items that pricing, product facts and tests use ("Client Radar"). It could also bring back the 1024–1535 px desktop overflow fixed on 19 October.
   - The founder's earlier decision was to keep one-click tabs.
-  - Recommendation for a later pass: rename the "AI Outbound" tab to "Find clients" together with the pricing copy.
+  - Recommendation for a later pass: rename the "Client Radar" tab to "Find clients" together with the pricing copy.
 - **"AI League"** stays the coworkers' area name: it's a brand the founder chose. The page now describes itself as "Your AI coworkers".
 - **"Log in"/"Log out"** replace "Sign in"/"Sign out" in the auth pages, landing header and profile.
 - **Audience:** freelancers first. Small agencies, including AI automation, stay named as the secondary audience. Creators keep their existing pages.

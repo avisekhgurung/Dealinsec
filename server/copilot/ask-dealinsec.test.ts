@@ -51,8 +51,8 @@ describe("Ask DealInSec: what each suggested question retrieves", () => {
 
   it("the facts that answer each suggested question are in what it retrieves", () => {
     const expectations: Record<string, RegExp[]> = {
-      "How can DealInSec help my SEO agency find clients?": [/AI Outbound/, /SEO/],
-      "How does AI Outbound work?": [/confirm the profile/, /source and date/, /One credit is one search/],
+      "How can DealInSec help my SEO agency find clients?": [/Client Radar/, /SEO/],
+      "How does Client Radar work?": [/confirm the profile/, /source and date/, /One credit is one search/],
       "Can I turn a prospect into a quotation and invoice?": [/Prospect → Lead → Deal → Quotation → Agreement → Invoice/],
       "Does DealInSec send emails automatically?": [/does not send emails, follow-ups or reminders on its own/],
       "Can I use DealInSec from the US or India?": [/United States/, /India only/],

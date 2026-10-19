@@ -1,7 +1,7 @@
 /**
  * Signed-in navigation model — the one list both bars read.
  *
- * The product has six areas, in workflow order: Home · AI League (Nibo, Mika, Zee) · AI Outbound ·
+ * The product has six areas, in workflow order: Home · The Nest (the AI team: Nibo, Mika, Zee) · Client Radar ·
  * Pipeline (Leads, Deals) · Documents (Quotations, Agreements) · Money
  * (Invoices — payment status is tracked inside invoices). Account (Profile,
  * Settings) sits outside the five: on desktop it lives in the bar's right-hand
@@ -35,8 +35,8 @@ type NavUser = Parameters<typeof canSeeModule>[0];
 
 export const NAV_GROUP_LABELS: Record<NavGroup, string> = {
   home: "Home",
-  league: "AI League",
-  outbound: "AI Outbound",
+  league: "The Nest",
+  outbound: "Client Radar",
   pipeline: "Pipeline",
   documents: "Documents",
   money: "Money",
@@ -71,8 +71,8 @@ const def = (item: Omit<NavItem, "isActive">): NavItem => ({
 /** Every signed-in destination, in workflow order. */
 export const NAV_ITEMS: readonly NavItem[] = [
   def({ key: "home", label: "Home", shortLabel: "Home", href: "/dashboard", group: "home" }),
-  def({ key: "league", label: "AI League", shortLabel: "AI League", href: "/ai-league", group: "league", module: "deals" }),
-  def({ key: "outbound", label: "AI Outbound", shortLabel: "Outbound", href: "/outbound", group: "outbound", module: "deals" }),
+  def({ key: "league", label: "The Nest 🪺", shortLabel: "The Nest", href: "/ai-league", group: "league", module: "deals" }),
+  def({ key: "outbound", label: "Client Radar 🔎", shortLabel: "Radar", href: "/outbound", group: "outbound", module: "deals" }),
   def({ key: "leads", label: "Leads", shortLabel: "Leads", href: "/leads", group: "pipeline", module: "deals" }),
   def({ key: "deals", label: "Deals", shortLabel: "Deals", href: "/deals", group: "pipeline", module: "deals" }),
   def({ key: "quotations", label: "Quotations", shortLabel: "Quotes", href: "/quotations", group: "documents", module: "quotations" }),
@@ -115,7 +115,7 @@ export function desktopNavSections(user: NavUser): NavSection[] {
   return sections(user, DESKTOP_GROUPS);
 }
 
-/** Mobile bar: four daily destinations, then "More" for the rest. AI League (Nibo, Mika, Zee) is in the bar itself;
+/** Mobile bar: four daily destinations, then "More" for the rest. The Nest (Nibo, Mika, Zee) is in the bar itself;
  *  Deals moved into More, next to the documents and money it leads to. */
 export const MOBILE_BAR_KEYS: readonly NavKey[] = ["home", "league", "outbound", "leads"];
 export function mobileBarItems(user: NavUser): NavItem[] {

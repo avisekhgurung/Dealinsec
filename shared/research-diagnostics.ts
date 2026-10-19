@@ -1,5 +1,5 @@
 /**
- * Research date diagnostics for AI Outbound: for each signal the model proposed, whether the page text the model was
+ * Research date diagnostics for Client Radar: for each signal the model proposed, whether the page text the model was
  * given held a date near the claim, whether the model quoted one (date_quote), and what precision the kept signal ended
  * with. Pure and read-only: it looks at the model's output, the pages and the finished result, and changes none of them.
  *

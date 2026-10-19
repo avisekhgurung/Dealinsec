@@ -4,7 +4,7 @@ import { flowState, type FlowInput } from "./outbound-flow";
 const base: FlowInput = { view: "searches", composing: null, run: null, results: null, anyInLeads: false, queue: null };
 const labels = { verify: "Checking each company" };
 
-describe("AI Outbound flow: only real state moves it", () => {
+describe("Client Radar flow: only real state moves it", () => {
   it("starts at describing; typing and confirming are steps 1 and 2", () => {
     expect(flowState(base).current).toBe(1);
     expect(flowState(base).done.every((d) => !d)).toBe(true);

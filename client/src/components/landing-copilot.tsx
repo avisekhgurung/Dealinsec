@@ -1,7 +1,7 @@
 /**
  * Landing Copilot — the public product guide (marketing funnel).
  *
- * A visitor can ask DealInSec before signing up: "how does AI Outbound work?",
+ * A visitor can ask DealInSec before signing up: "how does Client Radar work?",
  * "does it send emails automatically?", "what does it cost?". It answers from
  * the verified product facts (shared/product-facts.ts) and the same
  * /ai-knowledge base the in-app Copilot uses, so marketing can never drift

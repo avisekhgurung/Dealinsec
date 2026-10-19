@@ -62,7 +62,7 @@ import { PRO_INCLUDED_SEATS } from "@shared/permissions";
 import { openConsentSettings } from "@/lib/consent";
 import { LandingCopilot } from "@/components/landing-copilot";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
-import { BRAND_GRADIENT, GradientText, SectionHeader, fadeUp, stagger } from "@/components/landing-shared";
+import { BRAND_GRADIENT, GradientText, SectionHeader, fadeUp, onSectionLinkClick, scrollToSection, stagger } from "@/components/landing-shared";
 import { LandingTryDemo } from "@/components/landing-try-demo";
 import { AiTeamSection, AudienceCards, CtaBanner, FaqSection, FeaturesSection, HeroSection, ManualWorkflowSection, WorkflowWalkthrough } from "@/components/landing-redesign";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -112,7 +112,7 @@ const NAV_LINKS: (NavLink | { label: string; items: NavLink[] })[] = [
     { label: "Live demo", href: "#try", note: "Plan a search, read a reply, see what's next" },
     { label: "Who it's for", href: "#audiences", note: "Freelancers, consultants and small agencies" },
   ] },
-  { label: "AI coworkers", href: "/ai-coworkers" },
+  { label: "AI team", href: "#ai-team" },
   { label: "Pricing", href: "#pricing" },
   { label: "Resources", items: [
     { label: "Blog", href: "/blog" },
@@ -193,6 +193,15 @@ export default function LandingPage() {
     window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}${window.location.hash}`);
   }, [toast]);
 
+  // Arriving at /#pricing (or any section) from another page: the SPA renders after the browser's own jump, so go
+  // there once the sections exist.
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash || hash.length < 2) return;
+    const t = window.setTimeout(() => scrollToSection(hash), 150);
+    return () => window.clearTimeout(t);
+  }, []);
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -253,7 +262,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 relative overflow-x-hidden antialiased">
+    <div className="min-h-screen bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 relative overflow-x-clip antialiased">
       {/* Ambient decorative backdrop */}
       <AmbientBackdrop />
 
@@ -584,7 +593,7 @@ function Header({
                   <a
                     key={link.label}
                     href={link.href}
-                    onClick={() => setMobileMenuOpen(false)}
+                    onClick={(e) => { onSectionLinkClick(e, 280); setMobileMenuOpen(false); }}
                     className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
                   >
                     {Icon && <Icon className="w-4 h-4 text-emerald-600" />}
@@ -633,6 +642,7 @@ function NavItem({ href, label }: { href: string; label: string }) {
     return (
       <a
         href={href}
+        onClick={(e) => onSectionLinkClick(e)}
         className="px-3 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors rounded-md hover:bg-neutral-100/70 dark:hover:bg-neutral-800/50"
       >
         {label}
@@ -648,15 +658,18 @@ function NavItem({ href, label }: { href: string; label: string }) {
 
 /** A header menu (Product, Resources): keyboard-operable (Radix), hash and server links as real anchors. */
 function NavMenu({ label, items }: { label: string; items: NavLink[] }) {
+  // Controlled: an in-page item cancels the browser's jump (to scroll smoothly instead), which also skips the
+  // menu's own close-on-select, so the click closes it here.
+  const [open, setOpen] = useState(false);
   return (
-    <DropdownMenu modal={false}>
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger className="inline-flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium text-neutral-600 outline-none transition-colors hover:bg-neutral-100/70 hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-emerald-500/50 data-[state=open]:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/50 dark:hover:text-white">
         {label}<ChevronDown className="h-3.5 w-3.5 opacity-60" aria-hidden />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" sideOffset={8} className="w-64 rounded-xl p-1.5">
+      <DropdownMenuContent align="start" sideOffset={8} className="w-64 rounded-xl p-1.5" onCloseAutoFocus={(e) => e.preventDefault()}>
         {items.map((i) => (
           <DropdownMenuItem key={i.href} asChild className="cursor-pointer rounded-lg px-3 py-2">
-            <a href={i.href} className="flex flex-col items-start">
+            <a href={i.href} onClick={(e) => { onSectionLinkClick(e, 30); setOpen(false); }} className="flex flex-col items-start">
               <span className="text-sm font-medium">{i.label}</span>
               {i.note && <span className="text-xs text-neutral-500">{i.note}</span>}
             </a>
@@ -692,21 +705,6 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
           title="Start free. Upgrade when you need more."
           subtitle="Manage leads, deals and quotations for free. Upgrade when you need agreements, invoices, payment tracking and more AI research."
         />
-
-        {/* Honest currency note: only Indian accounts can be charged today. */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="mt-10 max-w-3xl mx-auto rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/50 p-5 sm:p-6"
-        >
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-400 mb-2.5">
-            <Globe className="w-3.5 h-3.5" /> United States, India and everywhere else
-          </p>
-          <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
-            Every new account starts on the free plan, which stays free and is open in every country, with no card. Upgrade to Pro when you need agreements, invoices and payment tracking. <strong className="font-semibold text-neutral-800 dark:text-neutral-200">In India</strong>, Pro is paid in rupees at the price below — and AI Outbound finds clients in India, the US, the UK, Canada, Australia, the UAE and other countries, and local businesses in your own city. <strong className="font-semibold text-neutral-800 dark:text-neutral-200">In the US and other countries</strong>, paid plans can&apos;t be bought yet, and we won&apos;t take a foreign card until they can.
-          </p>
-        </motion.div>
 
         <motion.div
           variants={stagger}
@@ -828,6 +826,12 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
 
         </motion.div>
 
+        {/* Honest currency note: only Indian workspaces can buy Pro today. */}
+        <p className="mt-6 max-w-3xl mx-auto flex items-start justify-center gap-2 text-center text-sm text-neutral-600 dark:text-neutral-400" data-testid="pricing-country-note">
+          <Globe className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+          <span>Pro is paid in rupees by workspaces in India. The free plan works in every country; paid plans can&apos;t be bought outside India yet.</span>
+        </p>
+
         {/* How the AI research limits work: read from shared/outbound-plans.ts and the run limits the server enforces. */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -856,7 +860,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
 /** The slim footer: the logo with its slogan, the main links, socials; then a quieter row of every page worth finding. */
 function Footer() {
   const main = [
-    { label: "Product", href: "#features" }, { label: "AI coworkers", href: "/ai-coworkers" }, { label: "Pricing", href: "#pricing" }, { label: "Blog", href: "/blog" },
+    { label: "Product", href: "#features" }, { label: "AI team", href: "#ai-team" }, { label: "Pricing", href: "#pricing" }, { label: "Blog", href: "/blog" },
     { label: "Support", href: "mailto:support@dealinsec.com" }, { label: "Privacy", href: "/privacy" }, { label: "Terms", href: "/terms" },
   ];
   const more = [
@@ -868,7 +872,7 @@ function Footer() {
   ];
   const link = (l: { label: string; href: string }, cls: string) =>
     l.href.startsWith("#") || l.href.startsWith("mailto:") || isServerRoute(l.href)
-      ? <a key={l.label} href={l.href} className={cls}>{l.label}</a>
+      ? <a key={l.label} href={l.href} onClick={(e) => onSectionLinkClick(e)} className={cls}>{l.label}</a>
       : <Link key={l.label} href={l.href} className={cls}>{l.label}</Link>;
   return (
     <footer className="relative z-[1] border-t border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">

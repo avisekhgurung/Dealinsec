@@ -1,5 +1,5 @@
 /**
- * Local business discovery ("dentists in Siliguri"), next to AI Outbound's web research ("US SaaS companies"): one
+ * Local business discovery ("dentists in Siliguri"), next to Client Radar's web research ("US SaaS companies"): one
  * search experience, two sources chosen by what is being looked for, never by the person's own billing country.
  *
  * Source: Google Places API (New) Text Search, when GOOGLE_PLACES_API_KEY is configured.

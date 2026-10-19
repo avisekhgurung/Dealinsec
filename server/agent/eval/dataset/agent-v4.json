@@ -67,7 +67,7 @@
     },
     {
       "id": "outbound-find-vs-quick-look",
-      "description": "Even a quick 'name a few' request goes through the one company search, AI Outbound",
+      "description": "Even a quick 'name a few' request goes through the one company search, Client Radar",
       "tags": [
         "outbound"
       ],

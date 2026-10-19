@@ -1,5 +1,5 @@
 /**
- * A deal's email story, on the deal page: the lead it was won from, the AI Outbound prospect behind it, its email
+ * A deal's email story, on the deal page: the lead it was won from, the Client Radar prospect behind it, its email
  * conversations, and the email part of its timeline (sent, replied, opted out, labels, stage changes). Built from ids
  * and labels only; reading a conversation opens it in the inbox. Shown only for a deal that came from a lead.
  */
@@ -41,7 +41,7 @@ export function DealEmailActivity({ dealId, locale }: { dealId: number; locale?:
           <>
             <p className="text-sm text-muted-foreground">
               Won from the lead <span className="font-medium text-foreground">{q.data.lead!.company}</span>
-              {q.data.prospect && <> · found by AI Outbound ({q.data.prospect.domain})</>}
+              {q.data.prospect && <> · found by Client Radar ({q.data.prospect.domain})</>}
             </p>
 
             {q.data.conversations.length > 0 && (

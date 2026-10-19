@@ -1,11 +1,11 @@
 /**
  * AI League's runtime: league runs driven by the existing durable Postgres workflow runner (server/workflow/runner.ts),
- * the same one AI Outbound's prospect runs use. The job IS the league_runs row:
+ * the same one Client Radar's prospect runs use. The job IS the league_runs row:
  *
  *   claim    one atomic UPDATE takes a queued/running/waiting run whose lease is free (FOR UPDATE SKIP LOCKED)
  *   step     the task's next deterministic step (tasks/*.ts) runs as the person, and its checkpoint is saved fenced by the
  *            claim number; a worker that lost the run writes nothing
- *   wait     a run that waits on something (Nibo on its AI Outbound search) is parked: its lease is held until the next
+ *   wait     a run that waits on something (Nibo on its Client Radar search) is parked: its lease is held until the next
  *            check, so nothing polls in between and a restart picks it up from the database, not from memory
  *   finish   one terminal status and the report, then ONE notification (it happens only if that fenced write won)
  *
@@ -172,7 +172,7 @@ export function realRuntimeDeps(): RuntimeDeps {
       if (emailReports() && (OWN_CLOCK.has(run.task) || run.source === "schedule")) {
         const user = await storage.getUser(run.userId).catch(() => undefined);
         const { sendEmail, leagueReportEmail } = await import("../emails");
-        const mail = leagueReportEmail({ coworker: bot?.name ?? "AI League", taskLabel: TASK_LABEL[run.task as LeagueTask] ?? run.task, headline: report.headline, counts: report.counts, runId: run.id, partial: status !== "completed" });
+        const mail = leagueReportEmail({ coworker: bot?.name ?? "The Nest", taskLabel: TASK_LABEL[run.task as LeagueTask] ?? run.task, headline: report.headline, counts: report.counts, runId: run.id, partial: status !== "completed" });
         let sent = false;
         for (let attempt = 0; attempt < 3 && !sent && user?.email; attempt++) {
           sent = await sendEmail({ to: user.email, ...mail });
@@ -181,8 +181,8 @@ export function realRuntimeDeps(): RuntimeDeps {
         await leagueStore.addEvent({ runId: run.id, orgId: run.organizationId, kind: sent ? "emailed" : "email_failed", message: sent ? "Report emailed to you" : "The report email couldn't be sent; the report is here in the app", now: new Date() }).catch(() => {});
       }
       await storage.logActivity({
-        organizationId: run.organizationId, userId: run.userId, userName: bot?.name ?? "AI League",
-        action: status === "completed" ? "finished a task" : status === "partial" ? "partly finished a task" : status === "cancelled" ? "cancelled a task" : "couldn't finish a task",
+        organizationId: run.organizationId, userId: run.userId, userName: bot?.name ?? "The Nest",
+        action: status === "completed" ? "completed a task" : status === "partial" ? "completed a task with limitations" : status === "cancelled" ? "cancelled a task" : "couldn't complete a task",
         entityType: "ai_league_run", entityId: run.id, detail: truncate(`${TASK_LABEL[run.task as LeagueTask] ?? run.task}: ${report.headline}`, 250),
       });
       await leagueStore.addEvent({ runId: run.id, orgId: run.organizationId, kind: "notified", message: "You were notified in the app", now: new Date() }).catch(() => {});

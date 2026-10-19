@@ -1,5 +1,5 @@
 /**
- * The AI Outbound prospect workspace: one row per prospect of the organization, with filters, sorting, paging and a
+ * The Client Radar prospect workspace: one row per prospect of the organization, with filters, sorting, paging and a
  * selection scope. Pure and shared: the server evaluates every query (rows never come from the client), the browser
  * uses the same parsing to keep the URL in sync.
  *

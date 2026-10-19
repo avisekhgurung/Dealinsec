@@ -2,9 +2,9 @@
  * The "try it" demo, no signup: the whole journey DealInSec runs, in three steps.
  *
  *  1. Find clients: the visitor describes who they want as clients, and sees the profile and the exact web searches
- *     AI Outbound would run. It runs in the browser with AI Outbound's own rules (shared/icp.ts parseIcpFallback and
+ *     Client Radar would run. It runs in the browser with Client Radar's own rules (shared/icp.ts parseIcpFallback and
  *     searchStrategies): no AI call, no web search, nothing sent or spent. Signing up carries the sentence over
- *     (lib/outbound-prefill.ts) and AI Outbound opens on it.
+ *     (lib/outbound-prefill.ts) and Client Radar opens on it.
  *  2. Close the deal: the real /api/ai/demo-deal pipeline (server/ai.ts extractDealDraft + the same
  *     analyzeDealProtections() the app uses) turns a pasted reply into a deal and checks what's missing. It writes
  *     nothing; signing up carries the draft over in the same shape create-deal.tsx's takeDealPrefill reads.
@@ -150,7 +150,7 @@ function FindClients({ onStart, onNext, onSignup }: { onStart: () => void; onNex
   return (
     <div>
       <label htmlFor="demo-target" className="text-sm font-semibold">Who do you want as clients?</label>
-      <p className="text-xs text-neutral-500 mt-0.5 mb-2">The kind of business, and where. AI Outbound researches real companies that fit.</p>
+      <p className="text-xs text-neutral-500 mt-0.5 mb-2">The kind of business, and where. Client Radar researches real companies that fit.</p>
       <div className="flex flex-col sm:flex-row gap-2">
         <input id="demo-target" value={text} onChange={(e) => setText(e.target.value.slice(0, 200))} onKeyDown={(e) => { if (e.key === "Enter") plan(text); }}
           placeholder="e.g. D2C skincare brands in India" data-testid="demo-target"
@@ -190,7 +190,7 @@ function FindClients({ onStart, onNext, onSignup }: { onStart: () => void; onNex
           </div>
 
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-2">AI Outbound would search the web for</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-2">Client Radar would search the web for</p>
             <ol className="space-y-1 text-sm" data-testid="demo-searches">
               {searches.map((q, i) => (
                 <li key={q} className="flex items-start gap-2"><span className="text-xs text-neutral-400 tabular-nums mt-0.5 w-4">{i + 1}.</span><span className="font-medium">{q}</span></li>

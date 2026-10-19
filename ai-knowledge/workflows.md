@@ -4,11 +4,11 @@ Prospect → Lead → Deal → Quotation → Agreement → Invoice → Payment t
 Each stage's action needs the matching role permission; agreements, invoices
 and payment tracking need Pro or the trial.
 
-0. **Prospect** — AI Outbound (/outbound): describe who you want, confirm the
+0. **Prospect** — Client Radar (/outbound): describe who you want, confirm the
    profile, start the search (it runs for a minute or two). Review the
    prospects with their evidence and score, then "Add to Leads" for the ones
    worth pursuing.
-1. **Lead** — Leads (/leads) or added from AI Outbound. Record facts, set next
+1. **Lead** — Leads (/leads) or added from Client Radar. Record facts, set next
    steps, draft and approve a first message, send it from your own email and
    mark it sent. When the lead is won, "Turn into a deal" creates its deal and
    marks the lead Won.

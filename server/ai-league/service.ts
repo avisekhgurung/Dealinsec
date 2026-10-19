@@ -33,7 +33,7 @@ const defaults = (): LeagueDeps => ({
   kick: () => { void import("./runtime").then((m) => m.kickLeague()); },
   tier: outboundTier,
 });
-const NOT_SETUP = () => fail(503, "LEAGUE_NOT_SETUP", "AI League isn't set up on this server yet.");
+const NOT_SETUP = () => fail(503, "LEAGUE_NOT_SETUP", "The Nest isn't set up on this server yet.");
 const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : null);
 
 /* ── views ───────────────────────────────────────────────────────────────── */
@@ -112,8 +112,8 @@ export async function startLeagueRun(user: Who, task: unknown, rawInput: unknown
       return e.kind === "concurrent"
         ? fail(429, "busy", `Your coworkers are already working on ${e.max} task${e.max === 1 ? "" : "s"}. This one can start when ${e.max === 1 ? "it finishes" : "one finishes"}.`)
         : tier === "free"
-          ? fail(402, "NO_CREDITS", `You've used the free plan's ${e.max} AI League tasks for this 30-day period. Upgrade to Pro for more.`, { feature: "outbound" })
-          : fail(429, "monthly_limit", `You've used the ${e.max} AI League tasks included in your plan for this 30-day period. More become available as earlier tasks pass 30 days.`);
+          ? fail(402, "NO_CREDITS", `You've used the free plan's ${e.max} AI team tasks for this 30-day period. Upgrade to Pro for more.`, { feature: "outbound" })
+          : fail(429, "monthly_limit", `You've used the ${e.max} AI team tasks included in your plan for this 30-day period. More become available as earlier tasks pass 30 days.`);
     }
     throw e;
   }

@@ -7,7 +7,7 @@ consultants — in the United States, other international markets and India.
 Freelancers use it the same way, and creators use it for paid brand
 collaborations.
 **How can it help my SEO (or marketing, or AI automation) agency find
-clients?** AI Outbound researches companies that match the clients you want
+clients?** Client Radar researches companies that match the clients you want
 — for example "US SaaS companies with 20–200 employees that need SEO" — and
 shows, for each, what its own website says, recent dated reasons to reach out
 and the people to contact, with sources. You add the good ones to Leads,

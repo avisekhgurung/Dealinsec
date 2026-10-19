@@ -14,13 +14,15 @@ import { Link } from "wouter";
 import {
   ArrowRight, Building2, Check, CheckCircle2, FileSignature, FileText, LayoutDashboard, LifeBuoy,
   Handshake, PlayCircle, ReceiptText, Search, ShieldCheck, Signature, Sparkles, UserRound, Users,
-  Bot, Flame, Lightbulb, Link2, Radar, X,
+  Flame, Lightbulb, Link2, Radar, X,
 } from "lucide-react";
 import { PRICING } from "@shared/product-facts";
 import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { DealinsecMark, DealinsecWordmark } from "@/components/dealinsec-logo";
 import { trackEvent } from "@/lib/analytics";
+import { onSectionLinkClick } from "@/components/landing-shared";
+import { NEST_TEAM_IMAGE, plushSrc } from "@/lib/plush";
 import { cn } from "@/lib/utils";
 import { LANDING_FAQS } from "@shared/landing-faqs";
 
@@ -55,7 +57,7 @@ function Scribble({ children, className, arrow = "down" }: { children: React.Rea
 
 /* ── Hero ─────────────────────────────────────────────────────────────────────────────── */
 
-/** Example prospects, drawn the way AI Outbound's prospect cards show them (components/outbound/prospect-card.tsx). */
+/** Example prospects, drawn the way Client Radar's prospect cards show them (components/outbound/prospect-card.tsx). */
 const PROSPECTS = [
   { name: "Northwind Logistics", meta: "Pune · Freight & warehousing · 60 people", score: 82, label: "Ready", tone: "emerald", strong: true, why: "Hiring · 2 Oct", line: "3 customer-support roles" },
   { name: "Bluepeak Freight", meta: "Mumbai · Logistics · 120 people", score: 74, label: "Qualified", tone: "sky", strong: false, why: "New location · Sep 2026", line: "Opened a Nashik hub" },
@@ -71,10 +73,10 @@ const scoreTone = (n: number) => (n >= 70
   ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
   : "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300");
 
-/** The product, drawn: AI Outbound's prospects with example data, and an interested reply becoming a deal. */
+/** The product, drawn: Client Radar's prospects with example data, and an interested reply becoming a deal. */
 function HeroProduct() {
   const side = [
-    { Icon: LayoutDashboard, label: "Dashboard" }, { Icon: Search, label: "AI Outbound", active: true }, { Icon: Users, label: "Leads" },
+    { Icon: LayoutDashboard, label: "Dashboard" }, { Icon: Search, label: "Client Radar", active: true }, { Icon: Users, label: "Leads" },
     { Icon: Building2, label: "Deals" }, { Icon: FileText, label: "Quotes" }, { Icon: FileSignature, label: "Agreements" }, { Icon: ReceiptText, label: "Invoices" },
   ];
   return (
@@ -157,7 +159,7 @@ export function HeroSection({ isAuthenticated, onPrimary }: { isAuthenticated: b
               className="group inline-flex h-12 items-center justify-center whitespace-nowrap rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-6 text-[15px] font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:shadow-emerald-600/40">
               {isAuthenticated ? "Go to Home" : "Get started free"}<ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
-            <a href="#how" onClick={() => trackEvent("hero_cta_click", { label: "see_how" })} data-testid="link-hero-demo"
+            <a href="#how" onClick={(e) => { trackEvent("hero_cta_click", { label: "see_how" }); onSectionLinkClick(e); }} data-testid="link-hero-demo"
               className="inline-flex h-12 items-center justify-center whitespace-nowrap rounded-lg border border-neutral-200 bg-white px-5 text-[15px] font-semibold shadow-sm transition hover:border-emerald-300 dark:border-neutral-700 dark:bg-neutral-900">
               <PlayCircle className="mr-2 h-5 w-5 text-emerald-600" />See how it works
             </a>
@@ -356,7 +358,7 @@ export function WorkflowWalkthrough() {
 const OUTCOMES: { Icon: typeof Radar; title: string; plan: string; text: string; points: string[] }[] = [
   {
     Icon: Radar, title: "Find opportunities", plan: "Free and Pro, with limits",
-    text: "Describe the clients you want and where. AI Outbound searches the web, or lists local businesses in a city from Google Maps, and checks each company's own website against your profile.",
+    text: "Describe the clients you want and where. Client Radar searches the web, or lists local businesses in a city from Google Maps, and checks each company's own website against your profile.",
     points: ["Companies in any country, or local businesses in your city", "A score and the reasons for it", "Dated signals with their sources; guesses labelled", "First messages drafted from verified facts, approved by you"],
   },
   {
@@ -416,21 +418,21 @@ export function FeaturesSection() {
 
 /* ── The AI team: Nibo, Mika and Zee ──────────────────────────────────────────────────────── */
 // What each coworker really does (server/ai-league; the /ai-coworkers page says the same). Plain <img> with both sizes,
-// lazy: the homepage doesn't load the app's AI League code for three pictures.
+// lazy: the homepage doesn't load the app's coworker code for these pictures (lib/plush.ts is dependency-free).
 const TEAM = [
   {
-    key: "nibo", name: "Nibo", role: "Opportunity Scout", does: "finds and researches potential clients", bar: "bg-blue-600", tint: "bg-blue-50 dark:bg-blue-950/40", fg: "text-blue-700 dark:text-blue-300",
-    line: "Find and research potential clients for your services. Describe who you want to work with; Nibo searches, reads each company's own website and saves the ones that fit.",
+    key: "nibo", name: "Nibo", role: "Deal Finder", emoji: "🔎", does: "discovers and researches potential clients", bar: "bg-amber-700", tint: "bg-amber-50 dark:bg-amber-950/40", fg: "text-amber-800 dark:text-amber-300",
+    line: "Discovers and researches potential clients for your services. Describe who you want to work with; Nibo searches, reads each company's own website and saves the ones that fit.",
     points: ["Evidence and the source page for every company", "Only qualified companies reach your leads", "Asks before it uses one of your searches"],
   },
   {
-    key: "mika", name: "Mika", role: "Deal Closer", does: "drafts outreach and follow-ups", bar: "bg-rose-600", tint: "bg-rose-50 dark:bg-rose-950/40", fg: "text-rose-700 dark:text-rose-300",
-    line: "Prepare personalised outreach and follow-ups. Mika drafts a short, specific first email for each lead from what was verified about them.",
+    key: "mika", name: "Mika", role: "Deal Closer", emoji: "💌", does: "drafts personalised outreach and follow-ups", bar: "bg-rose-600", tint: "bg-rose-50 dark:bg-rose-950/40", fg: "text-rose-700 dark:text-rose-300",
+    line: "Drafts personalised outreach and follow-ups: a short, specific first email for each lead, from what was verified about them.",
     points: ["Drafts only: nothing is sent for you", "You edit and approve the exact text", "Skips anyone on your do-not-contact list"],
   },
   {
-    key: "zee", name: "Zee", role: "Business Guardian", does: "shows what needs your attention", bar: "bg-emerald-600", tint: "bg-emerald-50 dark:bg-emerald-950/40", fg: "text-emerald-700 dark:text-emerald-300",
-    line: "See what needs attention across your deals, follow-ups and payments. Zee reads your own invoices, deals and follow-ups and tells you what needs you today.",
+    key: "zee", name: "Zee", role: "Business Buddy", emoji: "🌱", does: "keeps you on top of briefings, follow-ups and payment reminders", bar: "bg-emerald-600", tint: "bg-emerald-50 dark:bg-emerald-950/40", fg: "text-emerald-700 dark:text-emerald-300",
+    line: "Keeps you on top of business briefings, follow-up tasks and payment reminders. Zee reads your own invoices, deals and follow-ups and tells you what needs you today.",
     points: ["Overdue invoices and what's due this week", "Follow-ups due and messages waiting", "Never invents a number: checked against your records"],
   },
 ] as const;
@@ -440,21 +442,25 @@ export function AiTeamSection() {
     <section id="ai-team" className="scroll-mt-20 py-16 sm:py-20" data-testid="landing-ai-team">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <Reveal className="mx-auto max-w-3xl text-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"><Bot className="h-3.5 w-3.5" aria-hidden />AI coworkers</span>
-          <h2 className="mt-3 text-balance text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Meet Nibo, Mika and Zee, <span className={GREEN}>your AI coworkers</span></h2>
-          <p className="mt-3 text-neutral-600 dark:text-neutral-400">Three AI coworkers help with the legwork in the background: Nibo researches potential clients, Mika drafts outreach and Zee shows what needs your attention. They keep working when you close the page, and they ask before anything that matters. AI results may be incomplete or inaccurate, so check important details before contacting a client.</p>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"><span aria-hidden>🪺</span>The Nest · My AI Team</span>
+          <h2 className="mt-3 text-balance text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Meet Nibo, Mika and Zee, <span className={GREEN}>your AI team</span></h2>
+          <p className="mt-3 text-neutral-600 dark:text-neutral-400">They live in The Nest, your AI team inside DealInSec, and help with the legwork in the background: Nibo finds potential clients, Mika drafts outreach and follow-ups, and Zee keeps you on top of what needs your attention. They keep working when you close the page, and they ask before anything that matters. AI results may be incomplete or inaccurate, so check important details before contacting a client.</p>
         </Reveal>
-        <motion.ul initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={stagger} className="mt-10 grid gap-4 md:grid-cols-3">
+        <Reveal className="mx-auto mt-8 max-w-3xl">
+          <img {...NEST_TEAM_IMAGE} sizes="(min-width: 800px) 768px, 100vw" loading="lazy" decoding="async" draggable={false}
+            className="h-auto w-full select-none rounded-3xl shadow-[0_30px_60px_-30px_rgba(60,40,20,0.45)]" data-testid="landing-nest-team" />
+        </Reveal>
+        <motion.ul initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={stagger} className="mt-8 grid gap-4 md:grid-cols-3">
           {TEAM.map((m) => (
             <motion.li key={m.key} variants={reveal} className="relative flex flex-col overflow-hidden rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60" data-testid={`landing-ai-${m.key}`}>
               <span className={cn("absolute inset-x-0 top-0 h-1", m.bar)} aria-hidden />
               <div className="flex items-center gap-4">
-                <span className={cn("flex h-24 w-24 shrink-0 items-center justify-center rounded-full", m.tint)}>
-                  <img src={`/ai-league/${m.key}-mascot.webp`} srcSet={`/ai-league/${m.key}-mascot-sm.webp 192w, /ai-league/${m.key}-mascot.webp 512w`} sizes="88px"
-                    width={88} height={88} loading="lazy" decoding="async" alt={`${m.name}, the DealInSec AI coworker who ${m.does}`} className="h-[88px] w-[88px] object-contain" />
+                <span className={cn("nest-float-soft block h-24 w-24 shrink-0 overflow-hidden rounded-full shadow-[0_8px_18px_-10px_rgba(60,40,20,0.6)] ring-2 ring-white dark:ring-neutral-800", m.tint)}>
+                  <img {...plushSrc(m.key)} sizes="96px" width={96} height={96} loading="lazy" decoding="async" draggable={false}
+                    alt={`${m.name}, the DealInSec AI coworker who ${m.does}`} className="h-24 w-24 select-none object-cover" />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="text-xl font-extrabold">{m.name}</h3>
+                  <h3 className="text-xl font-extrabold">{m.name} <span aria-hidden>{m.emoji}</span></h3>
                   <p className={cn("text-sm font-semibold", m.fg)}>{m.role}</p>
                 </div>
               </div>
@@ -481,11 +487,6 @@ export function AiTeamSection() {
             </div>
           </div>
         </Reveal>
-        <p className="mt-6 text-center text-sm">
-          <a href="/ai-coworkers" onClick={() => trackEvent("landing_cta_click", { label: "ai_coworkers" })} className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:underline dark:text-emerald-400" data-testid="landing-ai-team-more">
-            How the AI coworkers work<ArrowRight className="h-4 w-4" aria-hidden />
-          </a>
-        </p>
       </div>
     </section>
   );

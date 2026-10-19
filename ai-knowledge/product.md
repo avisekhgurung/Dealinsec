@@ -25,7 +25,7 @@ invoices go out late. DealInSec keeps it in one connected workflow:
 
 **Prospect → Lead → Deal → Quotation → Agreement → Invoice → Payment tracking.**
 
-1. AI Outbound researches companies that match who you want to reach and
+1. Client Radar researches companies that match who you want to reach and
    shows the evidence for each (source and date). You decide who becomes a lead.
 2. Leads move through a pipeline with next steps, follow-up dates and a
    do-not-contact list. AI drafts a first message; you approve the exact text

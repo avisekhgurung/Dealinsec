@@ -1,5 +1,5 @@
 /**
- * Workspace allowances for AI Outbound, all counted from the database (provider_calls, prospect_runs, llm_calls),
+ * Workspace allowances for Client Radar, all counted from the database (provider_calls, prospect_runs, llm_calls),
  * never from memory: the instance sleeps and restarts. Each is a whole number of at least 1; anything else is the default.
  *   OUTBOUND_DAILY_RUNS            discovery runs per workspace per 24 h          (default 5)
  *   OUTBOUND_DAILY_SEARCHES        search-provider calls per workspace per 24 h   (default 60)
@@ -31,7 +31,7 @@ export const globalSearchLimit = () => int(process.env.OUTBOUND_GLOBAL_DAILY_SEA
 export const globalLocalSearchLimit = () => int(process.env.OUTBOUND_GLOBAL_DAILY_LOCAL_SEARCHES, 30);
 
 
-/** A plan's AI Outbound allowance: the shared defaults, each overridable by its environment variable. */
+/** A plan's Client Radar allowance: the shared defaults, each overridable by its environment variable. */
 export function outboundAllowance(tier: OutboundTier): OutboundAllowance {
   const d = OUTBOUND_ALLOWANCE_DEFAULTS[tier], up = tier.toUpperCase(), env = process.env;
   return {

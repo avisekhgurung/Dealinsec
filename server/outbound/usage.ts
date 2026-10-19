@@ -1,12 +1,12 @@
 /**
- * AI Outbound usage, shown BEFORE a search starts. Read-only and advisory: the server still enforces every limit where
+ * Client Radar usage, shown BEFORE a search starts. Read-only and advisory: the server still enforces every limit where
  * the work happens (startRun, the search step's atomic reservation, the model budget's reservation), so this can never
  * let anything through. It counts from the same tables, with the same windows, as that enforcement:
  *
  *   the workspace's own allowances (rolling 24 hours, limits.ts)
  *     prospect searches started · web searches made · contact lookups (only when a contact provider is connected)
  *   the platform's safety caps (every workspace together, per UTC day)
- *     web searches (OUTBOUND_GLOBAL_DAILY_SEARCHES) · the AI Outbound model budget (shared/llm-cost.ts)
+ *     web searches (OUTBOUND_GLOBAL_DAILY_SEARCHES) · the Client Radar model budget (shared/llm-cost.ts)
  *
  * The workspace's allowances are exact numbers. The platform caps are reported only as a state (available, limited,
  * paused), never as counts or dollars: they are an operational safeguard, not something a workspace is entitled to.
@@ -62,10 +62,10 @@ export interface UsageDeps {
   localReady?: () => boolean;
   /** Runs started in the window, newest first (enough of them to cover the allowance). */
   recentRuns: (orgId: string, since: Date, limit: number) => Promise<Pick<ProspectRunRow, "status" | "counters" | "createdAt">[]>;
-  /** The workspace's plan for AI Outbound. */
+  /** The workspace's plan for Client Radar. */
   tier: (user: Who) => Promise<OutboundTier>;
   countProviderCalls: (o: { orgId?: string; operation: string; since: Date }) => Promise<number>;
-  /** Model spend since `since`, every workspace: all of it, and the AI Outbound pool's. */
+  /** Model spend since `since`, every workspace: all of it, and the Client Radar pool's. */
   platformSpend: (since: Date, pool: readonly string[]) => Promise<{ all: number; pool: number }>;
   prospectsHeld: (orgId: string, since: Date) => Promise<number>;
   aiDrafts: (orgId: string, since: Date) => Promise<number>;
@@ -84,7 +84,7 @@ export async function outboundUsage(user: Who, d: Partial<UsageDeps> = {}): Prom
   const deps = { ...defaultUsageDeps(), ...d };
   let tablesReady = false;
   try { tablesReady = await deps.tablesReady(); } catch { tablesReady = false; }
-  if (!tablesReady) return fail(503, "PROSPECTS_NOT_SETUP", "AI Outbound isn't set up on this server yet.");
+  if (!tablesReady) return fail(503, "PROSPECTS_NOT_SETUP", "Client Radar isn't set up on this server yet.");
   const orgId = user.organizationId!;
   const now = deps.now(), since = new Date(now.getTime() - DAY), dayStart = utcDayStart(now);
   const perSearch = runBudget(DEFAULT_QUANTITY).queries;

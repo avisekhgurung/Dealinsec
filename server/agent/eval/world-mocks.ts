@@ -265,7 +265,7 @@ export const messageStoreMock = () => {
   };
 };
 
-/** AI Outbound's store, in memory, with the database's guarantees: one active run per organization and ICP, one prospect per organization and domain, one item per run and prospect, an atomic lease claim, and saveStep all-or-nothing. */
+/** Client Radar's store, in memory, with the database's guarantees: one active run per organization and ICP, one prospect per organization and domain, one item per run and prospect, an atomic lease claim, and saveStep all-or-nothing. */
 /**
  * The error_code columns are varchar(30): Postgres refuses a longer value and the write fails. The in-memory stores
  * refuse it the same way, so a code built too long is caught by the tests (B1), not in production.
@@ -432,7 +432,7 @@ export const traceStoreMock = () => ({
   },
 });
 
-/** AI Outbound's web search: configured or not, and canned results, from the world. */
+/** Client Radar's web search: configured or not, and canned results, from the world. */
 export const discoveryProviderMock = async () => {
   const { DiscoveryError } = await import("../../discovery/types");
   const provider = {

@@ -1,10 +1,11 @@
 /**
- * DealInSec AI League: three coworkers, one runtime (server/ai-league). Pure: the server, the browser and the tests
+ * DealInSec's AI team, shown to people as "The Nest" (code, routes and tables keep the "league" name): three coworkers,
+ * one runtime (server/ai-league). Pure: the server, the browser and the tests
  * read the same identities, task templates, statuses and schedule arithmetic.
  *
- *   Nibo  Opportunity Scout   finds companies with evidence (AI Outbound) and saves the qualified ones as leads
+ *   Nibo  Deal Finder         finds companies with evidence (Client Radar) and saves the qualified ones as leads
  *   Mika  Deal Closer         drafts first messages from verified facts; nothing is sent: the person approves and sends it themselves
- *   Zee   Business Guardian   briefs the person on what needs them, from the records themselves
+ *   Zee   Business Buddy      briefs the person on what needs them, from the records themselves
  *
  * They work as a team: in a chat a coworker can ask a teammate for help (a read-only answer from the teammate's own
  * records) or hand work to a teammate (always with the person's approval), and a "team huddle" is a short background
@@ -20,33 +21,35 @@ export interface BotIdentity {
   bot: Bot;
   name: string;
   role: string;
+  /** The coworker's emoji, shown beside the name (🔎 Nibo, 💌 Mika, 🌱 Zee). */
+  emoji: string;
   /** One sentence: what they do for you. */
   pitch: string;
   /** How they speak (used in their system prompt and their empty states). */
   voice: string;
-  /** Tailwind-friendly identity colours, from the mascots (Nibo blue, Mika pink, Zee green); light and dark both read well. */
+  /** Tailwind-friendly identity colours, from the plush hats (Nibo brown, Mika pink, Zee green); light and dark both read well. */
   accent: { fg: string; bg: string; ring: string; soft: string };
   suggestions: string[];
 }
 
 export const BOT_IDENTITY: Record<Bot, BotIdentity> = {
   nibo: {
-    bot: "nibo", name: "Nibo", role: "Opportunity Scout",
-    pitch: "Finds companies that fit what you sell, checks each one's own website, and saves the qualified ones to Leads with the evidence.",
+    bot: "nibo", name: "Nibo", role: "Deal Finder", emoji: "🔎",
+    pitch: "Finds potential clients and researches businesses: companies that fit what you sell, checked on their own website, and the qualified ones saved to Leads with the evidence.",
     voice: "curious, quick and evidence-first: says what was found and where, and plainly what wasn't",
-    accent: { fg: "text-blue-700 dark:text-blue-300", bg: "bg-blue-600", ring: "ring-blue-500/40", soft: "bg-blue-50 dark:bg-blue-950/40" },
+    accent: { fg: "text-amber-800 dark:text-amber-300", bg: "bg-amber-700", ring: "ring-amber-600/40", soft: "bg-amber-50 dark:bg-amber-950/40" },
     suggestions: ["Find 10 dental clinics in Siliguri that could use a better website", "Research 10 UK marketing agencies with 5–50 people", "Ask Mika how she would open with my newest leads"],
   },
   mika: {
-    bot: "mika", name: "Mika", role: "Deal Closer",
-    pitch: "Writes first messages to your leads from what's been verified about them, and lines them up for your approval. Nothing is sent for you: you copy the approved text and send it yourself.",
+    bot: "mika", name: "Mika", role: "Deal Closer", emoji: "💌",
+    pitch: "Drafts personalised outreach and follow-ups for your leads from what's been verified about them, and lines them up for your approval.",
     voice: "warm, thoughtful and professional: short, specific messages, never pushy, never invented",
     accent: { fg: "text-rose-700 dark:text-rose-300", bg: "bg-rose-600", ring: "ring-rose-500/40", soft: "bg-rose-50 dark:bg-rose-950/40" },
     suggestions: ["Draft first messages for my newest researched leads", "Which leads are waiting on a follow-up?", "Ask Zee which clients owe us money before I follow up"],
   },
   zee: {
-    bot: "zee", name: "Zee", role: "Business Guardian",
-    pitch: "Briefs you on what needs you today, from your own records: overdue invoices, quotes waiting, follow-ups due.",
+    bot: "zee", name: "Zee", role: "Business Buddy", emoji: "🌱",
+    pitch: "Helps you organise tasks, payments and business updates, from your own records: what's overdue, what's due and what needs you today.",
     voice: "calm, organized and reassuring: leads with what matters most and links to the record",
     accent: { fg: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-600", ring: "ring-emerald-500/40", soft: "bg-emerald-50 dark:bg-emerald-950/40" },
     suggestions: ["Give me today's business briefing", "What's overdue right now?", "Hold a team huddle: how do we land 3 new clients this month?"],
@@ -55,7 +58,7 @@ export const BOT_IDENTITY: Record<Bot, BotIdentity> = {
 
 /* ── plan limits ─────────────────────────────────────────────────────────── */
 
-/** AI League's default allowances per plan (the server applies LEAGUE_* env overrides: server/ai-league/limits.ts).
+/** The Nest's default allowances per plan (the server applies LEAGUE_* env overrides: server/ai-league/limits.ts).
  *  One source for the enforcement and for every public mention (product facts, the /ai-coworkers page). */
 export const LEAGUE_ALLOWANCE_DEFAULTS = {
   free: { monthlyRuns: 10, concurrent: 1, schedules: 1 },
@@ -82,7 +85,7 @@ export const LEAGUE_LIMITS = {
   huddleRounds: 2,
   /** Teammate consultations a coworker may make while answering one message (a teammate never consults further). */
   consultsPerReply: 2,
-  /** A research campaign (Nibo, over hours): at most this many qualified companies, AI Outbound searches, and hours. */
+  /** A research campaign (Nibo, over hours): at most this many qualified companies, Client Radar searches, and hours. */
   campaignTarget: 50,
   campaignSearches: 10,
   campaignMaxHours: 24,
@@ -93,7 +96,7 @@ export const LEAGUE_LIMITS = {
 export const TASK_INPUT = {
   "nibo.find_clients": z.object({
     request: z.string().trim().min(8, "Say who you're looking for and where, for example \"10 dental clinics in Siliguri\".").max(LEAGUE_LIMITS.requestChars),
-    /** Save the qualified ones to Leads (at most leadsPerRun); otherwise they stay in AI Outbound for you to pick. */
+    /** Save the qualified ones to Leads (at most leadsPerRun); otherwise they stay in Client Radar for you to pick. */
     saveLeads: z.boolean().default(true),
     maxLeads: z.number().int().min(1).max(LEAGUE_LIMITS.leadsPerRun).default(3),
   }).strict(),
@@ -107,7 +110,7 @@ export const TASK_INPUT = {
     request: z.string().trim().min(8, "Say who you're looking for and where, for example \"Indian digital marketing agencies that may need web development\".").max(LEAGUE_LIMITS.requestChars),
     /** Qualified companies wanted. */
     target: z.number().int().min(1).max(LEAGUE_LIMITS.campaignTarget).default(10),
-    /** At most this many AI Outbound searches (each from the plan's allowance, up to 10 companies each). */
+    /** At most this many Client Radar searches (each from the plan's allowance, up to 10 companies each). */
     maxSearches: z.number().int().min(1).max(LEAGUE_LIMITS.campaignSearches).default(5),
     saveLeads: z.boolean().default(true),
     /** UTC instants (ISO). null = start now / work until done / deliver when done. See shared/league-campaign.ts. */

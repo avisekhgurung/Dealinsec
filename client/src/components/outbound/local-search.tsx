@@ -126,7 +126,7 @@ export function LocalSearch({ fields, onChange, blocked, maxCompanies, onResearc
           {search.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Search className="mr-1.5 h-4 w-4" />}Find local businesses
         </Button>
       </form>
-      <p className="text-xs text-muted-foreground">One search uses one AI Outbound search credit. Listings are shown, not saved: research a website or save a business to Leads to keep it. Nobody is contacted.</p>
+      <p className="text-xs text-muted-foreground">One search uses one Client Radar search credit. Listings are shown, not saved: research a website or save a business to Leads to keep it. Nobody is contacted.</p>
 
       {search.isPending && <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3" aria-hidden>{Array.from({ length: 6 }, (_, i) => <li key={i} className="h-28 animate-pulse rounded-xl border bg-muted/40" />)}</ul>}
 

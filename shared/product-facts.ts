@@ -49,7 +49,7 @@ export const AUDIENCE_LINE =
 export const SECONDARY_AUDIENCE = ["creators who do paid brand collaborations"] as const;
 
 export const MARKETS =
-  "Launching first in India: plans are priced and paid in rupees, and onboarding, support and billing are set up for Indian agencies. Indian agencies can find clients in India and abroad: AI Outbound searches the United States, the United Kingdom, Canada, Australia, the UAE, India and other countries, whichever you choose, wherever your own business is, and can list local businesses in a city (Siliguri, Pune, Austin or anywhere else) from Google Maps. Workspaces in other countries can use the free plan; documents follow each workspace's country and currency (50 currencies are supported).";
+  "Launching first in India: plans are priced and paid in rupees, and onboarding, support and billing are set up for Indian agencies. Indian agencies can find clients in India and abroad: Client Radar searches the United States, the United Kingdom, Canada, Australia, the UAE, India and other countries, whichever you choose, wherever your own business is, and can list local businesses in a city (Siliguri, Pune, Austin or anywhere else) from Google Maps. Workspaces in other countries can use the free plan; documents follow each workspace's country and currency (50 currencies are supported).";
 
 /** The intended connected workflow. Every stage below is live today (see CAPABILITIES for the details and limits). */
 export const WORKFLOW = ["Prospect", "Lead", "Deal", "Quotation", "Agreement", "Invoice", "Payment tracking"] as const;
@@ -67,12 +67,12 @@ export interface Capability {
 
 export const CAPABILITIES: readonly Capability[] = [
   {
-    key: "ai_outbound", name: "AI Outbound (prospect research)", status: "live", plan: "all",
+    key: "ai_outbound", name: "Client Radar (prospect research)", status: "live", plan: "all",
     text: `The hero feature. Describe the companies you want to reach and choose where (any countries, regions or cities: the US, the UK, Canada, Australia, the UAE, India and others, or worldwide); you confirm the profile, then it searches the web, checks each company's own website against your ideal-client profile, looks for recent, dated reasons to reach out and named decision makers, and scores each one. For local businesses (dentists in Siliguri, cafes in Pune), it can instead list businesses in a city from Google Maps: the listings are shown for that search and not kept, you choose which listed websites DealInSec researches the same way, and you can save a business to Leads under the name you give it, with a link to its listing. A listing without a website says only that; it doesn't mean the business has no website or needs one. Every finding shows its source and date; guesses and unknowns are labelled, and thin markets are said plainly. Nothing is contacted and no lead is created until you add one. One credit is one search: the free plan includes ${OB.free.monthlySearches} a month (up to ${OB.free.maxCompanies} companies each), and Pro ${OB.pro.monthlySearches} a month (up to ${OB.pro.maxCompanies} companies each), counted over ${OUTBOUND_WINDOW_DAYS} days, with at most 5 a day. Research is never unlimited, and contact details aren't always available.`,
   },
   {
-    key: "ai_coworkers", name: "AI coworkers: Nibo, Mika and Zee (AI League)", status: "live", plan: "all",
-    text: `Three AI coworkers that do work in the background through the product's own features, as the signed-in person. Nibo runs an AI Outbound search, checks each company's own website and saves up to ${LEAGUE_LIMITS.leadsPerRun} qualified companies a task to Leads with their evidence and sources; his research always asks first because it uses a search. Mika drafts first emails from verified facts for leads you pick; nothing is sent, you approve the exact text and send it yourself. Zee briefs you from your own records: overdue invoices, follow-ups due, messages waiting, invoices due this week and agreements ready to invoice. Each has its own chat; they can ask each other for help, hand work to a teammate (always with your approval) and hold a short team huddle. Tasks keep running if you close the page and can be scheduled daily, on weekdays or weekly. The free plan includes ${LG.free.monthlyRuns} coworker tasks every ${LEAGUE_WINDOW_DAYS} days and Pro ${LG.pro.monthlyRuns}; each task also uses the allowance of the feature it runs. They never send, pay or sign anything.`,
+    key: "ai_coworkers", name: "AI coworkers: Nibo, Mika and Zee (The Nest, your AI team)", status: "live", plan: "all",
+    text: `Three AI coworkers in The Nest, your AI team, who do work in the background through the product's own features, as the signed-in person. Nibo 🔎 (Deal Finder) runs an Client Radar search, checks each company's own website and saves up to ${LEAGUE_LIMITS.leadsPerRun} qualified companies a task to Leads with their evidence and sources; his research always asks first because it uses a search. Mika 💌 (Deal Closer) drafts first emails from verified facts for leads you pick; nothing is sent, you approve the exact text and send it yourself. Zee 🌱 (Business Buddy) briefs you from your own records: overdue invoices, follow-ups due, messages waiting, invoices due this week and agreements ready to invoice. Each has its own chat; they can ask each other for help, hand work to a teammate (always with your approval) and hold a short team huddle. Tasks keep running if you close the page and can be scheduled daily, on weekdays or weekly. The free plan includes ${LG.free.monthlyRuns} coworker tasks every ${LEAGUE_WINDOW_DAYS} days and Pro ${LG.pro.monthlyRuns}; each task also uses the allowance of the feature it runs. They never send, pay or sign anything.`,
   },
   {
     key: "outreach_drafts", name: "Outreach drafts with approval", status: "live", plan: "all",
@@ -108,7 +108,7 @@ export const CAPABILITIES: readonly Capability[] = [
   },
   {
     key: "assistant", name: "In-app AI assistant (Copilot and Agent mode)", status: "live", plan: "all",
-    text: "Ask in plain words to find records, start an AI Outbound search, create a deal from a pasted brief, or prepare a quotation, agreement or invoice. It asks you to approve every change before it happens.",
+    text: "Ask in plain words to find records, start an Client Radar search, create a deal from a pasted brief, or prepare a quotation, agreement or invoice. It asks you to approve every change before it happens.",
   },
   {
     key: "team", name: "Team members and roles", status: "live", plan: "pro",
@@ -152,8 +152,8 @@ export const PRICING = {
 } as const;
 
 export const PRICING_LINES: readonly string[] = [
-  `Free plan: ${OB.free.monthlySearches} AI Outbound searches a month (up to ${OB.free.maxCompanies} companies each), the leads pipeline, and ${PRICING.freeMonthlyDeals} deals a month, each with its quotation. Agreements, invoices and payment tracking are Pro. Permanent, no card.`,
-  `DealInSec Pro: one plan that includes everything — AI Outbound with ${OB.pro.monthlySearches} searches a month (up to ${OB.pro.maxCompanies} companies each), the leads pipeline, unlimited deals, quotations, agreements with online signing, invoices, payment tracking and ${PRO_INCLUDED_SEATS} team members. ${rupees(PRICING.proMonthlyInr)} a month in India, paid once a month: it does not renew or charge automatically, you pay again to extend. There is no separate plan for AI Outbound or the CRM, and no annual plan. Extra team members are ${rupees(PRICING.extraSeatInr)} each a month.`,
+  `Free plan: ${OB.free.monthlySearches} Client Radar searches a month (up to ${OB.free.maxCompanies} companies each), the leads pipeline, and ${PRICING.freeMonthlyDeals} deals a month, each with its quotation. Agreements, invoices and payment tracking are Pro. Permanent, no card.`,
+  `DealInSec Pro: one plan that includes everything — Client Radar with ${OB.pro.monthlySearches} searches a month (up to ${OB.pro.maxCompanies} companies each), the leads pipeline, unlimited deals, quotations, agreements with online signing, invoices, payment tracking and ${PRO_INCLUDED_SEATS} team members. ${rupees(PRICING.proMonthlyInr)} a month in India, paid once a month: it does not renew or charge automatically, you pay again to extend. There is no separate plan for Client Radar or the CRM, and no annual plan. Extra team members are ${rupees(PRICING.extraSeatInr)} each a month.`,
   PRICING.checkout,
   `Checkout charges exactly the listed price (${rupees(PRICING.proMonthlyInr)} for Pro); DealInSec adds no tax on top of it.`,
   "No platform fee or commission on your deal value.",
@@ -169,7 +169,7 @@ export const NEVER_CLAIM: readonly string[] = [
   "that it collects or processes client payments",
   "that AI reads or classifies Gmail messages",
   "that paid plans can be bought outside India",
-  "unlimited AI research, unlimited sending, or separate prices for AI Outbound or the CRM",
+  "unlimited AI research, unlimited sending, or separate prices for Client Radar or the CRM",
   "that Gmail is available to every workspace",
   "that its agreements are certified digital signatures, or that it is legally or tax compliant in any country",
   "integrations it does not have (Outlook, WhatsApp, Stripe, PayPal, Salesforce, HubSpot)",
@@ -199,7 +199,7 @@ Primary: ${AUDIENCE_LINE}. Secondary (older pages and tools still exist): ${SECO
 ${MARKETS}
 
 ## The connected workflow
-${WORKFLOW.join(" → ")}. AI Outbound is where new clients start; a won lead becomes a deal, and the deal carries through quotation, agreement, invoice and payment tracking.
+${WORKFLOW.join(" → ")}. Client Radar is where new clients start; a won lead becomes a deal, and the deal carries through quotation, agreement, invoice and payment tracking.
 
 ## Available now
 ${byStatus("live")}

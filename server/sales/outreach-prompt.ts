@@ -22,7 +22,7 @@ export interface DraftInput {
   angles: { label: string; value: string }[];
   /** The sender's own notes that matched this company. */
   notes: { title: string; text: string }[];
-  /** The angle chosen in AI Outbound (from verified findings), when the lead came from there. */
+  /** The angle chosen in Client Radar (from verified findings), when the lead came from there. */
   angle?: { problem: string; opportunity: string; positioning: string; targetPerson: string | null } | null;
 }
 

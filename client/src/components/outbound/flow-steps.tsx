@@ -1,5 +1,5 @@
 /**
- * Where the person is in AI Outbound, from real state only: what they've typed and confirmed, the selected search's
+ * Where the person is in Client Radar, from real state only: what they've typed and confirmed, the selected search's
  * status and stage, whether its prospects reached Leads, and the outreach queue counts this session has loaded.
  * A step is checked only when the thing it names has actually happened; nothing advances on a timer.
  *
@@ -27,7 +27,7 @@ export function FlowSteps({ state }: { state: FlowState }) {
   const label = FLOW_STEPS[current - 1];
   const note = notes[current - 1];
   return (
-    <nav aria-label="Where you are in AI Outbound" data-testid="outbound-flow">
+    <nav aria-label="Where you are in Client Radar" data-testid="outbound-flow">
       {/* Phones and tablets: one line. */}
       <div className="lg:hidden">
         <p className="flex items-center gap-1.5 text-sm" aria-current="step" data-testid="outbound-flow-compact">

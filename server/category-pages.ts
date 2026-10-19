@@ -331,7 +331,7 @@ export const PAGES: CategoryPage[] = [
     <tr><td><b>Getting paid</b></td><td>You remember, then chase awkwardly</td><td>Overdue list, plus a drafted reminder in the tone you pick</td></tr>
     <tr><td><b>Cost</b></td><td>—</td><td>Free plan for quotations; Pro ₹199/month</td></tr>
   </table></div>
-  <div class="callout honest"><b>What it costs, plainly</b><p>Free is ₹0: 4 deals a month, each with its quotation. Pro is ₹199/month, paid once a month with no auto-renewal, and adds AI Outbound with a larger research allowance, e-signed agreements, invoices, payment tracking and unlimited deals. The free plan needs no card. DealInSec takes no percentage of your project value. Just need one invoice today? The <a href="/tools/gst-invoice-generator">free GST invoice generator</a> and <a href="/tools/quotation-maker">quotation maker</a> need no sign-up.</p></div>
+  <div class="callout honest"><b>What it costs, plainly</b><p>Free is ₹0: 4 deals a month, each with its quotation. Pro is ₹199/month, paid once a month with no auto-renewal, and adds Client Radar with a larger research allowance, e-signed agreements, invoices, payment tracking and unlimited deals. The free plan needs no card. DealInSec takes no percentage of your project value. Just need one invoice today? The <a href="/tools/gst-invoice-generator">free GST invoice generator</a> and <a href="/tools/quotation-maker">quotation maker</a> need no sign-up.</p></div>
   <p class="muted" style="font-size:14px;margin-top:10px">Guides: <a href="/blog/advance-payment-terms">advance payment terms</a> · <a href="/blog/payment-reminder-message-to-client">payment reminder messages</a> · <a href="/blog/how-to-make-a-quotation-online">making a quotation online</a>.</p>
 </div></section>`,
     faq: [
@@ -706,7 +706,7 @@ export const PAGES: CategoryPage[] = [
       },
     ],
   },
-  /* ── /find-local-clients — local businesses in an Indian city (AI Outbound, Google Maps listings) ── */
+  /* ── /find-local-clients — local businesses in an Indian city (Client Radar, Google Maps listings) ── */
   {
     path: "/find-local-clients",
     region: "IN",
@@ -730,9 +730,9 @@ export const PAGES: CategoryPage[] = [
 </div></section>
 <section><div class="wrap">
   <h2>How it works</h2>
-  <p class="sec-sub">Local search sits inside AI Outbound, next to the search for companies online. Nothing is contacted at any step until you send a message yourself.</p>
+  <p class="sec-sub">Local search sits inside Client Radar, next to the search for companies online. Nothing is contacted at any step until you send a message yourself.</p>
   <div class="feat">
-    <div class="ft"><b>1. Search a city</b><p>Choose Local businesses, type the kind of business and the city, and pick listings with a website, without one, or both. One local search uses one AI Outbound search and shows up to 20 businesses.</p></div>
+    <div class="ft"><b>1. Search a city</b><p>Choose Local businesses, type the kind of business and the city, and pick listings with a website, without one, or both. One local search uses one Client Radar search and shows up to 20 businesses.</p></div>
     <div class="ft"><b>2. Look through the listings</b><p>Each business shows its address, phone, website if one is listed and a link to open it in Google Maps, with businesses already in your leads marked.</p></div>
     <div class="ft"><b>3. Research the websites you pick</b><p>Tick the businesses worth a closer look. DealInSec reads each website itself, checks it against your search and records what it finds with the page it came from and the date.</p></div>
     <div class="ft"><b>4. Save the right ones as leads</b><p>A researched business becomes a lead in one step. A business without a website can be saved too, under the name you give it, with a link to its listing.</p></div>
@@ -750,7 +750,7 @@ export const PAGES: CategoryPage[] = [
     <tr><td><b>A lead you save from a listing</b></td><td>Keeps the name you give it and a link back to the listing.</td></tr>
     <tr><td><b>“No website listed”</b></td><td>Means only that the listing shows none. The business may still have one, and it doesn't mean they need one: check before you pitch.</td></tr>
   </table></div>
-  <div class="callout honest"><b>What it doesn't do</b><p>DealInSec doesn't guarantee clients, replies or meetings, and it isn't a contact database: phone numbers and emails are only what a listing or a website publishes, and they aren't verified. It doesn't send messages for you. Searching is limited: the free plan includes ${OB.free.monthlySearches} AI Outbound searches every ${OUTBOUND_WINDOW_DAYS} days and Pro (₹${PRICING.proMonthlyInr} a month in India) includes ${OB.pro.monthlySearches}, with researched websites counted separately.</p></div>
+  <div class="callout honest"><b>What it doesn't do</b><p>DealInSec doesn't guarantee clients, replies or meetings, and it isn't a contact database: phone numbers and emails are only what a listing or a website publishes, and they aren't verified. It doesn't send messages for you. Searching is limited: the free plan includes ${OB.free.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days and Pro (₹${PRICING.proMonthlyInr} a month in India) includes ${OB.pro.monthlySearches}, with researched websites counted separately.</p></div>
 </div></section>
 <section><div class="wrap">
   <h2>After the first yes</h2>
@@ -760,12 +760,12 @@ export const PAGES: CategoryPage[] = [
     <a class="rel-card" href="/freelancer-invoice-software">Invoices and payment tracking<span>Invoices from the agreement; see what is overdue.</span></a>
     <a class="rel-card" href="/tools/gst-invoice-generator">Free GST invoice generator<span>One invoice today, no sign-up.</span></a>
   </div>
-  <p class="muted" style="font-size:14px;margin-top:12px">Looking for companies online instead, in India or abroad? AI Outbound searches the web for them too; see <a href="/">how DealInSec works</a> and <a href="/for-freelancers">DealInSec for freelancers</a>.</p>
+  <p class="muted" style="font-size:14px;margin-top:12px">Looking for companies online instead, in India or abroad? Client Radar searches the web for them too; see <a href="/">how DealInSec works</a> and <a href="/for-freelancers">DealInSec for freelancers</a>.</p>
 </div></section>`,
     faq: [
       {
         q: "How do I find local clients for my agency with DealInSec?",
-        a: "Open AI Outbound, choose Local businesses, and type the kind of business and the city, for example dentists in Siliguri. DealInSec lists matching businesses from Google Maps. Pick the ones worth a closer look and DealInSec researches their websites with sources; save the right ones as leads, approve a first message and send it from your own email.",
+        a: "Open Client Radar, choose Local businesses, and type the kind of business and the city, for example dentists in Siliguri. DealInSec lists matching businesses from Google Maps. Pick the ones worth a closer look and DealInSec researches their websites with sources; save the right ones as leads, approve a first message and send it from your own email.",
       },
       {
         q: "Which cities can I search?",
@@ -781,7 +781,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "What does local search cost?",
-        a: `It is part of AI Outbound, with no separate price. One local search uses one AI Outbound search: the free plan includes ${OB.free.monthlySearches} every ${OUTBOUND_WINDOW_DAYS} days, and Pro, ₹${PRICING.proMonthlyInr} a month in India, includes ${OB.pro.monthlySearches}. Researching websites uses your plan's researched prospects. The free plan needs no card.`,
+        a: `It is part of Client Radar, with no separate price. One local search uses one Client Radar search: the free plan includes ${OB.free.monthlySearches} every ${OUTBOUND_WINDOW_DAYS} days, and Pro, ₹${PRICING.proMonthlyInr} a month in India, includes ${OB.pro.monthlySearches}. Researching websites uses your plan's researched prospects. The free plan needs no card.`,
       },
     ],
   },
@@ -818,7 +818,7 @@ export const PAGES: CategoryPage[] = [
     <div class="ft"><b>Deals for the work you win</b><p>A won lead becomes a deal in one step. The deal records the client, the engagement model (fixed price, retainer, hourly, milestones and more), the service, the value and the dates. You can also import existing deals from a CSV file.</p></div>
     <div class="ft"><b>What needs you today</b><p>The dashboard lists follow-ups due, quotations your client hasn't accepted yet, agreements waiting for a signature, work ready to invoice and invoices that are overdue, built from your own records.</p></div>
     <div class="ft"><b>Documents from the same deal</b><p>Send a quotation your client can open and accept online. On Pro, create the agreement your client signs online and the invoices, with the same figures, and record payments as they arrive.</p></div>
-    <div class="ft"><b>Find new clients</b><p>AI Outbound researches companies that fit what you sell, or lists local businesses in a city from Google Maps, with sources for what it finds. The free plan includes ${OB.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days.</p></div>
+    <div class="ft"><b>Find new clients</b><p>Client Radar researches companies that fit what you sell, or lists local businesses in a city from Google Maps, with sources for what it finds. The free plan includes ${OB.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days.</p></div>
     <div class="ft"><b>Do-not-contact, respected</b><p>Add an email address or a whole domain once and DealInSec won't draft or approve messages to it.</p></div>
   </div>
   <div class="callout honest"><b>What it doesn't do</b><p>There is no separate client directory: a client's details live on their lead and their deals. DealInSec doesn't send emails or WhatsApp messages for you, doesn't schedule meetings, isn't a contact database and doesn't replace your accounting software. Connecting Gmail is in limited early access, so it isn't available to every workspace yet.</p></div>
@@ -857,7 +857,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "What does it cost?",
-        a: `The free plan, with no credit card, includes the lead pipeline, ${PRICING.freeMonthlyDeals} deals a month with their quotations and ${OB.free.monthlySearches} AI Outbound searches every ${OUTBOUND_WINDOW_DAYS} days. Pro is ₹${PRICING.proMonthlyInr} a month in India and adds unlimited deals, agreements signed online, invoices, payment tracking and team members.`,
+        a: `The free plan, with no credit card, includes the lead pipeline, ${PRICING.freeMonthlyDeals} deals a month with their quotations and ${OB.free.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days. Pro is ₹${PRICING.proMonthlyInr} a month in India and adds unlimited deals, agreements signed online, invoices, payment tracking and team members.`,
       },
       {
         q: "Can I bring my existing deals?",
@@ -865,7 +865,7 @@ export const PAGES: CategoryPage[] = [
       },
     ],
   },
-  /* ── /ai-coworkers — Nibo, Mika and Zee (AI League), for India ───────────────────────────────────────── */
+  /* ── /ai-coworkers — Nibo, Mika and Zee (The Nest, the AI team; code name "league"), for India ───────────────────────────────────────── */
   // Every capability here is what server/ai-league does: Nibo's research always asks first and saves at most
   // LEAGUE_LIMITS.leadsPerRun companies a task; Mika only drafts; Zee's summary is checked against the records; a hand-off
   // always asks; the plan limits come from leagueAllowance(). Nothing here promises clients, replies or accuracy.
@@ -877,7 +877,7 @@ export const PAGES: CategoryPage[] = [
     description:
       "Three AI coworkers inside DealInSec: Nibo researches companies that fit, Mika drafts first messages you approve, Zee briefs you from your own records.",
     h1: "AI coworkers for your business workflow",
-    sub: "Nibo researches companies that fit what you sell, Mika drafts first messages for you to approve, and Zee tells you what needs you today, from your own invoices, deals and follow-ups. They work in the background and ask before anything that spends your allowance or changes something.",
+    sub: "Meet The Nest 🪺, your AI team. Nibo 🔎, the Deal Finder, researches companies that fit what you sell; Mika 💌, the Deal Closer, drafts outreach and follow-ups for you to approve; and Zee 🌱, your Business Buddy, tells you what needs you today, from your own invoices, deals and follow-ups. They work in the background and ask before anything that spends your allowance or changes something.",
     chips: ["Research with sources", "Drafts only, you send", "Briefings from your records", "Run in the background", "Free plan, no card"],
     shortLabel: "AI Coworkers",
     sections: `
@@ -885,15 +885,15 @@ export const PAGES: CategoryPage[] = [
   <h2>Three coworkers, three jobs</h2>
   <p class="sec-sub">Each one does real work through the same features you use yourself, as you, with your permissions. Their names and personalities are for you; the rules they follow are the product's.</p>
   <div class="feat">
-    <div class="ft"><b>Nibo finds companies that fit</b><p>Describe who you want to work with. Nibo runs an AI Outbound search, checks each company's own website, scores it against your ideal client and saves up to ${LEAGUE_LIMITS.leadsPerRun} qualified companies to your leads, each with the evidence and the page it came from. Research always asks before it starts, because it uses one of your searches.</p></div>
-    <div class="ft"><b>Mika drafts first messages</b><p>For leads you pick, or your newest researched leads, Mika writes a short first email from what was verified about each company. Nothing is sent: you read it, edit it, approve the exact text and send it yourself from your own email. Leads marked do-not-contact are skipped.</p></div>
-    <div class="ft"><b>Zee briefs you on what needs you</b><p>Overdue invoices, follow-ups due, messages waiting for approval, invoices due this week and agreements ready to invoice, read from your own records. Zee's short summary is checked against those records: one that mentions a figure they don't contain is left out.</p></div>
+    <div class="ft"><b>Nibo 🔎, Deal Finder: finds companies that fit</b><p>Describe who you want to work with. Nibo runs an Client Radar search, checks each company's own website, scores it against your ideal client and saves up to ${LEAGUE_LIMITS.leadsPerRun} qualified companies to your leads, each with the evidence and the page it came from. Research always asks before it starts, because it uses one of your searches.</p></div>
+    <div class="ft"><b>Mika 💌, Deal Closer: drafts first messages</b><p>For leads you pick, or your newest researched leads, Mika writes a short first email from what was verified about each company. Nothing is sent: you read it, edit it, approve the exact text and send it yourself from your own email. Leads marked do-not-contact are skipped.</p></div>
+    <div class="ft"><b>Zee 🌱, Business Buddy: briefs you on what needs you</b><p>Overdue invoices, follow-ups due, messages waiting for approval, invoices due this week and agreements ready to invoice, read from your own records. Zee's short summary is checked against those records: one that mentions a figure they don't contain is left out.</p></div>
   </div>
 </div></section>
 <section><div class="wrap">
   <h2>How they work</h2>
   <div class="feat">
-    <div class="ft"><b>Chat, or start a task</b><p>Ask a coworker in its own chat, or start a task from the AI League page. A task runs on the server, so it keeps going if you close the page, and reports back with what it did and links to the records.</p></div>
+    <div class="ft"><b>Chat, or start a task</b><p>Ask a coworker in its own chat, or start a task from The Nest, your AI team's page in the app. A task runs on the server, so it keeps going if you close the page, and reports back with what it did and links to the records.</p></div>
     <div class="ft"><b>Approvals stay yours</b><p>Anything that spends your allowance or changes your records waits for your approval, and nothing is sent, paid or signed by a coworker. Handing work from one coworker to another asks you first too.</p></div>
     <div class="ft"><b>They help each other</b><p>A coworker can ask a teammate for a view from the teammate's own records, or call a short team huddle where all three talk a question over and suggest next steps. Talking changes nothing.</p></div>
     <div class="ft"><b>Schedules</b><p>Set a task to run every day, every weekday or every week at a time in your timezone, such as a weekday morning briefing from Zee.</p></div>
@@ -907,7 +907,7 @@ export const PAGES: CategoryPage[] = [
     <tr><td><b>Tasks working at once</b></td><td>${leagueAllowance("free").concurrent}</td><td>${leagueAllowance("pro").concurrent}</td></tr>
     <tr><td><b>Recurring tasks</b></td><td>${leagueAllowance("free").schedules}</td><td>${leagueAllowance("pro").schedules}</td></tr>
   </table></div>
-  <div class="callout honest"><b>What they don't do</b><p>They don't guarantee clients, replies or payments, and they don't send messages for you. A task also uses the allowance of the feature it runs: Nibo's research uses AI Outbound searches (the free plan includes ${OB.free.monthlySearches} every ${OUTBOUND_WINDOW_DAYS} days, Pro ${OB.pro.monthlySearches}) and Mika's drafts use your plan's AI drafts. AI can be wrong, so every report links to the records and sources it used.</p></div>
+  <div class="callout honest"><b>What they don't do</b><p>They don't guarantee clients, replies or payments, and they don't send messages for you. A task also uses the allowance of the feature it runs: Nibo's research uses Client Radar searches (the free plan includes ${OB.free.monthlySearches} every ${OUTBOUND_WINDOW_DAYS} days, Pro ${OB.pro.monthlySearches}) and Mika's drafts use your plan's AI drafts. AI can be wrong, so every report links to the records and sources it used.</p></div>
 </div></section>
 <section><div class="wrap">
   <h2>Where the work goes next</h2>
@@ -937,7 +937,7 @@ export const PAGES: CategoryPage[] = [
       },
       {
         q: "What does it cost?",
-        a: `The free plan, with no card, includes ${leagueAllowance("free").monthlyRuns} coworker tasks every ${LEAGUE_WINDOW_DAYS} days. Pro, ₹${PRICING.proMonthlyInr} a month in India, includes ${leagueAllowance("pro").monthlyRuns}. Each task also uses the allowance of the feature it runs, such as AI Outbound searches for Nibo's research.`,
+        a: `The free plan, with no card, includes ${leagueAllowance("free").monthlyRuns} coworker tasks every ${LEAGUE_WINDOW_DAYS} days. Pro, ₹${PRICING.proMonthlyInr} a month in India, includes ${leagueAllowance("pro").monthlyRuns}. Each task also uses the allowance of the feature it runs, such as Client Radar searches for Nibo's research.`,
       },
     ],
   },

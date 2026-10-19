@@ -488,7 +488,7 @@ ${METHODOLOGY([vendor("bonsai")])}`,
     sections: `
 <section><div class="wrap">
   <h2>What DealInSec is</h2>
-  <p class="sec-sub">${ONE_LINER} It is built for ${AUDIENCE_LINE}. AI Outbound researches real prospects and shows the evidence for each; you approve the outreach and send it yourself; and each won deal carries one connected record: a quotation the client can accept online, an agreement they can sign online, invoices drawn from that agreement, and a clear view of what is paid, pending and overdue. Freelancers use it the same way, and creators can use it for paid brand collaborations. It works in 50 currencies, with the tax field, invoice numbering and date format of the country you work from.</p>
+  <p class="sec-sub">${ONE_LINER} It is built for ${AUDIENCE_LINE}. Client Radar researches real prospects and shows the evidence for each; you approve the outreach and send it yourself; and each won deal carries one connected record: a quotation the client can accept online, an agreement they can sign online, invoices drawn from that agreement, and a clear view of what is paid, pending and overdue. Freelancers use it the same way, and creators can use it for paid brand collaborations. It works in 50 currencies, with the tax field, invoice numbering and date format of the country you work from.</p>
 </div></section>
 <section><div class="wrap">
   <h2>Who makes it</h2>
@@ -497,7 +497,7 @@ ${METHODOLOGY([vendor("bonsai")])}`,
 <section><div class="wrap">
   <h2>What it does — and what it doesn't</h2>
   <div class="feat">
-    <div class="ft"><b>What it does</b><p>AI Outbound prospect research with sources and dates; a leads pipeline with follow-up tasks and a do-not-contact list; AI-drafted first messages you approve and send from your own email; deals and quotations with a client acceptance link; agreements with a public signing link, recording who signed, when and with which signature; invoices drawn from the agreement; payment tracking; a Protection Check that flags risky or missing terms before you send; and AI-drafted payment reminders that you review and send yourself.</p></div>
+    <div class="ft"><b>What it does</b><p>Client Radar prospect research with sources and dates; a leads pipeline with follow-up tasks and a do-not-contact list; AI-drafted first messages you approve and send from your own email; deals and quotations with a client acceptance link; agreements with a public signing link, recording who signed, when and with which signature; invoices drawn from the agreement; payment tracking; a Protection Check that flags risky or missing terms before you send; and AI-drafted payment reminders that you review and send yourself.</p></div>
     <div class="ft"><b>What it doesn't</b><p>It is not a marketplace, an email marketing platform or an autonomous sales agent: it never contacts prospects or clients on your behalf, and it doesn't send emails, follow-ups or reminders automatically. It does not track time, run a client portal, do accounting or expenses, schedule meetings or collect payments. Your client pays you directly and you mark the invoice paid. Online signing is electronic acceptance with an audit record, not a certified digital signature, and nothing it produces is legal advice.</p></div>
   </div>
 </div></section>

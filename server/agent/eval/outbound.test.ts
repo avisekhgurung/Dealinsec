@@ -1,5 +1,5 @@
 /**
- * AI Outbound end to end in the in-memory world: a fake web (real HTML extraction, the real SSRF-safe fetcher logic),
+ * Client Radar end to end in the in-memory world: a fake web (real HTML extraction, the real SSRF-safe fetcher logic),
  * a fake search engine, a scripted model routed by task, and the real services, pipeline, validators and score.
  * Each case pins down something a website, a search result, a model or a crash must not be able to change.
  */

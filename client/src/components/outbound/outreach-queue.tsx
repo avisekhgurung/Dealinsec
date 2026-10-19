@@ -180,7 +180,7 @@ export function OutreachQueue({ canEdit, onShowReady }: { canEdit: boolean; /** 
                 <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Written from these facts</h3>
                 {open.evidence.length ? open.evidence.map((e) => (
                   <div key={e.id} className="rounded-lg border px-3 py-2 text-sm">
-                    {/* A signal copied from AI Outbound already starts with its label ("Hiring: ..."): don't say it twice. */}
+                    {/* A signal copied from Client Radar already starts with its label ("Hiring: ..."): don't say it twice. */}
                     <p>{e.value.toLowerCase().startsWith(`${(FIELD[e.field] ?? e.field).toLowerCase()}:`) ? e.value : <><span className="text-xs text-muted-foreground">{FIELD[e.field] ?? e.field}:</span> {e.value}</>}</p>
                     {e.quote && <p className="mt-0.5 text-[11px] italic text-muted-foreground">“{e.quote}”</p>}
                     {e.url && <a href={e.url} target="_blank" rel="noopener noreferrer nofollow" className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:underline">{e.url.replace(/^https?:\/\//, "")}<ExternalLink className="h-2.5 w-2.5" /></a>}
