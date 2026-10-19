@@ -14,7 +14,7 @@ import { Link } from "wouter";
 import {
   ArrowRight, Building2, Check, CheckCircle2, FileSignature, FileText, LayoutDashboard, LifeBuoy,
   Handshake, PlayCircle, ReceiptText, Search, ShieldCheck, Signature, Sparkles, UserRound, Users,
-  Flame, Lightbulb, Link2, Radar, X,
+  Flame, Lightbulb, Link2, Radar, X, Home, Bird, Target, MoreHorizontal, Lock,
 } from "lucide-react";
 import { PRICING } from "@shared/product-facts";
 import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
@@ -24,7 +24,9 @@ import { trackEvent } from "@/lib/analytics";
 import { onSectionLinkClick } from "@/components/landing-shared";
 import { ProspectCard } from "@/components/outbound/prospect-card";
 import type { ProspectCard as ProspectCardData } from "@/lib/outbound";
-import { NEST_TEAM_IMAGE, plushSrc } from "@/lib/plush";
+import { NEST_TEAM_IMAGE, plushSrc, type NestAnimationState } from "@/lib/plush";
+import { NestCharacter } from "@/components/ai-league/nest-character";
+import { BOT_IDENTITY } from "@shared/ai-league";
 import { cn } from "@/lib/utils";
 import { LANDING_FAQS } from "@shared/landing-faqs";
 
@@ -93,34 +95,104 @@ const HERO_PROSPECT: ProspectCardData = {
 const HERO_TABS = ["Home", "The Nest", "Radar", "Leads", "Deals", "Quotes", "Agreements", "Invoices"] as const;
 const noop = () => {};
 
+/** The Nest on a phone, as the app shows it: each coworker with an example status (alive: the plush characters move). */
+const PHONE_TEAM: { bot: "nibo" | "mika" | "zee"; state: NestAnimationState; status: string; tone: string }[] = [
+  { bot: "nibo", state: "thinking", status: "Working · finding companies in Pune", tone: "text-amber-800" },
+  { bot: "mika", state: "waiting", status: "Waiting for your approval · 2 drafts", tone: "text-rose-700" },
+  { bot: "zee", state: "success", status: "Done · today's briefing is ready", tone: "text-emerald-700" },
+];
+const PHONE_TABS = [
+  { Icon: Home, label: "Home" }, { Icon: Bird, label: "The Nest", on: true }, { Icon: Radar, label: "Radar" },
+  { Icon: Target, label: "Leads" }, { Icon: MoreHorizontal, label: "More" },
+];
+
+function PhoneNest() {
+  return (
+    // A 300 × 600 phone screen, scaled to fit: 0.5 on small screens, 0.62 from sm.
+    <div style={{ animationDelay: ".55s" }} className="dis-hero-in absolute -bottom-10 -right-1 z-10 rounded-[2.1rem] border-[6px] border-neutral-900 bg-neutral-900 shadow-[0_30px_60px_-20px_rgba(0,0,0,0.5)] sm:-bottom-12 sm:-right-4 dark:border-neutral-700">
+      <div className="relative h-[300px] w-[150px] overflow-hidden rounded-[1.65rem] bg-white sm:h-[372px] sm:w-[186px] dark:bg-neutral-900">
+        <div className="absolute left-0 top-0 h-[600px] w-[300px] origin-top-left scale-50 sm:scale-[0.62]">
+          <div className="flex h-7 items-center justify-between px-6 pt-1 text-[11px] font-semibold text-neutral-800 dark:text-neutral-200"><span>9:41</span><span className="h-4 w-20 rounded-full bg-neutral-900" /><span>●●●</span></div>
+          <div className="px-4 pt-3">
+            <p className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white">The Nest <span aria-hidden>🪺</span></p>
+            <p className="text-[11px] font-medium text-neutral-500">My AI Team · Find clients. Win deals. Get paid.</p>
+          </div>
+          <ul className="space-y-2.5 px-3 pt-4">
+            {PHONE_TEAM.map((m) => {
+              const id = BOT_IDENTITY[m.bot];
+              return (
+                <li key={m.bot} className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
+                  <NestCharacter bot={m.bot} size={56} animationState={m.state} eager />
+                  <div className="min-w-0">
+                    <p className="text-[15px] font-semibold text-neutral-900 dark:text-white">{id.name} <span aria-hidden>{id.emoji}</span></p>
+                    <p className={cn("text-[11px] font-semibold", m.tone)}>{id.role}</p>
+                    <p className="mt-0.5 text-[11px] leading-snug text-neutral-500">{m.status}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          {/* Zee's briefing, as it reads in the app (example figures) */}
+          <div className="mx-3 mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/40">
+            <p className="text-[12px] font-bold text-emerald-900 dark:text-emerald-200">Today's business briefing <span aria-hidden>🌱</span></p>
+            <ul className="mt-1.5 space-y-1 text-[11px] text-emerald-900/80 dark:text-emerald-200/80">
+              <li>• 2 invoices due this week · ₹42,500</li>
+              <li>• 1 follow-up due today: Northwind Logistics</li>
+              <li>• 1 agreement ready to invoice</li>
+            </ul>
+          </div>
+          <div className="mx-3 mt-3 rounded-full border border-neutral-200 bg-white px-4 py-2 text-[11px] text-neutral-400 dark:border-neutral-800 dark:bg-neutral-950">Ask Zee what needs attention today…</div>
+          <div className="dis-topnav absolute inset-x-3 bottom-4 flex justify-around rounded-2xl py-2 text-white">
+            {PHONE_TABS.map(({ Icon, label, on }) => (
+              <span key={label} className={cn("flex flex-col items-center gap-0.5 text-[10px] font-semibold", on ? "text-white" : "text-white/60")}>
+                <span className={cn("flex h-7 w-9 items-center justify-center rounded-full", on && "bg-white/15")}><Icon className="h-4 w-4" /></span>{label}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HeroProduct() {
   return (
-    <div className="relative" aria-hidden="true">
-      {/* The AI team at work around the product: Nibo searching, Zee ticking things off, Mika drafting a reply. */}
+    <div className="relative pr-10 sm:pr-16" aria-hidden="true">
+      {/* The AI team around the product: Nibo searching, Mika drafting; all three live in The Nest on the phone. */}
       <HeroMate bot="nibo" pose="work" bubble="Found 3 companies that fit 🔎" ring="ring-amber-300 dark:ring-amber-700" delay=".45s"
         bubbleClass="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200" className="-left-1 -top-11 sm:-left-7 sm:-top-14" />
-      <HeroMate bot="zee" pose="win" bubble="2 invoices due this week 🌱" flip ring="ring-emerald-300 dark:ring-emerald-700" delay=".6s"
-        bubbleClass="hidden border-emerald-200 bg-emerald-50 text-emerald-900 sm:block dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" className="-right-1 -top-11 sm:-right-5 sm:-top-14" />
-      <HeroMate bot="mika" pose="work" bubble="Drafting a first message 💌" dots flip ring="ring-rose-300 dark:ring-rose-700" delay=".9s"
-        bubbleClass="hidden border-rose-200 bg-rose-50 text-rose-900 sm:block dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200" className="-bottom-12 -right-1 sm:-bottom-14 sm:-right-6" />
+      <HeroMate bot="mika" pose="work" bubble="Drafting a first message 💌" dots ring="ring-rose-300 dark:ring-rose-700" delay=".9s"
+        bubbleClass="hidden border-rose-200 bg-rose-50 text-rose-900 sm:block dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200" className="-bottom-12 -left-1 sm:-bottom-14 sm:-left-7" />
+      {/* The desktop app, in a browser window */}
       <div style={{ animationDelay: ".25s" }}
         className="dis-hero-in overflow-hidden rounded-2xl border border-neutral-200/80 bg-white shadow-[0_30px_80px_-30px_rgba(6,78,59,0.35)] dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="flex items-center gap-1.5 border-b border-neutral-200/80 bg-neutral-100 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-800/60">
+          <span className="h-2.5 w-2.5 rounded-full bg-[#FF5F57]" /><span className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E]" /><span className="h-2.5 w-2.5 rounded-full bg-[#28C840]" />
+          <span className="mx-auto flex h-6 min-w-0 max-w-[60%] flex-1 items-center justify-center gap-1 truncate rounded-md bg-white px-3 text-[10.5px] text-neutral-500 dark:bg-neutral-900">
+            <Lock className="h-2.5 w-2.5 shrink-0" />dealinsec.com/outbound
+          </span>
+          <span className="w-10" />
+        </div>
         {/* The app's top bar, as it is */}
-        <div className="dis-topnav flex h-11 items-center gap-1 px-3 text-white">
+        <div className="dis-topnav flex h-11 items-center gap-1 overflow-hidden px-3 text-white">
           <span className="mr-2 flex shrink-0 items-center gap-1.5"><DealinsecMark size={18} /><DealinsecWordmark size={12} tone="inverse" className="hidden sm:inline" /></span>
+          {/* As many tabs as fit: four on a phone, five from sm, all eight on the widest screens. */}
           {HERO_TABS.map((t, i) => (
-            <span key={t} className={cn("whitespace-nowrap rounded-full px-2 py-1 text-[10.5px] font-semibold", t === "Radar" ? "bg-white/15 text-white" : "text-white/70", i > 4 && "hidden md:inline", i > 3 && "hidden sm:inline")}>{t}</span>
+            <span key={t} className={cn("whitespace-nowrap rounded-full px-2 py-1 text-[10.5px] font-semibold", t === "Radar" ? "bg-white/15 text-white" : "text-white/70", i === 4 ? "hidden sm:inline" : i > 4 ? "hidden 2xl:inline" : "")}>{t}</span>
           ))}
         </div>
-        <div className="pointer-events-none select-none space-y-3 bg-neutral-50/60 p-4 sm:p-5 dark:bg-neutral-950/40" {...{ inert: "" }}>
+        {/* A window onto the page: the top of the screen, fading out where the phone sits in front of it. */}
+        <div className="pointer-events-none relative max-h-[330px] select-none space-y-3 overflow-hidden bg-neutral-50/60 p-4 sm:max-h-[400px] sm:p-5 dark:bg-neutral-950/40" {...{ inert: "" }}>
           <div>
             <p className="text-lg font-bold tracking-tight">Client Radar <span aria-hidden>🔎</span></p>
             <p className="text-xs text-neutral-500">Logistics companies in Pune and Mumbai · 20–200 people</p>
           </div>
           <p className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-neutral-600 dark:text-neutral-400"><b className="text-neutral-900 dark:text-neutral-100">25</b> discovered<b className="text-neutral-900 dark:text-neutral-100">11</b> match your client profile<b className="text-neutral-900 dark:text-neutral-100">3</b> ready for outreach</p>
           <ProspectCard p={HERO_PROSPECT} onOpen={noop} onAdd={noop} adding={false} canEdit />
+          <span className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent dark:from-neutral-900" />
         </div>
       </div>
+      <PhoneNest />
     </div>
   );
 }
@@ -161,7 +233,7 @@ export function HeroSection({ isAuthenticated, onPrimary }: { isAuthenticated: b
         </div>
         <div className="relative min-w-0 lg:pl-4">
           <HeroProduct />
-          <p className="mt-20 text-center text-[11px] text-neutral-400">The real Client Radar screen, with example data.</p>
+          <p className="mt-20 text-left text-[11px] text-neutral-400 sm:pr-48">Real DealInSec screens (Client Radar and The Nest), with example data.</p>
         </div>
       </div>
     </section>
