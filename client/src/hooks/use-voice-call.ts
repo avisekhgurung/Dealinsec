@@ -21,6 +21,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { isPhoneDevice, pickGentlemanVoice, speakable, splitSentences } from "@shared/voice";
 import { createNeuralSpeaker } from "@shared/neural-speech";
 import { createBrowserNeuralDeps, neuralVoiceAvailable, setAudioSession } from "@/lib/neural-voice";
+import { canRecord, createListenerContext, openServerListener, sttAvailable, type ServerListener } from "@/lib/server-listener";
 import { completedPrefix, createStreamSpeaker } from "@shared/stream-speech";
 import { endpointDelay, type Patience } from "@shared/voice-call";
 import { speedCommand, speedKey, stepSpeed } from "@shared/voice-speed";
@@ -43,7 +44,8 @@ const IDLE_MS = 30_000;
 const Recognition = (): (new () => any) | null =>
   typeof window === "undefined" ? null : (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition || null;
 
-export const voiceCallSupported = (): boolean => !!Recognition() && typeof window !== "undefined" && "speechSynthesis" in window;
+/** A call needs speech out, and a way to hear: our own recording (Sarvam speech to text) or the browser's recogniser. */
+export const voiceCallSupported = (): boolean => (!!Recognition() || canRecord()) && typeof window !== "undefined" && "speechSynthesis" in window;
 
 const isIOS = () => typeof navigator !== "undefined" && /iP(hone|ad|od)/.test(navigator.userAgent);
 /** On a phone, an open microphone or a running recogniser silences or ducks the assistant's voice: it listens only between turns there. */
@@ -83,6 +85,8 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
   const speakingNow = useRef(false);
   const speakingText = useRef("");
   const meter = useRef<{ stream: MediaStream; ctx: AudioContext; raf: number } | null>(null);
+  // Our own recording + Sarvam speech to text, when the server has it (else the browser's recogniser above).
+  const listener = useRef<ServerListener | null>(null);
   const wake = useRef<any>(null);
   const dispatchRef = useRef<(e: CallEvent) => void>(() => {});
   // The neural voice, when the server has one: sentences fetched ahead and played; the browser's voice covers any that fail.
@@ -207,23 +211,25 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     window.clearTimeout(idleT.current);
     idleT.current = window.setTimeout(() => dispatchRef.current({ type: "idle_timeout" }), IDLE_MS);
   };
+  /** The person's turn, finished: a speed request ("speak faster", "dheere bolo") is applied, then it is answered. */
+  const deliver = (t: string) => {
+    if (!isUtterance(t)) return;
+    transcript.current = "";
+    const cmd = speedCommand(t);
+    if (cmd) applySpeed(stepSpeed(speedRef.current, cmd));
+    dispatchRef.current({ type: "utterance", text: t });
+  };
   const armEndpoint = () => {
     window.clearTimeout(endpointT.current);
     // A pause after an unfinished thought ("…and", "…matlab", "um") waits longer, so thinking doesn't cut a question in half.
-    endpointT.current = window.setTimeout(() => {
-      const t = transcript.current;
-      if (!isUtterance(t)) return;
-      transcript.current = "";
-      const cmd = speedCommand(t);
-      if (cmd) applySpeed(stepSpeed(speedRef.current, cmd));
-      dispatchRef.current({ type: "utterance", text: t });
-    }, endpointDelay(transcript.current, patienceRef.current));
+    endpointT.current = window.setTimeout(() => deliver(transcript.current), endpointDelay(transcript.current, patienceRef.current));
   };
 
   const stopRecognition = () => {
     wantListen.current = false;
     window.clearTimeout(endpointT.current);
     window.clearTimeout(idleT.current);
+    listener.current?.pause();
     const r = rec.current;
     rec.current = null;
     try { r?.abort(); } catch { /* already stopped */ }
@@ -237,11 +243,17 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
   };
 
   /** Listening while the assistant speaks, so the person can cut in. */
-  const listenWhileSpeaking = () => { if (onPhone()) return; if (bargeRef.current && !stateRef.current.muted) startRecognition(); };
+  const listenWhileSpeaking = () => {
+    if (onPhone()) return;
+    const on = bargeRef.current && !stateRef.current.muted;
+    if (listener.current) { listener.current.watchBargeIn(on && stateRef.current.phase === "speaking"); return; }
+    if (on) startRecognition();
+  };
 
   const startRecognition = () => {
     setAudioSession("auto");   // the microphone needs the recording route; speaking switches back to the loudspeaker
     if (dead.current || stateRef.current.muted) return;
+    if (listener.current) { transcript.current = ""; listener.current.listen(); armIdle(); return; }
     const Ctor = Recognition();
     if (!Ctor) { dispatchRef.current({ type: "error", code: "unsupported" }); return; }
     wantListen.current = true;
@@ -435,11 +447,38 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     const audio = createBrowserNeuralDeps(o.voice ?? "agent");
     audio.unlock();
     warmUpSpeech();
+    const micCtx = createListenerContext();
     (async () => {
       if (!voiceCallSupported()) { audio.dispose(); dispatchRef.current({ type: "error", code: "unsupported" }); return; }
-      const m = await startMeter();
-      if (dead.current) return;
-      if (m === "blocked") { dispatchRef.current({ type: "error", code: "mic_blocked" }); return; }
+      // Hearing: our own recording through Sarvam when the server has it, else the browser's recogniser and level meter.
+      if (micCtx && await sttAvailable()) {
+        if (dead.current) return;
+        const l = await openServerListener(micCtx, {
+          holdMic: !(isIOS() || onPhone()),
+          patience: () => patienceRef.current,
+          onSpeech: () => { armIdle(); if (!stateRef.current.interim) dispatchRef.current({ type: "interim", text: "…" }); },
+          onInterim: (t) => { transcript.current = t; armIdle(); dispatchRef.current({ type: "interim", text: t }); },
+          onUtterance: (t) => { window.clearTimeout(idleT.current); deliver(t); },
+          onBargeIn: () => { if (stateRef.current.phase === "speaking") dispatchRef.current({ type: "interrupt" }); },
+          onBlocked: () => dispatchRef.current({ type: "error", code: "mic_blocked" }),
+          // Transcription keeps failing: back to the browser's recogniser for the rest of the call, if there is one.
+          onFailed: () => {
+            if (!Recognition()) { listener.current?.listen(); return; }
+            listener.current?.dispose(); listener.current = null;
+            if (stateRef.current.phase === "listening" && !stateRef.current.muted) startRecognition();
+          },
+        });
+        if (dead.current) { if (typeof l !== "string") l.dispose(); return; }
+        if (l === "blocked") { dispatchRef.current({ type: "error", code: "mic_blocked" }); return; }
+        if (l !== "unsupported") listener.current = l;
+      }
+      if (!listener.current) {
+        void micCtx?.close().catch(() => {});
+        if (!Recognition()) { audio.dispose(); dispatchRef.current({ type: "error", code: "unsupported" }); return; }
+        const m = await startMeter();
+        if (dead.current) return;
+        if (m === "blocked") { dispatchRef.current({ type: "error", code: "mic_blocked" }); return; }
+      }
       try { wake.current = await (navigator as any).wakeLock?.request?.("screen"); } catch { /* the screen may dim; fine */ }
       // Voices load lazily in some browsers: nudge the list before the first word.
       try { window.speechSynthesis.getVoices(); } catch { /* none */ }
@@ -456,10 +495,15 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
       dispatchRef.current({ type: "started", greeting: o.greeting });
     })();
     tick = window.setInterval(() => { if (stateRef.current.phase !== "ended") setSeconds((s) => s + 1); }, 1000);
+    // The orb follows the recording's level when we record ourselves.
+    const levelT = window.setInterval(() => { if (listener.current) setLevel(listener.current.level()); }, 80);
     return () => {
       dead.current = true;
       window.clearInterval(tick);
+      window.clearInterval(levelT);
       stopRecognition();
+      listener.current?.dispose(); listener.current = null;
+      void micCtx?.close().catch(() => {});
       cancelSpeech();
       audio.dispose();
       stopMeter();
@@ -470,7 +514,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
   }, []);
 
   // Muting also silences the microphone track itself, so the browser's indicator reflects it.
-  useEffect(() => { meter.current?.stream.getAudioTracks().forEach((t) => { t.enabled = !state.muted; }); }, [state.muted]);
+  useEffect(() => { meter.current?.stream.getAudioTracks().forEach((t) => { t.enabled = !state.muted; }); listener.current?.setMuted(state.muted); }, [state.muted]);
 
   // The call is over once its phase says so and any last words (the goodbye) have been spoken.
   useEffect(() => {

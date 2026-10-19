@@ -208,3 +208,16 @@ each coworker's pitch and pace) when neither is set up. Optional: `SARVAM_TTS_MO
 Hinglish), Mika is Zarina (`zarina_en_conversation`, `bulbul:v4-flash`, `en-IN`), Zee is Ratan
 (`ratan_hi_latenight_warm`, `bulbul:v4-flash`, `hi-IN`)),
 `VOICE_PROVIDER=openai` to force OpenAI. The same per-workspace daily character cap (`VOICE_DAILY_CHARS`) applies.
+
+Hearing (`server/voice/stt.ts`, `POST /api/voice/transcribe`; client `lib/server-listener.ts`): with `SARVAM_API_KEY`
+set, a call records the microphone itself (echo cancellation, noise suppression, auto gain, then a boost and a
+compressor, so a quiet voice is still heard) and Sarvam **saaras:v4** turns each turn into words (Indian English,
+Hindi, Hinglish; language auto-detected; product words like Nibo, GST and Razorpay passed as key terms). Turn-taking is
+`shared/turn-detector.ts`: the room's noise is measured when the mic opens, and at each pause what was said so far is
+transcribed and `endpointDelay` decides from the words whether to wait longer ("…and", "…matlab", "um"), so a thinking
+pause doesn't end the turn. On phones the mic is opened per turn and released while the assistant speaks (an open mic
+quiets the voice there); on desktop it stays open, feeds the orb, and sustained speech interrupts the assistant (when
+interrupting by voice is on). Without the key, after two failed transcriptions in a row, or in a browser that can't
+record, the call uses the browser's recogniser as before. Nothing logs the audio or the words. Optional:
+`SARVAM_STT_MODEL` (default `saaras:v4`), `SARVAM_STT_LANGUAGE` (default `unknown` = auto), `VOICE_STT_PER_MINUTE`
+(per person, default 90), `VOICE_STT_DAILY_KB` (per workspace, default 60000 KB of audio a day).
