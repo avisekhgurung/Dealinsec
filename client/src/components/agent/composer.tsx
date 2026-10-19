@@ -86,7 +86,7 @@ export function Composer({
   }), []);
   const submit = () => {
     if (running || disabled || pending) return;
-    if (voice.listening) voice.stop();
+    if (voice.listening) voice.cancel();   // what's in the box is what's sent; no late words land after it
     sentFrom.current = draftFor;
     submitter.submit(text);
   };
@@ -118,7 +118,7 @@ export function Composer({
       />
       {voiceLang && voice.supported && !running && (
         <button type="button" onClick={toggleVoice} disabled={disabled} aria-label={voice.listening ? "Stop dictating" : "Dictate a message"} aria-pressed={voice.listening} data-testid="agent-mic"
-          title={voice.error ?? "Dictate. Your browser's speech service may process the audio."}
+          title={voice.error ?? (voice.provider === "sarvam" ? "Dictate. Sarvam AI turns your words into text; the recording isn't kept." : "Dictate. Your browser's speech service may process the audio.")}
           className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition", voice.listening ? "animate-pulse border-rose-400 bg-rose-50 text-rose-600 dark:bg-rose-950/40" : "border-border text-foreground/70 hover:bg-muted/60")}>
           <Mic className="h-[18px] w-[18px]" />
         </button>

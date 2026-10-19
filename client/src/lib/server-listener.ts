@@ -59,7 +59,8 @@ export function createListenerContext(): AudioContext | null {
   } catch { return null; }
 }
 
-async function transcribeClip(blob: Blob, signal: AbortSignal): Promise<string | null> {
+/** One clip to words through our server (Sarvam); null when it failed. */
+export async function transcribeClip(blob: Blob, signal: AbortSignal): Promise<string | null> {
   try {
     const r = await fetch("/api/voice/transcribe", { method: "POST", credentials: "include", headers: { "Content-Type": blob.type.split(";")[0] || "audio/webm" }, body: blob, signal });
     if (!r.ok) return null;
@@ -68,13 +69,32 @@ async function transcribeClip(blob: Blob, signal: AbortSignal): Promise<string |
   } catch { return null; }
 }
 
-const openStream = async (): Promise<MediaStream | "blocked" | "failed"> => {
+export const openStream = async (): Promise<MediaStream | "blocked" | "failed"> => {
   try {
     return await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
   } catch (e: any) {
     return e?.name === "NotAllowedError" || e?.name === "SecurityError" ? "blocked" : "failed";
   }
 };
+
+/** The microphone's path to the recorder: a boost, then a compressor so the boost never clips; the analyser reads the level. */
+export function micGraph(ctx: AudioContext) {
+  const gain = ctx.createGain(); gain.gain.value = MIC_BOOST;
+  const comp = ctx.createDynamicsCompressor();
+  comp.threshold.value = -26; comp.knee.value = 10; comp.ratio.value = 3; comp.attack.value = 0.005; comp.release.value = 0.2;
+  const analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
+  const dest = ctx.createMediaStreamDestination();
+  gain.connect(comp).connect(dest);
+  comp.connect(analyser);
+  return { gain, comp, analyser, dest };
+}
+
+/** RMS level (0–1) of what the analyser hears now. */
+export function readLevel(analyser: AnalyserNode, buf: Float32Array): number {
+  analyser.getFloatTimeDomainData(buf as any);
+  let sum = 0; for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+  return Math.sqrt(sum / buf.length);
+}
 
 export async function openServerListener(ctx: AudioContext, o: {
   holdMic: boolean;
@@ -94,13 +114,7 @@ export async function openServerListener(ctx: AudioContext, o: {
   if (first === "failed") return "unsupported";
 
   // One graph for the call: mic → boost → compressor → recorder (and the level meter).
-  const gain = ctx.createGain(); gain.gain.value = MIC_BOOST;
-  const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -26; comp.knee.value = 10; comp.ratio.value = 3; comp.attack.value = 0.005; comp.release.value = 0.2;
-  const analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
-  const dest = ctx.createMediaStreamDestination();
-  gain.connect(comp).connect(dest);
-  comp.connect(analyser);
+  const { gain, comp, analyser, dest } = micGraph(ctx);
   const buf = new Float32Array(analyser.fftSize);
 
   let mic: { stream: MediaStream; src: MediaStreamAudioSourceNode } | null = null;
@@ -232,11 +246,9 @@ export async function openServerListener(ctx: AudioContext, o: {
   const tick = window.setInterval(() => {
     if (disposed) return;
     if (!mic || muted) { rms = 0; return; }
-    analyser.getFloatTimeDomainData(buf as any);
-    let sum = 0; for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
-    rms = Math.sqrt(sum / buf.length);
+    rms = readLevel(analyser, buf);
     if (!calibrateUntil) calibrateUntil = Date.now() + CALIBRATE_MS;
-    if (calib && Date.now() < calibrateUntil) { calib.push(rms); return; }
+    if (Date.now() < calibrateUntil) { calib.push(rms); return; }
     if (calib.length) { noise = calibrateNoise(calib); calib.length = 0; if (!ts.started) ts = { ...ts, noise }; }
     if (barge && !active) {
       if (rms > Math.max(0.03, noise * 5)) { bargeLoud += TICK_MS; if (bargeLoud >= BARGE_MS) { barge = false; bargeLoud = 0; o.onBargeIn(); } }

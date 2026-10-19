@@ -195,7 +195,9 @@ While a coworker works, the halo around the mascot animates (`league-halo` in in
 - **Voice calls with Nibo, Mika and Zee:** "Talk" in a coworker's chat opens the same tested call as Agent mode's,
   with their character in place of the orb, their greeting, their voice, and a spoken style that keeps them
   themselves (`coworkerVoiceStyle` in server/ai-league/chat.ts; the chat route takes `channel: "voice"`).
-- **Dictation:** the coworker chats have the same microphone as Agent mode (the browser's speech recognition).
+- **Dictation:** the coworker chats have the same microphone as Agent mode: Sarvam speech to text through the boosted
+  mic when the server has it (`lib/dictation.ts`; the box fills in every couple of seconds, stops on a tap or after
+  6 s of silence, long dictations recorded in 25 s pieces), else the browser's speech recognition.
 - **Chirps** (`lib/chirps.ts`, played by `lib/chirp-player.ts`): each coworker's own short, original sounds when a chat
   opens, a task starts, work is really finished, or something waits for approval. One switch in The Nest, off until
   turned on (`dis_nest_sound`).
