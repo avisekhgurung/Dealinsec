@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { completedPrefix, createStreamSpeaker } from "./stream-speech";
+import { completedPrefix, createStreamSpeaker, speakUpTo } from "./stream-speech";
 import { VoiceFetchError, type NeuralDeps } from "./neural-speech";
 
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
@@ -91,5 +91,23 @@ describe("completedPrefix", () => {
     expect(completedPrefix("Done! Next one? Still typ")).toBe("Done! Next one?");
     expect(completedPrefix("No end yet")).toBe("");
     expect(completedPrefix("Ends here.")).toBe("");   // the last sentence may still grow ("Ends here.com")
+  });
+});
+
+describe("speakUpTo", () => {
+  it("goes to the last finished sentence, Hindi's danda included", () => {
+    expect(speakUpTo("Hello there. How are", "")).toBe("Hello there.");
+    expect(speakUpTo("Aaj teen invoice due hain। Kal", "")).toBe("Aaj teen invoice due hain।");
+    expect(speakUpTo("Hello there. How are you? Fine", "Hello there.")).toBe("Hello there. How are you?");
+  });
+  it("in a long sentence with no end yet, goes to its last clause break; a short one waits", () => {
+    const long = "You have three invoices due this week, the biggest is for Sharma Traders at forty thousand rupees, and the other two are";
+    const upTo = speakUpTo(long, "");
+    expect(upTo).toBe("You have three invoices due this week, the biggest is for Sharma Traders at forty thousand rupees,");
+    expect(speakUpTo("Okay, so the thing is", "")).toBe("");
+    expect(speakUpTo(long, upTo)).toBe(upTo);   // nothing new until more arrives
+  });
+  it("nothing when the text no longer starts with what was taken (a new model step)", () => {
+    expect(speakUpTo("Here is the answer. More", "Let me check.")).toBe("Let me check.");
   });
 });

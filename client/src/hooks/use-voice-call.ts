@@ -22,7 +22,7 @@ import { isPhoneDevice, pickGentlemanVoice, speakable, splitSentences } from "@s
 import { createNeuralSpeaker } from "@shared/neural-speech";
 import { createBrowserNeuralDeps, neuralVoiceAvailable, setAudioSession } from "@/lib/neural-voice";
 import { canRecord, createListenerContext, openServerListener, sttAvailable, type ServerListener } from "@/lib/server-listener";
-import { completedPrefix, createStreamSpeaker } from "@shared/stream-speech";
+import { createStreamSpeaker, speakUpTo } from "@shared/stream-speech";
 import { endpointDelay, type Patience } from "@shared/voice-call";
 import { speedCommand, speedKey, stepSpeed } from "@shared/voice-speed";
 import type { NeuralDeps } from "@shared/neural-speech";
@@ -106,7 +106,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
   }, [voiceKey]);
 
   // ── this turn's reply, spoken while it is written (and a filler first) ──────────────────────────────
-  const turn = useRef<{ stream: ReturnType<typeof createStreamSpeaker>; consumed: string; fillerT?: number } | null>(null);
+  const turn = useRef<{ stream: ReturnType<typeof createStreamSpeaker>; consumed: string; step: number; fillerT?: number } | null>(null);
   const fillers = useRef<Blob[]>([]);
   const [early, setEarly] = useState(false);
 
@@ -148,7 +148,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     cancelTurn();
     const say = browserSayer();
     const stream = createStreamSpeaker(neural.current?.audio.deps ?? NO_NEURAL, { neural: () => !!neural.current && !neural.current.speaker.disabled, fallback: say });
-    const t: NonNullable<typeof turn.current> = { stream, consumed: "" };
+    const t: NonNullable<typeof turn.current> = { stream, consumed: "", step: -1 };
     turn.current = t;
     t.fillerT = window.setTimeout(() => {
       if (turn.current !== t || stateRef.current.phase !== "thinking" || stream.pushed > 0) return;
@@ -397,19 +397,22 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     else dispatchRef.current({ type: "reply_empty" });
   }, [running, messages]);
 
-  // The reply as it is written: each finished sentence is spoken straight away (the rest when the run ends).
-  const { live } = o.agent;
+  // The reply as it is written: each finished sentence (or, in a long sentence, each clause) is spoken straight away,
+  // so the voice keeps pace with the text; the rest when the run ends.
+  const { live, liveStep } = o.agent;
   useEffect(() => {
     const t = turn.current;
     if (!t || stateRef.current.phase !== "thinking" || !live) return;
-    const done = completedPrefix(speakable(live, SPOKEN_MAX));
-    if (done.length <= t.consumed.length || !done.startsWith(t.consumed)) return;
-    const fresh = done.slice(t.consumed.length);
-    t.consumed = done;
+    // A new model step: the text before it ("Let me check…") was a preamble before a tool, already spoken; follow the new one.
+    if (liveStep !== t.step) { t.step = liveStep; t.consumed = ""; }
+    const upTo = speakUpTo(speakable(live, SPOKEN_MAX), t.consumed);
+    if (upTo.length <= t.consumed.length) return;
+    const fresh = upTo.slice(t.consumed.length);
+    t.consumed = upTo;
     window.clearTimeout(t.fillerT);
     for (const p of splitSentences(fresh)) t.stream.push(p);
     speakingNow.current = true; setAudioSession("playback"); setEarly(true);
-  }, [live]);
+  }, [live, liveStep]);
 
   // An action approved or declined, by voice or by a tap on the card: say how it went.
   const { approvals } = o.agent;

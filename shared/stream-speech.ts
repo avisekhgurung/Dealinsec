@@ -113,6 +113,28 @@ export function createStreamSpeaker(deps: NeuralDeps, o: { neural: () => boolean
 
 /** The finished sentences in text that is still arriving: everything up to the last sentence end followed by a space. */
 export function completedPrefix(text: string): string {
-  const m = text.match(/^[\s\S]*[.!?…]["')\]]*(?=\s)/);
+  const m = text.match(/^[\s\S]*[.!?…।]["')\]]*(?=\s)/);
   return m ? m[0] : "";
+}
+
+/** A sentence this long with no end yet is spoken up to a clause break, so a long opening sentence doesn't hold the voice back. */
+const LONG_RUN = 110;
+const MIN_CLAUSE = 35;
+
+/**
+ * How far into text that is still arriving the voice can go, given what it has already taken (`consumed`, a prefix of
+ * `text`): to the last finished sentence, or, in a long run without one, to its last clause break (", " "; " ": " " — ").
+ * Returns `consumed` itself when nothing new is ready.
+ */
+export function speakUpTo(text: string, consumed: string): string {
+  if (!text.startsWith(consumed)) return consumed;
+  const done = completedPrefix(text);
+  if (done.length > consumed.length) return done;
+  const rest = text.slice(consumed.length);
+  if (rest.length < LONG_RUN) return consumed;
+  let cut = -1;
+  const re = /[,;:]\s|\s[—–-]\s/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(rest))) if (m.index >= MIN_CLAUSE) cut = m.index + 1;
+  return cut > 0 ? consumed + rest.slice(0, cut) : consumed;
 }

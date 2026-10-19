@@ -31,7 +31,8 @@ user (web today; voice / email later)
 
 ## Streaming replies, pinned and renamed conversations
 
-- **Word by word (web chat only):** the provider streams when given `onText` (server/copilot/provider.ts
+- **Word by word (web chat and voice calls; not email):** a voice call speaks each sentence, or each clause of a long
+  one, as soon as it is written (shared/stream-speech.ts `speakUpTo`). The provider streams when given `onText` (server/copilot/provider.ts
   `readChatStream`); the loop batches the pieces (~40 ms) into `agent.text_delta` events `{ step, text }`. A step that
   goes on to call tools was a preamble: the browser drops it when the next step's text starts. The final
   `agent.message` is always the saved, authoritative reply. A streamed call is never retried once text was shown. If a

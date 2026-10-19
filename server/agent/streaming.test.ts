@@ -52,11 +52,20 @@ describe("the loop streams the reply", () => {
     expect(r.reply).toBe("One invoice is overdue.");
   });
 
-  it("a voice call isn't streamed (it speaks whole replies)", async () => {
+  it("a voice call streams too, so each sentence can be spoken as soon as it is written", async () => {
+    const provider = new FakeProvider([async (_m, opts) => { opts?.onText?.("First bit. "); opts?.onText?.("Second bit."); return { content: "First bit. Second bit.", toolCalls: [], usage }; }]);
+    const ev = collect();
+    await runAgent(base(provider).deps, input("voice"), ev.emit);
+    expect(deltas(ev).map((d) => d.text).join("")).toBe("First bit. Second bit.");
+    const types = ev.events.map((e) => e.type);
+    expect(types.lastIndexOf("agent.text_delta")).toBeLessThan(types.indexOf("agent.message"));
+  });
+
+  it("email isn't streamed (nobody reads it live)", async () => {
     let got: unknown = "unset";
     const provider = new FakeProvider([async (_m, opts) => { got = opts?.onText; return { content: "Fine.", toolCalls: [], usage }; }]);
     const ev = collect();
-    await runAgent(base(provider).deps, input("voice"), ev.emit);
+    await runAgent(base(provider).deps, { ...input(), channel: "email" as const }, ev.emit);
     expect(got).toBeUndefined();
     expect(deltas(ev)).toEqual([]);
   });

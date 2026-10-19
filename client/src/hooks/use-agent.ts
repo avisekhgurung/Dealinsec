@@ -103,17 +103,20 @@ export function useAgent(opts: UseAgentOptions = {}) {
   // doesn't re-render the thread for every piece. A timer, not requestAnimationFrame: frames stop in a tab that isn't
   // being painted, and the text must still be current when the person looks back. The final agent.message replaces it.
   const [live, setLive] = useState("");
+  /** The model step `live` belongs to: a new step (after a tool) starts its text over (a voice call follows this). */
+  const [liveStep, setLiveStep] = useState(-1);
   const liveRef = useRef({ step: -1, text: "" });
   const liveFrame = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showLive = () => {
     if (liveFrame.current) return;
-    liveFrame.current = setTimeout(() => { liveFrame.current = null; setLive(liveRef.current.text); }, LIVE_RENDER_MS);
+    liveFrame.current = setTimeout(() => { liveFrame.current = null; setLive(liveRef.current.text); setLiveStep(liveRef.current.step); }, LIVE_RENDER_MS);
   };
   const clearLive = () => {
     if (liveFrame.current) clearTimeout(liveFrame.current);
     liveFrame.current = null;
     liveRef.current = { step: -1, text: "" };
     setLive("");
+    setLiveStep(-1);
   };
 
   const abortRef = useRef<AbortController | null>(null);
@@ -370,5 +373,5 @@ export function useAgent(opts: UseAgentOptions = {}) {
 
   useEffect(() => () => { abortRef.current?.abort(); if (liveFrame.current) clearTimeout(liveFrame.current); }, []);
 
-  return { sessionId, messages, approvals, running, steps, live, loading, send, stop, retry, approve, reject, reset, setChannel };
+  return { sessionId, messages, approvals, running, steps, live, liveStep, loading, send, stop, retry, approve, reject, reset, setChannel };
 }

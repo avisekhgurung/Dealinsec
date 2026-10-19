@@ -112,14 +112,15 @@ export async function runAgent(
 
   // The reply, streamed: the model's text arrives in pieces, batched (~40 ms) into agent.text_delta events tagged with
   // the model step. A step that goes on to call tools was a preamble; the browser drops it when the next step's text
-  // starts, and the final agent.message replaces whatever was streamed. Web only (a voice call speaks whole replies).
+  // starts, and the final agent.message replaces whatever was streamed. A voice call streams too: it speaks each
+  // sentence as soon as it is written, so the voice keeps pace with the text. (Email has no live reader.)
   let live = "", pending = "", liveStep = 0;
   let flushTimer: ReturnType<typeof setTimeout> | null = null;
   const flushText = () => {
     if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
     if (pending) { emit("agent.text_delta", { step: liveStep, text: pending }); pending = ""; }
   };
-  const onText = input.channel === "web" ? (d: string) => {
+  const onText = input.channel === "web" || input.channel === "voice" ? (d: string) => {
     live += d;
     pending += d;
     if (!flushTimer) flushTimer = setTimeout(flushText, TEXT_FLUSH_MS);
