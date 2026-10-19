@@ -4,7 +4,8 @@
  *   GET  /api/voice/status   { neural: boolean }: whether the call should use the neural voice
  *   POST /api/voice/speak    { text } -> audio/mpeg: one sentence, spoken
  *
- * Without OPENAI_API_KEY, status says neural:false and the call keeps using the browser's voice.
+ * POST /api/voice/speak also takes { voice: "agent" | "nibo" | "mika" | "zee" } (shared/voice-profiles.ts).
+ * Without SARVAM_API_KEY or OPENAI_API_KEY, status says neural:false and the browser's voice is used.
  * Any failure answers a JSON error and the call speaks that sentence with the browser's voice,
  * so a call never goes silent.
  */
@@ -12,7 +13,8 @@ import type { Express, Request, Response } from "express";
 import { isAuthenticated } from "../auth";
 import { agentLog } from "../agent/log";
 import { createVoiceBudget } from "./budget";
-import { prepareSpeech, synthesize, ttsConfigured } from "./tts";
+import { prepareSpeech, synthesize, ttsConfigured, ttsProvider } from "./tts";
+import { isVoiceKey } from "@shared/voice-profiles";
 
 const intEnv = (k: string, d: number) => { const n = Number(process.env[k]); return Number.isInteger(n) && n > 0 ? n : d; };
 // 50,000 characters is about 55 minutes of speech a day per workspace; at OpenAI's list price that is under a dollar.
@@ -25,7 +27,7 @@ export function registerVoiceRoutes(app: Express) {
   };
 
   app.get("/api/voice/status", isAuthenticated, gate, (req: any, res: Response) => {
-    res.json({ neural: ttsConfigured(), remainingChars: ttsConfigured() ? budget.remaining(req.user.organizationId) : 0 });
+    res.json({ neural: ttsConfigured(), provider: ttsProvider(), remainingChars: ttsConfigured() ? budget.remaining(req.user.organizationId) : 0 });
   });
 
   app.post("/api/voice/speak", isAuthenticated, gate, async (req: any, res: Response) => {
@@ -35,7 +37,9 @@ export function registerVoiceRoutes(app: Express) {
       if (!text) return res.status(400).json({ code: "empty", error: "There's nothing to say." });
       if (!budget.allowRate(String(req.user.id))) return res.status(429).json({ code: "rate_limited", error: "Too many requests. The browser voice will be used." });
       if (!budget.reserve(req.user.organizationId, text.length)) return res.status(429).json({ code: "daily_cap", error: "Today's neural voice allowance is used up. The browser voice will be used." });
-      const r = await synthesize(text);
+      // Whose voice: Agent mode's by default, or a coworker's (only the four known names; anything else is Agent mode).
+      const voice = isVoiceKey(req.body?.voice) ? req.body.voice : "agent";
+      const r = await synthesize(text, { voice });
       if (!r.ok) {
         budget.refund(req.user.organizationId, text.length);
         agentLog("error", { errorType: r.code, where: "voice_speak" }); // never the text

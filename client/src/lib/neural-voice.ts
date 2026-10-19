@@ -1,5 +1,6 @@
 /** The browser side of the neural voice: our own /api/voice routes, and one reusable audio element. */
 import { VoiceFetchError, type NeuralDeps } from "@shared/neural-speech";
+import type { VoiceKey } from "@shared/voice-profiles";
 
 /** A silent 0.1 s WAV, played once inside the call's start so the browser allows later sounds (iOS/Safari autoplay rule). */
 const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAABErAAABAAgAZGF0YQAAAAA=";
@@ -13,7 +14,8 @@ export async function neuralVoiceAvailable(): Promise<boolean> {
   } catch { return false; }
 }
 
-export function createBrowserNeuralDeps(): { deps: NeuralDeps; unlock: () => void; dispose: () => void } {
+/** `voice`: whose voice the server speaks in (Agent mode's by default, or a coworker's). */
+export function createBrowserNeuralDeps(voice: VoiceKey = "agent"): { deps: NeuralDeps; unlock: () => void; dispose: () => void } {
   const audio = new Audio();
   audio.preload = "auto";
   let settle: { resolve: () => void; reject: (e: Error) => void } | null = null;
@@ -21,7 +23,7 @@ export function createBrowserNeuralDeps(): { deps: NeuralDeps; unlock: () => voi
   audio.onerror = () => { const s = settle; settle = null; s?.reject(new Error("audio error")); };
   const deps: NeuralDeps = {
     async fetchAudio(text, signal) {
-      const r = await fetch("/api/voice/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }), credentials: "include", signal });
+      const r = await fetch("/api/voice/speak", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, voice }), credentials: "include", signal });
       if (!r.ok) {
         let code = "upstream";
         try { code = (await r.json())?.code ?? code; } catch { /* not json */ }

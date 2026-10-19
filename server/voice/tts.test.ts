@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { MAX_SPOKEN_CHARS, buildRequest, prepareSpeech, synthesize, ttsConfigured, ttsVoice, type FetchFn } from "./tts";
+import { MAX_SPOKEN_CHARS, audioTypeOf, buildRequest, buildSarvamRequest, prepareSpeech, synthesize, ttsConfigured, ttsProvider, ttsVoice, type FetchFn } from "./tts";
+import { isVoiceKey, sarvamSpeaker, VOICE_KEYS, VOICE_PROFILES } from "@shared/voice-profiles";
 import { createVoiceBudget } from "./budget";
 
 const ENV = { OPENAI_API_KEY: "sk-test-SECRET-123" } as NodeJS.ProcessEnv;
@@ -68,6 +69,55 @@ describe("synthesize", () => {
     }
     const frame = new Uint8Array(300); frame.set([0xff, 0xfb]);
     expect((await synthesize("hello there", { env: ENV, fetchFn: (async () => reply(200, frame)) as FetchFn })).ok).toBe(true);
+  });
+});
+
+describe("Sarvam (bulbul): the Indian voice, first when it has a key", () => {
+  const SV = { SARVAM_API_KEY: "sv-test-SECRET-9", OPENAI_API_KEY: "sk-test-SECRET-123" } as NodeJS.ProcessEnv;
+  const sarvamReply = (bytes: Uint8Array) => reply(200, new TextEncoder().encode(JSON.stringify({ request_id: "r1", audios: [Buffer.from(bytes).toString("base64")] })));
+
+  it("picks Sarvam when it has a key, OpenAI otherwise, and honours VOICE_PROVIDER only when that provider has a key", () => {
+    expect(ttsProvider(SV)).toBe("sarvam");
+    expect(ttsProvider(ENV)).toBe("openai");
+    expect(ttsProvider({ ...SV, VOICE_PROVIDER: "openai" })).toBe("openai");
+    expect(ttsProvider({ OPENAI_API_KEY: "sk-x", VOICE_PROVIDER: "sarvam" } as any)).toBe("openai");
+    expect(ttsProvider({ SARVAM_API_KEY: " " } as any)).toBeNull();
+  });
+  it("asks bulbul for MP3 in Hinglish (hi-IN) with the coworker's speaker and pace, the key only in its header", () => {
+    const r = buildSarvamRequest("Aaj ka follow-up bhej do.", SV, "nibo");
+    const body = JSON.parse(r.body);
+    expect(r.url).toBe("https://api.sarvam.ai/text-to-speech");
+    expect(body).toMatchObject({ text: "Aaj ka follow-up bhej do.", language_code: "hi-IN", model: "bulbul:v3", speaker: VOICE_PROFILES.nibo.sarvam.speaker, pace: VOICE_PROFILES.nibo.sarvam.pace, output_audio_codec: "mp3" });
+    expect(r.headers["api-subscription-key"]).toBe("sv-test-SECRET-9");
+    expect(r.body).not.toMatch(/SECRET/);
+  });
+  it("each voice has its own speaker; an override must be a plain lowercase name", () => {
+    expect(new Set(VOICE_KEYS.map((k) => VOICE_PROFILES[k].sarvam.speaker)).size).toBe(4);
+    expect(sarvamSpeaker("zee", { SARVAM_VOICE_ZEE: "Tarun" })).toBe("tarun");
+    expect(sarvamSpeaker("zee", { SARVAM_VOICE_ZEE: "x; drop" })).toBe(VOICE_PROFILES.zee.sarvam.speaker);
+    expect(isVoiceKey("mika")).toBe(true);
+    expect(isVoiceKey("pikachu")).toBe(false);
+  });
+  it("decodes the base64 audio Sarvam returns (MP3 or WAV)", async () => {
+    const wav = new Uint8Array(300); wav.set([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45]);
+    const a = await synthesize("Namaste.", { env: { SARVAM_API_KEY: "k" } as any, voice: "mika", fetchFn: (async () => sarvamReply(mp3())) as FetchFn });
+    expect(a).toMatchObject({ ok: true, contentType: "audio/mpeg", provider: "sarvam" });
+    const b = await synthesize("Namaste.", { env: { SARVAM_API_KEY: "k" } as any, fetchFn: (async () => sarvamReply(wav)) as FetchFn });
+    expect(b).toMatchObject({ ok: true, contentType: "audio/wav" });
+    expect(audioTypeOf(new TextEncoder().encode("x".repeat(300)))).toBeNull();
+  });
+  it("a sentence Sarvam can't make is tried once with OpenAI in the same voice; without an OpenAI key it fails plainly", async () => {
+    const urls: string[] = [];
+    const r = await synthesize("Hello there.", { env: SV, voice: "zee", fetchFn: (async (u, i) => { urls.push(u); return u.includes("sarvam") ? reply(500) : reply(200); }) as FetchFn });
+    expect(r).toMatchObject({ ok: true, provider: "openai" });
+    expect(urls).toEqual(["https://api.sarvam.ai/text-to-speech", "https://api.openai.com/v1/audio/speech"]);
+    const alone = await synthesize("Hello there.", { env: { SARVAM_API_KEY: "sv-test-SECRET-9" } as any, fetchFn: (async () => reply(200, new TextEncoder().encode("{\"audios\":[]}"))) as FetchFn });
+    expect(alone).toMatchObject({ ok: false, code: "upstream" });
+    expect(JSON.stringify(alone)).not.toMatch(/SECRET/);
+  });
+  it("OpenAI uses each coworker's own voice and manner; Agent mode keeps its gentleman", () => {
+    expect(JSON.parse(buildRequest("x", ENV, "mika").body)).toMatchObject({ voice: VOICE_PROFILES.mika.openai.voice });
+    expect(JSON.parse(buildRequest("x", ENV, "agent").body).instructions).toMatch(/English gentleman/);
   });
 });
 

@@ -9,9 +9,9 @@
  * Everything on screen is read from the server: statuses from runs and approvals, progress from stored milestones,
  * reports from stored results. Nothing is sample data.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute, useSearch } from "wouter";
-import { ArrowLeft, ChevronRight, ListChecks, MessagesSquare, Play, Sparkles } from "lucide-react";
+import { ArrowLeft, ChevronRight, ListChecks, MessagesSquare, Play, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,8 @@ import { cn } from "@/lib/utils";
 import { BOTS, BOT_IDENTITY, BOT_STATUS_LABEL, isBot, isTerminal, type Bot } from "@shared/ai-league";
 import { leagueCall, leagueEndpoints, refreshLeague, runUrl, useApprovals, useLeagueStatus, useRoster, useRuns, when, type BotCard, type RunView } from "@/lib/ai-league";
 import { NEST_TEAM_IMAGE } from "@/lib/plush";
+import { playChirp, useNestSound } from "@/lib/chirp-player";
+import { useCoworkerVoice } from "@/hooks/use-coworker-voice";
 import { Mascot, MascotEmpty, mascotState } from "@/components/ai-league/mascot";
 import { RunDetail, StatusPill, runStatusLabel } from "@/components/ai-league/run-report";
 import { TaskDialog } from "@/components/ai-league/task-dialog";
@@ -96,7 +98,7 @@ function LeagueHome() {
             <p className="mt-0.5 text-sm font-medium text-foreground/80">My AI Team · Find clients. Win deals. Get paid.</p>
 
           </div>
-          <NotificationBell className="lg:hidden" />
+          <div className="flex items-center gap-1"><SoundSwitch /><NotificationBell className="lg:hidden" /></div>
         </div>
       </header>
 
@@ -163,6 +165,19 @@ function LeagueHome() {
   );
 }
 
+/** The Nest's one sound switch: coworkers read their replies aloud in their own voices, and chirp. Off until turned on. */
+function SoundSwitch({ compact = false }: { compact?: boolean }) {
+  const [on, setOn] = useNestSound();
+  const label = on ? "Sound on: coworkers speak and chirp" : "Sound off";
+  return (
+    <Button type="button" size="sm" variant="ghost" className={cn("h-9", compact ? "w-9 px-0" : "px-2.5")} aria-pressed={on} aria-label={label} title={label}
+      onClick={() => { setOn(!on); if (!on) playChirp("mika", "hello"); }} data-testid="nest-sound">
+      {on ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
+      {!compact && <span className="ml-1.5 hidden text-xs sm:inline">{on ? "Sound on" : "Sound off"}</span>}
+    </Button>
+  );
+}
+
 /** The team picture and what each coworker is for: the first thing on the Team view. */
 const WELCOME_KEY = "dis_nest_welcome_hidden";
 function NestWelcome() {
@@ -205,6 +220,15 @@ const NEST_LINE: Record<Bot, string> = {
 function CoworkerCard({ card, onTask, onOpenRun }: { card: BotCard; onTask: () => void; onOpenRun: (id: string) => void }) {
   const id = BOT_IDENTITY[card.bot];
   const state = card.lastRun && !card.activeRun && card.status === "available" && card.unread > 0 && card.lastRun.status === "completed" ? "done" : mascotState(card.status);
+  // A chirp on a real change only (never for how things already were when the page opened).
+  const prev = useRef(state);
+  useEffect(() => {
+    if (prev.current !== state) {
+      if (state === "done") playChirp(card.bot, "done");
+      else if (state === "waiting") playChirp(card.bot, "needsYou");
+    }
+    prev.current = state;
+  }, [state, card.bot]);
   return (
     <article className={cn("group relative flex flex-col gap-3 rounded-2xl border bg-card p-4 transition-colors hover:border-foreground/20 focus-within:ring-2", id.accent.ring)} data-testid={`coworker-${card.bot}`}>
       <div className={cn("pointer-events-none absolute inset-x-0 top-0 h-1 rounded-t-2xl", id.accent.bg)} aria-hidden />
@@ -295,6 +319,9 @@ function CoworkerChat({ bot }: { bot: Bot }) {
   const id = BOT_IDENTITY[bot];
   const endpoints = useMemo(() => leagueEndpoints(bot), [bot]);
   const agent = useAgent({ sessionId: bot, endpoints });
+  const [soundOn] = useNestSound();
+  const voice = useCoworkerVoice(bot, agent, soundOn);
+  useEffect(() => { playChirp(bot, "hello"); }, [bot]);
   const roster = useRoster();
   const runs = useRuns({ bot });
   const [runId, setRunId] = useRunParam();
@@ -348,12 +375,13 @@ function CoworkerChat({ bot }: { bot: Bot }) {
         <section className="flex min-h-0 min-w-0 flex-col" aria-label={`Chat with ${id.name}`}>
           <header className="flex items-center gap-3 border-b px-4 py-3">
             <Link href="/ai-league" className="lg:hidden" aria-label="Back to The Nest"><ArrowLeft className="h-5 w-5" /></Link>
-            <Mascot bot={bot} size={44} state={agent.running ? "thinking" : mascotState(card?.status)} speaking={agent.running && !!agent.live} eager />
+            <Mascot bot={bot} size={44} state={agent.running ? "thinking" : mascotState(card?.status)} speaking={(agent.running && !!agent.live) || voice.speaking} eager />
             <div className="min-w-0 flex-1">
               <h1 className="text-base font-semibold leading-tight">{id.name} <span aria-hidden>{id.emoji}</span></h1>
               <p className={cn("truncate text-xs", id.accent.fg)}>{id.role}{card && card.status !== "available" ? ` · ${BOT_STATUS_LABEL[card.status]}` : ""}</p>
             </div>
             <Button size="sm" variant="outline" className="h-9 xl:hidden" onClick={() => setTasksOpen(true)} data-testid="open-tasks"><ListChecks className="mr-1.5 h-4 w-4" />Tasks{active ? " ·1" : ""}</Button>
+            <SoundSwitch compact />
             <Button size="sm" variant="outline" className="hidden h-9 sm:inline-flex" onClick={() => setHuddle(true)} data-testid="chat-start-huddle"><MessagesSquare className="mr-1.5 h-4 w-4" />Huddle</Button>
             <Button size="sm" className={cn("hidden h-9 text-white sm:inline-flex", id.accent.bg)} onClick={() => setDialog(true)} data-testid="chat-start-task"><Play className="mr-1.5 h-3.5 w-3.5" />{bot === "zee" ? "Brief me" : "Start a task"}</Button>
           </header>

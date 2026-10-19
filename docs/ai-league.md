@@ -184,3 +184,18 @@ supplied character art: Nibo (blue, magnifier), Mika (pink, letter), Zee (green,
 opaque image, removed by a flood fill of its neutral greys (the floor shadow under the feet went with it). Rendered by
 `client/src/components/ai-league/mascot.tsx` (`srcSet`, `object-contain`, lazy except where visible on first paint).
 While a coworker works, the halo around the mascot animates (`league-halo` in index.css), never the image itself.
+
+## Voices and chirps (The Nest's sound)
+
+One switch in The Nest (page header and each chat header), off until the person turns it on (`dis_nest_sound`):
+
+- **Coworkers read their finished replies aloud** in their own voices (`shared/voice-profiles.ts`): Nibo curious and
+  quick, Mika warm, Zee calm. The plush character does its talking bob while it speaks (`hooks/use-coworker-voice.ts`).
+- **Chirps** (`lib/chirps.ts`, played by `lib/chirp-player.ts` with Web Audio): each coworker's own short, original
+  sounds when a chat opens, a task starts, work is really finished, or something waits for approval.
+
+Voice provider (`server/voice/tts.ts`): **Sarvam AI bulbul** first when `SARVAM_API_KEY` is set (Indian voices,
+code-mixed Hinglish, `hi-IN`), OpenAI as the backup for a sentence Sarvam can't make, and the browser's own voice (with
+each coworker's pitch and pace) when neither is set up. Optional: `SARVAM_TTS_MODEL` (default `bulbul:v3`),
+`SARVAM_TTS_LANGUAGE` (default `hi-IN`), `SARVAM_VOICE_AGENT|NIBO|MIKA|ZEE` to pick other bulbul speakers,
+`VOICE_PROVIDER=openai` to force OpenAI. The same per-workspace daily character cap (`VOICE_DAILY_CHARS`) applies.

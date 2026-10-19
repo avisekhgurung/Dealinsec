@@ -5,6 +5,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { playChirp } from "@/lib/chirp-player";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -55,7 +56,7 @@ export function TaskDialog({ bot, open, onOpenChange, onStarted, initialRequest,
   const [max, setMax] = useState(3);
   const start = useMutation({
     mutationFn: () => startTask(task, task === "nibo.campaign" ? campaign!.input : task === "nibo.find_clients" ? { request, saveLeads, maxLeads: max } : task === "mika.first_messages" ? { max } : task === "team.huddle" ? { topic: request, lead } : {}),
-    onSuccess: (r) => { void refreshLeague(); onOpenChange(false); onStarted(r.run); toast({ title: r.existing ? "Already running" : huddle ? "The team is talking it over" : `${id.name} is on it`, description: "Progress shows here. It keeps going if you leave this page." }); },
+    onSuccess: (r) => { void refreshLeague(); onOpenChange(false); onStarted(r.run); if (!r.existing) playChirp(huddle ? lead : bot, "start"); toast({ title: r.existing ? "Already running" : huddle ? "The team is talking it over" : `${id.name} is on it`, description: "Progress shows here. It keeps going if you leave this page." }); },
     onError: (e) => { if (isUpgradeError(parseApiError(e))) { onOpenChange(false); openUpgradeModal({ feature: "outbound" }); } else toast({ title: "Couldn't start this task", description: leadError(e), variant: "destructive" }); },
   });
   const ready = ((task !== "nibo.find_clients" && task !== "team.huddle" && task !== "nibo.campaign") || request.trim().length >= 8) && !campaign?.problem;
