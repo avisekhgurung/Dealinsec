@@ -1,11 +1,11 @@
 /**
  * Desktop top navigation — a raised, lit bar across the top of the workspace.
  *
- * Replaced the left sidebar (Sep 2026, founder's call): the product's five
- * areas — Home · Client Radar · Pipeline (Leads, Deals) · Documents
- * (Quotations, Agreements) · Money (Invoices) — sit in the bar as one-click
- * tabs, grouped by thin dividers (items, groups and active rules come from
- * @shared/nav-model, shared with the mobile bar). The account controls sit on
+ * Like the phone's bottom bar: the daily destinations (Home · The Nest · Client
+ * Radar · Leads · Deals) are icon tabs in one rounded segment with a sliding
+ * highlight, and the rest (Documents: Quotations, Agreements; Money: Invoices)
+ * sit behind "More" at the end of the same segment, which takes the open page's
+ * name and icon. Items, gating and active rules come from @shared/nav-model. The account controls sit on
  * the right — plan chip, notifications, settings, the avatar (→ profile) and a
  * Sign out button that is one click, never tucked in a menu (an earlier
  * explicit ask).
@@ -17,10 +17,11 @@
 import { motion } from "framer-motion";
 import { tSpring } from "@/lib/motion";
 import { ModeSwitcher } from "@/components/mode-switch";
-import { Fragment, useEffect, useReducer } from "react";
+import { useEffect, useReducer, useState } from "react";
 import { useLocation, Link } from "wouter";
-import { Settings, LogOut, Sparkles, Crown, Users, Zap } from "lucide-react";
+import { Settings, LogOut, Sparkles, Crown, Users, Zap, MoreHorizontal, ChevronDown } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { DealinsecMark, DealinsecWordmark } from "@/components/dealinsec-logo";
@@ -33,7 +34,8 @@ import {
   hasActiveDealBoost,
   getTrialDaysLeft,
 } from "@shared/schema";
-import { desktopNavSections, navItem } from "@/lib/nav";
+import { NAV_ICONS, desktopBarItems, desktopMoreActive, desktopMoreSections, navItem, type NavSection } from "@/lib/nav";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { usePlanPrices, formatRupees, usePlanCheckoutAvailable } from "@/hooks/use-plan-prices";
 
 /** Plan lifecycle states, resolved strictly in this order. */
@@ -44,6 +46,50 @@ type PlanState =
   | "TRIAL_ENDING"  // 1–3 days left
   | "BOOST"         // Deal Boost still running (no longer sold)
   | "FREE";
+
+/** A label without its emoji ("Client Radar 🔎" → "Client Radar"), for the middle widths. */
+const plainLabel = (label: string) => label.replace(/\s*[\uD83C-\uD83E][\uDC00-\uDFFF]\uFE0F?/g, "").trim();
+
+/** "More" at the end of the segment: Documents (Quotations, Agreements) and Money (Invoices). While one of them is
+ *  open, the button wears its name and icon and is lit like a tab. */
+function MoreMenu({ location, sections }: { location: string; sections: NavSection[] }) {
+  const current = desktopMoreActive(location);
+  const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(false), [location]);   // a page change always closes it
+  if (!sections.length) return null;
+  const Icon = current ? NAV_ICONS[current.key] : MoreHorizontal;
+  return (
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger aria-current={current ? "page" : undefined} data-testid="topnav-more" aria-label={current ? `More: ${current.label}` : "More"} title={current ? current.label : "More"}
+        className="dis-topnav-tab relative flex h-9 shrink-0 items-center gap-2 rounded-xl px-2.5 xl:px-3 text-[13.5px] font-semibold whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60 data-[state=open]:bg-white/10">
+        {current && <motion.span layoutId="topnav-pill" className="dis-topnav-pill absolute inset-0 rounded-xl" transition={tSpring} aria-hidden="true" />}
+        <Icon className="relative h-[17px] w-[17px]" aria-hidden="true" />
+        {/* On the narrowest desktops, an open page's icon alone; its name shows from xl (and always as the tooltip). */}
+        <span className={cn("relative", current && "hidden xl:inline")}>{current ? current.shortLabel : "More"}</span>
+        <ChevronDown className="relative h-3.5 w-3.5 opacity-70" aria-hidden="true" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={10} className="w-60 rounded-xl p-1.5">
+        {sections.map((section, i) => (
+          <DropdownMenuGroup key={section.group}>
+            {i > 0 && <DropdownMenuSeparator />}
+            <DropdownMenuLabel className="px-2.5 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{section.label}</DropdownMenuLabel>
+            {section.items.map((item) => {
+              const ItemIcon = NAV_ICONS[item.key];
+              const active = item.isActive(location);
+              return (
+                <DropdownMenuItem key={item.key} asChild className={cn("cursor-pointer gap-2.5 rounded-lg px-2.5 py-2", active && "bg-emerald-50 font-semibold text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300")}>
+                  <Link href={item.href} aria-current={active ? "page" : undefined} data-testid={`topnav-${item.key}`} onClick={() => setOpen(false)}>
+                    <ItemIcon className="h-4 w-4" aria-hidden="true" />{item.label}
+                  </Link>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuGroup>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 function BarTip({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -200,36 +246,26 @@ export function DesktopTopNav() {
           </Link>
           <span aria-hidden="true" className="self-center h-8 w-px mr-1 bg-gradient-to-b from-white/0 via-white/20 to-white/0" />
 
-          {/* ── Workspace tabs ── */}
-          {/* min-w-0 + overflow-x-auto: if the tabs ever outgrow the bar (a narrow window, a longer label), they scroll
-              under their own edge instead of sliding beneath the account controls. */}
-          <nav aria-label="Workspace" className="flex items-stretch min-w-0 pl-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {desktopNavSections(user as any).map((section, i) => (
-              <Fragment key={section.group}>
-                {/* Group divider: costs 5px, so the bar is no wider than the old flat one. */}
-                {i > 0 && <span aria-hidden="true" className="self-center h-6 w-px mx-0.5 bg-white/15" />}
-                <div role="group" aria-label={section.label} className="flex items-stretch">
-                  {section.items.map((item) => {
-                    const active = item.isActive(location);
-                    return (
-                      <Link
-                        key={item.key}
-                        href={item.href}
-                        data-testid={`topnav-${item.key}`}
-                        aria-current={active ? "page" : undefined}
-                        className="dis-topnav-tab relative flex shrink-0 items-center gap-2 px-2 xl:px-2.5 min-[1536px]:px-4 text-[14px] font-semibold whitespace-nowrap outline-none focus-visible:bg-white/10"
-                      >
-                        {/* Short labels ("Radar", "Quotes") until the bar has room for the long ones: with eight tabs, the
-                            wordmark and the account controls, that is about 1536px (measured; 1280px overflowed). */}
-                        <span className="min-[1536px]:hidden">{item.shortLabel}</span>
-                        <span className="hidden min-[1536px]:inline">{item.label}</span>
-                        {active && <motion.span layoutId="topnav-underline" className="dis-topnav-underline" transition={tSpring} aria-hidden="true" />}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </Fragment>
-            ))}
+          {/* ── Workspace: the daily tabs, icon and name, in one segment; the rest behind "More" in the same segment ── */}
+          <nav aria-label="Workspace" className="flex min-w-0 items-center pl-2">
+            <div className="dis-topnav-seg flex items-center gap-0.5 rounded-2xl p-1">
+              {desktopBarItems(user as any).map((item) => {
+                const active = item.isActive(location);
+                const Icon = NAV_ICONS[item.key];
+                return (
+                  <Link key={item.key} href={item.href} data-testid={`topnav-${item.key}`} aria-current={active ? "page" : undefined}
+                    className="dis-topnav-tab relative flex h-9 shrink-0 items-center gap-2 rounded-xl px-2.5 text-[13.5px] font-semibold whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60 xl:px-3">
+                    {active && <motion.span layoutId="topnav-pill" className="dis-topnav-pill absolute inset-0 rounded-xl" transition={tSpring} aria-hidden="true" />}
+                    <Icon className="relative h-[17px] w-[17px]" aria-hidden="true" />
+                    {/* As much name as fits: "Radar", then "Client Radar", then "Client Radar 🔎" on the widest screens. */}
+                    <span className="relative xl:hidden">{item.shortLabel}</span>
+                    <span className="relative hidden xl:inline min-[1536px]:hidden">{plainLabel(item.label)}</span>
+                    <span className="relative hidden min-[1536px]:inline">{item.label}</span>
+                  </Link>
+                );
+              })}
+              <MoreMenu location={location} sections={desktopMoreSections(user as any)} />
+            </div>
           </nav>
 
           {/* ── Account ── */}

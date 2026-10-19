@@ -33,5 +33,6 @@ export const NAV_ICONS: Record<NavKey, LucideIcon> = {
 
 export {
   NAV_ITEMS, NAV_GROUP_LABELS, navItem, canSeeNavItem, desktopNavSections, mobileBarItems, moreSheetSections, isMoreActive,
+  desktopBarItems, desktopMoreSections, desktopMoreActive,
   type NavItem, type NavKey, type NavGroup, type NavSection,
 } from "@shared/nav-model";

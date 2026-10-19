@@ -122,6 +122,21 @@ export function mobileBarItems(user: NavUser): NavItem[] {
   return MOBILE_BAR_KEYS.map(navItem).filter((i) => canSeeNavItem(user, i));
 }
 
+/** Desktop bar: the daily destinations as icon tabs in one segment; the documents and money live behind "More" in the
+ *  same segment (Profile and Settings are the bar's own account controls on the right). */
+export const DESKTOP_BAR_KEYS: readonly NavKey[] = ["home", "league", "outbound", "leads", "deals"];
+export function desktopBarItems(user: NavUser): NavItem[] {
+  return DESKTOP_BAR_KEYS.map(navItem).filter((i) => canSeeNavItem(user, i));
+}
+export const DESKTOP_MORE_GROUPS: readonly NavGroup[] = ["documents", "money"];
+export function desktopMoreSections(user: NavUser): NavSection[] {
+  return sections(user, DESKTOP_MORE_GROUPS);
+}
+/** The "More" item behind which the current page sits on desktop, if any (so More can show its name and light up). */
+export function desktopMoreActive(path: string): NavItem | null {
+  return NAV_ITEMS.find((i) => DESKTOP_MORE_GROUPS.includes(i.group) && i.isActive(path)) ?? null;
+}
+
 export const MORE_GROUPS: readonly NavGroup[] = ["pipeline", "documents", "money", "account"];
 /** The More sheet: everything not already in the bar (Pipeline shows Deals; Leads is in the bar). */
 export function moreSheetSections(user: NavUser): NavSection[] {
