@@ -208,8 +208,9 @@ function header(): string {
     <a class="brand" href="/" aria-label="DealInSec home">${LOGO_SVG}<span class="brand-text">Deal<span class="brand-accent">InSec</span></span></a>
     <nav class="nav">
       <a href="/blog" class="active">Blog</a>
-      <a href="/tools">Free Tools</a>
       <a href="/">Product</a>
+      <a href="/ai-coworkers">AI Team</a>
+      <a href="/tools">Free Tools</a>
       <a href="mailto:support@dealinsec.com">Contact</a>
     </nav>
     <a class="btn" href="${SIGNUP}" data-cta>Get started free →</a>
@@ -230,7 +231,7 @@ function footer(): string {
       ${COOKIE_FOOTER_LINKS}
     </div>
     ${consentBanner()}
-    <div class="muted">© 2026 DealInSec — prospects, quotations, e-signed agreements and invoices for agencies, consultants, freelancers and creators. Articles are general information, not legal or tax advice.</div>
+    <div class="muted">© 2026 DealInSec — Client Radar, The Nest AI team, leads, quotations, agreements signed online and invoices for freelancers, consultants, small agencies and creators. Articles are general information, not legal or tax advice.</div>
   </div></footer>`;
 }
 
@@ -238,7 +239,7 @@ function footer(): string {
 function ctaBand(): string {
   return `<div class="cta-band"><div class="wrap">
     <h2>${TAGLINE}</h2>
-    <p>DealInSec helps small agencies and consultants research prospects with evidence, then turns each won deal into a quotation, an agreement signed online and invoices that always agree with each other — and shows who hasn't paid.</p>
+    <p>DealInSec helps freelancers and small agencies find clients with Client Radar, get help from an AI team (Nibo, Mika and Zee), and turn each won deal into a quotation, an agreement signed online and invoices that always agree with each other — and shows who hasn't paid.</p>
     <a class="btn" href="${SIGNUP}" data-cta>Get started free →</a>
     <span class="sub-note">No card required · Free plan in every country</span>
   </div></div>`;

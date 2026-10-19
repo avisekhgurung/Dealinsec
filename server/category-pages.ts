@@ -113,7 +113,14 @@ const STYLES = `<style>
   section p,section li{font-size:16px;color:var(--ink)}
   .sec-sub{color:var(--muted);max-width:720px}
 
-  .thread{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:18px}
+  .thread{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:18px}
+  .team{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
+  @media(max-width:760px){.team{grid-template-columns:1fr}}
+  .mate{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--card-line);border-radius:16px;padding:14px}
+  .mate img{width:64px;height:64px;border-radius:50%;object-fit:cover;flex-shrink:0;box-shadow:0 6px 14px -8px rgba(60,40,20,.55)}
+  .mate b{display:block;font-size:16px}
+  .mate .role{font-size:13px;font-weight:700;margin-bottom:2px}
+  .mate p{margin:0;font-size:14px;color:var(--muted)}
   @media(max-width:860px){.thread{grid-template-columns:1fr 1fr}}
   @media(max-width:520px){.thread{grid-template-columns:1fr}}
   .th-card{background:var(--card);border:1px solid var(--card-line);border-radius:16px;padding:20px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
@@ -161,8 +168,8 @@ function header(): string {
     <a class="brand" href="/" aria-label="DealInSec home">${LOGO_SVG}<span class="brand-text">Deal<span class="brand-accent">InSec</span></span></a>
     <nav class="nav">
       <a href="/">Product</a>
-      <a href="/for-freelancers">Freelancers</a>
-      <a href="/for-creators">Creators</a>
+      <a href="/ai-coworkers">AI Team</a>
+      <a href="/crm-for-freelancers">CRM</a>
       <a href="/tools">Free Tools</a>
       <a href="/blog">Blog</a>
       <a href="/#pricing">Pricing</a>
@@ -174,16 +181,17 @@ function header(): string {
 function footer(region: "IN" | "global"): string {
   const tagline =
     region === "IN"
-      ? "find clients, win deals and get paid. For freelancers, consultants and small agencies in India: prospect research, then quotation, agreement signed online, invoice and payment tracking."
-      : "find clients, win deals and get paid. For freelancers, consultants and small agencies wherever they bill from: prospect research, then quotation, agreement signed online, invoice and payment tracking.";
+      ? "find clients, win deals and get paid. For freelancers, consultants and small agencies in India: Client Radar to find clients, The Nest AI team, then quotation, agreement signed online, invoice and payment follow-up."
+      : "find clients, win deals and get paid. For freelancers, consultants and small agencies wherever they bill from: Client Radar to find clients, The Nest AI team, then quotation, agreement signed online, invoice and payment follow-up.";
   return `<footer class="site"><div class="wrap">
     <div class="links">
       <a href="/">Product</a>
       <a href="/freelance-business-management-software">Freelance Business Management</a>
+      <a href="/crm-for-freelancers">CRM for Freelancers</a>
       <a href="/for-freelancers">For Freelancers</a>
       <a href="/for-creators">For Creators</a>
       <a href="/find-local-clients">Find Local Clients</a>
-      <a href="/ai-coworkers">AI Coworkers</a>
+      <a href="/ai-coworkers">AI Team (The Nest)</a>
       <a href="/tools/deal-risk-checker">Deal Risk Checker</a>
       <a href="/freelancer-invoice-software">Freelancer Invoice Software</a>
       <a href="/quotation-software">Quotation Software</a>
@@ -206,8 +214,8 @@ function footer(region: "IN" | "global"): string {
 function ctaBand(region: "IN" | "global"): string {
   const sub =
     region === "IN"
-      ? "From the first prospect to the paid invoice: AI-assisted prospect research, then a quotation, an agreement signed online, invoices and payment tracking that always agree with each other. For small agencies, consultants and freelancers in India."
-      : "From the first prospect to the paid invoice: AI-assisted prospect research, then a quotation, an agreement signed online, invoices and payment tracking that always agree with each other. For small agencies, consultants and freelancers, wherever you bill from.";
+      ? "Client Radar finds potential clients with evidence, your AI team in The Nest helps with research, drafts and briefings, and every deal runs from quotation to an agreement signed online, invoices and payment follow-up. For freelancers, consultants and small agencies in India."
+      : "Client Radar finds potential clients with evidence, your AI team in The Nest helps with research, drafts and briefings, and every deal runs from quotation to an agreement signed online, invoices and payment follow-up. For freelancers, consultants and small agencies, wherever you bill from.";
   const note =
     region === "IN"
       ? `No card required · Free plan · Pro ₹${PRICING.proMonthlyInr}/month`
@@ -220,21 +228,39 @@ function ctaBand(region: "IN" | "global"): string {
   </div></div>`;
 }
 
-/** The quote → agreement → invoice → payment walk, highlighting this page's step. */
-function threadSection(highlight: "quote" | "contract" | "invoice" | "track" | "none"): string {
-  const steps: { key: string; n: string; title: string; body: string }[] = [
-    { key: "quote", n: "1", title: "Quotation", body: "Generated from the deal record — itemised deliverables, revision rounds, terms, a stable number (QT-series) and a clean PDF in your name." },
-    { key: "contract", n: "2", title: "Agreement", body: "The accepted quotation becomes an agreement with the same figures. Electronic acceptance is recorded — who, when, which signature." },
-    { key: "invoice", n: "3", title: "Invoice", body: "Billed from the agreement — advance/balance or milestones — and DealInSec won't let you invoice more than the agreement is worth." },
-    { key: "track", n: "4", title: "Payment tracking", body: "Overdue, due this week, ready to invoice — the dashboard tells you what to bill and what to chase today." },
+/** The whole journey, from finding the client to getting paid, highlighting this page's step. */
+type ThreadStep = "find" | "lead" | "quote" | "contract" | "invoice" | "track";
+function threadSection(highlight: ThreadStep | "none"): string {
+  const steps: { key: ThreadStep; n: string; title: string; body: string }[] = [
+    { key: "find", n: "1", title: "Find clients", body: "Client Radar researches companies online in any country, or local businesses in a city, and scores each one with the evidence. Nobody is contacted until you choose." },
+    { key: "lead", n: "2", title: "Leads and deals", body: "Save the right ones as leads with next steps and follow-up dates; a won lead becomes a deal with the client, scope, fee and dates." },
+    { key: "quote", n: "3", title: "Quotation", body: "Generated from the deal record — itemised deliverables, revision rounds, terms, a stable number (QT-series) and a link your client accepts online." },
+    { key: "contract", n: "4", title: "Agreement", body: "The accepted quotation becomes an agreement with the same figures. Electronic acceptance is recorded — who, when, which signature." },
+    { key: "invoice", n: "5", title: "Invoice", body: "Billed from the agreement — advance/balance or milestones — and DealInSec won't let you invoice more than the agreement is worth." },
+    { key: "track", n: "6", title: "Payment follow-up", body: "Overdue, due this week, ready to invoice — the dashboard shows what to chase, and AI drafts a polite reminder you send yourself." },
   ];
   const cards = steps
     .map((s) => `<div class="th-card${s.key === highlight ? " hl" : ""}"><div class="n">${s.n}</div><b>${s.title}</b><p>${s.body}</p></div>`)
     .join("");
   return `<section><div class="wrap">
-    <h2>One thread from quotation to payment</h2>
-    <p class="sec-sub">Every document is generated from the one before it, so the numbers never drift between your quotation, your agreement and your invoice.</p>
+    <h2>One thread from finding the client to getting paid</h2>
+    <p class="sec-sub">Each step carries the one before it forward, so the client, the scope and the numbers never drift between your research, your quotation, your agreement and your invoice.</p>
     <div class="thread">${cards}</div>
+  </div></section>`;
+}
+
+/** Nibo, Mika and Zee, briefly, on every page but their own: the AI team is part of the product, not an extra. */
+function aiTeamSection(): string {
+  const mates = [
+    { bot: "nibo", name: "Nibo 🔎", role: "Deal Finder", colour: "#92400e", line: "Finds potential clients and researches businesses, with sources." },
+    { bot: "mika", name: "Mika 💌", role: "Deal Closer", colour: "#be123c", line: "Drafts personalised outreach and follow-ups for you to approve and send." },
+    { bot: "zee", name: "Zee 🌱", role: "Business Buddy", colour: "#047857", line: "Briefs you on tasks, payments and what needs you today." },
+  ];
+  const cards = mates.map((m) => `<div class="mate"><img src="/ai-league/plush/${m.bot}-${m.bot === "nibo" ? "search" : m.bot === "mika" ? "letter" : "tea"}-sm.webp" width="64" height="64" loading="lazy" decoding="async" alt="${m.name.split(" ")[0]}, the ${m.role}"><div><b>${m.name}</b><div class="role" style="color:${m.colour}">${m.role}</div><p>${m.line}</p></div></div>`).join("");
+  return `<section><div class="wrap">
+    <h2>Your AI team in The Nest 🪺</h2>
+    <p class="sec-sub">Three AI coworkers work in the background through the same features you use, and ask before anything that matters. Nothing is sent, paid or signed by them. <a href="/ai-coworkers">Meet the team</a>.</p>
+    <div class="team">${cards}</div>
   </div></section>`;
 }
 
@@ -1173,7 +1199,9 @@ export const PAGES: CategoryPage[] = [
 
 /* ── Rendering ─────────────────────────────────────────────────────────── */
 
-const THREAD_HIGHLIGHT: Record<string, "quote" | "contract" | "invoice" | "track"> = {
+const THREAD_HIGHLIGHT: Record<string, ThreadStep> = {
+  "/find-local-clients": "find",
+  "/crm-for-freelancers": "lead",
   "/quotation-software": "quote",
   "/contract-management": "contract",
   "/proposal-management": "quote",
@@ -1244,6 +1272,7 @@ export function renderCategoryPage(p: CategoryPage, siblings: RelatedLink[]): st
   <div class="chips">${chips}</div>
 </div></div>
 ${threadSection(THREAD_HIGHLIGHT[p.path] ?? "none")}
+${p.path === "/ai-coworkers" ? "" : aiTeamSection()}
 ${p.sections}
 <section><div class="wrap faq">
   <h2>Frequently asked questions</h2>

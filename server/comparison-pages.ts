@@ -459,10 +459,10 @@ ${METHODOLOGY([vendor("bonsai")])}`,
     updated: REVIEWED_ON,
     metaTitle: "About DealInSec: Who Makes It and How We Write",
     description:
-      "About DealInSec: a client-acquisition and deal-to-payment workspace for freelancers, consultants and small B2B service agencies. Who makes it, what it does and doesn't do, where paid plans are available, and how our guides are written.",
+      "About DealInSec: a simple business workspace for freelancers, consultants and small service agencies, with Client Radar and an AI team. Who makes it, what it does and doesn't do, where paid plans are available, and how our guides are written.",
     h1: "About DealInSec",
     sub: `${ONE_LINER} It helps freelancers, consultants and small agencies find clients, win deals and get paid — built and run by an independent founder.`,
-    chips: ["Independent founder", "Agencies and consultants in any country", "50 currencies", "Free plan, no card"],
+    chips: ["Independent founder", "Freelancers and small agencies", "Client Radar and The Nest AI team", "50 currencies", "Free plan, no card"],
     shortLabel: "About DealInSec",
     extraJsonLd: [
       {
@@ -497,7 +497,7 @@ ${METHODOLOGY([vendor("bonsai")])}`,
 <section><div class="wrap">
   <h2>What it does — and what it doesn't</h2>
   <div class="feat">
-    <div class="ft"><b>What it does</b><p>Client Radar prospect research with sources and dates; a leads pipeline with follow-up tasks and a do-not-contact list; AI-drafted first messages you approve and send from your own email; deals and quotations with a client acceptance link; agreements with a public signing link, recording who signed, when and with which signature; invoices drawn from the agreement; payment tracking; a Protection Check that flags risky or missing terms before you send; and AI-drafted payment reminders that you review and send yourself.</p></div>
+    <div class="ft"><b>What it does</b><p>Client Radar prospect research with sources and dates; The Nest, an AI team of three coworkers (Nibo finds clients, Mika drafts outreach, Zee briefs you) who work in the background and ask before anything that matters; a leads pipeline with follow-up tasks and a do-not-contact list; AI-drafted first messages you approve and send from your own email; deals and quotations with a client acceptance link; agreements with a public signing link, recording who signed, when and with which signature; invoices drawn from the agreement; payment tracking; a Protection Check that flags risky or missing terms before you send; and AI-drafted payment reminders that you review and send yourself.</p></div>
     <div class="ft"><b>What it doesn't</b><p>It is not a marketplace, an email marketing platform or an autonomous sales agent: it never contacts prospects or clients on your behalf, and it doesn't send emails, follow-ups or reminders automatically. It does not track time, run a client portal, do accounting or expenses, schedule meetings or collect payments. Your client pays you directly and you mark the invoice paid. Online signing is electronic acceptance with an audit record, not a certified digital signature, and nothing it produces is legal advice.</p></div>
   </div>
 </div></section>

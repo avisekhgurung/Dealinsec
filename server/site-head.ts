@@ -57,8 +57,8 @@ export interface PageHead { title: string; description: string; /** "noindex, fo
 /** The public pages the SPA renders (the rest of the public site is server-rendered with its own head). */
 export const SPA_PAGE_HEADS: Readonly<Record<string, PageHead>> = {
   "/pitch": {
-    title: "DealInSec product overview — from prospect to payment",
-    description: "A one-page overview of DealInSec: Client Radar prospect research, leads, deals, quotations, agreements signed online, invoices and payment tracking for small B2B agencies and consultants.",
+    title: "DealInSec product overview: find clients, win deals, get paid",
+    description: "A one-page overview of DealInSec: Client Radar to find clients, The Nest AI team (Nibo, Mika and Zee), leads, deals, quotations, agreements signed online, invoices and payment follow-ups.",
     // A printable sales overview with illustrative figures, not a page to rank: kept out of search and the sitemap.
     robots: "noindex, follow",
   },
