@@ -30,7 +30,7 @@ export const VOICE_PROFILES: Record<VoiceKey, VoiceProfile> = {
     browser: { pitch: 1, rate: 1 },
   },
   nibo: {
-    sarvam: { speaker: "aayan", pace: 1.12 },
+    sarvam: { speaker: "anand", pace: 1.12 },
     openai: { voice: "verse", instructions: "Speak as a curious, quick and cheerful young researcher who has just found something interesting. Light and lively, never loud." },
     browser: { pitch: 1.35, rate: 1.08 },
   },
@@ -40,7 +40,7 @@ export const VOICE_PROFILES: Record<VoiceKey, VoiceProfile> = {
     browser: { pitch: 1.25, rate: 1 },
   },
   zee: {
-    sarvam: { speaker: "anand", pace: 0.92 },
+    sarvam: { speaker: "ratan_hi_latenight_warm", model: "bulbul:v4-flash", language: "hi-IN", pace: 0.92 },
     openai: { voice: "sage", instructions: "Speak calmly and reassuringly, like an organised, dependable friend. Unhurried, steady and clear." },
     browser: { pitch: 0.95, rate: 0.92 },
   },

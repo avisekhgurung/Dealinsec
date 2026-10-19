@@ -94,8 +94,9 @@ describe("Sarvam (bulbul): the Indian voice, first when it has a key", () => {
   it("Mika speaks as Zarina: a bulbul:v4-flash English persona, so her requests name that model and language", () => {
     const body = JSON.parse(buildSarvamRequest("Hi, I've drafted your first message.", SV, "mika").body);
     expect(body).toMatchObject({ speaker: "zarina_en_conversation", model: "bulbul:v4-flash", language_code: "en-IN" });
-    // The others stay on the default model and Hinglish.
-    expect(JSON.parse(buildSarvamRequest("x", SV, "zee").body)).toMatchObject({ model: "bulbul:v3", language_code: "hi-IN" });
+    // Nibo is Anand on the default model in Hinglish; Zee is Ratan's warm late-night persona on v4-flash.
+    expect(JSON.parse(buildSarvamRequest("x", SV, "nibo").body)).toMatchObject({ speaker: "anand", model: "bulbul:v3", language_code: "hi-IN" });
+    expect(JSON.parse(buildSarvamRequest("x", SV, "zee").body)).toMatchObject({ speaker: "ratan_hi_latenight_warm", model: "bulbul:v4-flash", language_code: "hi-IN" });
     // Per-voice overrides, validated.
     expect(sarvamVoice("mika", { SARVAM_MODEL_MIKA: "bulbul:v3", SARVAM_VOICE_MIKA: "kavya", SARVAM_LANGUAGE_MIKA: "hi-IN" })).toEqual({ speaker: "kavya", model: "bulbul:v3", language: "hi-IN" });
     expect(sarvamVoice("mika", { SARVAM_MODEL_MIKA: "gpt-4; drop" }).model).toBe("bulbul:v4-flash");

@@ -204,6 +204,7 @@ Voice provider (`server/voice/tts.ts`): **Sarvam AI bulbul** first when `SARVAM_
 code-mixed Hinglish, `hi-IN`), OpenAI as the backup for a sentence Sarvam can't make, and the browser's own voice (with
 each coworker's pitch and pace) when neither is set up. Optional: `SARVAM_TTS_MODEL` (default `bulbul:v3`),
 `SARVAM_TTS_LANGUAGE` (default `hi-IN`), `SARVAM_VOICE_AGENT|NIBO|MIKA|ZEE` to pick other bulbul speakers (with
-`SARVAM_MODEL_<KEY>` / `SARVAM_LANGUAGE_<KEY>` when the speaker belongs to another model; Mika is Zarina,
-`zarina_en_conversation` on `bulbul:v4-flash`, `en-IN`),
+`SARVAM_MODEL_<KEY>` / `SARVAM_LANGUAGE_<KEY>` when the speaker belongs to another model; Nibo is Anand (`anand`, `bulbul:v3`,
+Hinglish), Mika is Zarina (`zarina_en_conversation`, `bulbul:v4-flash`, `en-IN`), Zee is Ratan
+(`ratan_hi_latenight_warm`, `bulbul:v4-flash`, `hi-IN`)),
 `VOICE_PROVIDER=openai` to force OpenAI. The same per-workspace daily character cap (`VOICE_DAILY_CHARS`) applies.
