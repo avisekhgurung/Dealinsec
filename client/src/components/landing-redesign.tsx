@@ -40,21 +40,6 @@ function Reveal({ children, className, delay = 0 }: { children: React.ReactNode;
   );
 }
 
-/** Handwritten note (Caveat, subset in index.html) with a hand-drawn arrow. Decorative. */
-function Scribble({ children, className, arrow = "down" }: { children: React.ReactNode; className?: string; arrow?: "down" | "down-left" | "down-right" | "up" }) {
-  const up = arrow === "up";
-  const d = arrow === "down" || up ? "M20 4C26 14 26 24 18 34" : arrow === "down-left" ? "M34 4C30 16 20 24 6 30" : "M6 4C10 16 20 24 34 30";
-  return (
-    <span aria-hidden="true" className={cn("pointer-events-none absolute flex select-none font-['Caveat',cursive] text-[19px] leading-tight text-neutral-700 dark:text-neutral-300", up ? "flex-col-reverse" : "flex-col", className)}>
-      {children}
-      <svg className={cn("block h-9 w-10 text-neutral-500", up ? "mb-1 rotate-180" : "mt-1")} viewBox="0 0 40 36" fill="none">
-        <path d={d} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" className="dis-draw" />
-        <path d={arrow === "down" || up ? "M13 29l5 6 5-5" : arrow === "down-left" ? "M10 25l-4 5 6 1" : "M29 25l5 5-6 1"} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </span>
-  );
-}
-
 /* ── Hero ─────────────────────────────────────────────────────────────────────────────── */
 
 /** Example prospects, drawn the way Client Radar's prospect cards show them (components/outbound/prospect-card.tsx). */
@@ -73,6 +58,25 @@ const scoreTone = (n: number) => (n >= 70
   ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
   : "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300");
 
+/** One plush coworker at work beside the product picture: a working pose, a soft float and a speech bubble in their
+ *  colour. Decorative (the whole picture is aria-hidden); the bubbles say example things, like the rest of it. */
+function HeroMate({ bot, pose, bubble, dots, flip, bubbleClass, ring, className, delay }: {
+  bot: "nibo" | "mika" | "zee"; pose: "rest" | "work" | "win"; bubble: string; dots?: boolean; flip?: boolean;
+  bubbleClass: string; ring: string; className?: string; delay: string;
+}) {
+  return (
+    <div style={{ animationDelay: delay }} className={cn("dis-hero-in pointer-events-none absolute z-10 flex items-center gap-2", flip && "flex-row-reverse", className)}>
+      <span className={cn("nest-float-soft block h-14 w-14 shrink-0 overflow-hidden rounded-full shadow-[0_10px_22px_-10px_rgba(60,40,20,0.6)] ring-[3px] sm:h-[76px] sm:w-[76px]", ring)} style={{ animationDelay: delay }}>
+        <img {...plushSrc(bot, pose)} sizes="76px" width={76} height={76} alt="" loading="eager" decoding="async" draggable={false} className="h-full w-full select-none object-cover" />
+      </span>
+      <span className={cn("whitespace-nowrap rounded-2xl border px-3 py-1.5 text-[11px] font-semibold shadow-md", bubbleClass)}>
+        {bubble}
+        {dots && <span className="ml-1 inline-flex gap-0.5 align-middle">{[0, 1, 2].map((i) => <span key={i} className="h-1 w-1 rounded-full bg-current motion-safe:animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />)}</span>}
+      </span>
+    </div>
+  );
+}
+
 /** The product, drawn: Client Radar's prospects with example data, and an interested reply becoming a deal. */
 function HeroProduct() {
   const side = [
@@ -81,7 +85,13 @@ function HeroProduct() {
   ];
   return (
     <div className="relative" aria-hidden="true">
-      <Scribble className="-top-14 right-4 hidden text-right lg:block" arrow="down-left">From prospect<br />to payment</Scribble>
+      {/* The AI team at work around the product: Nibo searching, Zee ticking things off, Mika drafting a reply. */}
+      <HeroMate bot="nibo" pose="work" bubble="Found 3 companies that fit 🔎" ring="ring-amber-300 dark:ring-amber-700" delay=".45s"
+        bubbleClass="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200" className="-left-1 -top-11 sm:-left-7 sm:-top-14" />
+      <HeroMate bot="zee" pose="win" bubble="2 invoices due this week 🌱" flip ring="ring-emerald-300 dark:ring-emerald-700" delay=".6s"
+        bubbleClass="hidden border-emerald-200 bg-emerald-50 text-emerald-900 sm:block dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" className="-right-1 -top-11 sm:-right-5 sm:-top-14" />
+      <HeroMate bot="mika" pose="work" bubble="Drafting your reply 💌" dots flip ring="ring-rose-300 dark:ring-rose-700" delay=".9s"
+        bubbleClass="hidden border-rose-200 bg-rose-50 text-rose-900 sm:block dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200" className="-bottom-12 -right-1 sm:-bottom-14 sm:-right-6" />
       <div style={{ animationDelay: ".25s" }}
         className="dis-hero-in overflow-hidden rounded-2xl border border-neutral-200/80 bg-white shadow-[0_30px_80px_-30px_rgba(6,78,59,0.35)] dark:border-neutral-800 dark:bg-neutral-900">
         <div className="flex">
@@ -175,7 +185,7 @@ export function HeroSection({ isAuthenticated, onPrimary }: { isAuthenticated: b
         </div>
         <div className="relative min-w-0 lg:pl-4">
           <HeroProduct />
-          <p className="mt-12 text-center text-[11px] text-neutral-400">Illustration with example data.</p>
+          <p className="mt-20 text-center text-[11px] text-neutral-400">Illustration with example data.</p>
         </div>
       </div>
     </section>

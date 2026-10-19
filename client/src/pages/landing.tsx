@@ -559,7 +559,7 @@ function Header({
                   style={{ background: "linear-gradient(135deg, #059669 0%, #0D9488 100%)" }}
                   data-testid="button-nav-signup"
                 >
-                  Get started<span className="hidden sm:inline">&nbsp;free</span>
+                  <span>Get started<span className="hidden sm:inline"> free</span></span>
                 </Button>
               </>
             )}
