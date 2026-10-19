@@ -164,7 +164,10 @@ describe("a voice call with a coworker", () => {
     const v = coworkerVoiceStyle("mika");
     expect(v).toMatch(/live voice call with you, Mika/);
     expect(v).toMatch(/Deal Closer/);
-    expect(v).toMatch(/one to three short sentences/);
+    expect(v).toMatch(/One to three short sentences/);
+    expect(v).toMatch(/Laugh when something is funny/);
+    expect(v).toMatch(/never insult, threaten or demean/);
+    expect(v).toMatch(/a playful tone never changes a fact or skips an approval/);
     expect(v).toMatch(/never claim it is done before it is/);
     expect(v).not.toMatch(/English gentleman|you are DealInSec/);
   });

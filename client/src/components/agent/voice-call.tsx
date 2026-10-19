@@ -14,6 +14,10 @@ import { CardView } from "./card-view";
 import { NestCharacter } from "@/components/ai-league/nest-character";
 import type { Bot } from "@shared/ai-league";
 import type { VoiceKey } from "@shared/voice-profiles";
+import { nextSpeed } from "@shared/voice-speed";
+import type { Patience } from "@shared/voice-call";
+
+const PATIENCE_KEY = "dis-voice-patience";
 import { cn } from "@/lib/utils";
 
 type Agent = ReturnType<typeof useAgent>;
@@ -36,9 +40,12 @@ export function VoiceCall({ agent, lang, firstName, onClose, who }: { agent: Age
   useEffect(() => { agent.setChannel("voice"); return () => agent.setChannel("web"); }, [agent.setChannel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const voice: VoiceKey = who?.bot ?? "agent";
-  const call = useVoiceCall({ agent, lang, greeting: who?.greeting ?? hello(new Date().getHours(), firstName), bargeIn, voice });
+  // "Wait for me": a longer pause before the turn ends, for people who think while they talk. Remembered.
+  const [patience, setPatience] = useState<Patience>(() => { try { return window.localStorage.getItem(PATIENCE_KEY) === "long" ? "long" : "normal"; } catch { return "normal"; } });
+  const togglePatience = () => setPatience((p) => { const n: Patience = p === "long" ? "normal" : "long"; try { window.localStorage.setItem(PATIENCE_KEY, n); } catch { /* not remembered */ } return n; });
+  const call = useVoiceCall({ agent, lang, greeting: who?.greeting ?? hello(new Date().getHours(), firstName), bargeIn, voice, patience });
   const name = who?.name ?? "DealInSec";
-  const { state, level, seconds, finished, dispatch } = call;
+  const { state, level, seconds, finished, dispatch, speed, setSpeed, speakingEarly } = call;
 
   // A call that ended normally closes itself; one that failed stays up to say why.
   useEffect(() => { if (finished && (state.endReason === "user" || state.endReason === "idle")) onClose(); }, [finished, state.endReason, onClose]);
@@ -49,7 +56,7 @@ export function VoiceCall({ agent, lang, firstName, onClose, who }: { agent: Age
     state.muted && phase === "listening" ? "Muted" :
     phase === "connecting" ? "Connecting…" :
     phase === "listening" ? (state.interim ? "Listening…" : state.confirming ? (state.confirming.risk === "CONSEQUENTIAL_MUTATION" ? "Say confirm, or no" : "Say approve, or no") : "Go ahead, I'm listening") :
-    phase === "thinking" ? "One moment…" :
+    phase === "thinking" ? (speakingEarly ? "Speaking" : "One moment…") :
     phase === "speaking" ? "Speaking" : "Call ended";
 
   // Cards from the latest assistant message OF THIS CALL that need a tap (approvals) or are worth seeing.
@@ -75,7 +82,7 @@ export function VoiceCall({ agent, lang, firstName, onClose, who }: { agent: Age
           {who ? (
             // The coworker themself, alive: listening still, thinking while busy, talking while they speak.
             <span className={cn("block transition-transform duration-100", state.muted && "opacity-40")} style={{ transform: phase === "listening" ? `scale(${1 + Math.min(level, 1) * 0.12})` : undefined }} data-testid="call-orb">
-              <NestCharacter bot={who.bot} size={160} animationState={busy ? "thinking" : "idle"} isSpeaking={phase === "speaking"} eager />
+              <NestCharacter bot={who.bot} size={160} animationState={busy && !speakingEarly ? "thinking" : "idle"} isSpeaking={phase === "speaking" || speakingEarly} eager />
             </span>
           ) : (
           <span
@@ -89,7 +96,7 @@ export function VoiceCall({ agent, lang, firstName, onClose, who }: { agent: Age
         <div className="text-center">
           <p className="text-lg font-semibold" data-testid="call-status">{label}</p>
           <p className="mx-auto mt-2 min-h-[3.5rem] max-w-md text-balance text-base leading-snug text-white/75" aria-live="polite" data-testid="call-caption">
-            {phase === "speaking" ? state.lastReply : heard}
+            {phase === "speaking" ? state.lastReply : phase === "thinking" && speakingEarly ? agent.live || heard : heard}
           </p>
           {state.notice && <p role="alert" className="mx-auto mt-3 max-w-sm rounded-xl bg-amber-500/15 px-4 py-2.5 text-sm text-amber-100" data-testid="call-notice">{state.notice}</p>}
         </div>
@@ -118,6 +125,16 @@ export function VoiceCall({ agent, lang, firstName, onClose, who }: { agent: Age
           <button type="button" onClick={() => (phase === "ended" ? onClose() : dispatch({ type: "end" }))} aria-label={phase === "ended" ? "Close" : "End call"} data-testid="call-end"
             className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-600 text-white transition hover:bg-rose-500">
             <PhoneOff className="h-6 w-6" />
+          </button>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <button type="button" onClick={() => setSpeed(nextSpeed(speed))} data-testid="call-speed" aria-label={`Speaking speed ${speed}×. Change it`}
+            title="How fast it speaks. You can also say “speak faster”, “slow down”, “jaldi bolo” or “dheere bolo”."
+            className="rounded-full bg-white/12 px-3 py-1.5 font-semibold tabular-nums text-white hover:bg-white/20">{speed}× speed</button>
+          <button type="button" onClick={togglePatience} aria-pressed={patience === "long"} data-testid="call-patience"
+            title="Waits longer before answering, so a pause to think doesn't end your turn."
+            className={cn("rounded-full px-3 py-1.5 font-semibold", patience === "long" ? "bg-emerald-400/90 text-neutral-900" : "bg-white/12 text-white hover:bg-white/20")}>
+            Wait for me: {patience === "long" ? "longer" : "normal"}
           </button>
         </div>
         {onPhone() ? (

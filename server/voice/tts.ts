@@ -73,7 +73,7 @@ export function buildSarvamRequest(text: string, env: Env = process.env, voice: 
     url: `${base}/text-to-speech`,
     headers: { "Content-Type": "application/json", "api-subscription-key": String(env.SARVAM_API_KEY ?? "").trim() },
     body: JSON.stringify({
-      text, language_code: language, model, speaker, pace: VOICE_PROFILES[voice].sarvam.pace,
+      text, language_code: language, model, speaker, pace: VOICE_PROFILES[voice].sarvam.pace, temperature: VOICE_PROFILES[voice].sarvam.temperature,
       speech_sample_rate: 24000, output_audio_codec: "mp3",
     }),
   };

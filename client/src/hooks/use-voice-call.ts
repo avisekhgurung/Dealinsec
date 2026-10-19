@@ -21,14 +21,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { isPhoneDevice, pickGentlemanVoice, speakable, splitSentences } from "@shared/voice";
 import { createNeuralSpeaker } from "@shared/neural-speech";
 import { createBrowserNeuralDeps, neuralVoiceAvailable, setAudioSession } from "@/lib/neural-voice";
+import { completedPrefix, createStreamSpeaker } from "@shared/stream-speech";
+import { endpointDelay, type Patience } from "@shared/voice-call";
+import { speedCommand, speedKey, stepSpeed } from "@shared/voice-speed";
+import type { NeuralDeps } from "@shared/neural-speech";
 import { VOICE_PROFILES, type VoiceKey } from "@shared/voice-profiles";
 import { approvalReadback, initialCall, isPersonTalking, isUtterance, reduceCall, type CallEffect, type CallEvent, type CallState, type PendingApproval } from "@shared/voice-call";
 import type { useAgent } from "@/hooks/use-agent";
 
 type Agent = ReturnType<typeof useAgent>;
 
-/** How long a pause means "I've finished my sentence". */
-const SILENCE_MS = 1200;
+/** A filler ("Hmm, let me check…") plays if nothing has been said this long after the person stops talking. */
+const FILLER_AFTER_MS = 550;
+/** Replies are spoken in full up to this length (voice replies are short; this only bounds a runaway). */
+const SPOKEN_MAX = 4000;
+/** Stand-in pieces when the neural voice isn't on: nothing is fetched or played by them. */
+const NO_NEURAL: NeuralDeps = { fetchAudio: () => Promise.reject(new Error("off")), createUrl: () => "", revokeUrl: () => {}, play: () => Promise.resolve(), stopPlayback: () => {} };
 /** How long of nothing before "are you still there?" */
 const IDLE_MS = 30_000;
 
@@ -52,7 +60,7 @@ const warmUpSpeech = () => {
 };
 
 /** `voice`: whose voice answers (Agent mode's gentleman by default, or a coworker's: shared/voice-profiles.ts). */
-export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; bargeIn: boolean; voice?: VoiceKey }) {
+export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; bargeIn: boolean; voice?: VoiceKey; patience?: Patience }) {
   const [state, setState] = useState<CallState>(initialCall);
   const [level, setLevel] = useState(0);
   const [seconds, setSeconds] = useState(0);
@@ -79,16 +87,96 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
   const dispatchRef = useRef<(e: CallEvent) => void>(() => {});
   // The neural voice, when the server has one: sentences fetched ahead and played; the browser's voice covers any that fail.
   const neural = useRef<{ speaker: ReturnType<typeof createNeuralSpeaker>; audio: ReturnType<typeof createBrowserNeuralDeps> } | null>(null);
+  const voiceKey: VoiceKey = o.voice ?? "agent";
+  const patienceRef = useRef<Patience>(o.patience ?? "normal");
+  patienceRef.current = o.patience ?? "normal";
+
+  // ── the person's speed for this voice (button or "speak faster" / "dheere bolo"), remembered ──────────────
+  const readSpeed = () => { try { const v = Number(window.localStorage.getItem(speedKey(voiceKey))); return v >= 0.5 && v <= 2 ? v : 1; } catch { return 1; } };
+  const speedRef = useRef<number>(readSpeed());
+  const [speed, setSpeedState] = useState(speedRef.current);
+  const applySpeed = useCallback((v: number) => {
+    speedRef.current = v; setSpeedState(v);
+    try { window.localStorage.setItem(speedKey(voiceKey), String(v)); } catch { /* not remembered */ }
+    neural.current?.audio.setRate(v);
+  }, [voiceKey]);
+
+  // ── this turn's reply, spoken while it is written (and a filler first) ──────────────────────────────
+  const turn = useRef<{ stream: ReturnType<typeof createStreamSpeaker>; consumed: string; fillerT?: number } | null>(null);
+  const fillers = useRef<Blob[]>([]);
+  const [early, setEarly] = useState(false);
 
   // ── speaking ────────────────────────────────────────────────────────────
   const cancelSpeech = () => {
+    cancelTurn();
     speakToken.current++;
     speakingNow.current = false;
     neural.current?.speaker.cancel();
     try { window.speechSynthesis.cancel(); } catch { /* nothing speaking */ }
   };
 
+  /** The browser's voice for this call: the coworker's pitch and pace (or Agent mode's gentleman), at the person's speed. */
+  const browserSayer = () => {
+    const synth = window.speechSynthesis;
+    const voices = synth.getVoices();
+    const coworker = o.voice && o.voice !== "agent" ? VOICE_PROFILES[o.voice].browser : null;
+    const vi = coworker ? voices.findIndex((x) => x.lang === "hi-IN" || x.lang === "en-IN") : pickGentlemanVoice(voices, o.lang);
+    const voice = vi >= 0 ? voices[vi] : null;
+    const pitch = coworker?.pitch ?? 0.9, rate = (coworker?.rate ?? 0.98) * speedRef.current;
+    return (part: string) => new Promise<void>((resolve) => {
+      const u = new SpeechSynthesisUtterance(part);
+      if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = o.lang;
+      u.rate = rate; u.pitch = pitch; u.volume = 1;
+      u.onend = () => resolve(); u.onerror = () => resolve();
+      synth.speak(u);
+    });
+  };
+
+  const cancelTurn = () => {
+    const t = turn.current;
+    turn.current = null;
+    if (t) { window.clearTimeout(t.fillerT); t.stream.cancel(); }
+    setEarly(false);
+  };
+
+  /** The person has finished: a fresh stream for the reply, with a filler if the reply takes a moment. */
+  const startTurn = () => {
+    cancelTurn();
+    const say = browserSayer();
+    const stream = createStreamSpeaker(neural.current?.audio.deps ?? NO_NEURAL, { neural: () => !!neural.current && !neural.current.speaker.disabled, fallback: say });
+    const t: NonNullable<typeof turn.current> = { stream, consumed: "" };
+    turn.current = t;
+    t.fillerT = window.setTimeout(() => {
+      if (turn.current !== t || stateRef.current.phase !== "thinking" || stream.pushed > 0) return;
+      const clip = fillers.current.length ? fillers.current[Math.floor(Math.random() * fillers.current.length)] : null;
+      if (clip) stream.pushClip(clip);
+      else if (!neural.current) { const f = VOICE_PROFILES[voiceKey].fillers; stream.push(f[Math.floor(Math.random() * f.length)]); }
+      else return;
+      setAudioSession("playback"); speakingNow.current = true; setEarly(true);
+    }, FILLER_AFTER_MS);
+  };
+
   const speak = (text: string) => {
+    // This turn has been speaking as the reply was written: say only what's left, then hand back to listening.
+    const t = turn.current;
+    if (t) {
+      window.clearTimeout(t.fillerT);
+      const full = speakable(text, SPOKEN_MAX);
+      let rest = full;
+      if (t.consumed) {
+        if (full.startsWith(t.consumed)) rest = full.slice(t.consumed.length);
+        else { const tail = t.consumed.slice(-40); const at = full.indexOf(tail); rest = at >= 0 ? full.slice(at + tail.length) : full; }
+      }
+      speakingText.current = text;
+      for (const p of splitSentences(rest)) t.stream.push(p);
+      speakingNow.current = true; setAudioSession("playback");
+      t.stream.finish(() => {
+        if (turn.current !== t || dead.current) return;
+        turn.current = null; setEarly(false);
+        speakingNow.current = false; restartFresh(); dispatchRef.current({ type: "speech_done" });
+      });
+      return;
+    }
     const synth = window.speechSynthesis;
     const parts = splitSentences(speakable(text, 900));
     cancelSpeech();
@@ -98,19 +186,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     const token = speakToken.current;
     speakingNow.current = true;
     setAudioSession("playback");   // loudspeaker, full media volume (iPhone)
-    const voices = synth.getVoices();
-    // A coworker speaks in their own pitch and pace, preferring an Indian voice; Agent mode keeps its gentleman.
-    const coworker = o.voice && o.voice !== "agent" ? VOICE_PROFILES[o.voice].browser : null;
-    const vi = coworker ? voices.findIndex((x) => x.lang === "hi-IN" || x.lang === "en-IN") : pickGentlemanVoice(voices, o.lang);
-    const voice = vi >= 0 ? voices[vi] : null;
-    const pitch = coworker?.pitch ?? 0.9, rate = coworker?.rate ?? 0.98;
-    const sayWithBrowser = (part: string) => new Promise<void>((resolve) => {
-      const u = new SpeechSynthesisUtterance(part);
-      if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = o.lang;
-      u.rate = rate; u.pitch = pitch; u.volume = 1;
-      u.onend = () => resolve(); u.onerror = () => resolve();
-      synth.speak(u);
-    });
+    const sayWithBrowser = browserSayer();
     const finished = () => { if (token !== speakToken.current || dead.current) return; speakingNow.current = false; restartFresh(); dispatchRef.current({ type: "speech_done" }); };
     if (neural.current && !neural.current.speaker.disabled) {
       neural.current.speaker.speak(parts, { fallback: sayWithBrowser, onDone: finished });
@@ -120,14 +196,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     const next = () => {
       if (token !== speakToken.current || dead.current) return;
       if (i >= parts.length) { speakingNow.current = false; restartFresh(); dispatchRef.current({ type: "speech_done" }); return; }
-      const u = new SpeechSynthesisUtterance(parts[i++]);
-      if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = o.lang;
-      u.volume = 1;
-      u.rate = rate;   // Agent mode: unhurried
-      u.pitch = pitch; // Agent mode: a little lower, measured, not chirpy
-      u.onend = next;
-      u.onerror = next;
-      synth.speak(u);
+      void sayWithBrowser(parts[i++]).then(next);
     };
     // A beat after cancel(): some browsers drop a speak() issued in the same tick.
     window.setTimeout(next, 80);
@@ -140,10 +209,15 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
   };
   const armEndpoint = () => {
     window.clearTimeout(endpointT.current);
+    // A pause after an unfinished thought ("…and", "…matlab", "um") waits longer, so thinking doesn't cut a question in half.
     endpointT.current = window.setTimeout(() => {
       const t = transcript.current;
-      if (isUtterance(t)) { transcript.current = ""; dispatchRef.current({ type: "utterance", text: t }); }
-    }, SILENCE_MS);
+      if (!isUtterance(t)) return;
+      transcript.current = "";
+      const cmd = speedCommand(t);
+      if (cmd) applySpeed(stepSpeed(speedRef.current, cmd));
+      dispatchRef.current({ type: "utterance", text: t });
+    }, endpointDelay(transcript.current, patienceRef.current));
   };
 
   const stopRecognition = () => {
@@ -272,10 +346,12 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
       case "cancel_speech": cancelSpeech(); break;
       case "send":
         awaiting.current = { sawRunning: false, at: Date.now() };
+        startTurn();
         void agentRef.current.send(fx.text);
         break;
       case "stop_run":
         awaiting.current = null;
+        cancelTurn();
         agentRef.current.stop();
         break;
     }
@@ -300,7 +376,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     if (!a.sawRunning) return;
     awaiting.current = null;
     const reply = [...messages].reverse().find((m) => m.role === "assistant");
-    const text = speakable(reply?.content ?? "", 900);
+    const text = speakable(reply?.content ?? "", SPOKEN_MAX);
     const pending: PendingApproval[] = (reply?.cards ?? [])
       .filter((c) => c.kind === "approval" && typeof c.data.approvalId === "string")
       .map((c) => ({ approvalId: String(c.data.approvalId), tool: String(c.data.tool ?? ""), risk: String(c.data.risk ?? "SAFE_MUTATION"), readback: approvalReadback((c.data.preview ?? {}) as any, String(c.data.risk ?? "")) }));
@@ -308,6 +384,20 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     else if (isUtterance(text)) dispatchRef.current({ type: "reply", text });
     else dispatchRef.current({ type: "reply_empty" });
   }, [running, messages]);
+
+  // The reply as it is written: each finished sentence is spoken straight away (the rest when the run ends).
+  const { live } = o.agent;
+  useEffect(() => {
+    const t = turn.current;
+    if (!t || stateRef.current.phase !== "thinking" || !live) return;
+    const done = completedPrefix(speakable(live, SPOKEN_MAX));
+    if (done.length <= t.consumed.length || !done.startsWith(t.consumed)) return;
+    const fresh = done.slice(t.consumed.length);
+    t.consumed = done;
+    window.clearTimeout(t.fillerT);
+    for (const p of splitSentences(fresh)) t.stream.push(p);
+    speakingNow.current = true; setAudioSession("playback"); setEarly(true);
+  }, [live]);
 
   // An action approved or declined, by voice or by a tap on the card: say how it went.
   const { approvals } = o.agent;
@@ -353,7 +443,14 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
       try { wake.current = await (navigator as any).wakeLock?.request?.("screen"); } catch { /* the screen may dim; fine */ }
       // Voices load lazily in some browsers: nudge the list before the first word.
       try { window.speechSynthesis.getVoices(); } catch { /* none */ }
-      if (await neuralVoiceAvailable()) { if (dead.current) return; neural.current = { speaker: createNeuralSpeaker(audio.deps), audio }; }
+      if (await neuralVoiceAvailable()) {
+        if (dead.current) return;
+        neural.current = { speaker: createNeuralSpeaker(audio.deps), audio };
+        audio.setRate(speedRef.current);
+        // Two of this voice's fillers, made now so one can play the instant the person stops talking.
+        const pool = [...VOICE_PROFILES[voiceKey].fillers].sort(() => Math.random() - 0.5).slice(0, 2);
+        for (const f of pool) { const ac = new AbortController(); void audio.deps.fetchAudio(f, ac.signal).then((b) => { if (!dead.current) fillers.current.push(b); }, () => {}); }
+      }
       else audio.dispose();
       if (dead.current) return;
       dispatchRef.current({ type: "started", greeting: o.greeting });
@@ -387,5 +484,6 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
   }, [state.phase]);
 
   const send = useCallback((e: CallEvent) => dispatchRef.current(e), []);
-  return { state, level, seconds, finished, dispatch: send };
+  /** speakingEarly: the reply (or a filler) is being spoken while it is still being written. */
+  return { state, level, seconds, finished, dispatch: send, speed, setSpeed: applySpeed, speakingEarly: early };
 }

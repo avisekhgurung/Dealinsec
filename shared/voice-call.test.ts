@@ -272,3 +272,16 @@ describe("isPersonTalking: the person over the assistant, not its echo", () => {
     expect(isPersonTalking("firms okay", spoken)).toBe(false);
   });
 });
+
+describe("a thinking pause doesn't cut the person off", () => {
+  it("waits longer after an unfinished thought, a filler or only a word or two", async () => {
+    const { endpointDelay } = await import("./voice-call");
+    const done = endpointDelay("What invoices are overdue this week?");
+    expect(endpointDelay("Find me dental clinics in Pune and")).toBeGreaterThan(done + 1000);
+    expect(endpointDelay("I want clients who are, um")).toBeGreaterThan(done + 1000);
+    expect(endpointDelay("mujhe woh leads chahiye matlab")).toBeGreaterThan(done + 1000);
+    expect(endpointDelay("Send it to Acme,")).toBeGreaterThan(done + 1000);
+    expect(endpointDelay("Okay")).toBeGreaterThan(done);
+    expect(endpointDelay("What invoices are overdue this week?", "long")).toBeGreaterThan(done);
+  });
+});

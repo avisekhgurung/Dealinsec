@@ -240,3 +240,26 @@ export function isPersonTalking(heard: string, spoken: string): boolean {
   if (STOP_WORDS.some((s) => t.includes(` ${s} `) && !` ${wordsOf(spoken).join(" ")} `.includes(` ${s} `))) return true;
   return fresh.length >= 2 && fresh.length / h.length >= 0.5;
 }
+
+/* ── when has the person finished? ─────────────────────────────────────── */
+
+/** How long a pause may last before the person's turn ends: "normal" or "long" (the call's "Wait for me" setting). */
+export type Patience = "normal" | "long";
+const ENDPOINT_MS = { normal: 1700, long: 2800 } as const;
+/** Words a sentence doesn't end on: the person is still thinking ("…and", "…so", "…matlab", "…um"). */
+const TRAILING = /(?:^|\s)(and|or|but|so|because|like|then|um+|uh+|hmm+|er+|the|a|an|to|for|with|of|in|on|my|your|which|that|if|when|aur|toh|to|ki|ke|ka|matlab|yaani|lekin|par|phir|jaise|kyunki|wo|woh|yeh|ye)$/i;
+
+/**
+ * The silence (ms) that ends the person's turn, given what they've said so far. A pause after an unfinished thought
+ * (a connector, a filler, a comma, or only a word or two) gets extra time, so a thinking pause doesn't cut a question
+ * in half; a finished-sounding sentence ends at the base wait.
+ */
+export function endpointDelay(text: string, patience: Patience = "normal"): number {
+  const base = ENDPOINT_MS[patience];
+  const t = text.trim().replace(/\s+/g, " ");
+  const words = t ? t.split(" ").length : 0;
+  if (!t) return base;
+  if (/[,\-–—:]$/.test(t) || TRAILING.test(t.replace(/[.!?…]+$/, ""))) return base + 1500;
+  if (words <= 2) return base + 900;
+  return base;
+}
