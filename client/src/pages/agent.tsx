@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, History, Phone, Plus, Sparkles } from "lucide-react";
+import { ArrowLeft, AudioLines, History, Plus, Sparkles } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { AgentConversation } from "@/components/agent/agent-conversation";
 import { BriefingStart } from "@/components/agent/briefing-start";
@@ -100,9 +100,9 @@ export default function AgentPage() {
             <p className="hidden truncate text-xs text-muted-foreground sm:block">Ask about clients, deals, payments, or what to do next</p>
           </div>
           {canCall && !unavailable && (
-            <button type="button" onClick={() => setCallOpen(true)} aria-label="Start a voice call" data-testid="agent-call"
+            <button type="button" onClick={() => setCallOpen(true)} aria-label="Talk to DealInSec: a voice call" title="Talk to DealInSec" data-testid="agent-call"
               className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700">
-              <Phone className="h-4 w-4" /><span className="hidden sm:inline">Call</span>
+              <AudioLines className="h-4 w-4" /><span className="hidden sm:inline">Talk</span>
             </button>
           )}
           <AutonomyControl />

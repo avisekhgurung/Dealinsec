@@ -431,7 +431,8 @@ function CoworkerChat({ bot }: { bot: Bot }) {
                 <span className="shrink-0 font-semibold text-foreground/80">View</span>
               </button>
             )}
-            <Composer onSend={(t, accepted) => agent.send(t, accepted)} onStop={agent.stop} running={agent.running} placeholder={CHAT_PLACEHOLDER[bot]} label={`Message ${id.name}`} draftFor={`league-${bot}`} seed={seed} voiceLang={locale} />
+            <Composer onSend={(t, accepted) => agent.send(t, accepted)} onStop={agent.stop} running={agent.running} placeholder={CHAT_PLACEHOLDER[bot]} label={`Message ${id.name}`} draftFor={`league-${bot}`} seed={seed} voiceLang={locale}
+              onVoiceMode={canCall ? () => setCallOpen(true) : undefined} voiceModeLabel={`Talk to ${id.name}`} />
           </div>
         </section>
 

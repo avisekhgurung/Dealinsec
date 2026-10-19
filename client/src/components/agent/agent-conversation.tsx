@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Phone, Sparkles } from "lucide-react";
+import { AudioLines, Sparkles } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAudience } from "@/hooks/use-audience";
 import { useAuth } from "@/hooks/useAuth";
@@ -30,7 +30,7 @@ function Empty({ onPaste, onPrompt, pasteLabel, prompts, onCall }: { onPaste: ()
       {onCall && (
         <button type="button" onClick={onCall} data-testid="starter-call"
           className="gradient-btn mt-5 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-md">
-          <Phone className="h-4 w-4" />Talk to DealInSec
+          <AudioLines className="h-4 w-4" />Talk to DealInSec
         </button>
       )}
       <div className="mt-6 flex flex-wrap justify-center gap-2">
@@ -112,6 +112,8 @@ export function AgentConversation({
             placeholder="Ask about deals, clients or payments…"
             voiceLang={voiceLang}
             draftFor={agent.sessionId}
+            onVoiceMode={onCall}
+            voiceModeLabel="Talk to DealInSec"
           />
           <p className="mt-1.5 text-center text-[11px] text-muted-foreground">AI results may be incomplete or inaccurate. Check what it prepares before you approve or share it.</p>
         </div>

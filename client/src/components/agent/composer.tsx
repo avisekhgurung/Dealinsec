@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUp, Loader2, Mic, Square } from "lucide-react";
+import { ArrowUp, AudioLines, Loader2, Mic, Square } from "lucide-react";
 import { useSpeechInput } from "@/hooks/use-voice";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
@@ -21,7 +21,7 @@ const touchFirst = () => typeof window !== "undefined" && !!window.matchMedia?.(
  * Text-base keeps iOS from zooming on focus.
  */
 export function Composer({
-  onSend, onStop, running, disabled, placeholder, autoFocus, seed, voiceLang, draftFor, label = "Message the agent",
+  onSend, onStop, running, disabled, placeholder, autoFocus, seed, voiceLang, draftFor, label = "Message the agent", onVoiceMode, voiceModeLabel = "Start voice mode",
 }: {
   /** Send; call `accepted()` once the message is in the conversation (the box clears then). */
   onSend: (text: string, accepted: () => void) => unknown;
@@ -38,6 +38,9 @@ export function Composer({
   draftFor?: string | null;
   /** The box's accessible name. */
   label?: string;
+  /** Voice mode (a voice call): while the box is empty, the round button starts it instead of sending, like a chat app. */
+  onVoiceMode?: () => void;
+  voiceModeLabel?: string;
 }) {
   const [text, setText] = useState(() => (draftFor !== undefined ? loadDraft(draftFor) : ""));
   // Kept as it's typed; cleared when sent; never sent by itself. Opening another conversation shows that one's draft
@@ -127,6 +130,12 @@ export function Composer({
             initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }} transition={{ duration: DURATION.fast }}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-neutral-900 text-white transition-colors hover:bg-neutral-700 dark:bg-neutral-100 dark:text-neutral-900">
             <Square className="h-3.5 w-3.5 fill-current" />
+          </motion.button>
+        ) : onVoiceMode && !text.trim() && !pending ? (
+          <motion.button key="voice" type="button" onClick={onVoiceMode} disabled={disabled} aria-label={voiceModeLabel} title={voiceModeLabel} data-testid="voice-mode"
+            initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }} transition={{ duration: DURATION.fast }}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition-colors hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-40 dark:bg-neutral-100 dark:text-neutral-900">
+            <AudioLines className="h-[18px] w-[18px]" />
           </motion.button>
         ) : (
           <motion.button key="send" type="submit" disabled={!canSend} aria-label={pending ? "Sending" : "Send"} aria-busy={pending} data-testid="agent-send"

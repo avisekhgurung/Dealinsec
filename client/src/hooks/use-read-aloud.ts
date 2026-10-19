@@ -8,7 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { speakable, splitSentences } from "@shared/voice";
 import { createNeuralSpeaker } from "@shared/neural-speech";
 import { VOICE_PROFILES, type VoiceKey } from "@shared/voice-profiles";
-import { createBrowserNeuralDeps, neuralVoiceAvailable } from "@/lib/neural-voice";
+import { createBrowserNeuralDeps, neuralVoiceAvailable, setAudioSession } from "@/lib/neural-voice";
 
 function browserSay(text: string, voice: VoiceKey): Promise<void> {
   return new Promise((resolve) => {
@@ -16,7 +16,7 @@ function browserSay(text: string, voice: VoiceKey): Promise<void> {
       const synth = window.speechSynthesis;
       const u = new SpeechSynthesisUtterance(text);
       const p = VOICE_PROFILES[voice].browser;
-      u.pitch = p.pitch; u.rate = p.rate;
+      u.pitch = p.pitch; u.rate = p.rate; u.volume = 1;
       const voices = synth.getVoices();
       const v = voices.find((x) => x.lang === "hi-IN") ?? voices.find((x) => x.lang === "en-IN") ?? null;
       if (v) { u.voice = v; u.lang = v.lang; }
@@ -51,7 +51,8 @@ export function useReadAloud(voice: VoiceKey) {
       const audio = createBrowserNeuralDeps(voice);
       pipe.current = { audio, speaker: createNeuralSpeaker(audio.deps), neural: neuralVoiceAvailable() };
     }
-    pipe.current.audio.unlock();   // inside the tap
+    pipe.current.audio.unlock();   // inside the tap: loudspeaker route, louder graph, permission to play
+    setAudioSession("playback");
     const mine = ++token.current;
     setPlaying(key);
     const done = () => { if (mine === token.current) setPlaying(null); };

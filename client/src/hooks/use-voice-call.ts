@@ -20,7 +20,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isPhoneDevice, pickGentlemanVoice, speakable, splitSentences } from "@shared/voice";
 import { createNeuralSpeaker } from "@shared/neural-speech";
-import { createBrowserNeuralDeps, neuralVoiceAvailable } from "@/lib/neural-voice";
+import { createBrowserNeuralDeps, neuralVoiceAvailable, setAudioSession } from "@/lib/neural-voice";
 import { VOICE_PROFILES, type VoiceKey } from "@shared/voice-profiles";
 import { approvalReadback, initialCall, isPersonTalking, isUtterance, reduceCall, type CallEffect, type CallEvent, type CallState, type PendingApproval } from "@shared/voice-call";
 import type { useAgent } from "@/hooks/use-agent";
@@ -97,6 +97,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     if (!parts.length) { dispatchRef.current({ type: "speech_done" }); return; }
     const token = speakToken.current;
     speakingNow.current = true;
+    setAudioSession("playback");   // loudspeaker, full media volume (iPhone)
     const voices = synth.getVoices();
     // A coworker speaks in their own pitch and pace, preferring an Indian voice; Agent mode keeps its gentleman.
     const coworker = o.voice && o.voice !== "agent" ? VOICE_PROFILES[o.voice].browser : null;
@@ -106,7 +107,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     const sayWithBrowser = (part: string) => new Promise<void>((resolve) => {
       const u = new SpeechSynthesisUtterance(part);
       if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = o.lang;
-      u.rate = rate; u.pitch = pitch;
+      u.rate = rate; u.pitch = pitch; u.volume = 1;
       u.onend = () => resolve(); u.onerror = () => resolve();
       synth.speak(u);
     });
@@ -121,6 +122,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
       if (i >= parts.length) { speakingNow.current = false; restartFresh(); dispatchRef.current({ type: "speech_done" }); return; }
       const u = new SpeechSynthesisUtterance(parts[i++]);
       if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = o.lang;
+      u.volume = 1;
       u.rate = rate;   // Agent mode: unhurried
       u.pitch = pitch; // Agent mode: a little lower, measured, not chirpy
       u.onend = next;
@@ -164,6 +166,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
   const listenWhileSpeaking = () => { if (onPhone()) return; if (bargeRef.current && !stateRef.current.muted) startRecognition(); };
 
   const startRecognition = () => {
+    setAudioSession("auto");   // the microphone needs the recording route; speaking switches back to the loudspeaker
     if (dead.current || stateRef.current.muted) return;
     const Ctor = Recognition();
     if (!Ctor) { dispatchRef.current({ type: "error", code: "unsupported" }); return; }
