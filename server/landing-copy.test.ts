@@ -66,7 +66,7 @@ describe("homepage copy", () => {
   });
 
   it("labels example data and keeps inference apart from evidence", () => {
-    expect(sections).toContain("Illustration with example data.");
+    expect(sections).toContain("The real Client Radar screen, with example data.");
     expect(sections).toContain("Demonstration with example data.");
     expect(sections).toContain("Possible opportunity · inference");
     expect(sections).toMatch(/\.example/); // example domains use the reserved TLD, so no real company is implied

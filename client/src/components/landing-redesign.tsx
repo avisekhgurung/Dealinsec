@@ -22,6 +22,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { DealinsecMark, DealinsecWordmark } from "@/components/dealinsec-logo";
 import { trackEvent } from "@/lib/analytics";
 import { onSectionLinkClick } from "@/components/landing-shared";
+import { ProspectCard } from "@/components/outbound/prospect-card";
+import type { ProspectCard as ProspectCardData } from "@/lib/outbound";
 import { NEST_TEAM_IMAGE, plushSrc } from "@/lib/plush";
 import { cn } from "@/lib/utils";
 import { LANDING_FAQS } from "@shared/landing-faqs";
@@ -42,22 +44,12 @@ function Reveal({ children, className, delay = 0 }: { children: React.ReactNode;
 
 /* ── Hero ─────────────────────────────────────────────────────────────────────────────── */
 
-/** Example prospects, drawn the way Client Radar's prospect cards show them (components/outbound/prospect-card.tsx). */
-const PROSPECTS = [
-  { name: "Northwind Logistics", meta: "Pune · Freight & warehousing · 60 people", score: 82, label: "Ready", tone: "emerald", strong: true, why: "Hiring · 2 Oct", line: "3 customer-support roles" },
-  { name: "Bluepeak Freight", meta: "Mumbai · Logistics · 120 people", score: 74, label: "Qualified", tone: "sky", strong: false, why: "New location · Sep 2026", line: "Opened a Nashik hub" },
-  { name: "Clearwater Cargo", meta: "Pune · Logistics · 25 people", score: 52, label: "Partial", tone: "amber", strong: false, why: null, line: null },
-] as const;
 const TONE: Record<string, string> = {
   sky: "bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
   amber: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
   emerald: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
   rose: "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300",
 };
-const scoreTone = (n: number) => (n >= 70
-  ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
-  : "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300");
-
 /** One plush coworker at work beside the product picture: a working pose, a soft float and a speech bubble in their
  *  colour. Decorative (the whole picture is aria-hidden); the bubbles say example things, like the rest of it. */
 function HeroMate({ bot, pose, bubble, dots, flip, bubbleClass, ring, className, delay }: {
@@ -77,12 +69,31 @@ function HeroMate({ bot, pose, bubble, dots, flip, bubbleClass, ring, className,
   );
 }
 
-/** The product, drawn: Client Radar's prospects with example data, and an interested reply becoming a deal. */
+/**
+ * The product itself, not a drawing: the app's own top bar (its real tab names, Radar open) above Client Radar's real
+ * prospect card component (components/outbound/prospect-card.tsx), filled with example data on a ".example" domain, so
+ * what visitors see here is what they get. Inert and hidden from assistive tech; the caption says it's example data.
+ */
+const HERO_PROSPECT: ProspectCardData = {
+  id: 1, name: "Northwind Logistics", domain: "northwind-logistics.example", website: "https://northwind-logistics.example/",
+  status: "researched", rejectReason: null, rejectLabel: null,
+  score: { total: 82, knownMax: 100, unknownPoints: 6, confidence: "high", components: [], missing: [] },
+  ready: true, classification: "ready", timing: "strong",
+  fit: { verdict: "match", headline: "Fits your client profile", signals: [
+    { key: "industry", label: "Industry", status: "match", detail: "Freight and warehousing, as you described" },
+    { key: "size", label: "Size", status: "match", detail: "About 60 people, inside your 20–200 range" },
+    { key: "place", label: "Location", status: "match", detail: "Based in Pune" },
+  ] },
+  profile: { industry: "Freight & warehousing", location: "Pune", country: "IN", employees: "60 people", serves: null },
+  whyNow: { id: 1, kind: "signal", type: "hiring", label: "Hiring", value: "Hiring three customer-support executives for the Pune warehouse", status: "verified", source: "site", url: null, quote: null, observedAt: null, date: "2 Oct 2026" },
+  opportunity: { id: 2, kind: "opportunity", type: "opportunity", label: "Opportunity", value: "A growing support team may handle repetitive status questions that could be partly automated.", status: "inferred", source: "ai", url: null, quote: null, observedAt: null },
+  decisionMaker: { id: 3, kind: "decision_maker", type: "founder", label: "Founder", value: "R. Mehta · Founder", status: "verified", source: "site", url: null, quote: null, observedAt: null },
+  evidenceCount: 5, leadId: null, researched: true, contact: "public",
+};
+const HERO_TABS = ["Home", "The Nest", "Radar", "Leads", "Deals", "Quotes", "Agreements", "Invoices"] as const;
+const noop = () => {};
+
 function HeroProduct() {
-  const side = [
-    { Icon: LayoutDashboard, label: "Dashboard" }, { Icon: Search, label: "Client Radar", active: true }, { Icon: Users, label: "Leads" },
-    { Icon: Building2, label: "Deals" }, { Icon: FileText, label: "Quotes" }, { Icon: FileSignature, label: "Agreements" }, { Icon: ReceiptText, label: "Invoices" },
-  ];
   return (
     <div className="relative" aria-hidden="true">
       {/* The AI team at work around the product: Nibo searching, Zee ticking things off, Mika drafting a reply. */}
@@ -90,60 +101,25 @@ function HeroProduct() {
         bubbleClass="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200" className="-left-1 -top-11 sm:-left-7 sm:-top-14" />
       <HeroMate bot="zee" pose="win" bubble="2 invoices due this week 🌱" flip ring="ring-emerald-300 dark:ring-emerald-700" delay=".6s"
         bubbleClass="hidden border-emerald-200 bg-emerald-50 text-emerald-900 sm:block dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" className="-right-1 -top-11 sm:-right-5 sm:-top-14" />
-      <HeroMate bot="mika" pose="work" bubble="Drafting your reply 💌" dots flip ring="ring-rose-300 dark:ring-rose-700" delay=".9s"
+      <HeroMate bot="mika" pose="work" bubble="Drafting a first message 💌" dots flip ring="ring-rose-300 dark:ring-rose-700" delay=".9s"
         bubbleClass="hidden border-rose-200 bg-rose-50 text-rose-900 sm:block dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200" className="-bottom-12 -right-1 sm:-bottom-14 sm:-right-6" />
       <div style={{ animationDelay: ".25s" }}
         className="dis-hero-in overflow-hidden rounded-2xl border border-neutral-200/80 bg-white shadow-[0_30px_80px_-30px_rgba(6,78,59,0.35)] dark:border-neutral-800 dark:bg-neutral-900">
-        <div className="flex">
-          <div className="hidden w-[150px] shrink-0 border-r border-neutral-100 bg-neutral-50/70 p-3 sm:block dark:border-neutral-800 dark:bg-neutral-900/60">
-            <div className="mb-4 flex items-center gap-1.5 px-1"><DealinsecMark size={18} /><DealinsecWordmark size={12} /></div>
-            <ul className="space-y-0.5 text-[11px]">
-              {side.map(({ Icon, label, active }) => (
-                <li key={label} className={cn("flex items-center gap-2 rounded-md px-2 py-1.5", active ? "bg-emerald-50 font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "text-neutral-500")}>
-                  <Icon className="h-3.5 w-3.5" />{label}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="min-w-0 flex-1 p-4 sm:p-5">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <span className="text-[15px] font-bold">Prospects</span>
-              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-[10px] font-semibold text-white"><Sparkles className="h-3 w-3" />New search</span>
-            </div>
-            <p className="mb-3 truncate rounded-lg border border-neutral-100 bg-neutral-50 px-2.5 py-1.5 text-[10.5px] text-neutral-600 dark:border-neutral-800 dark:bg-neutral-800/40 dark:text-neutral-300">
-              <Search className="mr-1 inline h-3 w-3" />Logistics companies in Pune and Mumbai · 20–200 people
-            </p>
-            <ul className="space-y-2">
-              {PROSPECTS.map((p, i) => (
-                <li key={p.name} style={{ animationDelay: `${0.6 + i * 0.12}s` }} className="dis-row-in flex gap-2.5 rounded-xl border border-neutral-100 p-2.5 dark:border-neutral-800">
-                  <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-[13px] font-extrabold tabular-nums", scoreTone(p.score))}>{p.score}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center justify-between gap-2">
-                      <b className="truncate text-[12px]">{p.name}</b>
-                      <span className="flex shrink-0 gap-1">
-                        <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold", TONE[p.tone])}>{p.label}</span>
-                        {p.strong && <span className="hidden rounded-full bg-orange-50 px-1.5 py-0.5 text-[9px] font-semibold text-orange-700 sm:inline dark:bg-orange-500/15 dark:text-orange-300">Strong timing</span>}
-                      </span>
-                    </span>
-                    <span className="block truncate text-[10px] text-neutral-500">{p.meta}</span>
-                    {p.why
-                      ? <span className="mt-1 block truncate text-[10.5px]"><b className="text-orange-700 dark:text-orange-400">Why now · {p.why}</b> <span className="text-neutral-600 dark:text-neutral-300">{p.line}</span></span>
-                      : <span className="mt-1 block truncate text-[10.5px] text-neutral-400">No dated reason to reach out yet</span>}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-3 flex flex-wrap items-center justify-end gap-1.5 text-[10px] font-semibold">
-              <span className="rounded-md border border-neutral-200 px-2 py-1 text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">AI brief</span>
-              <span className="rounded-md bg-emerald-600 px-2 py-1 text-white">Add to Leads</span>
-            </div>
-          </div>
+        {/* The app's top bar, as it is */}
+        <div className="dis-topnav flex h-11 items-center gap-1 px-3 text-white">
+          <span className="mr-2 flex shrink-0 items-center gap-1.5"><DealinsecMark size={18} /><DealinsecWordmark size={12} tone="inverse" className="hidden sm:inline" /></span>
+          {HERO_TABS.map((t, i) => (
+            <span key={t} className={cn("whitespace-nowrap rounded-full px-2 py-1 text-[10.5px] font-semibold", t === "Radar" ? "bg-white/15 text-white" : "text-white/70", i > 4 && "hidden md:inline", i > 3 && "hidden sm:inline")}>{t}</span>
+          ))}
         </div>
-      </div>
-      <div
-        className="dis-invoice-in absolute -bottom-8 left-2 flex items-center gap-3 rounded-xl border border-neutral-200/80 bg-white px-3.5 py-2.5 shadow-xl sm:-left-6 dark:border-neutral-800 dark:bg-neutral-900">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-500/15"><Handshake className="h-4 w-4 text-emerald-600" /></span>
-        <span className="text-[11px] leading-tight"><b className="block text-[12px]">Interested reply 🎉</b><span className="text-neutral-500">Northwind Logistics → new deal</span></span>
+        <div className="pointer-events-none select-none space-y-3 bg-neutral-50/60 p-4 sm:p-5 dark:bg-neutral-950/40" {...{ inert: "" }}>
+          <div>
+            <p className="text-lg font-bold tracking-tight">Client Radar <span aria-hidden>🔎</span></p>
+            <p className="text-xs text-neutral-500">Logistics companies in Pune and Mumbai · 20–200 people</p>
+          </div>
+          <p className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-neutral-600 dark:text-neutral-400"><b className="text-neutral-900 dark:text-neutral-100">25</b> discovered<b className="text-neutral-900 dark:text-neutral-100">11</b> match your client profile<b className="text-neutral-900 dark:text-neutral-100">3</b> ready for outreach</p>
+          <ProspectCard p={HERO_PROSPECT} onOpen={noop} onAdd={noop} adding={false} canEdit />
+        </div>
       </div>
     </div>
   );
@@ -185,7 +161,7 @@ export function HeroSection({ isAuthenticated, onPrimary }: { isAuthenticated: b
         </div>
         <div className="relative min-w-0 lg:pl-4">
           <HeroProduct />
-          <p className="mt-20 text-center text-[11px] text-neutral-400">Illustration with example data.</p>
+          <p className="mt-20 text-center text-[11px] text-neutral-400">The real Client Radar screen, with example data.</p>
         </div>
       </div>
     </section>
