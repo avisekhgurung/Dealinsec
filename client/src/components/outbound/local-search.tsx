@@ -39,9 +39,11 @@ function GoogleMapsAttribution({ className }: { className?: string }) {
   return <span className={cn("text-xs text-muted-foreground", className)} data-testid="google-maps-attribution">Listings from <span translate="no" className="font-medium text-foreground/80">Google Maps</span></span>;
 }
 
-export function LocalSearch({ fields, onChange, blocked, maxCompanies, onResearchStarted }: {
+export function LocalSearch({ fields, onChange, blocked, maxCompanies, onResearchStarted, onOpenProspect }: {
   fields: LocalFields; onChange: (f: LocalFields) => void; blocked: string | null; maxCompanies: number;
   onResearchStarted: (runId: string) => void;
+  /** Opens the research already done for a business (its brief), instead of researching it again. */
+  onOpenProspect?: (prospectId: number) => void;
 }) {
   const { toast } = useToast();
   const { openUpgradeModal } = useUpgradeModal();
@@ -67,14 +69,22 @@ export function LocalSearch({ fields, onChange, blocked, maxCompanies, onResearc
     },
     onError: refusal("Couldn't search local businesses"),
   });
+  // `ids`: research exactly these (the "Research all" button); otherwise the ticked ones.
   const research = useMutation({
-    mutationFn: () => leadCall<{ runId: string; queued: number; skipped: number }>("POST", LOCAL_RESEARCH_URL, {
-      category: fields.category, city: fields.city, country: fields.country,
-      places: (results ?? []).filter((r) => picked.has(r.placeId) && r.website).map((r) => ({ placeId: r.placeId, website: r.website! })),
-    }),
+    mutationFn: (ids?: string[]) => {
+      const chosen = new Set(ids ?? Array.from(picked));
+      return leadCall<{ runId: string; queued: number; skipped: number; alreadyKnown?: number }>("POST", LOCAL_RESEARCH_URL, {
+        category: fields.category, city: fields.city, country: fields.country,
+        places: (results ?? []).filter((r) => chosen.has(r.placeId) && r.website).map((r) => ({ placeId: r.placeId, website: r.website! })),
+      });
+    },
     onSuccess: (r) => {
       trackEvent("outbound_local_research", { queued: r.queued });
-      if (r.skipped) toast({ title: `Researching ${r.queued} website${r.queued === 1 ? "" : "s"}`, description: `${r.skipped} more didn't fit in what's left of your plan's researched prospects.` });
+      const notes = [
+        r.alreadyKnown ? `${r.alreadyKnown} already researched or in your leads, so skipped.` : "",
+        r.skipped ? `${r.skipped} more didn't fit in what's left of your plan's researched prospects.` : "",
+      ].filter(Boolean);
+      if (notes.length) toast({ title: `Researching ${r.queued} website${r.queued === 1 ? "" : "s"}`, description: notes.join(" ") });
       void queryClient.invalidateQueries({ queryKey: [OUTBOUND_RUNS_URL] }); void queryClient.invalidateQueries({ queryKey: [OUTBOUND_USAGE_URL] });
       setPicked(new Set());
       onResearchStarted(r.runId);
@@ -91,7 +101,9 @@ export function LocalSearch({ fields, onChange, blocked, maxCompanies, onResearc
     onError: (e) => toast({ title: "Couldn't save the lead", description: leadError(e), variant: "destructive" }),
   });
 
-  const researchable = (results ?? []).filter((r) => r.website && !r.existing?.prospectId);
+  // Already researched, already a lead, or saved just now: never offered for research again.
+  const isKnown = (r: LocalResult) => !!(r.existing?.prospectId || r.existing?.leadId || saved[r.placeId]);
+  const researchable = (results ?? []).filter((r) => r.website && !isKnown(r));
   const pickLimit = Math.max(1, maxCompanies);
   const toggle = (id: string) => setPicked((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else if (n.size < pickLimit) n.add(id); return n; });
   const ready = fields.category.trim().length >= 2 && fields.city.trim().length >= 2;
@@ -140,7 +152,7 @@ export function LocalSearch({ fields, onChange, blocked, maxCompanies, onResearc
           <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3" data-testid="local-cards">
             {results.map((r) => {
               const leadId = saved[r.placeId] ?? r.existing?.leadId;
-              const canPick = !!r.website && !r.existing?.prospectId;
+              const canPick = !!r.website && !isKnown(r);
               return (
                 <li key={r.placeId} className={cn("flex min-w-0 flex-col gap-2 rounded-xl border bg-card p-3", picked.has(r.placeId) && "border-emerald-500 ring-1 ring-emerald-500/40")} data-testid="local-card">
                   <div className="flex min-w-0 items-start gap-2">
@@ -160,7 +172,9 @@ export function LocalSearch({ fields, onChange, blocked, maxCompanies, onResearc
                   {!r.website && <p className="text-[11px] leading-snug text-muted-foreground">{NO_WEBSITE_NOTE}</p>}
                   <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
                     <a href={r.mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-1 rounded-md border px-2.5 text-xs hover:bg-muted" data-testid="local-maps-link"><ExternalLink className="h-3.5 w-3.5" aria-hidden />Open in Google Maps</a>
-                    {r.existing?.prospectId && <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-800 dark:bg-sky-950/50 dark:text-sky-300" data-testid="local-existing-prospect">Already researched</span>}
+                    {r.existing?.prospectId && (onOpenProspect
+                      ? <button type="button" onClick={() => onOpenProspect(r.existing!.prospectId!)} className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-800 hover:underline dark:bg-sky-950/50 dark:text-sky-300" data-testid="local-existing-prospect">Already researched · view brief</button>
+                      : <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-800 dark:bg-sky-950/50 dark:text-sky-300" data-testid="local-existing-prospect">Already researched</span>)}
                     {leadId ? <Link href={`/leads/${leadId}`} className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800 hover:underline dark:bg-emerald-950/50 dark:text-emerald-300" data-testid="local-existing-lead">In Leads</Link>
                       : naming?.placeId !== r.placeId && <Button type="button" variant="ghost" size="sm" className="h-9 px-2.5 text-xs" onClick={() => setNaming({ placeId: r.placeId, name: "" })} data-testid="local-save-lead"><UserPlus className="mr-1 h-3.5 w-3.5" />Save to Leads</Button>}
                   </div>
@@ -180,11 +194,15 @@ export function LocalSearch({ fields, onChange, blocked, maxCompanies, onResearc
           </ul>
           {researchable.length > 0 && (
             <div className="sticky bottom-20 z-10 flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-background/95 p-3 shadow-sm backdrop-blur lg:bottom-4" data-testid="local-research-bar">
-              <p className="text-xs text-muted-foreground">{picked.size ? `${picked.size} selected. ` : ""}DealInSec reads each website itself and checks it against your search, with evidence. Uses your researched prospects (up to {pickLimit} at a time).</p>
-              <div className="flex gap-2">
-                <Button type="button" variant="ghost" size="sm" className="h-9" onClick={() => setPicked(new Set(researchable.slice(0, pickLimit).map((r) => r.placeId)))}>Select {Math.min(pickLimit, researchable.length)} with websites</Button>
-                <Button type="button" size="sm" className="gradient-btn h-9 text-white" disabled={!picked.size || research.isPending} onClick={() => research.mutate()} data-testid="local-research">
-                  {research.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}Research {picked.size || ""} selected website{picked.size === 1 ? "" : "s"}
+              <p className="text-xs text-muted-foreground">{picked.size ? `${picked.size} selected. ` : ""}DealInSec reads each website itself and checks it against your search, with a score, an AI brief and evidence. Businesses already researched or in your leads are skipped, so nothing is used twice. Uses your researched prospects (up to {pickLimit} at a time).</p>
+              <div className="flex flex-wrap gap-2">
+                {picked.size > 0 && (
+                  <Button type="button" variant="outline" size="sm" className="h-9" disabled={research.isPending} onClick={() => research.mutate(undefined)} data-testid="local-research">
+                    Research {picked.size} selected
+                  </Button>
+                )}
+                <Button type="button" size="sm" className="gradient-btn h-9 text-white" disabled={research.isPending} onClick={() => research.mutate(researchable.slice(0, pickLimit).map((r) => r.placeId))} data-testid="local-research-all">
+                  {research.isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}{researchable.length <= pickLimit ? `Research all ${researchable.length} with websites` : `Research the first ${pickLimit} with websites`}
                 </Button>
               </div>
             </div>

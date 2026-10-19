@@ -401,7 +401,7 @@ export default function OutboundPage() {
                 </div>}
                 {mode === "local" ? <>
                   {!localReady && usage.data && <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200" data-testid="local-not-ready">Local business search isn't switched on yet. Search for companies online meanwhile: a city in your request still narrows it.</p>}
-                  <LocalSearch fields={localFields} onChange={setLocalFields} blocked={blocked} maxCompanies={maxCompanies}
+                  <LocalSearch fields={localFields} onChange={setLocalFields} blocked={blocked} maxCompanies={maxCompanies} onOpenProspect={(id) => setOpen({ id, runId: null })}
                     onResearchStarted={(id) => { setRunId(id); if (view !== "searches") setView("searches"); setTimeout(() => document.getElementById("outbound-run")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150); }} />
                   <UsageNote usage={usage.data?.usage} mode="local" />
                 </> : <>

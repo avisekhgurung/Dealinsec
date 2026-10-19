@@ -14,7 +14,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { filterByWebsite, isPlaceId, localQuery, localSearchSchema, mapsUrlFor, type LocalResult } from "@shared/local-discovery";
+import { filterByWebsite, isPlaceId, localQuery, localSearchSchema, mapsUrlFor, splitKnownSites, type LocalResult } from "@shared/local-discovery";
 import { OUTBOUND_WINDOW_DAYS, TIER_LABEL, type OutboundTier } from "@shared/outbound-plans";
 import { icpSchema, type Icp } from "@shared/icp";
 import { siteHost } from "@shared/research";
@@ -154,7 +154,7 @@ const researchSchema = z.object({
   places: z.array(z.object({ placeId: z.string().refine(isPlaceId, "not a place ID"), website: z.string().trim().max(300) })).min(1).max(20),
 });
 
-export async function researchLocalSites(user: Who, raw: unknown, d: Partial<LocalDeps> = {}): Promise<Result<{ runId: string; queued: number; skipped: number }>> {
+export async function researchLocalSites(user: Who, raw: unknown, d: Partial<LocalDeps> = {}): Promise<Result<{ runId: string; queued: number; skipped: number; alreadyKnown: number }>> {
   const deps = { ...defaults(), ...d };
   const gate = writeGate(user);
   if (gate) return gate;
@@ -171,9 +171,23 @@ export async function researchLocalSites(user: Who, raw: unknown, d: Partial<Loc
     if (domain && domain.includes(".") && !seen.has(domain)) { seen.add(domain); sites.push({ placeId: p.placeId, domain }); }
   }
   if (!sites.length) return fail(400, "invalid", "None of those listings gives a website to research.");
+  // Already researched or already a lead (by website or by listing): never researched again, so nothing is used twice.
+  const [byDomain, byPlace, byLink] = await Promise.all([
+    deps.store.prospectsByDomains(orgId, sites.map((x) => x.domain)),
+    deps.store.prospectsByPlaceIds(orgId, sites.map((x) => x.placeId)),
+    deps.leads.leadIdsByEvidenceUrls(orgId, sites.map((x) => mapsUrlFor(x.placeId))),
+  ]);
+  const leadDomains: string[] = [];
+  for (const x of sites) if (await deps.leads.findByDomain(orgId, x.domain)) leadDomains.push(x.domain);
+  const linked = new Set(byLink.map((l) => l.url));
+  const { fresh, known } = splitKnownSites(sites, {
+    prospectDomains: byDomain.map((p) => p.domain), prospectPlaceIds: byPlace.map((p) => p.placeId),
+    leadDomains, leadPlaceIds: sites.filter((x) => linked.has(mapsUrlFor(x.placeId))).map((x) => x.placeId),
+  });
+  if (!fresh.length) return fail(409, "already_researched", "Those businesses are already researched or in your leads, so nothing was used. Open them from the listing.");
   const tier = await deps.tier(user);
   const allowance = outboundAllowance(tier);
-  const picked = sites.slice(0, allowance.maxCompanies);
+  const picked = fresh.slice(0, allowance.maxCompanies);
   const since = new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY);
   let run;
   try {
@@ -199,7 +213,7 @@ export async function researchLocalSites(user: Who, raw: unknown, d: Partial<Loc
   }
   await deps.store.setLease(run.id, run.attempts, null);
   deps.kick();
-  return { ok: true, runId: run.id, queued: seeds.length, skipped: sites.length - seeds.length };
+  return { ok: true, runId: run.id, queued: seeds.length, skipped: fresh.length - seeds.length, alreadyKnown: known.length };
 }
 
 /* ── save a listing without a website as a lead ──────────────────────────── */

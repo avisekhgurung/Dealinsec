@@ -104,3 +104,19 @@ export const DISCOVERY_PRESETS: readonly DiscoveryPreset[] = [
   { key: "web_industry", label: "International businesses in an industry", mode: "web", request: "10 UK marketing agencies with 5–50 employees", note: "Web research: companies found online, each checked on its own website." },
   { key: "web_redesign", label: "Businesses that may benefit from website work", mode: "web", request: "10 US dental clinics and law firms with 5–50 employees", note: "Each home page is checked for a mobile viewport tag and an old copyright year: hints, not proof they need a new site." },
 ];
+
+/**
+ * Of the websites the person picked, which are new to this workspace and which are already known: researched before
+ * (a prospect with that domain, or one researched from that listing) or already a lead (by domain, or saved from that
+ * listing). Known ones are never researched again, so nothing is used twice.
+ */
+export function splitKnownSites<T extends { placeId: string; domain: string }>(
+  sites: readonly T[],
+  known: { prospectDomains: readonly string[]; prospectPlaceIds: readonly string[]; leadDomains: readonly string[]; leadPlaceIds: readonly string[] },
+): { fresh: T[]; known: T[] } {
+  const domains = new Set([...known.prospectDomains, ...known.leadDomains]);
+  const places = new Set([...known.prospectPlaceIds, ...known.leadPlaceIds]);
+  const fresh: T[] = [], seen: T[] = [];
+  for (const s of sites) (domains.has(s.domain) || places.has(s.placeId) ? seen : fresh).push(s);
+  return { fresh, known: seen };
+}

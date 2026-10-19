@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DISCOVERY_PRESETS, filterByWebsite, isPlaceId, localQuery, localSearchSchema, mapsUrlFor, suggestDiscoveryMode } from "./local-discovery";
+import { DISCOVERY_PRESETS, filterByWebsite, isPlaceId, localQuery, localSearchSchema, mapsUrlFor, splitKnownSites, suggestDiscoveryMode } from "./local-discovery";
 
 describe("local or web", () => {
   it("suggests local for a kind of business found on a map in a named place, web otherwise", () => {
@@ -39,5 +39,28 @@ describe("the local search request", () => {
       if (p.mode === "local") { expect(p.local).toBeDefined(); expect(p.local).not.toHaveProperty("city"); } else expect(p.request).toBeTruthy();
       expect(`${p.label} ${p.note}`.replace(/not proof they need a new site/g, "")).not.toMatch(/guarantee|needs? a new (web)?site|will reply/i);
     }
+  });
+});
+
+describe("research only what's new to the workspace", () => {
+  const sites = [
+    { placeId: "ChIJaaaaaaaaaaaaaaaa", domain: "smiles.example" },
+    { placeId: "ChIJbbbbbbbbbbbbbbbb", domain: "brightdental.example" },
+    { placeId: "ChIJcccccccccccccccc", domain: "newclinic.example" },
+    { placeId: "ChIJdddddddddddddddd", domain: "savedlead.example" },
+  ];
+  it("skips sites already researched (by website or listing) or already in Leads (by website or listing)", () => {
+    const r = splitKnownSites(sites, {
+      prospectDomains: ["smiles.example"],
+      prospectPlaceIds: ["ChIJbbbbbbbbbbbbbbbb"],
+      leadDomains: [],
+      leadPlaceIds: ["ChIJdddddddddddddddd"],
+    });
+    expect(r.fresh.map((s) => s.domain)).toEqual(["newclinic.example"]);
+    expect(r.known.map((s) => s.domain)).toEqual(["smiles.example", "brightdental.example", "savedlead.example"]);
+  });
+  it("a lead with the same website counts as known; nothing known means everything is fresh", () => {
+    expect(splitKnownSites(sites, { prospectDomains: [], prospectPlaceIds: [], leadDomains: ["newclinic.example"], leadPlaceIds: [] }).fresh).toHaveLength(3);
+    expect(splitKnownSites(sites, { prospectDomains: [], prospectPlaceIds: [], leadDomains: [], leadPlaceIds: [] }).known).toEqual([]);
   });
 });
