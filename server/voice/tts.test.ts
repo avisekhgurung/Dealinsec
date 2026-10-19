@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MAX_SPOKEN_CHARS, audioTypeOf, buildRequest, buildSarvamRequest, prepareSpeech, synthesize, ttsConfigured, ttsProvider, ttsVoice, type FetchFn } from "./tts";
-import { isVoiceKey, sarvamSpeaker, VOICE_KEYS, VOICE_PROFILES } from "@shared/voice-profiles";
+import { isVoiceKey, sarvamSpeaker, sarvamVoice, VOICE_KEYS, VOICE_PROFILES } from "@shared/voice-profiles";
 import { createVoiceBudget } from "./budget";
 
 const ENV = { OPENAI_API_KEY: "sk-test-SECRET-123" } as NodeJS.ProcessEnv;
@@ -90,6 +90,15 @@ describe("Sarvam (bulbul): the Indian voice, first when it has a key", () => {
     expect(body).toMatchObject({ text: "Aaj ka follow-up bhej do.", language_code: "hi-IN", model: "bulbul:v3", speaker: VOICE_PROFILES.nibo.sarvam.speaker, pace: VOICE_PROFILES.nibo.sarvam.pace, output_audio_codec: "mp3" });
     expect(r.headers["api-subscription-key"]).toBe("sv-test-SECRET-9");
     expect(r.body).not.toMatch(/SECRET/);
+  });
+  it("Mika speaks as Zarina: a bulbul:v4-flash English persona, so her requests name that model and language", () => {
+    const body = JSON.parse(buildSarvamRequest("Hi, I've drafted your first message.", SV, "mika").body);
+    expect(body).toMatchObject({ speaker: "zarina_en_conversation", model: "bulbul:v4-flash", language_code: "en-IN" });
+    // The others stay on the default model and Hinglish.
+    expect(JSON.parse(buildSarvamRequest("x", SV, "zee").body)).toMatchObject({ model: "bulbul:v3", language_code: "hi-IN" });
+    // Per-voice overrides, validated.
+    expect(sarvamVoice("mika", { SARVAM_MODEL_MIKA: "bulbul:v3", SARVAM_VOICE_MIKA: "kavya", SARVAM_LANGUAGE_MIKA: "hi-IN" })).toEqual({ speaker: "kavya", model: "bulbul:v3", language: "hi-IN" });
+    expect(sarvamVoice("mika", { SARVAM_MODEL_MIKA: "gpt-4; drop" }).model).toBe("bulbul:v4-flash");
   });
   it("each voice has its own speaker; an override must be a plain lowercase name", () => {
     expect(new Set(VOICE_KEYS.map((k) => VOICE_PROFILES[k].sarvam.speaker)).size).toBe(4);

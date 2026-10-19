@@ -11,7 +11,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute, useSearch } from "wouter";
-import { ArrowLeft, ChevronRight, ListChecks, MessagesSquare, Play, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, AudioLines, ChevronRight, ListChecks, MessagesSquare, Play, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,9 @@ import { BOTS, BOT_IDENTITY, BOT_STATUS_LABEL, isBot, isTerminal, type Bot } fro
 import { leagueCall, leagueEndpoints, refreshLeague, runUrl, useApprovals, useLeagueStatus, useRoster, useRuns, when, type BotCard, type RunView } from "@/lib/ai-league";
 import { NEST_TEAM_IMAGE } from "@/lib/plush";
 import { playChirp, useNestSound } from "@/lib/chirp-player";
-import { useCoworkerVoice } from "@/hooks/use-coworker-voice";
+import { VoiceCall } from "@/components/agent/voice-call";
+import { voiceCallSupported } from "@/hooks/use-voice-call";
+import { useMoney } from "@/hooks/use-locale";
 import { Mascot, MascotEmpty, mascotState } from "@/components/ai-league/mascot";
 import { RunDetail, StatusPill, runStatusLabel } from "@/components/ai-league/run-report";
 import { TaskDialog } from "@/components/ai-league/task-dialog";
@@ -165,15 +167,22 @@ function LeagueHome() {
   );
 }
 
-/** The Nest's one sound switch: coworkers read their replies aloud in their own voices, and chirp. Off until turned on. */
+/** How each coworker answers a voice call. */
+const CALL_GREETING: Record<Bot, string> = {
+  nibo: "Hi, Nibo here! Who shall we find today?",
+  mika: "Hi, it's Mika. Which lead shall we write to?",
+  zee: "Hello, Zee here. Shall I tell you what needs you today?",
+};
+
+/** The Nest's chirps switch (replies are read aloud only when you press a reply's speaker). Off until turned on. */
 function SoundSwitch({ compact = false }: { compact?: boolean }) {
   const [on, setOn] = useNestSound();
-  const label = on ? "Sound on: coworkers speak and chirp" : "Sound off";
+  const label = on ? "Chirps on" : "Chirps off";
   return (
     <Button type="button" size="sm" variant="ghost" className={cn("h-9", compact ? "w-9 px-0" : "px-2.5")} aria-pressed={on} aria-label={label} title={label}
       onClick={() => { setOn(!on); if (!on) playChirp("mika", "hello"); }} data-testid="nest-sound">
       {on ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
-      {!compact && <span className="ml-1.5 hidden text-xs sm:inline">{on ? "Sound on" : "Sound off"}</span>}
+      {!compact && <span className="ml-1.5 hidden text-xs sm:inline">{on ? "Chirps on" : "Chirps off"}</span>}
     </Button>
   );
 }
@@ -319,8 +328,11 @@ function CoworkerChat({ bot }: { bot: Bot }) {
   const id = BOT_IDENTITY[bot];
   const endpoints = useMemo(() => leagueEndpoints(bot), [bot]);
   const agent = useAgent({ sessionId: bot, endpoints });
-  const [soundOn] = useNestSound();
-  const voice = useCoworkerVoice(bot, agent, soundOn);
+  const [reading, setReading] = useState(false);
+  const [callOpen, setCallOpen] = useState(false);
+  const { locale } = useMoney();
+  const canCall = voiceCallSupported();
+  const regenerate = () => { const last = [...agent.messages].reverse().find((m) => m.role === "user"); if (last) void agent.send(last.content); };
   useEffect(() => { playChirp(bot, "hello"); }, [bot]);
   const roster = useRoster();
   const runs = useRuns({ bot });
@@ -375,12 +387,17 @@ function CoworkerChat({ bot }: { bot: Bot }) {
         <section className="flex min-h-0 min-w-0 flex-col" aria-label={`Chat with ${id.name}`}>
           <header className="flex items-center gap-3 border-b px-4 py-3">
             <Link href="/ai-league" className="lg:hidden" aria-label="Back to The Nest"><ArrowLeft className="h-5 w-5" /></Link>
-            <Mascot bot={bot} size={44} state={agent.running ? "thinking" : mascotState(card?.status)} speaking={(agent.running && !!agent.live) || voice.speaking} eager />
+            <Mascot bot={bot} size={44} state={agent.running ? "thinking" : mascotState(card?.status)} speaking={(agent.running && !!agent.live) || reading} eager />
             <div className="min-w-0 flex-1">
               <h1 className="text-base font-semibold leading-tight">{id.name} <span aria-hidden>{id.emoji}</span></h1>
               <p className={cn("truncate text-xs", id.accent.fg)}>{id.role}{card && card.status !== "available" ? ` · ${BOT_STATUS_LABEL[card.status]}` : ""}</p>
             </div>
             <Button size="sm" variant="outline" className="h-9 xl:hidden" onClick={() => setTasksOpen(true)} data-testid="open-tasks"><ListChecks className="mr-1.5 h-4 w-4" />Tasks{active ? " ·1" : ""}</Button>
+            {canCall && (
+              <Button size="sm" className={cn("h-9 text-white", id.accent.bg)} onClick={() => setCallOpen(true)} aria-label={`Talk to ${id.name}: a voice call`} title={`Talk to ${id.name} in ${id.name}'s voice`} data-testid="chat-call">
+                <AudioLines className="h-4 w-4 sm:mr-1.5" /><span className="hidden sm:inline">Talk</span>
+              </Button>
+            )}
             <SoundSwitch compact />
             <Button size="sm" variant="outline" className="hidden h-9 sm:inline-flex" onClick={() => setHuddle(true)} data-testid="chat-start-huddle"><MessagesSquare className="mr-1.5 h-4 w-4" />Huddle</Button>
             <Button size="sm" className={cn("hidden h-9 text-white sm:inline-flex", id.accent.bg)} onClick={() => setDialog(true)} data-testid="chat-start-task"><Play className="mr-1.5 h-3.5 w-3.5" />{bot === "zee" ? "Brief me" : "Start a task"}</Button>
@@ -401,7 +418,8 @@ function CoworkerChat({ bot }: { bot: Bot }) {
             ) : (
               <Thread messages={agent.messages} approvals={agent.approvals} running={agent.running} steps={agent.steps} live={agent.live} assistant={assistant}
                 onEditLast={(t) => setSeed((x) => ({ text: t, n: x.n + 1 }))}
-                onStop={agent.stop} onRetry={agent.retry} onApprove={(a, t) => void agent.approve(a, t)} onDecline={(a, t) => void agent.reject(a, t)} />
+                onStop={agent.stop} onRetry={agent.retry} onApprove={(a, t) => void agent.approve(a, t)} onDecline={(a, t) => void agent.reject(a, t)}
+                voice={bot} onRegenerate={regenerate} onSpeakingChange={setReading} />
             )}
           </div>
           <div className="border-t px-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-3 sm:px-4">
@@ -413,7 +431,7 @@ function CoworkerChat({ bot }: { bot: Bot }) {
                 <span className="shrink-0 font-semibold text-foreground/80">View</span>
               </button>
             )}
-            <Composer onSend={(t, accepted) => agent.send(t, accepted)} onStop={agent.stop} running={agent.running} placeholder={CHAT_PLACEHOLDER[bot]} label={`Message ${id.name}`} draftFor={`league-${bot}`} seed={seed} />
+            <Composer onSend={(t, accepted) => agent.send(t, accepted)} onStop={agent.stop} running={agent.running} placeholder={CHAT_PLACEHOLDER[bot]} label={`Message ${id.name}`} draftFor={`league-${bot}`} seed={seed} voiceLang={locale} />
           </div>
         </section>
 
@@ -427,6 +445,7 @@ function CoworkerChat({ bot }: { bot: Bot }) {
           <div className="pt-3">{tasksPanel}</div>
         </SheetContent>
       </Sheet>
+      {callOpen && <VoiceCall agent={agent} lang={locale} onClose={() => setCallOpen(false)} who={{ bot, name: id.name, greeting: CALL_GREETING[bot] }} />}
       {dialog && <TaskDialog bot={bot} open={dialog} onOpenChange={setDialog} onStarted={(r: RunView) => setRunId(r.id)} />}
       {huddle && <TaskDialog bot={bot} huddle open={huddle} onOpenChange={setHuddle} onStarted={(r: RunView) => setRunId(r.id)} />}
       <RunSheet id={runId} onClose={() => setRunId(null)} />

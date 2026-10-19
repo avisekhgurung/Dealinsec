@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, History, Phone, Plus, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, History, Phone, Plus, Sparkles } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { AgentConversation } from "@/components/agent/agent-conversation";
 import { BriefingStart } from "@/components/agent/briefing-start";
@@ -21,7 +21,6 @@ import { HistoryList } from "@/components/agent/history-list";
 import { useAgent } from "@/hooks/use-agent";
 import { useMoney } from "@/hooks/use-locale";
 import { useUiMode } from "@/hooks/use-ui-mode";
-import { useSpeechOutput } from "@/hooks/use-voice";
 import { voiceCallSupported } from "@/hooks/use-voice-call";
 import { VoiceCall } from "@/components/agent/voice-call";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,7 +37,6 @@ export default function AgentPage() {
   // Agent mode: this page IS the app (no navigation bars). App mode: the same page inside the dashboard shell.
   const focus = useUiMode() === "agent";
   const { locale } = useMoney();
-  const speech = useSpeechOutput(locale);
   const { user } = useAuth();
   const [callOpen, setCallOpen] = useState(false);
   const canCall = voiceCallSupported();
@@ -76,17 +74,6 @@ export default function AgentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Read the agent's finished reply aloud (when the person has turned that on).
-  const wasRunning = useRef(false);
-  useEffect(() => {
-    if (wasRunning.current && !agent.running && speech.enabled && !callOpen) {
-      const last = [...agent.messages].reverse().find((m) => m.role === "assistant");
-      if (last?.content) speech.speak(last.content);
-    }
-    wasRunning.current = agent.running;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agent.running]);
-
   const open = (id: string) => { setHistoryOpen(false); navigate(`/agent/${id}`); };
   const fresh = () => { setHistoryOpen(false); agent.reset(); };
 
@@ -116,12 +103,6 @@ export default function AgentPage() {
             <button type="button" onClick={() => setCallOpen(true)} aria-label="Start a voice call" data-testid="agent-call"
               className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white transition hover:bg-emerald-700">
               <Phone className="h-4 w-4" /><span className="hidden sm:inline">Call</span>
-            </button>
-          )}
-          {speech.supported && (
-            <button type="button" onClick={() => speech.setEnabled(!speech.enabled)} aria-pressed={speech.enabled} aria-label={speech.enabled ? "Stop reading replies aloud" : "Read replies aloud"} data-testid="agent-voice-out"
-              className={`flex h-9 w-9 items-center justify-center rounded-lg border transition ${speech.enabled ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" : "border-border text-foreground/70 hover:bg-muted/60"}`}>
-              {speech.enabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
             </button>
           )}
           <AutonomyControl />

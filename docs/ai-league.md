@@ -185,17 +185,25 @@ opaque image, removed by a flood fill of its neutral greys (the floor shadow und
 `client/src/components/ai-league/mascot.tsx` (`srcSet`, `object-contain`, lazy except where visible on first paint).
 While a coworker works, the halo around the mascot animates (`league-halo` in index.css), never the image itself.
 
-## Voices and chirps (The Nest's sound)
+## Voices, calls and chirps
 
-One switch in The Nest (page header and each chat header), off until the person turns it on (`dis_nest_sound`):
-
-- **Coworkers read their finished replies aloud** in their own voices (`shared/voice-profiles.ts`): Nibo curious and
-  quick, Mika warm, Zee calm. The plush character does its talking bob while it speaks (`hooks/use-coworker-voice.ts`).
-- **Chirps** (`lib/chirps.ts`, played by `lib/chirp-player.ts` with Web Audio): each coworker's own short, original
-  sounds when a chat opens, a task starts, work is really finished, or something waits for approval.
+- **Read aloud, on request:** every reply (Agent mode and each coworker) has a row like a chat app's: Copy, Good,
+  Bad, Share, Read aloud and Regenerate (the latest reply). Read aloud speaks that one reply in its writer's voice
+  (`shared/voice-profiles.ts`: Nibo curious and quick, Mika warm, Zee calm); nothing is read automatically. The
+  coworker's plush character talks while it plays (`hooks/use-read-aloud.ts`). Good/Bad are kept in the browser
+  (`dis_reply_ratings`) and counted as a consent-gated analytics event, never with the message text.
+- **Voice calls with Nibo, Mika and Zee:** "Talk" in a coworker's chat opens the same tested call as Agent mode's,
+  with their character in place of the orb, their greeting, their voice, and a spoken style that keeps them
+  themselves (`coworkerVoiceStyle` in server/ai-league/chat.ts; the chat route takes `channel: "voice"`).
+- **Dictation:** the coworker chats have the same microphone as Agent mode (the browser's speech recognition).
+- **Chirps** (`lib/chirps.ts`, played by `lib/chirp-player.ts`): each coworker's own short, original sounds when a chat
+  opens, a task starts, work is really finished, or something waits for approval. One switch in The Nest, off until
+  turned on (`dis_nest_sound`).
 
 Voice provider (`server/voice/tts.ts`): **Sarvam AI bulbul** first when `SARVAM_API_KEY` is set (Indian voices,
 code-mixed Hinglish, `hi-IN`), OpenAI as the backup for a sentence Sarvam can't make, and the browser's own voice (with
 each coworker's pitch and pace) when neither is set up. Optional: `SARVAM_TTS_MODEL` (default `bulbul:v3`),
-`SARVAM_TTS_LANGUAGE` (default `hi-IN`), `SARVAM_VOICE_AGENT|NIBO|MIKA|ZEE` to pick other bulbul speakers,
+`SARVAM_TTS_LANGUAGE` (default `hi-IN`), `SARVAM_VOICE_AGENT|NIBO|MIKA|ZEE` to pick other bulbul speakers (with
+`SARVAM_MODEL_<KEY>` / `SARVAM_LANGUAGE_<KEY>` when the speaker belongs to another model; Mika is Zarina,
+`zarina_en_conversation` on `bulbul:v4-flash`, `en-IN`),
 `VOICE_PROVIDER=openai` to force OpenAI. The same per-workspace daily character cap (`VOICE_DAILY_CHARS`) applies.

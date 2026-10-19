@@ -11,7 +11,8 @@
  *   SARVAM_API_KEY        Sarvam's key (sent as the api-subscription-key header)
  *   SARVAM_TTS_MODEL      default bulbul:v3
  *   SARVAM_TTS_LANGUAGE   default hi-IN (reads Hindi, English and Hinglish mixed together)
- *   SARVAM_VOICE_<KEY>    a different speaker for AGENT, NIBO, MIKA or ZEE
+ *   SARVAM_VOICE_<KEY>    a different speaker for AGENT, NIBO, MIKA or ZEE (with SARVAM_MODEL_<KEY> / SARVAM_LANGUAGE_<KEY>
+ *                         when that speaker belongs to another model or language)
  *   SARVAM_TTS_BASE_URL   default https://api.sarvam.ai (tests point it at a local fake)
  *   OPENAI_API_KEY        OpenAI's key, for the backup
  *   OPENAI_TTS_MODEL      default gpt-4o-mini-tts (the one that takes spoken-style instructions)
@@ -20,7 +21,7 @@
  *   VOICE_PROVIDER        "sarvam" or "openai" to force one; otherwise Sarvam when it has a key, else OpenAI
  */
 import { speakable } from "@shared/voice";
-import { sarvamSpeaker, VOICE_PROFILES, type VoiceKey } from "@shared/voice-profiles";
+import { sarvamVoice, VOICE_PROFILES, type VoiceKey } from "@shared/voice-profiles";
 
 export const MAX_SPOKEN_CHARS = 600;
 const TIMEOUT_MS = 15_000;
@@ -67,13 +68,12 @@ export function buildRequest(text: string, env: Env = process.env, voice: VoiceK
 
 export function buildSarvamRequest(text: string, env: Env = process.env, voice: VoiceKey = "agent") {
   const base = (env.SARVAM_TTS_BASE_URL?.trim() || "https://api.sarvam.ai").replace(/\/+$/, "");
-  const model = env.SARVAM_TTS_MODEL?.trim() || "bulbul:v3";
-  const language = env.SARVAM_TTS_LANGUAGE?.trim() || "hi-IN";
+  const { speaker, model, language } = sarvamVoice(voice, env);
   return {
     url: `${base}/text-to-speech`,
     headers: { "Content-Type": "application/json", "api-subscription-key": String(env.SARVAM_API_KEY ?? "").trim() },
     body: JSON.stringify({
-      text, language_code: language, model, speaker: sarvamSpeaker(voice, env), pace: VOICE_PROFILES[voice].sarvam.pace,
+      text, language_code: language, model, speaker, pace: VOICE_PROFILES[voice].sarvam.pace,
       speech_sample_rate: 24000, output_audio_codec: "mp3",
     }),
   };

@@ -3,15 +3,17 @@
  * calm and unhurried). One table for the server (which voice the provider uses) and the browser (the fallback voice's
  * pitch and rate when the neural voice isn't available), kept apart from the characters' artwork and animation.
  *
- * Sarvam speakers are bulbul:v3 names (docs.sarvam.ai, "Voices"); each can be overridden on the server with
- * SARVAM_VOICE_<KEY> (for example SARVAM_VOICE_NIBO=kabir) without a code change.
+ * Sarvam speakers are bulbul names (docs.sarvam.ai, "Voices"). A speaker belongs to one model: bulbul:v3 names are
+ * plain ("shubh"), bulbul:v4-flash personas are "<name>_<language>_<style>" ("zarina_en_conversation"), so a voice that
+ * uses a v4-flash persona names its model (and the language that persona speaks). Each can be overridden on the server
+ * with SARVAM_VOICE_<KEY>, SARVAM_MODEL_<KEY> and SARVAM_LANGUAGE_<KEY>, without a code change.
  */
 export const VOICE_KEYS = ["agent", "nibo", "mika", "zee"] as const;
 export type VoiceKey = (typeof VOICE_KEYS)[number];
 export const isVoiceKey = (x: unknown): x is VoiceKey => typeof x === "string" && (VOICE_KEYS as readonly string[]).includes(x);
 
 export interface VoiceProfile {
-  sarvam: { speaker: string; pace: number };
+  sarvam: { speaker: string; pace: number; /** The model this speaker belongs to, when not the default (bulbul:v3). */ model?: string; /** The language this speaker reads, when not the default (hi-IN). */ language?: string };
   openai: { voice: string; instructions: string };
   /** The browser's own voice, when the neural one isn't available: pitch 0–2, rate 0.1–10 (1 = normal). */
   browser: { pitch: number; rate: number };
@@ -33,7 +35,7 @@ export const VOICE_PROFILES: Record<VoiceKey, VoiceProfile> = {
     browser: { pitch: 1.35, rate: 1.08 },
   },
   mika: {
-    sarvam: { speaker: "kavya", pace: 1.02 },
+    sarvam: { speaker: "zarina_en_conversation", model: "bulbul:v4-flash", language: "en-IN", pace: 1.02 },
     openai: { voice: "coral", instructions: "Speak warmly and kindly, like a thoughtful friend helping with a message. Gentle, smiling, never pushy." },
     browser: { pitch: 1.25, rate: 1 },
   },
@@ -48,4 +50,18 @@ export const VOICE_PROFILES: Record<VoiceKey, VoiceProfile> = {
 export function sarvamSpeaker(key: VoiceKey, env: Record<string, string | undefined> = {}): string {
   const o = env[`SARVAM_VOICE_${key.toUpperCase()}`]?.trim().toLowerCase();
   return o && /^[a-z][a-z0-9_]{1,40}$/.test(o) ? o : VOICE_PROFILES[key].sarvam.speaker;
+}
+
+const MODEL_RE = /^bulbul:v[0-9][a-z0-9-]*$/;
+const LANG_RE = /^[a-z]{2}-IN$/;
+/** Speaker, model and language for one voice: per-voice overrides, then the profile, then the server-wide defaults. */
+export function sarvamVoice(key: VoiceKey, env: Record<string, string | undefined> = {}): { speaker: string; model: string; language: string } {
+  const p = VOICE_PROFILES[key].sarvam;
+  const K = key.toUpperCase();
+  const pick = (v: string | undefined, re: RegExp) => { const t = v?.trim(); return t && re.test(t) ? t : undefined; };
+  return {
+    speaker: sarvamSpeaker(key, env),
+    model: pick(env[`SARVAM_MODEL_${K}`], MODEL_RE) ?? p.model ?? pick(env.SARVAM_TTS_MODEL, MODEL_RE) ?? "bulbul:v3",
+    language: pick(env[`SARVAM_LANGUAGE_${K}`], LANG_RE) ?? p.language ?? pick(env.SARVAM_TTS_LANGUAGE, LANG_RE) ?? "hi-IN",
+  };
 }

@@ -38,15 +38,16 @@ function Inlines({ nodes }: { nodes: Inline[] }) {
 }
 
 /** Copy with honest feedback: "Copied" only when the clipboard took it. */
-export function CopyButton({ text, label = "Copy", className, testId }: { text: string; label?: string; className?: string; testId?: string }) {
+/** `iconOnly`: just the icon (the label stays for screen readers and as a tooltip), as in a reply's action row. */
+export function CopyButton({ text, label = "Copy", className, testId, iconOnly = false }: { text: string; label?: string; className?: string; testId?: string; iconOnly?: boolean }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
   return (
     <button type="button" data-testid={testId}
       onClick={async () => { const ok = await copyText(text); setState(ok ? "copied" : "failed"); setTimeout(() => setState("idle"), 1600); }}
       className={cn("inline-flex h-8 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted sm:h-7 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60", className)}
-      aria-label={state === "copied" ? "Copied" : label}>
+      aria-label={state === "copied" ? "Copied" : label} title={iconOnly ? label : undefined}>
       {state === "copied" ? <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
-      <span>{state === "copied" ? "Copied" : state === "failed" ? "Couldn't copy" : label}</span>
+      <span className={iconOnly ? "sr-only" : undefined}>{state === "copied" ? "Copied" : state === "failed" ? "Couldn't copy" : label}</span>
       <span className="sr-only" role="status">{state === "copied" ? "Copied to clipboard" : state === "failed" ? "Couldn't copy" : ""}</span>
     </button>
   );

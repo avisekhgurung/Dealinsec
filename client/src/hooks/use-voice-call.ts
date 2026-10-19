@@ -21,6 +21,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { isPhoneDevice, pickGentlemanVoice, speakable, splitSentences } from "@shared/voice";
 import { createNeuralSpeaker } from "@shared/neural-speech";
 import { createBrowserNeuralDeps, neuralVoiceAvailable } from "@/lib/neural-voice";
+import { VOICE_PROFILES, type VoiceKey } from "@shared/voice-profiles";
 import { approvalReadback, initialCall, isPersonTalking, isUtterance, reduceCall, type CallEffect, type CallEvent, type CallState, type PendingApproval } from "@shared/voice-call";
 import type { useAgent } from "@/hooks/use-agent";
 
@@ -50,7 +51,8 @@ const warmUpSpeech = () => {
   } catch { /* no speech on this device; the call says so */ }
 };
 
-export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; bargeIn: boolean }) {
+/** `voice`: whose voice answers (Agent mode's gentleman by default, or a coworker's: shared/voice-profiles.ts). */
+export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; bargeIn: boolean; voice?: VoiceKey }) {
   const [state, setState] = useState<CallState>(initialCall);
   const [level, setLevel] = useState(0);
   const [seconds, setSeconds] = useState(0);
@@ -96,12 +98,15 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     const token = speakToken.current;
     speakingNow.current = true;
     const voices = synth.getVoices();
-    const vi = pickGentlemanVoice(voices, o.lang);
+    // A coworker speaks in their own pitch and pace, preferring an Indian voice; Agent mode keeps its gentleman.
+    const coworker = o.voice && o.voice !== "agent" ? VOICE_PROFILES[o.voice].browser : null;
+    const vi = coworker ? voices.findIndex((x) => x.lang === "hi-IN" || x.lang === "en-IN") : pickGentlemanVoice(voices, o.lang);
     const voice = vi >= 0 ? voices[vi] : null;
+    const pitch = coworker?.pitch ?? 0.9, rate = coworker?.rate ?? 0.98;
     const sayWithBrowser = (part: string) => new Promise<void>((resolve) => {
       const u = new SpeechSynthesisUtterance(part);
       if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = o.lang;
-      u.rate = 0.98; u.pitch = 0.9;
+      u.rate = rate; u.pitch = pitch;
       u.onend = () => resolve(); u.onerror = () => resolve();
       synth.speak(u);
     });
@@ -116,8 +121,8 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
       if (i >= parts.length) { speakingNow.current = false; restartFresh(); dispatchRef.current({ type: "speech_done" }); return; }
       const u = new SpeechSynthesisUtterance(parts[i++]);
       if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = o.lang;
-      u.rate = 0.98;   // unhurried
-      u.pitch = 0.9;   // a little lower: measured, not chirpy
+      u.rate = rate;   // Agent mode: unhurried
+      u.pitch = pitch; // Agent mode: a little lower, measured, not chirpy
       u.onend = next;
       u.onerror = next;
       synth.speak(u);
@@ -334,7 +339,7 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     dead.current = false;
     let tick: number | undefined;
     // Created and unlocked right away, while the tap that started the call still counts, so later sounds are allowed.
-    const audio = createBrowserNeuralDeps();
+    const audio = createBrowserNeuralDeps(o.voice ?? "agent");
     audio.unlock();
     warmUpSpeech();
     (async () => {

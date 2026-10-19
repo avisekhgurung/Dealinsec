@@ -86,7 +86,7 @@ export default function PrivacyPolicy() {
             <tr><td>Google (Fonts)</td><td>Web fonts</td><td>IP address and browser details when a page loads its fonts</td></tr>
             <tr><td>Google (Gmail API)</td><td>Sending your approved emails and finding replies, only if you connect your Gmail</td><td>The approved emails you send; reading your mailbox only to find replies to your outreach. See Section 6.</td></tr>
             <tr><td>DeepSeek</td><td>AI model powering DealInSec Copilot</td><td>Your prompt plus the specific deal, invoice and payment records needed to answer it — sent only when you use the Copilot. See Section 5.</td></tr>
-            <tr><td>Sarvam AI (India)</td><td>Turning replies into speech: a voice call with Agent mode, or Nibo, Mika and Zee reading their replies aloud</td><td>The text of the sentence being spoken, only while you are in a voice call or have turned The Nest's sound on. Not your records, and no recording of your voice.</td></tr>
+            <tr><td>Sarvam AI (India)</td><td>Turning replies into speech: a voice call (with Agent mode, Nibo, Mika or Zee), or a reply you choose to have read aloud</td><td>The text of the sentence being spoken, only during a voice call or when you press Read aloud on a reply. Not your records, and no recording of your voice.</td></tr>
             <tr><td>OpenAI</td><td>Backup voice when Sarvam AI can't make a sentence</td><td>The same: only the text of the sentence being spoken.</td></tr>
           </tbody>
         </table>

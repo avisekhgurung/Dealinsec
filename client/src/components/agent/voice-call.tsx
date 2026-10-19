@@ -11,6 +11,9 @@ import type { ApprovalView } from "@/hooks/use-agent";
 import { useAgent } from "@/hooks/use-agent";
 import { useVoiceCall, onPhone } from "@/hooks/use-voice-call";
 import { CardView } from "./card-view";
+import { NestCharacter } from "@/components/ai-league/nest-character";
+import type { Bot } from "@shared/ai-league";
+import type { VoiceKey } from "@shared/voice-profiles";
 import { cn } from "@/lib/utils";
 
 type Agent = ReturnType<typeof useAgent>;
@@ -20,7 +23,11 @@ const timeLabel = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}
 const hello = (hour: number, name?: string | null) =>
   `${hour < 5 ? "Good evening" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"}${name ? `, ${name}` : ""}. How can I help?`;
 
-export function VoiceCall({ agent, lang, firstName, onClose }: { agent: Agent; lang: string; firstName?: string | null; onClose: () => void }) {
+/**
+ * `who`: a coworker on the call (Nibo, Mika or Zee): their name, their live plush character in place of the orb, their
+ * own voice and greeting. Without it, the call is with DealInSec (Agent mode).
+ */
+export function VoiceCall({ agent, lang, firstName, onClose, who }: { agent: Agent; lang: string; firstName?: string | null; onClose: () => void; who?: { bot: Bot; name: string; greeting: string } }) {
   // On by default: the person comes first. Off only if a loudspeaker keeps fooling it.
   const [bargeIn, setBargeIn] = useState(() => { try { return window.localStorage.getItem(BARGE_KEY) !== "0"; } catch { return true; } });
   const toggleBarge = () => setBargeIn((v) => { const n = !v; try { window.localStorage.setItem(BARGE_KEY, n ? "1" : "0"); } catch { /* not remembered */ } return n; });
@@ -28,7 +35,9 @@ export function VoiceCall({ agent, lang, firstName, onClose }: { agent: Agent; l
   // The agent answers in a spoken register for as long as the call is open.
   useEffect(() => { agent.setChannel("voice"); return () => agent.setChannel("web"); }, [agent.setChannel]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const call = useVoiceCall({ agent, lang, greeting: hello(new Date().getHours(), firstName), bargeIn });
+  const voice: VoiceKey = who?.bot ?? "agent";
+  const call = useVoiceCall({ agent, lang, greeting: who?.greeting ?? hello(new Date().getHours(), firstName), bargeIn, voice });
+  const name = who?.name ?? "DealInSec";
   const { state, level, seconds, finished, dispatch } = call;
 
   // A call that ended normally closes itself; one that failed stays up to say why.
@@ -53,9 +62,9 @@ export function VoiceCall({ agent, lang, firstName, onClose }: { agent: Agent; l
   const busy = phase === "thinking";
 
   return (
-    <div className="fixed inset-0 z-[80] flex flex-col bg-gradient-to-b from-[#06302b] via-[#08201f] to-[#070f1a] text-white" role="dialog" aria-label="Voice call with DealInSec" data-testid="voice-call" data-phase={phase}>
+    <div className="fixed inset-0 z-[80] flex flex-col bg-gradient-to-b from-[#06302b] via-[#08201f] to-[#070f1a] text-white" role="dialog" aria-label={`Voice call with ${name}`} data-testid="voice-call" data-phase={phase}>
       <header className="flex items-center justify-between px-5 pt-[max(1rem,env(safe-area-inset-top))] text-sm">
-        <span className="flex items-center gap-2 font-semibold tracking-wide"><span className={cn("h-2 w-2 rounded-full", phase === "ended" ? "bg-neutral-400" : "animate-pulse bg-emerald-400")} />DealInSec</span>
+        <span className="flex items-center gap-2 font-semibold tracking-wide"><span className={cn("h-2 w-2 rounded-full", phase === "ended" ? "bg-neutral-400" : "animate-pulse bg-emerald-400")} />{name}</span>
         <span className="tabular-nums text-white/70" data-testid="call-timer">{timeLabel(seconds)}</span>
       </header>
 
@@ -63,11 +72,18 @@ export function VoiceCall({ agent, lang, firstName, onClose }: { agent: Agent; l
         <div className="relative flex h-56 w-56 items-center justify-center" aria-hidden="true">
           {phase === "speaking" && <span className="dis-orb-ripple absolute inset-4 rounded-full bg-emerald-400/30" />}
           {busy && <span className="dis-orb-spin absolute inset-0 rounded-full" style={{ background: "conic-gradient(from 0deg, transparent 0 60%, rgba(110,231,183,.9) 100%)", mask: "radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px))", WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 3px))" }} />}
+          {who ? (
+            // The coworker themself, alive: listening still, thinking while busy, talking while they speak.
+            <span className={cn("block transition-transform duration-100", state.muted && "opacity-40")} style={{ transform: phase === "listening" ? `scale(${1 + Math.min(level, 1) * 0.12})` : undefined }} data-testid="call-orb">
+              <NestCharacter bot={who.bot} size={160} animationState={busy ? "thinking" : "idle"} isSpeaking={phase === "speaking"} eager />
+            </span>
+          ) : (
           <span
             className={cn("block h-40 w-40 rounded-full shadow-[0_0_80px_rgba(16,185,129,0.45)] transition-transform duration-100", phase === "speaking" && "dis-orb-breathe", state.muted && "opacity-40")}
             style={{ transform: phase === "speaking" ? undefined : `scale(${orbScale})`, background: "radial-gradient(circle at 35% 30%, #a7f3d0 0%, #10b981 45%, #047857 100%)" }}
             data-testid="call-orb"
           />
+          )}
         </div>
 
         <div className="text-center">

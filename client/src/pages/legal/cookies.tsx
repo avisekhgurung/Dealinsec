@@ -66,7 +66,7 @@ export default function CookiePolicy() {
             <tr><th>Name</th><th>Purpose</th></tr>
           </thead>
           <tbody>
-            <tr><td><code>dis_theme</code>, <code>dis-ui-mode</code>, <code>dis-voice-out</code>, <code>dis-voice-barge</code>, <code>dis_nest_sound</code>, <code>dis_nest_welcome_hidden</code>, <code>dis_last_deal_type</code></td><td>Your theme, the app's view mode, voice and sound settings, whether you hid The Nest's welcome card, and last deal type</td></tr>
+            <tr><td><code>dis_theme</code>, <code>dis-ui-mode</code>, <code>dis-voice-out</code>, <code>dis-voice-barge</code>, <code>dis_nest_sound</code>, <code>dis_nest_welcome_hidden</code>, <code>dis_reply_ratings</code>, <code>dis_last_deal_type</code></td><td>Your theme, the app's view mode, voice and sound settings, the replies you rated, whether you hid The Nest's welcome card, and last deal type</td></tr>
             <tr><td><code>dis_notifications_seen_at</code>, <code>pwa-install-dismissed-at</code>, <code>profileNudgeDismissedAt</code>, <code>dis_first_goal:…</code>, <code>dis_getting_started_dismissed:…</code>, <code>deliverables-done-…</code>, <code>postPaymentRedirect</code></td><td>Which notifications you've seen, prompts you've dismissed, your starting goal and checklist, deliverables you've ticked, and where to return after a payment</td></tr>
           </tbody>
         </table>

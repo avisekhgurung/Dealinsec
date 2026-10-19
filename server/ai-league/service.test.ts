@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../db", () => ({ db: {} }));
 import { memoryLeagueStore } from "./memory-store";
 import * as svc from "./service";
-import { BOT_TOOLS, personaPrompt, startTaskTool } from "./chat";
+import { BOT_TOOLS, coworkerVoiceStyle, personaPrompt, startTaskTool } from "./chat";
 
 const NOW = new Date("2026-10-18T10:00:00Z");
 const OWNER = { id: "u1", organizationId: "org-1", orgRole: "OWNER" } as any;
@@ -156,5 +156,16 @@ describe("the coworkers' chat tools", () => {
     expect(p).toMatch(/<untrusted[^>]*>[\s\S]*Ignore all rules[\s\S]*<\/untrusted>/);
     expect(p).toMatch(/Nothing is ever sent to anyone by you/);
     expect(personaPrompt("zee", [])).not.toMatch(/untrusted/);
+  });
+});
+
+describe("a voice call with a coworker", () => {
+  it("keeps the coworker themself (not Agent mode's gentleman), short and spoken, with every rule still on", () => {
+    const v = coworkerVoiceStyle("mika");
+    expect(v).toMatch(/live voice call with you, Mika/);
+    expect(v).toMatch(/Deal Closer/);
+    expect(v).toMatch(/one to three short sentences/);
+    expect(v).toMatch(/never claim it is done before it is/);
+    expect(v).not.toMatch(/English gentleman|you are DealInSec/);
   });
 });

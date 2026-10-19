@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { fadeUp, useCalmMotion } from "@/lib/motion";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowDown, Bot, ChevronDown, ChevronUp, PencilLine, RefreshCw } from "lucide-react";
+import { ArrowDown, Bot, ChevronDown, ChevronUp, PencilLine, RefreshCw, Share, Square, ThumbsDown, ThumbsUp, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isFollowing, isLongMessage, onContentChange } from "@/lib/chat/interaction";
@@ -10,6 +10,9 @@ import type { ApprovalView, ThreadMessage } from "@/hooks/use-agent";
 import { ActivityStrip, StepsSummary } from "./activity-strip";
 import { CardView } from "./card-view";
 import { CopyButton, RichText } from "./rich-text";
+import { useReadAloud } from "@/hooks/use-read-aloud";
+import { trackEvent } from "@/lib/analytics";
+import type { VoiceKey } from "@shared/voice-profiles";
 
 /** Who is answering: Agent mode's own assistant, or an AI League coworker with its mascot. */
 export interface AssistantIdentity { name: string; avatar: ReactNode }
@@ -20,6 +23,54 @@ const DEFAULT_ASSISTANT: AssistantIdentity = {
 
 /** Actions under a message: always reachable by keyboard and touch; on a desktop pointer they appear on hover/focus. */
 const ACTIONS = "mt-1 flex flex-wrap items-center gap-0.5 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 [@media(hover:none)]:opacity-100";
+/** The latest reply keeps its actions visible, like a chat app. */
+const ACTIONS_SHOWN = "mt-1 flex flex-wrap items-center gap-0.5";
+const ICON_BTN = "inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 disabled:opacity-40 sm:h-7 sm:w-7";
+
+/* ── a reply's ratings: kept in this browser (no message text), and counted as an analytics event ── */
+const RATINGS_KEY = "dis_reply_ratings";
+type Rating = "up" | "down";
+const readRatings = (): Record<string, Rating> => { try { return JSON.parse(localStorage.getItem(RATINGS_KEY) || "{}"); } catch { return {}; } };
+function saveRating(key: string, r: Rating | null) {
+  try {
+    const all = readRatings();
+    if (r) all[key] = r; else delete all[key];
+    const keys = Object.keys(all);
+    for (const k of keys.slice(0, Math.max(0, keys.length - 300))) delete all[k];   // only the most recent few hundred
+    localStorage.setItem(RATINGS_KEY, JSON.stringify(all));
+  } catch { /* not remembered */ }
+}
+
+/** Copy · Good · Bad · Share · Read aloud · Regenerate, under a reply. */
+function ReplyActions({ msgKey, text, who, shown, reading, onRead, onRegenerate }: {
+  msgKey: string; text: string; who: string; shown: boolean; reading: boolean; onRead: () => void; onRegenerate?: () => void;
+}) {
+  const [rating, setRating] = useState<Rating | null>(() => readRatings()[msgKey] ?? null);
+  const [shared, setShared] = useState(false);
+  const rate = (v: Rating) => {
+    const next = rating === v ? null : v;
+    setRating(next); saveRating(msgKey, next);
+    if (next) trackEvent("agent_reply_rated", { value: next, who });
+  };
+  const share = async () => {
+    const nav = navigator as Navigator & { share?: (d: { text: string; title?: string }) => Promise<void> };
+    if (nav.share) { try { await nav.share({ title: `${who} on DealInSec`, text }); } catch { /* the person closed the share sheet */ } return; }
+    try { await navigator.clipboard.writeText(text); setShared(true); setTimeout(() => setShared(false), 1600); } catch { /* no clipboard */ }
+  };
+  return (
+    <div className={shown ? ACTIONS_SHOWN : ACTIONS} role="toolbar" aria-label="Reply actions" data-testid="reply-actions">
+      <CopyButton text={text} label="Copy" testId="agent-message-copy" iconOnly />
+      <button type="button" className={cn(ICON_BTN, rating === "up" && "text-emerald-600")} aria-pressed={rating === "up"} aria-label="Good response" title="Good response" onClick={() => rate("up")} data-testid="reply-good"><ThumbsUp className="h-3.5 w-3.5" fill={rating === "up" ? "currentColor" : "none"} /></button>
+      <button type="button" className={cn(ICON_BTN, rating === "down" && "text-rose-600")} aria-pressed={rating === "down"} aria-label="Bad response" title="Bad response" onClick={() => rate("down")} data-testid="reply-bad"><ThumbsDown className="h-3.5 w-3.5" fill={rating === "down" ? "currentColor" : "none"} /></button>
+      <button type="button" className={ICON_BTN} aria-label={shared ? "Copied to share" : "Share"} title={shared ? "Copied to share" : "Share"} onClick={() => void share()} data-testid="reply-share"><Share className="h-3.5 w-3.5" /></button>
+      <button type="button" className={cn(ICON_BTN, reading && "text-emerald-600")} aria-pressed={reading} aria-label={reading ? "Stop reading" : "Read aloud"} title={reading ? "Stop reading" : `Read aloud in ${who}'s voice`} onClick={onRead} data-testid="reply-read">
+        {reading ? <Square className="h-3.5 w-3.5" fill="currentColor" /> : <Volume2 className="h-3.5 w-3.5" />}
+      </button>
+      {onRegenerate && <button type="button" className={ICON_BTN} aria-label="Regenerate" title="Ask again for a new reply" onClick={onRegenerate} data-testid="reply-regenerate"><RefreshCw className="h-3.5 w-3.5" /></button>}
+      <span className="sr-only" role="status">{shared ? "Copied to share" : ""}</span>
+    </div>
+  );
+}
 
 function UserMessage({ text, canEdit, onEdit }: { text: string; canEdit: boolean; onEdit?: (text: string) => void }) {
   const long = isLongMessage(text);
@@ -57,6 +108,7 @@ function UserMessage({ text, canEdit, onEdit }: { text: string; canEdit: boolean
  */
 export function Thread({
   messages, approvals, running, steps, live = "", onStop, onRetry, onApprove, onDecline, onEditDraft, onEditLast, compact, header, footer, assistant = DEFAULT_ASSISTANT,
+  voice = "agent", onRegenerate, onSpeakingChange,
 }: {
   messages: ThreadMessage[];
   approvals: Record<string, ApprovalView>;
@@ -75,7 +127,17 @@ export function Thread({
   header?: React.ReactNode;
   footer?: React.ReactNode;
   assistant?: AssistantIdentity;
+  /** Whose voice "Read aloud" uses (Agent mode's, or a coworker's). */
+  voice?: VoiceKey;
+  /** Asks again for a new reply to the last message (offered on the latest reply only). */
+  onRegenerate?: () => void;
+  /** A reply is being read aloud (the coworker's character can talk while it is). */
+  onSpeakingChange?: (speaking: boolean) => void;
 }) {
+  const reader = useReadAloud(voice);
+  useEffect(() => { onSpeakingChange?.(reader.playing !== null); }, [reader.playing, onSpeakingChange]);
+  // A new message stops any reading.
+  useEffect(() => { if (running) reader.stop(); }, [running]); // eslint-disable-line react-hooks/exhaustive-deps
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const following = useRef(true);
@@ -129,6 +191,7 @@ export function Thread({
   useEffect(() => { seen.current = new Set(messages.map((m) => m.key)); }, [messages]);
   const enter = (key: string) => (animated.current.has(key) ? { initial: "hidden" as const, animate: "visible" as const, variants: fadeUp } : {});
   const lastUserKey = [...messages].reverse().find((m) => m.role === "user")?.key;
+  const lastAssistantKey = [...messages].reverse().find((m) => m.role === "assistant")?.key;
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -172,7 +235,11 @@ export function Thread({
                     </div>
                   )}
                   {m.steps && <StepsSummary steps={m.steps} />}
-                  {m.content && !m.error && <div className={ACTIONS}><CopyButton text={m.content} label="Copy reply" testId="agent-message-copy" /></div>}
+                  {m.content && !m.error && (
+                    <ReplyActions msgKey={m.key} text={m.content} who={assistant.name} shown={m.key === lastAssistantKey && !running}
+                      reading={reader.playing === m.key} onRead={() => reader.toggle(m.key, m.content)}
+                      onRegenerate={m.key === lastAssistantKey && !running && onRegenerate ? onRegenerate : undefined} />
+                  )}
                 </div>
               </motion.div>
             ),

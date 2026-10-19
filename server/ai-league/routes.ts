@@ -91,7 +91,8 @@ export function registerAiLeagueRoutes(app: Express) {
     res.setHeader("Cache-Control", "no-store");
     res.json({ sessionId: t.session.id, lastReadAt: t.thread.lastReadAt, ...transcript });
   }));
-  const messageBody = z.object({ text: z.string().min(1).max(4000) });
+  // "voice": a voice call with the coworker; the loop answers in a short, spoken register (as Agent mode's calls do).
+  const messageBody = z.object({ text: z.string().min(1).max(4000), channel: z.enum(["web", "voice"]).default("web") });
   app.post("/api/ai-league/bots/:bot/messages", isAuthenticated, sameOriginJson, guarded("league_message", async (req, res) => {
     const bot = botOf(req, res); if (!bot) return;
     const body = messageBody.safeParse(req.body ?? {});
@@ -104,7 +105,7 @@ export function registerAiLeagueRoutes(app: Express) {
     const gone = new AbortController();
     res.on("close", () => { if (!res.writableEnded) gone.abort(); });
     let stream: ReturnType<typeof openStream> | null = null;
-    const out = await converse(deps, { user: req.user, text: body.data.text, sessionId: t.session.id, adapter: { channel: "web", signal: gone.signal, emit: (e) => { (stream ??= openStream(res)).send(e); } } });
+    const out = await converse(deps, { user: req.user, text: body.data.text, sessionId: t.session.id, adapter: { channel: body.data.channel, signal: gone.signal, emit: (e) => { (stream ??= openStream(res)).send(e); } } });
     if (!out.ok && !stream) return res.status(REFUSAL[out.code] ?? 400).json({ error: out.message, code: out.code });
     await leagueStore.markThreadRead(req.user.organizationId, req.user.id, bot, new Date()).catch(() => {});
     (stream as ReturnType<typeof openStream> | null)?.end();
