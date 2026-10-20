@@ -158,11 +158,13 @@ function PhoneNest() {
 function HeroProduct() {
   return (
     <div className="relative pr-10 sm:pr-16" aria-hidden="true">
-      {/* The AI team around the product: Nibo searching, Mika drafting; all three live in The Nest on the phone. */}
+      {/* The AI team around the product: Nibo searching, Mika drafting, Zee with the day's briefing; all three also live in The Nest on the phone. */}
       <HeroMate bot="nibo" pose="work" bubble="Found 3 companies that fit 🔎" ring="ring-amber-300 dark:ring-amber-700" delay=".45s"
         bubbleClass="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200" className="-left-1 -top-11 sm:-left-7 sm:-top-14" />
       <HeroMate bot="mika" pose="work" bubble="Drafting a first message 💌" dots ring="ring-rose-300 dark:ring-rose-700" delay=".9s"
         bubbleClass="hidden border-rose-200 bg-rose-50 text-rose-900 sm:block dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200" className="-bottom-12 -left-1 sm:-bottom-14 sm:-left-7" />
+      <HeroMate bot="zee" pose="win" bubble="Today's briefing is ready 🌱" flip ring="ring-emerald-300 dark:ring-emerald-700" delay="1.2s"
+        bubbleClass="hidden border-emerald-200 bg-emerald-50 text-emerald-900 sm:block dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" className="-right-1 -top-11 sm:-right-4 sm:-top-14" />
       {/* The desktop app, in a browser window */}
       <div style={{ animationDelay: ".25s" }}
         className="dis-hero-in overflow-hidden rounded-2xl border border-neutral-200/80 bg-white shadow-[0_30px_80px_-30px_rgba(6,78,59,0.35)] dark:border-neutral-800 dark:bg-neutral-900">
