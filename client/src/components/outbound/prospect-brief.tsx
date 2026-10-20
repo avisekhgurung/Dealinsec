@@ -25,6 +25,7 @@ import { trackEvent } from "@/lib/analytics";
 import { PROSPECT_FEEDBACK, PROSPECT_FEEDBACK_LABEL, type ProspectFeedback } from "@shared/prospect-feedback";
 import { SITE_SIGNAL_NOTE } from "@shared/site-signals";
 import { ScoreBadge } from "./prospect-card";
+import { OpportunityPlan } from "./opportunity-plan";
 
 const CONF: Record<string, string> = { low: "Mostly unknown", medium: "Partly known", high: "Well measured" };
 const SOURCE: Record<string, string> = { website: "their website", provider: "a data provider", search: "a search result", derived: "worked out from other findings" };
@@ -185,7 +186,7 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit, focus = 
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={() => research.mutate()} disabled={busy || !runId} title={runId ? undefined : "No search found this company, so it can't be researched again here"} data-testid="brief-research">{research.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-1.5 h-4 w-4" />}Research again</Button>
                 <Button size="sm" variant="outline" onClick={() => contacts.mutate()} disabled={busy || !b.providers.contact || !runId} title={!b.providers.contact ? "Connect a contact data provider (Hunter) to look people up" : !runId ? "No search found this company, so contacts can't be looked up here" : undefined} data-testid="brief-contacts">{contacts.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <UserSearch className="mr-1.5 h-4 w-4" />}Find contact</Button>
-                <Button size="sm" variant="outline" onClick={() => angle.mutate()} disabled={busy} data-testid="brief-angle">{angle.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}{b.angle ? "New angle" : "Generate angle"}</Button>
+                <Button size="sm" variant="outline" onClick={() => angle.mutate()} disabled={busy} data-testid="brief-angle">{angle.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}{b.angle ? "New angle and plan" : "Find the opportunity"}</Button>
                 {p.leadId ? (
                   <Button size="sm" asChild><Link href={`/leads/${p.leadId}`}>Open lead · draft outreach</Link></Button>
                 ) : !p.rejectReason && (
@@ -213,17 +214,7 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit, focus = 
 
             <Qualification b={b} />
 
-            {b.angle && (
-              <Section title="Outreach angle" tone="inference" hint={`${b.angle.confidence} confidence · from ${b.angle.evidenceIds.length} finding${b.angle.evidenceIds.length === 1 ? "" : "s"}`}>
-                <div className="space-y-1.5 rounded-xl border border-violet-200 bg-violet-50/60 p-3 text-sm dark:border-violet-900/60 dark:bg-violet-950/20" data-testid="brief-angle-text">
-                  <p><span className="font-medium">Problem:</span> {b.angle.problem}</p>
-                  <p><span className="font-medium">Opportunity:</span> {b.angle.opportunity}</p>
-                  <p><span className="font-medium">Position it as:</span> {b.angle.positioning}</p>
-                  {b.angle.targetPerson && <p><span className="font-medium">Write to:</span> {b.angle.targetPerson}</p>}
-                  <p className="text-xs text-muted-foreground">{b.angle.reason}</p>
-                </div>
-              </Section>
-            )}
+            <OpportunityPlan b={b} />
 
             {p.score && (
               <Section title={`Score ${p.score.total} / 100`}>

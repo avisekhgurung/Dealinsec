@@ -8,7 +8,9 @@
  *   enrichment: {facts:[{field, value, quote, page}]}
  *   research:   {findings:[{kind:"signal"|"person"|"pain", type?, value?, name?, title?, quote, page, date_quote?}],
  *                opportunities:[{text, supports:["#0","F12"], confidence}]}
- *   angle:      {problem, evidence:["F12"], opportunity, positioning, target_person, reason, confidence}
+ *   angle:      {problem, evidence:["F12"], opportunity, positioning, target_person, reason, confidence,
+ *                plan:{solution, value, impact, effort, service_match, confirm_if, disprove_if, next_action,
+ *                      demo:{title, scope, effort, assumptions[], exclusions[], needs[]} | null}}
  */
 import { contentIssues } from "./outreach-check";
 import { COUNTRIES, roleRank, type Icp } from "./icp";
@@ -266,6 +268,65 @@ export function normalizeResearch(raw: unknown, pages: ResearchPage[], site: str
 export interface Angle {
   problem: string; opportunity: string; positioning: string; targetPerson: string | null; reason: string;
   evidenceIds: number[]; confidence: "low" | "medium";
+  /** What could be offered and how to test the idea (angle-v3 and later); null when the model's plan didn't pass the checks. */
+  plan?: OpportunityPlan | null;
+}
+
+/* ── the opportunity plan: what to offer, and how to test the idea ─────── */
+
+export const PLAN_IMPACTS = ["low", "medium", "high"] as const;
+export const PLAN_EFFORTS = ["small", "medium", "large"] as const;
+export const SERVICE_MATCHES = ["direct", "adjacent", "none"] as const;
+/** A proof-of-value sample is small by design: a few hours ("small") or a day or two ("medium"), never a project. */
+export const DEMO_EFFORTS = ["small", "medium"] as const;
+export type PlanImpact = (typeof PLAN_IMPACTS)[number];
+export type PlanEffort = (typeof PLAN_EFFORTS)[number];
+/** "unknown" is never the model's choice: code sets it when the salesperson hasn't said what they sell. */
+export type ServiceMatch = (typeof SERVICE_MATCHES)[number] | "unknown";
+
+export interface DemoOffer {
+  title: string; scope: string; effort: (typeof DEMO_EFFORTS)[number];
+  assumptions: string[]; exclusions: string[]; needs: string[];
+}
+/**
+ * Everything here is a HYPOTHESIS built on the cited findings, never a fact about the company. The enums are the model's
+ * judgment; the opportunity score (shared/opportunity-score.ts) turns them into points by fixed rules and caps them by
+ * the evidence, so a confident-sounding plan can't buy a high score.
+ */
+export interface OpportunityPlan {
+  solution: string; value: string; impact: PlanImpact; effort: PlanEffort; serviceMatch: ServiceMatch;
+  confirmIf: string; disproveIf: string; nextAction: string; demo: DemoOffer | null;
+}
+
+/** Internal finding ids ("(F12056, F12061)", "F11774, inferred") are citations for code, never words for a person or a draft. */
+export const stripCitations = (t: string): string =>
+  t.replace(/\bF\d{1,9}\b/g, "")
+    // what a citation leaves behind: "( , )", "(-)", "(inferred )", "(, undated)", "[, ]" → nothing
+    .replace(/\s*[(\[](?:\s*(?:inferred|confirmed|undated|dated)\b|[\s,;:\-–—])*[)\]]/gi, "")
+    .replace(/(?:,\s*){2,}/g, ", ").replace(/\s+([,.;:])/g, "$1").replace(/\s{2,}/g, " ").trim();
+
+const oneOf = <T extends readonly string[]>(xs: T, v: unknown): T[number] | null => (typeof v === "string" && (xs as readonly string[]).includes(v.trim().toLowerCase()) ? (v.trim().toLowerCase() as T[number]) : null);
+
+/** The plan part of an angle, checked like the angle (content rules, nothing instruction-like). A bad demo is dropped, not the plan. */
+export function normalizePlan(raw: unknown, ctx: { siteHost: string }): { plan: OpportunityPlan | null; reason?: string } {
+  if (!raw || typeof raw !== "object") return { plan: null, reason: "no_plan" };
+  const a = raw as Record<string, unknown>;
+  const ok = (v: string) => !injectionLike(v) && !contentIssues(v, { to: "", siteHost: ctx.siteHost }).length;
+  const t = (o: Record<string, unknown>, k: string, min: number, max = 300) => { const v = typeof o[k] === "string" ? stripCitations(cleanLine(o[k] as string)).slice(0, max) : ""; return v.length >= min ? v : null; };
+  const solution = t(a, "solution", 10), value = t(a, "value", 10), confirmIf = t(a, "confirm_if", 10), disproveIf = t(a, "disprove_if", 10), nextAction = t(a, "next_action", 6, 200);
+  const impact = oneOf(PLAN_IMPACTS, a.impact), effort = oneOf(PLAN_EFFORTS, a.effort), serviceMatch = oneOf(SERVICE_MATCHES, a.service_match);
+  if (!solution || !value || !confirmIf || !disproveIf || !nextAction || !impact || !effort || !serviceMatch) return { plan: null, reason: "plan_incomplete" };
+  if (![solution, value, confirmIf, disproveIf, nextAction].every(ok)) return { plan: null, reason: "plan_content_rules" };
+  const list = (v: unknown) => (Array.isArray(v) ? v : []).slice(0, 4).map((x) => (typeof x === "string" ? cleanLine(x).slice(0, 160) : "")).filter((x) => x.length >= 3);
+  let demo: DemoOffer | null = null;
+  // A sample of something the salesperson doesn't sell would commit them to work outside their offer: none.
+  const d = serviceMatch !== "none" && a.demo && typeof a.demo === "object" ? (a.demo as Record<string, unknown>) : null;
+  if (d) {
+    const title = t(d, "title", 5, 120), scope = t(d, "scope", 10), dEffort = oneOf(DEMO_EFFORTS, d.effort);
+    const assumptions = list(d.assumptions), exclusions = list(d.exclusions), needs = list(d.needs);
+    if (title && scope && dEffort && [title, scope, ...assumptions, ...exclusions, ...needs].every(ok)) demo = { title, scope, effort: dEffort, assumptions, exclusions, needs };
+  }
+  return { plan: { solution, value, impact, effort, serviceMatch, confirmIf, disproveIf, nextAction, demo } };
 }
 
 /**
@@ -276,7 +337,7 @@ export interface Angle {
 export function normalizeAngle(raw: unknown, ctx: { allowedIds: number[]; people: string[]; siteHost: string }): { angle: Angle | null; reason?: string } {
   if (!raw || typeof raw !== "object") return { angle: null, reason: "not_an_object" };
   const a = raw as Record<string, unknown>;
-  const t = (k: string, min: number, max = 300) => { const v = typeof a[k] === "string" ? cleanLine(a[k] as string).slice(0, max) : ""; return v.length >= min ? v : null; };
+  const t = (k: string, min: number, max = 300) => { const v = typeof a[k] === "string" ? stripCitations(cleanLine(a[k] as string)).slice(0, max) : ""; return v.length >= min ? v : null; };
   const problem = t("problem", 10), opportunity = t("opportunity", 10), positioning = t("positioning", 10), reason = t("reason", 10);
   if (!problem || !opportunity || !positioning || !reason) return { angle: null, reason: "missing_text" };
   const all = [problem, opportunity, positioning, reason].join("\n");
@@ -287,7 +348,11 @@ export function normalizeAngle(raw: unknown, ctx: { allowedIds: number[]; people
   const tp = typeof a.target_person === "string" ? cleanLine(a.target_person) : "";
   const targetPerson = tp ? (ctx.people.find((p) => p.toLowerCase() === tp.toLowerCase() || tp.toLowerCase().startsWith(p.toLowerCase())) ?? null) : null;
   if (tp && !targetPerson && !/^(none|null|unknown|n\/a)$/i.test(tp)) return { angle: null, reason: "unknown_person" };
-  return { angle: { problem, opportunity, positioning, reason, targetPerson, evidenceIds: Array.from(new Set(ev.map((m) => Number(m![1])))), confidence: a.confidence === "medium" ? "medium" : "low" } };
+  const plan = "plan" in a ? normalizePlan(a.plan, { siteHost: ctx.siteHost }) : null;
+  return {
+    angle: { problem, opportunity, positioning, reason, targetPerson, evidenceIds: Array.from(new Set(ev.map((m) => Number(m![1])))), confidence: a.confidence === "medium" ? "medium" : "low", ...(plan ? { plan: plan.plan } : {}) },
+    ...(plan?.reason ? { reason: plan.reason } : {}),
+  };
 }
 
 /* ── a contact form the site itself offers ──────────────────────────────── */

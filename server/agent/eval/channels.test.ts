@@ -10,6 +10,7 @@
  *     follow-ups, "STOP" opts out, replays change nothing, unknown senders are not stored;
  *   - LinkedIn and X: drafts within the real limits, copying is not sending, "I sent it" is recorded as the person's word;
  *   - approval integrity, AI drafts only from verified facts and within the plan's allowance, workspace isolation;
+ *   - AI drafts offer to make nothing, and describe the sender only when the workspace described its offer;
  *   - the access token is sealed, never returned, and bound to its connection.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -37,10 +38,11 @@ import { hashDraft } from "@shared/outreach-hash";
 import { memoryChannelStore } from "../../channels/memory-store";
 import * as svc from "../../channels/service";
 import { WhatsappError, type WhatsappClient, type WhatsappTemplate } from "../../channels/whatsapp-api";
+import type { ChatMessage } from "../../copilot/provider";
 import { decryptToken, loadKeyring } from "../../mail/token-crypto";
 import { leadsStore } from "../../leads/store";
 import { useWorld } from "./world-mocks";
-import { createWorld, seedLead, userRow, ORG1, ORG2, type World } from "./world";
+import { createWorld, seedLead, seedProfile, userRow, ORG1, ORG2, type World } from "./world";
 
 const world = () => (globalThis as any).__world as World;
 const OWNER = () => userRow() as any;
@@ -108,6 +110,8 @@ const inbound = (wamid: string, text: string, from = PHONE.slice(1), ts = T0.get
 
 beforeEach(() => {
   useWorld(createWorld());
+  // The sender has described their offer, as the model text describes them; tests of a missing offer clear it.
+  seedProfile(world(), { about: "I build simple websites for clinics." }); seedProfile(world(), { about: "I build simple websites for clinics." }, ORG2);
   now = T0; waCalls = []; waBehaviour = {}; suppressions = []; stopped = []; providerCalls = []; emailSends = 0;
   mem = memoryChannelStore({ emailSends: () => emailSends });
 });
@@ -428,6 +432,88 @@ describe("LinkedIn and X: drafted here, sent by the person", () => {
 });
 
 /* ── isolation and permissions ──────────────────────────────────────────── */
+
+/* ── what an AI draft may say about the sender ──────────────────────────── */
+
+describe("AI drafts on every channel: the sender is described only as their offer says, and nothing is offered to be made", () => {
+  const CHANNELS = [["whatsapp", "text"], ["linkedin", "connection_note"], ["linkedin", "message"], ["x", "dm"]] as const;
+  const WEBSITES = { about: "I build simple websites for clinics.", services: ["Websites"] };
+  const BOOKKEEPING = { about: "I do bookkeeping for small clinics.", services: ["Bookkeeping"] };
+  /** A message that fits every channel's AI-draft length (LinkedIn messages need 120+, connection notes at most 200). */
+  const say = (middle: string) => `Hello, I saw on your website that you run a family dental clinic in Siliguri. ${middle} Would a quick chat next week be useful?`;
+  const NEUTRAL = say("How do most of your patients book a visit today, by phone or online?");
+  let n = 0;
+  const prompts: string[][] = [];
+  const scripted = (...texts: string[]) => deps({ chat: (async (_t: unknown, messages: ChatMessage[]) => {
+    prompts.push(messages.map((m) => String(m.content)));
+    return { content: JSON.stringify({ text: texts[Math.min(prompts.length - 1, texts.length - 1)] }), toolCalls: [], usage: { inputTokens: 1, outputTokens: 1 } };
+  }) as any });
+  async function aiDraft(channel: string, kind: string, texts: string[], user = OWNER()) {
+    prompts.length = 0;
+    const l = await lead({ companyName: `Clinic ${++n}`, domain: `clinic${n}.in` }, user.organizationId);
+    if (channel === "whatsapp") await optIn(l.id, user);
+    return svc.draftChannelMessage(user, l.id, { channel, kind, write: "ai", ...(channel === "whatsapp" ? { to: PHONE } : {}) }, scripted(...texts)) as Promise<any>;
+  }
+  const setOffer = (offer: typeof WEBSITES | null, orgId = ORG1) => (offer ? seedProfile(world(), offer, orgId) : world().profiles.delete(orgId));
+
+  const CASES: [string, typeof WEBSITES | null, string, "ok" | "describes_sender" | "unsupported_sender_claim" | "unrequested_offer"][] = [
+    ["no offer: 'I build websites.'", null, "I build websites.", "describes_sender"],
+    ["no offer: 'We develop mobile apps.'", null, "We develop mobile apps.", "describes_sender"],
+    ["no offer: 'I help businesses automate workflows.'", null, "I help businesses automate workflows.", "describes_sender"],
+    ["no offer: 'Our team creates dashboards.'", null, "Our team creates dashboards.", "describes_sender"],
+    ["no offer: casing, curly contraction, punctuation", null, "WE’RE A small web STUDIO!!", "describes_sender"],
+    ["no offer: a neutral question", null, "Are online bookings something you are looking at?", "ok"],
+    ["offer: a description consistent with it", WEBSITES, "I build simple websites for clinics like yours.", "ok"],
+    ["offer: an exaggerated record", WEBSITES, "I've built over 200 websites for clinics in 10 years.", "unsupported_sender_claim"],
+    ["offer: a service it doesn't name", WEBSITES, "I build websites and mobile apps for clinics.", "unsupported_sender_claim"],
+    ["offer: a description that contradicts it", BOOKKEEPING, "I build websites for clinics.", "unsupported_sender_claim"],
+    ["offer: an offer to make a mock-up", WEBSITES, "I could put together a quick mock-up of a booking page.", "unrequested_offer"],
+  ];
+  describe.each(CHANNELS)("%s %s", (channel, kind) => {
+    it.each(CASES)("%s", async (_what, offer, middle, want) => {
+      setOffer(offer);
+      const r = await aiDraft(channel, kind, [say(middle)]);
+      if (want === "ok") {
+        expect(r).toMatchObject({ ok: true, retried: false, message: { body: say(middle), status: "draft" } });
+        expect(mem.messages.at(-1)!.promptVersion).toBe("draft-ch3");
+        expect(prompts).toHaveLength(1);
+        return;
+      }
+      // Refused: one retry that is told why, then nothing stored.
+      expect(r).toMatchObject({ ok: false, code: "draft_rejected" });
+      expect(r.issues).toEqual([want]);
+      expect(prompts).toHaveLength(2);
+      expect(prompts[1].at(-1)).toMatch(/cannot be used/);
+      expect(mem.messages.filter((m) => m.direction === "out" && m.promptVersion)).toHaveLength(0);
+    });
+    it("the prompt carries the rules and the offer, or says there is none", async () => {
+      await aiDraft(channel, kind, [NEUTRAL]);
+      expect(prompts[0][0]).toMatch(/Never offer to make, prepare, put together or send anything/);
+      expect(prompts[0][0]).toMatch(/never add another service, years of experience, credentials/);
+      expect(prompts[0][1]).toContain("I build simple websites for clinics.");
+      setOffer(null);
+      await aiDraft(channel, kind, [NEUTRAL]);
+      expect(prompts[0][1]).toContain("(the sender has not described what they offer)");
+    });
+    it("a retry that fixes the description is saved; a retry that offers a mock-up instead is still refused", async () => {
+      setOffer(null);
+      const fixed = await aiDraft(channel, kind, [say("I'm a web designer."), NEUTRAL]);
+      expect(fixed).toMatchObject({ ok: true, retried: true, message: { body: NEUTRAL } });
+      expect(prompts[1].at(-1)).toMatch(/says what the sender is or does/);
+      const swapped = await aiDraft(channel, kind, [say("I build websites."), say("I could prepare a sample booking page for you.")]);
+      expect(swapped).toMatchObject({ ok: false, code: "draft_rejected", issues: ["unrequested_offer"] });
+      setOffer(WEBSITES);
+      const stillOffering = await aiDraft(channel, kind, [say("Happy to put together a mock-up."), say("I'd gladly prepare a prototype.")]);
+      expect(stillOffering).toMatchObject({ ok: false, code: "draft_rejected", issues: ["unrequested_offer"] });
+    });
+  });
+  it("another workspace's offer never counts: with none of its own, a workspace's draft still can't describe the sender", async () => {
+    setOffer(null, ORG1); setOffer(WEBSITES, ORG2);
+    expect(await aiDraft("x", "dm", [say("I build simple websites for clinics like yours.")])).toMatchObject({ ok: false, issues: ["describes_sender"] });
+    expect(prompts[0][1]).not.toContain("I build simple websites");
+    expect(await aiDraft("x", "dm", [say("I build simple websites for clinics like yours.")], OTHER())).toMatchObject({ ok: true });
+  });
+});
 
 describe("workspace isolation and permissions", () => {
   it("another workspace can't read, approve, send, mark or cancel a message, and a reader can't write", async () => {

@@ -35,7 +35,10 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
   const { toast } = useToast();
   const canRun = memberCan(user as any, "deals.create");
   const gmail = useGmailCanSend(); // only offered (and mentioned) where this person can really send from Gmail
-  const q = useQuery<{ messages: Message[] }>({ queryKey: [messagesUrl(leadId)], retry: false });
+  const q = useQuery<{ messages: Message[]; sample?: { title: string; scope: string } | null }>({ queryKey: [messagesUrl(leadId)], retry: false });
+  const sample = q.data?.sample ?? null;
+  // Offering the plan's sample commits the person's time, so it's their choice, off until they tick it.
+  const [offerSample, setOfferSample] = useState(false);
   const current = q.data?.messages.find((m) => m.status === "draft" || m.status === "approved" || m.status === "sending") ?? null;
   const lastSent = q.data?.messages.find((m) => m.status === "sent") ?? null;
 
@@ -47,7 +50,7 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
 
   const done = () => { void refreshLeads(); };
   const fail = (title: string) => (e: unknown) => toast({ title, description: leadError(e), variant: "destructive" });
-  const draft = useMutation({ mutationFn: () => leadCall("POST", draftUrl(leadId), {}), onSuccess: done, onError: fail("Couldn't write the message") });
+  const draft = useMutation({ mutationFn: () => leadCall("POST", draftUrl(leadId), { offerSample: !!sample && offerSample }), onSuccess: done, onError: fail("Couldn't write the message") });
   const save = useMutation({ mutationFn: () => leadCall("PATCH", messageUrl(current!.id), { subject, body }), onSuccess: done, onError: fail("Couldn't save your changes") });
   // Activation: a reviewed and approved draft (not merely generated), and a message recorded as sent.
   const approve = useMutation({ mutationFn: () => leadCall("POST", messageUrl(current!.id, "approve"), { bodyHash: current!.bodyHash }), onSuccess: () => { trackEvent("outreach_draft_approved", { source: "lead", edited: !!current?.edited, by_ai: current?.createdBy === "agent" }); done(); }, onError: fail("Couldn't approve it") });
@@ -95,6 +98,16 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
             </Button>
           )}
         </div>
+
+        {!current && !lastSent && canRun && sample && (
+          <label className="flex items-start gap-2 rounded-lg border border-border/70 p-2.5 text-sm" data-testid="outreach-offer-sample">
+            <input type="checkbox" className="mt-0.5 h-4 w-4 accent-primary" checked={offerSample} onChange={(e) => setOfferSample(e.target.checked)} disabled={busy} />
+            <span>
+              <span className="font-medium">Offer a small sample: {sample.title}</span>
+              <span className="block text-xs text-muted-foreground">{sample.scope} Only tick this if you're happy to make it.</span>
+            </span>
+          </label>
+        )}
 
         {current && (
           <div className="space-y-2.5" data-testid="outreach-message">

@@ -1,3 +1,5 @@
+import type { OpportunityPlan } from "@shared/prospect-intel";
+import type { OpportunityScore } from "@shared/opportunity-score";
 import type { ProspectFeedback } from "@shared/prospect-feedback";
 /** Client Radar: the shapes the /api/outbound routes return, and their addresses. */
 export const OUTBOUND_RUNS_URL = "/api/outbound/runs";
@@ -44,10 +46,12 @@ export interface ProspectCard {
   siteSignals?: string[];
   feedback?: ProspectFeedback | null;
 }
-export interface Angle { problem: string; opportunity: string; positioning: string; targetPerson: string | null; reason: string; evidenceIds: number[]; confidence: "low" | "medium" }
+export interface Angle { problem: string; opportunity: string; positioning: string; targetPerson: string | null; reason: string; evidenceIds: number[]; confidence: "low" | "medium"; plan?: OpportunityPlan | null }
 export interface Brief {
   prospect: ProspectCard; facts: Evidence[]; signals: Evidence[]; people: Evidence[]; inferences: Evidence[]; opportunities: Evidence[];
   sources: { provider: string; query: string; url: string; title: string }[]; angle: Angle | null; providers: { contact: boolean };
+  /** Older servers omit it. */
+  opportunityScore?: OpportunityScore | null;
 }
 
 export const COUNTRY_NAME: Record<string, string> = {

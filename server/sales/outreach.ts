@@ -25,7 +25,7 @@
  *  - the timeline records ids and counts only, never message text.
  */
 import { z } from "zod";
-import { checkDraft, checkStructure, issuesForRetry, type Issue } from "@shared/outreach-check";
+import { checkDraft, checkStructure, issuesForRetry, offerDescribed, scopeIssues, type Issue } from "@shared/outreach-check";
 import { hashDraft } from "@shared/outreach-hash";
 import { FOLLOW_UP_DAYS, OUTCOMES, SUPPRESSION_REASON_LABEL, isRemovable, parseSuppressionInput, pathToContacted, suppressionKeys, type Outcome, type SuppressionReason } from "@shared/outreach-safety";
 import { latestPerField, normField, type ScoreClaim } from "@shared/lead-score";
@@ -140,7 +140,8 @@ const asDraft = (text: string | null): { subject: string; body: string } | null 
   return raw && typeof raw.subject === "string" && typeof raw.body === "string" ? { subject: raw.subject.trim(), body: raw.body.replace(/\r\n/g, "\n").trim() } : null;
 };
 
-export async function listMessages(user: Who, leadId: number, d: Partial<OutreachDeps> = {}): Promise<Result<{ messages: MessageView[] }>> {
+/** `sample`: the proof-of-value sample the lead's opportunity plan proposed (Client Radar), which a first draft can offer. */
+export async function listMessages(user: Who, leadId: number, d: Partial<OutreachDeps> = {}): Promise<Result<{ messages: MessageView[]; sample: { title: string; scope: string } | null }>> {
   const deps = { ...defaults(), ...d };
   const gate = readGate(user);
   if (gate) return gate;
@@ -149,11 +150,12 @@ export async function listMessages(user: Who, leadId: number, d: Partial<Outreac
   if (!got.ok) return got;
   await repairAfterSend(user.organizationId!, 10, deps);
   const rows = await deps.store.listForLead(user.organizationId!, leadId);
-  return { ok: true, messages: rows.map(messageView) };
+  const sample = await import("../outbound/lead-angle").then((m) => m.angleForLead(user.organizationId!, leadId)).then((a) => a?.sample ?? null).catch(() => null);
+  return { ok: true, messages: rows.map(messageView), sample };
 }
 
 /** Writes the first message to a lead. Synchronous: one model call (and at most one retry), then the draft is stored for review. */
-export async function draftOutreach(user: Who, leadId: number, opts: { by?: "user" | "agent" } = {}, d: Partial<OutreachDeps> = {}): Promise<Result<{ message: MessageView; retried: boolean }>> {
+export async function draftOutreach(user: Who, leadId: number, opts: { by?: "user" | "agent"; offerSample?: boolean } = {}, d: Partial<OutreachDeps> = {}): Promise<Result<{ message: MessageView; retried: boolean }>> {
   const deps = { ...defaults(), ...d };
   const gate = writeGate(user);
   if (gate) return gate;
@@ -213,8 +215,15 @@ export async function draftOutreach(user: Who, leadId: number, opts: { by?: "use
     offer: ideal.ok ? { about: ideal.profile.about, services: ideal.profile.services } : { about: null, services: [] },
     company: lead.companyName, greetName: lead.contactName?.trim() || null,
     facts, angles, notes: notes.map((n) => ({ title: n.title, text: n.text })),
-    angle: await import("../outbound/lead-angle").then((m) => m.angleForLead(orgId, leadId)).catch(() => null),
   };
+  const angle = await import("../outbound/lead-angle").then((m) => m.angleForLead(orgId, leadId)).catch(() => null);
+  // Without the sender's own words for what they offer, nothing about a service reaches the model (it would invent one).
+  const described = offerDescribed(input.offer);
+  input.angle = angle && !described ? { ...angle, solution: null } : angle;
+  // The sample is offered only when the person asked for it here (it commits their time); an agent never offers it.
+  input.sample = opts.offerSample && opts.by !== "agent" && described ? angle?.sample ?? null : null;
+  // "What the sender offers" is the only source for what a draft says about the sender (shared/outreach-check.ts scopeIssues).
+  const scope = { sampleOffered: !!input.sample, offer: input.offer };
   const ctx = { to: to.address, siteHost: siteHost(lead.domain || (() => { try { return new URL(lead.website ?? "").hostname; } catch { return ""; } })()) };
   const trace = { task: "draft" as const, orgId, userId: user.id, leadId, promptVersion: OUTREACH_PROMPT_VERSION };
   const model = modelFor("draft");
@@ -225,7 +234,7 @@ export async function draftOutreach(user: Who, leadId: number, opts: { by?: "use
     for (let attempt = 0; attempt < 2; attempt++) {
       const reply = await deps.chat(trace, messages, { maxTokens: 2500, model });
       draft = asDraft(reply.content);
-      issues = draft ? checkDraft(draft, ctx) : [{ code: "body_length", message: "Reply with only the JSON object: {\"subject\":...,\"body\":...}." }];
+      issues = draft ? [...checkDraft(draft, ctx), ...scopeIssues(draft, scope)] : [{ code: "body_length", message: "Reply with only the JSON object: {\"subject\":...,\"body\":...}." }];
       if (!issues.length) break;
       retried = true;
       messages.push({ role: "assistant", content: reply.content ?? "" }, { role: "user", content: `That draft cannot be used. Fix these problems and return the JSON object again:\n${issuesForRetry(issues)}` });

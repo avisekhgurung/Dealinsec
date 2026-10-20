@@ -23,6 +23,7 @@ import {
   type ChannelStatus, type ChannelMessageStatus, type DeliveryState, type MessageKind, type SendMode, type ShortChannel,
 } from "@shared/channels";
 import { hashDraft } from "@shared/outreach-hash";
+import { scopeIssues } from "@shared/outreach-check";
 import { pathToContacted } from "@shared/outreach-safety";
 import { canMove, type LeadStatus } from "@shared/leads";
 import { siteHost } from "@shared/research";
@@ -333,6 +334,8 @@ async function aiDraft(user: Who, lead: any, claims: any[], channel: ShortChanne
     company: lead.companyName, greetName: lead.contactName?.trim() || null, facts, angles, notes: [],
     angle: await import("../outbound/lead-angle").then((m) => m.angleForLead(orgId, lead.id)).catch(() => null),
   };
+  // As with email: no sample is ever offered on a channel, and the sender is described only as "What the sender offers" says.
+  const scope = { sampleOffered: false, offer: input.offer };
   const site = siteHost(lead.domain || (() => { try { return new URL(lead.website ?? "").hostname; } catch { return ""; } })());
   const trace = { task: "draft" as const, orgId, userId: user.id, leadId: lead.id, promptVersion: CHANNEL_PROMPT_VERSION };
   const messages: ChatMessage[] = [{ role: "system", content: channelSystemPrompt(channel, kind) }, { role: "user", content: channelUserMessage(input) }];
@@ -342,7 +345,7 @@ async function aiDraft(user: Who, lead: any, claims: any[], channel: ShortChanne
       const reply = await deps.chat(trace, messages, { maxTokens: 1200, model: modelFor("draft") });
       const raw = parseJsonObject(reply.content) as { text?: unknown } | null;
       text = raw && typeof raw.text === "string" ? raw.text.replace(/\r\n/g, "\n").trim() : null;
-      issues = text ? checkChannelDraft(text, kind, { siteHost: site }) : [{ code: "body_length", message: "Reply with only the JSON object: {\"text\":...}." }];
+      issues = text ? [...checkChannelDraft(text, kind, { siteHost: site }), ...scopeIssues({ subject: "", body: text }, scope)] : [{ code: "body_length", message: "Reply with only the JSON object: {\"text\":...}." }];
       if (!issues.length) break;
       retried = true;
       messages.push({ role: "assistant", content: reply.content ?? "" }, { role: "user", content: `That message cannot be used. Fix these problems and return the JSON object again:\n${issues.map((x) => `- ${x.message}`).join("\n")}` });

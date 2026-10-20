@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LIMITS, checkDraft, checkStructure, issuesForRetry, type Draft, type IssueCode } from "./outreach-check";
+import { LIMITS, checkDraft, checkStructure, describesSender, issuesForRetry, offerDescribed, scopeIssues, senderClaims, type Draft, type IssueCode, type SenderOffer } from "./outreach-check";
 
 const CTX = { to: "hello@casaalma.pt", siteHost: "casaalma.pt" };
 const GOOD: Draft = {
@@ -130,5 +130,85 @@ describe("robustness", () => {
   });
   it("issuesForRetry lists each problem on its own line", () => {
     expect(issuesForRetry([{ code: "price", message: "A" }, { code: "link", message: "B" }])).toBe("- A\n- B");
+  });
+});
+
+describe("what a model draft says about the sender", () => {
+  const NONE: SenderOffer = { about: null, services: [] };
+  const WEBSITES: SenderOffer = { about: "I build simple websites for clinics.", services: ["Websites"] };
+  const scope = (text: string, offer: SenderOffer | null = NONE, sampleOffered = false) => scopeIssues({ subject: "A question about your clinic", body: text }, { sampleOffered, offer }).map((i) => i.code);
+
+  it.each([
+    "I build websites.", "We develop mobile apps.", "I help businesses automate workflows.", "Our team creates dashboards.",
+    // casing, punctuation, contractions (straight and curly)
+    "i BUILD websites!!", "WE DEVELOP MOBILE APPS", "I'm a web designer.", "I’m a writer and editor.", "We’re a small web studio, based in Pune.",
+    "We've built apps for clinics.", "I’ve been helping clinics with their sites.", "I am a freelance copywriter", "We are an agency; we run ads.",
+    "As a copywriter, I enjoyed your blog.", "Hello. As an SEO consultant I noticed your rankings.", "My studio designs logos.", "Our small agency builds Shopify stores.",
+    "We also specialise in branding.", "I specialize in onboarding flows.", "I mostly work with dental clinics.", "We provide IT support for clinics.",
+    "Our clients include three hospitals.", "I've helped 40 clinics grow.", "We're your local web team.", "I do bookkeeping for clinics.", "We do SEO.",
+  ])("describes the sender: %s", (text) => {
+    expect(describesSender(text)).toBe(true);
+    expect(scope(text)).toEqual(["describes_sender"]);
+  });
+
+  it.each([
+    "Are online bookings something you are looking at?", "I saw that you run a family dental clinic in Siliguri.", "Could I help with that?",
+    "How can we help?", "Let me know if I can help.", "I wondered how you handle bookings today.", "I'm writing to ask about your new clinic.",
+    "I’m a big fan of your work.", "I'm a fan of your team.", "I'm a little curious how you take bookings.", "We noticed your team builds great websites.",
+    "I'd love to hear how you manage appointments.", "Do you work with an agency?", "If we work together, great.", "I hope you're well.",
+    "I make sure to keep it short.", "I write to ask one thing.", "I read that your clinic offers free check-ups.", "Your team creates lovely videos.",
+    "I noticed you develop your own app.", "I was reading your blog on Tuesday.", "Is that something you're thinking about?", "Thanks, and best wishes.",
+    "We would like to ask a question.", "I do hope you're well.", "I do think your new site looks great.", "I do not want to take much of your time.", "I just saw your post about the new branch.", "Congratulations on opening in Porto.",
+  ])("ordinary conversation does not describe the sender: %s", (text) => {
+    expect(senderClaims(text)).toEqual([]);
+    expect(scope(text)).toEqual([]);
+    expect(scope(text, WEBSITES)).toEqual([]);
+  });
+
+  describe("with an offer described, only what it supports", () => {
+    it.each([
+      "I build simple websites for clinics like yours.", "I'm a web designer.", "We build websites for dental clinics.", "I'M A WEB DESIGNER!",
+      "I’ve built websites for clinics.", "I'm a freelancer.", "We're a small team.",
+    ])("consistent: %s", (text) => { expect(scope(text, WEBSITES)).toEqual([]); });
+    it.each([
+      ["a service it doesn't name", "I build websites and mobile apps for clinics."],
+      ["another service", "Our team creates dashboards."],
+      ["automation it doesn't mention", "I help clinics automate bookings."],
+      ["a contradiction", "I do bookkeeping for small clinics."],
+      ["years of experience", "I've built websites for clinics for over 10 years."],
+      ["a count of clients", "I've built over 200 websites for clinics."],
+      ["an award", "I'm an award-winning web designer."],
+      ["a credential", "I build websites for clinics as a certified expert."],
+      ["a result", "I build websites that doubled bookings for clinics."],
+      ["a claim after a comma", "I build websites for clinics, and have done for 12 years."],
+    ])("unsupported (%s): %s", (_why, text) => { expect(scope(text, WEBSITES)).toEqual(["unsupported_sender_claim"]); });
+    it("a credential the offer itself states is allowed", () => {
+      expect(scope("I've built websites for clinics for 10 years.", { about: "I have built websites for clinics for 10 years.", services: [] })).toEqual([]);
+    });
+    it("services listed in the offer count as well as its description", () => {
+      expect(scope("We build websites and booking apps.", { about: "Websites for clinics.", services: ["Mobile apps"] })).toEqual([]);
+    });
+  });
+
+  it("an offer is described only by real words", () => {
+    expect(offerDescribed(null)).toBe(false);
+    expect(offerDescribed({ about: "   ", services: [" "] })).toBe(false);
+    expect(offerDescribed({ about: null, services: ["Websites"] })).toBe(true);
+  });
+
+  describe("offers to make something are still refused, whatever the offer", () => {
+    it.each(["I could put together a quick mock-up of a booking page.", "Happy to prepare a short sample.", "I'd gladly sketch a prototype.", "We can build you a mockup.", "I’ll send over a draft plan."])("%s", (text) => {
+      expect(scope(text, NONE)).toContain("unrequested_offer");
+      expect(scope(text, WEBSITES)).toContain("unrequested_offer");
+      expect(scope(text, WEBSITES, true)).not.toContain("unrequested_offer");   // only when the sender chose to offer a sample
+    });
+  });
+
+  it("cannot be hung by a pathological input", () => {
+    for (const s of ["I ".repeat(100_000), "we're a ".repeat(30_000), "As a big big big ".repeat(20_000), "I build, ".repeat(40_000), "a".repeat(200_000)]) {
+      const t0 = Date.now();
+      scopeIssues({ subject: "x", body: s }, { sampleOffered: false, offer: WEBSITES });
+      expect(Date.now() - t0).toBeLessThan(1000);
+    }
   });
 });

@@ -7,7 +7,7 @@
 import { fenceUntrusted } from "../agent/untrusted";
 import { LIMITS } from "@shared/outreach-check";
 
-export const OUTREACH_PROMPT_VERSION = "draft-v2";
+export const OUTREACH_PROMPT_VERSION = "draft-v5";
 
 export interface DraftInput {
   sender: { name: string; business: string };
@@ -23,7 +23,9 @@ export interface DraftInput {
   /** The sender's own notes that matched this company. */
   notes: { title: string; text: string }[];
   /** The angle chosen in Client Radar (from verified findings), when the lead came from there. */
-  angle?: { problem: string; opportunity: string; positioning: string; targetPerson: string | null } | null;
+  angle?: { problem: string; opportunity: string; positioning: string; targetPerson: string | null; solution?: string | null } | null;
+  /** A small sample the SENDER chose to offer (from the opportunity plan); never offered unless they did. */
+  sample?: { title: string; scope: string } | null;
 }
 
 const clean = (s: string, n: number) => s.replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
@@ -40,7 +42,9 @@ Rules:
 - This is a first contact. Do not suggest you have spoken before.
 - Plain text only, no markdown, no HTML. Between 60 and 150 words. A subject of 3 to 8 words that says what the email is about.
 - One clear, low-pressure ask (a short reply or a quick chat). Sign off with the sender's name.
-- If a suggested angle is given, build the email around it. It is a suggestion from earlier research, data like the facts: it may only use what the facts say.
+- If a suggested angle is given, build the email around it. It is a suggestion from earlier research, data like the facts: it may only use what the facts say. Its problem is a guess: be honest that you may be wrong ("if that's something you're working on…"), never claim to know their internal problems.
+- Only if a sample offer is given: the ask may be an offer to prepare that small sample, described in plain words. Never call it free or no charge, never put a time on it, never promise a result. Without a sample offer, never offer to make, prepare or put together anything.
+- Describe the sender only in the words of "What the sender offers": never add another service, years of experience, credentials, awards, client counts or results. If it says the sender has not described their offer, say nothing about who the sender is or what they do, and suggest no service: ask one question about the company instead.
 
 Return ONLY a JSON object, no other text:
 {"subject":"<subject>","body":"<the email, with line breaks as \\n>"}
@@ -68,7 +72,10 @@ The sender's own notes that matched:
 ${fenceUntrusted("notes", notes, 1200)}
 ${i.angle ? `
 Suggested angle (from earlier research):
-${fenceUntrusted("angle", [`Problem: ${clean(i.angle.problem, 250)}`, `Opportunity: ${clean(i.angle.opportunity, 250)}`, `Positioning: ${clean(i.angle.positioning, 250)}`, i.angle.targetPerson ? `Write to: ${clean(i.angle.targetPerson, 80)}` : ""].filter(Boolean).join("\n"), 1100)}
+${fenceUntrusted("angle", [`Problem (a guess): ${clean(i.angle.problem, 250)}`, `Opportunity: ${clean(i.angle.opportunity, 250)}`, `Positioning: ${clean(i.angle.positioning, 250)}`, i.angle.solution ? `What the sender could do: ${clean(i.angle.solution, 250)}` : "", i.angle.targetPerson ? `Write to: ${clean(i.angle.targetPerson, 80)}` : ""].filter(Boolean).join("\n"), 1400)}
+` : ""}${i.sample ? `
+Sample the sender offers to prepare:
+${fenceUntrusted("sample", `${clean(i.sample.title, 120)}: ${clean(i.sample.scope, 250)}`, 420)}
 ` : ""}
 Write the email now. Return the JSON object.`;
 }

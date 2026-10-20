@@ -115,8 +115,8 @@ export function registerSalesRoutes(app: Express) {
       res.status(500).json({ code: "internal", error: "Something went wrong on our side." });
     }
   };
-  app.get("/api/sales/leads/:id/messages", isAuthenticated, gate, messagesGate, guarded("sales_messages", async (req, res, id) => reply(res, await listMessages(req.user, id), (r) => ({ messages: r.messages }))));
-  app.post("/api/sales/leads/:id/draft", isAuthenticated, gate, messagesGate, guarded("sales_draft", async (req, res, id) => reply(res, await draftOutreach(req.user, id), (r) => ({ message: r.message, retried: r.retried }), 201)));
+  app.get("/api/sales/leads/:id/messages", isAuthenticated, gate, messagesGate, guarded("sales_messages", async (req, res, id) => reply(res, await listMessages(req.user, id), (r) => ({ messages: r.messages, sample: r.sample }))));
+  app.post("/api/sales/leads/:id/draft", isAuthenticated, gate, messagesGate, guarded("sales_draft", async (req, res, id) => reply(res, await draftOutreach(req.user, id, { offerSample: req.body?.offerSample === true }), (r) => ({ message: r.message, retried: r.retried }), 201)));
   app.patch("/api/sales/messages/:id", isAuthenticated, gate, messagesGate, guarded("sales_message_edit", async (req, res, id) => reply(res, await editDraft(req.user, id, req.body), (r) => ({ message: r.message }))));
   app.post("/api/sales/messages/:id/approve", isAuthenticated, gate, messagesGate, guarded("sales_message_approve", async (req, res, id) => reply(res, await approveMessage(req.user, id, req.body?.bodyHash), (r) => ({ message: r.message, already: r.already }))));
   app.post("/api/sales/messages/:id/open", isAuthenticated, gate, messagesGate, guarded("sales_message_open", async (req, res, id) => { res.setHeader("Cache-Control", "no-store"); return reply(res, await openApproved(req.user, id, req.body?.bodyHash), (r) => ({ to: r.to, subject: r.subject, body: r.body })); }));

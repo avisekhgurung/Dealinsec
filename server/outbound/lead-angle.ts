@@ -5,15 +5,25 @@
 import { REJECT_LABEL, domainOf, type RejectReason } from "@shared/prospect";
 import { outboundStore, prospectsTablesReady } from "./store";
 
-export interface LeadAngle { problem: string; opportunity: string; positioning: string; targetPerson: string | null }
+export interface LeadAngle {
+  problem: string; opportunity: string; positioning: string; targetPerson: string | null;
+  /** From the opportunity plan (angle-v3 and later), when there is one. */
+  solution: string | null;
+  /** The small proof-of-value sample the plan proposed: offered in a draft only when the sender asks for it. */
+  sample: { title: string; scope: string } | null;
+}
 
 export async function angleForLead(orgId: string, leadId: number): Promise<LeadAngle | null> {
   try {
     if (!(await prospectsTablesReady())) return null;
-    const a = (await outboundStore.prospectByLead(orgId, leadId))?.angle as Partial<LeadAngle> | null | undefined;
-    return a && typeof a.problem === "string" && typeof a.opportunity === "string" && typeof a.positioning === "string"
-      ? { problem: a.problem, opportunity: a.opportunity, positioning: a.positioning, targetPerson: typeof a.targetPerson === "string" ? a.targetPerson : null }
-      : null;
+    const a = (await outboundStore.prospectByLead(orgId, leadId))?.angle as (Partial<LeadAngle> & { plan?: { solution?: unknown; demo?: { title?: unknown; scope?: unknown } | null } | null }) | null | undefined;
+    if (!(a && typeof a.problem === "string" && typeof a.opportunity === "string" && typeof a.positioning === "string")) return null;
+    const plan = a.plan && typeof a.plan === "object" ? a.plan : null;
+    const demo = plan?.demo && typeof plan.demo.title === "string" && typeof plan.demo.scope === "string" ? { title: plan.demo.title, scope: plan.demo.scope } : null;
+    return {
+      problem: a.problem, opportunity: a.opportunity, positioning: a.positioning, targetPerson: typeof a.targetPerson === "string" ? a.targetPerson : null,
+      solution: typeof plan?.solution === "string" ? plan.solution : null, sample: demo,
+    };
   } catch { return null; }
 }
 

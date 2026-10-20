@@ -62,7 +62,8 @@ const events = (leadId: number, kind: string) => world().leads.events.filter((e)
 const status = (leadId: number) => world().leads.leads.find((x) => x.id === leadId)!.status;
 const code = (r: any) => (r.ok ? "ok" : r.code);
 
-beforeEach(() => { useWorld(createWorld()); prompts = []; reply(); vi.spyOn(console, "log").mockImplementation(() => {}); });
+// The sender has described their offer (their ideal client profile), as BODY describes them; tests of a missing offer clear it.
+beforeEach(() => { useWorld(createWorld()); seedProfile(world(), { about: "I help small hotel groups keep their client paperwork tidy." }); seedProfile(world(), { about: "I help small hotel groups keep their client paperwork tidy." }, ORG2); prompts = []; reply(); vi.spyOn(console, "log").mockImplementation(() => {}); });
 afterEach(() => { delete process.env.SALES_DAILY_DRAFT_LIMIT; delete process.env.OUTBOUND_MONTHLY_DRAFTS_PRO; });
 
 describe("writing a draft", () => {
@@ -84,7 +85,7 @@ describe("writing a draft", () => {
   it("traces the call (task, prompt version, tokens, cost) and records neither the prompt nor the draft", async () => {
     const l = await researched(); await draft(l.id);
     expect(world().llmCalls).toHaveLength(1);
-    expect(world().llmCalls[0]).toMatchObject({ task: "draft", ok: true, promptVersion: "draft-v2", tokensIn: 900, tokensOut: 180, leadId: l.id, organizationId: ORG1 });
+    expect(world().llmCalls[0]).toMatchObject({ task: "draft", ok: true, promptVersion: "draft-v5", tokensIn: 900, tokensOut: 180, leadId: l.id, organizationId: ORG1 });
     expect(JSON.stringify(world().llmCalls)).not.toMatch(/Casa Alma|boutique|hello@/i);
   });
   it("the timeline records ids and counts, never the message text", async () => {
@@ -182,6 +183,54 @@ describe("what the model is shown", () => {
     seedLead(world(), { companyName: "Rival Ltd", website: "https://rival.test" }, ORG2);
     await draft(l.id);
     expect(prompts[0][1].content).not.toMatch(/Rival/);
+  });
+});
+
+describe("what the email says about the sender: only what their offer says, and no offer to make anything", () => {
+  const HOTELS = { about: "I help small hotel groups keep their client paperwork tidy.", services: [] as string[] };
+  const WEBSITES = { about: "I build simple websites for clinics.", services: ["Websites"] };
+  const SENTENCE = "I help small hotel groups keep their client paperwork tidy, and I wondered whether that is something you are thinking about as you grow.";
+  const body = (middle: string) => BODY.replace(SENTENCE, `${middle} I wondered whether that is on your mind as you grow.`);
+  const setOffer = (offer: typeof HOTELS | null) => (offer ? seedProfile(world(), offer) : world().profiles.delete(ORG1));
+  const CASES: [string, typeof HOTELS | null, string, "ok" | "describes_sender" | "unsupported_sender_claim" | "unrequested_offer"][] = [
+    ["no offer: 'I build websites.'", null, "I build websites.", "describes_sender"],
+    ["no offer: 'We develop mobile apps.'", null, "We develop mobile apps.", "describes_sender"],
+    ["no offer: 'I help businesses automate workflows.'", null, "I help businesses automate workflows.", "describes_sender"],
+    ["no offer: 'Our team creates dashboards.'", null, "Our team creates dashboards.", "describes_sender"],
+    ["no offer: casing, curly contraction, punctuation", null, "i’M a FREELANCE copywriter!", "describes_sender"],
+    ["no offer: a neutral question", null, "Is guest paperwork something you are looking at?", "ok"],
+    ["offer: a description consistent with it", HOTELS, "I help small hotel groups keep their client paperwork tidy.", "ok"],
+    ["offer: an exaggerated record", HOTELS, "I've helped over 50 hotel groups keep their paperwork tidy for 12 years.", "unsupported_sender_claim"],
+    ["offer: services it doesn't name", HOTELS, "I help hotel groups with paperwork, websites and booking apps.", "unsupported_sender_claim"],
+    ["offer: a description that contradicts it", WEBSITES, "I help small hotel groups keep their client paperwork tidy.", "unsupported_sender_claim"],
+    ["offer: an offer to make a sample", HOTELS, "I could put together a sample checklist for your new hotel.", "unrequested_offer"],
+  ];
+  it.each(CASES)("%s", async (_what, offer, middle, want) => {
+    setOffer(offer);
+    const l = await researched();
+    script(asJson(SUBJECT, body(middle)));
+    const r = await draftOutreach(user(), l.id) as any;
+    if (want === "ok") {
+      expect(r).toMatchObject({ ok: true, retried: false, message: { body: body(middle), status: "draft" } });
+      expect(world().messages[0].promptVersion).toBe("draft-v5");
+      return;
+    }
+    expect(r).toMatchObject({ ok: false, code: "draft_rejected" });
+    expect(r.issues).toEqual([want]);
+    expect(prompts).toHaveLength(2);
+    expect(prompts[1].at(-1)!.content).toMatch(/cannot be used/);
+    expect(world().messages).toHaveLength(0);
+  });
+  it("the prompt states the rule; a retry that swaps the description for an offer to make something is still refused", async () => {
+    setOffer(null);
+    const l = await researched();
+    script(asJson(SUBJECT, body("I build websites.")), asJson(SUBJECT, body("Happy to put together a mock-up of your booking page.")));
+    expect(await draftOutreach(user(), l.id)).toMatchObject({ ok: false, code: "draft_rejected", issues: ["unrequested_offer"] });
+    expect(prompts[0][0].content).toMatch(/never add another service, years of experience, credentials/);
+    expect(prompts[0][1].content).toContain("(the sender has not described what they offer)");
+    // The first retry was told why (the conversation the model saw; the second reason is the refusal of try 2).
+    expect(prompts[1].filter((m) => m.role === "user").map((m) => m.content).join("\n")).toMatch(/says what the sender is or does[\s\S]*offers to make or prepare something/);
+    expect(world().messages).toHaveLength(0);
   });
 });
 

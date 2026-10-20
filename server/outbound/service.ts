@@ -9,7 +9,8 @@
 import { createHash } from "node:crypto";
 import { sanitizeQuery } from "@shared/discovery";
 import { describeIcp, icpSchema, mergeIcp, parseIcpFallback, searchStrategies, withSavedExclusions, type Icp } from "@shared/icp";
-import { normalizeAngle } from "@shared/prospect-intel";
+import { normalizeAngle, type Angle, type OpportunityPlan } from "@shared/prospect-intel";
+import { scoreOpportunity, weightsFrom, type CitedFinding, type OpportunityScore } from "@shared/opportunity-score";
 import { FRESHNESS_LABEL, PROSPECT_CLASS_LABEL, REJECT_LABEL, SIGNAL_LABEL, TIMING_LABEL, dateLabel, isContactFormRoute, isDecisionMaker, isSignalType, readiness, runBudget, signalDating, timingOf, type FindingLike, type ProspectClass, type RejectReason, type Timing, hasVerifiedEmail } from "@shared/prospect";
 import { roleRank } from "@shared/icp";
 import type { ProspectFindingRow, ProspectRow, ProspectRunRow } from "@shared/schema";
@@ -288,8 +289,10 @@ export async function getRun(user: Who, id: string, d: Partial<PipelineDeps> = {
   return { ok: true, run: runView(run), prospects: cards };
 }
 
-export interface StoredAngle { problem: string; opportunity: string; positioning: string; targetPerson: string | null; reason: string; evidenceIds: number[]; confidence: "low" | "medium"; promptVersion?: string; at?: string }
-export interface ProspectBrief { prospect: ProspectCard; facts: Evidence[]; signals: Evidence[]; people: Evidence[]; inferences: Evidence[]; opportunities: Evidence[]; sources: { provider: string; query: string; url: string; title: string }[]; angle: StoredAngle | null; providers: { contact: boolean } }
+export interface StoredAngle { problem: string; opportunity: string; positioning: string; targetPerson: string | null; reason: string; evidenceIds: number[]; confidence: "low" | "medium"; plan?: OpportunityPlan | null; promptVersion?: string; at?: string }
+export interface ProspectBrief { prospect: ProspectCard; facts: Evidence[]; signals: Evidence[]; people: Evidence[]; inferences: Evidence[]; opportunities: Evidence[]; sources: { provider: string; query: string; url: string; title: string }[]; angle: StoredAngle | null; providers: { contact: boolean };
+  /** The angle's opportunity score (shared/opportunity-score.ts), worked out again from today's evidence; null without an angle. */
+  opportunityScore: OpportunityScore | null }
 
 /* ── the person's verdict on a prospect (shared/prospect-feedback.ts) ───── */
 
@@ -318,6 +321,17 @@ export async function setProspectFeedback(user: Who, id: number, value: unknown,
   return { ok: true, feedback: value };
 }
 
+/** The stored angle scored against the findings it cites, as they stand now (a finding that is gone cites nothing). */
+function opportunityScoreOf(p: ProspectRow, ev: Evidence[]): OpportunityScore | null {
+  const a = p.angle as StoredAngle | null;
+  if (!a || !Array.isArray(a.evidenceIds)) return null;
+  const byId = new Map(ev.map((e) => [e.id, e]));
+  const cited: CitedFinding[] = a.evidenceIds.map((id) => byId.get(id)).filter((e): e is Evidence => !!e).map((e) => ({
+    id: e.id, kind: e.kind, type: e.type, status: e.status, url: e.url, quote: e.quote, dated: !!e.date, timing: e.timing,
+  }));
+  return scoreOpportunity({ cited, fitVerdict: (p.fit as any)?.verdict ?? null, plan: a.plan ?? null, weights: weightsFrom(process.env.OPPORTUNITY_WEIGHTS) });
+}
+
 export async function getProspect(user: Who, id: number, d: Partial<PipelineDeps> = {}): Promise<Result<{ brief: ProspectBrief }>> {
   const deps = { ...pipelineDeps(), ...d };
   const gate = readGate(user);
@@ -340,6 +354,7 @@ export async function getProspect(user: Who, id: number, d: Partial<PipelineDeps
       inferences: ev.filter((e) => e.kind === "fact" && e.status !== "confirmed"),
       opportunities: ev.filter((e) => e.kind === "opportunity"),
       sources: (p.sources as ProspectBrief["sources"]) ?? [], angle: (p.angle as StoredAngle | null) ?? null, providers: { contact: !!deps.contact },
+      opportunityScore: opportunityScoreOf(p, ev),
     },
   };
 }
@@ -428,19 +443,25 @@ export async function generateAngle(user: Who, id: number, d: Partial<PipelineDe
   const orgId = user.organizationId!;
   const p = await deps.store.getProspect(orgId, id);
   if (!p) return fail(404, "not_found", "That company isn't in your workspace.");
-  const fs = (await deps.store.findings(orgId, id)).filter((f) => f.kind !== "decision_maker" && (f.kind !== "signal" || signalDating(likeOf(f), deps.now()).band !== "stale"));
+  // Site-markup observations (an old copyright year, no mobile viewport) are hints, never a need: they stay in the brief
+  // but don't become the reason to write (live review, Oct 20: an angle built on a copyright line).
+  const fs = (await deps.store.findings(orgId, id)).filter((f) => f.kind !== "decision_maker" && f.type !== "site_signal" && (f.kind !== "signal" || signalDating(likeOf(f), deps.now()).band !== "stale"));
   if (!fs.some((f) => f.kind === "signal" || f.kind === "opportunity" || f.type === "pain_point")) return fail(422, "no_evidence", "There's nothing yet that says why to reach out now. Research the company first.");
   const people = (await deps.store.findings(orgId, id)).filter((f) => f.kind === "decision_maker").map((f) => String((f.meta as any)?.name ?? f.value.split(",")[0]));
   const saved = await savedProfile(orgId);
+  // What the salesperson sells, in their own words (the ideal client profile): the only basis for a solution or a sample.
+  const offer = [saved?.about?.trim() ?? "", saved?.services?.length ? `Services: ${saved.services.join(", ")}` : ""].filter(Boolean).join("\n") || null;
   const now = deps.now();
   const list = fs.map((f) => ({ id: f.id, label: f.kind === "signal" ? `Signal (${isSignalType(f.type) ? SIGNAL_LABEL[f.type] : f.type})` : f.kind === "opportunity" ? "Opportunity" : LABEL[f.type] ?? f.type, value: f.value, inferred: f.status !== "confirmed", timing: f.kind === "signal" ? signalTiming(likeOf(f), now) : undefined }));
-  let angle = null, why = "";
+  let angle: Angle | null = null, why = "";
   try {
-    for (let attempt = 0; attempt < 2 && !angle; attempt++) {
+    // A second try when the angle failed, or passed without a usable plan; an angle with a plan is never replaced by one without.
+    for (let attempt = 0; attempt < 2 && !angle?.plan; attempt++) {
       const reply = await deps.chat({ task: "angle", orgId, userId: user.id, promptVersion: PROMPT_VERSIONS.angle },
-        [{ role: "system", content: angleSystemPrompt() }, { role: "user", content: angleUserMessage(p.name, saved?.about ?? null, list, people) }], { maxTokens: 4000 });
+        [{ role: "system", content: angleSystemPrompt() }, { role: "user", content: angleUserMessage(p.name, offer, list, people) }], { maxTokens: 4000 });
       const r = normalizeAngle(parseJsonObject(reply.content), { allowedIds: list.map((x) => x.id), people, siteHost: p.domain });
-      angle = r.angle; why = r.reason ?? "";
+      if (r.angle && (!angle || r.angle.plan)) angle = r.angle;
+      why = r.reason ?? why;
     }
   } catch (e) {
     const f = capFail(e, "angle");
@@ -448,6 +469,9 @@ export async function generateAngle(user: Who, id: number, d: Partial<PipelineDe
     return fail(502, "model_unavailable", "The angle couldn't be written. Try again in a moment.");
   }
   if (!angle) return fail(422, "angle_rejected", "The suggested angle didn't pass the checks, so it wasn't kept. Try again.", { why });
+  // With no offer stated, the model can't know what fits the salesperson: the match is unknown and no sample is kept
+  // (a sample would commit them to work they never said they do).
+  if (!offer && angle.plan) angle = { ...angle, plan: { ...angle.plan, serviceMatch: "unknown", demo: null } };
   await deps.store.updateProspect(orgId, id, { angle: { ...angle, promptVersion: PROMPT_VERSIONS.angle, at: deps.now().toISOString() }, updatedAt: deps.now() });
   return getProspect(user, id, d);
 }

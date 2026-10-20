@@ -31,7 +31,7 @@ import { AGENT_TOOLS } from "../tools";
 import { FakeProvider, call, collect, say, type Step } from "../testing";
 import type { AutonomyLevel } from "../types";
 import { useWorld } from "./world-mocks";
-import { createWorld, seedLead, userRow, ORG1, ORG2, type World } from "./world";
+import { createWorld, seedLead, seedProfile, userRow, ORG1, ORG2, type World } from "./world";
 
 const world = () => (globalThis as any).__world as World;
 const OWNER = () => world().users.get("u1")!;
@@ -41,7 +41,8 @@ const BODY = "Hello,\n\nI saw that Casa Alma runs boutique hotels in Lisbon and 
 let drafts = 0;
 const writes = (body = BODY) => { drafts = 0; world().llm = async () => { drafts++; return { content: JSON.stringify({ subject: SUBJECT, body }), toolCalls: [], usage: { inputTokens: 900, outputTokens: 180 } }; }; };
 
-beforeEach(() => { useWorld(createWorld()); writes(); vi.spyOn(console, "log").mockImplementation(() => {}); });
+// The sender has described their offer, as BODY describes them.
+beforeEach(() => { useWorld(createWorld()); for (const o of [ORG1, ORG2]) seedProfile(world(), { about: "I help small hotel groups keep their client paperwork tidy." }, o); writes(); vi.spyOn(console, "log").mockImplementation(() => {}); });
 
 async function run(o: { user?: any; autonomy?: AutonomyLevel; steps: Step[]; store?: MemoryAgentStore }) {
   const store = o.store ?? new MemoryAgentStore();
@@ -179,7 +180,7 @@ describe("draft_outreach", () => {
     await approve(a.store, firstApproval(a.store));
     expect(message()).toMatchObject({ status: "draft", createdBy: "agent", toAddress: "hello@casaalma.pt" });
 
-    useWorld(createWorld()); writes();
+    useWorld(createWorld()); seedProfile(world(), { about: "I help small hotel groups keep their client paperwork tidy." }); writes();
     const l2 = await researched();
     const b = await run({ autonomy: 1, steps: [call("draft_outreach", { leadId: l2.id }), say("ok")] });
     expect(b.store.approvals.size).toBe(0);

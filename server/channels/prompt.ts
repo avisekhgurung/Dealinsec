@@ -3,13 +3,14 @@
  * (server/sales/outreach-prompt.ts DraftInput: the sender's offer and VERIFIED facts about the company, fenced as data)
  * and the same refusals (shared/channels.ts checkChannelDraft), with the channel's own length and tone. Bump
  * CHANNEL_PROMPT_VERSION whenever this text changes; it starts with "draft-", so a channel draft counts against the
- * plan's AI-draft allowance exactly like an email draft.
+ * plan's AI-draft allowance exactly like an email draft. The scope rules (no offer to make anything, no description of a
+ * sender who hasn't described their offer) are the email draft's, checked by shared/outreach-check.ts scopeIssues.
  */
 import { fenceUntrusted } from "../agent/untrusted";
 import { KIND_DRAFT_TARGET, type MessageKind, type ShortChannel } from "@shared/channels";
 import type { DraftInput } from "../sales/outreach-prompt";
 
-export const CHANNEL_PROMPT_VERSION = "draft-ch1";
+export const CHANNEL_PROMPT_VERSION = "draft-ch3";
 
 const clean = (s: string, n: number) => s.replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
 
@@ -33,6 +34,8 @@ Rules:
 - This is a first contact. Do not suggest you have spoken or met before.
 - Plain text only. Between ${t.min} and ${t.max} characters in total, counting spaces.
 - One clear, low-pressure ask.
+- Never offer to make, prepare, put together or send anything (no sample, mock-up or prototype): the sender hasn't offered that. Ask a question instead.
+- Describe the sender only in the words of "What the sender offers": never add another service, years of experience, credentials, awards, client counts or results. If it says the sender has not described their offer, say nothing about who the sender is or what they do, and suggest no service: ask one question about the company instead.
 
 Return ONLY a JSON object, no other text:
 {"text":"<the message, with line breaks as \\n>"}`;

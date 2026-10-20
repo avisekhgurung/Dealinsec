@@ -27,7 +27,7 @@ import { addSuppression, approveMessage, cancelMessage, draftOutreach, editDraft
 import { messageStore } from "../../sales/message-store";
 import { updateLead } from "../../services/leads";
 import { useWorld } from "./world-mocks";
-import { createWorld, userRow, ORG1, ORG2, type World } from "./world";
+import { createWorld, seedProfile, userRow, ORG1, ORG2, type World } from "./world";
 
 const world = () => (globalThis as any).__world as World;
 const OWNER = () => userRow() as any;
@@ -72,7 +72,9 @@ const sentMessage = async (p: { id: number }) => {
   return m;
 };
 
-beforeEach(() => { useWorld(createWorld()); pid = 0; fid = 0; drafts = 0; model(); vi.spyOn(console, "log").mockImplementation(() => {}); });
+// The sender has said what they offer (their ideal client profile), as the drafts below describe them.
+const OFFER = { about: "I help agencies keep client agreements and invoices tidy.", services: ["Agreements and invoicing"] };
+beforeEach(() => { useWorld(createWorld()); seedProfile(world(), OFFER); seedProfile(world(), OFFER, ORG2); pid = 0; fid = 0; drafts = 0; model(); vi.spyOn(console, "log").mockImplementation(() => {}); });
 afterEach(() => { delete process.env.SALES_DAILY_DRAFT_LIMIT; expect(world().emails).toEqual([]); /* nothing is ever sent */ });
 
 describe("preparing drafts for selected prospects", () => {
@@ -441,5 +443,70 @@ describe("the follow-up after a send is durable: recorded with the send, done on
     expect(await markSent(OWNER(), m.id)).toMatchObject({ ok: true, movedTo: "contacted" });
     expect(marks(m.id)).toEqual([]);
     expect(followUps(m.leadId)).toHaveLength(1);
+  });
+});
+
+describe("Mika drafts from the opportunity plan", () => {
+  const PLAN_ANGLE = (evidenceIds: number[]) => ({
+    problem: "A new SEO hire may mean more client work to keep track of", opportunity: "Tidy agreements and invoices as the team grows", positioning: "Help them stay organised while hiring",
+    targetPerson: null, reason: "They are hiring", evidenceIds, confidence: "medium",
+    plan: { solution: "Set up a simple agreement and invoice flow for new clients", value: "Less admin while the team grows", impact: "medium", effort: "small", serviceMatch: "direct",
+      confirmIf: "They mention onboarding new clients", disproveIf: "They already use a billing tool", nextAction: "Ask how they onboard clients",
+      demo: { title: "Sample client onboarding pack", scope: "A sample agreement and invoice layout for one made-up client", effort: "small", assumptions: [], exclusions: ["No access to their systems"], needs: [] } },
+  });
+  const prompts: string[] = [];
+  const capture = () => { prompts.length = 0; model((p) => { prompts.push(p); return null; }); };
+  const leadFor = async (p: { id: number }) => {
+    const [r] = await drafted([p.id]);
+    const m = world().messages.find((x) => x.id === r.messageId)!;
+    expect(code(await cancelMessage(OWNER(), m.id))).toBe("ok");
+    return m.leadId;
+  };
+
+  it("the plan's solution goes into every draft; the sample only when the person ticks it, never for an agent", async () => {
+    const p = prospect(); p.angle = PLAN_ANGLE([fid - 1]) as any;
+    capture();
+    const leadId = await leadFor(p);
+    expect(prompts.at(-1)).toMatch(/What the sender could do: Set up a simple agreement/);
+    expect(prompts.at(-1)).not.toMatch(/Sample the sender offers/);
+    // The lead's messages say a sample exists, so the panel can offer it.
+    expect((await listMessages(OWNER(), leadId) as any).sample).toEqual({ title: "Sample client onboarding pack", scope: "A sample agreement and invoice layout for one made-up client" });
+
+    expect(code(await draftOutreach(OWNER(), leadId, { offerSample: true, by: "agent" }))).toBe("ok");
+    expect(prompts.at(-1)).not.toMatch(/Sample the sender offers/);
+    const m = world().messages.filter((x) => x.leadId === leadId).at(-1)!;
+    expect(code(await cancelMessage(OWNER(), m.id))).toBe("ok");
+
+    expect(code(await draftOutreach(OWNER(), leadId, { offerSample: true }))).toBe("ok");
+    expect(prompts.at(-1)).toMatch(/Sample the sender offers to prepare:[\s\S]*Sample client onboarding pack/);
+    // Still a draft for review: nothing approved or sent.
+    expect(world().messages.filter((x) => x.leadId === leadId).at(-1)!.status).toBe("draft");
+  });
+  it("a workspace that hasn't said what it sells: no solution, no sample, and a draft that describes the sender or offers work is rewritten", async () => {
+    world().profiles.delete(ORG1);
+    // A neutral first message: a question about the company, nothing about the sender.
+    const NEUTRAL = "Hello,\n\nI saw on your website that you are hiring a Senior SEO Strategist for your SaaS team. Congratulations on the growth. I wondered how you are planning to bring the new strategist onto live client work, and whether that is on your mind right now.\n\nWould a short reply be useful?\n\nBest,\nAsha Rao";
+    const BAD = "Hello,\n\nI saw you are hiring a Senior SEO Strategist. I'm a writer and editor, and I could put together a short sample checklist for your new hire if that would help.\n\nWould a short reply be useful?\n\nBest,\nAsha Rao";
+    let n = 0;
+    world().llm = async (m) => { n++; prompts.push(m.map((x) => x.content).join("\n")); return { content: JSON.stringify({ subject: "A quick note about your SEO hiring", body: n === 2 ? BAD : NEUTRAL }), toolCalls: [], usage: { inputTokens: 900, outputTokens: 180 } }; };
+    const p = prospect(); p.angle = PLAN_ANGLE([fid - 1]) as any;
+    prompts.length = 0;
+    const leadId = await leadFor(p);                       // try 1: neutral
+    expect(prompts.at(-1)).not.toMatch(/What the sender could do/);
+    // The live failure: an invented identity and an unrequested offer. The try that does it is refused with the reasons.
+    const r = await draftOutreach(OWNER(), leadId, { offerSample: true }) as any;   // try 2: bad, try 3: neutral
+    expect(r.ok).toBe(true);
+    expect(r.retried).toBe(true);
+    expect(prompts.at(-1)).toMatch(/offers to make or prepare something/);
+    expect(prompts.at(-1)).toMatch(/says what the sender is or does/);
+    expect(prompts.at(-1)).not.toMatch(/Sample the sender offers/);   // asked for, but there is no offer to base it on
+    expect(r.message.body).toBe(NEUTRAL);
+  });
+  it("without a plan there is no sample to offer, even when asked", async () => {
+    capture();
+    const leadId = await leadFor(prospect());
+    expect((await listMessages(OWNER(), leadId) as any).sample).toBeNull();
+    expect(code(await draftOutreach(OWNER(), leadId, { offerSample: true }))).toBe("ok");
+    expect(prompts.at(-1)).not.toMatch(/Sample the sender offers/);
   });
 });

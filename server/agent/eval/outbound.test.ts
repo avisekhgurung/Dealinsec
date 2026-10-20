@@ -40,7 +40,7 @@ import { outboundStore } from "../../outbound/store";
 import { createRunner } from "../../workflow/runner";
 import type { ContactEnrichmentProvider } from "../../outbound/providers";
 import { useWorld } from "./world-mocks";
-import { createWorld, seedLead, userRow, ORG1, ORG2, type World } from "./world";
+import { createWorld, seedLead, seedProfile, userRow, ORG1, ORG2, type World } from "./world";
 
 const world = () => (globalThis as any).__world as World;
 const user = (over: Record<string, any> = {}) => userRow(over) as any;
@@ -1325,6 +1325,40 @@ describe("on demand: research, contacts, angle", () => {
     script.angle = (m) => ({ ...ANGLE((m[1].content.match(/F\d+/g) ?? []).slice(0, 1)), positioning: "Offer them 20% off the first month" });
     expect(await generateAngle(user(), nw.id, deps())).toMatchObject({ ok: false, code: "angle_rejected" });
   });
+  it("the angle carries an opportunity plan, scored by fixed rules from the findings it cites; a reply without a plan gets one more try", async () => {
+    const id = await start(); await drive(id);
+    const nw = world().outbound.prospects.find((p) => p.domain === "northwind.com")!;
+    const PLAN = { solution: "Set up a simple outbound sequence for the new PPC service", value: "A steady first pipeline while the practice is new", impact: "high", effort: "small", service_match: "direct",
+      confirm_if: "They say the PPC practice still needs clients", disprove_if: "They already have a full PPC pipeline", next_action: "Ask who books PPC calls today",
+      demo: { title: "Sample outreach sequence", scope: "Three sample emails for the PPC launch from their public pages", effort: "small", assumptions: [], exclusions: ["No sending"], needs: [] } };
+    seedProfile(world(), { about: "We run outbound prospecting for marketing agencies.", services: ["Outbound sequences"] });
+    let n = 0;
+    script.angle = (m) => { n++; const ids = (m[1].content.match(/F\d+/g) ?? []).slice(0, 2); return n === 1 ? ANGLE(ids) : { ...ANGLE(ids), plan: PLAN }; };
+    const r = await generateAngle(user(), nw.id, deps()) as any;
+    expect(r.ok).toBe(true);
+    expect(n).toBe(2);
+    expect(r.brief.angle.plan).toMatchObject({ impact: "high", serviceMatch: "direct", demo: { title: "Sample outreach sequence" } });
+    const s = r.brief.opportunityScore;
+    expect(s.version).toBe("opp-v1");
+    expect(s.components.map((c: any) => c.max)).toEqual([30, 25, 20, 15, 10]);
+    expect(s.total).toBe(Math.round(s.components.reduce((a: number, c: any) => a + c.points, 0)));
+    // Reproducible: reading the brief again scores the same.
+    expect((await getProspect(user(), nw.id, deps()) as any).brief.opportunityScore).toEqual(s);
+    // A plan that breaks the content rules is never kept; the angle without it is.
+    n = 0;
+    script.angle = (m) => ({ ...ANGLE((m[1].content.match(/F\d+/g) ?? []).slice(0, 1)), plan: { ...PLAN, value: "Cuts their costs by 40%" } });
+    const r2 = await generateAngle(user(), nw.id, deps()) as any;
+    expect(r2.ok).toBe(true);
+    expect(r2.brief.angle.plan).toBeNull();
+    expect(r2.brief.opportunityScore.limits.join(" ")).toMatch(/Generate the angle again/);
+    // Live review, Oct 20: with no offer described, the model assumed one. Now the match is unknown and no sample is kept.
+    world().profiles.delete(ORG1);
+    n = 1;
+    script.angle = (m) => ({ ...ANGLE((m[1].content.match(/F\d+/g) ?? []).slice(0, 2)), plan: PLAN });
+    const r3 = await generateAngle(user(), nw.id, deps()) as any;
+    expect(r3.brief.angle.plan).toMatchObject({ serviceMatch: "unknown", demo: null });
+    expect(r3.brief.opportunityScore.limits.join(" ")).toMatch(/Describe what you sell/);
+  });
   it("no angle without a reason to reach out", async () => {
     const id = await start(); await drive(id);
     const bakery = world().outbound.prospects.find((p) => p.domain === "breadbakery.co.uk")!;
@@ -1459,6 +1493,13 @@ describe("website observations, contact status and feedback", () => {
     expect(brief.brief.prospect.siteSignals).toEqual(["The home page's copyright notice reads 2019"]);
     // An observation never makes a prospect ready or adds a reason to reach out.
     expect(brief.brief.prospect.blockers).not.toContain("site_signal");
+    // …nor the reason an angle gives (live review, Oct 20: an angle built on a copyright line): the model never sees it.
+    let shown = "";
+    script.angle = (m) => { shown = m[1].content; return ANGLE((m[1].content.match(/F\d+/g) ?? []).slice(0, 1)); };
+    await generateAngle(user(), nw.id, deps());
+    expect(shown).toMatch(/F\d+/);
+    expect(shown).not.toMatch(/copyright|© 2019/i);
+    expect(shown).not.toContain(`F${obs[0].id} `);
   });
 
   it("contact status is kept apart from fit: verified only when a provider verified it, public when found on their site", () => {
