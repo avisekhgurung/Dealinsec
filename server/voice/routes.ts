@@ -15,6 +15,7 @@ import express, { type Express, type Request, type Response } from "express";
 import { isAuthenticated } from "../auth";
 import { agentLog } from "../agent/log";
 import { createVoiceBudget } from "./budget";
+import { isUnlimitedOrg, UNLIMITED } from "../unlimited";
 import { prepareSpeech, synthesize, ttsConfigured, ttsProvider } from "./tts";
 import { isVoiceKey } from "@shared/voice-profiles";
 import { STT_MAX_BYTES, sttAudioType, sttConfigured, transcribe } from "./stt";
@@ -33,8 +34,9 @@ export function registerVoiceRoutes(app: Express) {
   };
 
   app.get("/api/voice/status", isAuthenticated, gate, (req: any, res: Response) => {
-    const stt = sttConfigured() && listenBudget.remaining(req.user.organizationId) > 0;
-    res.json({ neural: ttsConfigured(), provider: ttsProvider(), remainingChars: ttsConfigured() ? budget.remaining(req.user.organizationId) : 0, stt });
+    const org = req.user.organizationId, unlimited = isUnlimitedOrg(org);
+    const stt = sttConfigured() && (unlimited || listenBudget.remaining(org) > 0);
+    res.json({ neural: ttsConfigured(), provider: ttsProvider(), remainingChars: ttsConfigured() ? (unlimited ? UNLIMITED : budget.remaining(org)) : 0, stt });
   });
 
   app.post("/api/voice/speak", isAuthenticated, gate, async (req: any, res: Response) => {
@@ -43,12 +45,12 @@ export function registerVoiceRoutes(app: Express) {
       const text = prepareSpeech(req.body?.text);
       if (!text) return res.status(400).json({ code: "empty", error: "There's nothing to say." });
       if (!budget.allowRate(String(req.user.id))) return res.status(429).json({ code: "rate_limited", error: "Too many requests. The browser voice will be used." });
-      if (!budget.reserve(req.user.organizationId, text.length)) return res.status(429).json({ code: "daily_cap", error: "Today's neural voice allowance is used up. The browser voice will be used." });
+      if (!isUnlimitedOrg(req.user.organizationId) && !budget.reserve(req.user.organizationId, text.length)) return res.status(429).json({ code: "daily_cap", error: "Today's neural voice allowance is used up. The browser voice will be used." });
       // Whose voice: Agent mode's by default, or a coworker's (only the four known names; anything else is Agent mode).
       const voice = isVoiceKey(req.body?.voice) ? req.body.voice : "agent";
       const r = await synthesize(text, { voice });
       if (!r.ok) {
-        budget.refund(req.user.organizationId, text.length);
+        if (!isUnlimitedOrg(req.user.organizationId)) budget.refund(req.user.organizationId, text.length);
         agentLog("error", { errorType: r.code, where: "voice_speak" }); // never the text
         return res.status(r.code === "rate_limited" ? 429 : 502).json({ code: r.code, error: r.message });
       }
@@ -68,10 +70,10 @@ export function registerVoiceRoutes(app: Express) {
       if (!sttAudioType(req.headers["content-type"]) || !Buffer.isBuffer(body)) return res.status(415).json({ code: "bad_audio", error: "Send the recording as audio." });
       const kb = Math.max(1, Math.ceil(body.length / 1000));
       if (!listenBudget.allowRate(String(req.user.id))) return res.status(429).json({ code: "rate_limited", error: "Too many recordings. The browser's recogniser will be used." });
-      if (!listenBudget.reserve(req.user.organizationId, kb)) return res.status(429).json({ code: "daily_cap", error: "Today's speech recognition allowance is used up. The browser's recogniser will be used." });
+      if (!isUnlimitedOrg(req.user.organizationId) && !listenBudget.reserve(req.user.organizationId, kb)) return res.status(429).json({ code: "daily_cap", error: "Today's speech recognition allowance is used up. The browser's recogniser will be used." });
       const r = await transcribe(new Uint8Array(body), req.headers["content-type"]);
       if (!r.ok) {
-        listenBudget.refund(req.user.organizationId, kb);
+        if (!isUnlimitedOrg(req.user.organizationId)) listenBudget.refund(req.user.organizationId, kb);
         agentLog("error", { errorType: r.code, where: "voice_transcribe" }); // never the audio or the words
         return res.status(r.code === "rate_limited" ? 429 : r.code === "bad_audio" ? 422 : 502).json({ code: r.code, error: r.message });
       }

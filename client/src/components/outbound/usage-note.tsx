@@ -19,7 +19,7 @@ export interface OutboundUsage {
   workspace: { searches: Allowance | null; webSearches: Allowance | null; contactLookups: Allowance | null };
   /** The plan's 30-day allowance (absent from an older server). */
   plan?: {
-    tier: "free" | "trial" | "pro"; label: string; searches: Allowance | null; maxCompanies: number; windowDays: number;
+    tier: "free" | "trial" | "pro" | "unlimited"; label: string; searches: Allowance | null; maxCompanies: number; windowDays: number;
     /** Separate allowances over the same days (absent from an older server; null = couldn't be counted). */
     prospects?: Allowance | null; drafts?: Allowance | null; sends?: Allowance | null; spendPercent?: number | null;
   };
@@ -72,15 +72,17 @@ export function UsageNote({ usage, mode = "web" }: { usage: OutboundUsage | unde
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
         <span>
           {usage.plan ? <>{usage.plan.label}: </> : null}
-          {usage.plan?.searches
+          {usage.plan?.tier === "unlimited"
+            ? <><strong className="font-semibold text-foreground" data-testid="outbound-plan-left">no monthly or daily limits</strong> on searches, prospects, AI drafts or sends, up to {usage.plan.maxCompanies} companies a search.</>
+            : usage.plan?.searches
             ? <><strong className="font-semibold text-foreground" data-testid="outbound-plan-left">{usage.plan.searches.remaining} of {usage.plan.searches.limit} searches left</strong> in the last {usage.plan.windowDays} days, up to {usage.plan.maxCompanies} companies each.</>
             : <>Included in your plan, no extra charge.</>}
-          {s && s.remaining > 0 && <> <span data-testid="outbound-searches-left">{s.remaining} of {s.limit} left today.</span></>}
+          {s && s.remaining > 0 && usage.plan?.tier !== "unlimited" && <> <span data-testid="outbound-searches-left">{s.remaining} of {s.limit} left today.</span></>}
           {" "}One search = one credit; a search that stops before searching isn&apos;t counted.
           {usage.plan?.tier === "free" && <> <Link href="/pricing" className="font-semibold text-primary hover:underline" data-testid="outbound-upgrade">Pro includes more</Link>.</>}
         </span>
       </p>
-      {usage.plan && (usage.plan.prospects || usage.plan.drafts || usage.plan.sends) && (
+      {usage.plan && usage.plan.tier !== "unlimited" && (usage.plan.prospects || usage.plan.drafts || usage.plan.sends) && (
         <p className="pl-5 text-muted-foreground" data-testid="outbound-plan-allowances">
           {[
             usage.plan.prospects && `${usage.plan.prospects.remaining} of ${usage.plan.prospects.limit} researched prospects left`,

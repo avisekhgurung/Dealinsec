@@ -9,6 +9,10 @@ import { ProviderError, aiProvider, type AIProvider, type ChatMessage, type Chat
 import { budgetPoolOf, costMicroUsd, dailyLimit, globalDailySpendMicroUsd, modelFor, poolDailySpendMicroUsd, poolTasks, pricesFromEnv, utcDayStart, type BudgetPool, type LlmTask } from "@shared/llm-cost";
 import { traceStore, type TraceStore } from "./trace-store";
 import { workspaceMonthlySpendMicroUsd } from "../outbound/limits";
+import { isUnlimitedOrg, UNLIMITED } from "../unlimited";
+
+/** The workspace's daily allowance for a task: none for a workspace in UNLIMITED_ORG_IDS. */
+const taskLimit = (task: LlmTask, orgId: string, env: Record<string, string | undefined>) => (isUnlimitedOrg(orgId, env) ? UNLIMITED : dailyLimit(task, env));
 import { OUTBOUND_WINDOW_DAYS as WORKSPACE_WINDOW_DAYS } from "@shared/outbound-plans";
 
 export interface TraceCtx {
@@ -58,7 +62,7 @@ export function estimateCallMicroUsd(messages: ChatMessage[], maxTokens: number 
 /** Throws CapExceeded when the workspace has used its allowance for this task in the last 24 hours, CapUnavailable if that cannot be counted. */
 export async function assertWithinCap(task: LlmTask, orgId: string, deps: Partial<TraceDeps> = {}, env: Record<string, string | undefined> = process.env): Promise<void> {
   const d = { ...defaultDeps(), ...deps };
-  const limit = dailyLimit(task, env);
+  const limit = taskLimit(task, orgId, env);
   let used: number;
   try { used = await d.store.count({ orgId, task, since: new Date(d.now() - DAY_MS) }); } catch { throw new CapUnavailable(); }
   if (used >= limit) throw new CapExceeded(task, used, limit);
@@ -69,7 +73,7 @@ export async function remainingToday(task: LlmTask, orgId: string, deps: Partial
   const d = { ...defaultDeps(), ...deps };
   let used: number;
   try { used = await d.store.count({ orgId, task, since: new Date(d.now() - DAY_MS) }); } catch { throw new CapUnavailable(); }
-  return Math.max(0, dailyLimit(task, env) - used);
+  return Math.max(0, taskLimit(task, orgId, env) - used);
 }
 
 /**
@@ -85,7 +89,7 @@ export async function tracedChat(ctx: TraceCtx, messages: ChatMessage[], opts: C
   const base = { organizationId: ctx.orgId, userId: ctx.userId ?? null, task: ctx.task, model, promptVersion: ctx.promptVersion, leadId: ctx.leadId ?? null, runId: ctx.runId ?? null };
   // The task's allocation and the overall ceiling are checked together, in one atomic reservation.
   const pool = budgetPoolOf(ctx.task), limit = poolDailySpendMicroUsd(pool, env);
-  const workspaceCeiling = workspaceMonthlySpendMicroUsd(env);
+  const workspaceCeiling = workspaceMonthlySpendMicroUsd(env, ctx.orgId);
   let reservation: number | null | "workspace";
   try {
     reservation = await d.store.reserve({ ...base, tokensIn: 0, tokensOut: 0, latencyMs: 0, costMicroUsd: estimateCallMicroUsd(messages, opts.maxTokens, env), ok: false, errorCode: "reserved" },

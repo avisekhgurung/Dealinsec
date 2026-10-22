@@ -18,6 +18,8 @@ const DEFAULTS: Record<"free" | "pro", LeagueAllowance> = LEAGUE_ALLOWANCE_DEFAU
 const int = (v: string | undefined, d: number, max = 10_000) => { const n = Number(v); return v !== undefined && v.trim() !== "" && Number.isInteger(n) && n >= 0 && n <= max ? n : d; };
 
 export function leagueAllowance(tier: OutboundTier, env: NodeJS.ProcessEnv = process.env): LeagueAllowance {
+  // A workspace in UNLIMITED_ORG_IDS (server/unlimited.ts): no monthly count; concurrency and schedules at their ceilings.
+  if (tier === "unlimited") return { monthlyRuns: 1_000_000, concurrent: 10, schedules: 50 };
   const k = tier === "free" ? "free" : "pro", K = k.toUpperCase();
   return {
     monthlyRuns: int(env[`LEAGUE_MONTHLY_RUNS_${K}`], DEFAULTS[k].monthlyRuns),

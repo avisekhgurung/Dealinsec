@@ -12,7 +12,8 @@
  * average and about $2.35 at the 90th percentile; the earlier 25 (sized for ₹499) could cost more than the plan earns.
  * The trial gets Pro's allowance; free is a small, real taste.
  */
-export type OutboundTier = "free" | "trial" | "pro";
+/** "unlimited": a workspace listed in UNLIMITED_ORG_IDS (server/unlimited.ts), never a plan anyone buys. */
+export type OutboundTier = "free" | "trial" | "pro" | "unlimited";
 
 export interface OutboundAllowance {
   /** Searches per rolling 30 days. */
@@ -40,6 +41,8 @@ export const OUTBOUND_ALLOWANCE_DEFAULTS: Readonly<Record<OutboundTier, Outbound
   free: { monthlySearches: 3, maxCompanies: 10, monthlyProspects: 30, monthlyDrafts: 3, monthlySends: 3 },
   trial: { monthlySearches: 10, maxCompanies: 10, monthlyProspects: 100, monthlyDrafts: 10, monthlySends: 10 },
   pro: { monthlySearches: 10, maxCompanies: 10, monthlyProspects: 100, monthlyDrafts: 10, monthlySends: 10 },
+  // Per search it looks for as many companies as Pro (one search stays one search); there is just no monthly count.
+  unlimited: { monthlySearches: 1_000_000, maxCompanies: 10, monthlyProspects: 1_000_000, monthlyDrafts: 1_000_000, monthlySends: 1_000_000 },
 };
 
 /**
@@ -52,4 +55,4 @@ export const WORKSPACE_MONTHLY_SPEND_USD_DEFAULT = 1.5;
 
 export const OUTBOUND_WINDOW_DAYS = 30;
 
-export const TIER_LABEL: Record<OutboundTier, string> = { free: "Free plan", trial: "Pro trial", pro: "Pro" };
+export const TIER_LABEL: Record<OutboundTier, string> = { free: "Free plan", trial: "Pro trial", pro: "Pro", unlimited: "Unlimited" };

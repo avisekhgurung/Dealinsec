@@ -91,7 +91,7 @@ export async function outboundUsage(user: Who, d: Partial<UsageDeps> = {}): Prom
   const safe = async <T>(f: () => Promise<T>): Promise<T | null> => { try { return await f(); } catch { return null; } };
 
   const searches = await safe(async () => {
-    const limit = dailyRunLimit();
+    const limit = dailyRunLimit(orgId);
     const counted = (await deps.recentRuns(orgId, since, Math.max(20, limit + 5))).filter(runCountsTowardLimit);
     const oldest = counted.length ? counted.reduce((a, r) => (r.createdAt < a ? r.createdAt : a), counted[0].createdAt) : null;
     return allowance(counted.length, limit, oldest ? new Date(new Date(oldest).getTime() + DAY) : null);
@@ -108,10 +108,10 @@ export async function outboundUsage(user: Who, d: Partial<UsageDeps> = {}): Prom
   const prospects = await safe(async () => allowance(await deps.prospectsHeld(orgId, windowStart), planAllowance.monthlyProspects, null));
   const drafts = await safe(async () => allowance(await deps.aiDrafts(orgId, windowStart), planAllowance.monthlyDrafts, null));
   const sends = await safe(async () => allowance(await deps.gmailSends(orgId, windowStart), planAllowance.monthlySends, null));
-  const spendPercent = await safe(async () => Math.min(100, Math.round((100 * (await deps.workspaceSpend(orgId, windowStart))) / workspaceMonthlySpendMicroUsd())));
-  const webSearches = await safe(async () => allowance(await deps.countProviderCalls({ orgId, operation: "search", since }), dailySearchLimit(), null));
+  const spendPercent = await safe(async () => Math.min(100, Math.round((100 * (await deps.workspaceSpend(orgId, windowStart))) / workspaceMonthlySpendMicroUsd(process.env, orgId))));
+  const webSearches = await safe(async () => allowance(await deps.countProviderCalls({ orgId, operation: "search", since }), dailySearchLimit(orgId), null));
   const contactLookups = deps.contactReady()
-    ? await safe(async () => allowance(await deps.countProviderCalls({ orgId, operation: "contact", since }), dailyContactLimit(), null))
+    ? await safe(async () => allowance(await deps.countProviderCalls({ orgId, operation: "contact", since }), dailyContactLimit(orgId), null))
     : null;
 
   const state = await safe(async (): Promise<PlatformState> => {

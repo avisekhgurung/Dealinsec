@@ -15,17 +15,21 @@
  *   OUTBOUND_MONTHLY_SENDS_FREE / _TRIAL / _PRO      sends through Gmail or the WhatsApp Cloud API, together (defaults 3 / 10 / 10)
  *   WORKSPACE_MONTHLY_SPEND_USD                      model + provider spend per workspace (default $1.50)
  *
- * Platform-wide, every workspace together, per UTC day (on top of the above, never instead of it):
+ * UNLIMITED_ORG_IDS (server/unlimited.ts): workspaces with none of the per-workspace limits above (the founder's own).
+ *
+ * Platform-wide, every workspace together, per UTC day (on top of the above, never instead of it; unlimited workspaces too):
  *   OUTBOUND_GLOBAL_DAILY_SEARCHES search-provider calls                          (default 30: about 900 a month, inside Tavily's 1,000 free credits)
  *   LLM_GLOBAL_DAILY_SPEND_USD     model spend for every sales and outbound task  (default $1.00, shared/llm-cost.ts)
  */
 import { OUTBOUND_ALLOWANCE_DEFAULTS, WORKSPACE_MONTHLY_SPEND_USD_DEFAULT, type OutboundAllowance, type OutboundTier } from "@shared/outbound-plans";
+import { isUnlimitedOrg, UNLIMITED, UNLIMITED_SPEND_MICRO_USD } from "../unlimited";
 
 const int = (v: string | undefined, d: number) => { const n = Number(v); return Number.isInteger(n) && n >= 1 ? n : d; };
-export const dailyRunLimit = () => int(process.env.OUTBOUND_DAILY_RUNS, 5);
-export const dailySearchLimit = () => int(process.env.OUTBOUND_DAILY_SEARCHES, 60);
-export const dailyContactLimit = () => int(process.env.OUTBOUND_DAILY_CONTACT_LOOKUPS, 30);
-export const dailyCompanyLimit = () => int(process.env.OUTBOUND_DAILY_COMPANY_LOOKUPS, 100);
+/** Per-workspace daily limits; a workspace in UNLIMITED_ORG_IDS has none (pass its id where the limit is enforced). */
+export const dailyRunLimit = (orgId?: string | null) => (isUnlimitedOrg(orgId) ? UNLIMITED : int(process.env.OUTBOUND_DAILY_RUNS, 5));
+export const dailySearchLimit = (orgId?: string | null) => (isUnlimitedOrg(orgId) ? UNLIMITED : int(process.env.OUTBOUND_DAILY_SEARCHES, 60));
+export const dailyContactLimit = (orgId?: string | null) => (isUnlimitedOrg(orgId) ? UNLIMITED : int(process.env.OUTBOUND_DAILY_CONTACT_LOOKUPS, 30));
+export const dailyCompanyLimit = (orgId?: string | null) => (isUnlimitedOrg(orgId) ? UNLIMITED : int(process.env.OUTBOUND_DAILY_COMPANY_LOOKUPS, 100));
 export const globalSearchLimit = () => int(process.env.OUTBOUND_GLOBAL_DAILY_SEARCHES, 30);
 /** Local business searches (Google Places) across all workspaces per UTC day: 30 a day stays inside the 1,000 free a month. */
 export const globalLocalSearchLimit = () => int(process.env.OUTBOUND_GLOBAL_DAILY_LOCAL_SEARCHES, 30);
@@ -43,8 +47,10 @@ export function outboundAllowance(tier: OutboundTier): OutboundAllowance {
   };
 }
 
-/** The workspace spend ceiling in millionths of a dollar (WORKSPACE_MONTHLY_SPEND_USD; a missing, zero or unreadable value is the default, never "no limit"). */
-export function workspaceMonthlySpendMicroUsd(env: NodeJS.ProcessEnv = process.env): number {
+/** The workspace spend ceiling in millionths of a dollar (WORKSPACE_MONTHLY_SPEND_USD; a missing, zero or unreadable value is the default, never "no limit").
+ *  A workspace in UNLIMITED_ORG_IDS has none (the platform's daily caps still apply). */
+export function workspaceMonthlySpendMicroUsd(env: Record<string, string | undefined> = process.env, orgId?: string | null): number {
+  if (isUnlimitedOrg(orgId, env)) return UNLIMITED_SPEND_MICRO_USD;
   const n = Number(env.WORKSPACE_MONTHLY_SPEND_USD);
   return Math.round((Number.isFinite(n) && n > 0 ? n : WORKSPACE_MONTHLY_SPEND_USD_DEFAULT) * 1_000_000);
 }

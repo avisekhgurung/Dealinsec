@@ -89,7 +89,7 @@ export async function localSearch(user: Who, raw: unknown, d: Partial<LocalDeps>
     const run = await deps.store.createRun({
       id: newRunId(), orgId, userId: user.id, by: "user", request: `${input.category} in ${input.city}`.slice(0, 500), icp: icpFor({ ...input, quantity: max }), quantity: max,
       idemKey: `local_${randomUUID()}`, now, queries: [{ q: query, provider: deps.provider.name, done: true, ok: true }],
-      limits: [{ since, max: allowance.monthlySearches }, { since: new Date(now.getTime() - DAY), max: dailyRunLimit() }],
+      limits: [{ since, max: allowance.monthlySearches }, { since: new Date(now.getTime() - DAY), max: dailyRunLimit(orgId) }],
       finished: { counters: { searched: 1, results: 0, mode: "local" } },
     });
     runId = run.id;
@@ -103,7 +103,7 @@ export async function localSearch(user: Who, raw: unknown, d: Partial<LocalDeps>
   // transaction (the same ledger and locks as web searches), then completed with what happened.
   let reservation: number | null | "workspace";
   try {
-    reservation = await deps.store.reserveSearch({ orgId, runId, provider: deps.provider.name, operation: "local_search", costMicroUsd: cost, limit: globalLocalSearchLimit(), since: utcDayStart(now), now, workspace: { since, maxMicroUsd: workspaceMonthlySpendMicroUsd() } });
+    reservation = await deps.store.reserveSearch({ orgId, runId, provider: deps.provider.name, operation: "local_search", costMicroUsd: cost, limit: globalLocalSearchLimit(), since: utcDayStart(now), now, workspace: { since, maxMicroUsd: workspaceMonthlySpendMicroUsd(process.env, orgId) } });
   } catch { reservation = null; }
   if (reservation === "workspace") {
     await refund("workspace_budget");
@@ -196,7 +196,7 @@ export async function researchLocalSites(user: Who, raw: unknown, d: Partial<Loc
     run = await deps.store.createRun({
       id: newRunId(), orgId, userId: user.id, by: "user", request: `Websites of ${parsed.data.category} in ${parsed.data.city}`.slice(0, 500),
       icp: icpFor({ ...parsed.data, quantity: picked.length }), quantity: picked.length, idemKey: `local_sites_${randomUUID()}`, queries: [], now,
-      limits: [{ since: new Date(now.getTime() - DAY), max: dailyRunLimit() }], prospects: { since, max: allowance.monthlyProspects },
+      limits: [{ since: new Date(now.getTime() - DAY), max: dailyRunLimit(orgId) }], prospects: { since, max: allowance.monthlyProspects },
       holdUntil: new Date(now.getTime() + 5 * 60_000),
     });
   } catch (e) {

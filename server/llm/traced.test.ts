@@ -221,3 +221,20 @@ describe("separate allocations: Client Radar can't use up the budget for lead re
     expect(ok(0, 16)).toBe(5); // and the ceiling is used, not wasted
   });
 });
+
+describe("a workspace listed in UNLIMITED_ORG_IDS", () => {
+  const ENV = { UNLIMITED_ORG_IDS: "org-founder, org-other" };
+  it("has no daily task allowance; everyone else keeps theirs", async () => {
+    const { deps } = rig({ used: 10_000 });
+    await expect(assertWithinCap("draft", "org-founder", deps, ENV)).resolves.toBeUndefined();
+    await expect(assertWithinCap("draft", "org-1", deps, ENV)).rejects.toBeInstanceOf(CapExceeded);
+    await expect(assertWithinCap("draft", "org-founder", deps, {})).rejects.toBeInstanceOf(CapExceeded);   // not listed on this server
+  });
+  it("has no 30-day workspace spend ceiling, but the platform's daily budget still stops it", async () => {
+    const r = rig({ workspaceSpent: 50_000_000 });   // $50 spent: far over any workspace ceiling
+    await expect(tracedChat({ ...CTX, orgId: "org-founder" }, MSGS, {}, r.deps, ENV)).resolves.toMatchObject({ content: "ok" });
+    await expect(tracedChat(CTX, MSGS, {}, rig({ workspaceSpent: 50_000_000 }).deps, ENV)).rejects.toBeInstanceOf(WorkspaceBudgetExceeded);
+    const full = rig({ ledger: [{ at: Date.UTC(2026, 9, 11, 1), cost: globalDailySpendMicroUsd({}) }] });
+    await expect(tracedChat({ ...CTX, orgId: "org-founder" }, MSGS, {}, full.deps, ENV)).rejects.toBeInstanceOf(GlobalCapExceeded);
+  });
+});

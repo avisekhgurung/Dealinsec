@@ -242,14 +242,14 @@ async function searchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps:
     // The platform-wide budget is reserved (atomically, for every workspace together) only after the workspace's own
     // limit passed; a reservation that can't be made because the searches can't be counted stops the run (fail closed).
     let reservation: number | null | "workspace" = null;
-    if (provider && used < dailySearchLimit()) {
-      const workspace = { since: new Date(deps.now().getTime() - OUTBOUND_WINDOW_DAYS * DAY), maxMicroUsd: workspaceMonthlySpendMicroUsd() };
+    if (provider && used < dailySearchLimit(run.organizationId)) {
+      const workspace = { since: new Date(deps.now().getTime() - OUTBOUND_WINDOW_DAYS * DAY), maxMicroUsd: workspaceMonthlySpendMicroUsd(process.env, run.organizationId) };
       try { reservation = await deps.store.reserveSearch({ orgId: run.organizationId, runId: run.id, provider: provider.name, costMicroUsd: costMicroUsd(provider.name), limit: globalSearchLimit(), since: utcDayStart(deps.now()), now: deps.now(), workspace }); }
       catch { throw new StopRun("cap_unavailable"); }
     }
     if (!provider) { next.done = true; next.ok = false; next.error = "not_configured"; }
     else if (reservation === "workspace") { for (const q of plan) if (!q.done) { q.done = true; q.ok = false; q.error = "workspace_budget"; } counters.stoppedBy = "workspace_budget"; }
-    else if (used >= dailySearchLimit()) { for (const q of plan) if (!q.done) { q.done = true; q.ok = false; q.error = "daily_limit"; } counters.stoppedBy = "daily_limit"; }
+    else if (used >= dailySearchLimit(run.organizationId)) { for (const q of plan) if (!q.done) { q.done = true; q.ok = false; q.error = "daily_limit"; } counters.stoppedBy = "daily_limit"; }
     else if (reservation === null) { for (const q of plan) if (!q.done) { q.done = true; q.ok = false; q.error = "global_limit"; } counters.stoppedBy = "global_limit"; }
     else {
       const budget = runBudget(run.quantity);
@@ -472,7 +472,7 @@ export async function enrichOne(run: Pick<ProspectRunRow, "id" | "organizationId
       if (deps.company) {
         try {
           // Its own daily allowance, counted from the database; a count that can't be made skips the provider (fail closed).
-          if ((await deps.store.countProviderCalls({ orgId, operation: "company", since: new Date(now.getTime() - DAY) })) >= dailyCompanyLimit()) throw new Error("company_allowance");
+          if ((await deps.store.countProviderCalls({ orgId, operation: "company", since: new Date(now.getTime() - DAY) })) >= dailyCompanyLimit(orgId)) throw new Error("company_allowance");
           const c = await trackProvider(deps, { orgId, runId: run.id, provider: deps.company.name, operation: "company" }, () => deps.company!.enrich(p.domain));
           if (c) {
             const pf: NewFinding[] = [];

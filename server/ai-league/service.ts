@@ -25,8 +25,9 @@ import { leagueAllowance, LEAGUE_WINDOW_DAYS } from "./limits";
 import { campaignTimesProblem } from "@shared/league-campaign";
 import { leagueStore, leagueTablesReady, RunLimit, type LeagueStore } from "./store";
 
+import type { OutboundTier } from "@shared/outbound-plans";
 const DAY = 86_400_000;
-export interface LeagueDeps { store: LeagueStore; now: () => Date; ready: () => Promise<boolean>; kick: () => void; tier: (u: Who) => Promise<"free" | "trial" | "pro"> }
+export interface LeagueDeps { store: LeagueStore; now: () => Date; ready: () => Promise<boolean>; kick: () => void; tier: (u: Who) => Promise<OutboundTier> }
 const defaults = (): LeagueDeps => ({
   store: leagueStore, now: () => new Date(),
   ready: async () => { try { return await leagueTablesReady(); } catch { return false; } },

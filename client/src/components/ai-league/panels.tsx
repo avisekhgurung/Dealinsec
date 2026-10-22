@@ -205,7 +205,7 @@ function Meter({ label, used, limit }: { label: string; used: number; limit: num
   const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 100;
   return (
     <div>
-      <div className="flex justify-between text-xs"><span>{label}</span><span className="tabular-nums text-muted-foreground">{used} of {limit}</span></div>
+      <div className="flex justify-between text-xs"><span>{label}</span><span className="tabular-nums text-muted-foreground">{limit >= 1_000_000 ? `${used} · no limit` : `${used} of ${limit}`}</span></div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={used} aria-valuemin={0} aria-valuemax={limit} aria-label={label}>
         <div className={cn("h-full rounded-full", pct >= 100 ? "bg-red-500" : pct >= 80 ? "bg-amber-500" : "bg-emerald-500")} style={{ width: `${pct}%` }} />
       </div>

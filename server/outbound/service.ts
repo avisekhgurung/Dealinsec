@@ -121,7 +121,7 @@ export async function startRun(user: Who, raw: { request?: unknown; icp?: unknow
   // started at the same moment can't go past either limit together.
   const limits = [
     { since: new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY), max: allowance.monthlySearches },
-    { since: new Date(now.getTime() - DAY), max: dailyRunLimit() },
+    { since: new Date(now.getTime() - DAY), max: dailyRunLimit(orgId) },
   ];
   // The researched-prospects allowance: a new search may research only what is left of it (index limits.length).
   const prospects = { since: limits[0].since, max: allowance.monthlyProspects };
@@ -133,7 +133,7 @@ export async function startRun(user: Who, raw: { request?: unknown; icp?: unknow
       : fail(429, "monthly_limit", i === 0
         ? `You've used the ${allowance.monthlySearches} Client Radar searches included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`
         : `You've used the ${allowance.monthlyProspects} researched prospects included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`)
-    : fail(429, "daily_limit", `You've started today's ${dailyRunLimit()} prospect searches. Try again tomorrow.`);
+    : fail(429, "daily_limit", `You've started today's ${dailyRunLimit(orgId)} prospect searches. Try again tomorrow.`);
   for (let i = 0; i < limits.length; i++) if ((await deps.store.countRunsSince(orgId, limits[i].since)) >= limits[i].max) return limitReached(i);
   if ((await deps.store.prospectsHeldSince(orgId, prospects.since)) >= prospects.max) return limitReached(limits.length);
   // The searches the person saw (and may have edited) are the plan, each re-checked; none given = the default strategies.
@@ -413,7 +413,7 @@ export async function findContacts(user: Who, id: number, runId: unknown, d: Par
   const run = await runFor(orgId, id, runId, deps);
   const icp = (run?.icp as Icp | undefined) ?? { roles: [] as string[] } as unknown as Icp;
   const now = deps.now();
-  if ((await deps.store.countProviderCalls({ orgId, operation: "contact", since: new Date(now.getTime() - DAY) })) >= dailyContactLimit()) return fail(429, "daily_limit", `You've used today's ${dailyContactLimit()} contact lookups. Try again tomorrow.`);
+  if ((await deps.store.countProviderCalls({ orgId, operation: "contact", since: new Date(now.getTime() - DAY) })) >= dailyContactLimit(orgId)) return fail(429, "daily_limit", `You've used today's ${dailyContactLimit(orgId)} contact lookups. Try again tomorrow.`);
   let people;
   const t0 = Date.now();
   try {
