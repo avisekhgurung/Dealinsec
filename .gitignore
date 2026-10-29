@@ -30,3 +30,4 @@ eval-results/
 
 # Opt-in local diagnostics (AI Outbound search traces): never committed
 .diagnostics/
+.neon
