@@ -241,7 +241,10 @@ function waRefusal(e: unknown, orgId: string, conn: WhatsappConnectionRow, deps:
     permission: "The connected WhatsApp token is missing a permission this needs. An owner or admin needs to reconnect it.",
     rate_limited: "WhatsApp is limiting messages from your number right now. Try again later.",
   };
-  return fail(code === "rate_limited" ? 429 : 502, `whatsapp_${code}`, msg[code] ?? "WhatsApp refused the request. Try again in a moment.");
+  // Meta's own explanation names the real cause ("Recipient phone number not in allowed list", a payment problem, …):
+  // without it a refusal is undiagnosable from the product.
+  const detail = e instanceof WhatsappError && e.detail ? ` WhatsApp said: ${e.detail}` : "";
+  return fail(code === "rate_limited" ? 429 : 502, `whatsapp_${code}`, (msg[code] ?? "WhatsApp refused the request.") + detail);
 }
 
 export async function draftChannelMessage(user: Who, leadId: number, raw: unknown, d: Partial<ChannelDeps> = {}): Promise<Result<{ message: ChannelMessageView; retried: boolean }>> {
@@ -548,7 +551,9 @@ export async function sendWhatsapp(user: Who, id: number, bodyHash: unknown, d: 
       await deps.store.transition({ orgId, id, from: ["sending"], set: { status: "uncertain", errorCode: "no_answer", updatedAt: deps.now() } });
       return fail(502, "uncertain", "WhatsApp didn't answer, so it isn't known whether the message went out. It won't be sent again by itself; check with them, then mark what happened.");
     }
-    await deps.store.transition({ orgId, id, from: ["sending"], set: { status: "failed", errorCode: `whatsapp_${code}`.slice(0, 40), updatedAt: deps.now() } });
+    // Keep Meta's numeric code with the bucket (whatsapp_rejected_131042): the failed card can then name the cause.
+    const graphNo = e instanceof WhatsappError && e.providerCode ? `_${e.providerCode}` : "";
+    await deps.store.transition({ orgId, id, from: ["sending"], set: { status: "failed", errorCode: `whatsapp_${code}${graphNo}`.slice(0, 40), updatedAt: deps.now() } });
     return waRefusal(e, orgId, conn, deps);
   }
 }

@@ -20,7 +20,8 @@ export type WhatsappErrorCode =
   | "uncertain";      // no answer: it may or may not have been sent
 
 export class WhatsappError extends Error {
-  constructor(readonly code: WhatsappErrorCode, readonly providerCode: number | null, message: string) { super(message); }
+  /** `detail` is Meta's own explanation (error message + error_data.details): the error body never carries the token. */
+  constructor(readonly code: WhatsappErrorCode, readonly providerCode: number | null, message: string, readonly detail: string | null = null) { super(message); }
 }
 
 export interface WhatsappTemplate { name: string; language: string; category: string; body: string; params: number }
@@ -63,9 +64,11 @@ export function whatsappClient(fetchImpl: typeof fetch = fetch, timeoutMs = 15_0
     let json: any = null;
     try { json = await res.json(); } catch { json = null; }
     if (!res.ok || json?.error) {
+      const detail = [json?.error?.message, json?.error?.error_data?.details]
+        .filter((s: unknown): s is string => typeof s === "string" && !!s.trim()).join(" — ").slice(0, 300) || null;
       // A 5xx on a send may still have gone out: uncertain, not failed.
-      if (isSend && res.status >= 500) throw new WhatsappError("uncertain", Number(json?.error?.code) || null, "WhatsApp had a problem, so it isn't known whether the message was sent.");
-      throw new WhatsappError(mapGraphError(res.status, json?.error), Number(json?.error?.code) || null, "WhatsApp refused the request.");
+      if (isSend && res.status >= 500) throw new WhatsappError("uncertain", Number(json?.error?.code) || null, "WhatsApp had a problem, so it isn't known whether the message was sent.", detail);
+      throw new WhatsappError(mapGraphError(res.status, json?.error), Number(json?.error?.code) || null, "WhatsApp refused the request.", detail);
     }
     return json;
   }

@@ -141,6 +141,17 @@ describe("each channel's state is what the server checked", () => {
     expect(waCalls).toHaveLength(0);
   });
 
+  it("a refusal keeps Meta's code and explanation, so the person reads the real cause", async () => {
+    await connect();
+    const l = await lead(); await optIn(l.id); await theyWrote();
+    const m = await approved("whatsapp", "text", l.id, { to: PHONE });
+    waBehaviour.send = () => new WhatsappError("rejected", 131042, "WhatsApp refused the request.", "Business eligibility payment issue");
+    const r = await svc.sendWhatsapp(OWNER(), m.id, m.bodyHash, d());
+    expect(r).toMatchObject({ ok: false, code: "whatsapp_rejected" });
+    expect((r as any).message).toContain("WhatsApp said: Business eligibility payment issue");
+    expect((await mem.store.get(ORG1, m.id))!).toMatchObject({ status: "failed", errorCode: "whatsapp_rejected_131042" });
+  });
+
   it("a token WhatsApp stops accepting puts the connection in 'permission missing'", async () => {
     await connect();
     const l = await lead(); await optIn(l.id); await theyWrote();
@@ -279,7 +290,7 @@ describe("WhatsApp: exactly the approved text, once", () => {
     const { m } = await ready();
     waBehaviour.send = () => new WhatsappError("recipient", 131026, "x");
     expect(await svc.sendWhatsapp(OWNER(), m.id, m.bodyHash, d())).toMatchObject({ ok: false });
-    expect((await mem.store.get(ORG1, m.id))).toMatchObject({ status: "failed", errorCode: "whatsapp_recipient" });
+    expect((await mem.store.get(ORG1, m.id))).toMatchObject({ status: "failed", errorCode: "whatsapp_recipient_131026" });
     expect(await mem.store.countApiSends(ORG1, new Date(0))).toBe(0);
   });
 

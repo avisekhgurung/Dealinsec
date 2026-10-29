@@ -44,6 +44,13 @@ describe("WhatsApp Cloud API client", () => {
     await expect(c.sendText("t", "1", "+15550001111", "x")).rejects.toBeInstanceOf(WhatsappError);
   });
 
+  it("keeps Meta's code and explanation on a refusal, so the person reads the real cause", async () => {
+    const { c } = client([json({ error: { code: 131042, message: "Business eligibility payment issue", error_data: { details: "There was an error related to your payment method." } } }, 400)]);
+    await expect(c.sendTemplate("t", "1", "+15550001111", { name: "intro_v1", language: "en", params: [] })).rejects.toMatchObject({
+      code: "rejected", providerCode: 131042, detail: "Business eligibility payment issue — There was an error related to your payment method.",
+    });
+  });
+
   it("offers only APPROVED templates whose values are all plain text in the body, with their parameter count", async () => {
     const { c } = client([json({ data: [
       { name: "intro_v1", language: "en", status: "APPROVED", category: "MARKETING", components: [{ type: "BODY", text: "Hi {{1}}, about {{2}}. Again {{1}}." }, { type: "FOOTER", text: "Reply STOP to opt out" }] },
