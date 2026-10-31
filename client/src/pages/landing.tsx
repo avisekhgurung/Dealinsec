@@ -60,7 +60,6 @@ import { PRICING } from "@shared/product-facts";
 import { OUTBOUND_ALLOWANCE_DEFAULTS, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
 import { PRO_INCLUDED_SEATS } from "@shared/permissions";
 import { openConsentSettings } from "@/lib/consent";
-import { LandingCopilot } from "@/components/landing-copilot";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { BRAND_GRADIENT, GradientText, SectionHeader, fadeUp, onSectionLinkClick, scrollToSection, stagger } from "@/components/landing-shared";
 import { LandingTryDemo } from "@/components/landing-try-demo";
@@ -290,9 +289,9 @@ export default function LandingPage() {
 
       <Footer />
 
-      {/* Public product guide — answers from the same knowledge base the
-          in-app Copilot uses, so marketing can't drift from the product. */}
-      <LandingCopilot onCta={() => { landingCta("ask_dealinsec"); isAuthenticated ? setLocation("/dashboard") : openAuth("signup"); }} />
+      {/* The "Ask about DealInSec" bubble (LandingCopilot) is hidden by the
+          founder's call (2026-11-01). The component and its /api route still
+          exist — remount it here to bring it back. */}
 
       {/* Auth Modal */}
       <Dialog open={authModalOpen} onOpenChange={setAuthModalOpen}>
