@@ -154,7 +154,7 @@ function FindClients({ onStart, onNext, onSignup }: { onStart: () => void; onNex
       <div className="flex flex-col sm:flex-row gap-2">
         <input id="demo-target" value={text} onChange={(e) => setText(e.target.value.slice(0, 200))} onKeyDown={(e) => { if (e.key === "Enter") plan(text); }}
           placeholder="e.g. D2C skincare brands in India" data-testid="demo-target"
-          className="flex-1 h-11 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent px-3.5 text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 placeholder:text-neutral-400" />
+          className="flex-1 h-11 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent px-3.5 text-md outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 placeholder:text-neutral-400" />
         <button type="button" onClick={() => plan(text)} disabled={text.trim().length < 3} data-testid="demo-plan" className={cn(primaryBtn, "h-11")} style={{ background: BRAND_GRADIENT }}>
           <Search className="w-4 h-4" /> Plan the search
         </button>
@@ -296,7 +296,7 @@ function CloseDeal({ result, onResult, onStart, onNext }: { result: DemoResult |
       <p className="text-xs text-neutral-500 mt-0.5 mb-2">We'll turn it into a deal and check what's missing before you agree.</p>
       <textarea id="demo-reply" value={text} onChange={(e) => setText(e.target.value.slice(0, MAX_LEN))} placeholder={REPLY_PLACEHOLDER} rows={3} maxLength={MAX_LEN}
         data-testid="demo-textarea"
-        className="w-full resize-none rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent p-3.5 text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 placeholder:text-neutral-400" />
+        className="w-full resize-none rounded-xl border border-neutral-300 dark:border-neutral-700 bg-transparent p-3.5 text-md outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 placeholder:text-neutral-400" />
       <div className="flex flex-wrap items-center justify-between gap-3 mt-3">
         <button type="button" onClick={() => { setText(REPLY_EXAMPLE); trackEvent("demo_open", { source: "example", step: "close" }); run(REPLY_EXAMPLE); }} data-testid="demo-try-example" className={linkBtn}>
           Try an example instead

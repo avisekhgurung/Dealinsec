@@ -103,7 +103,7 @@ function TodayRow({ item, index, calm }: { item: TodayItem; index: number; calm:
             </span>
             <span className="text-sm font-semibold leading-snug text-foreground">{item.title}</span>
           </span>
-          <span className="mt-0.5 block text-xs leading-snug text-muted-foreground lg:text-[13px]">{item.detail}</span>
+          <span className="mt-0.5 block text-xs leading-snug text-muted-foreground lg:text-sm">{item.detail}</span>
           <span className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 group-hover:underline dark:text-emerald-400 sm:hidden">
             {item.action} <ArrowRight className="h-3.5 w-3.5" aria-hidden />
           </span>

@@ -171,12 +171,12 @@ export function NotificationBell({ className = "" }: { className?: string }) {
                         <Icon className="w-3.5 h-3.5" />
                       </span>
                       <span className="flex-1 min-w-0">
-                        <span className="block text-[13px] leading-snug">
+                        <span className="block text-sm leading-snug">
                           <b className="font-semibold">{a.userName || "Someone"}</b>{" "}
                           {a.action} {a.entityType}
                         </span>
                         {a.detail && (
-                          <span className="block text-[12px] text-muted-foreground truncate mt-0.5">
+                          <span className="block text-xs text-muted-foreground truncate mt-0.5">
                             {a.detail}
                           </span>
                         )}

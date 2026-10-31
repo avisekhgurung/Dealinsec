@@ -125,7 +125,7 @@ function PhoneNest() {
                 <li key={m.bot} className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-white p-3 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
                   <NestCharacter bot={m.bot} size={56} animationState={m.state} eager />
                   <div className="min-w-0">
-                    <p className="text-[15px] font-semibold text-neutral-900 dark:text-white">{id.name} <span aria-hidden>{id.emoji}</span></p>
+                    <p className="text-md font-semibold text-neutral-900 dark:text-white">{id.name} <span aria-hidden>{id.emoji}</span></p>
                     <p className={cn("text-[11px] font-semibold", m.tone)}>{id.role}</p>
                     <p className="mt-0.5 text-[11px] leading-snug text-neutral-500">{m.status}</p>
                   </div>
@@ -135,7 +135,7 @@ function PhoneNest() {
           </ul>
           {/* Zee's briefing, as it reads in the app (example figures) */}
           <div className="mx-3 mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/40">
-            <p className="text-[12px] font-bold text-emerald-900 dark:text-emerald-200">Today's business briefing <span aria-hidden>🌱</span></p>
+            <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">Today's business briefing <span aria-hidden>🌱</span></p>
             <ul className="mt-1.5 space-y-1 text-[11px] text-emerald-900/80 dark:text-emerald-200/80">
               <li>• 1 follow-up due today: Northwind Logistics</li>
               <li>• 2 replies waiting for you</li>
@@ -209,26 +209,26 @@ export function HeroSection({ isAuthenticated, onPrimary }: { isAuthenticated: b
             <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60 motion-reduce:hidden" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" /></span>
             For freelancers and service providers in India
           </p>
-          <h1 style={{ animationDelay: "0.13s" }} className="dis-hero-in mt-5 text-[2.75rem] font-extrabold leading-[1.02] tracking-[-0.035em] text-[#111B22] sm:text-6xl lg:text-[4.1rem] dark:text-white">
+          <h1 style={{ animationDelay: "0.13s" }} className="dis-hero-in mt-5 text-[clamp(1.9rem,3.2vw,3.2rem)] font-bold leading-[1.05] tracking-[-0.03em] text-[#111B22] dark:text-white">
             Your AI team<br />finds <span className={GREEN}>clients</span><br /><span className="dis-gradient-text">for you.</span>
           </h1>
-          <p style={{ animationDelay: "0.21s" }} className="dis-hero-in mt-5 max-w-lg text-base leading-relaxed text-neutral-600 sm:text-lg dark:text-neutral-400">
+          <p style={{ animationDelay: "0.21s" }} className="dis-hero-in mt-5 max-w-[72ch] text-base font-normal leading-relaxed text-neutral-600 dark:text-neutral-400">
             DealInSec gives Indian freelancers and service providers an AI team that researches potential clients, drafts the outreach and keeps every follow-up moving — with evidence behind every name, and you approving every message.
           </p>
           <div style={{ animationDelay: "0.29s" }} className="dis-hero-in mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <button type="button" onClick={() => { trackEvent("hero_cta_click", { label: isAuthenticated ? "dashboard" : "start_free" }); onPrimary(); }} data-testid="button-hero-cta"
-              className="group inline-flex h-12 items-center justify-center whitespace-nowrap rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-6 text-[15px] font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:shadow-emerald-600/40">
+              className="group inline-flex h-12 items-center justify-center whitespace-nowrap rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-6 text-md font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:shadow-emerald-600/40">
               {isAuthenticated ? "Go to Home" : "Get started free"}<ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </button>
             <a href="#how" onClick={(e) => { trackEvent("hero_cta_click", { label: "see_how" }); onSectionLinkClick(e); }} data-testid="link-hero-demo"
-              className="inline-flex h-12 items-center justify-center whitespace-nowrap rounded-lg border border-neutral-200 bg-white px-5 text-[15px] font-semibold shadow-sm transition hover:border-emerald-300 dark:border-neutral-700 dark:bg-neutral-900">
+              className="inline-flex h-12 items-center justify-center whitespace-nowrap rounded-lg border border-neutral-200 bg-white px-5 text-md font-semibold shadow-sm transition hover:border-emerald-300 dark:border-neutral-700 dark:bg-neutral-900">
               <PlayCircle className="mr-2 h-5 w-5 text-emerald-600" />See how it works
             </a>
           </div>
           <p style={{ animationDelay: "0.33s" }} className="dis-hero-in mt-4 flex items-start gap-2 text-sm font-medium text-neutral-800 dark:text-neutral-200" data-testid="hero-approval">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />AI coworkers research and draft; you approve every message and send it yourself. Nothing is sent automatically.
           </p>
-          <ul style={{ animationDelay: "0.37s" }} className="dis-hero-in mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px] text-neutral-500 dark:text-neutral-400">
+          <ul style={{ animationDelay: "0.37s" }} className="dis-hero-in mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-neutral-500 dark:text-neutral-400">
             {["No credit card required", `Free: ${OUTBOUND_ALLOWANCE_DEFAULTS.free.monthlySearches} AI research searches every ${OUTBOUND_WINDOW_DAYS} days`, "Outreach drafts you approve and send", `Pro ₹${PRICING.proMonthlyInr}/month in India`].map((t) => (
               <li key={t} className="inline-flex items-center gap-1.5"><Check className="h-4 w-4 text-emerald-600" />{t}</li>
             ))}
@@ -418,16 +418,16 @@ export function FeaturesSection() {
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300"><Icon className="h-5 w-5" aria-hidden /></span>
                 <span className="text-[11px] font-semibold text-neutral-500">{plan}</span>
               </div>
-              <h3 className="mt-3 text-[17px] font-bold">{title}</h3>
+              <h3 className="mt-3 text-lg font-bold">{title}</h3>
               <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{text}</p>
-              <ul className="mt-3 space-y-1.5 text-[13px] text-neutral-600 dark:text-neutral-400">
+              <ul className="mt-3 space-y-1.5 text-sm text-neutral-600 dark:text-neutral-400">
                 {points.map((p) => <li key={p} className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />{p}</li>)}
               </ul>
             </motion.li>
           ))}
           <motion.li variants={reveal} className="flex flex-col justify-center rounded-2xl border border-emerald-300 bg-gradient-to-br from-emerald-50 to-white p-5 dark:border-emerald-800 dark:from-emerald-950/40 dark:to-neutral-900">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white"><Handshake className="h-5 w-5" aria-hidden /></span>
-            <h3 className="mt-3 text-[17px] font-bold">One connected client record</h3>
+            <h3 className="mt-3 text-lg font-bold">One connected client record</h3>
             <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">The prospect becomes the lead, and every fact, source, message and follow-up stays on that one record — so you always know where each conversation stands and why.</p>
           </motion.li>
         </motion.ul>
@@ -485,7 +485,7 @@ export function AiTeamSection() {
                 </div>
               </div>
               <p className="mt-4 text-sm text-neutral-600 dark:text-neutral-400">{m.line}</p>
-              <ul className="mt-3 space-y-1.5 text-[13px] text-neutral-600 dark:text-neutral-400">
+              <ul className="mt-3 space-y-1.5 text-sm text-neutral-600 dark:text-neutral-400">
                 {m.points.map((p) => <li key={p} className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden />{p}</li>)}
               </ul>
             </motion.li>
@@ -630,7 +630,7 @@ export function FaqSection() {
             <Accordion key={c} type="single" collapsible className="space-y-2.5">
               {items.map((f, i) => (
                 <AccordionItem key={f.q} value={`faq-${c}-${i}`} className="rounded-xl border border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-900/50">
-                  <AccordionTrigger className="py-3.5 text-left text-[13.5px] font-semibold hover:no-underline">{f.q}</AccordionTrigger>
+                  <AccordionTrigger className="py-3.5 text-left text-sm font-semibold hover:no-underline">{f.q}</AccordionTrigger>
                   <AccordionContent className="pb-4 text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">{f.a}</AccordionContent>
                 </AccordionItem>
               ))}

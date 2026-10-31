@@ -895,11 +895,11 @@ function Footer() {
             ))}
           </div>
         </div>
-        <div className="mt-8 flex flex-wrap justify-center gap-x-4 gap-y-1.5 border-t border-neutral-100 pt-6 text-[12px] text-neutral-500 dark:border-neutral-800">
+        <div className="mt-8 flex flex-wrap justify-center gap-x-4 gap-y-1.5 border-t border-neutral-100 pt-6 text-xs text-neutral-500 dark:border-neutral-800">
           {more.map((l) => link(l, "hover:text-emerald-700 dark:hover:text-emerald-300"))}
           <button type="button" onClick={openConsentSettings} className="hover:text-emerald-700 dark:hover:text-emerald-300">Cookie settings</button>
         </div>
-        <p className="mt-4 text-center text-[12px] text-neutral-400">© {new Date().getFullYear()} DealInSec. All rights reserved. Pro purchases are processed by Razorpay; DealInSec tracks your client payments and never handles them.</p>
+        <p className="mt-4 text-center text-xs text-neutral-400">© {new Date().getFullYear()} DealInSec. All rights reserved. Pro purchases are processed by Razorpay; DealInSec tracks your client payments and never handles them.</p>
       </div>
     </footer>
   );

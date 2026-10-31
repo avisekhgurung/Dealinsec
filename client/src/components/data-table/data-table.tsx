@@ -377,7 +377,7 @@ export function DataTable<TData>({
                     {row.getVisibleCells().map((cell) => {
                       const meta = cell.column.columnDef.meta;
                       return (
-                        <TableCell key={cell.id} className={cn("py-2 text-[13px] whitespace-nowrap", meta?.align && alignClass[meta.align], meta?.className)}>
+                        <TableCell key={cell.id} className={cn("py-2 text-sm whitespace-nowrap", meta?.align && alignClass[meta.align], meta?.className)}>
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </TableCell>
                       );

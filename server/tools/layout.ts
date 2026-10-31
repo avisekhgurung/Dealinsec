@@ -36,6 +36,7 @@ const APP_SIGNUP = "/?ref=tools_remove_brand";
 
 import { consentBanner, consentScript, GA_ID } from "@shared/consent-script";
 import { PRICING } from "@shared/product-facts";
+import { FONT_HEAD, FONT_STACK_SANS } from "../fonts";
 
 /** Same property as client/index.html; server/seo.test.ts asserts they match. */
 export const GA_MEASUREMENT_ID = GA_ID;
@@ -68,7 +69,7 @@ const STYLES = `<style>
   /* Tokens mirror the landing page's light theme (client/src/index.css). */
   :root{--green:hsl(160 84% 30%);--green-d:hsl(160 84% 23%);--ink:hsl(222 47% 11%);--muted:hsl(215 16% 47%);--line:hsl(215 20% 88%);--card-line:hsl(215 20% 92%);--bg:hsl(210 20% 98%);--card:hsl(0 0% 100%);--accent-bg:hsl(160 60% 95%);--accent-fg:hsl(160 55% 22%);--accent-line:hsl(160 40% 85%)}
   html{-webkit-text-size-adjust:100%}
-  body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  body{margin:0;font-family:${FONT_STACK_SANS};color:var(--ink);background:var(--bg);line-height:1.6;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
   a{color:var(--green);text-decoration:none}
   a:hover{text-decoration:underline}
   h1,h2,h3{line-height:1.2;margin:0 0 .5em}
@@ -80,13 +81,13 @@ const STYLES = `<style>
   header.site{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
   header.site .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
   /* Matches <DealinsecLogo size="md"> in the app header exactly. */
-  .brand{display:inline-flex;align-items:center;gap:9px;font-size:19px;font-weight:800;line-height:1;letter-spacing:-.034em;color:#111B22}
+  .brand{display:inline-flex;align-items:center;gap:9px;font-family:Inter,"Source Sans 3",sans-serif;font-size:19px;font-weight:800;line-height:1;letter-spacing:-.034em;color:#111B22}
   .brand:hover{text-decoration:none}
   .logo{flex-shrink:0;filter:drop-shadow(0 1px 1px rgba(0,0,0,.05))}
   .brand-text{line-height:1;font-weight:800}
   .brand-accent{background:linear-gradient(180deg,#22D892 0%,#0C8E7B 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#10A584}
   .hero{padding:56px 0 20px;text-align:center}
-  .hero h1{font-size:clamp(28px,5vw,44px);font-weight:800;letter-spacing:-.02em}
+  .hero h1{font-size:clamp(28px,5vw,44px);font-weight:700;letter-spacing:-.02em}
   .hero p.sub{font-size:clamp(16px,2.2vw,20px);color:var(--muted);max-width:660px;margin:0 auto}
   .chips{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:20px 0 0}
   .chip{font-size:13px;font-weight:600;color:var(--accent-fg);background:var(--accent-bg);border:1px solid var(--accent-line);border-radius:999px;padding:6px 12px}
@@ -100,12 +101,12 @@ const STYLES = `<style>
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
   @media(max-width:760px){.steps{grid-template-columns:1fr}}
-  .step .n{width:34px;height:34px;border-radius:50%;background:var(--accent-bg);color:var(--accent-fg);font-weight:800;display:grid;place-items:center;margin-bottom:8px}
+  .step .n{width:34px;height:34px;border-radius:50%;background:var(--accent-bg);color:var(--accent-fg);font-weight:700;display:grid;place-items:center;margin-bottom:8px}
   .faq h3{font-size:17px;margin-top:18px}
   .faq p{color:var(--muted);margin:.3em 0 0}
   .cta-band{background:linear-gradient(135deg,var(--green),#0a6e46);color:#fff;margin-top:24px}
   .cta-band .wrap{padding:44px 20px;text-align:center}
-  .cta-band h2{color:#fff;font-size:clamp(22px,3.5vw,32px);font-weight:800}
+  .cta-band h2{color:#fff;font-size:clamp(22px,3.5vw,32px);font-weight:700}
   .cta-band p{color:#DCFCE7;max-width:620px;margin:0 auto 22px}
   .cta-band .btn{background:#fff;color:var(--green-d)}
   .cta-band .btn:hover{background:#F0FDF4}
@@ -137,7 +138,7 @@ const STYLES = `<style>
   .btn .ext{width:14px;height:14px;opacity:.85}
 
   /* ── Hero badge + two-tone headline ── */
-  .badge{display:inline-flex;align-items:center;gap:9px;padding:8px 16px;border-radius:999px;background:var(--card);border:1px solid var(--accent-line);color:var(--accent-fg);font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;box-shadow:0 1px 2px rgba(16,24,40,.05);margin-bottom:20px}
+  .badge{display:inline-flex;align-items:center;gap:9px;padding:8px 16px;border-radius:999px;background:var(--card);border:1px solid var(--accent-line);color:var(--accent-fg);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;box-shadow:0 1px 2px rgba(16,24,40,.05);margin-bottom:20px}
   .hero .accent{color:var(--green)}
 
   /* ── Icon tool cards ── */
@@ -180,7 +181,7 @@ const STYLES = `<style>
   .export-overlay.open .export-sheet{transform:translateY(0) scale(1);opacity:1}
   .export-hero{background:linear-gradient(135deg,var(--green),var(--green-d));color:#fff;padding:26px 24px 22px;text-align:center;position:relative}
   .export-check{width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center;margin:0 auto 12px;animation:eo-pop .45s cubic-bezier(.34,1.56,.64,1) both}
-  .export-hero h3{color:#fff;font-size:19px;margin:0 0 3px;font-weight:800}
+  .export-hero h3{color:#fff;font-size:19px;margin:0 0 3px;font-weight:700}
   .export-hero p{color:#DCFCE7;font-size:13px;margin:0}
   .export-close{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;border:0;background:rgba(255,255,255,.18);color:#fff;font-size:20px;cursor:pointer;line-height:1;display:grid;place-items:center}
   .export-close:hover{background:rgba(255,255,255,.3)}
@@ -346,7 +347,7 @@ const STYLES = `<style>
 
   /* "More free tools" related section (per-tool footer nav). */
   .related{padding:28px 0}
-  .rt-title{font-size:18px;font-weight:800;letter-spacing:-.01em;margin:0 0 14px}
+  .rt-title{font-size:18px;font-weight:700;letter-spacing:-.01em;margin:0 0 14px}
   .rt-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
   @media(max-width:860px){.rt-grid{grid-template-columns:1fr 1fr}}
   .rt-card{
@@ -360,7 +361,7 @@ const STYLES = `<style>
     transition:transform .14s ease, box-shadow .16s ease, border-color .16s ease;
   }
   .rt-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-green),var(--glass-inset);border-color:rgba(255,255,255,.6);text-decoration:none}
-  .rt-card .rt-go{color:var(--green-d);font-weight:800;transition:transform .16s ease}
+  .rt-card .rt-go{color:var(--green-d);font-weight:700;transition:transform .16s ease}
   .rt-card:hover .rt-go{transform:translateX(3px)}
 
   /* Export panel → frosted scrim + floating sheet. */
@@ -439,14 +440,14 @@ const STYLES = `<style>
   .bm-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px}
   .bm-list li{position:relative;padding-left:29px;font-size:13.5px;color:var(--ink);line-height:1.45}
   .bm-list li b{font-weight:700}
-  .bm-list li::before{content:"✓";position:absolute;left:0;top:0;width:20px;height:20px;border-radius:50%;background:var(--accent-bg);color:var(--green-d);font-size:12px;font-weight:800;display:grid;place-items:center}
+  .bm-list li::before{content:"✓";position:absolute;left:0;top:0;width:20px;height:20px;border-radius:50%;background:var(--accent-bg);color:var(--green-d);font-size:12px;font-weight:700;display:grid;place-items:center}
   .export-opt.eo-primary{background:linear-gradient(180deg,hsl(160 60% 96%),hsl(160 55% 93%));border-color:var(--accent-line)}
   .export-opt.eo-primary .eo-ico{background:var(--green);color:#fff}
   .export-opt.eo-primary:hover{border-color:var(--green);box-shadow:var(--shadow-green)}
   /* Save confirmation toast. */
   /* "Make it with AI" box on the invoice tool. */
   .ai-box{background:linear-gradient(135deg,var(--accent-bg),rgba(255,255,255,.55));border:1px solid var(--accent-line);border-radius:14px;padding:14px 16px;margin-bottom:18px}
-  .ai-head{font-size:14px;font-weight:800;color:var(--green-d);margin-bottom:8px}
+  .ai-head{font-size:14px;font-weight:700;color:var(--green-d);margin-bottom:8px}
   .ai-box textarea.f{background:rgba(255,255,255,.85)}
 
   /* HARD GUARD: the export node is <div class="card print-doc"> — it carries BOTH
@@ -702,9 +703,7 @@ export function renderToolPage(o: ToolPageOptions): string {
 <meta name="twitter:description" content="${esc(o.description)}" />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="icon" href="/favicon.ico" sizes="any" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+${FONT_HEAD}
 <script defer src="/tools/lib/html-to-image.js"></script>
 ${gaSnippet()}
 ${STYLES}

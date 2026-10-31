@@ -33,6 +33,7 @@
  */
 import type { Express } from "express";
 import { esc, SITE_ORIGIN, LOGO_SVG, gaSnippet, COOKIE_FOOTER_LINKS } from "./tools/layout";
+import { FONT_HEAD, FONT_STACK_SANS } from "./fonts";
 import { consentBanner } from "@shared/consent-script";
 import { PRICING, TAGLINE } from "@shared/product-facts";
 import { OUTBOUND_ALLOWANCE_DEFAULTS as OB, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
@@ -78,7 +79,7 @@ const STYLES = `<style>
   *,*::before,*::after{box-sizing:border-box}
   :root{--green:hsl(160 84% 30%);--green-d:hsl(160 84% 23%);--ink:hsl(222 47% 11%);--muted:hsl(215 16% 47%);--line:hsl(215 20% 88%);--card-line:hsl(215 20% 92%);--bg:hsl(210 20% 98%);--card:hsl(0 0% 100%);--accent-bg:hsl(160 60% 95%);--accent-fg:hsl(160 55% 22%);--accent-line:hsl(160 40% 85%)}
   html{-webkit-text-size-adjust:100%}
-  body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg);line-height:1.65;-webkit-font-smoothing:antialiased}
+  body{margin:0;font-family:${FONT_STACK_SANS};color:var(--ink);background:var(--bg);line-height:1.65;-webkit-font-smoothing:antialiased}
   a{color:var(--green);text-decoration:none}
   a:hover{text-decoration:underline}
   h1,h2,h3{line-height:1.2;margin:0 0 .5em}
@@ -89,7 +90,7 @@ const STYLES = `<style>
   .btn.ghost:hover{background:#fff;border-color:var(--green);color:var(--green)}
   header.site{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
   header.site .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
-  .brand{display:inline-flex;align-items:center;gap:9px;font-size:19px;font-weight:800;line-height:1;letter-spacing:-.034em;color:#111B22}
+  .brand{display:inline-flex;align-items:center;gap:9px;font-family:Inter,"Source Sans 3",sans-serif;font-size:19px;font-weight:800;line-height:1;letter-spacing:-.034em;color:#111B22}
   .brand:hover{text-decoration:none}
   .logo{flex-shrink:0;filter:drop-shadow(0 1px 1px rgba(0,0,0,.05))}
   .brand-accent{background:linear-gradient(180deg,#22D892 0%,#0C8E7B 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#10A584}
@@ -102,14 +103,14 @@ const STYLES = `<style>
   .muted{color:var(--muted)}
 
   .hero{padding:56px 0 26px;text-align:center}
-  .hero h1{font-size:clamp(28px,4.8vw,44px);font-weight:800;letter-spacing:-.02em;max-width:820px;margin:0 auto 12px}
+  .hero h1{font-size:clamp(28px,4.8vw,44px);font-weight:700;letter-spacing:-.02em;max-width:820px;margin:0 auto 12px}
   .hero p.sub{font-size:clamp(16px,2.2vw,19px);color:var(--muted);max-width:680px;margin:0 auto 22px}
   .hero-ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
   .chips{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:22px 0 0}
   .chip{font-size:13px;font-weight:600;color:var(--accent-fg);background:var(--accent-bg);border:1px solid var(--accent-line);border-radius:999px;padding:6px 12px}
 
   section{padding:26px 0}
-  section h2{font-size:clamp(21px,3vw,27px);font-weight:800;letter-spacing:-.01em}
+  section h2{font-size:clamp(21px,3vw,27px);font-weight:700;letter-spacing:-.01em}
   section p,section li{font-size:16px;color:var(--ink)}
   .sec-sub{color:var(--muted);max-width:720px}
 
@@ -124,7 +125,7 @@ const STYLES = `<style>
   @media(max-width:860px){.thread{grid-template-columns:1fr 1fr}}
   @media(max-width:520px){.thread{grid-template-columns:1fr}}
   .th-card{background:var(--card);border:1px solid var(--card-line);border-radius:16px;padding:20px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
-  .th-card .n{width:32px;height:32px;border-radius:50%;background:var(--accent-bg);color:var(--accent-fg);font-weight:800;display:grid;place-items:center;margin-bottom:10px;font-size:14px}
+  .th-card .n{width:32px;height:32px;border-radius:50%;background:var(--accent-bg);color:var(--accent-fg);font-weight:700;display:grid;place-items:center;margin-bottom:10px;font-size:14px}
   .th-card b{display:block;margin-bottom:5px;font-size:15.5px}
   .th-card p{font-size:14px;color:var(--muted);margin:0}
   .th-card.hl{border-color:var(--green);box-shadow:0 4px 14px rgba(4,120,87,.12)}
@@ -156,7 +157,7 @@ const STYLES = `<style>
 
   .cta-band{background:linear-gradient(135deg,var(--green),#0a6e46);margin-top:34px}
   .cta-band .wrap{padding:44px 20px;text-align:center}
-  .cta-band h2{color:#fff;font-size:clamp(22px,3.5vw,30px);font-weight:800;margin:0 0 8px}
+  .cta-band h2{color:#fff;font-size:clamp(22px,3.5vw,30px);font-weight:700;margin:0 0 8px}
   .cta-band p{color:#DCFCE7;max-width:600px;margin:0 auto 20px;font-size:16px}
   .cta-band .btn{background:#fff;color:var(--green-d)}
   .cta-band .btn:hover{background:#F0FDF4}
@@ -1300,9 +1301,7 @@ ${relatedSection(p.path, siblings)}`;
 ${ogImg}
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="icon" href="/favicon.ico" sizes="any" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+${FONT_HEAD}
 ${gaSnippet()}
 ${STYLES}
 ${jsonLd.map((b) => `<script type="application/ld+json">${JSON.stringify(b).replace(/</g, "\\u003c")}</script>`).join("\n")}

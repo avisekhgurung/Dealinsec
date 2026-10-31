@@ -38,7 +38,7 @@ function BottomNavBar() {
   const sections = moreSheetSections(user as any);
 
   const label = (text: string, active: boolean) => (
-    <span className={`max-w-full truncate px-0.5 text-[11px] leading-none tracking-tight min-[400px]:text-[12px] ${active ? "font-bold" : "font-medium"}`}>
+    <span className={`max-w-full truncate px-0.5 text-[11px] leading-none tracking-tight min-[400px]:text-xs ${active ? "font-bold" : "font-medium"}`}>
       {text}
     </span>
   );
@@ -82,7 +82,7 @@ function BottomNavBar() {
           <SheetContent side="bottom" className="dis-moresheet dis-bottomnav border-0 p-0 text-white">
             <div className="safe-area-pb">
               <div className="max-w-lg mx-auto px-4 pt-5 pb-4">
-                <SheetTitle className="text-[17px] font-bold text-white">More</SheetTitle>
+                <SheetTitle className="text-lg font-bold text-white">More</SheetTitle>
                 <SheetDescription className="sr-only">Documents, money and your account</SheetDescription>
 
                 <div className="mt-3 space-y-4">
@@ -90,7 +90,7 @@ function BottomNavBar() {
                     <section key={section.group} aria-labelledby={`more-${section.group}`}>
                       <h3
                         id={`more-${section.group}`}
-                        className="px-1 pb-1.5 text-[12px] font-semibold uppercase tracking-wider text-emerald-200/80"
+                        className="px-1 pb-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-200/80"
                       >
                         {section.label}
                       </h3>
@@ -105,7 +105,7 @@ function BottomNavBar() {
                                 onClick={() => setMoreOpen(false)}
                                 data-testid={`nav-more-${item.key}`}
                                 aria-current={active ? "page" : undefined}
-                                className="dis-moresheet-item flex items-center gap-3 min-h-[48px] px-3 rounded-xl text-[15px] font-semibold outline-none"
+                                className="dis-moresheet-item flex items-center gap-3 min-h-[48px] px-3 rounded-xl text-md font-semibold outline-none"
                               >
                                 <Icon className="w-5 h-5 shrink-0" strokeWidth={active ? 2.3 : 1.9} />
                                 <span className="truncate">{item.label}</span>

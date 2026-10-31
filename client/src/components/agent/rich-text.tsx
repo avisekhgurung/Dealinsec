@@ -66,7 +66,7 @@ function CodeBlock({ lang, code, open }: { lang: string | null; code: string; op
 }
 
 const HEADING_TAG = { 1: "h3", 2: "h4", 3: "h5", 4: "h6" } as const;
-const HEADING_CLASS = { 1: "text-base font-semibold", 2: "text-[15px] font-semibold", 3: "text-sm font-semibold", 4: "text-sm font-medium text-foreground/80" } as const;
+const HEADING_CLASS = { 1: "text-base font-semibold", 2: "text-md font-semibold", 3: "text-sm font-semibold", 4: "text-sm font-medium text-foreground/80" } as const;
 
 function Blocks({ blocks, nested = false }: { blocks: Block[]; nested?: boolean }) {
   return (

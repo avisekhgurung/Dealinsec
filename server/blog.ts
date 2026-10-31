@@ -20,6 +20,7 @@
  */
 import type { Express } from "express";
 import { esc, SITE_ORIGIN, LOGO_SVG, gaSnippet, COOKIE_FOOTER_LINKS } from "./tools/layout";
+import { FONT_HEAD, FONT_STACK_SANS } from "./fonts";
 import { consentBanner } from "@shared/consent-script";
 import { TAGLINE } from "@shared/product-facts";
 
@@ -76,7 +77,7 @@ const STYLES = `<style>
   *,*::before,*::after{box-sizing:border-box}
   :root{--green:hsl(160 84% 30%);--green-d:hsl(160 84% 23%);--ink:hsl(222 47% 11%);--muted:hsl(215 16% 47%);--line:hsl(215 20% 88%);--card-line:hsl(215 20% 92%);--bg:hsl(210 20% 98%);--card:hsl(0 0% 100%);--accent-bg:hsl(160 60% 95%);--accent-fg:hsl(160 55% 22%);--accent-line:hsl(160 40% 85%)}
   html{-webkit-text-size-adjust:100%}
-  body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg);line-height:1.7;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  body{margin:0;font-family:${FONT_STACK_SANS};color:var(--ink);background:var(--bg);line-height:1.7;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
   a{color:var(--green);text-decoration:none}
   a:hover{text-decoration:underline}
   .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
@@ -86,7 +87,7 @@ const STYLES = `<style>
   .btn.ghost:hover{background:#fff;border-color:var(--green)}
   header.site{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
   header.site .wrap{display:flex;align-items:center;justify-content:space-between;height:64px}
-  .brand{display:inline-flex;align-items:center;gap:9px;font-size:19px;font-weight:800;line-height:1;letter-spacing:-.034em;color:#111B22}
+  .brand{display:inline-flex;align-items:center;gap:9px;font-family:Inter,"Source Sans 3",sans-serif;font-size:19px;font-weight:800;line-height:1;letter-spacing:-.034em;color:#111B22}
   .brand:hover{text-decoration:none}
   .logo{flex-shrink:0;filter:drop-shadow(0 1px 1px rgba(0,0,0,.05))}
   .brand-accent{background:linear-gradient(180deg,#22D892 0%,#0C8E7B 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#10A584}
@@ -103,9 +104,9 @@ const STYLES = `<style>
   .crumbs{font-size:13px;color:var(--muted);padding:22px 0 0}
   .crumbs a{color:var(--muted)}
   article{max-width:760px;margin:0 auto;padding:10px 20px 30px}
-  article h1{font-size:clamp(28px,4.6vw,40px);font-weight:800;letter-spacing:-.02em;line-height:1.15;margin:14px 0 10px}
+  article h1{font-size:clamp(28px,4.6vw,40px);font-weight:700;letter-spacing:-.02em;line-height:1.15;margin:14px 0 10px}
   .post-meta{font-size:14px;color:var(--muted);margin-bottom:22px}
-  article h2{font-size:clamp(21px,3vw,26px);font-weight:800;letter-spacing:-.01em;margin:38px 0 12px;line-height:1.25}
+  article h2{font-size:clamp(21px,3vw,26px);font-weight:700;letter-spacing:-.01em;margin:38px 0 12px;line-height:1.25}
   article h3{font-size:18px;font-weight:700;margin:26px 0 8px}
   article p,article li{font-family:"Source Serif 4",Georgia,"Times New Roman",serif;font-size:17.5px;line-height:1.85}
   article p{margin:0 0 18px}
@@ -114,7 +115,7 @@ const STYLES = `<style>
   .lead{font-size:19.5px;color:var(--ink)}
   .hero-img{margin:0 0 26px}
   .hero-img img{width:100%;height:auto;border-radius:16px;display:block;box-shadow:0 4px 18px rgba(16,24,40,.10)}
-  .sample-cap,.cta-inline p,.post-meta{font-family:Inter,system-ui,sans-serif}
+  .sample-cap,.cta-inline p,.post-meta{font-family:${FONT_STACK_SANS}}
   .answer{background:var(--accent-bg);border:1px solid var(--accent-line);border-radius:14px;padding:16px 18px;margin:0 0 22px}
   .answer p{margin:0;font-size:16.5px}
   .callout{border-radius:14px;padding:14px 18px;margin:0 0 18px;border:1px solid}
@@ -131,8 +132,8 @@ const STYLES = `<style>
   /* ── Rendered sample document ── */
   .sample-doc{background:#fff;border:1px solid var(--card-line);border-radius:14px;padding:26px 26px 22px;margin:0 0 8px;box-shadow:0 1px 3px rgba(16,24,40,.07);font-size:13.5px}
   .sample-doc .sd-top{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}
-  .sample-doc .sd-kicker{font-size:20px;font-weight:800;letter-spacing:.04em;color:#0E8C5A}
-  .sample-doc .sd-biz{font-weight:800;font-size:16px}
+  .sample-doc .sd-kicker{font-size:20px;font-weight:700;letter-spacing:.04em;color:#0E8C5A}
+  .sample-doc .sd-biz{font-weight:700;font-size:16px}
   .sample-doc .sd-mut{color:var(--muted);font-size:12.5px}
   .sample-doc .sd-bill{margin:14px 0 10px;padding:10px 12px;background:#F8FAFC;border-radius:10px}
   .sample-doc table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
@@ -140,7 +141,7 @@ const STYLES = `<style>
   .sample-doc thead th.r,.sample-doc td.r{text-align:right}
   .sample-doc tbody td{padding:7px 9px;border-bottom:1px solid #EEF2F6}
   .sample-doc tfoot td{padding:6px 9px;text-align:right}
-  .sample-doc .sd-total td{font-weight:800;font-size:14.5px;color:#0E8C5A}
+  .sample-doc .sd-total td{font-weight:700;font-size:14.5px;color:#0E8C5A}
   .sample-doc ol{padding-left:18px;margin:6px 0 0;font-size:12.5px;color:#475569}
   .sample-cap{font-size:13px;color:var(--muted);margin:0 0 22px}
 
@@ -157,14 +158,14 @@ const STYLES = `<style>
 
   /* ── Index cards ── */
   .hero{padding:52px 0 8px;text-align:center}
-  .hero h1{font-size:clamp(28px,5vw,42px);font-weight:800;letter-spacing:-.02em;margin:0 0 10px}
+  .hero h1{font-size:clamp(28px,5vw,42px);font-weight:700;letter-spacing:-.02em;margin:0 0 10px}
   .hero p.sub{font-size:clamp(16px,2.2vw,19px);color:var(--muted);max-width:640px;margin:0 auto}
   .post-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px;padding:34px 0 10px}
   .post-card{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--card-line);border-radius:16px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04);color:var(--ink)}
   .post-card:hover{text-decoration:none;border-color:var(--green);box-shadow:0 4px 14px rgba(16,24,40,.08)}
   .post-card img{width:100%;height:auto;aspect-ratio:16/9;object-fit:cover;display:block}
   .post-card .pc-body{display:flex;flex-direction:column;flex:1;padding:20px 22px 22px}
-  .post-card h2{font-size:19px;font-weight:800;line-height:1.3;margin:0 0 8px;color:var(--ink)}
+  .post-card h2{font-size:19px;font-weight:700;line-height:1.3;margin:0 0 8px;color:var(--ink)}
   .post-card p{color:var(--muted);font-size:14.5px;margin:0 0 14px;flex:1}
   .post-card .pc-meta{font-size:13px;color:var(--muted)}
   .post-card .go{color:var(--green);font-weight:700;font-size:14px;margin-top:8px}
@@ -172,7 +173,7 @@ const STYLES = `<style>
   /* ── Signup CTA band (the funnel) ── */
   .cta-band{background:linear-gradient(135deg,var(--green),#0a6e46);margin-top:40px}
   .cta-band .wrap{padding:44px 20px;text-align:center}
-  .cta-band h2{color:#fff;font-size:clamp(22px,3.5vw,30px);font-weight:800;margin:0 0 8px}
+  .cta-band h2{color:#fff;font-size:clamp(22px,3.5vw,30px);font-weight:700;margin:0 0 8px}
   .cta-band p{color:#DCFCE7;max-width:600px;margin:0 auto 20px;font-size:16px}
   .cta-band .btn{background:#fff;color:var(--green-d)}
   .cta-band .btn:hover{background:#F0FDF4}
@@ -180,7 +181,7 @@ const STYLES = `<style>
 
   /* ── Related posts ── */
   .related{max-width:760px;margin:0 auto;padding:0 20px 10px}
-  .related h2{font-size:20px;font-weight:800;margin:0 0 14px}
+  .related h2{font-size:20px;font-weight:700;margin:0 0 14px}
   .rel-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
   @media(max-width:640px){.rel-grid{grid-template-columns:1fr}}
   .rel-card{background:var(--card);border:1px solid var(--card-line);border-radius:14px;padding:16px;color:var(--ink);font-weight:700;font-size:15px;line-height:1.35}
@@ -189,14 +190,14 @@ const STYLES = `<style>
 
   /* ── Copy-ready templates (see tpl()) ── */
   .tpl{border:1px solid var(--line);border-radius:12px;margin:20px 0;overflow:hidden;background:#fff}
-  .tpl-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;background:hsl(210 20% 97%);font-family:Inter,system-ui,sans-serif;font-size:14px}
+  .tpl-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;background:hsl(210 20% 97%);font-family:${FONT_STACK_SANS};font-size:14px}
   .tpl-head b{line-height:1.35}
   .tpl-body{margin:0;padding:14px 16px;white-space:pre-wrap;overflow-wrap:anywhere;font-family:"Source Serif 4",Georgia,serif;font-size:16px;line-height:1.7}
-  button.copy{flex-shrink:0;min-height:40px;min-width:76px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink);font:600 14px Inter,system-ui,sans-serif;cursor:pointer}
+  button.copy{flex-shrink:0;min-height:40px;min-width:76px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink);font:600 14px ${FONT_STACK_SANS};cursor:pointer}
   button.copy:hover{border-color:var(--green)}
   button.copy.done{background:var(--green);color:#fff;border-color:transparent}
-  .tpl-when{font-family:Inter,system-ui,sans-serif;font-size:13.5px;color:var(--muted);margin:22px 0 -12px}
-  .seq{width:100%;border-collapse:collapse;font-family:Inter,system-ui,sans-serif;font-size:14.5px;margin:0 0 18px}
+  .tpl-when{font-family:${FONT_STACK_SANS};font-size:13.5px;color:var(--muted);margin:22px 0 -12px}
+  .seq{width:100%;border-collapse:collapse;font-family:${FONT_STACK_SANS};font-size:14.5px;margin:0 0 18px}
   .seq th{background:var(--accent-bg);color:var(--accent-fg);text-align:left;padding:9px 10px;border:1px solid var(--accent-line);font-size:13px}
   .seq td{padding:9px 10px;border:1px solid var(--card-line);vertical-align:top}
   .seq-wrap{overflow-x:auto;margin:0 0 18px}
@@ -285,9 +286,7 @@ function shell(o: {
 ${ogImg}
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="icon" href="/favicon.ico" sizes="any" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet" />
+${FONT_HEAD}
 ${gaSnippet()}
 ${STYLES}
 ${ld}

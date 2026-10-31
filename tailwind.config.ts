@@ -82,10 +82,24 @@ export default {
           offline: "rgb(156 163 175)",
         },
       },
+      // Families come from the tokens in index.css (single source of truth).
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-        serif: ["Georgia", "serif"],
-        mono: ["Menlo", "monospace"],
+        sans: ["var(--font-sans)"],
+        serif: ["var(--font-serif)"],
+        mono: ["var(--font-mono)"],
+      },
+      // The type scale's named sizes mirror the --text-* tokens (xs 12 / sm 13 /
+      // md 14 / lg 16 / xl 18 / 2xl 22 / 3xl 28). `base` stays 16px so rem math
+      // holds; 4xl and up keep Tailwind's display defaults.
+      fontSize: {
+        xs: ["12px", { lineHeight: "1.5" }],
+        sm: ["13px", { lineHeight: "1.5" }],
+        md: ["14px", { lineHeight: "1.5" }],
+        base: ["16px", { lineHeight: "1.5" }],
+        lg: ["16px", { lineHeight: "1.5" }],
+        xl: ["18px", { lineHeight: "1.25" }],
+        "2xl": ["22px", { lineHeight: "1.25" }],
+        "3xl": ["28px", { lineHeight: "1.25" }],
       },
       keyframes: {
         "accordion-down": {

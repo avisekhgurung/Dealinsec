@@ -63,7 +63,7 @@ function MoreMenu({ location, sections }: { location: string; sections: NavSecti
   return (
     <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger aria-current={current ? "page" : undefined} data-testid="topnav-more" aria-label={current ? `Workspace: ${current.label}` : "Workspace"} title={current ? current.label : "Workspace"}
-        className="dis-topnav-tab relative flex h-9 shrink-0 items-center gap-2 rounded-xl px-2.5 xl:px-3 text-[13.5px] font-semibold whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60 data-[state=open]:bg-white/10">
+        className="dis-topnav-tab relative flex h-9 shrink-0 items-center gap-2 rounded-xl px-2.5 xl:px-3 text-sm font-semibold whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60 data-[state=open]:bg-white/10">
         {current && <motion.span layoutId="topnav-pill" className="dis-topnav-pill absolute inset-0 rounded-xl" transition={tSpring} aria-hidden="true" />}
         <Icon className="relative h-[17px] w-[17px]" aria-hidden="true" />
         {/* On the narrowest desktops, an open page's icon alone; its name shows from xl (and always as the tooltip). */}
@@ -176,7 +176,7 @@ export function DesktopTopNav() {
         href="/pricing"
         data-testid="topnav-plan-chip"
         aria-label={label}
-        className={`dis-topnav-chip inline-flex items-center gap-1.5 h-8 px-2.5 xl:px-3 rounded-full text-[12px] font-semibold whitespace-nowrap ${tone}`}
+        className={`dis-topnav-chip inline-flex items-center gap-1.5 h-8 px-2.5 xl:px-3 rounded-full text-xs font-semibold whitespace-nowrap ${tone}`}
       >
         {icon}
         {/* The bar stops growing at 1600px, so the long wording appears only once it has reached full width. Below xl
@@ -194,7 +194,7 @@ export function DesktopTopNav() {
           <BarTip label="Plan managed by your organization owner">
             <span
               data-testid="topnav-plan-chip"
-              className="dis-topnav-chip inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-[12px] font-semibold text-white/75 whitespace-nowrap"
+              className="dis-topnav-chip inline-flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-semibold text-white/75 whitespace-nowrap"
             >
               <Users className="w-3.5 h-3.5" />
               <span className="hidden min-[1600px]:inline">
@@ -257,7 +257,7 @@ export function DesktopTopNav() {
                 const Icon = NAV_ICONS[item.key];
                 return (
                   <Link key={item.key} href={item.href} data-testid={`topnav-${item.key}`} aria-current={active ? "page" : undefined}
-                    className="dis-topnav-tab relative flex h-9 shrink-0 items-center gap-2 rounded-xl px-2.5 text-[13.5px] font-semibold whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60 xl:px-3">
+                    className="dis-topnav-tab relative flex h-9 shrink-0 items-center gap-2 rounded-xl px-2.5 text-sm font-semibold whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60 xl:px-3">
                     {active && <motion.span layoutId="topnav-pill" className="dis-topnav-pill absolute inset-0 rounded-xl" transition={tSpring} aria-hidden="true" />}
                     <Icon className="relative h-[17px] w-[17px]" aria-hidden="true" />
                     {/* As much name as fits: "Radar", then "Client Radar", then "Client Radar 🔎" on the widest screens. */}
@@ -303,10 +303,10 @@ export function DesktopTopNav() {
                 aria-current={profileActive ? "page" : undefined}
                 className="dis-topnav-user flex items-center gap-2.5 h-10 pl-1 pr-1 min-[1400px]:pr-3 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60"
               >
-                <span className="dis-topnav-avatar flex items-center justify-center w-8 h-8 rounded-full text-[12px] font-bold text-white">
+                <span className="dis-topnav-avatar flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold text-white">
                   {initials}
                 </span>
-                <span className="hidden min-[1400px]:block max-w-[140px] truncate text-[13.5px] font-semibold text-white/95">
+                <span className="hidden min-[1400px]:block max-w-[140px] truncate text-sm font-semibold text-white/95">
                   {displayName}
                 </span>
               </Link>
@@ -317,7 +317,7 @@ export function DesktopTopNav() {
               data-testid="topnav-logout"
               aria-label="Log out"
               title="Log out"
-              className="dis-topnav-signout flex items-center gap-1.5 h-9 px-2.5 min-[1400px]:px-3 rounded-[10px] text-[13px] font-semibold whitespace-nowrap text-rose-200 hover:text-white"
+              className="dis-topnav-signout flex items-center gap-1.5 h-9 px-2.5 min-[1400px]:px-3 rounded-[10px] text-sm font-semibold whitespace-nowrap text-rose-200 hover:text-white"
             >
               <LogOut className="w-4 h-4" />
               <span className="hidden min-[1400px]:inline">Log out</span>

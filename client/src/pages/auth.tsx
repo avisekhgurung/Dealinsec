@@ -142,7 +142,7 @@ export default function AuthPage() {
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-300 mb-2">
             Deal · Sign · Secured
           </p>
-          <h2 className="text-[26px] leading-[1.15] font-bold tracking-tight">
+          <h2 className="text-[1.6rem] leading-[1.2] font-bold tracking-tight">
             Find clients.<br />
             <span className="text-emerald-300">Win deals. Get paid.</span>
           </h2>
@@ -379,7 +379,7 @@ export default function AuthPage() {
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-300 mb-4">
             Deal · Sign · Secured
           </p>
-          <h2 className="text-3xl xl:text-[40px] font-bold text-white leading-[1.12] tracking-tight">
+          <h2 className="text-[clamp(1.9rem,3.2vw,3.2rem)] font-bold text-white leading-[1.12] tracking-[-0.03em]">
             Find clients.<br />
             <span className="text-emerald-300">Win deals. Get paid.</span>
           </h2>

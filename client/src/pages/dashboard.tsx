@@ -500,7 +500,7 @@ function StatCard({ title, value, format, icon: Icon, tone, href, loading, sub, 
         {loading ? (
           <Skeleton className="h-7 lg:h-8 w-16 lg:w-24" />
         ) : unavailable ? (
-          <p className="text-xl sm:text-2xl lg:text-[26px] font-semibold text-neutral-400 leading-none" aria-label={`${title}: unavailable`}>—</p>
+          <p className="text-xl sm:text-2xl lg:text-3xl font-semibold text-neutral-400 leading-none" aria-label={`${title}: unavailable`}>—</p>
         ) : (() => {
           const text = format ? format(animated) : String(animated);
           // Long currency strings step down instead of truncating —
@@ -508,7 +508,7 @@ function StatCard({ title, value, format, icon: Icon, tone, href, loading, sub, 
           const size =
             text.length > 11 ? "text-base sm:text-lg lg:text-xl"
             : text.length > 8 ? "text-lg sm:text-xl lg:text-2xl"
-            : "text-xl sm:text-2xl lg:text-[26px]";
+            : "text-xl sm:text-2xl lg:text-3xl";
           return (
             <p className={`${size} font-semibold text-neutral-900 dark:text-white leading-none tracking-tight tabular-nums whitespace-nowrap`}>
               {text}
@@ -1119,7 +1119,7 @@ export default function DashboardPage() {
                             {/* Colour + name only — counts live in the donut's
                                 hover tooltip and its centre total. */}
                             {platformDist.map((entry, i) => (
-                              <div key={i} className="flex items-baseline gap-2 text-xs lg:text-[13px]">
+                              <div key={i} className="flex items-baseline gap-2 text-xs lg:text-sm">
                                 <span className="w-2 h-2 rounded-full shrink-0 translate-y-[-1px]" style={{ backgroundColor: colorForPlatform(entry.platform, i) }} />
                                 <span className="min-w-0 truncate text-foreground" title={entry.platform}>{entry.platform}</span>
                               </div>
@@ -1178,12 +1178,12 @@ export default function DashboardPage() {
                           <div className="w-full xl:flex-1 min-w-0 self-stretch flex flex-col justify-center gap-3">
                             {moneyPie.map((entry, i) => (
                               <div key={i} className="min-w-0">
-                                <div className="flex items-baseline gap-2 text-xs lg:text-[13px]">
+                                <div className="flex items-baseline gap-2 text-xs lg:text-sm">
                                   <span className="w-2 h-2 rounded-full shrink-0 translate-y-[-1px]" style={{ backgroundColor: entry.fill }} />
                                   <span className="flex-1 min-w-0 truncate text-foreground">{entry.name}</span>
                                   <span className="text-muted-foreground/80 tabular-nums shrink-0">{Math.round((entry.value / totalInvoiceValueMinor) * 100)}%</span>
                                 </div>
-                                <div className="pl-4 font-semibold text-foreground tabular-nums text-sm lg:text-[15px] leading-tight">
+                                <div className="pl-4 font-semibold text-foreground tabular-nums text-sm lg:text-md leading-tight">
                                   {fmt.money(entry.value)}
                                 </div>
                               </div>

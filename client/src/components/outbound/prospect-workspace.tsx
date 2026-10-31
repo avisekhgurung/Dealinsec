@@ -392,7 +392,7 @@ export function ProspectWorkspace({ canExport, onOpen, onPrepared }: { canExport
                 <div className="flex items-start gap-3">
                   <Checkbox className="mt-1" checked={on} disabled={sel.mode === "filter"} onCheckedChange={() => setSel((cur) => toggleId(cur, r.id))} aria-label={`Select ${r.name}`} />
                   <div className="min-w-0 flex-1">
-                    <button onClick={() => onOpen(r)} className="block max-w-full truncate text-left text-[15px] font-semibold hover:underline">{r.name}</button>
+                    <button onClick={() => onOpen(r)} className="block max-w-full truncate text-left text-md font-semibold hover:underline">{r.name}</button>
                     <a href={r.website} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex max-w-full items-center gap-1 text-xs text-muted-foreground hover:underline"><span className="truncate">{r.domain}</span><ExternalLink className="h-3 w-3 shrink-0" /></a>
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">{[r.country ? countryName(r.country) : null, r.industry, r.companySize].filter(Boolean).join(" · ") || "Location and industry not known"}</p>
                   </div>

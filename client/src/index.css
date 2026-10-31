@@ -2,6 +2,67 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Typography: self-hosted fonts (client/public/fonts, latin subsets, SIL OFL) ──
+   Source Sans 3 is the UI face; Source Serif 4 400 (+italic) is kept because the
+   blog's article body already uses it, 600 for display accents; Inter 800 exists
+   only for the brand wordmark (.dis-wordmark), which public/brand renders match. */
+@font-face {
+  font-family: "Source Sans 3";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/source-sans-3-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Source Sans 3";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/source-sans-3-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Source Sans 3";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/source-sans-3-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Source Sans 3";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/source-sans-3-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/source-serif-4-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/source-serif-4-400-italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/source-serif-4-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/inter-800.woff2") format("woff2");
+}
+
 /**
  * ================================================================
  *  BRAND PALETTE — "Emerald + Slate" (active)
@@ -57,9 +118,27 @@
   --chart-3: 215 28% 40%;
   --chart-4: 25 85% 55%;
   --chart-5: 340 75% 50%;
-  --font-sans: Open Sans, sans-serif;
-  --font-serif: Georgia, serif;
-  --font-mono: Menlo, monospace;
+  /* Typography tokens — the single source of truth. tailwind.config.ts reads the
+     families from these vars, and its fontSize scale mirrors the px values. */
+  --font-sans: "Source Sans 3", "Aptos", "Segoe UI Variable", "Trebuchet MS", sans-serif;
+  --font-serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 22px;
+  --text-3xl: 28px;
+
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
   --radius: .5rem;
   --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
   --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
@@ -184,8 +263,23 @@
     @apply border-border;
   }
 
+  html,
+  body,
+  #root {
+    font-family: var(--font-sans);
+  }
+
+  /* Form controls don't inherit the page font by default. */
+  button,
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+  }
+
   body {
     @apply font-sans antialiased text-foreground;
+    line-height: var(--leading-normal);
     background: linear-gradient(135deg, hsl(160 30% 98%) 0%, hsl(180 20% 97%) 50%, hsl(210 20% 98%) 100%);
     min-height: 100vh;
   }
@@ -924,14 +1018,14 @@ button:not(:disabled):active,
   /* Text inside those controls shouldn't stay mobile-large */
   .app-shell button.text-base,
   .app-shell button.text-lg {
-    font-size: 0.875rem;            /* 14px */
+    font-size: var(--text-md);      /* 14px */
   }
 
   /* Form fields: 16px is a mobile-zoom guard, not a desktop type size */
   .app-shell input,
   .app-shell textarea,
   .app-shell select {
-    font-size: 0.875rem;
+    font-size: var(--text-md);
   }
 
   /* Radii: 16px+ pills read consumer; B2B sits at 10–12px */
