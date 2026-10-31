@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/hooks/useAuth";
 import { trackEvent } from "@/lib/analytics";
 import { dismissGettingStarted, getFirstGoal, isGettingStartedDismissed, setFirstGoal } from "@/lib/first-goal";
+import { DEAL_SUITE_HIDDEN } from "@shared/flags";
 import { listUrl, type LeadList } from "@/lib/leads";
 import { OUTBOUND_RUNS_URL } from "@/lib/outbound";
 import { cn } from "@/lib/utils";
@@ -190,7 +191,8 @@ export function GettingStarted() {
             <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-700" style={{ width: `${pct}%` }} />
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          {/* One product, one focus while the deal suite is hidden (shared/flags.ts): no goal to switch between. */}
+          <div className={DEAL_SUITE_HIDDEN ? "hidden" : "mt-3 flex flex-wrap items-center gap-2"}>
             <span id="getting-started-focus" className="text-xs font-medium text-muted-foreground">Your focus:</span>
             <Select value={goal ?? undefined} onValueChange={changeGoal}>
               <SelectTrigger className="h-8 w-auto min-w-[12rem] text-xs" id="getting-started-goal" aria-labelledby="getting-started-focus getting-started-goal" data-testid="getting-started-goal">

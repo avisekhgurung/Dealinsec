@@ -4,6 +4,8 @@ import { TodayPanel } from "@/components/dashboard/today-panel";
 import { GettingStarted } from "@/components/getting-started";
 import { LoadError } from "@/components/load-error";
 import { useAuth } from "@/hooks/useAuth";
+import { DEAL_SUITE_HIDDEN } from "@shared/flags";
+import { SalesFunnel } from "@/components/outbound/sales-funnel";
 import { useAudience } from "@/hooks/use-audience";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -149,7 +151,9 @@ function SubscriptionCard({ user }: { user: (Partial<User> & { email?: string | 
             Free plan
           </p>
           <p className="text-xs text-muted-foreground">
-            Upgrade to Pro for unlimited deals, agreements with online signing, invoices and payment tracking
+            {DEAL_SUITE_HIDDEN
+              ? "Upgrade to Pro for more AI client searches, outreach drafts and coworker tasks, and up to 5 team members"
+              : "Upgrade to Pro for unlimited deals, agreements with online signing, invoices and payment tracking"}
           </p>
         </div>
         <Link href="/pricing" onClick={() => trackEvent("upgrade_clicked", { source: "dashboard" })}>
@@ -635,7 +639,9 @@ export default function DashboardPage() {
     setNudgeDismissed(true);
   };
 
-  const showProfileNudge = profileDone < profileTotal && !nudgeDismissed;
+  // The billing-address/PAN/signature/bank nudge serves the deal documents; while the suite is hidden it would be
+  // the first thing a new account sees about a flow it can't reach, so it hides with the suite (shared/flags.ts).
+  const showProfileNudge = !DEAL_SUITE_HIDDEN && profileDone < profileTotal && !nudgeDismissed;
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
@@ -1256,12 +1262,12 @@ export default function DashboardPage() {
               <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 mx-auto mb-4">
                 <Briefcase className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h3 className="font-semibold mb-1">No deals yet</h3>
+              <h3 className="font-semibold mb-1">{DEAL_SUITE_HIDDEN ? "No clients yet" : "No deals yet"}</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                {audience.emptyState}
+                {DEAL_SUITE_HIDDEN ? "Describe who you want to work with, and your AI team finds companies that fit, with the evidence." : audience.emptyState}
               </p>
               <div className="flex flex-wrap items-center justify-center gap-2">
-                {/* Finding the client comes first; creating the deal is for work already won. */}
+                {/* Finding the client comes first; the deal button exists only while the deal suite is visible. */}
                 {canSeeOutbound && (
                   <Link href="/outbound">
                     <Button className="gradient-btn" data-testid="button-empty-find-clients">
@@ -1270,7 +1276,7 @@ export default function DashboardPage() {
                     </Button>
                   </Link>
                 )}
-                {canCreateDeal && (
+                {canCreateDeal && !DEAL_SUITE_HIDDEN && (
                   <Link href="/deals/new">
                     <Button variant={canSeeOutbound ? "outline" : "default"} className={canSeeOutbound ? "font-semibold" : "gradient-btn"} data-testid="button-create-first-deal">
                       <Plus className="w-4 h-4 mr-2" />
@@ -1298,9 +1304,9 @@ export default function DashboardPage() {
             <p className="hidden sm:block text-sm text-muted-foreground">Here's what needs your attention today.</p>
           </div>
           <div className="flex items-center gap-2 lg:gap-3">
-            {/* Finding clients is the primary action; the deal button is for work already won. Desktop only:
-                mobile already has Client Radar in the bottom bar. */}
-            {canCreateDeal && (
+            {/* Finding clients is the primary action; the deal button exists only while the suite is visible
+                (shared/flags.ts). Desktop only: mobile already has Client Radar in the bottom bar. */}
+            {canCreateDeal && !DEAL_SUITE_HIDDEN && (
               <Link href="/deals/new" className="hidden lg:block">
                 <Button size="sm" variant="outline" className="font-semibold" data-testid="header-new-deal">
                   <Plus className="w-4 h-4 mr-1.5" />
@@ -1358,11 +1364,13 @@ export default function DashboardPage() {
             {/* A brand-new account sees Today only when something real needs it — never an unearned "All clear". */}
             <TodayPanel hideWhenEmpty />
             {accountEl}
-            {statsEl}
-            {dealStatusEl}
-            {analyticsEl}
-            {chartsEl}
-            {recentEl}
+            {/* With the deal suite hidden (shared/flags.ts), a fresh account sees no deal charts: finding clients is
+                the product. An account that already holds deals keeps its numbers below. */}
+            {!DEAL_SUITE_HIDDEN && statsEl}
+            {!DEAL_SUITE_HIDDEN && dealStatusEl}
+            {!DEAL_SUITE_HIDDEN && analyticsEl}
+            {!DEAL_SUITE_HIDDEN && chartsEl}
+            {!DEAL_SUITE_HIDDEN && recentEl}
             {emptyEl}
           </>
         ) : (
@@ -1370,18 +1378,24 @@ export default function DashboardPage() {
             <GettingStarted />
             {profileStripEl}
             {todayEl}
-            {statsEl}
+            {!DEAL_SUITE_HIDDEN && statsEl}
             {!isLoading && (
               <section className="space-y-4 lg:space-y-5" aria-labelledby="dashboard-insights-title" data-testid="dashboard-insights">
                 <h2 id="dashboard-insights-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Insights</h2>
                 {/* The pipeline's size, won and lost: a number to read, not a task, so it lives here. */}
                 <LeadsStrip />
-                {analyticsEl}
-                {chartsEl}
-                {dealStatusEl}
+                {/* Finding clients is the product (shared/flags.ts): the insights are the client-finding funnel —
+                    researched → contacted → replied — not deal charts. */}
+                {DEAL_SUITE_HIDDEN ? <SalesFunnel /> : (
+                  <>
+                    {analyticsEl}
+                    {chartsEl}
+                    {dealStatusEl}
+                  </>
+                )}
               </section>
             )}
-            {recentEl}
+            {!DEAL_SUITE_HIDDEN && recentEl}
             <section className="space-y-4" aria-label="Account and setup" data-testid="dashboard-account">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Account</h2>
               {accountEl}

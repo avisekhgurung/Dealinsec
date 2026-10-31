@@ -17,7 +17,7 @@ export interface LandingFaq {
 export const LANDING_FAQS: LandingFaq[] = [
   {
     q: "What is DealInSec?",
-    a: `DealInSec is a simple business workspace for freelancers and small service businesses, built first for India. It helps you find potential clients with AI-assisted research, save them as leads, manage deals, send quotations, create agreements your client signs online, create invoices and follow up on payments, all from one connected record per client. Find clients. Win deals. Get paid.`,
+    a: `DealInSec is an AI team that finds clients for freelancers and small service businesses, built first for India. Describe who you want to work with; it researches companies with evidence for why now, drafts outreach you approve and send yourself, and keeps leads, replies and follow-ups on one record per client. Your AI team finds clients for you.`,
   },
   {
     q: "Who is DealInSec for?",

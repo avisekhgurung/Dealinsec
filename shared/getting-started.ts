@@ -1,3 +1,4 @@
+import { DEAL_SUITE_HIDDEN } from "./flags";
 /**
  * The "Get started" checklist: what a new account does first, in the order that
  * fits what the person said they want to do (their first goal, asked during
@@ -121,12 +122,15 @@ export function checklistFor(goal: FirstGoal | null, facts: Facts, can: Checklis
         title: "Approve and send a first message",
         detail: "Review the drafted message, send it from your own email app, then mark it sent.",
       },
-      firstDeal("Turn a reply into a deal", "When a company is interested, create a deal for the work."),
-      {
-        id: "quote_flow", module: "quotations", href: "/deals", done: has(facts.quotations), discovery: true,
-        title: "Then quote, agree terms and get paid",
-        detail: "From a deal you can send a quotation, get the agreement signed and track the invoice.",
-      },
+      // With the deal suite hidden (shared/flags.ts), finding and winning the conversation IS the journey.
+      ...(DEAL_SUITE_HIDDEN ? [] : [
+        firstDeal("Turn a reply into a deal", "When a company is interested, create a deal for the work."),
+        {
+          id: "quote_flow", module: "quotations", href: "/deals", done: has(facts.quotations), discovery: true,
+          title: "Then quote, agree terms and get paid",
+          detail: "From a deal you can send a quotation, get the agreement signed and track the invoice.",
+        } as Draft,
+      ]),
     ];
   } else if (goal === "manage_deals") {
     drafts = [
@@ -183,8 +187,10 @@ export function checklistState(steps: ChecklistStep[]): ChecklistState {
   return { total: steps.length, done, complete: !anyUnknown && done === steps.length, anyUnknown };
 }
 
-/** Where onboarding lands someone who chose this goal. No goal lands on Client Radar: the product's first promise. */
+/** Where onboarding lands someone who chose this goal. No goal lands on Client Radar: the product's first promise.
+ *  With the deal suite hidden, the deal-first goals can't be chosen and everything lands on finding clients. */
 export function destinationFor(goal: FirstGoal | null): "/outbound" | "/deals/new" | "/leads" {
+  if (DEAL_SUITE_HIDDEN) return goal === "manage_deals" ? "/leads" : "/outbound";
   switch (goal) {
     case "get_paid": return "/deals/new";
     case "manage_deals": return "/leads";

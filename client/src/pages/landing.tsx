@@ -107,8 +107,8 @@ const isServerRoute = (href: string) => SERVER_ROUTE_PREFIXES.some((p) => href.s
 type NavLink = { label: string; href: string; note?: string };
 const NAV_LINKS: (NavLink | { label: string; items: NavLink[] })[] = [
   { label: "Product", items: [
-    { label: "How it works", href: "#how", note: "From a potential client to a paid invoice" },
-    { label: "Features", href: "#features", note: "Leads, deals, quotations, agreements, invoices" },
+    { label: "How it works", href: "#how", note: "From a search to a client conversation" },
+    { label: "Features", href: "#features", note: "Client Radar, outreach, leads and follow-ups" },
     { label: "Live demo", href: "#try", note: "Plan a search, read a reply, see what's next" },
     { label: "Who it's for", href: "#audiences", note: "Freelancers, consultants and small agencies" },
   ] },
@@ -128,9 +128,9 @@ const flatNav = (links: typeof NAV_LINKS): NavLink[] => links.flatMap((l) => ("i
 
 const DASHBOARD_LINKS = [
   { label: "Home", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Deals", href: "/deals", icon: Briefcase },
-  { label: "Agreements", href: "/contracts", icon: FileCheck },
-  { label: "Invoices", href: "/invoices", icon: Receipt },
+  { label: "Radar", href: "/outbound", icon: Briefcase },
+  { label: "Leads", href: "/leads", icon: FileCheck },
+  { label: "The Nest", href: "/ai-league", icon: Receipt },
   { label: "Profile", href: "/profile", icon: UserCircle },
 ];
 
@@ -683,16 +683,16 @@ function NavMenu({ label, items }: { label: string; items: NavLink[] }) {
 function PricingPreview({ onCTA }: { onCTA: () => void }) {
   const free = OUTBOUND_ALLOWANCE_DEFAULTS.free, pro = OUTBOUND_ALLOWANCE_DEFAULTS.pro;
   const freePerks = [
-    `${PRICING.freeMonthlyDeals} new deals a month, each with its quotation`,
+    `AI client research: ${free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${free.maxCompanies} companies each`,
+    "Local businesses in your city, from Google Maps",
     "Lead pipeline: save researched prospects as leads, with follow-ups",
-    `AI prospect research: ${free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${free.maxCompanies} companies each`,
+    "Nibo, Mika and Zee: AI coworker tasks included",
     "Outreach drafts you approve, and the dashboard",
   ];
   const proMonthlyPerks = [
-    "Unlimited deals & quotations",
-    "Agreements your client signs online",
-    "Invoices and payment tracking",
-    `AI prospect research: ${pro.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${pro.maxCompanies} companies each`,
+    `AI client research: ${pro.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${pro.maxCompanies} companies each`,
+    "More AI coworker tasks for Nibo, Mika and Zee",
+    "More AI outreach drafts and sends",
     `Up to ${PRO_INCLUDED_SEATS} team members`,
     "One plan: no separate CRM or AI fee",
   ];
@@ -703,7 +703,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
         <SectionHeader
           eyebrow="Pricing"
           title="Start free. Upgrade when you need more."
-          subtitle="Manage leads, deals and quotations for free. Upgrade when you need agreements, invoices, payment tracking and more AI research."
+          subtitle="Find and research clients for free. Upgrade when you need more searches, drafts and coworker tasks."
         />
 
         <motion.div
@@ -728,7 +728,7 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
               <span className="text-4xl font-bold tracking-tight">₹0</span>
               <span className="text-sm text-neutral-500">/ forever</span>
             </div>
-            <p className="text-xs text-neutral-500 mt-1">Research a prospect, save the lead, create the deal and send the quotation.</p>
+            <p className="text-xs text-neutral-500 mt-1">Research prospects, save leads and send outreach you approve.</p>
             <ul className="mt-5 space-y-2.5">
               {freePerks.map((f) => (
                 <li key={f} className="flex items-start gap-2 text-sm text-neutral-700 dark:text-neutral-300">

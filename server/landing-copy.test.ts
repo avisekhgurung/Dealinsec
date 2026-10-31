@@ -21,7 +21,7 @@ describe("homepage copy", () => {
   it("leads with the brand promise, says who it's for and what Free includes, with human approval beside the CTA", () => {
     expect(sections).toContain("Your AI team<br />finds <span");
     expect(sections).toContain("For freelancers and service providers in India");
-    expect(sections).toContain("DealInSec gives Indian freelancers and service providers an AI team that researches potential clients, drafts the outreach and keeps follow-ups moving. When a client says yes, the same workspace carries the deal through quotation, agreement and invoice.");
+    expect(sections).toContain("DealInSec gives Indian freelancers and service providers an AI team that researches potential clients, drafts the outreach and keeps every follow-up moving");
     expect(sections).toContain('"Get started free"');
     expect(sections).toContain("See how it works");
     expect(sections).toContain("No credit card required");
@@ -29,8 +29,8 @@ describe("homepage copy", () => {
     expect(sections).toMatch(/Free: \$\{OUTBOUND_ALLOWANCE_DEFAULTS\.free\.monthlySearches\} AI research searches every \$\{OUTBOUND_WINDOW_DAYS\} days/);
   });
 
-  it("walks the real five-stage workflow, each stage naming its plan", () => {
-    for (const [stage, plan] of [["Describe who you want; AI researches", "Free"], ["Approve the first message and send it", "Free"], ["Track replies, next steps and follow-ups", "Free"], ["They say yes: deal and quotation", "Free"], ["Agreement signed, invoices tracked", "Pro"]]) {
+  it("walks the real three-stage finding workflow, each stage naming its plan", () => {
+    for (const [stage, plan] of [["Describe who you want; AI researches", "Free"], ["Approve the first message and send it", "Free"], ["Track replies, next steps and follow-ups", "Free"]]) {
       expect(sections, stage).toContain(`label: "${stage}", plan: "${plan}"`);
     }
   });

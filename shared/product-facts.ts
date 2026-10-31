@@ -19,20 +19,20 @@ import { LEAGUE_ALLOWANCE_DEFAULTS as LG, LEAGUE_LIMITS, LEAGUE_WINDOW_DAYS } fr
 const OB = OUTBOUND_ALLOWANCE_DEFAULTS;
 
 export const PRODUCT_NAME = "DealInSec";
-export const TAGLINE = "Find clients. Win deals. Get paid.";
+export const TAGLINE = "Your AI team finds clients for you.";
 export const SUPPORT_EMAIL = "support@dealinsec.com";
 
 /** One sentence: what it is. */
 export const ONE_LINER =
-  "DealInSec is a simple business workspace for freelancers, consultants and small service agencies, built first for India: find clients with AI-assisted research, manage leads and deals, send quotations and agreements, create invoices and follow up on payments in one place.";
+  "DealInSec is an AI team that finds clients for freelancers, consultants and small service agencies, built first for India: describe who you want to work with, and it researches companies with evidence, drafts outreach you approve and keeps your leads and follow-ups in one place.";
 
 /** The line under the headline: the client journey in one place, and what the AI coworkers help with. */
 export const SUPPORTING_LINE =
-  "Manage your client journey in one place, with AI coworkers to help you research opportunities, prepare outreach and see what needs attention.";
+  "Your AI coworkers research potential clients, prepare the outreach and keep follow-ups moving; you approve everything that reaches a client.";
 
 /** A short paragraph for summaries, meta descriptions and the top of AI-readable files. */
 export const SUMMARY =
-  "DealInSec helps service businesses manage the journey from prospect discovery to payment: find prospects, research and qualify them, save leads, manage deals, send quotations, create agreements and collect signatures online, generate invoices and track payments. AI-assisted prospect research checks each company's own website, shows dated signals with their sources and drafts a first message; you review and approve before anything reaches a client, and you send it yourself. Every document comes from the same deal, so the scope and the numbers match.";
+  "DealInSec finds clients for service businesses: describe the clients you want, and Client Radar searches the web or lists local businesses in a city, checks each company's own website against your profile, shows dated signals with their sources and drafts a first message. You review and approve before anything reaches a client, and you send it yourself; leads, replies and follow-ups stay on one record. Deal, quotation, agreement and invoice records exist for work you win, but finding clients is the product.";
 
 /** The primary audience, in the order the homepage and assistants name it. */
 export const PRIMARY_AUDIENCE = [

@@ -21,7 +21,7 @@ describe("Ask DealInSec: the prompt", () => {
   for (const country of ["US", "IN", "GB"]) {
     const p = publicSystemPrompt(country);
     it(`(${country}) knows what DealInSec is and who it is for`, () => {
-      expect(p).toMatch(/simple business workspace for freelancers, consultants and small service agencies, built first for India/);
+      expect(p).toMatch(/AI team that finds clients for freelancers, consultants and small service agencies, built first for India/);
       expect(p).toMatch(/freelancers, solo consultants and small B2B service agencies of about 1 to 10 people/);
       expect(p).not.toMatch(/India's freelancers|designers, developers, writers, video editors/);
     });

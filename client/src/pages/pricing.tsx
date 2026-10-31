@@ -126,7 +126,7 @@ export default function PricingPage() {
           description:
             plan === "extra_seat"
               ? `${seatQty} extra seat${seatQty > 1 ? "s" : ""} added for 1 month.`
-              : "DealInSec Pro is active — Client Radar and the full workflow are unlocked for 1 month.",
+              : "DealInSec Pro is active — more searches, drafts and coworker tasks for 1 month.",
           variant: "success" as any,
         });
         const savedRedirect = localStorage.getItem(REDIRECT_KEY);
@@ -149,15 +149,14 @@ export default function PricingPage() {
     }, plan === "extra_seat" ? { qty: seatQty } : {});
   };
 
+  // Finding clients is the product (shared/flags.ts): Pro is sold on more finding — searches, drafts, coworker
+  // tasks and seats. The hidden deal suite is still included for work you win, said once without the feature tour.
   const PRO_FEATURES = [
-    "Unlimited deals and quotations",
-    `AI prospect research: ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.maxCompanies} companies each, in any country`,
-    "Unlimited agreements your client signs online",
-    // In-app invoices carry the country's tax IDs but are not GST tax invoices (see shared/landing-faqs.ts), so they
-    // are never described as "GST-ready".
-    checkoutAvailable ? "Unlimited invoices with your PAN and GSTIN" : "Unlimited invoices",
-    "Payment tracking: see who still owes you",
+    `AI client research: ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.maxCompanies} companies each, in any country`,
+    "More AI outreach drafts and sends every month",
+    "More coworker tasks for Nibo, Mika and Zee",
     "Up to 5 team members",
+    "Everything for work you win included: records, documents and payment tracking",
     "One plan: no separate CRM or Client Radar fee",
   ];
 
@@ -260,7 +259,7 @@ export default function PricingPage() {
                   You're on the Free plan
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  4 deals a month with quotations · agreements, invoices &amp; payment tracking need Pro
+                  {OUTBOUND_ALLOWANCE_DEFAULTS.free.monthlySearches} AI client searches every {OUTBOUND_WINDOW_DAYS} days · Pro has more searches, drafts and coworker tasks
                 </p>
               </div>
               {boostActive && boostExpiryLabel && (
@@ -314,13 +313,14 @@ export default function PricingPage() {
               <span className="text-4xl font-black text-foreground leading-none">{fmt(0)}</span>
               <span className="text-sm text-muted-foreground font-medium">/ forever</span>
             </div>
-            <p className="text-xs text-muted-foreground mb-4">Find your first clients and quote them properly, free</p>
+            <p className="text-xs text-muted-foreground mb-4">Find and research your first clients, free</p>
             <ul className="space-y-2.5 mb-6 flex-1">
               {[
-                "4 new deals every month, each with its quotation",
+                `AI client research: ${OUTBOUND_ALLOWANCE_DEFAULTS.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${OUTBOUND_ALLOWANCE_DEFAULTS.free.maxCompanies} companies each`,
+                "Local businesses in your city, from Google Maps",
                 "Lead pipeline: save researched prospects as leads, with follow-ups",
-                `AI prospect research: ${OUTBOUND_ALLOWANCE_DEFAULTS.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${OUTBOUND_ALLOWANCE_DEFAULTS.free.maxCompanies} companies each`,
-                "Quotation PDFs and share links",
+                "Nibo, Mika and Zee: AI coworker tasks included",
+                "Outreach drafts you approve, and the dashboard",
               ].map((f) => (
                 <li key={f} className="flex items-start gap-2.5 text-sm">
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center mt-px">
@@ -446,13 +446,13 @@ export default function PricingPage() {
           <h3 className="text-sm font-semibold">How it works</h3>
           <div className="space-y-3">
             {[
-              { step: "1", title: "Create a deal", desc: "Free plan covers 4 deals every month" },
-              { step: "2", title: "Send its quotation", desc: "Included with the deal — no extra cost" },
-              { step: "3", title: "Get the agreement signed", desc: "Pro — scope & terms your client or brand signs online" },
+              { step: "1", title: "Describe who you want", desc: "The clients you're after, and where — any country or your own city" },
+              { step: "2", title: "AI researches with evidence", desc: "Each company's own website, dated reasons to reach out, a score" },
+              { step: "3", title: "Approve and send outreach", desc: "Drafted from the facts; you approve the exact text and send it" },
               {
                 step: "4",
-                title: "Invoice and track payment",
-                desc: "Pro — invoice + payment tracking",
+                title: "Track replies and follow-ups",
+                desc: "Leads, next steps and follow-up tasks on one record",
               },
             ].map(({ step, title, desc }) => (
               <div key={step} className="flex items-start gap-3">
@@ -467,7 +467,7 @@ export default function PricingPage() {
             ))}
           </div>
           <p className="text-[11px] text-muted-foreground pt-1 border-t border-border/50">
-            Every new account starts on the free plan, no card. Upgrade to Pro when you need agreements, invoices and payment tracking.
+            Every new account starts on the free plan, no card. Upgrade to Pro when you need more searches, drafts and coworker tasks.
           </p>
         </div>
 

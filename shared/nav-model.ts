@@ -13,6 +13,7 @@
  * MODULE_PERMISSIONS in ./permissions.
  */
 import { canSeeModule } from "./permissions";
+import { DEAL_SUITE_HIDDEN } from "./flags";
 
 export type NavGroup = "home" | "league" | "outbound" | "pipeline" | "documents" | "money" | "account";
 export type NavModule = "deals" | "quotations" | "agreements" | "invoices";
@@ -122,14 +123,14 @@ export function mobileBarItems(user: NavUser): NavItem[] {
   return MOBILE_BAR_KEYS.map(navItem).filter((i) => canSeeNavItem(user, i));
 }
 
-/** Desktop bar: finding clients is the product's face, so the bar holds the finding tabs; Deals and everything after
- *  the win (documents, money) live behind "Workspace" in the same segment (Profile and Settings are the bar's own
- *  account controls on the right). */
+/** Desktop bar: finding clients IS the product (shared/flags.ts), so the bar holds the finding tabs. While the deal
+ *  suite is hidden there is nothing behind them; with the suite visible, Deals, documents and money sit behind
+ *  "Workspace" in the same segment (Profile and Settings are the bar's own account controls on the right). */
 export const DESKTOP_BAR_KEYS: readonly NavKey[] = ["home", "league", "outbound", "leads"];
 export function desktopBarItems(user: NavUser): NavItem[] {
   return DESKTOP_BAR_KEYS.map(navItem).filter((i) => canSeeNavItem(user, i));
 }
-export const DESKTOP_MORE_GROUPS: readonly NavGroup[] = ["pipeline", "documents", "money"];
+export const DESKTOP_MORE_GROUPS: readonly NavGroup[] = DEAL_SUITE_HIDDEN ? [] : ["pipeline", "documents", "money"];
 /** The Workspace menu: the win-and-bill side. Pipeline shows only Deals here (Leads has its own tab). */
 export function desktopMoreSections(user: NavUser): NavSection[] {
   return sections(user, DESKTOP_MORE_GROUPS)
@@ -141,7 +142,7 @@ export function desktopMoreActive(path: string): NavItem | null {
   return NAV_ITEMS.find((i) => DESKTOP_MORE_GROUPS.includes(i.group) && !DESKTOP_BAR_KEYS.includes(i.key) && i.isActive(path)) ?? null;
 }
 
-export const MORE_GROUPS: readonly NavGroup[] = ["pipeline", "documents", "money", "account"];
+export const MORE_GROUPS: readonly NavGroup[] = DEAL_SUITE_HIDDEN ? ["account"] : ["pipeline", "documents", "money", "account"];
 /** The More sheet: everything not already in the bar (Pipeline shows Deals; Leads is in the bar). */
 export function moreSheetSections(user: NavUser): NavSection[] {
   return sections(user, MORE_GROUPS)

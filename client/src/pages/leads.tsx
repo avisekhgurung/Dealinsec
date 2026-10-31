@@ -228,7 +228,7 @@ export default function LeadsPage() {
                 <div className="px-6 py-14 text-center" data-testid="leads-empty">
                   <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-muted"><Target className="h-6 w-6 text-muted-foreground" aria-hidden /></div>
                   <p className="font-semibold">No leads yet</p>
-                  <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">Leads are potential clients. Add one yourself, import a CSV, or find companies with Client Radar. Give each lead a next step, and turn it into a deal when you win the work.</p>
+                  <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">Leads are potential clients. Add one yourself, import a CSV, or find companies with Client Radar. Give each lead a next step, and keep every follow-up moving.</p>
                   <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                     {canEdit && <Button size="sm" className="gradient-btn text-white" onClick={() => setAddOpen(true)}>Add your first lead</Button>}
                     {canEdit && <Button size="sm" variant="outline" onClick={() => setImportOpen(true)}><FileUp className="mr-1.5 h-4 w-4" />Import a CSV</Button>}

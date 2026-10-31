@@ -53,12 +53,12 @@ describe("active route", () => {
     for (const p of ["/", "/agent", "/agent/abc", "/pricing", "/terms", "/invite/tok"]) expect(lit(p)).toEqual([]);
   });
 
-  it("lights More only for routes inside the sheet", () => {
-    // Deals lives in More on the phone bar (The Nest took its place in the bar).
-    for (const p of ["/quotations", "/deals", "/deals/abc", "/deals/abc/quote", "/contracts/abc", "/invoices", "/brand-invoices/new", "/profile", "/settings"]) {
+  it("lights More only for routes inside the sheet (the deal suite is hidden: shared/flags.ts)", () => {
+    for (const p of ["/profile", "/settings"]) {
       expect(isMoreActive(p)).toBe(true);
     }
-    for (const p of ["/dashboard", "/ai-league", "/ai-league/mika", "/outbound", "/leads/abc", "/pricing", "/"]) {
+    // Deal-suite routes still work by URL but no longer live in the sheet, so they light nothing.
+    for (const p of ["/dashboard", "/ai-league", "/ai-league/mika", "/outbound", "/leads/abc", "/pricing", "/", "/quotations", "/deals", "/deals/abc/quote", "/contracts/abc", "/invoices", "/brand-invoices/new"]) {
       expect(isMoreActive(p)).toBe(false);
     }
   });
@@ -94,32 +94,31 @@ describe("mobile bar and More sheet", () => {
     expect(mobileBarItems(OWNER).map((i) => i.shortLabel)).toEqual(["Home", "The Nest", "Radar", "Leads"]);
   });
 
-  it("sheet groups Pipeline (Deals), Documents, Money and Account, never repeating a bar item", () => {
+  it("sheet holds only Account while the deal suite is hidden, never repeating a bar item", () => {
     const s = moreSheetSections(OWNER);
-    expect(s.map((x) => x.label)).toEqual(["Pipeline", "Documents", "Money", "Account"]);
-    expect(s.map((x) => keys(x.items))).toEqual([["deals"], ["quotations", "agreements"], ["invoices"], ["profile", "settings"]]);
+    expect(s.map((x) => x.label)).toEqual(["Account"]);
+    expect(s.map((x) => keys(x.items))).toEqual([["profile", "settings"]]);
     const inBar = new Set(keys(mobileBarItems(OWNER)));
     expect(s.flatMap((x) => keys(x.items)).filter((k) => inBar.has(k))).toEqual([]);
   });
 
-  it("More lights for deals, documents and account pages, not for a page whose tab is in the bar", () => {
-    expect(isMoreActive("/deals/12")).toBe(true);
-    expect(isMoreActive("/contracts")).toBe(true);
+  it("More lights for account pages only; a page whose tab is in the bar lights that tab", () => {
     expect(isMoreActive("/settings")).toBe(true);
+    expect(isMoreActive("/profile")).toBe(true);
     expect(isMoreActive("/leads/4")).toBe(false);
     expect(isMoreActive("/ai-league/nibo")).toBe(false);
   });
 
-  it("an invoices-only custom role keeps Home, Money and Account", () => {
+  it("an invoices-only custom role keeps Home and Account (Money is hidden with the suite)", () => {
     const u = custom("payments.manage");
     expect(keys(mobileBarItems(u))).toEqual(["home"]);
-    expect(moreSheetSections(u).map((x) => x.group)).toEqual(["money", "account"]);
+    expect(moreSheetSections(u).map((x) => x.group)).toEqual(["account"]);
   });
 
-  it("deal permissions light Pipeline and Quotations (same gate as today)", () => {
+  it("deal permissions keep the finding bar; the sheet stays Account-only while the suite is hidden", () => {
     const u = custom("deals.create");
     expect(keys(mobileBarItems(u))).toEqual(["home", "league", "outbound", "leads"]);
-    expect(moreSheetSections(u).map((x) => keys(x.items))).toEqual([["deals"], ["quotations"], ["profile", "settings"]]);
+    expect(moreSheetSections(u).map((x) => keys(x.items))).toEqual([["profile", "settings"]]);
   });
 
   it("Settings and Profile are always reachable", () => {
@@ -130,17 +129,14 @@ describe("mobile bar and More sheet", () => {
   });
 });
 
-describe("desktop bar: finding tabs, the win-and-bill side behind Workspace in the same segment", () => {
-  it("shows Home, The Nest, Client Radar and Leads as tabs; Deals, Quotations, Agreements and Invoices under Workspace", () => {
+describe("desktop bar: the finding tabs are the whole bar while the deal suite is hidden", () => {
+  it("shows Home, The Nest, Client Radar and Leads as tabs, and no Workspace menu at all", () => {
     expect(desktopBarItems(OWNER).map((i) => i.key)).toEqual(["home", "league", "outbound", "leads"]);
-    expect(desktopMoreSections(OWNER).map((s) => [s.label, s.items.map((i) => i.key)])).toEqual([["Pipeline", ["deals"]], ["Documents", ["quotations", "agreements"]], ["Money", ["invoices"]]]);
+    expect(desktopMoreSections(OWNER)).toEqual([]);
   });
-  it("Workspace knows which of its pages is open, including documents under other URLs; bar tabs never light it", () => {
-    expect(desktopMoreActive("/invoices")?.key).toBe("invoices");
-    expect(desktopMoreActive("/brand-invoices/12")?.key).toBe("invoices");
-    expect(desktopMoreActive("/deals/5/quote")?.key).toBe("quotations");
-    expect(desktopMoreActive("/contracts/9")?.key).toBe("agreements");
-    expect(desktopMoreActive("/deals/5")?.key).toBe("deals");
-    expect(desktopMoreActive("/leads")).toBeNull();
+  it("nothing lights the (absent) menu, whatever the URL", () => {
+    for (const p of ["/invoices", "/brand-invoices/12", "/deals/5/quote", "/contracts/9", "/deals/5", "/leads"]) {
+      expect(desktopMoreActive(p)).toBeNull();
+    }
   });
 });

@@ -20,11 +20,9 @@ describe("isFirstGoal", () => {
 });
 
 describe("checklistFor ordering", () => {
-  it("find_clients starts from research and ends by revealing the deal-to-payment side", () => {
-    expect(ids("find_clients")).toEqual(["run_search", "add_lead", "first_message", "first_deal", "quote_flow"]);
-    const last = checklistFor("find_clients", ZERO, ALL).at(-1)!;
-    expect(last.discovery).toBe(true);
-    expect(last.href).toBe("/deals");
+  it("find_clients is the whole journey while the deal suite is hidden: research, lead, first message", () => {
+    expect(ids("find_clients")).toEqual(["run_search", "add_lead", "first_message"]);
+    expect(checklistFor("find_clients", ZERO, ALL).every((x) => !x.discovery)).toBe(true);
   });
   it("manage_deals starts from the pipeline", () => {
     expect(ids("manage_deals")).toEqual(["add_pipeline", "first_deal", "send_quote", "run_search"]);
@@ -67,7 +65,7 @@ describe("permissions", () => {
     expect(ids("find_clients", ZERO, invoicesOnly)).toEqual([]);
   });
   it("hides outbound and leads steps without access", () => {
-    expect(ids("find_clients", ZERO, { ...ALL, outbound: false, leads: false })).toEqual(["first_deal", "quote_flow"]);
+    expect(ids("find_clients", ZERO, { ...ALL, outbound: false, leads: false })).toEqual([]);
   });
   it("quotation steps follow deals unless quotations is given", () => {
     expect(ids("manage_deals", ZERO, { ...ALL, deals: false })).toEqual(["add_pipeline", "run_search"]);
@@ -102,7 +100,7 @@ describe("unknown facts", () => {
 describe("destinationFor", () => {
   it("lands each goal where its first step is", () => {
     expect(destinationFor("find_clients")).toBe("/outbound");
-    expect(destinationFor("get_paid")).toBe("/deals/new");
+    expect(destinationFor("get_paid")).toBe("/outbound"); // deal suite hidden: the deal-first landing is gone
     expect(destinationFor("manage_deals")).toBe("/leads");
     expect(destinationFor(null)).toBe("/outbound"); // no goal lands on the product's promise: finding clients
   });

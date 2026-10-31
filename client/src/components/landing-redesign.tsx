@@ -92,8 +92,8 @@ const HERO_PROSPECT: ProspectCardData = {
   decisionMaker: { id: 3, kind: "decision_maker", type: "founder", label: "Founder", value: "R. Mehta · Founder", status: "verified", source: "site", url: null, quote: null, observedAt: null },
   evidenceCount: 5, leadId: null, researched: true, contact: "public",
 };
-// The app's real desktop tabs after the find-clients-first nav: the client work lives under the Workspace menu.
-const HERO_TABS = ["Home", "The Nest", "Radar", "Leads", "Workspace"] as const;
+// The app's real desktop tabs: finding clients is the whole bar.
+const HERO_TABS = ["Home", "The Nest", "Radar", "Leads"] as const;
 const noop = () => {};
 
 /** The Nest on a phone, as the app shows it: each coworker with an example status (alive: the plush characters move). */
@@ -137,9 +137,9 @@ function PhoneNest() {
           <div className="mx-3 mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-950/40">
             <p className="text-[12px] font-bold text-emerald-900 dark:text-emerald-200">Today's business briefing <span aria-hidden>🌱</span></p>
             <ul className="mt-1.5 space-y-1 text-[11px] text-emerald-900/80 dark:text-emerald-200/80">
-              <li>• 2 invoices due this week · ₹42,500</li>
               <li>• 1 follow-up due today: Northwind Logistics</li>
-              <li>• 1 agreement ready to invoice</li>
+              <li>• 2 replies waiting for you</li>
+              <li>• Nibo found 3 new companies that fit</li>
             </ul>
           </div>
           <div className="mx-3 mt-3 rounded-full border border-neutral-200 bg-white px-4 py-2 text-[11px] text-neutral-400 dark:border-neutral-800 dark:bg-neutral-950">Ask Zee what needs attention today…</div>
@@ -213,7 +213,7 @@ export function HeroSection({ isAuthenticated, onPrimary }: { isAuthenticated: b
             Your AI team<br />finds <span className={GREEN}>clients</span><br /><span className="dis-gradient-text">for you.</span>
           </h1>
           <p style={{ animationDelay: "0.21s" }} className="dis-hero-in mt-5 max-w-lg text-base leading-relaxed text-neutral-600 sm:text-lg dark:text-neutral-400">
-            DealInSec gives Indian freelancers and service providers an AI team that researches potential clients, drafts the outreach and keeps follow-ups moving. When a client says yes, the same workspace carries the deal through quotation, agreement and invoice.
+            DealInSec gives Indian freelancers and service providers an AI team that researches potential clients, drafts the outreach and keeps every follow-up moving — with evidence behind every name, and you approving every message.
           </p>
           <div style={{ animationDelay: "0.29s" }} className="dis-hero-in mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             <button type="button" onClick={() => { trackEvent("hero_cta_click", { label: isAuthenticated ? "dashboard" : "start_free" }); onPrimary(); }} data-testid="button-hero-cta"
@@ -246,17 +246,15 @@ export function HeroSection({ isAuthenticated, onPrimary }: { isAuthenticated: b
 /* ── How it works: the real workflow on one example client ───────────────────────────── */
 
 /**
- * The five stages DealInSec runs, walked through on ONE made-up client (labelled as a demonstration), finding-first:
- * research the company (evidence vs inference kept apart, as the product keeps them), approve and send the first
- * message, work the lead, and when they say yes, the quotation and the paperwork behind it. Example domains use the
- * reserved ".example" TLD so no real company is implied. Each stage names the plan it needs.
+ * The three stages DealInSec runs, walked through on ONE made-up client (labelled as a demonstration): research the
+ * company (evidence vs inference kept apart, as the product keeps them), approve and send the first message, then
+ * work the lead's replies and follow-ups. Example domains use the reserved ".example" TLD so no real company is
+ * implied. Each stage names the plan it needs.
  */
 const WALK = [
   { key: "research", label: "Describe who you want; AI researches", plan: "Free" },
   { key: "outreach", label: "Approve the first message and send it", plan: "Free" },
   { key: "lead", label: "Track replies, next steps and follow-ups", plan: "Free" },
-  { key: "quote", label: "They say yes: deal and quotation", plan: "Free" },
-  { key: "paperwork", label: "Agreement signed, invoices tracked", plan: "Pro" },
 ] as const;
 type WalkKey = (typeof WALK)[number]["key"];
 
@@ -318,7 +316,7 @@ function WalkPanel({ step }: { step: WalkKey }) {
         <div className="space-y-3">
           <div className={box}>
             <div className="flex items-center justify-between gap-2"><b>Northwind Logistics</b><Pill tone="sky">Replied</Pill></div>
-            <Row k="Next step" v="Send a proposal · due Fri" />
+            <Row k="Next step" v="Book a call · due Fri" />
             <Row k="Facts" v="3 facts, each with its source" />
             <Row k="Contact" v="Founder, named on their site" />
           </div>
@@ -327,42 +325,6 @@ function WalkPanel({ step }: { step: WalkKey }) {
             <p className="mt-1 text-sm">Each lead keeps its facts, messages, next step and follow-up date in one place, and the dashboard shows what needs you today.</p>
           </div>
           <p className="text-xs text-neutral-500">Stages: new → researching → qualified → contacted → replied → meeting → proposal → won or lost.</p>
-        </div>
-      );
-    case "quote":
-      return (
-        <div className="space-y-3">
-          <div className={box}>
-            <p className={cn(label, "text-neutral-500")}>Deal</p>
-            <Row k="Engagement" v="Fixed-price project" />
-            <Row k="Service" v="AI automation · support assistant" />
-            <Row k="Value" v="₹85,000 · 4 weeks" />
-          </div>
-          <div className={box}>
-            <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-sm font-semibold"><FileText className="h-4 w-4 text-emerald-600" />Quotation · version 1</span><Pill>Accepted online</Pill></div>
-            <p className="mt-1.5 text-xs text-neutral-500">Generated from the deal and shared as a link the client opened and accepted. Print or PDF anytime.</p>
-          </div>
-          <div className="rounded-xl bg-amber-50 p-3 text-sm dark:bg-amber-950/30">
-            <b className="text-amber-800 dark:text-amber-300">Protection Check:</b> no advance agreed yet. Ask for one before work starts.
-          </div>
-        </div>
-      );
-    case "paperwork":
-      return (
-        <div className="space-y-3">
-          <div className={box}>
-            <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-sm font-semibold"><Signature className="h-4 w-4 text-emerald-600" />Agreement</span><Pill>Signed</Pill></div>
-            <p className="mt-1.5 text-sm text-neutral-600 dark:text-neutral-300">Scope and fee carried over from the deal; signed online through a link, with who signed and when recorded.</p>
-          </div>
-          <div className={box}>
-            <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-sm font-semibold"><ReceiptText className="h-4 w-4 text-emerald-600" />Advance invoice · 50%</span><Pill>Paid</Pill></div>
-            <Row k="Amount" v="₹42,500" />
-          </div>
-          <div className={box}>
-            <div className="flex items-center justify-between gap-2"><span className="flex items-center gap-2 text-sm font-semibold"><ReceiptText className="h-4 w-4 text-emerald-600" />Final invoice · 50%</span><Pill tone="amber">Pending</Pill></div>
-            <Row k="Amount" v="₹42,500" />
-          </div>
-          <p className="text-xs text-neutral-500">The quiet part of the workspace: invoices come from the agreement and can&apos;t exceed it; you mark them paid. Electronic acceptance with an audit record, not a certified digital signature; DealInSec never collects or moves your client&apos;s money.</p>
         </div>
       );
   }
@@ -386,7 +348,7 @@ export function WorkflowWalkthrough() {
         <Reveal className="mx-auto max-w-3xl text-center">
           <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-400">How it works</p>
           <h2 className="mt-2 text-balance text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">How your next client is found</h2>
-          <p className="mt-3 text-neutral-600 dark:text-neutral-400">One example prospect, from a search to a won deal. Each stage carries the evidence forward, and you approve everything that reaches the client.</p>
+          <p className="mt-3 text-neutral-600 dark:text-neutral-400">One example prospect, from a search to a conversation. Each stage carries the evidence forward, and you approve everything that reaches the client.</p>
         </Reveal>
 
         <div className="mt-10 grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
@@ -435,9 +397,9 @@ const OUTCOMES: { Icon: typeof Radar; title: string; plan: string; text: string;
     points: ["Stages, next steps and follow-up dates", "A dashboard of what needs you today", "Zee briefs you each day from your own records"],
   },
   {
-    Icon: ReceiptText, title: "When you win: deal to paid", plan: "Quotations free · agreements and invoices Pro",
-    text: "The quiet half of the workspace. Turn the yes into a deal, send a quotation link your client accepts online, get the agreement signed and track invoices to paid.",
-    points: ["Quotation links, versioned, with Protection Check", "Agreements signed online with an audit record", "Invoices from the agreement; paid, pending and overdue at a glance"],
+    Icon: Building2, title: "Local businesses in your city", plan: "Free and Pro",
+    text: "Dentists in Siliguri, cafes in Pune, coaching institutes in Kota: list local businesses straight from Google Maps and research the ones you choose.",
+    points: ["Address, phone and website when listed", "You pick which ones get researched", "Save a business straight to Leads"],
   },
 ];
 
@@ -447,7 +409,7 @@ export function FeaturesSection() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <Reveal className="mx-auto max-w-3xl text-center">
           <h2 className="text-balance text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Built to find your <span className={GREEN}>next client</span></h2>
-          <p className="mt-3 text-neutral-600 dark:text-neutral-400">Research, outreach and follow-through in one place, with AI coworkers doing the legwork. And when the client says yes, the same workspace carries the deal to paid.</p>
+          <p className="mt-3 text-neutral-600 dark:text-neutral-400">Research, outreach and follow-through in one place, with AI coworkers doing the legwork — and evidence, not guesswork, behind every company on your list.</p>
         </Reveal>
         <motion.ul initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-60px" }} variants={stagger} className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {OUTCOMES.map(({ Icon, title, plan, text, points }) => (
@@ -466,7 +428,7 @@ export function FeaturesSection() {
           <motion.li variants={reveal} className="flex flex-col justify-center rounded-2xl border border-emerald-300 bg-gradient-to-br from-emerald-50 to-white p-5 dark:border-emerald-800 dark:from-emerald-950/40 dark:to-neutral-900">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white"><Handshake className="h-5 w-5" aria-hidden /></span>
             <h3 className="mt-3 text-[17px] font-bold">One connected client record</h3>
-            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">The prospect becomes the lead, the lead the deal, and every quotation, agreement and invoice comes from that deal, so the scope and the numbers always match.</p>
+            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">The prospect becomes the lead, and every fact, source, message and follow-up stays on that one record — so you always know where each conversation stands and why.</p>
           </motion.li>
         </motion.ul>
       </div>
@@ -489,9 +451,9 @@ const TEAM = [
     points: ["Drafts only: nothing is sent for you", "You edit and approve the exact text", "Skips anyone on your do-not-contact list"],
   },
   {
-    key: "zee", name: "Zee", role: "Business Buddy", emoji: "🌱", does: "keeps you on top of briefings, follow-ups and payment reminders", bar: "bg-emerald-600", tint: "bg-emerald-50 dark:bg-emerald-950/40", fg: "text-emerald-700 dark:text-emerald-300",
-    line: "Keeps you on top of business briefings, follow-up tasks and payment reminders. Zee reads your own invoices, deals and follow-ups and tells you what needs you today.",
-    points: ["Overdue invoices and what's due this week", "Follow-ups due and messages waiting", "Never invents a number: checked against your records"],
+    key: "zee", name: "Zee", role: "Business Buddy", emoji: "🌱", does: "keeps you on top of briefings and follow-ups", bar: "bg-emerald-600", tint: "bg-emerald-50 dark:bg-emerald-950/40", fg: "text-emerald-700 dark:text-emerald-300",
+    line: "Keeps you on top of the hunt: a morning briefing from your own records, follow-up tasks due and messages waiting for you.",
+    points: ["A briefing each day, from your own records", "Follow-ups due and messages waiting", "Never invents a number: checked against your records"],
   },
 ] as const;
 
@@ -555,16 +517,16 @@ export function AiTeamSection() {
 const SPREAD = [
   "Prospects in browser tabs and a spreadsheet",
   "Outreach and replies scattered across your inbox",
-  "Quotations and agreements in separate documents",
-  "Invoices in another tool, payments in your bank app",
-  "Re-typing the client, the scope and the fee at every step",
+  "Follow-ups on sticky notes and phone reminders",
+  "No record of why a company was worth contacting",
+  "Good prospects going cold because nobody chased",
 ];
 const TOGETHER = [
   "Researched prospects saved straight into your lead pipeline",
   "Each lead's facts, sources, next steps and follow-ups in one place",
-  "Quotation, agreement and invoices generated from the same deal",
-  "What's paid, pending and overdue on one dashboard",
-  "AI drafts; you approve everything that reaches a client",
+  "Outreach drafted from the evidence, approved by you",
+  "What needs you today on one dashboard",
+  "Your AI team keeps working when you close the page",
 ];
 
 export function ManualWorkflowSection() {
@@ -572,8 +534,8 @@ export function ManualWorkflowSection() {
     <section className="py-16 sm:py-20" data-testid="landing-manual-vs">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <Reveal className="mx-auto max-w-2xl text-center">
-          <h2 className="text-balance text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Why keep the client journey <span className={GREEN}>in one place</span></h2>
-          <p className="mt-3 text-neutral-600 dark:text-neutral-400">When each step lives in a different tool, details get re-typed, follow-ups slip and nobody is sure what was agreed or paid.</p>
+          <h2 className="text-balance text-3xl font-extrabold tracking-[-0.025em] sm:text-4xl">Why keep the whole hunt <span className={GREEN}>in one place</span></h2>
+          <p className="mt-3 text-neutral-600 dark:text-neutral-400">When each step lives in a different tool, details get re-typed, follow-ups slip and good prospects go cold.</p>
         </Reveal>
         <div className="mt-10 grid gap-4 md:grid-cols-2">
           <Reveal className="rounded-2xl border border-neutral-200 bg-neutral-50/70 p-6 dark:border-neutral-800 dark:bg-neutral-900/40">
@@ -589,7 +551,7 @@ export function ManualWorkflowSection() {
             </ul>
           </Reveal>
         </div>
-        <p className="mx-auto mt-5 max-w-2xl text-center text-xs text-neutral-500">DealInSec doesn&apos;t replace your accounting software, and it doesn&apos;t guarantee clients or replies: it keeps the work of winning and billing a client together.</p>
+        <p className="mx-auto mt-5 max-w-2xl text-center text-xs text-neutral-500">DealInSec doesn&apos;t guarantee clients or replies: it keeps the work of finding and winning a client together, with you approving everything that goes out.</p>
       </div>
     </section>
   );
@@ -598,10 +560,10 @@ export function ManualWorkflowSection() {
 /* ── Who it's for ────────────────────────────────────────────────────────────────────── */
 
 const AUDIENCES = [
-  { Icon: Building2, title: "Freelance web developers", text: "Research businesses in your city or niche, reach out with evidence, and quote the build when they bite.", href: "/for-freelancers" },
+  { Icon: Building2, title: "Freelance web developers", text: "Research businesses in your city or niche and reach out with evidence, not guesswork.", href: "/for-freelancers" },
   { Icon: Sparkles, title: "Designers and creatives", text: "Find companies that fit the work you want to do, send a first message you approved, and win the project.", href: "/for-freelancers" },
   { Icon: Users, title: "Digital marketers and SEO consultants", text: "Find companies in your niche with evidence and dated reasons to reach out, then land the retainer.", href: "/for-freelancers" },
-  { Icon: UserRound, title: "Independent consultants", text: "Turn a researched prospect into a conversation, and a conversation into a deal you track to paid.", href: "/for-freelancers" },
+  { Icon: UserRound, title: "Independent consultants", text: "Turn a researched prospect into a conversation, with the follow-ups that make it real work.", href: "/for-freelancers" },
 ];
 
 export function AudienceCards() {
@@ -638,7 +600,7 @@ export function CtaBanner({ isAuthenticated, onPrimary }: { isAuthenticated: boo
           <span aria-hidden="true" className="dis-orb absolute -bottom-20 -right-10 h-72 w-72 rounded-full bg-teal-300/25 blur-3xl" style={{ animationDelay: "2s" }} />
           <div className="relative">
             <h2 className="text-3xl font-extrabold leading-tight tracking-[-0.025em] sm:text-5xl">Your next client is out there.<br />Send your AI team to find them.</h2>
-            <p className="mx-auto mt-4 max-w-xl text-emerald-50/90">Start free: research potential clients, save leads and send outreach you approve. Upgrade when you win and need agreements, invoices and payment tracking.</p>
+            <p className="mx-auto mt-4 max-w-xl text-emerald-50/90">Start free: research potential clients, save leads and send outreach you approve. Upgrade when you need more searches, drafts and coworker tasks.</p>
             <button type="button" onClick={onPrimary} data-testid="button-final-cta"
               className="group mt-7 inline-flex h-12 items-center rounded-lg bg-white px-6 text-sm font-semibold text-emerald-800 shadow-xl transition hover:bg-emerald-50">
               {isAuthenticated ? "Go to Home" : "Get started free"}<ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />

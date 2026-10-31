@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { DealinsecLogo } from "@/components/dealinsec-logo";
 import { AudiencePicker, DESCRIBES_YOU } from "@/components/audience-picker";
 import { FirstGoalPicker } from "@/components/first-goal-picker";
+import { DEAL_SUITE_HIDDEN } from "@shared/flags";
 import type { Audience } from "@shared/audience";
 import { cn } from "@/lib/utils";
 import { readAudienceIntent } from "@/lib/audience-intent";
@@ -401,16 +402,19 @@ export default function OnboardingPage() {
                 >
                   <motion.div variants={itemVariants} className="text-center">
                     <h1 id="first-goal-heading" ref={headingRef} tabIndex={-1} className="text-2xl font-bold tracking-tight outline-none">
-                      What would you like to do first?
+                      {DEAL_SUITE_HIDDEN ? "Let's find your first clients" : "What would you like to do first?"}
                     </h1>
                     <p id="first-goal-hint" className="mt-1.5 text-sm text-muted-foreground">
-                      Optional. This helps DealInSec show you the right tools from day one. You can change it later.
+                      {DEAL_SUITE_HIDDEN ? "Tell DealInSec where to look and what kind of work you do." : "Optional. This helps DealInSec show you the right tools from day one. You can change it later."}
                     </p>
                   </motion.div>
 
-                  <motion.div variants={itemVariants}>
-                    <FirstGoalPicker value={goal} onChange={setGoal} labelledBy="first-goal-heading" describedBy="first-goal-hint" idPrefix="onboarding-goal" />
-                  </motion.div>
+                  {/* One product, one goal while the deal suite is hidden (shared/flags.ts). */}
+                  {!DEAL_SUITE_HIDDEN && (
+                    <motion.div variants={itemVariants}>
+                      <FirstGoalPicker value={goal} onChange={setGoal} labelledBy="first-goal-heading" describedBy="first-goal-hint" idPrefix="onboarding-goal" />
+                    </motion.div>
+                  )}
 
                   <motion.div variants={itemVariants} className="space-y-1.5">
                     <label htmlFor="onboarding-target-market" className="text-base font-semibold tracking-tight">Where do you want to find clients?</label>
