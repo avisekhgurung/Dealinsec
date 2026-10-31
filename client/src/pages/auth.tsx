@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Loader2, Briefcase, FileText, FileCheck, Receipt, Search, BadgeCheck, Check, ArrowLeft, Eye, EyeOff,
+  Loader2, Search, Users, Send, MessagesSquare, Handshake, Check, ArrowLeft, Eye, EyeOff,
   Mail, Lock, ShieldCheck, KeyRound, Trash2, Sparkles,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -29,19 +29,19 @@ import { trackEvent } from "@/lib/analytics";
 import { postAuthDestination } from "@/lib/deal-prefill";
 import { authErrorMessage } from "@/lib/auth-copy";
 
-/** The whole journey: find the client, then get paid. Short labels so all six fit a phone. */
+/** The whole journey: from a search to a client conversation. Short labels so all six fit a phone. */
 const PIPELINE = [
-  { icon: Search, label: "Prospect" },
-  { icon: Briefcase, label: "Deal" },
-  { icon: FileText, label: "Quote" },
-  { icon: FileCheck, label: "Agreement" },
-  { icon: Receipt, label: "Invoice" },
-  { icon: BadgeCheck, label: "Paid" },
+  { icon: Search, label: "Research" },
+  { icon: ShieldCheck, label: "Evidence" },
+  { icon: Users, label: "Lead" },
+  { icon: Send, label: "Outreach" },
+  { icon: MessagesSquare, label: "Reply" },
+  { icon: Handshake, label: "Client" },
 ];
 
 const PROOF_POINTS = [
   "Built for freelancers and service providers in India",
-  "Agreements carry a signed execution record",
+  "You approve every message — nothing is sent automatically",
   "Free plan, no credit card required. Pro when you need it",
 ];
 
@@ -140,11 +140,11 @@ export default function AuthPage() {
 
         <div className="relative mt-7">
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-300 mb-2">
-            Deal · Sign · Secured
+            Research · Outreach · Follow-up
           </p>
           <h2 className="text-[1.6rem] leading-[1.2] font-bold tracking-tight">
-            Find clients.<br />
-            <span className="text-emerald-300">Win deals. Get paid.</span>
+            Your AI team<br />
+            <span className="text-emerald-300">finds clients for you.</span>
           </h2>
 
           <div className="flex items-center gap-1 mt-5">
@@ -201,8 +201,8 @@ export default function AuthPage() {
               </h1>
               <p className="text-sm text-muted-foreground mt-1.5 mb-6">
                 {mode === "signup"
-                  ? "Start managing leads, deals, quotations and invoices in one place. No credit card required."
-                  : "Log in to manage your clients, deals and payments."}
+                  ? "Send your AI team to find your first clients. No credit card required."
+                  : "Log in and pick up where your AI team left off."}
               </p>
 
               <Button
@@ -377,16 +377,16 @@ export default function AuthPage() {
 
         <div className="relative max-w-lg">
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-emerald-300 mb-4">
-            Deal · Sign · Secured
+            Research · Outreach · Follow-up
           </p>
           <h2 className="text-[clamp(1.9rem,3.2vw,3.2rem)] font-bold text-white leading-[1.12] tracking-[-0.03em]">
-            Find clients.<br />
-            <span className="text-emerald-300">Win deals. Get paid.</span>
+            Your AI team<br />
+            <span className="text-emerald-300">finds clients for you.</span>
           </h2>
           <p className="text-emerald-100/70 mt-4 text-sm leading-relaxed">
-            For freelancers, consultants and small agencies: find potential clients with
-            evidence, track leads and deals, then quote, get the agreement signed, invoice
-            and follow up on payments, all from the same deal.
+            For freelancers, consultants and small agencies: your AI team researches
+            potential clients with evidence behind every name, drafts the outreach, and
+            keeps every follow-up moving — you approve every message before it goes.
           </p>
 
           <div className="flex items-center gap-1.5 xl:gap-2 mt-9">
@@ -430,8 +430,8 @@ export default function AuthPage() {
             <div>
               <p className="text-sm font-semibold text-white">Made for your country and currency</p>
               <p className="text-xs text-emerald-100/70 leading-relaxed mt-0.5">
-                Invoices numbered in order, your tax registration on your documents, amounts in
-                your own currency, and every agreement carrying its own execution record.
+                Search for potential clients in your own city or worldwide, with evidence and
+                sources behind every name, and amounts shown in your own currency.
               </p>
             </div>
           </div>

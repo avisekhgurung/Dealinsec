@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { DealinsecMark, DealinsecWordmark, BRAND_SLOGAN } from "@/components/dealinsec-logo";
-import { ChartColumnIncreasing, CreditCard, FileText, Handshake, ReceiptText, Search, Signature, Users, type LucideIcon } from "lucide-react";
+import { ChartColumnIncreasing, Handshake, MessagesSquare, Search, Send, ShieldCheck, Users, type LucideIcon } from "lucide-react";
 
 /**
  * The app loader: the D at the centre of an orbit (two slow counter-rotating rings with travelling lights, five
  * floating cards for what DealInSec handles), the wordmark and slogan, then the journey
- * Prospect → Deal → Quote → Agreement → Invoice → Get Paid filling in step by step, over drifting emerald waves.
+ * Research → Evidence → Lead → Outreach → Reply → Client filling in step by step, over drifting emerald waves —
+ * the same find-clients journey the auth page's brand panel shows.
  *
  * Pure CSS animation (it runs while the app's code is still loading, and needs no animation frame loop), with one
  * timer for the active step. Everything decorative is hidden from screen readers; the status is announced once.
@@ -13,12 +14,12 @@ import { ChartColumnIncreasing, CreditCard, FileText, Handshake, ReceiptText, Se
  * Sized so the journey fits a 375px phone.
  */
 const JOURNEY: { icon: LucideIcon; label: string }[] = [
-  { icon: Search, label: "Prospect" },
-  { icon: Users, label: "Deal" },
-  { icon: FileText, label: "Quote" },
-  { icon: Signature, label: "Agreement" },
-  { icon: ReceiptText, label: "Invoice" },
-  { icon: CreditCard, label: "Get Paid" },
+  { icon: Search, label: "Research" },
+  { icon: ShieldCheck, label: "Evidence" },
+  { icon: Users, label: "Lead" },
+  { icon: Send, label: "Outreach" },
+  { icon: MessagesSquare, label: "Reply" },
+  { icon: Handshake, label: "Client" },
 ];
 
 /** The floating cards: an icon, where it sits on the orbit (degrees, 0 = right, clockwise), when it appears. */
@@ -26,8 +27,8 @@ const ORBIT_CARDS: { icon: LucideIcon; angle: number; delay: number }[] = [
   { icon: Users, angle: -128, delay: 0.25 },
   { icon: ChartColumnIncreasing, angle: -52, delay: 0.4 },
   { icon: Handshake, angle: -6, delay: 0.55 },
-  { icon: CreditCard, angle: 56, delay: 0.7 },
-  { icon: FileText, angle: 188, delay: 0.85 },
+  { icon: Send, angle: 56, delay: 0.7 },
+  { icon: MessagesSquare, angle: 188, delay: 0.85 },
 ];
 
 const STEP_MS = 850;
