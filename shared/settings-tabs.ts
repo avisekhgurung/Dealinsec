@@ -8,13 +8,20 @@
  * an unknown key, falls back to Business details.
  */
 
+import { DEAL_SUITE_HIDDEN } from "./flags";
+
 export const SETTINGS_TABS = ["organization", "team", "integrations", "subscription", "preferences", "activity"] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number];
 
 export const DEFAULT_SETTINGS_TAB: SettingsTab = "organization";
 
 export const SETTINGS_TAB_META: Record<SettingsTab, { label: string; description: string }> = {
-  organization: { label: "Business details", description: "Your business name, work type, country and how your documents look." },
+  organization: {
+    label: "Business details",
+    description: DEAL_SUITE_HIDDEN
+      ? "Your business name, work type, country and what your AI team knows about you."
+      : "Your business name, work type, country and how your documents look.",
+  },
   team: { label: "Team", description: "Who works in this workspace and what each person can do." },
   integrations: { label: "Integrations", description: "DealInSec only connects what you approve, and you can disconnect any time." },
   subscription: { label: "Plan & billing", description: "Your plan and, for teams, your seats." },

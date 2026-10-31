@@ -115,7 +115,9 @@ export function KnowledgeCard({ canEdit }: { canEdit: boolean }) {
             </Button>
           </form>
         )}
-        {!canEdit && <p className="text-xs text-muted-foreground">Only people whose role lets them create deals can add or remove knowledge.</p>}
+        {/* The permission is still deals.create under the hood; the note just
+            doesn't name a hidden feature. */}
+        {!canEdit && <p className="text-xs text-muted-foreground">Your role doesn't allow adding or removing knowledge — ask the workspace Owner.</p>}
 
         <div className="space-y-2" data-testid="knowledge-list">
           {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}

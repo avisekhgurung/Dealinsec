@@ -15,6 +15,7 @@ import { useLocation, Link } from "wouter";
 import { BottomNav } from "@/components/bottom-nav";
 import { hasActivePro, hasActiveTrial, getTrialDaysLeft } from "@shared/schema";
 import { bankRoutingLabel, taxIdLabel } from "@shared/invoice-tax";
+import { DEAL_SUITE_HIDDEN } from "@shared/flags";
 
 // ─── Country-specific field labels ───────────────────────────────────────────
 // India keeps PAN, GSTIN and IFSC exactly as before. Elsewhere a PAN has no
@@ -538,6 +539,9 @@ export default function ProfilePage() {
       </div>
 
       <main className="px-4 space-y-4 max-w-lg mx-auto animate-fade-in lg:max-w-[1600px] lg:px-8 lg:space-y-6 xl:px-12">
+        {/* With the deal suite hidden the business/bank/signature steps have no
+            purpose, and a one-step stepper is noise — so the whole card goes. */}
+        {!DEAL_SUITE_HIDDEN && (
         <SetupStepper
           steps={[
             { key: "identity",  label: "Personal",      icon: User,     done: Boolean(user?.firstName && user?.phone) },
@@ -549,6 +553,7 @@ export default function ProfilePage() {
           ]}
           onStepClick={(k) => openEditor(k)}
         />
+        )}
         {isEditing ? (
           /* ---- Edit Mode (form readable width even on wide screens) ---- */
           <div className="glass-card rounded-2xl p-5 lg:p-7 space-y-5 lg:max-w-3xl lg:mx-auto" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border) / 0.5)" }}>
@@ -556,7 +561,11 @@ export default function ProfilePage() {
               <Edit className="h-4 w-4 text-primary" />
               <h3 className="font-semibold text-lg">Edit profile</h3>
             </div>
-            <p className="text-sm text-muted-foreground -mt-3">Keep these up to date. They appear on the agreements and invoices you send.</p>
+            <p className="text-sm text-muted-foreground -mt-3">
+              {DEAL_SUITE_HIDDEN
+                ? "Keep these up to date so your workspace knows who you are."
+                : "Keep these up to date. They appear on the agreements and invoices you send."}
+            </p>
 
             <section id="profile-section-identity" className="scroll-mt-24 space-y-4">
               <div className="flex items-center gap-2 pt-1">
@@ -597,6 +606,9 @@ export default function ProfilePage() {
             </div>
             </section>
 
+            {/* Tax, bank, signature and stamp exist only for the document suite —
+                hidden with it. The stored values are left untouched. */}
+            {!DEAL_SUITE_HIDDEN && (<>
             <section id="profile-section-business" className="scroll-mt-24 space-y-4">
               <div className="flex items-center gap-2 pt-1">
                 <Building className="h-4 w-4 text-primary" />
@@ -851,6 +863,7 @@ export default function ProfilePage() {
                 government; you can record an e-stamp certificate on each agreement.
               </p>
             </section>
+            </>)}
 
             <div className="flex gap-3 pt-2">
               <Button
@@ -912,6 +925,9 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/* Business, bank, signature and stamp cards belong to the document
+                suite — hidden with it, values untouched. */}
+            {!DEAL_SUITE_HIDDEN && (<>
             {/* Business Info Card */}
             <div className="glass-card rounded-2xl p-5 border-0" style={{ background: "linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.8) 100%)" }}>
               <div className="flex items-center gap-2 mb-4">
@@ -1047,6 +1063,7 @@ export default function ProfilePage() {
                 </div>
               </div>
             )}
+            </>)}
 
             {/* Plan card — plan only; deal limits are enforced server-side
                 and explained by the upgrade modal, not counted in the UI.
@@ -1080,10 +1097,12 @@ export default function ProfilePage() {
                     </p>
                     <p className="text-sm text-white/60 mt-1">
                       {hasActivePro(user)
-                        ? `Unlimited workflow${user?.planExpiresAt ? ` · until ${new Date(user.planExpiresAt).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}` : ""}`
+                        ? `${DEAL_SUITE_HIDDEN ? "Everything unlocked" : "Unlimited workflow"}${user?.planExpiresAt ? ` · until ${new Date(user.planExpiresAt).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}` : ""}`
                         : hasActiveTrial(user)
                           ? `${getTrialDaysLeft(user) === 1 ? "Last day" : `${getTrialDaysLeft(user)} days left`} · everything unlocked`
-                          : "Deals & quotations · upgrade for agreements and invoices"}
+                          : DEAL_SUITE_HIDDEN
+                            ? "Upgrade for more AI searches, drafts and coworker tasks"
+                            : "Deals & quotations · upgrade for agreements and invoices"}
                     </p>
                   </div>
                   <Link href="/pricing">

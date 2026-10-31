@@ -58,6 +58,7 @@ import { AudiencePicker } from "@/components/audience-picker";
 import { normalizeAudience, type Audience } from "@shared/audience";
 import { getLocaleSettings, type LocaleFields, type LocaleSettings } from "@shared/schema";
 import { sameRegion } from "@shared/region";
+import { DEAL_SUITE_HIDDEN } from "@shared/flags";
 import { trackEvent } from "@/lib/analytics";
 import { consentChoice, openConsentSettings, OPEN_CONSENT_EVENT } from "@/lib/consent";
 
@@ -103,6 +104,17 @@ interface Activity {
   id: number; userName: string | null; action: string; entityType: string;
   detail: string | null; createdAt: string;
 }
+
+/** The role editor's permission groups. With the deal suite hidden, the
+ *  quotation/agreement/invoice modules go with it and "Deals" reads as the
+ *  pipeline (converting a lead still uses deals.create under the hood).
+ *  Permissions a role already holds are kept — only the checkboxes hide. */
+const PERMISSION_GROUPS = DEAL_SUITE_HIDDEN
+  ? PERMISSION_MATRIX.flatMap((g) =>
+      g.module === "Deals" ? [{ ...g, module: "Pipeline" }]
+      : ["Quotations", "Agreements", "Invoices"].includes(g.module) ? []
+      : [g])
+  : PERMISSION_MATRIX;
 
 const fmtDate = (d: string | null | undefined, locale: string) =>
   d ? new Date(d).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -461,7 +473,10 @@ export default function SettingsPage() {
                   <>
                     <SettingsSection
                       title="Business details"
-                      description={<>
+                      description={DEAL_SUITE_HIDDEN ? <>
+                        How your business is named inside DealInSec{isSolo ? "" : " and to your team"}. Freelancing under your
+                        own name? Use it here.
+                      </> : <>
                         How your business is named inside DealInSec{isSolo ? "" : " and to your team"}. Freelancing under your
                         own name? Use it here. Your contact, tax and bank details for documents live in your{" "}
                         <Link href="/profile" className="text-primary font-medium hover:underline">profile</Link>.
@@ -510,7 +525,9 @@ export default function SettingsPage() {
 
                     <SettingsSection
                       title="Work type"
-                      description="What kind of work you do. It changes the wording and which deal type is offered first. Your existing deals, quotations, agreements and invoices are not affected."
+                      description={DEAL_SUITE_HIDDEN
+                        ? "What kind of work you do. It changes the wording DealInSec uses — nothing you've already created is affected."
+                        : "What kind of work you do. It changes the wording and which deal type is offered first. Your existing deals, quotations, agreements and invoices are not affected."}
                     >
                       {orgLoading ? (
                         <Skeleton className="h-20 w-full rounded-xl" />
@@ -532,7 +549,9 @@ export default function SettingsPage() {
 
                     <SettingsSection
                       title={<>Country &amp; currency</>}
-                      description="What your quotations, agreements and invoices are issued in."
+                      description={DEAL_SUITE_HIDDEN
+                        ? "Where you work, and the currency and time zone DealInSec uses for you."
+                        : "What your quotations, agreements and invoices are issued in."}
                     >
                       {orgLoading ? (
                         <Skeleton className="h-32 w-full rounded-xl" />
@@ -584,7 +603,8 @@ export default function SettingsPage() {
                   </>
                 )}
 
-                <DocumentStyleCard canEdit={memberCan(user as any, "org.settings")} />
+                {/* Styles the printed quotations/agreements/invoices — hidden with the suite. */}
+                {!DEAL_SUITE_HIDDEN && <DocumentStyleCard canEdit={memberCan(user as any, "org.settings")} />}
 
                 <KnowledgeCard canEdit={memberCan(user as any, "deals.create")} />
               </>
@@ -613,8 +633,12 @@ export default function SettingsPage() {
                 ) : undefined}
               >
                 <ul className="text-sm text-muted-foreground space-y-1.5 max-w-xl list-disc pl-5">
+                  {DEAL_SUITE_HIDDEN ? (
+                    <li>Each person gets their own login and a role that decides what they can see and do — searches, leads and outreach included.</li>
+                  ) : (<>
                   <li>Give your accountant the <strong className="text-foreground">Accounts</strong> role: they raise invoices and track payments, but can't create or edit deals.</li>
                   <li>Give an assistant the <strong className="text-foreground">Sales</strong> role: they create deals and quotations, but can't touch invoices.</li>
+                  </>)}
                   <li>Pro includes up to 5 people, you included.</li>
                 </ul>
                 {!canInvite && <PermissionNote>Only the Owner or an Admin can invite people.</PermissionNote>}
@@ -987,7 +1011,9 @@ export default function SettingsPage() {
                     <div className="min-w-0">
                       <p className="text-sm font-medium">Download my data</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Your profile plus every deal, quotation, agreement and invoice your role can see, as JSON.
+                        {DEAL_SUITE_HIDDEN
+                          ? "Your profile plus every record your role can see, as JSON."
+                          : "Your profile plus every deal, quotation, agreement and invoice your role can see, as JSON."}
                       </p>
                     </div>
                     <Button
@@ -1095,8 +1121,9 @@ export default function SettingsPage() {
                 </div>
                 {isSolo ? (
                   <p className="text-sm text-muted-foreground max-w-md">
-                    The free plan covers 4 deals a month with their quotations. Pro adds signed agreements,
-                    invoices and payment tracking — and room for up to 5 people if you ever need help.
+                    {DEAL_SUITE_HIDDEN
+                      ? "Pro unlocks more AI client searches, outreach drafts and coworker tasks — and room for up to 5 people if you ever need help."
+                      : "The free plan covers 4 deals a month with their quotations. Pro adds signed agreements, invoices and payment tracking — and room for up to 5 people if you ever need help."}
                   </p>
                 ) : (
                   <p className="text-sm text-muted-foreground max-w-md">
@@ -1193,7 +1220,7 @@ export default function SettingsPage() {
                 <span className="text-xs text-muted-foreground tabular-nums">{rolePerms.length} selected</span>
               </div>
               <div className="divide-y divide-border/50">
-                {PERMISSION_MATRIX.map((group) => (
+                {PERMISSION_GROUPS.map((group) => (
                   <div key={group.module} className="px-3.5 py-2.5 flex items-start gap-3">
                     <span className="w-24 lg:w-28 flex-shrink-0 text-sm font-semibold pt-0.5">{group.module}</span>
                     <div className="flex flex-wrap gap-x-4 gap-y-2 flex-1">
