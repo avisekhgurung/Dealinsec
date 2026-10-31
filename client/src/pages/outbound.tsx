@@ -377,7 +377,7 @@ export default function OutboundPage() {
         <div className="flex items-center justify-between gap-4 px-4 py-4 lg:mx-auto lg:max-w-[1600px] lg:px-8">
           <div className="min-w-0">
             <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight lg:text-2xl">Client Radar <span aria-hidden>🔎</span></h1>
-            <p className="mt-0.5 hidden text-sm text-muted-foreground lg:block">Find potential clients for your services: companies that fit, a reason to get in touch now, and the evidence behind each one. You can also ask Agent mode or Nibo to run a search; the results show here.</p>
+            <p className="mt-0.5 hidden text-sm text-muted-foreground lg:block">Find potential clients for your services: companies that fit, a reason to get in touch now, and the evidence behind each one. You can also ask Nibo in The Nest to run a search; the results show here.</p>
           </div>
           <NotificationBell className="lg:hidden" />
         </div>

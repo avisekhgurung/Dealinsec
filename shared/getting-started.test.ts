@@ -33,8 +33,8 @@ describe("checklistFor ordering", () => {
     expect(ids("get_paid")).toEqual(["first_deal", "send_quote", "agreement", "invoice", "record_payment", "run_search"]);
     expect(checklistFor("get_paid", ZERO, ALL).map((s) => s.discovery)).toEqual([false, false, false, false, false, true]);
   });
-  it("no goal falls back to get_paid", () => {
-    expect(ids(null)).toEqual(ids("get_paid"));
+  it("no goal falls back to find_clients: finding clients is the product's face", () => {
+    expect(ids(null)).toEqual(ids("find_clients"));
   });
 });
 
@@ -104,7 +104,7 @@ describe("destinationFor", () => {
     expect(destinationFor("find_clients")).toBe("/outbound");
     expect(destinationFor("get_paid")).toBe("/deals/new");
     expect(destinationFor("manage_deals")).toBe("/leads");
-    expect(destinationFor(null)).toBe("/dashboard");
+    expect(destinationFor(null)).toBe("/outbound"); // no goal lands on the product's promise: finding clients
   });
 });
 

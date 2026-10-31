@@ -122,19 +122,23 @@ export function mobileBarItems(user: NavUser): NavItem[] {
   return MOBILE_BAR_KEYS.map(navItem).filter((i) => canSeeNavItem(user, i));
 }
 
-/** Desktop bar: the daily destinations as icon tabs in one segment; the documents and money live behind "More" in the
- *  same segment (Profile and Settings are the bar's own account controls on the right). */
-export const DESKTOP_BAR_KEYS: readonly NavKey[] = ["home", "league", "outbound", "leads", "deals"];
+/** Desktop bar: finding clients is the product's face, so the bar holds the finding tabs; Deals and everything after
+ *  the win (documents, money) live behind "Workspace" in the same segment (Profile and Settings are the bar's own
+ *  account controls on the right). */
+export const DESKTOP_BAR_KEYS: readonly NavKey[] = ["home", "league", "outbound", "leads"];
 export function desktopBarItems(user: NavUser): NavItem[] {
   return DESKTOP_BAR_KEYS.map(navItem).filter((i) => canSeeNavItem(user, i));
 }
-export const DESKTOP_MORE_GROUPS: readonly NavGroup[] = ["documents", "money"];
+export const DESKTOP_MORE_GROUPS: readonly NavGroup[] = ["pipeline", "documents", "money"];
+/** The Workspace menu: the win-and-bill side. Pipeline shows only Deals here (Leads has its own tab). */
 export function desktopMoreSections(user: NavUser): NavSection[] {
-  return sections(user, DESKTOP_MORE_GROUPS);
+  return sections(user, DESKTOP_MORE_GROUPS)
+    .map((s) => ({ ...s, items: s.items.filter((i) => !DESKTOP_BAR_KEYS.includes(i.key)) }))
+    .filter((s) => s.items.length > 0);
 }
-/** The "More" item behind which the current page sits on desktop, if any (so More can show its name and light up). */
+/** The Workspace item behind which the current page sits on desktop, if any (so the menu can show its name and light up). */
 export function desktopMoreActive(path: string): NavItem | null {
-  return NAV_ITEMS.find((i) => DESKTOP_MORE_GROUPS.includes(i.group) && i.isActive(path)) ?? null;
+  return NAV_ITEMS.find((i) => DESKTOP_MORE_GROUPS.includes(i.group) && !DESKTOP_BAR_KEYS.includes(i.key) && i.isActive(path)) ?? null;
 }
 
 export const MORE_GROUPS: readonly NavGroup[] = ["pipeline", "documents", "money", "account"];

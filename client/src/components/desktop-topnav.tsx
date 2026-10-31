@@ -17,6 +17,7 @@
 import { motion } from "framer-motion";
 import { tSpring } from "@/lib/motion";
 import { ModeSwitcher } from "@/components/mode-switch";
+import { useAgentModeEnabled } from "@/hooks/use-agent-mode";
 import { useEffect, useReducer, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { Settings, LogOut, Sparkles, Crown, Users, Zap, MoreHorizontal, ChevronDown } from "lucide-react";
@@ -50,7 +51,8 @@ type PlanState =
 /** A label without its emoji ("Client Radar 🔎" → "Client Radar"), for the middle widths. */
 const plainLabel = (label: string) => label.replace(/\s*[\uD83C-\uD83E][\uDC00-\uDFFF]\uFE0F?/g, "").trim();
 
-/** "More" at the end of the segment: Documents (Quotations, Agreements) and Money (Invoices). While one of them is
+/** "Workspace" at the end of the segment: Deals, then Documents (Quotations, Agreements) and Money (Invoices) — the
+ *  win-and-bill side of the product, out of the way of finding clients. While one of them is
  *  open, the button wears its name and icon and is lit like a tab. */
 function MoreMenu({ location, sections }: { location: string; sections: NavSection[] }) {
   const current = desktopMoreActive(location);
@@ -60,12 +62,12 @@ function MoreMenu({ location, sections }: { location: string; sections: NavSecti
   const Icon = current ? NAV_ICONS[current.key] : MoreHorizontal;
   return (
     <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger aria-current={current ? "page" : undefined} data-testid="topnav-more" aria-label={current ? `More: ${current.label}` : "More"} title={current ? current.label : "More"}
+      <DropdownMenuTrigger aria-current={current ? "page" : undefined} data-testid="topnav-more" aria-label={current ? `Workspace: ${current.label}` : "Workspace"} title={current ? current.label : "Workspace"}
         className="dis-topnav-tab relative flex h-9 shrink-0 items-center gap-2 rounded-xl px-2.5 xl:px-3 text-[13.5px] font-semibold whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60 data-[state=open]:bg-white/10">
         {current && <motion.span layoutId="topnav-pill" className="dis-topnav-pill absolute inset-0 rounded-xl" transition={tSpring} aria-hidden="true" />}
         <Icon className="relative h-[17px] w-[17px]" aria-hidden="true" />
         {/* On the narrowest desktops, an open page's icon alone; its name shows from xl (and always as the tooltip). */}
-        <span className={cn("relative", current && "hidden xl:inline")}>{current ? current.shortLabel : "More"}</span>
+        <span className={cn("relative", current && "hidden xl:inline")}>{current ? current.shortLabel : "Workspace"}</span>
         <ChevronDown className="relative h-3.5 w-3.5 opacity-70" aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={10} className="w-60 rounded-xl p-1.5">
@@ -109,6 +111,7 @@ const iconButton =
 export function DesktopTopNav() {
   const [location, setLocation] = useLocation();
   const { user, isAuthenticated } = useAuth();
+  const agentOn = useAgentModeEnabled();
   const { toast } = useToast();
 
   // Hourly tick so a trial countdown left open overnight stays honest —
@@ -246,8 +249,8 @@ export function DesktopTopNav() {
           </Link>
           <span aria-hidden="true" className="self-center h-8 w-px mr-1 bg-gradient-to-b from-white/0 via-white/20 to-white/0" />
 
-          {/* ── Workspace: the daily tabs, icon and name, in one segment; the rest behind "More" in the same segment ── */}
-          <nav aria-label="Workspace" className="flex min-w-0 items-center pl-2">
+          {/* ── The daily tabs, icon and name, in one segment; the win-and-bill side behind "Workspace" in the same segment ── */}
+          <nav aria-label="Sections" className="flex min-w-0 items-center pl-2">
             <div className="dis-topnav-seg flex items-center gap-0.5 rounded-2xl p-1">
               {desktopBarItems(user as any).map((item) => {
                 const active = item.isActive(location);
@@ -272,7 +275,7 @@ export function DesktopTopNav() {
           <div className="ml-auto flex shrink-0 items-center gap-1.5 xl:gap-2 pl-3">
             {/* Icons, with their names as tooltip and accessible label. The bar is capped at 1600px, so a wider
                 screen never buys room for the switcher's words next to seven full tab labels and the plan chip. */}
-            <ModeSwitcher tone="dark" labelsFrom="never" />
+            {agentOn === true && <ModeSwitcher tone="dark" labelsFrom="never" />}
             {planChip()}
 
             <span aria-hidden="true" className="mx-1 h-6 w-px bg-white/15" />

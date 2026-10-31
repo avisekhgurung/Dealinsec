@@ -53,7 +53,7 @@ const PIPELINE = [
   { title: "Quotations", text: "Versioned, generated from the deal, with a link your client opens and accepts online. Protection Check flags missing terms first.", plan: "Free" },
   { title: "Agreements", text: "Standard and custom terms; your client signs online through a link. Electronic acceptance with an audit record, not a certified digital signature.", plan: "Pro" },
   { title: "Invoices and payment follow-ups", text: "Single or split into advance and final, never more than the agreement. Mark payments received; AI drafts a polite reminder you send yourself.", plan: "Pro" },
-  { title: "Today list and Agent mode", text: "The dashboard shows what needs you today. Ask DealInSec in plain words to find records or prepare documents; it asks before every change.", plan: "Free" },
+  { title: "Today list and your AI team", text: "The dashboard shows what needs you today. Ask Nibo, Mika or Zee in plain words; they work through your records and ask before anything that matters.", plan: "Free" },
 ];
 
 const TRUST = [

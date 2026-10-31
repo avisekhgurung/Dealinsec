@@ -119,9 +119,9 @@ export default function OnboardingPage() {
   // or the Deal Risk Checker), which they can still change here.
   const [audience, setAudience] = useState<Audience | null>(readAudienceIntent);
   const [describes, setDescribes] = useState<string | null>(null);
-  // Optional: shapes where they land and the dashboard's "Get started" order.
-  // A client search started in the landing demo already answers it: finding clients.
-  const [goal, setGoal] = useState<FirstGoal | null>(() => (hasPendingOutboundPrefill() ? "find_clients" : null));
+  // Shapes where they land and the dashboard's "Get started" order. Finding clients is the product's promise, so it
+  // starts selected; anyone here for the paperwork side picks their own.
+  const [goal, setGoal] = useState<FirstGoal | null>("find_clients");
   const [market, setMarket] = useState<TargetMarket | "">("");
   // Signup already asked for the name: start from it rather than asking twice.
   const [fullName, setFullName] = useState(() => [user?.firstName, user?.lastName].filter(Boolean).join(" "));

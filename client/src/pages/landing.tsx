@@ -277,8 +277,8 @@ export default function LandingPage() {
 
       <main className="relative z-[1]">
         <HeroSection isAuthenticated={isAuthenticated} onPrimary={() => (isAuthenticated ? setLocation("/dashboard") : openAuth("signup"))} />
-        <WorkflowWalkthrough />
         <AiTeamSection />
+        <WorkflowWalkthrough />
         <FeaturesSection />
         <ManualWorkflowSection />
         <AudienceCards />

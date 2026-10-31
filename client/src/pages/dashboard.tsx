@@ -1260,14 +1260,25 @@ export default function DashboardPage() {
               <p className="text-sm text-muted-foreground mb-4">
                 {audience.emptyState}
               </p>
-              {canCreateDeal && (
-                <Link href="/deals/new">
-                  <Button className="gradient-btn" data-testid="button-create-first-deal">
-                    <Plus className="w-4 h-4 mr-2" />
-                    {audience.newDealCta}
-                  </Button>
-                </Link>
-              )}
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {/* Finding the client comes first; creating the deal is for work already won. */}
+                {canSeeOutbound && (
+                  <Link href="/outbound">
+                    <Button className="gradient-btn" data-testid="button-empty-find-clients">
+                      <Radar className="w-4 h-4 mr-2" />
+                      Find your first client
+                    </Button>
+                  </Link>
+                )}
+                {canCreateDeal && (
+                  <Link href="/deals/new">
+                    <Button variant={canSeeOutbound ? "outline" : "default"} className={canSeeOutbound ? "font-semibold" : "gradient-btn"} data-testid="button-create-first-deal">
+                      <Plus className="w-4 h-4 mr-2" />
+                      {audience.newDealCta}
+                    </Button>
+                  </Link>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
@@ -1287,20 +1298,21 @@ export default function DashboardPage() {
             <p className="hidden sm:block text-sm text-muted-foreground">Here's what needs your attention today.</p>
           </div>
           <div className="flex items-center gap-2 lg:gap-3">
-            {/* Secondary, desktop only: mobile already has Client Radar in the bottom bar. */}
-            {canSeeOutbound && (
-              <Link href="/outbound" className="hidden lg:block">
-                <Button size="sm" variant="outline" className="font-semibold" data-testid="header-find-prospects">
-                  <Radar className="w-4 h-4 mr-1.5" />
-                  Find prospects
+            {/* Finding clients is the primary action; the deal button is for work already won. Desktop only:
+                mobile already has Client Radar in the bottom bar. */}
+            {canCreateDeal && (
+              <Link href="/deals/new" className="hidden lg:block">
+                <Button size="sm" variant="outline" className="font-semibold" data-testid="header-new-deal">
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  {audience.newDealCta}
                 </Button>
               </Link>
             )}
-            {canCreateDeal && (
-              <Link href="/deals/new" className="hidden lg:block">
-                <Button size="sm" className="gradient-btn text-white font-semibold" data-testid="header-new-deal">
-                  <Plus className="w-4 h-4 mr-1.5" />
-                  {audience.newDealCta}
+            {canSeeOutbound && (
+              <Link href="/outbound" className="hidden lg:block">
+                <Button size="sm" className="gradient-btn text-white font-semibold" data-testid="header-find-prospects">
+                  <Radar className="w-4 h-4 mr-1.5" />
+                  Find clients
                 </Button>
               </Link>
             )}

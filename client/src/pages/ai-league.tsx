@@ -28,6 +28,7 @@ import { playChirp, useNestSound } from "@/lib/chirp-player";
 import { VoiceCall } from "@/components/agent/voice-call";
 import { voiceCallSupported } from "@/hooks/use-voice-call";
 import { useMoney } from "@/hooks/use-locale";
+import { useAgentModeEnabled } from "@/hooks/use-agent-mode";
 import { Mascot, MascotEmpty, mascotState } from "@/components/ai-league/mascot";
 import { RunDetail, StatusPill, runStatusLabel } from "@/components/ai-league/run-report";
 import { TaskDialog } from "@/components/ai-league/task-dialog";
@@ -190,6 +191,7 @@ function SoundSwitch({ compact = false }: { compact?: boolean }) {
 /** The team picture and what each coworker is for: the first thing on the Team view. */
 const WELCOME_KEY = "dis_nest_welcome_hidden";
 function NestWelcome() {
+  const agentOn = useAgentModeEnabled();
   // Remembered per browser; storage can be unavailable (private windows), which just shows the card again.
   const [hidden, setHidden] = useState(() => { try { return localStorage.getItem(WELCOME_KEY) === "1"; } catch { return false; } });
   const hide = () => { setHidden(true); try { localStorage.setItem(WELCOME_KEY, "1"); } catch { /* not stored */ } };
@@ -203,7 +205,7 @@ function NestWelcome() {
         <div className="space-y-3 p-4 sm:p-5">
           <div>
             <h2 id="nest-welcome-h" className="text-lg font-bold tracking-tight">Welcome to The Nest <span aria-hidden>🪺</span></h2>
-            <p className="text-sm text-muted-foreground">Your AI team works in the background and asks before anything that matters. Need a quick answer instead? <Link href="/agent" className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400" data-testid="league-ask-agent">Ask DealInSec</Link>.</p>
+            <p className="text-sm text-muted-foreground">Your AI team works in the background and asks before anything that matters.{agentOn === true && <> Need a quick answer instead? <Link href="/agent" className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400" data-testid="league-ask-agent">Ask DealInSec</Link>.</>}</p>
           </div>
           <ul className="space-y-2 text-sm">
             {BOTS.map((b) => (

@@ -103,7 +103,8 @@ export function checklistFor(goal: FirstGoal | null, facts: Facts, can: Checklis
   };
 
   let drafts: Draft[];
-  if (goal === "find_clients") {
+  if (goal === "find_clients" || goal === null) {
+    // Finding clients is the product's face, so it is also the default when no goal was chosen.
     drafts = [
       {
         id: "run_search", module: "outbound", href: "/outbound", done: has(facts.outboundRuns),
@@ -139,7 +140,7 @@ export function checklistFor(goal: FirstGoal | null, facts: Facts, can: Checklis
       discoverSearch,
     ];
   } else {
-    // get_paid, and the default when no goal was chosen.
+    // get_paid.
     drafts = [
       firstDeal("Create a deal for work you've won", "Add the client, the work and the amount. Everything else starts from here."),
       sendQuote,
@@ -182,12 +183,11 @@ export function checklistState(steps: ChecklistStep[]): ChecklistState {
   return { total: steps.length, done, complete: !anyUnknown && done === steps.length, anyUnknown };
 }
 
-/** Where onboarding lands someone who chose this goal. */
-export function destinationFor(goal: FirstGoal | null): "/outbound" | "/deals/new" | "/leads" | "/dashboard" {
+/** Where onboarding lands someone who chose this goal. No goal lands on Client Radar: the product's first promise. */
+export function destinationFor(goal: FirstGoal | null): "/outbound" | "/deals/new" | "/leads" {
   switch (goal) {
-    case "find_clients": return "/outbound";
     case "get_paid": return "/deals/new";
     case "manage_deals": return "/leads";
-    default: return "/dashboard";
+    default: return "/outbound";
   }
 }

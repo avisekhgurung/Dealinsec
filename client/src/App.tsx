@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { AppLoader, RouteLoader } from "@/components/app-loader";
 import { AgentModeFab, BackToChat } from "@/components/mode-switch";
 import { useUiMode } from "@/hooks/use-ui-mode";
+import { useAgentModeEnabled } from "@/hooks/use-agent-mode";
 import { DesktopTopNav } from "@/components/desktop-topnav";
 import { InstallPrompt } from "@/components/install-prompt";
 import { ConfirmProvider } from "@/components/confirm-dialog";
@@ -90,7 +91,10 @@ function isFullBleedRoute(pathname: string) {
 function Router() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const [location, setLocation] = useLocation();
-  const uiMode = useUiMode();
+  const storedUiMode = useUiMode();
+  // Agent mode exists only where the server switches it on; a remembered "agent" preference means nothing without it.
+  const agentOn = useAgentModeEnabled();
+  const uiMode = agentOn === false && storedUiMode === "agent" ? "app" : storedUiMode;
 
   // Fire a GA4 page_view on every SPA route change (and on first render).
   // The gtag config in index.html has send_page_view:false, so this is the
@@ -200,7 +204,7 @@ function Router() {
       {showShell && <DesktopTopNav />}
       {/* One way into the agent on every authed workspace page (not on print/full-bleed views, nor the agent page itself) */}
       {/* Not over a coworker's chat (AI League): its composer sits where the floating button would. */}
-      {showShell && uiMode !== "agent" && !location.startsWith("/agent") && !location.startsWith("/ai-league/") && isAuthenticated && <AgentModeFab />}
+      {showShell && agentOn === true && uiMode !== "agent" && !location.startsWith("/agent") && !location.startsWith("/ai-league/") && isAuthenticated && <AgentModeFab />}
       {showShell && uiMode === "agent" && !location.startsWith("/agent") && !location.startsWith("/ai-league/") && <BackToChat />}
       {/* Content sits below the desktop top bar via --dis-topnav-h
           (see .app-shell in index.css). */}
@@ -217,7 +221,8 @@ function Router() {
             <Route path="/forgot-password"><Redirect to={home} /></Route>
             <Route path="/reset-password"><Redirect to={home} /></Route>
             <Route path="/dashboard" component={DashboardPage} />
-            <Route path="/agent/:id?" component={AgentPage} />
+            {/* Hidden while Agent mode is off (The Nest is the AI surface); only a definite "off" bounces a deep link. */}
+            <Route path="/agent/:id?">{agentOn === false ? <Redirect to="/dashboard" /> : <AgentPage />}</Route>
             <Route path="/ai-league" component={AiLeaguePage} />
             <Route path="/ai-league/:bot" component={AiLeaguePage} />
             <Route path="/outbound" component={OutboundPage} />

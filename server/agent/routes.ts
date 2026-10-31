@@ -33,6 +33,12 @@ import { AGENT_TOOLS } from "./tools";
 import type { AgentEvent } from "./types";
 import { conversationDeps } from "./wiring";
 
+/** Agent mode is hidden while The Nest (Nibo, Mika, Zee) is the product's one AI surface: the coworkers cover the
+ *  same ground with names and jobs. AGENT_MODE_ENABLED=true on the server brings the old single-agent chat back;
+ *  nothing is deleted, and The Nest (which shares the agent's machinery, not these routes) is unaffected either way. */
+export const agentModeEnabled = (env: NodeJS.ProcessEnv = process.env) =>
+  (env.AGENT_MODE_ENABLED ?? "").trim().toLowerCase() === "true";
+
 const messageBody = z.object({
   text: z.string().trim().min(1, "Type a message").max(MAX_TEXT, "That message is too long"),
   // "voice" is a spoken call made from the web app: same session, same approvals (never given by voice), a spoken style.
@@ -79,6 +85,7 @@ export function registerAgentRoutes(app: Express) {
    *  migration hasn't been run) only the agent is off — the rest of the app is
    *  unaffected. */
   const gate = async (req: Request, res: Response, next: () => void) => {
+    if (!agentModeEnabled()) return res.status(404).json({ code: "AGENT_DISABLED", error: "Agent mode is switched off on this server." });
     const user = (req as any).user;
     if (!user?.organizationId) return res.status(403).json({ error: "Finish setting up your workspace first." });
     try {
@@ -94,6 +101,7 @@ export function registerAgentRoutes(app: Express) {
   const guard = [isAuthenticated, gate] as const;
 
   app.get("/api/agent/status", isAuthenticated, async (req: any, res) => {
+    if (!agentModeEnabled()) return res.json({ enabled: false, tablesReady: false, providerConfigured: copilotConfigured(), autonomyLevel: 0 });
     let ready = false;
     try { ready = !!req.user.organizationId && (await agentTablesReady()); } catch { /* reported as not ready */ }
     const enabled = ready && copilotConfigured();

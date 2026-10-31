@@ -19,18 +19,18 @@ const sections = src["client/src/components/landing-redesign.tsx"];
 
 describe("homepage copy", () => {
   it("leads with the brand promise, says who it's for and what Free includes, with human approval beside the CTA", () => {
-    expect(sections).toContain("Find clients.<br />Win <span");
+    expect(sections).toContain("Your AI team<br />finds <span");
     expect(sections).toContain("For freelancers and service providers in India");
-    expect(sections).toContain("DealInSec is a simple business workspace for Indian freelancers and service providers. Track leads and deals, prepare quotations and agreements, create invoices and follow up on payments, with AI coworkers to help along the way.");
+    expect(sections).toContain("DealInSec gives Indian freelancers and service providers an AI team that researches potential clients, drafts the outreach and keeps follow-ups moving. When a client says yes, the same workspace carries the deal through quotation, agreement and invoice.");
     expect(sections).toContain('"Get started free"');
     expect(sections).toContain("See how it works");
     expect(sections).toContain("No credit card required");
     expect(sections).toContain("you approve every message and send it yourself. Nothing is sent automatically.");
-    expect(sections).toMatch(/Free: \$\{PRICING\.freeMonthlyDeals\} new deals a month with quotations/);
+    expect(sections).toMatch(/Free: \$\{OUTBOUND_ALLOWANCE_DEFAULTS\.free\.monthlySearches\} AI research searches every \$\{OUTBOUND_WINDOW_DAYS\} days/);
   });
 
   it("walks the real five-stage workflow, each stage naming its plan", () => {
-    for (const [stage, plan] of [["Research a potential client", "Free"], ["Save the prospect and manage the lead", "Free"], ["Create a deal and send a quotation", "Free"], ["Create an agreement and collect a signature", "Pro"], ["Generate an invoice and track payment", "Pro"]]) {
+    for (const [stage, plan] of [["Describe who you want; AI researches", "Free"], ["Approve the first message and send it", "Free"], ["Track replies, next steps and follow-ups", "Free"], ["They say yes: deal and quotation", "Free"], ["Agreement signed, invoices tracked", "Pro"]]) {
       expect(sections, stage).toContain(`label: "${stage}", plan: "${plan}"`);
     }
   });

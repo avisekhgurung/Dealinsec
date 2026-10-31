@@ -130,17 +130,17 @@ describe("mobile bar and More sheet", () => {
   });
 });
 
-describe("desktop bar: daily tabs, the rest behind More in the same segment", () => {
-  it("shows Home, The Nest, Client Radar, Leads and Deals as tabs; Quotations, Agreements and Invoices under More", () => {
-    expect(desktopBarItems(OWNER).map((i) => i.key)).toEqual(["home", "league", "outbound", "leads", "deals"]);
-    expect(desktopMoreSections(OWNER).map((s) => [s.label, s.items.map((i) => i.key)])).toEqual([["Documents", ["quotations", "agreements"]], ["Money", ["invoices"]]]);
+describe("desktop bar: finding tabs, the win-and-bill side behind Workspace in the same segment", () => {
+  it("shows Home, The Nest, Client Radar and Leads as tabs; Deals, Quotations, Agreements and Invoices under Workspace", () => {
+    expect(desktopBarItems(OWNER).map((i) => i.key)).toEqual(["home", "league", "outbound", "leads"]);
+    expect(desktopMoreSections(OWNER).map((s) => [s.label, s.items.map((i) => i.key)])).toEqual([["Pipeline", ["deals"]], ["Documents", ["quotations", "agreements"]], ["Money", ["invoices"]]]);
   });
-  it("More knows which of its pages is open, including documents under other URLs", () => {
+  it("Workspace knows which of its pages is open, including documents under other URLs; bar tabs never light it", () => {
     expect(desktopMoreActive("/invoices")?.key).toBe("invoices");
     expect(desktopMoreActive("/brand-invoices/12")?.key).toBe("invoices");
     expect(desktopMoreActive("/deals/5/quote")?.key).toBe("quotations");
     expect(desktopMoreActive("/contracts/9")?.key).toBe("agreements");
-    expect(desktopMoreActive("/deals/5")).toBeNull();
+    expect(desktopMoreActive("/deals/5")?.key).toBe("deals");
     expect(desktopMoreActive("/leads")).toBeNull();
   });
 });
