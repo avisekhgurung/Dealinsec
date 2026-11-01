@@ -5,7 +5,7 @@
  * tap on the card shown here.
  */
 import { useEffect, useRef, useState } from "react";
-import { Hand, Mic, MicOff, PhoneOff } from "lucide-react";
+import { Hand, Mic, MicOff, PhoneOff, X } from "lucide-react";
 import type { AgentCard } from "@shared/agent";
 import type { ApprovalView } from "@/hooks/use-agent";
 import { useAgent } from "@/hooks/use-agent";
@@ -61,9 +61,15 @@ export function VoiceCall({ agent, lang, firstName, onClose, who }: { agent: Age
 
   // Cards from the latest assistant message OF THIS CALL that need a tap (approvals) or are worth seeing.
   const callStart = useRef(agent.messages.length);
-  const lastAssistant = [...agent.messages.slice(callStart.current)].reverse().find((m) => m.role === "assistant");
+  let lastAssistantAt = -1;
+  for (let i = agent.messages.length - 1; i >= callStart.current; i--) if (agent.messages[i].role === "assistant") { lastAssistantAt = i; break; }
+  const lastAssistant = lastAssistantAt >= 0 ? agent.messages[lastAssistantAt] : undefined;
   const cards: AgentCard[] = (lastAssistant?.cards ?? []).filter((c) => c.kind === "approval" || c.kind === "companies" || c.kind === "lead");
   const approvals: Record<string, ApprovalView> = agent.approvals;
+  const needsTap = cards.some((c) => c.kind === "approval");
+  // An informational sheet can be waved away; one waiting for a tap stays until it is answered.
+  const [sheetHiddenFor, setSheetHiddenFor] = useState(-1);
+  const sheetOpen = cards.length > 0 && (needsTap || sheetHiddenFor !== lastAssistantAt);
 
   const orbScale = phase === "listening" && !state.muted ? 1 + Math.min(level, 1) * 0.45 : 1;
   const busy = phase === "thinking";
@@ -95,17 +101,32 @@ export function VoiceCall({ agent, lang, firstName, onClose, who }: { agent: Age
 
         <div className="text-center">
           <p className="text-lg font-semibold" data-testid="call-status">{label}</p>
+          {/* Only the person's own words appear here: the reply is spoken, not written (founder's call, 2026-11-01). */}
           <p className="mx-auto mt-2 min-h-[3.5rem] max-w-md text-balance text-base leading-snug text-white/75" aria-live="polite" data-testid="call-caption">
-            {phase === "speaking" ? state.lastReply : phase === "thinking" && speakingEarly ? agent.live || heard : heard}
+            {heard}
           </p>
           {state.notice && <p role="alert" className="mx-auto mt-3 max-w-sm rounded-xl bg-amber-500/15 px-4 py-2.5 text-sm text-amber-100" data-testid="call-notice">{state.notice}</p>}
         </div>
 
-        {cards.length > 0 && (
-          <div className="max-h-[34vh] w-full max-w-md space-y-3 overflow-y-auto rounded-2xl bg-background p-3 text-foreground shadow-xl" data-testid="call-cards">
-            {cards.map((c, i) => (
-              <CardView key={i} card={c} approvals={approvals} onApprove={agent.approve} onDecline={agent.reject} />
-            ))}
+        {sheetOpen && (
+          <div className="dis-rise w-full max-w-md overflow-hidden rounded-2xl bg-background text-foreground shadow-2xl ring-1 ring-white/15" data-testid="call-cards">
+            <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-2.5">
+              <p className="flex items-center gap-2 text-sm font-semibold">
+                {needsTap && <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-500" aria-hidden="true" />}
+                {needsTap ? `${name} needs your go-ahead` : `From ${name}`}
+              </p>
+              {!needsTap && (
+                <button type="button" onClick={() => setSheetHiddenFor(lastAssistantAt)} aria-label="Hide this" data-testid="call-cards-hide"
+                  className="rounded-full p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground">
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <div className="max-h-[30vh] space-y-3 overflow-y-auto p-3">
+              {cards.map((c, i) => (
+                <CardView key={i} card={c} approvals={approvals} onApprove={agent.approve} onDecline={agent.reject} />
+              ))}
+            </div>
           </div>
         )}
       </main>

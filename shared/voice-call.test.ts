@@ -84,10 +84,18 @@ describe("interrupting", () => {
 });
 
 describe("mute", () => {
-  it("muting stops listening; nothing is heard or sent while muted; unmuting resumes", () => {
-    const r = run([{ type: "mute" }, { type: "utterance", text: "hello there" }, { type: "unmute" }], live());
-    expect(r.effects).toEqual(["stop_listening", "listen"]);
+  it("muting flushes the microphone: a turn already spoken is still delivered and answered", () => {
+    // The hook's mute_mic transcribes what was said before the mute and sends it as an utterance.
+    const r = run([{ type: "mute" }, { type: "utterance", text: "hello there" }], live());
+    expect(r.effects).toEqual(["mute_mic", "stop_listening", "send:hello there"]);
+    expect(r.s.phase).toBe("thinking");
+    expect(r.s.muted).toBe(true);
+  });
+  it("muting with nothing said just stops listening; unmuting resumes", () => {
+    const r = run([{ type: "mute" }, { type: "unmute" }], live());
+    expect(r.effects).toEqual(["mute_mic", "listen"]);
     expect(r.s.phase).toBe("listening");
+    expect(r.s.muted).toBe(false);
   });
   it("after a reply, a muted call does not start listening", () => {
     const r = run([{ type: "utterance", text: "hello there" }, { type: "mute" }, { type: "reply", text: "Hello." }, { type: "speech_done" }], live());

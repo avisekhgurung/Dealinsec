@@ -344,6 +344,16 @@ export function useVoiceCall(o: { agent: Agent; lang: string; greeting: string; 
     switch (fx.kind) {
       case "listen": startRecognition(); break;
       case "stop_listening": stopRecognition(); break;
+      case "mute_mic": {
+        // Muting right after talking: what was already said is delivered (and answered), not thrown away.
+        window.clearTimeout(endpointT.current);
+        window.clearTimeout(idleT.current);
+        if (listener.current) { listener.current.flush(); break; }
+        const pending = transcript.current;
+        stopRecognition();
+        deliver(pending);   // only a real utterance is sent; a cough or nothing is dropped
+        break;
+      }
       case "speak":
         speak(fx.text);
         // The person comes first: keep an ear open while speaking.

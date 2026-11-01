@@ -26,6 +26,8 @@ const BARGE_MS = 350;
 export interface ServerListener {
   listen(): void;
   pause(): void;
+  /** Stop listening, but first deliver a turn in progress (what was recorded is transcribed and sent). */
+  flush(): void;
   watchBargeIn(on: boolean): void;
   setMuted(m: boolean): void;
   level(): number;
@@ -201,7 +203,7 @@ export async function openServerListener(ctx: AudioContext, o: {
     if (!active) return;
     endTurn();
     if (isUtterance(text)) o.onUtterance(text.trim());
-    else if (!disposed) api.listen();   // only noise: keep listening
+    else if (!disposed && !muted) api.listen();   // only noise: keep listening (unless the person just muted)
   };
 
   /** A transcription failed; twice in a row, the call goes back to the browser's recogniser. */
@@ -280,6 +282,12 @@ export async function openServerListener(ctx: AudioContext, o: {
       });
     },
     pause() { listenId++; endTurn(); },
+    flush() {
+      listenId++;
+      // Nothing said yet: just stop. Something said: send the turn as it stands (same path as a very long turn).
+      if (!active || !ts.started) { endTurn(); return; }
+      void cap();
+    },
     watchBargeIn(on) {
       barge = on && o.holdMic; bargeLoud = 0;
       if (barge && ctx.state === "suspended") void ctx.resume().catch(() => {});

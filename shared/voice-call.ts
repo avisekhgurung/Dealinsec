@@ -57,6 +57,8 @@ export type CallEvent =
 export type CallEffect =
   | { kind: "listen" }
   | { kind: "stop_listening" }
+  /** Mute the microphone, but first deliver anything the person already said (a turn still being decided). */
+  | { kind: "mute_mic" }
   | { kind: "send"; text: string }
   | { kind: "speak"; text: string }
   | { kind: "cancel_speech" }
@@ -91,7 +93,9 @@ export function reduceCall(s: CallState, e: CallEvent): { state: CallState; effe
       return keep({ ...s, interim: e.text, idlePrompted: false });
 
     case "utterance": {
-      if (s.phase !== "listening" || s.muted || !isUtterance(e.text)) return keep(s);
+      // A muted call can still receive one: speech from just BEFORE the mute, flushed by mute_mic
+      // (the microphone itself is off while muted, so nothing new can arrive).
+      if (s.phase !== "listening" || !isUtterance(e.text)) return keep(s);
       const text = e.text.trim();
       const heard = { ...s, interim: "", lastUserText: text, idlePrompted: false };
       if (s.confirming) {
@@ -143,7 +147,9 @@ export function reduceCall(s: CallState, e: CallEvent): { state: CallState; effe
 
     case "mute":
       if (s.muted) return keep(s);
-      return keep({ ...s, muted: true, interim: "" }, s.phase === "listening" ? [{ kind: "stop_listening" }] : []);
+      // Muting right after talking means "your turn now", not "forget what I said": mute_mic first
+      // delivers a turn that was still being decided, so the person still gets their answer.
+      return keep({ ...s, muted: true, interim: "" }, s.phase === "listening" ? [{ kind: "mute_mic" }] : []);
 
     case "unmute":
       if (!s.muted) return keep(s);
