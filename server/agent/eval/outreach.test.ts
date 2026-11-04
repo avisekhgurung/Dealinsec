@@ -85,7 +85,8 @@ describe("writing a draft", () => {
   it("traces the call (task, prompt version, tokens, cost) and records neither the prompt nor the draft", async () => {
     const l = await researched(); await draft(l.id);
     expect(world().llmCalls).toHaveLength(1);
-    expect(world().llmCalls[0]).toMatchObject({ task: "draft", ok: true, promptVersion: "draft-v5", tokensIn: 900, tokensOut: 180, leadId: l.id, organizationId: ORG1 });
+    // The researched lead's launch fact makes "trigger" the strongest way to open, and the version records it.
+    expect(world().llmCalls[0]).toMatchObject({ task: "draft", ok: true, promptVersion: "draft-v6:trigger", tokensIn: 900, tokensOut: 180, leadId: l.id, organizationId: ORG1 });
     expect(JSON.stringify(world().llmCalls)).not.toMatch(/Casa Alma|boutique|hello@/i);
   });
   it("the timeline records ids and counts, never the message text", async () => {
@@ -212,7 +213,7 @@ describe("what the email says about the sender: only what their offer says, and 
     const r = await draftOutreach(user(), l.id) as any;
     if (want === "ok") {
       expect(r).toMatchObject({ ok: true, retried: false, message: { body: body(middle), status: "draft" } });
-      expect(world().messages[0].promptVersion).toBe("draft-v5");
+      expect(world().messages[0].promptVersion).toBe("draft-v6:trigger");
       return;
     }
     expect(r).toMatchObject({ ok: false, code: "draft_rejected" });

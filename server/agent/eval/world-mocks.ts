@@ -153,6 +153,9 @@ export const messageStoreMock = () => {
   let seq = 0;
   const w = () => world();
   const mine = (orgId: string, id: number) => w().messages.find((m) => m.organizationId === orgId && m.id === id);
+  // message-store.ts aiDraftsUsed: one variant batch counts once (DISTINCT on the batch id; a single draft counts by its own id).
+  const aiDraftsUsed = (orgId: string, a: { since: Date; prefix: string }) =>
+    new Set(w().messages.filter((x) => x.organizationId === orgId && x.direction === "out" && String(x.promptVersion ?? "").startsWith(a.prefix) && x.createdAt >= a.since).map((x) => x.variantGroup ?? `id:${x.id}`)).size;
   const outboxEvent = (orgId: string, m: any, kind: string, e: { source: string; provider: string | null; actorUserId: string | null; now: Date }) => {
     if (w().outreachEvents.some((x) => x.organizationId === orgId && x.messageId === m.id && x.kind === kind)) return;
     w().outreachEvents.push({ id: w().outreachEvents.length + 1, organizationId: orgId, leadId: m.leadId, messageId: m.id, kind, source: e.source, provider: e.provider, providerMessageId: null, actorUserId: e.actorUserId, createdAt: e.now });
@@ -168,14 +171,48 @@ export const messageStoreMock = () => {
       stopLeadFollowups: async () => 0,
       create: async (m: Record<string, any>) => {
         if (w().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL");
-        if (w().messages.some((x) => x.organizationId === m.orgId && x.leadId === m.leadId && x.direction === "out" && (x.status === "draft" || x.status === "approved"))) throw new DraftExists();
+        if (w().messages.some((x) => x.organizationId === m.orgId && x.leadId === m.leadId && x.direction === "out" && (x.status === "draft" || x.status === "approved" || x.status === "variant"))) throw new DraftExists();
         // message-store.ts: the AI-draft allowance, checked with the insert (no await in between, so atomic here too).
-        if (m.allowance && w().messages.filter((x) => x.organizationId === m.orgId && x.direction === "out" && String(x.promptVersion ?? "").startsWith(m.allowance.prefix) && x.createdAt >= m.allowance.since).length >= m.allowance.max) throw new DraftAllowanceReached(m.allowance.max);
-        const row = { id: ++seq, leadId: m.leadId, organizationId: m.orgId, direction: "out", channel: "manual", subject: m.subject, body: m.body, bodyHash: m.bodyHash, toAddress: m.toAddress, toSource: m.toSource, status: "draft", researchId: m.researchId, claimIds: m.claimIds, promptVersion: m.promptVersion, edited: false, createdBy: m.by, createdByUser: m.userId, approvedBy: null, approvedAt: null, sentAt: null, createdAt: m.now, updatedAt: m.now };
+        if (m.allowance && aiDraftsUsed(m.orgId, m.allowance) >= m.allowance.max) throw new DraftAllowanceReached(m.allowance.max);
+        const row = { id: ++seq, leadId: m.leadId, organizationId: m.orgId, direction: "out", channel: "manual", subject: m.subject, body: m.body, bodyHash: m.bodyHash, toAddress: m.toAddress, toSource: m.toSource, status: "draft", researchId: m.researchId, claimIds: m.claimIds, promptVersion: m.promptVersion, strategy: m.strategy ?? null, variantGroup: null, chosenAt: null, edited: false, createdBy: m.by, createdByUser: m.userId, approvedBy: null, approvedAt: null, sentAt: null, createdAt: m.now, updatedAt: m.now };
         w().messages.push(row);
         return { ...row };
       },
-      countAiDrafts: async (orgId: string, since: Date, prefix: string) => w().messages.filter((x) => x.organizationId === orgId && x.direction === "out" && String(x.promptVersion ?? "").startsWith(prefix) && x.createdAt >= since).length,
+      // message-store.ts createVariants: all or nothing, one batch = one AI draft, refused while anything unsent or pending exists.
+      createVariants: async (m: Record<string, any>) => {
+        if (w().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL");
+        if (w().messages.some((x) => x.organizationId === m.orgId && x.leadId === m.leadId && x.direction === "out" && (x.status === "draft" || x.status === "approved" || x.status === "variant"))) throw new DraftExists();
+        if (aiDraftsUsed(m.orgId, m.allowance) >= m.allowance.max) throw new DraftAllowanceReached(m.allowance.max);
+        const rows = m.variants.map((v: Record<string, any>) => ({ id: ++seq, leadId: m.leadId, organizationId: m.orgId, direction: "out", channel: "manual", subject: v.subject, body: v.body, bodyHash: v.bodyHash, toAddress: m.toAddress, toSource: m.toSource, status: "variant", researchId: m.researchId, claimIds: m.claimIds, promptVersion: v.promptVersion, strategy: v.strategy, variantGroup: m.group, chosenAt: null, edited: false, createdBy: m.by, createdByUser: m.userId, approvedBy: null, approvedAt: null, sentAt: null, createdAt: m.now, updatedAt: m.now }));
+        w().messages.push(...rows);
+        return rows.map((r: any) => ({ ...r }));
+      },
+      pendingVariants: async (orgId: string, leadId: number) => w().messages.filter((x) => x.organizationId === orgId && x.leadId === leadId && x.status === "variant").sort((a, b) => a.id - b.id).map((x) => ({ ...x })),
+      // message-store.ts chooseVariant: the whole batch decided in one step (the real one locks it in id order; each call here runs to the end).
+      chooseVariant: async (o: { orgId: string; id: number; hash: string; now: Date }) => {
+        if (w().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL");
+        const row = mine(o.orgId, o.id);
+        if (!row?.variantGroup) return { result: "gone" };
+        const group = w().messages.filter((x) => x.organizationId === o.orgId && x.variantGroup === row.variantGroup);
+        if (row.status !== "variant") {
+          if ((row.status === "draft" || row.status === "approved") && row.bodyHash === o.hash) return { result: "already", row: { ...row } };
+          return row.status === "cancelled" && group.some((g) => g.status === "draft" || g.status === "approved") ? { result: "conflict" } : { result: "gone" };
+        }
+        if (row.bodyHash !== o.hash) return { result: "changed" };
+        if (group.some((g) => g.id !== o.id && (g.status === "draft" || g.status === "approved"))) return { result: "conflict" };
+        // The partial unique index: another unsent message would make the chosen row a second one.
+        if (w().messages.some((x) => x.organizationId === o.orgId && x.leadId === row.leadId && x.direction === "out" && (x.status === "draft" || x.status === "approved"))) return { result: "conflict" };
+        Object.assign(row, { status: "draft", chosenAt: o.now, updatedAt: o.now });
+        for (const g of group) if (g.id !== o.id && g.status === "variant") Object.assign(g, { status: "cancelled", updatedAt: o.now });
+        return { result: "chosen", row: { ...row } };
+      },
+      cancelVariants: async (o: { orgId: string; leadId: number; group: string; now: Date }) => {
+        if (w().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL");
+        const rows = w().messages.filter((x) => x.organizationId === o.orgId && x.leadId === o.leadId && x.variantGroup === o.group && x.status === "variant");
+        for (const r of rows) Object.assign(r, { status: "cancelled", updatedAt: o.now });
+        return rows.length;
+      },
+      countAiDrafts: async (orgId: string, since: Date, prefix: string) => aiDraftsUsed(orgId, { since, prefix }),
       get: async (orgId: string, id: number) => { const r = mine(orgId, id); return r ? { ...r } : null; },
       listForLead: async (orgId: string, leadId: number) => w().messages.filter((m) => m.organizationId === orgId && m.leadId === leadId).sort((a, b) => b.createdAt - a.createdAt || b.id - a.id).map((m) => ({ ...m })),
       unsent: async (orgId: string, leadId: number) => { const r = w().messages.find((m) => m.organizationId === orgId && m.leadId === leadId && m.direction === "out" && (m.status === "draft" || m.status === "approved")); return r ? { ...r } : null; },

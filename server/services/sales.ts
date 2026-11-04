@@ -39,12 +39,13 @@ export function lastContactedAt(events: Pick<LeadEvent, "kind" | "data" | "creat
 /** A confirmed business email found on the company's own site counts as a way in, the same as the score treats it. */
 export const hasConfirmedEmail = (claims: ScoreClaim[]): boolean => latestPerField(claims).some((c) => normField(c.field) === "business_email" && c.status === "confirmed");
 
-/** The lead's one unsent message, where the messages table exists. */
+/** The lead's one unsent message, where the messages table exists. Versions still waiting to be chosen count as a draft: there is a message to deal with. */
 async function pendingMessageOf(orgId: string, leadId: number): Promise<"draft" | "approved" | null> {
   try {
     if (!(await messagesTablesReady())) return null;
     const m = await messageStore.unsent(orgId, leadId);
-    return m ? (m.status === "approved" ? "approved" : "draft") : null;
+    if (m) return m.status === "approved" ? "approved" : "draft";
+    return (await messageStore.pendingVariants(orgId, leadId)).length ? "draft" : null;
   } catch { return null; }
 }
 

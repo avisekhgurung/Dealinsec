@@ -430,7 +430,9 @@ export default function OnboardingPage() {
                     <div>
                       <h2 className="text-base font-semibold tracking-tight">What kind of work do you do?</h2>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        This sets the wording across the app and which kind of deal is offered first. You can change it any time in Settings.
+                        {DEAL_SUITE_HIDDEN
+                          ? "This sets the wording across the app. You can change it any time in Settings."
+                          : "This sets the wording across the app and which kind of deal is offered first. You can change it any time in Settings."}
                       </p>
                     </div>
                     <AudiencePicker value={audience} onChange={(a) => { setAudience(a); setErrors({}); }} idPrefix="onboarding-audience" />

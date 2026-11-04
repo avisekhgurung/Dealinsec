@@ -139,6 +139,32 @@ export function withSavedExclusions(icp: Icp, saved: { exclusions?: string[] } |
   return { ...icp, exclusions: ex };
 }
 
+/**
+ * The saved ideal client (shared/fit.ts), read as a search profile by plain rules: no model call, nothing
+ * invented. The first target industry says what kind of company to find and the rest become keywords; a
+ * target location naming a recognised country becomes its code, anything else stays a place; the saved
+ * exclusions carry over. Null when no target industry is saved — a search must know what to look for.
+ */
+export function icpFromIdealClient(p: { targetIndustries?: string[]; targetLocations?: string[]; exclusions?: string[] } | null | undefined): Icp | null {
+  const industries = (p?.targetIndustries ?? []).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean);
+  if (!industries.length) return null;
+  const countries: string[] = [], locations: string[] = [];
+  for (const place of p?.targetLocations ?? []) {
+    const clean = place.replace(/\s+/g, " ").trim();
+    if (!clean) continue;
+    const code = COUNTRIES[clean.toLowerCase()];
+    if (code) countries.push(code); else locations.push(clean.slice(0, 60));
+  }
+  const out = icpSchema.safeParse({
+    industry: industries[0].slice(0, 80),
+    keywords: industries.slice(1, 9).map((x) => x.slice(0, 60)),
+    countries: countries.slice(0, 5),
+    locations: locations.slice(0, 5),
+    exclusions: (p?.exclusions ?? []).map((x) => x.replace(/\s+/g, " ").trim().slice(0, 60)).filter(Boolean).slice(0, 10),
+  });
+  return out.success ? out.data : null;
+}
+
 /** A short readable line: "digital marketing agency · US · 5–30 people · serves SaaS". */
 export function describeIcp(i: Icp): string {
   const size = i.employeeMin && i.employeeMax ? `${i.employeeMin}–${i.employeeMax} people` : i.employeeMax ? `up to ${i.employeeMax} people` : i.employeeMin ? `${i.employeeMin}+ people` : "";

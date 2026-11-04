@@ -14,7 +14,7 @@ export interface Icp {
   industry: string; keywords: string[]; countries: string[]; locations: string[]; employeeMin: number | null; employeeMax: number | null;
   targetMarket: string[]; roles: string[]; exclusions: string[]; quantity: number;
 }
-export interface ParsedIcp { icp: Icp; searches: string[]; description: string; source: "model" | "rules"; /** The country was filled in from the market chosen at setup (client-side, removable). */ fromSetup?: boolean }
+export interface ParsedIcp { icp: Icp; searches: string[]; description: string; /** "saved" = built from the saved ideal client, by deliberate plain rules (no model involved). */ source: "model" | "rules" | "saved"; /** The country was filled in from the market chosen at setup (client-side, removable). */ fromSetup?: boolean }
 
 export interface Counters {
   searched: number; results: number; discovered: number; rejected: number; rejectedBy: Record<string, number>; verified: number; enriched: number;
@@ -59,6 +59,20 @@ export const COUNTRY_NAME: Record<string, string> = {
   IE: "Ireland", SG: "Singapore", AE: "UAE", NZ: "New Zealand", ZA: "South Africa", PT: "Portugal", IT: "Italy", SE: "Sweden", BR: "Brazil", MX: "Mexico", JP: "Japan",
 };
 export const countryName = (c: string | null | undefined) => (c ? COUNTRY_NAME[c] ?? c : "");
+
+/**
+ * The date a finding's provenance line carries: the date the evidence itself states where there is one
+ * ("dated"), otherwise the day the page was read ("seen"). A signal names its date in its own header, so
+ * its provenance repeats nothing. `day` renders an ISO timestamp for the reader; a precision-safe `date`
+ * string from the server is shown as given.
+ */
+export function evidenceDateLine(e: Pick<Evidence, "kind" | "date" | "observedAt" | "retrievedAt">, day: (iso: string) => string | null): string | null {
+  if (e.kind === "signal") return null;
+  if (e.date) return `dated ${e.date}`;
+  if (e.observedAt) return `dated ${day(e.observedAt)}`;
+  if (e.retrievedAt) return `seen ${day(e.retrievedAt)}`;
+  return null;
+}
 
 export const RUN_STAGE_LABEL: Record<string, string> = {
   search: "Searching the web", verify: "Checking each company's website", enrich: "Reading what each company does", research: "Looking for reasons to reach out now",

@@ -39,10 +39,12 @@ export const outreachSafetyReady = tablesReadyCheck(["outreach_suppressions", "o
 /** What finishing a send's follow-up did: the work itself, already done before, or nothing to do (no outbox entry, not sent). */
 export type AfterSendResult = { result: "done"; movedTo: string | null; ticketId: number | null } | { result: "already" | "not_due" | "not_sent" };
 
-export type MessageStatus = "draft" | "approved" | "sending" | "sent" | "cancelled";
+export type MessageStatus = "variant" | "draft" | "approved" | "sending" | "sent" | "cancelled";
 export interface NewMessage {
   orgId: string; leadId: number; subject: string; body: string; bodyHash: string; toAddress: string; toSource: "lead" | "site";
   researchId: number | null; claimIds: number[]; promptVersion: string; by: "user" | "agent"; userId: string; now: Date;
+  /** How the message opens (shared/outreach-strategy.ts). Follow-ups and old callers leave it unset. */
+  strategy?: string | null;
   /**
    * The plan's AI-draft allowance (shared/outbound-plans.ts): AI first messages saved since `since` (prompt version
    * starting with `prefix`) must be under `max`, counted under a per-workspace lock with the insert, else DraftAllowanceReached.
@@ -54,10 +56,41 @@ export class DraftAllowanceReached extends Error { constructor(public max: numbe
 /** Serialises the AI-draft allowance check with the insert, per workspace. */
 export const DRAFT_ALLOWANCE_LOCK = 7_310_031;
 
+/** One of several versions of a first message, written each with its own strategy, stored for the person to choose from. */
+export interface NewVariants {
+  orgId: string; leadId: number; toAddress: string; toSource: "lead" | "site"; researchId: number | null; claimIds: number[];
+  by: "user" | "agent"; userId: string; now: Date;
+  /** The batch id every version carries (lead_messages.variant_group): one batch is ONE AI draft against the allowance. */
+  group: string;
+  variants: { strategy: string; subject: string; body: string; bodyHash: string; promptVersion: string }[];
+  allowance: { since: Date; max: number; prefix: string };
+}
+/** What choosing a version did. "conflict": another version of this lead was already chosen (or a draft exists). */
+export type ChooseResult =
+  | { result: "chosen"; row: LeadMessageRow }
+  | { result: "already"; row: LeadMessageRow }
+  | { result: "gone" | "changed" | "conflict" };
+
 export interface MessageStore {
-  /** Creates a draft, or throws DraftExists if the lead already has an unsent (draft or approved) message. */
+  /** Creates a draft, or throws DraftExists if the lead already has an unsent (draft or approved) message, or versions waiting to be chosen. */
   create(m: NewMessage): Promise<LeadMessageRow>;
-  /** AI first messages this workspace saved since `since` (prompt version starting with `prefix`), whatever happened to them since. */
+  /**
+   * Stores one batch of message versions (status "variant"), all or nothing, under the allowance lock: the batch
+   * counts as ONE AI draft, and is refused (DraftExists) when the lead already has an unsent message or a pending
+   * batch, or (DraftAllowanceReached) when the allowance is used.
+   */
+  createVariants(m: NewVariants): Promise<LeadMessageRow[]>;
+  /** The lead's versions still waiting to be chosen, oldest first. */
+  pendingVariants(orgId: string, leadId: number): Promise<LeadMessageRow[]>;
+  /**
+   * Makes the version with this hash THE draft and cancels its siblings, in one transaction that locks the whole
+   * batch in id order (two people choosing different versions run one after the other, and the partial unique
+   * index guarantees at most one becomes a draft, whatever else races).
+   */
+  chooseVariant(o: { orgId: string; id: number; hash: string; now: Date }): Promise<ChooseResult>;
+  /** Cancels every still-pending version of this batch. Returns how many. */
+  cancelVariants(o: { orgId: string; leadId: number; group: string; now: Date }): Promise<number>;
+  /** AI first messages this workspace saved since `since` (prompt version starting with `prefix`); one variant batch counts once. */
   countAiDrafts(orgId: string, since: Date, prefix: string): Promise<number>;
   get(orgId: string, id: number): Promise<LeadMessageRow | null>;
   listForLead(orgId: string, leadId: number, limit?: number): Promise<LeadMessageRow[]>;
@@ -105,6 +138,18 @@ export interface MessageStore {
   stopLeadFollowups(o: { orgId: string; leadId: number; reason: string; now: Date }): Promise<number>;
 }
 
+/** AI first messages counted for the allowance: one variant batch is ONE draft (DISTINCT on the batch id; a single draft has none and counts by its own id). */
+async function aiDraftsUsed(q: { execute: (s: ReturnType<typeof sql>) => Promise<{ rows: unknown[] }> }, orgId: string, since: Date, prefix: string): Promise<number> {
+  const r = await q.execute(sql`SELECT count(DISTINCT COALESCE(variant_group, id::text))::int AS n FROM ${leadMessages} WHERE organization_id = ${orgId} AND direction = 'out'
+    AND prompt_version LIKE ${prefix + "%"} AND created_at >= ${since.toISOString()}::timestamp`);
+  return Number((r.rows[0] as { n: unknown } | undefined)?.n ?? 0);
+}
+/** Whether this lead has a batch of versions still waiting to be chosen. */
+async function pendingVariantExists(q: { execute: (s: ReturnType<typeof sql>) => Promise<{ rows: unknown[] }> }, orgId: string, leadId: number): Promise<boolean> {
+  const r = await q.execute(sql`SELECT 1 FROM ${leadMessages} WHERE organization_id = ${orgId} AND lead_id = ${leadId} AND direction = 'out' AND status = 'variant' LIMIT 1`);
+  return r.rows.length > 0;
+}
+
 export const messageStore: MessageStore = {
   async create(m) {
     try {
@@ -112,13 +157,12 @@ export const messageStore: MessageStore = {
         const a = m.allowance;
         return await db.transaction(async (tx) => {
           await tx.execute(sql`SELECT pg_advisory_xact_lock(${DRAFT_ALLOWANCE_LOCK}, hashtext(${m.orgId}))`);
-          const used = await tx.execute(sql`SELECT count(*)::int AS n FROM ${leadMessages} WHERE organization_id = ${m.orgId} AND direction = 'out'
-            AND prompt_version LIKE ${a.prefix + "%"} AND created_at >= ${a.since.toISOString()}::timestamp`);
+          if (await pendingVariantExists(tx, m.orgId, m.leadId)) throw new DraftExists();
           // One allowance for AI drafts on every channel (server/channels/store.ts counts both tables the same way, under this lock).
-          if (Number((used.rows[0] as { n: unknown }).n) + (await channelCountFor(tx as any, "ai_drafts", m.orgId, a.since, a.prefix)) >= a.max) throw new DraftAllowanceReached(a.max);
+          if ((await aiDraftsUsed(tx, m.orgId, a.since, a.prefix)) + (await channelCountFor(tx as any, "ai_drafts", m.orgId, a.since, a.prefix)) >= a.max) throw new DraftAllowanceReached(a.max);
           const [row] = await tx.insert(leadMessages).values({
             leadId: m.leadId, organizationId: m.orgId, subject: m.subject, body: m.body, bodyHash: m.bodyHash, toAddress: m.toAddress, toSource: m.toSource,
-            status: "draft", researchId: m.researchId, claimIds: m.claimIds, promptVersion: m.promptVersion, createdBy: m.by, createdByUser: m.userId,
+            status: "draft", researchId: m.researchId, claimIds: m.claimIds, promptVersion: m.promptVersion, strategy: m.strategy ?? null, createdBy: m.by, createdByUser: m.userId,
             createdAt: m.now, updatedAt: m.now,
           }).returning();
           return row;
@@ -126,7 +170,7 @@ export const messageStore: MessageStore = {
       }
       const [row] = await db.insert(leadMessages).values({
         leadId: m.leadId, organizationId: m.orgId, subject: m.subject, body: m.body, bodyHash: m.bodyHash, toAddress: m.toAddress, toSource: m.toSource,
-        status: "draft", researchId: m.researchId, claimIds: m.claimIds, promptVersion: m.promptVersion, createdBy: m.by, createdByUser: m.userId,
+        status: "draft", researchId: m.researchId, claimIds: m.claimIds, promptVersion: m.promptVersion, strategy: m.strategy ?? null, createdBy: m.by, createdByUser: m.userId,
         createdAt: m.now, updatedAt: m.now,
       }).returning();
       return row;
@@ -136,10 +180,72 @@ export const messageStore: MessageStore = {
       throw e;
     }
   },
+  async createVariants(m) {
+    try {
+      return await db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT pg_advisory_xact_lock(${DRAFT_ALLOWANCE_LOCK}, hashtext(${m.orgId}))`);
+        // One slot per lead: no unsent message and no earlier batch still waiting. The unsent check is advisory
+        // here (the unique index is the guarantee for drafts); the pending-batch check is decisive, made under
+        // the same lock every creation takes.
+        const clash = await tx.execute(sql`SELECT 1 FROM ${leadMessages} WHERE organization_id = ${m.orgId} AND lead_id = ${m.leadId}
+          AND direction = 'out' AND status IN ('variant', 'draft', 'approved') LIMIT 1`);
+        if (clash.rows.length) throw new DraftExists();
+        const a = m.allowance;
+        if ((await aiDraftsUsed(tx, m.orgId, a.since, a.prefix)) + (await channelCountFor(tx as any, "ai_drafts", m.orgId, a.since, a.prefix)) >= a.max) throw new DraftAllowanceReached(a.max);
+        return tx.insert(leadMessages).values(m.variants.map((v) => ({
+          leadId: m.leadId, organizationId: m.orgId, subject: v.subject, body: v.body, bodyHash: v.bodyHash, toAddress: m.toAddress, toSource: m.toSource,
+          status: "variant", researchId: m.researchId, claimIds: m.claimIds, promptVersion: v.promptVersion, strategy: v.strategy, variantGroup: m.group,
+          createdBy: m.by, createdByUser: m.userId, createdAt: m.now, updatedAt: m.now,
+        }))).returning();
+      });
+    } catch (e) {
+      if ((e as { code?: string })?.code === "23505") throw new DraftExists();
+      throw e;
+    }
+  },
+  async pendingVariants(orgId, leadId) {
+    return db.select().from(leadMessages)
+      .where(and(eq(leadMessages.organizationId, orgId), eq(leadMessages.leadId, leadId), eq(leadMessages.status, "variant"))).orderBy(leadMessages.id);
+  },
+  async chooseVariant({ orgId, id, hash, now }) {
+    return db.transaction(async (tx): Promise<ChooseResult> => {
+      const [target] = await tx.select().from(leadMessages).where(and(eq(leadMessages.organizationId, orgId), eq(leadMessages.id, id))).limit(1);
+      if (!target?.variantGroup) return { result: "gone" };
+      // The whole batch, locked in id order: two chooses of different versions run one after the other, never deadlocked.
+      const group = await tx.select().from(leadMessages)
+        .where(and(eq(leadMessages.organizationId, orgId), eq(leadMessages.leadId, target.leadId), eq(leadMessages.variantGroup, target.variantGroup)))
+        .orderBy(leadMessages.id).for("update");
+      const row = group.find((g) => g.id === id);
+      if (!row) return { result: "gone" };
+      if (row.status !== "variant") {
+        if ((row.status === "draft" || row.status === "approved") && row.bodyHash === hash) return { result: "already", row }; // a second click
+        return row.status === "cancelled" && group.some((g) => g.status === "draft" || g.status === "approved") ? { result: "conflict" } : { result: "gone" };
+      }
+      if (row.bodyHash !== hash) return { result: "changed" };
+      if (group.some((g) => g.id !== id && (g.status === "draft" || g.status === "approved"))) return { result: "conflict" };
+      let chosen: LeadMessageRow | undefined;
+      try {
+        [chosen] = await tx.update(leadMessages).set({ status: "draft", chosenAt: now, updatedAt: now })
+          .where(and(eq(leadMessages.organizationId, orgId), eq(leadMessages.id, id), eq(leadMessages.status, "variant"))).returning();
+      } catch (e) {
+        // The partial unique index: something else already holds this lead's one unsent slot.
+        if ((e as { code?: string })?.code === "23505") return { result: "conflict" };
+        throw e;
+      }
+      if (!chosen) return { result: "changed" };
+      await tx.update(leadMessages).set({ status: "cancelled", updatedAt: now })
+        .where(and(eq(leadMessages.organizationId, orgId), eq(leadMessages.variantGroup, target.variantGroup), eq(leadMessages.status, "variant")));
+      return { result: "chosen", row: chosen };
+    });
+  },
+  async cancelVariants({ orgId, leadId, group, now }) {
+    const rows = await db.update(leadMessages).set({ status: "cancelled", updatedAt: now })
+      .where(and(eq(leadMessages.organizationId, orgId), eq(leadMessages.leadId, leadId), eq(leadMessages.variantGroup, group), eq(leadMessages.status, "variant")))
+      .returning({ id: leadMessages.id });
+    return rows.length;
+  },
   async countAiDrafts(orgId, since, prefix) {
-    const r = await db.execute(sql`SELECT count(*)::int AS n FROM ${leadMessages} WHERE organization_id = ${orgId} AND direction = 'out'
-      AND prompt_version LIKE ${prefix + "%"} AND created_at >= ${since.toISOString()}::timestamp`);
-    return Number((r.rows[0] as { n: unknown } | undefined)?.n ?? 0) + (await channelCountFor(db as any, "ai_drafts", orgId, since, prefix));
+    return (await aiDraftsUsed(db, orgId, since, prefix)) + (await channelCountFor(db as any, "ai_drafts", orgId, since, prefix));
   },
   async get(orgId, id) {
     const [r] = await db.select().from(leadMessages).where(and(eq(leadMessages.organizationId, orgId), eq(leadMessages.id, id))).limit(1);

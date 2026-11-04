@@ -34,6 +34,8 @@ import { TrialCountdown } from "@/components/trial-countdown";
 import { canSeeModule, memberCan } from "@shared/permissions";
 import { useLocale, useMoney, type MoneyFormat } from "@/hooks/use-locale";
 import type { Deal, Contract, BrandInvoice, Quote, User } from "@shared/schema";
+import { listUrl as leadListUrl, type LeadList } from "@/lib/leads";
+import { isFirstRun } from "@/lib/first-run";
 import { invoiceStats, paidInvoicesSubline } from "@shared/invoice-stats";
 
 // ─── Team seats strip ────────────────────────────────────────────────────────
@@ -569,6 +571,10 @@ export default function DashboardPage() {
     queryKey: ["/api/quotes"],
   });
 
+  // Lead counts, only to decide first-run while the deal suite is hidden (see firstRun below). The same
+  // query key as LeadsStrip's, so the strip's own read is reused, not repeated.
+  const leadCounts = useQuery<LeadList>({ queryKey: [leadListUrl({})], enabled: DEAL_SUITE_HIDDEN && canSeeModule(user as any, "deals"), retry: false });
+
   const isLoading = dealsLoading || contractsLoading || invoicesLoading;
 
   // Stat counts — show total deals across all statuses (Pending + Active + Completed)
@@ -653,8 +659,14 @@ export default function DashboardPage() {
   // charts, with account and setup last. An account with no deals yet is still setting up, so its
   // order stays as it was: setup first.
   // A failed deals read is not "no deals yet": the empty list would put zeros
-  // and the first-run empty state where the real numbers should be.
-  const firstRun = !dealsLoading && !dealsError && deals.length === 0;
+  // and the first-run empty state where the real numbers should be. With the deal suite hidden,
+  // leads decide instead of deals (client/src/lib/first-run.ts says why).
+  const firstRun = isFirstRun({
+    suiteHidden: DEAL_SUITE_HIDDEN,
+    leadTotal: leadCounts.isSuccess ? leadCounts.data.total : null,
+    dealsKnown: !dealsLoading && !dealsError,
+    dealCount: deals.length,
+  });
   const nudgeEl = (
     <>
 {/* ── Profile completion nudge — top priority before any action ── */}

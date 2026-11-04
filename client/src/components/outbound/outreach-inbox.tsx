@@ -24,6 +24,7 @@ import { leadError } from "@/lib/leads";
 import { cn } from "@/lib/utils";
 import { FOLLOWUP_STATUS_TEXT, INBOX_FILTERS, INBOX_FILTER_TEXT, REPLY_LABELS, REPLY_LABEL_TEXT, THREAD_STATUS_TEXT, type ConversationMessage, type ConversationView, type InboxFilter, type InboxItem, type ReplyLabel, type ThreadStatus } from "@shared/inbox-view";
 import { REPLY_SYNC_TEXT } from "@shared/gmail-connect";
+import { DEAL_SUITE_HIDDEN } from "@shared/flags";
 
 const TONE: Record<ThreadStatus, string> = {
   awaiting: "border-border bg-muted text-muted-foreground",
@@ -224,6 +225,12 @@ function CreateDealFromReply({ thread: t }: { thread: ConversationView["thread"]
     create.mutate({ threadId: t.id, dealTitle: title.trim(), dealAmount: value }, {
       onSuccess: (r) => {
         setOpen(false);
+        // With the deal suite hidden (shared/flags.ts), the win is still recorded through the same
+        // service, but the person is never sent into the hidden suite.
+        if (DEAL_SUITE_HIDDEN) {
+          toast(r.existing ? { title: "This lead is already won", description: "Nothing was recorded twice." } : { title: "Marked as won", description: "The win counts in your results, and the lead's follow-ups have stopped." });
+          return;
+        }
         toast(r.existing ? { title: "This lead already has a deal", description: "Opening it. No second deal was created." } : { title: "Deal created", description: "It's linked to this conversation. The lead is marked Won and its follow-ups have stopped." });
         setLocation(r.route);
       },
@@ -232,32 +239,32 @@ function CreateDealFromReply({ thread: t }: { thread: ConversationView["thread"]
   };
   return (
     <>
-      <Button size="sm" className="gradient-btn text-white" onClick={() => { setError(null); setOpen(true); }} data-testid="review-create-deal"><Handshake className="mr-1.5 h-4 w-4" aria-hidden />Review and create deal</Button>
+      <Button size="sm" className="gradient-btn text-white" onClick={() => { setError(null); setOpen(true); }} data-testid="review-create-deal"><Handshake className="mr-1.5 h-4 w-4" aria-hidden />{DEAL_SUITE_HIDDEN ? "Review and mark won" : "Review and create deal"}</Button>
       <Dialog open={open} onOpenChange={(o) => !create.isPending && setOpen(o)}>
         <DialogContent className="max-w-md" data-testid="deal-from-reply">
           <DialogHeader>
-            <DialogTitle>Create a deal for {t.company}</DialogTitle>
-            <DialogDescription>They replied with interest. Check the details: you can change everything else on the deal afterwards.</DialogDescription>
+            <DialogTitle>{DEAL_SUITE_HIDDEN ? `Mark ${t.company} as won?` : `Create a deal for ${t.company}`}</DialogTitle>
+            <DialogDescription>{DEAL_SUITE_HIDDEN ? "They replied with interest. Check the value: it counts in your results." : "They replied with interest. Check the details: you can change everything else on the deal afterwards."}</DialogDescription>
           </DialogHeader>
           <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); submit(); }}>
             <div className="space-y-1.5">
-              <Label htmlFor="reply-deal-title">Deal title</Label>
+              <Label htmlFor="reply-deal-title">{DEAL_SUITE_HIDDEN ? "Project name" : "Deal title"}</Label>
               <Input id="reply-deal-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} disabled={create.isPending} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="reply-deal-amount">Deal amount ({fmt.symbol})</Label>
+              <Label htmlFor="reply-deal-amount">{DEAL_SUITE_HIDDEN ? "Value won" : "Deal amount"} ({fmt.symbol})</Label>
               <Input id="reply-deal-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))} placeholder="0" disabled={create.isPending} data-testid="reply-deal-amount" />
               {!t.estimatedValue && <p className="text-[11px] text-muted-foreground">The lead has no estimated value in your workspace's currency, so enter the amount you agreed.</p>}
             </div>
             <ul className="space-y-1 rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
               <li>Contact: <span className="break-all text-foreground">{t.contact || "—"}</span></li>
               <li>The lead is marked Won, and any follow-up drafts for it are stopped.</li>
-              <li>The deal keeps a link to this conversation and to the lead it came from.</li>
+              <li>{DEAL_SUITE_HIDDEN ? "The win keeps a link to this conversation and to the lead it came from." : "The deal keeps a link to this conversation and to the lead it came from."}</li>
             </ul>
             {error && <p className="text-sm font-medium text-destructive" role="alert" data-testid="deal-from-reply-error">{error}</p>}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={create.isPending}>Cancel</Button>
-              <Button type="submit" className="gradient-btn text-white" disabled={create.isPending} data-testid="deal-from-reply-submit">{create.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Creating…</> : "Create deal"}</Button>
+              <Button type="submit" className="gradient-btn text-white" disabled={create.isPending} data-testid="deal-from-reply-submit">{create.isPending ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />{DEAL_SUITE_HIDDEN ? "Saving…" : "Creating…"}</> : (DEAL_SUITE_HIDDEN ? "Mark won" : "Create deal")}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -295,7 +302,7 @@ function Conversation({ threadId, onBack }: { threadId: number; onBack: () => vo
       <div className="mb-3 rounded-lg border bg-muted/30 p-3 text-sm" data-testid="conversation-next"><span className="font-medium">Next: </span>{next.next}</div>
       <div className="mb-4 flex flex-wrap gap-2">
         <Button asChild size="sm" variant="outline"><Link href={`/leads/${t.leadId}`}>Open the lead</Link></Button>
-        {t.dealId ? <Button asChild size="sm" variant="outline"><Link href={`/deals/${t.dealId}`}><Handshake className="mr-1.5 h-4 w-4" aria-hidden />Open the deal</Link></Button>
+        {t.dealId ? !DEAL_SUITE_HIDDEN && <Button asChild size="sm" variant="outline"><Link href={`/deals/${t.dealId}`}><Handshake className="mr-1.5 h-4 w-4" aria-hidden />Open the deal</Link></Button>
           : t.canConvert && t.status === "interested" && canWrite && <CreateDealFromReply thread={t} />}
         {t.gmailUrl && <Button asChild size="sm" variant="outline"><a href={t.gmailUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="mr-1.5 h-4 w-4" aria-hidden />Reply in Gmail</a></Button>}
       </div>

@@ -20,6 +20,7 @@ import { ProspectWorkspace } from "@/components/outbound/prospect-workspace";
 import { OutreachQueue, outreachQueueKey, type QueueItem } from "@/components/outbound/outreach-queue";
 import { SegmentedTabs } from "@/components/outbound/segmented-tabs";
 import { SalesFunnel } from "@/components/outbound/sales-funnel";
+import { StrategyStats } from "@/components/outbound/strategy-stats";
 import { OutreachInbox } from "@/components/outbound/outreach-inbox";
 import { OUTBOUND_USAGE_URL, UsageNote, searchBlockedReason, useOutboundUsage } from "@/components/outbound/usage-note";
 import { LocalSearch, type LocalFields } from "@/components/outbound/local-search";
@@ -30,11 +31,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { leadCall, leadError } from "@/lib/leads";
+import { IDEAL_CLIENT_URL, leadCall, leadError, type IdealClientResponse } from "@/lib/leads";
 import { stagger, staggerItem, useCalmMotion } from "@/lib/motion";
 import { queryClient } from "@/lib/queryClient";
 import { COUNTRY_NAME, ICP_URL, OUTBOUND_RUNS_URL, RUN_ERROR, RUN_STAGE_LABEL, countryName, runUrl, prospectUrl, type ParsedIcp, type ProspectCard as Card_, type RunView } from "@/lib/outbound";
-import { searchStrategies } from "@shared/icp";
+import { describeIcp, icpFromIdealClient, searchStrategies } from "@shared/icp";
 import { DISCOVERY_PRESETS, suggestDiscoveryMode, type DiscoveryMode, type DiscoveryPreset } from "@shared/local-discovery";
 import { takeOutboundPrefill } from "@/lib/outbound-prefill";
 import { getTargetMarket } from "@/lib/first-goal";
@@ -325,6 +326,20 @@ export default function OutboundPage() {
 
   const off = notSetUp(runs.error);
   const usage = useOutboundUsage(canEdit && !off);
+  // The saved ideal client, read as a search profile by plain rules (shared/icp.ts): one click instead of
+  // retyping who you serve, and no model call. The person still confirms the chips before anything starts.
+  const ideal = useQuery<IdealClientResponse>({ queryKey: [IDEAL_CLIENT_URL], enabled: canEdit && !off, retry: false });
+  const savedIcp = ideal.data?.isSet ? icpFromIdealClient(ideal.data.profile) : null;
+  const useSavedProfile = () => {
+    if (!savedIcp) return;
+    trackEvent("outbound_saved_profile_used");
+    // The same setup-market default as a parsed request: a profile naming no place starts from the market
+    // chosen at setup, as a visible, removable chip.
+    const target = getTargetMarket(user?.id);
+    const fromSetup = !!target && target !== "WW" && !savedIcp.countries.length && !savedIcp.locations.length;
+    const icpSaved = fromSetup ? { ...savedIcp, countries: [target!] } : savedIcp;
+    setParsed({ icp: icpSaved, searches: searchStrategies(icpSaved), description: describeIcp(icpSaved), source: "saved", fromSetup });
+  };
   const blocked = searchBlockedReason(usage.data?.usage, mode);
   const localReady = !!usage.data?.usage.localReady;
   // The most companies one search may look for on this plan (the server caps it the same way).
@@ -414,9 +429,16 @@ export default function OutboundPage() {
                 </div>}
                 <UsageNote usage={usage.data?.usage} />
                 {!parsed ? (
-                  <Button onClick={() => parse.mutate(undefined)} disabled={text.trim().length < 3 || parse.isPending || !!blocked} className="gradient-btn text-white" data-testid="outbound-find">
-                    {parse.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Search className="mr-1.5 h-4 w-4" />}Find prospects
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button onClick={() => parse.mutate(undefined)} disabled={text.trim().length < 3 || parse.isPending || !!blocked} className="gradient-btn text-white" data-testid="outbound-find">
+                      {parse.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Search className="mr-1.5 h-4 w-4" />}Find prospects
+                    </Button>
+                    {!text.trim() && savedIcp && (
+                      <Button variant="outline" onClick={useSavedProfile} disabled={parse.isPending || !!blocked} data-testid="outbound-use-saved">
+                        <Sparkles className="mr-1.5 h-4 w-4" />Use my saved ideal client
+                      </Button>
+                    )}
+                  </div>
                 ) : icp && (
                   <div className="space-y-3 rounded-xl border bg-muted/30 p-3" data-testid="icp-confirm">
                     <p className="text-sm font-medium">Here's what I'll look for. Change anything before I start.</p>
@@ -442,7 +464,7 @@ export default function OutboundPage() {
                     </div>
                     {parsed.fromSetup && icp.countries.length > 0 && <p className="text-xs text-muted-foreground" data-testid="outbound-from-setup">The country comes from the market you chose at setup. Remove it to search worldwide.</p>}
                     {!icp.countries.length && !icp.locations.length && <p className="text-xs text-muted-foreground" data-testid="outbound-worldwide">Searching worldwide. Pick a country (the US, the UK, Canada, Australia, the UAE, India…) for more relevant companies.</p>}
-                    <p className="text-xs text-muted-foreground">Reaching: {icp.roles.slice(0, 4).join(", ") || "decision makers"} · {parsed.searches.length} searches planned{parsed.source === "rules" ? " · read by simple rules (the AI was unavailable)" : ""}</p>
+                    <p className="text-xs text-muted-foreground">Reaching: {icp.roles.slice(0, 4).join(", ") || "decision makers"} · {parsed.searches.length} searches planned{parsed.source === "rules" ? " · read by simple rules (the AI was unavailable)" : parsed.source === "saved" ? " · from your saved ideal client" : ""}</p>
                     <div className="flex flex-wrap items-center gap-3">
                       <label className="flex items-center gap-2 text-sm">How many <input type="number" min={1} max={maxCompanies} value={icp.quantity} onChange={(e) => setQty(Number(e.target.value))} className="w-16 rounded-md border bg-background px-2 py-1 text-sm" data-testid="outbound-quantity" /></label>
                       <Button onClick={() => start.mutate()} disabled={start.isPending || !!blocked} className="gradient-btn text-white" data-testid="outbound-start">{start.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-1.5 h-4 w-4" />}Start search</Button>
@@ -464,7 +486,7 @@ export default function OutboundPage() {
             <SegmentedTabs label="Client Radar views" value={view} onChange={setView}
               tabs={[{ value: "searches", label: "Searches", testId: "view-searches" }, { value: "prospects", label: "All prospects", testId: "view-prospects" }, { value: "outreach", label: "Outreach", testId: "view-outreach" }, { value: "inbox", label: "Inbox", testId: "view-inbox" }, { value: "results", label: "Results", testId: "view-results" }]} />
 
-            {view === "results" ? <SalesFunnel />
+            {view === "results" ? <div className="space-y-4"><SalesFunnel /><StrategyStats /></div>
               : view === "inbox" ? <OutreachInbox />
               : view === "outreach" ? <OutreachQueue canEdit={canEdit} onShowReady={() => navigate(`${location}?view=prospects&readiness=ready`, { replace: true })} />
               : view === "prospects" ? <ProspectWorkspace canExport={canEdit} onOpen={(r, focus) => setOpen({ id: r.id, runId: r.latestRunId, focus })} onPrepared={() => setView("outreach")} /> : <>

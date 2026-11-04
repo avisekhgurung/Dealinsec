@@ -45,6 +45,7 @@ import { pageNumbers } from "@/components/data-table/data-table";
 import { FeedbackCard } from "@/components/feedback-card";
 import { DocumentStyleCard } from "@/components/settings/document-style-card";
 import { KnowledgeCard } from "@/components/settings/knowledge-card";
+import { IdealClientCard } from "@/components/settings/ideal-client-card";
 import { IntegrationsPanel } from "@/components/settings/integrations-panel";
 import { PermissionNote, SectionSkeleton, SettingsSection } from "@/components/settings/section-card";
 import { SettingsTabsNav, settingsPanelId, settingsTabId, type SettingsTabItem } from "@/components/settings/settings-tabs-nav";
@@ -605,6 +606,9 @@ export default function SettingsPage() {
 
                 {/* Styles the printed quotations/agreements/invoices — hidden with the suite. */}
                 {!DEAL_SUITE_HIDDEN && <DocumentStyleCard canEdit={memberCan(user as any, "org.settings")} />}
+
+                {/* The saved ideal client and offer: same record and dialog as the Leads page, made findable here. */}
+                <IdealClientCard canEdit={memberCan(user as any, "deals.create")} />
 
                 <KnowledgeCard canEdit={memberCan(user as any, "deals.create")} />
               </>

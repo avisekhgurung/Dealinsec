@@ -6,8 +6,22 @@
  */
 import { fenceUntrusted } from "../agent/untrusted";
 import { LIMITS } from "@shared/outreach-check";
+import type { OutreachStrategy } from "@shared/outreach-strategy";
 
-export const OUTREACH_PROMPT_VERSION = "draft-v5";
+export const OUTREACH_PROMPT_VERSION = "draft-v6";
+/** What llm_calls and lead_messages record for a draft opened this way, e.g. "draft-v6:trigger". Keeps the "draft-" prefix the AI-draft allowance counts. */
+export const versionFor = (strategy: OutreachStrategy) => `${OUTREACH_PROMPT_VERSION}:${strategy}`;
+
+/**
+ * How this version of the message opens. One short block appended to the system prompt: it steers emphasis
+ * only, and may not loosen any rule above it (each block says so where it could be misread).
+ */
+const STRATEGY_RULE: Record<OutreachStrategy, string> = {
+  trigger: `Open the email with the most recent thing that happened at the company (news, a launch, hiring, a possible buying signal), in plain words, as something the sender noticed. A fact marked "possible angle" is still a guess: ask, never state.`,
+  problem: `Build the email around the possible problem the facts or angles suggest: raise it early, as a gentle question, honest that you may be wrong. Never state the problem as fact.`,
+  value: `Build the email around the concrete opportunity (or the sample the sender offers, if one is given): say plainly what the sender could do for them, still only in the words of "What the sender offers".`,
+  direct: `Keep it a plain, honest introduction: one thing the sender noticed about the company, who the sender is (only if "What the sender offers" describes them), and the one small ask. Don't build it around an angle.`,
+};
 
 export interface DraftInput {
   sender: { name: string; business: string };
@@ -30,8 +44,9 @@ export interface DraftInput {
 
 const clean = (s: string, n: number) => s.replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
 
-export function draftSystemPrompt(): string {
+export function draftSystemPrompt(strategy?: OutreachStrategy): string {
   return `You write ONE short first email from a sender to a company they have never contacted. You have no tools and take no actions. A person reads and edits your draft before anything is sent.
+${strategy ? `\nHow THIS version opens:\n- ${STRATEGY_RULE[strategy]}\n` : ""}
 
 Rules:
 - Use ONLY the facts you are given. Never add anything about the company from your own knowledge. Never invent a name, number, client, result or event.

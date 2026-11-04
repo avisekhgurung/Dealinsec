@@ -40,6 +40,7 @@ import { CLAIM_STATUS_HINT, CLAIM_STATUS_LABEL, claimProvenance, leadSource, los
 import type { ActionKey, NextAction } from "@shared/next-action";
 import { memberCan } from "@shared/permissions";
 import { CLAIM_STATUSES, TICKET_KINDS } from "@shared/leads";
+import { DEAL_SUITE_HIDDEN } from "@shared/flags";
 import { ACTIVITY_LABEL as EVENT_LABEL, activityActor, activityDetail, activityThreadId, conversationHref } from "@shared/activity-text";
 
 const CLAIM_STYLE: Record<string, string> = {
@@ -153,8 +154,14 @@ export default function LeadDetailsPage() {
       const amount = Number(dealAmount.replace(/,/g, ""));
       return leadCall<{ dealId: number; route: string }>("POST", `/api/leads/${id}/convert`, { ...(amount > 0 ? { dealAmount: amount } : {}), ...(dealTitle.trim() ? { dealTitle: dealTitle.trim() } : {}) });
     },
-    onSuccess: (r) => { trackEvent("lead_converted"); refreshLeads(); setDealOpen(false); toast({ title: "Deal created", description: "The lead is now marked as won. Next, prepare a quotation from the deal." }); setLocation(r.route || `/deals/${r.dealId}`); },
-    onError: (e) => setDealError(leadError(e, "Couldn't create the deal. Please try again.")),
+    // With the deal suite hidden (shared/flags.ts), the win is still recorded through the same service
+    // (the funnel's "won" and revenue read from deals), but the person never lands in the hidden suite.
+    onSuccess: (r) => {
+      trackEvent("lead_converted"); refreshLeads(); setDealOpen(false);
+      if (DEAL_SUITE_HIDDEN) { toast({ title: "Marked as won", description: "The win and its value now count in your results." }); return; }
+      toast({ title: "Deal created", description: "The lead is now marked as won. Next, prepare a quotation from the deal." }); setLocation(r.route || `/deals/${r.dealId}`);
+    },
+    onError: (e) => setDealError(leadError(e, DEAL_SUITE_HIDDEN ? "Couldn't mark this as won. Please try again." : "Couldn't create the deal. Please try again.")),
   });
 
   const backBar = (
@@ -239,8 +246,8 @@ export default function LeadDetailsPage() {
         {lead.convertedDealId && (
           <Card className="border-emerald-300/60 bg-emerald-50/60 dark:border-emerald-800/60 dark:bg-emerald-950/20">
             <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
-              <p className="text-sm font-medium">This lead was won and turned into a deal.</p>
-              <Button asChild size="sm" variant="outline"><Link href={`/deals/${lead.convertedDealId}`}>Open the deal</Link></Button>
+              <p className="text-sm font-medium">{DEAL_SUITE_HIDDEN ? "This lead was won." : "This lead was won and turned into a deal."}</p>
+              {!DEAL_SUITE_HIDDEN && <Button asChild size="sm" variant="outline"><Link href={`/deals/${lead.convertedDealId}`}>Open the deal</Link></Button>}
             </CardContent>
           </Card>
         )}
@@ -279,7 +286,7 @@ export default function LeadDetailsPage() {
                 </div>
                 {data.canConvert && (
                   <Button className="gradient-btn w-full text-white sm:w-auto" onClick={() => { setDealError(null); setDealOpen(true); }} data-testid="button-create-deal">
-                    <Handshake className="mr-1.5 h-4 w-4" />Mark won and create deal
+                    <Handshake className="mr-1.5 h-4 w-4" />{DEAL_SUITE_HIDDEN ? "Mark won" : "Mark won and create deal"}
                   </Button>
                 )}
               </div>
@@ -454,7 +461,7 @@ export default function LeadDetailsPage() {
                     <p className="text-[11px] text-muted-foreground">
                       {activityActor(e)} · {dateLabel(e.createdAt, locale)}
                       {thread && <> · <Link href={conversationHref(thread)} className="text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400">View conversation</Link></>}
-                      {e.kind === "converted" && typeof d.dealId === "number" && <> · <Link href={`/deals/${d.dealId}`} className="text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400">Open the deal</Link></>}
+                      {!DEAL_SUITE_HIDDEN && e.kind === "converted" && typeof d.dealId === "number" && <> · <Link href={`/deals/${d.dealId}`} className="text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400">Open the deal</Link></>}
                     </p>
                   </li>
                 );
@@ -477,15 +484,17 @@ export default function LeadDetailsPage() {
 
       <Dialog open={dealOpen} onOpenChange={setDealOpen}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Create deal from this lead</DialogTitle><DialogDescription>This creates a pending deal for {lead.companyName} and marks the lead as won. Nothing is sent to the client.</DialogDescription></DialogHeader>
+          {DEAL_SUITE_HIDDEN
+            ? <DialogHeader><DialogTitle>Mark {lead.companyName} as won?</DialogTitle><DialogDescription>This records the win and its value in your results. Nothing is sent to the client.</DialogDescription></DialogHeader>
+            : <DialogHeader><DialogTitle>Create deal from this lead</DialogTitle><DialogDescription>This creates a pending deal for {lead.companyName} and marks the lead as won. Nothing is sent to the client.</DialogDescription></DialogHeader>}
           <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); setDealError(null); convert.mutate(); }}>
-            <div className="space-y-1.5"><Label htmlFor="deal-amount" className="text-xs">Deal amount *</Label>
+            <div className="space-y-1.5"><Label htmlFor="deal-amount" className="text-xs">{DEAL_SUITE_HIDDEN ? "Value won *" : "Deal amount *"}</Label>
               <Input id="deal-amount" inputMode="decimal" value={dealAmount} onChange={(e) => setDealAmount(e.target.value)} placeholder="50000" data-testid="input-deal-amount" /></div>
             <div className="space-y-1.5"><Label htmlFor="deal-title" className="text-xs">Project name</Label>
               <Input id="deal-title" value={dealTitle} maxLength={200} onChange={(e) => setDealTitle(e.target.value)} placeholder={`Work for ${lead.companyName}`} data-testid="input-deal-title" /></div>
             {dealError && <p role="alert" className="text-sm text-rose-600 dark:text-rose-400" data-testid="deal-error">{dealError}</p>}
             <DialogFooter><Button type="button" variant="outline" onClick={() => setDealOpen(false)}>Cancel</Button>
-              <Button type="submit" className="gradient-btn text-white" disabled={convert.isPending || !(Number(dealAmount.replace(/,/g, "")) > 0)} data-testid="button-confirm-deal">{convert.isPending ? "Creating…" : "Create deal"}</Button></DialogFooter>
+              <Button type="submit" className="gradient-btn text-white" disabled={convert.isPending || !(Number(dealAmount.replace(/,/g, "")) > 0)} data-testid="button-confirm-deal">{convert.isPending ? (DEAL_SUITE_HIDDEN ? "Saving…" : "Creating…") : (DEAL_SUITE_HIDDEN ? "Mark won" : "Create deal")}</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>

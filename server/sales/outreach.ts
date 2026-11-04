@@ -24,8 +24,11 @@
  *    bounce puts the address on the list for every lead, and an opt-out also marks the lead do-not-contact;
  *  - the timeline records ids and counts only, never message text.
  */
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { checkDraft, checkStructure, issuesForRetry, offerDescribed, scopeIssues, type Issue } from "@shared/outreach-check";
+import { MAX_VARIANTS, selectStrategies, type OutreachStrategy, type StrategyChoice } from "@shared/outreach-strategy";
+import { scoreDraft, type Scorecard } from "@shared/draft-scorecard";
 import { hashDraft } from "@shared/outreach-hash";
 import { FOLLOW_UP_DAYS, OUTCOMES, SUPPRESSION_REASON_LABEL, isRemovable, parseSuppressionInput, pathToContacted, suppressionKeys, type Outcome, type SuppressionReason } from "@shared/outreach-safety";
 import { latestPerField, normField, type ScoreClaim } from "@shared/lead-score";
@@ -42,7 +45,7 @@ import { getIdealClient } from "../services/ideal-client";
 import { relatedKnowledge } from "../services/knowledge";
 import { createTicket, fail, getLead, moveLead, readGate, updateLead, writeGate, type Result, type Who } from "../services/leads";
 import { storage } from "../storage";
-import { OUTREACH_PROMPT_VERSION, draftSystemPrompt, draftUserMessage, type DraftInput } from "./outreach-prompt";
+import { draftSystemPrompt, draftUserMessage, versionFor, type DraftInput } from "./outreach-prompt";
 import { DraftAllowanceReached, DraftExists, messageStore, messagesTablesReady, outreachSafetyReady, type MessageStore } from "./message-store";
 import { AI_DRAFT_VERSION_PREFIX, outboundTier } from "../outbound/plan";
 import { outboundAllowance } from "../outbound/limits";
@@ -57,11 +60,16 @@ export { hashDraft } from "@shared/outreach-hash";
 export interface MessageView {
   id: number; leadId: number; status: LeadMessageRow["status"]; subject: string; body: string; bodyHash: string;
   to: string | null; toSource: string | null; edited: boolean; createdBy: string; createdAt: string; approvedAt: string | null; sentAt: string | null;
+  /** How this version opens (shared/outreach-strategy.ts) and its batch, for messages written since variants exist. */
+  strategy: string | null; variantGroup: string | null;
+  /** The deterministic quality card (shared/draft-scorecard.ts), measured on read for versions and drafts. Never a prediction. */
+  scorecard?: Scorecard;
 }
 const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : null);
 export const messageView = (m: LeadMessageRow): MessageView => ({
   id: m.id, leadId: m.leadId, status: m.status, subject: m.subject ?? "", body: m.body, bodyHash: m.bodyHash, to: m.toAddress, toSource: m.toSource,
   edited: m.edited, createdBy: m.createdBy, createdAt: iso(m.createdAt)!, approvedAt: iso(m.approvedAt), sentAt: iso(m.sentAt),
+  strategy: m.strategy ?? null, variantGroup: m.variantGroup ?? null,
 });
 
 const NOT_SETUP = () => fail(503, "MESSAGES_NOT_SETUP", "Outreach drafts aren't set up on this server yet.");
@@ -102,14 +110,14 @@ export function recipientFor(lead: { contactEmail?: string | null }, claims: Sco
   return site ? { address: site.value.trim(), source: "site" } : null;
 }
 
-/** The verified facts and the guesses a draft may use. Nothing else about the company reaches the model. */
-export function draftFacts(claims: ScoreClaim[]): { facts: { id: number; label: string; value: string }[]; angles: { id: number; label: string; value: string }[] } {
+/** The verified facts and the guesses a draft may use (each with its normalized field, for the strategy rules). Nothing else about the company reaches the model. */
+export function draftFacts(claims: ScoreClaim[]): { facts: { id: number; field: string; label: string; value: string }[]; angles: { id: number; field: string; label: string; value: string }[] } {
   const latest = latestPerField(claims);
-  const facts: { id: number; label: string; value: string }[] = [], angles: { id: number; label: string; value: string }[] = [];
+  const facts: { id: number; field: string; label: string; value: string }[] = [], angles: { id: number; field: string; label: string; value: string }[] = [];
   for (const c of latest) {
     const f = normField(c.field);
-    if (FACT_FIELDS[f] && c.status === "confirmed") facts.push({ id: c.id, label: FACT_FIELDS[f], value: c.value });
-    else if (ANGLE_FIELDS[f] && (c.status === "inferred" || c.status === "confirmed")) angles.push({ id: c.id, label: ANGLE_FIELDS[f], value: c.value });
+    if (FACT_FIELDS[f] && c.status === "confirmed") facts.push({ id: c.id, field: f, label: FACT_FIELDS[f], value: c.value });
+    else if (ANGLE_FIELDS[f] && (c.status === "inferred" || c.status === "confirmed")) angles.push({ id: c.id, field: f, label: ANGLE_FIELDS[f], value: c.value });
   }
   return { facts, angles };
 }
@@ -148,15 +156,54 @@ export async function listMessages(user: Who, leadId: number, d: Partial<Outreac
   if (!(await ready())) return NOT_SETUP();
   const got = await getLead(user, leadId);
   if (!got.ok) return got;
+  const { lead, claims } = got.detail;
   await repairAfterSend(user.organizationId!, 10, deps);
   const rows = await deps.store.listForLead(user.organizationId!, leadId);
   const sample = await import("../outbound/lead-angle").then((m) => m.angleForLead(user.organizationId!, leadId)).then((a) => a?.sample ?? null).catch(() => null);
-  return { ok: true, messages: rows.map(messageView), sample };
+  // The quality card a person compares versions (and reviews a draft) with: measured NOW from the message and
+  // the lead's claims, stored nowhere. Each strategy is marked against its own evidence, found by the same rules
+  // that offered it; a strategy grounded outside the claims (a sample, the Client Radar angle) has none to mark.
+  const { facts, angles } = draftFacts(claims.map((c) => ({ id: c.id, field: c.field, value: c.value, status: c.status, evidenceUrl: c.evidenceUrl, createdAt: c.createdAt })));
+  const valueOf = new Map([...facts, ...angles].map((f) => [f.id, f.value]));
+  const evidenceIds = new Map(selectStrategies({ facts, angles, radar: null, offerDescribed: true, sampleAvailable: false }).map((c) => [c.strategy as string, c.evidenceIds]));
+  const withCard = (v: MessageView): MessageView =>
+    v.status === "variant" || v.status === "draft"
+      ? { ...v, scorecard: scoreDraft(v, { greetName: lead.contactName?.trim() || null, factValues: facts.map((f) => f.value), evidenceValues: (evidenceIds.get(v.strategy ?? "") ?? []).map((id) => valueOf.get(id)!).filter(Boolean) }) }
+      : v;
+  return { ok: true, messages: rows.map((m) => withCard(messageView(m))), sample };
 }
 
-/** Writes the first message to a lead. Synchronous: one model call (and at most one retry), then the draft is stored for review. */
-export async function draftOutreach(user: Who, leadId: number, opts: { by?: "user" | "agent"; offerSample?: boolean } = {}, d: Partial<OutreachDeps> = {}): Promise<Result<{ message: MessageView; retried: boolean }>> {
-  const deps = { ...defaults(), ...d };
+/** The cap refusals a draft can hit, in the person's words; null when `e` is something else. */
+const capFail = (e: unknown) =>
+  e instanceof WorkspaceBudgetExceeded ? fail(429, "workspace_budget", "This workspace's AI usage for the last 30 days has reached its limit. What's already found and saved stays; it frees up as earlier usage passes 30 days.")
+    : e instanceof GlobalCapExceeded ? fail(429, "global_limit", "Today's AI budget for lead research and drafting is used up for everyone on DealInSec. It resets at midnight UTC.")
+      : e instanceof CapExceeded ? fail(429, "daily_limit", `You've used today's ${dailyLimit("draft")} drafts. Try again tomorrow.`)
+        : e instanceof CapUnavailable ? fail(503, "SALES_NOT_SETUP", "The sales agent isn't set up on this server yet.")
+          : null;
+
+type DraftOpts = { by?: "user" | "agent"; offerSample?: boolean };
+interface PreparedDraft {
+  orgId: string;
+  to: { address: string; source: "lead" | "site" };
+  input: DraftInput;
+  scope: { sampleOffered: boolean; offer: DraftInput["offer"] };
+  ctx: { to: string; siteHost: string };
+  model: string;
+  allowance: { since: Date; max: number; prefix: string };
+  draftLimit: () => ReturnType<typeof fail>;
+  /** The ways the evidence supports opening this message, strongest first (never empty: "direct" is the floor). */
+  strategies: StrategyChoice[];
+  claimIds: number[];
+  claims: number;
+  researchId: number | null;
+}
+
+/**
+ * Everything writing a first message needs, checked and assembled once: the gates, the recipient, the facts
+ * the message may be written from, the sender's offer, the plan's allowance, and which strategies the evidence
+ * supports. Shared by the single draft and the versions, so both answer every refusal the same way.
+ */
+async function prepareDraft(user: Who, leadId: number, opts: DraftOpts, deps: OutreachDeps): Promise<Result<PreparedDraft>> {
   const gate = writeGate(user);
   if (gate) return gate;
   if (!(await ready())) return NOT_SETUP();
@@ -176,6 +223,8 @@ export async function draftOutreach(user: Who, leadId: number, opts: { by?: "use
 
   const existing = await deps.store.unsent(orgId, leadId);
   if (existing) return fail(409, "draft_exists", "This lead already has a message waiting. Send or cancel it first.", { messageId: existing.id });
+  const pending = await deps.store.pendingVariants(orgId, leadId);
+  if (pending.length) return fail(409, "draft_exists", "This lead already has message versions waiting. Choose one or discard them first.", { messageId: pending[0].id });
 
   const scoreClaims: ScoreClaim[] = claims.map((c) => ({ id: c.id, field: c.field, value: c.value, status: c.status, evidenceUrl: c.evidenceUrl, createdAt: c.createdAt }));
   const to = recipientFor(lead, scoreClaims);
@@ -186,7 +235,7 @@ export async function draftOutreach(user: Who, leadId: number, opts: { by?: "use
   if (!facts.length) return fail(422, "no_facts", "There is nothing verified about this company to write from yet. Research the lead first, so the message says something true.");
 
   // The plan's AI-draft allowance over 30 days: checked here so no model call is paid for a draft that couldn't be saved,
-  // and again with the insert (store.create, under a per-workspace lock) so parallel requests can't pass it together.
+  // and again with the insert (under a per-workspace lock) so parallel requests can't pass it together.
   const tier = await outboundTier(user);
   const plan = outboundAllowance(tier);
   const allowance = { since: new Date(deps.now().getTime() - OUTBOUND_WINDOW_DAYS * 86_400_000), max: plan.monthlyDrafts, prefix: AI_DRAFT_VERSION_PREFIX };
@@ -197,10 +246,8 @@ export async function draftOutreach(user: Who, leadId: number, opts: { by?: "use
 
   try { await assertWithinCap("draft", orgId); }
   catch (e) {
-    if (e instanceof WorkspaceBudgetExceeded) return fail(429, "workspace_budget", "This workspace's AI usage for the last 30 days has reached its limit. What's already found and saved stays; it frees up as earlier usage passes 30 days.");
-    if (e instanceof GlobalCapExceeded) return fail(429, "global_limit", "Today's AI budget for lead research and drafting is used up for everyone on DealInSec. It resets at midnight UTC.");
-    if (e instanceof CapExceeded) return fail(429, "daily_limit", `You've used today's ${dailyLimit("draft")} drafts. Try again tomorrow.`);
-    if (e instanceof CapUnavailable) return fail(503, "SALES_NOT_SETUP", "The sales agent isn't set up on this server yet.");
+    const cf = capFail(e);
+    if (cf) return cf;
     throw e;
   }
 
@@ -225,44 +272,149 @@ export async function draftOutreach(user: Who, leadId: number, opts: { by?: "use
   // "What the sender offers" is the only source for what a draft says about the sender (shared/outreach-check.ts scopeIssues).
   const scope = { sampleOffered: !!input.sample, offer: input.offer };
   const ctx = { to: to.address, siteHost: siteHost(lead.domain || (() => { try { return new URL(lead.website ?? "").hostname; } catch { return ""; } })()) };
-  const trace = { task: "draft" as const, orgId, userId: user.id, leadId, promptVersion: OUTREACH_PROMPT_VERSION };
-  const model = modelFor("draft");
 
+  const strategies = selectStrategies({
+    facts, angles,
+    radar: angle ? { problem: angle.problem ?? null, opportunity: angle.opportunity ?? null } : null,
+    offerDescribed: described, sampleAvailable: !!input.sample,
+  });
+  return {
+    ok: true, orgId, to, input, scope, ctx, model: modelFor("draft"), allowance, draftLimit, strategies,
+    claimIds: [...facts, ...angles].map((f) => f.id), claims: facts.length + angles.length, researchId: await latestResearchId(orgId, leadId),
+  };
+}
+
+/** One model-written version, opened the strategy's way: at most one retry, checked by the same rules as ever. Cap and provider errors are thrown to the caller. */
+async function writeOne(user: Who, leadId: number, p: PreparedDraft, strategy: StrategyChoice["strategy"], deps: OutreachDeps): Promise<{ draft: { subject: string; body: string } | null; issues: Issue[]; retried: boolean }> {
+  const trace = { task: "draft" as const, orgId: p.orgId, userId: user.id, leadId, promptVersion: versionFor(strategy) };
+  const messages: ChatMessage[] = [{ role: "system", content: draftSystemPrompt(strategy) }, { role: "user", content: draftUserMessage(p.input) }];
   let issues: Issue[] = [], draft: { subject: string; body: string } | null = null, retried = false;
-  try {
-    const messages: ChatMessage[] = [{ role: "system", content: draftSystemPrompt() }, { role: "user", content: draftUserMessage(input) }];
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const reply = await deps.chat(trace, messages, { maxTokens: 2500, model });
-      draft = asDraft(reply.content);
-      issues = draft ? [...checkDraft(draft, ctx), ...scopeIssues(draft, scope)] : [{ code: "body_length", message: "Reply with only the JSON object: {\"subject\":...,\"body\":...}." }];
-      if (!issues.length) break;
-      retried = true;
-      messages.push({ role: "assistant", content: reply.content ?? "" }, { role: "user", content: `That draft cannot be used. Fix these problems and return the JSON object again:\n${issuesForRetry(issues)}` });
-    }
-  } catch (e) {
-    if (e instanceof WorkspaceBudgetExceeded) return fail(429, "workspace_budget", "This workspace's AI usage for the last 30 days has reached its limit. What's already found and saved stays; it frees up as earlier usage passes 30 days.");
-    if (e instanceof GlobalCapExceeded) return fail(429, "global_limit", "Today's AI budget for lead research and drafting is used up for everyone on DealInSec. It resets at midnight UTC.");
-    if (e instanceof CapExceeded) return fail(429, "daily_limit", `You've used today's ${dailyLimit("draft")} drafts. Try again tomorrow.`);
-    if (e instanceof CapUnavailable) return fail(503, "SALES_NOT_SETUP", "The sales agent isn't set up on this server yet.");
-    agentLog("error", { errorType: (e as Error)?.name ?? "Error", where: "sales_draft", code: e instanceof ProviderError ? e.code : "internal" }); // never the text
-    return fail(502, "model_unavailable", "The writing assistant didn't answer. Try again in a moment.");
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const reply = await deps.chat(trace, messages, { maxTokens: 2500, model: p.model });
+    draft = asDraft(reply.content);
+    issues = draft ? [...checkDraft(draft, p.ctx), ...scopeIssues(draft, p.scope)] : [{ code: "body_length", message: "Reply with only the JSON object: {\"subject\":...,\"body\":...}." }];
+    if (!issues.length) break;
+    retried = true;
+    messages.push({ role: "assistant", content: reply.content ?? "" }, { role: "user", content: `That draft cannot be used. Fix these problems and return the JSON object again:\n${issuesForRetry(issues)}` });
   }
-  if (!draft || issues.length) return fail(422, "draft_rejected", "The draft didn't pass the safety checks, so it wasn't saved. Try again, or write the message yourself.", { issues: issues.map((i) => i.code) });
+  return { draft: issues.length ? null : draft, issues, retried };
+}
 
+/** Stores one checked version as THE draft, with its strategy, and records the timeline entry (ids and counts only). */
+async function storeSingle(user: Who, leadId: number, p: PreparedDraft, strategy: StrategyChoice["strategy"], draft: { subject: string; body: string }, opts: DraftOpts, deps: OutreachDeps): Promise<Result<{ message: MessageView }>> {
   let row: LeadMessageRow;
   try {
     row = await deps.store.create({
-      orgId, leadId, subject: draft.subject, body: draft.body, bodyHash: hashDraft(draft.subject, draft.body), toAddress: to.address, toSource: to.source,
-      researchId: await latestResearchId(orgId, leadId), claimIds: [...facts, ...angles].map((f) => f.id), promptVersion: OUTREACH_PROMPT_VERSION,
-      by: opts.by ?? "user", userId: user.id, now: deps.now(), allowance,
+      orgId: p.orgId, leadId, subject: draft.subject, body: draft.body, bodyHash: hashDraft(draft.subject, draft.body), toAddress: p.to.address, toSource: p.to.source,
+      researchId: p.researchId, claimIds: p.claimIds, promptVersion: versionFor(strategy), strategy,
+      by: opts.by ?? "user", userId: user.id, now: deps.now(), allowance: p.allowance,
     });
   } catch (e) {
     if (e instanceof DraftExists) return fail(409, "draft_exists", "This lead already has a message waiting. Send or cancel it first.");
-    if (e instanceof DraftAllowanceReached) return draftLimit();
+    if (e instanceof DraftAllowanceReached) return p.draftLimit();
     throw e;
   }
-  await leadsStore.addEvent(orgId, leadId, { kind: "draft_created", data: { messageId: row.id, claims: facts.length + angles.length }, actor: opts.by ?? "user", actorUserId: user.id });
-  return { ok: true, message: messageView(row), retried };
+  await leadsStore.addEvent(p.orgId, leadId, { kind: "draft_created", data: { messageId: row.id, claims: p.claims }, actor: opts.by ?? "user", actorUserId: user.id });
+  return { ok: true, message: messageView(row) };
+}
+
+/** Writes the first message to a lead, opened the way the evidence best supports. Synchronous: one model call (and at most one retry), then the draft is stored for review. */
+export async function draftOutreach(user: Who, leadId: number, opts: DraftOpts = {}, d: Partial<OutreachDeps> = {}): Promise<Result<{ message: MessageView; retried: boolean }>> {
+  const deps = { ...defaults(), ...d };
+  const p = await prepareDraft(user, leadId, opts, deps);
+  if (!p.ok) return p;
+  const strategy = p.strategies[0].strategy;
+  let r: Awaited<ReturnType<typeof writeOne>>;
+  try { r = await writeOne(user, leadId, p, strategy, deps); }
+  catch (e) {
+    const cf = capFail(e);
+    if (cf) return cf;
+    agentLog("error", { errorType: (e as Error)?.name ?? "Error", where: "sales_draft", code: e instanceof ProviderError ? e.code : "internal" }); // never the text
+    return fail(502, "model_unavailable", "The writing assistant didn't answer. Try again in a moment.");
+  }
+  if (!r.draft) return fail(422, "draft_rejected", "The draft didn't pass the safety checks, so it wasn't saved. Try again, or write the message yourself.", { issues: r.issues.map((i) => i.code) });
+  const stored = await storeSingle(user, leadId, p, strategy, r.draft, opts, deps);
+  return stored.ok ? { ok: true, message: stored.message, retried: r.retried } : stored;
+}
+
+/**
+ * Writes up to MAX_VARIANTS versions of the first message, one strategy each, for the person to choose from
+ * (status "variant": not a draft yet, so nothing can be approved until one is chosen). One batch counts as ONE
+ * AI draft against the plan's allowance; the model is still called once per version, under the same daily and
+ * budget caps. A version that fails the safety checks is dropped, and a cap reached partway stores what passed
+ * so far; when only one way is grounded, or only one version survives, it is stored as the draft directly —
+ * nothing to choose between. Every refusal is the same one a single draft gives.
+ */
+export async function draftOutreachVariants(user: Who, leadId: number, opts: DraftOpts = {}, d: Partial<OutreachDeps> = {}): Promise<Result<{ variants: MessageView[]; retried: boolean }>> {
+  const deps = { ...defaults(), ...d };
+  const p = await prepareDraft(user, leadId, opts, deps);
+  if (!p.ok) return p;
+  const wanted = p.strategies.slice(0, MAX_VARIANTS);
+
+  const good: { strategy: StrategyChoice["strategy"]; subject: string; body: string }[] = [];
+  let retried = false, lastIssues: Issue[] = [];
+  for (const choice of wanted.length >= 2 ? wanted : wanted.slice(0, 1)) {
+    try {
+      const r = await writeOne(user, leadId, p, choice.strategy, deps);
+      retried ||= r.retried;
+      if (r.draft) good.push({ strategy: choice.strategy, ...r.draft });
+      else lastIssues = r.issues;
+    } catch (e) {
+      const cf = capFail(e);
+      if (!cf) agentLog("error", { errorType: (e as Error)?.name ?? "Error", where: "sales_draft_variant", code: e instanceof ProviderError ? e.code : "internal" }); // never the text
+      if (good.length) break; // keep what already passed
+      return cf ?? fail(502, "model_unavailable", "The writing assistant didn't answer. Try again in a moment.");
+    }
+  }
+  if (!good.length) return fail(422, "draft_rejected", "No version passed the safety checks, so nothing was saved. Try again, or write the message yourself.", { issues: lastIssues.map((i) => i.code) });
+
+  if (good.length === 1) {
+    const stored = await storeSingle(user, leadId, p, good[0].strategy, good[0], opts, deps);
+    return stored.ok ? { ok: true, variants: [stored.message], retried } : stored;
+  }
+  const group = randomUUID();
+  let rows: LeadMessageRow[];
+  try {
+    rows = await deps.store.createVariants({
+      orgId: p.orgId, leadId, toAddress: p.to.address, toSource: p.to.source, researchId: p.researchId, claimIds: p.claimIds,
+      by: opts.by ?? "user", userId: user.id, now: deps.now(), group,
+      variants: good.map((g) => ({ strategy: g.strategy, subject: g.subject, body: g.body, bodyHash: hashDraft(g.subject, g.body), promptVersion: versionFor(g.strategy) })),
+      allowance: p.allowance,
+    });
+  } catch (e) {
+    if (e instanceof DraftExists) return fail(409, "draft_exists", "This lead already has a message waiting. Send or cancel it first.");
+    if (e instanceof DraftAllowanceReached) return p.draftLimit();
+    throw e;
+  }
+  await leadsStore.addEvent(p.orgId, leadId, { kind: "variants_created", data: { group, count: rows.length, strategies: good.map((g) => g.strategy), claims: p.claims }, actor: opts.by ?? "user", actorUserId: user.id });
+  return { ok: true, variants: rows.map(messageView), retried };
+}
+
+/**
+ * The person picks one version as THE message: it becomes the draft (the one-unsent-per-lead index holds,
+ * whatever races) and its siblings are discarded. Checked NOW against the lead's do-not-contact flag and the
+ * organization's list, for exactly the text the person read (`bodyHash`). Approval stays its own step.
+ */
+export async function chooseVariant(user: Who, id: number, bodyHash: unknown, d: Partial<OutreachDeps> = {}): Promise<Result<{ message: MessageView; already: boolean }>> {
+  const deps = { ...defaults(), ...d };
+  const gate = writeGate(user);
+  if (gate) return gate;
+  if (!(await ready())) return NOT_SETUP();
+  if (typeof bodyHash !== "string" || !/^[a-f0-9]{64}$/.test(bodyHash)) return fail(400, "invalid", "Choose the version you are looking at.");
+  const l = await load(user, id, deps);
+  if (!l.ok) return l;
+  const stop = blocked(l.lead);
+  if (stop) return stop;
+  const listed = await suppressionBlock(user.organizationId!, l.row.toAddress, deps);
+  if (listed) return listed;
+  const r = await deps.store.chooseVariant({ orgId: user.organizationId!, id, hash: bodyHash, now: deps.now() });
+  if (r.result === "chosen" || r.result === "already") {
+    if (r.result === "chosen") await leadsStore.addEvent(user.organizationId!, l.row.leadId, { kind: "variant_chosen", data: { messageId: id, strategy: r.row.strategy ?? null }, actor: "user", actorUserId: user.id });
+    return { ok: true, message: messageView(r.row), already: r.result === "already" };
+  }
+  if (r.result === "changed") return fail(409, "changed", "The message changed since you read it. Read it again before choosing.");
+  if (r.result === "conflict") return fail(409, "variant_chosen", "Another version was already chosen for this lead. Reload to see it.");
+  return fail(409, "not_choosable", "That isn't a version waiting to be chosen.");
 }
 
 async function latestResearchId(orgId: string, leadId: number): Promise<number | null> {
@@ -435,7 +587,7 @@ async function legacyAfterSend(user: Who, o: { leadId: number; messageId: number
   return movedTo;
 }
 
-/** Throws the draft away (nothing was sent). Works from draft or approved. */
+/** Throws the draft away (nothing was sent). Works from draft or approved; on a version awaiting a choice, the whole batch goes (it was one proposal). */
 export async function cancelMessage(user: Who, id: number, d: Partial<OutreachDeps> = {}): Promise<Result<{ message: MessageView }>> {
   const deps = { ...defaults(), ...d };
   const gate = writeGate(user);
@@ -445,6 +597,13 @@ export async function cancelMessage(user: Who, id: number, d: Partial<OutreachDe
   if (!l.ok) return l;
   if (l.row.status === "cancelled") return { ok: true, message: messageView(l.row) };
   if (l.row.status === "sending") return SENDING();
+  if (l.row.status === "variant" && l.row.variantGroup) {
+    const n = await deps.store.cancelVariants({ orgId: user.organizationId!, leadId: l.row.leadId, group: l.row.variantGroup, now: deps.now() });
+    if (!n) return fail(409, "changed", "That message changed. Reload and try again.");
+    await leadsStore.addEvent(user.organizationId!, l.row.leadId, { kind: "draft_cancelled", data: { messageId: id, versions: n }, actor: "user", actorUserId: user.id });
+    const row = await deps.store.get(user.organizationId!, id);
+    return { ok: true, message: messageView(row ?? { ...l.row, status: "cancelled" }) };
+  }
   if (l.row.status !== "draft" && l.row.status !== "approved") return fail(409, "not_cancellable", `That message is already ${l.row.status}.`);
   const next = await deps.store.transition({ orgId: user.organizationId!, id, from: l.row.status as "draft" | "approved", to: "cancelled", now: deps.now() });
   if (!next) return fail(409, "changed", "That message changed. Reload and try again.");
@@ -465,13 +624,13 @@ async function recordEventSafely(orgId: string, e: { leadId: number; messageId: 
   }
 }
 
-/** Cancels every unsent (draft or approved) message to an address or domain that has just been put on the list. Returns how many. */
+/** Cancels every unsent (draft, approved, or version awaiting a choice) message to an address or domain that has just been put on the list. Returns how many. */
 async function cancelUnsentTo(user: Who, entry: { kind: string; value: string }, deps: OutreachDeps): Promise<number> {
   const orgId = user.organizationId!;
   let n = 0;
-  for (const m of await deps.store.listForOrg(orgId, ["draft", "approved"], 1000)) {
+  for (const m of await deps.store.listForOrg(orgId, ["draft", "approved", "variant"], 1000)) {
     if (!suppressionKeys(m.toAddress ?? "").some((k) => k.kind === entry.kind && k.value === entry.value)) continue;
-    const done = await deps.store.transition({ orgId, id: m.id, from: m.status as "draft" | "approved", to: "cancelled", now: deps.now() });
+    const done = await deps.store.transition({ orgId, id: m.id, from: m.status as "draft" | "approved" | "variant", to: "cancelled", now: deps.now() });
     if (done) { n++; await leadsStore.addEvent(orgId, m.leadId, { kind: "draft_cancelled", data: { messageId: m.id, why: "suppressed" }, actor: "user", actorUserId: user.id }); }
   }
   return n;
@@ -629,16 +788,17 @@ export async function openApproved(user: Who, id: number, bodyHash: unknown, d: 
 }
 
 /**
- * A lead has just been marked do-not-contact: every unsent message to it (draft or approved) is discarded, so no earlier
- * approval can be used. Called by services/leads.ts updateLead. Organization-scoped. Returns how many were discarded.
+ * A lead has just been marked do-not-contact: every unsent message to it (draft, approved, or a version awaiting a
+ * choice) is discarded, so no earlier approval or pending version can be used. Called by services/leads.ts updateLead.
+ * Organization-scoped. Returns how many were discarded.
  */
 export async function discardUnsentForLead(orgId: string, leadId: number, actorUserId: string | null, d: Partial<OutreachDeps> = {}): Promise<number> {
   const deps = { ...defaults(), ...d };
   if (!(await ready())) return 0;
   let n = 0;
   for (const m of await deps.store.listForLead(orgId, leadId)) {
-    if (m.direction !== "out" || (m.status !== "draft" && m.status !== "approved")) continue;
-    const done = await deps.store.transition({ orgId, id: m.id, from: m.status as "draft" | "approved", to: "cancelled", now: deps.now() });
+    if (m.direction !== "out" || (m.status !== "draft" && m.status !== "approved" && m.status !== "variant")) continue;
+    const done = await deps.store.transition({ orgId, id: m.id, from: m.status as "draft" | "approved" | "variant", to: "cancelled", now: deps.now() });
     if (done) { n++; await leadsStore.addEvent(orgId, leadId, { kind: "draft_cancelled", data: { messageId: m.id, why: "do_not_contact" }, actor: "user", actorUserId }); }
   }
   return n;

@@ -21,8 +21,9 @@ import { agentLog } from "../agent/log";
 import { leadsTablesReady } from "../leads/store";
 import * as sales from "../services/sales";
 import { getResearch, startResearch } from "./research";
-import { addSuppression, approveMessage, cancelMessage, draftOutreach, editDraft, listMessages, listOutreachQueue, listSuppressions, markSent, openApproved, recordOutcome, removeSuppression } from "./outreach";
+import { addSuppression, approveMessage, cancelMessage, chooseVariant, draftOutreach, draftOutreachVariants, editDraft, listMessages, listOutreachQueue, listSuppressions, markSent, openApproved, recordOutcome, removeSuppression } from "./outreach";
 import { messagesTablesReady } from "./message-store";
+import { strategyStats } from "./strategy-stats";
 import { salesTablesReady } from "./research-store";
 
 export function registerSalesRoutes(app: Express) {
@@ -116,7 +117,13 @@ export function registerSalesRoutes(app: Express) {
     }
   };
   app.get("/api/sales/leads/:id/messages", isAuthenticated, gate, messagesGate, guarded("sales_messages", async (req, res, id) => reply(res, await listMessages(req.user, id), (r) => ({ messages: r.messages, sample: r.sample }))));
-  app.post("/api/sales/leads/:id/draft", isAuthenticated, gate, messagesGate, guarded("sales_draft", async (req, res, id) => reply(res, await draftOutreach(req.user, id, { offerSample: req.body?.offerSample === true }), (r) => ({ message: r.message, retried: r.retried }), 201)));
+  app.post("/api/sales/leads/:id/draft", isAuthenticated, gate, messagesGate, guarded("sales_draft", async (req, res, id) => {
+    const opts = { offerSample: req.body?.offerSample === true };
+    // `variants: true` writes up to three versions to choose from (one AI draft against the allowance); without it, the single draft as ever.
+    if (req.body?.variants === true) return reply(res, await draftOutreachVariants(req.user, id, opts), (r) => ({ variants: r.variants, retried: r.retried }), 201);
+    return reply(res, await draftOutreach(req.user, id, opts), (r) => ({ message: r.message, retried: r.retried }), 201);
+  }));
+  app.post("/api/sales/messages/:id/choose", isAuthenticated, gate, messagesGate, guarded("sales_message_choose", async (req, res, id) => reply(res, await chooseVariant(req.user, id, req.body?.bodyHash), (r) => ({ message: r.message, already: r.already }))));
   app.patch("/api/sales/messages/:id", isAuthenticated, gate, messagesGate, guarded("sales_message_edit", async (req, res, id) => reply(res, await editDraft(req.user, id, req.body), (r) => ({ message: r.message }))));
   app.post("/api/sales/messages/:id/approve", isAuthenticated, gate, messagesGate, guarded("sales_message_approve", async (req, res, id) => reply(res, await approveMessage(req.user, id, req.body?.bodyHash), (r) => ({ message: r.message, already: r.already }))));
   app.post("/api/sales/messages/:id/open", isAuthenticated, gate, messagesGate, guarded("sales_message_open", async (req, res, id) => { res.setHeader("Cache-Control", "no-store"); return reply(res, await openApproved(req.user, id, req.body?.bodyHash), (r) => ({ to: r.to, subject: r.subject, body: r.body })); }));
@@ -135,6 +142,7 @@ export function registerSalesRoutes(app: Express) {
   const addsByUser = new Map<string, number[]>();
   const addAllowed = (userId: string) => { const now = Date.now(), recent = (addsByUser.get(userId) ?? []).filter((t) => now - t < 3_600_000); if (recent.length >= 60) return false; recent.push(now); addsByUser.set(userId, recent); return true; };
   app.get("/api/sales/outreach", isAuthenticated, gate, messagesGate, plain("sales_outreach_queue", async (req, res) => reply(res, await listOutreachQueue(req.user, { status: req.query?.status }), (r) => ({ items: r.items }))));
+  app.get("/api/sales/outreach/strategy-stats", isAuthenticated, gate, messagesGate, plain("sales_strategy_stats", async (req, res) => reply(res, await strategyStats(req.user, { days: req.query?.days }), (r) => ({ days: r.days, rows: r.rows }))));
   app.post("/api/sales/messages/:id/outcome", isAuthenticated, gate, messagesGate, guarded("sales_message_outcome", async (req, res, id) => reply(res, await recordOutcome(req.user, id, req.body), (r) => ({ outcome: r.outcome, already: r.already, suppressed: r.suppressed, cancelled: r.cancelled, movedTo: r.movedTo }))));
   app.get("/api/sales/suppressions", isAuthenticated, gate, plain("sales_suppressions", async (req, res) => reply(res, await listSuppressions(req.user), (r) => ({ entries: r.entries }))));
   app.post("/api/sales/suppressions", isAuthenticated, gate, plain("sales_suppression_add", async (req, res) => {

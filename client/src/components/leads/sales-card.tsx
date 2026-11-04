@@ -102,7 +102,21 @@ export function SalesCard({ leadId, hasWebsite = true, showNextAction = true, co
   const score = useQuery<{ score: LeadScore }>({ queryKey: [scoreUrl(leadId)], retry: false });
   const next = useQuery<{ next: NextAction }>({ queryKey: [nextActionUrl(leadId)], retry: false });
   if (score.isLoading || next.isLoading) return <Card className="glass-card" data-testid="sales-card-loading"><CardContent className="p-4"><div className="h-4 w-1/3 animate-pulse rounded bg-muted" /></CardContent></Card>;
-  if (score.error || next.error || !score.data || !next.data) return null;
+  // The score failing must not take research and outreach down with it: those panels stand on their own.
+  if (score.error || next.error || !score.data || !next.data) {
+    return (
+      <div className="space-y-3" data-testid="sales-card">
+        <Card className="glass-card" data-testid="score-error">
+          <CardContent className="flex items-center justify-between gap-3 p-4">
+            <p className="text-sm text-muted-foreground">The lead score couldn't be loaded.</p>
+            <Button variant="outline" size="sm" onClick={() => { void score.refetch(); void next.refetch(); }}>Try again</Button>
+          </CardContent>
+        </Card>
+        <ResearchPanel leadId={leadId} hasWebsite={hasWebsite} />
+        <ChannelPanel leadId={leadId} companyName={companyName} contactName={contactName} />
+      </div>
+    );
+  }
   const s = score.data.score, n = next.data.next;
 
   return (

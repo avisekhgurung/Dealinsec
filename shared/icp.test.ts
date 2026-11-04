@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countryFromDomain, describeIcp, isSeniorDecisionMaker, icpSchema, industryMatched, marketWord, mergeIcp, parseHeadcount, parseIcpFallback, prospectFit, queryKey, roleRank, searchStrategies, singular, withSavedExclusions, MAX_QUANTITY, type Icp } from "./icp";
+import { countryFromDomain, describeIcp, isSeniorDecisionMaker, icpFromIdealClient, icpSchema, industryMatched, marketWord, mergeIcp, parseHeadcount, parseIcpFallback, prospectFit, queryKey, roleRank, searchStrategies, singular, withSavedExclusions, MAX_QUANTITY, type Icp } from "./icp";
 import { sanitizeQuery } from "./discovery";
 
 const DOD = "Find 30 US digital marketing agencies with 5–30 employees that serve SaaS companies.";
@@ -68,6 +68,46 @@ describe("taking a model's ICP", () => {
   });
   it("describes itself in one line", () => {
     expect(describeIcp(icp())).toBe("digital marketing agency · United States · 5–30 people · serves SaaS");
+  });
+});
+
+describe("the saved ideal client as a search profile", () => {
+  it("maps industries, recognises countries among the places, and carries the exclusions", () => {
+    const r = icpFromIdealClient({
+      targetIndustries: ["SaaS companies", "fintech startups"],
+      targetLocations: ["United States", "Bay Area"],
+      exclusions: ["gambling"],
+    })!;
+    expect(r.industry).toBe("SaaS companies");
+    expect(r.keywords).toEqual(["fintech startups"]);
+    expect(r.countries).toEqual(["US"]);
+    expect(r.locations).toEqual(["Bay Area"]);
+    expect(r.exclusions).toEqual(["gambling"]);
+    expect(r.quantity).toBeGreaterThan(0); // the schema's default, so a search can start as-is
+  });
+  it("no target industry saved = no profile: a search must know what to look for", () => {
+    expect(icpFromIdealClient(null)).toBeNull();
+    expect(icpFromIdealClient({})).toBeNull();
+    expect(icpFromIdealClient({ targetIndustries: [], targetLocations: ["India"] })).toBeNull();
+    expect(icpFromIdealClient({ targetIndustries: ["  "] })).toBeNull();
+  });
+  it("nothing is invented and limits hold: messy spacing is cleaned, lists are capped to the schema's sizes", () => {
+    const r = icpFromIdealClient({
+      targetIndustries: ["  marketing   agencies  ", "a", "b", "c", "d", "e", "f", "g", "h", "i"],
+      targetLocations: ["india", "uk", "Mumbai", "Pune", "Delhi", "Goa", "Jaipur", "Kota"],
+      exclusions: Array.from({ length: 12 }, (_, i) => `x${i}`),
+    })!;
+    expect(r.industry).toBe("marketing agencies");
+    expect(r.keywords.length).toBeLessThanOrEqual(8);
+    expect(r.countries).toEqual(["IN", "GB"]);
+    expect(r.locations.length).toBeLessThanOrEqual(5);
+    expect(r.exclusions.length).toBeLessThanOrEqual(10);
+    expect(r.targetMarket).toEqual([]); // never guessed from the profile
+    expect(r.employeeMin).toBeNull();
+  });
+  it("the result is a valid ICP the run endpoint would accept", () => {
+    const r = icpFromIdealClient({ targetIndustries: ["dentists"] })!;
+    expect(icpSchema.safeParse(r).success).toBe(true);
   });
 });
 

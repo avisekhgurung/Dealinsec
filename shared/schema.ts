@@ -1411,10 +1411,15 @@ export const leadMessages = pgTable("lead_messages", {
   bodyHash: varchar("body_hash", { length: 64 }).notNull(),
   toAddress: varchar("to_address", { length: 254 }),
   toSource: varchar("to_source", { length: 8 }), // lead | site
-  status: varchar("status", { length: 12 }).notNull(), // draft | approved | sending (a connected-mailbox send not yet settled) | sent | cancelled
+  status: varchar("status", { length: 12 }).notNull(), // variant (one of several versions awaiting a choice) | draft | approved | sending (a connected-mailbox send not yet settled) | sent | cancelled
   researchId: integer("research_id"),
   claimIds: jsonb("claim_ids").notNull().default(sql`'[]'::jsonb`), // the facts the draft was written from
   promptVersion: varchar("prompt_version", { length: 20 }),
+  // How the message opens (shared/outreach-strategy.ts), the generation batch it came from, and when it was
+  // picked over its siblings (script/migrate-draft-variants.ts). A pre-variants draft leaves all three null.
+  strategy: varchar("strategy", { length: 12 }),
+  variantGroup: varchar("variant_group", { length: 36 }),
+  chosenAt: timestamp("chosen_at"),
   edited: boolean("edited").notNull().default(false),
   createdBy: varchar("created_by", { length: 8 }).notNull().default("user"), // user | agent
   createdByUser: varchar("created_by_user"),
@@ -1588,6 +1593,21 @@ export const providerCalls = pgTable("provider_calls", {
   orgDayIdx: index("provider_calls_org_created_idx").on(t.organizationId, t.createdAt),
 }));
 export type ProviderCallRow = typeof providerCalls.$inferSelect;
+
+/**
+ * A person's verdict on a researched prospect (shared/prospect-feedback.ts). Authoritative DDL in
+ * script/migrate-prospect-feedback.ts; declared here so a fresh environment matches production.
+ */
+export const prospectFeedback = pgTable("prospect_feedback", {
+  organizationId: varchar("organization_id").notNull(),
+  prospectId: integer("prospect_id").notNull(),
+  value: varchar("value", { length: 20 }).notNull(), // relevant | not_relevant | duplicate | already_contacted (CHECK in the migration)
+  userId: varchar("user_id").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.organizationId, t.prospectId] }),
+}));
+export type ProspectFeedbackRow = typeof prospectFeedback.$inferSelect;
 
 /**
  * Connected mailboxes (Gmail Release A, send-only; script/migrate-mailbox.ts, server/mail/mailbox-schema.ts holds the

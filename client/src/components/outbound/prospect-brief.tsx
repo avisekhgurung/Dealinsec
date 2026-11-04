@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { leadCall, leadError } from "@/lib/leads";
 import { useCalmMotion } from "@/lib/motion";
-import { countryName, prospectUrl, type Brief, type Evidence } from "@/lib/outbound";
+import { countryName, evidenceDateLine, prospectUrl, type Brief, type Evidence } from "@/lib/outbound";
 import { cn } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
 import { PROSPECT_FEEDBACK, PROSPECT_FEEDBACK_LABEL, type ProspectFeedback } from "@shared/prospect-feedback";
@@ -32,10 +32,20 @@ const SOURCE: Record<string, string> = { website: "their website", provider: "a 
 const STATUS: Record<string, string> = { confirmed: "confirmed", inferred: "inferred, not confirmed", unknown: "unknown", conflicting: "sources disagree" };
 const day = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : null);
 
-/** Where a finding came from and how sure it is: source type, validation status, confidence. Never more than is stored. */
+/**
+ * Where a finding came from, how sure it is, and when: the date the evidence itself states where there is
+ * one, otherwise the day the page was read ("seen"). Never more than is stored. Signals name their date in
+ * their own header, so it isn't repeated here. Disagreeing sources are called out, not buried in the row.
+ */
 function Provenance({ e }: { e: Evidence }) {
-  const bits = [`From ${SOURCE[e.source] ?? e.source}`, STATUS[e.status] ?? e.status, e.confidence ? `${e.confidence} confidence` : null].filter(Boolean);
-  return <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{bits.join(" · ")}</p>;
+  const dated = evidenceDateLine(e, day);
+  const bits = [`From ${SOURCE[e.source] ?? e.source}`, e.status === "conflicting" ? null : STATUS[e.status] ?? e.status, e.confidence ? `${e.confidence} confidence` : null, dated].filter(Boolean);
+  return (
+    <p className="text-[10px] uppercase tracking-wide text-muted-foreground" data-testid="provenance">
+      {bits.join(" · ")}
+      {e.status === "conflicting" && <span className="font-semibold text-rose-700 dark:text-rose-400"> · sources disagree — check this one</span>}
+    </p>
+  );
 }
 
 type State = "ok" | "partial" | "blocked" | "unknown";
