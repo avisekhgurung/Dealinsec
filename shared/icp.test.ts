@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countryFromDomain, describeIcp, isSeniorDecisionMaker, icpFromIdealClient, icpSchema, industryMatched, marketWord, mergeIcp, parseHeadcount, parseIcpFallback, prospectFit, queryKey, roleRank, searchStrategies, singular, withSavedExclusions, MAX_QUANTITY, type Icp } from "./icp";
+import { countryFromDomain, describeIcp, isSeniorDecisionMaker, icpFromIdealClient, icpSchema, industryMatched, marketWord, mergeIcp, parseHeadcount, parseIcpFallback, prospectFit, queryKey, roleRank, searchStrategies, singular, withSavedExclusions, withSavedServices, MAX_QUANTITY, type Icp } from "./icp";
 import { sanitizeQuery } from "./discovery";
 
 const DOD = "Find 30 US digital marketing agencies with 5–30 employees that serve SaaS companies.";
@@ -420,5 +420,95 @@ describe("prospect geography (the person's choice, never the account's country)"
     const world = icpSchema.parse({ industry: "SEO agency" });
     expect(searchPlaces(world)).toEqual([""]);
     expect(searchStrategies(world).every((q) => countryOfQuery(q, world) === undefined)).toBe(true);
+  });
+});
+
+/* ── Phase 3A: the offer reaches the search, and "known big" ─────────────── */
+
+describe("3A: services and segment on the ICP", () => {
+  it("both default empty, so every stored and old-shaped ICP still parses to the same searches", () => {
+    const r = icpSchema.parse({ industry: "SEO agency" });
+    expect(r.services).toEqual([]);
+    expect(r.segment).toBeNull();
+  });
+  it("backward compatible by construction: with no services, the plan is byte-for-byte what it was before 3A", () => {
+    // Frozen from the pre-3A code (dumped on 4 Nov 2026, before this module changed): these exact arrays.
+    const frozen: [Record<string, unknown>, string[]][] = [
+      [{ industry: "digital marketing agency", keywords: ["SEO agency"], countries: ["US"], targetMarket: ["SaaS companies"], employeeMax: 30 },
+        ["digital marketing agency for SaaS companies United States", "SaaS digital marketing agency United States", "SEO agency for SaaS companies United States", "SaaS SEO agency United States", "digital marketing agency SaaS companies clients case study", "boutique SaaS digital marketing agency United States"]],
+      [{ industry: "accounting firm", countries: ["GB"], locations: ["London", "Manchester"] },
+        ["accounting firm London", "accounting firm Manchester"]],
+      [{ industry: "interior design studio", employeeMax: 10 },
+        ["interior design studio", "boutique interior design studio"]],
+      [{ industry: "web development agency", keywords: ["Shopify agency", "ecommerce developer", "React studio"], countries: ["IN"], targetMarket: ["D2C brands"] },
+        ["web development agency for D2C brands India", "D2C web development agency India", "Shopify agency for D2C brands India", "D2C Shopify agency India", "web development agency D2C brands clients case study", "ecommerce developer D2C brands India", "React studio D2C brands India"]],
+      [{ industry: "boutique hotel", locations: ["Goa"], exclusions: ["hostel"] },
+        ["boutique hotel Goa"]],
+    ];
+    for (const [raw, expected] of frozen) expect(searchStrategies(icpSchema.parse(raw))).toEqual(expected);
+  });
+  it("the saved ideal client's services carry into the search profile", () => {
+    const r = icpFromIdealClient({ targetIndustries: ["dentists"], services: ["  web   development ", "AI automation", ""] })!;
+    expect(r.services).toEqual(["web development", "AI automation"]);
+    expect(icpSchema.safeParse(r).success).toBe(true);
+  });
+  it("withSavedServices fills services only when the request named none, and never overwrites an edit", () => {
+    const base = icpSchema.parse({ industry: "SEO agency" });
+    expect(withSavedServices(base, { services: ["web development"] }).services).toEqual(["web development"]);
+    expect(withSavedServices({ ...base, services: ["copywriting"] }, { services: ["web development"] }).services).toEqual(["copywriting"]);
+    expect(withSavedServices(base, null).services).toEqual([]);
+    expect(withSavedServices(base, { services: [] })).toBe(base);
+  });
+});
+
+describe("3A: 'known big' works against a prospect only when known, only for a small-team ICP (option B)", () => {
+  const smallIcp = icpSchema.parse({ industry: "software startup", employeeMax: 5 });
+  const bigCapIcp = icpSchema.parse({ industry: "software startup", employeeMax: 200 });
+  const p = (over: Partial<ProspectProfileT> = {}): ProspectProfileT => ({ name: "Acme Labs", domain: "acmelabs.com", industry: "software startup", description: "We build developer tools", ...over });
+  type ProspectProfileT = Parameters<typeof prospectFit>[1];
+  const funding = { kind: "signal", type: "FUNDING", value: "Raised a $4M seed round", status: "confirmed" };
+  const ftHire = (v: string) => ({ kind: "signal", type: "HIRING", value: v, status: "confirmed", meta: { hiringKind: "full_time" } });
+
+  it("disclosed funding in its own copy downgrades to weak, with the quoted reason", () => {
+    const fit = prospectFit(smallIcp, p({ description: "We build developer tools. Backed by Sequoia." }));
+    expect(fit.verdict).toBe("weak");
+    expect(fit.headline).toMatch(/bigger than the small clients/i);
+    const scale = fit.signals.find((s) => s.label === "Company scale")!;
+    expect(scale.status).toBe("mismatch");
+    expect(scale.detail).toContain("Backed by Sequoia");
+  });
+  it("a confirmed funding signal from research does the same (via extras.findings)", () => {
+    const fit = prospectFit(smallIcp, p(), { findings: [funding] });
+    expect(fit.verdict).toBe("weak");
+    expect(fit.signals.find((s) => s.label === "Company scale")!.detail).toContain("announced funding");
+  });
+  it("a stated headcount above the cap downgrades; a silent one never does", () => {
+    expect(prospectFit(smallIcp, p({ employees: "a team of 40" })).verdict).toBe("weak");
+    const silent = prospectFit(smallIcp, p());
+    expect(silent.verdict).not.toBe("weak");
+    expect(silent.signals.find((s) => s.label === "Company scale")).toBeUndefined();
+  });
+  it("several full-time openings count as big; one alone does not", () => {
+    expect(prospectFit(smallIcp, p(), { findings: [ftHire("Hiring a full-time engineer"), ftHire("Hiring a full-time designer")] }).verdict).toBe("weak");
+    expect(prospectFit(smallIcp, p(), { findings: [ftHire("Hiring a full-time engineer")] }).verdict).not.toBe("weak");
+  });
+  it("an explicit ask for outside help cancels the downgrade: a funded startup wanting a freelance MVP stays in", () => {
+    const fit = prospectFit(smallIcp, p({ description: "We build developer tools. Backed by Sequoia. Looking for a freelance developer for our MVP." }));
+    expect(fit.verdict).not.toBe("weak");
+    const scale = fit.signals.find((s) => s.label === "Company scale")!;
+    expect(scale.status).toBe("match");
+    expect(scale.detail).toMatch(/outside help/i);
+  });
+  it("option B: with a big (or no) size cap, funded companies are untouched", () => {
+    const fit = prospectFit(bigCapIcp, p({ description: "We build developer tools. Backed by Sequoia." }), { findings: [funding] });
+    expect(fit.verdict).not.toBe("weak");
+    expect(fit.signals.find((s) => s.label === "Company scale")).toBeUndefined();
+    const noCap = icpSchema.parse({ industry: "software startup" });
+    expect(prospectFit(noCap, p(), { findings: [funding] }).signals.find((s) => s.label === "Company scale")).toBeUndefined();
+  });
+  it("an excluded company stays excluded — the rule never upgrades", () => {
+    const icpEx = icpSchema.parse({ industry: "software startup", employeeMax: 5, exclusions: ["gambling"] });
+    const fit = prospectFit(icpEx, p({ description: "online gambling platform, backed by Sequoia, looking for a freelance developer" }));
+    expect(fit.verdict).toBe("excluded");
   });
 });

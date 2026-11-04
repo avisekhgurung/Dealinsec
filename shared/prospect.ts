@@ -8,6 +8,7 @@
 import { JUNK_PATH, JUNK_TITLE, cleanName, hostOf, isBlockedSite, looksLikeCompanyHost, registrableDomain, type SearchResult } from "./discovery";
 import { normText } from "./fit";
 import { countryLabel, isSeniorDecisionMaker, type Icp } from "./icp";
+import { classifyHiring } from "./opportunity-signals";
 import type { ScoreClaim } from "./lead-score";
 import { numericDate, type DateOrder } from "./page-dates";
 
@@ -125,6 +126,9 @@ export function relevance(c: Candidate, icp: Icp): number {
   if (has(icp.industry)) s += 4; else if (anyWord(icp.industry)) s += 2;
   for (const k of icp.keywords) if (has(k)) s += 2;
   for (const m of icp.targetMarket) if (has(m)) s += 3;
+  // A result that names the person's own service was likely found by an opportunity-led search (a business asking for
+  // that work): the service words count toward relevance, or those results would all be dropped as off topic.
+  for (const sv of icp.services ?? []) if (has(sv)) s += 2;
   for (const c2 of icp.countries) if (has(countryLabel(c2)) || has(c2)) s += 1;
   for (const l of icp.locations) if (has(l)) s += 1;
   return s;
@@ -341,8 +345,14 @@ const SIGNAL_FIELD: Record<SignalType, string> = {
  * Prospect findings in the shape the lead score reads (shared/lead-score.ts), so a prospect and a lead are scored by
  * the same function. A stale signal does not score. A strong timing signal (a confirmed concrete event dated to the day
  * or month, ≤ 90 days) also counts as INFERRED timing; a blog post or a year-only date never does.
+ *
+ * A HIRING signal is read for what it means to a freelancer (shared/opportunity-signals.ts classifyHiring): a posting
+ * that asks for a freelancer / contractor / white-label partner is a REAL buying signal (full credit, not half-credit
+ * activity); with `opts.smallTeam` (the ICP hunts small teams), a plain full-time opening earns no buying-signal credit
+ * at all — they are building in-house. Wording that says neither scores as before, and timing is unchanged either way
+ * (a dated posting is still a dated business event).
  */
-export function findingsAsClaims(findings: FindingLike[], now: Date): ScoreClaim[] {
+export function findingsAsClaims(findings: FindingLike[], now: Date, opts: { smallTeam?: boolean } = {}): ScoreClaim[] {
   const out: ScoreClaim[] = [];
   for (const f of findings) {
     const base = { id: f.id, value: f.value, status: f.status, evidenceUrl: f.sourceUrl ?? null, createdAt: f.retrievedAt ?? null };
@@ -358,7 +368,9 @@ export function findingsAsClaims(findings: FindingLike[], now: Date): ScoreClaim
     else if (f.kind === "signal" && isSignalType(f.type)) {
       const d = signalDating(f, now);
       if (d.band === "stale") continue;
-      out.push({ ...base, field: SIGNAL_FIELD[f.type] });
+      const hiring = f.type === "HIRING" ? ((f.meta?.hiringKind as string | undefined) ?? classifyHiring(f.value)) : null;
+      if (hiring === "outside_help") out.push({ ...base, field: "buying_signal" });
+      else if (!(hiring === "full_time" && opts.smallTeam)) out.push({ ...base, field: SIGNAL_FIELD[f.type] });
       if (f.status === "confirmed" && isEventSignal(f.type) && d.usable && d.days! <= STRONG_TIMING_DAYS) {
         out.push({ ...base, field: "timing", status: "inferred", value: `${SIGNAL_LABEL[f.type]} ${d.days === 0 ? "today" : `${d.days} days ago`}: ${f.value}` });
       }

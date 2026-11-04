@@ -35,7 +35,8 @@ import { IDEAL_CLIENT_URL, leadCall, leadError, type IdealClientResponse } from 
 import { stagger, staggerItem, useCalmMotion } from "@/lib/motion";
 import { queryClient } from "@/lib/queryClient";
 import { COUNTRY_NAME, ICP_URL, OUTBOUND_RUNS_URL, RUN_ERROR, RUN_STAGE_LABEL, countryName, runUrl, prospectUrl, type ParsedIcp, type ProspectCard as Card_, type RunView } from "@/lib/outbound";
-import { describeIcp, icpFromIdealClient, searchStrategies } from "@shared/icp";
+import { describeIcp, icpFromIdealClient, icpSchema, searchStrategies } from "@shared/icp";
+import { SEGMENT_LABEL, SEGMENT_PRESETS, offerLine, type SegmentPreset } from "@shared/opportunity-queries";
 import { DISCOVERY_PRESETS, suggestDiscoveryMode, type DiscoveryMode, type DiscoveryPreset } from "@shared/local-discovery";
 import { takeOutboundPrefill } from "@/lib/outbound-prefill";
 import { getTargetMarket } from "@/lib/first-goal";
@@ -346,7 +347,7 @@ export default function OutboundPage() {
   const maxCompanies = usage.data?.usage.plan?.maxCompanies ?? 50;
   // Where to look is the person's choice (never their own account's country): editing it re-plans the searches with the
   // same rules the server uses (shared/icp.ts searchStrategies).
-  const editPlaces = (patch: { countries?: string[]; locations?: string[] }) =>
+  const editPlaces = (patch: Partial<ParsedIcp["icp"]>) =>
     setParsed((p) => { if (!p) return p; const next = { ...p.icp, ...patch }; return { ...p, icp: next, searches: searchStrategies(next) }; });
   const [placeText, setPlaceText] = useState("");
   const addLocation = () => {
@@ -356,6 +357,21 @@ export default function OutboundPage() {
   };
   const firstTime = !!runs.data && runs.data.runs.length === 0;
   const pickExample = (x: string) => { setMode("web"); setText(x); setParsed(null); setTimeout(() => inputRef.current?.focus(), 0); };
+  // One click builds a whole search profile from a segment preset (plain rules, no model call): the kind of company,
+  // its size cap, the person's saved services (so opportunity-led searches are planned) and the setup-market country.
+  // The person still sees and edits every chip before anything starts.
+  const applySegment = (p: SegmentPreset) => {
+    trackEvent("outbound_segment_preset_used", { segment: p.segment });
+    setMode("web"); setText("");
+    const target = getTargetMarket(user?.id);
+    const fromSetup = !!target && target !== "WW" && target in COUNTRY_NAME;
+    const base = icpSchema.parse({
+      industry: p.industry, keywords: p.keywords, targetMarket: p.targetMarket, employeeMax: p.employeeMax,
+      segment: p.segment, services: (ideal.data?.isSet ? ideal.data.profile?.services ?? [] : []).slice(0, 6),
+      countries: fromSetup ? [target!] : [],
+    });
+    setParsed({ icp: base, searches: searchStrategies(base), description: describeIcp(base), source: "preset", fromSetup });
+  };
   const applyPreset = (p: DiscoveryPreset) => {
     trackEvent("outbound_preset_used", { preset: p.key });
     if (p.mode === "local") { setMode("local"); setLocalFields((f) => ({ ...f, ...p.local })); }
@@ -427,6 +443,14 @@ export default function OutboundPage() {
                 {!text && !firstTime && !runs.isLoading && <div className="flex flex-wrap gap-2">
                   {EXAMPLES.map((x) => <button key={x} onClick={() => pickExample(x)} className="rounded-full border px-3 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">{x}</button>)}
                 </div>}
+                {!text && !parsed && !runs.isLoading && (
+                  <div className="space-y-1.5" data-testid="outbound-segments">
+                    <p className="text-xs font-medium text-muted-foreground">Or start from who you sell to — one click builds a search profile you can edit:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {SEGMENT_PRESETS.map((p) => <button key={p.segment} onClick={() => applySegment(p)} title={p.note} className={presetChip} data-testid="outbound-segment-preset">{p.label}</button>)}
+                    </div>
+                  </div>
+                )}
                 <UsageNote usage={usage.data?.usage} />
                 {!parsed ? (
                   <div className="flex flex-wrap items-center gap-2">
@@ -450,7 +474,14 @@ export default function OutboundPage() {
                       {(icp.employeeMin || icp.employeeMax) && chip(icp.employeeMin && icp.employeeMax ? `${icp.employeeMin}–${icp.employeeMax} people` : icp.employeeMax ? `up to ${icp.employeeMax} people` : `${icp.employeeMin}+ people`)}
                       {icp.targetMarket.map((m) => chip(`serves ${m}`))}
                       {icp.exclusions.map((x) => chip(`not ${x}`))}
+                      {(icp.services ?? []).map((s) => chip(`you sell: ${s}`, () => editPlaces({ services: (icp.services ?? []).filter((x) => x !== s) })))}
+                      {icp.segment && chip(SEGMENT_LABEL[icp.segment], () => editPlaces({ segment: null }))}
                     </div>
+                    {(icp.services ?? []).length > 0 && (
+                      <p className="text-xs text-muted-foreground" data-testid="outbound-searching-as">
+                        Searching as: <span className="font-medium text-foreground">{offerLine(icp)}</span> · the plan includes searches for businesses asking for this work.
+                      </p>
+                    )}
                     <div className="flex flex-wrap items-center gap-2" data-testid="outbound-places">
                       <label className="sr-only" htmlFor="outbound-add-country">Add a country to search</label>
                       <select id="outbound-add-country" value="" disabled={icp.countries.length >= 5} onChange={(e) => { const c = e.target.value; if (c && !icp.countries.includes(c)) editPlaces({ countries: [...icp.countries, c] }); }}
@@ -461,10 +492,18 @@ export default function OutboundPage() {
                       <input value={placeText} onChange={(e) => setPlaceText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addLocation(); } }} onBlur={addLocation}
                         placeholder="+ City or region (optional)" aria-label="Add a city or region" maxLength={60} disabled={icp.locations.length >= 5}
                         className="h-8 w-48 rounded-md border bg-background px-2 text-xs" data-testid="outbound-add-location" />
+                      {icp.segment && (
+                        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">Size
+                          <select value={icp.employeeMax === 5 ? "5" : icp.employeeMax === 20 ? "20" : ""} onChange={(e) => editPlaces({ employeeMin: null, employeeMax: e.target.value ? Number(e.target.value) : null })}
+                            className="h-8 rounded-md border bg-background px-2 text-xs text-foreground" data-testid="outbound-size-cap" aria-label="Largest company size">
+                            <option value="5">Up to 5 people</option><option value="20">Up to 20 people</option><option value="">Any size</option>
+                          </select>
+                        </label>
+                      )}
                     </div>
                     {parsed.fromSetup && icp.countries.length > 0 && <p className="text-xs text-muted-foreground" data-testid="outbound-from-setup">The country comes from the market you chose at setup. Remove it to search worldwide.</p>}
                     {!icp.countries.length && !icp.locations.length && <p className="text-xs text-muted-foreground" data-testid="outbound-worldwide">Searching worldwide. Pick a country (the US, the UK, Canada, Australia, the UAE, India…) for more relevant companies.</p>}
-                    <p className="text-xs text-muted-foreground">Reaching: {icp.roles.slice(0, 4).join(", ") || "decision makers"} · {parsed.searches.length} searches planned{parsed.source === "rules" ? " · read by simple rules (the AI was unavailable)" : parsed.source === "saved" ? " · from your saved ideal client" : ""}</p>
+                    <p className="text-xs text-muted-foreground">Reaching: {icp.roles.slice(0, 4).join(", ") || "decision makers"} · {parsed.searches.length} searches planned{parsed.source === "rules" ? " · read by simple rules (the AI was unavailable)" : parsed.source === "saved" ? " · from your saved ideal client" : parsed.source === "preset" ? " · a ready-made profile, change anything" : ""}</p>
                     <div className="flex flex-wrap items-center gap-3">
                       <label className="flex items-center gap-2 text-sm">How many <input type="number" min={1} max={maxCompanies} value={icp.quantity} onChange={(e) => setQty(Number(e.target.value))} className="w-16 rounded-md border bg-background px-2 py-1 text-sm" data-testid="outbound-quantity" /></label>
                       <Button onClick={() => start.mutate()} disabled={start.isPending || !!blocked} className="gradient-btn text-white" data-testid="outbound-start">{start.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-1.5 h-4 w-4" />}Start search</Button>

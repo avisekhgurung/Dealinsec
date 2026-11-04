@@ -15,6 +15,7 @@ import { randomUUID } from "node:crypto";
 import { isSeeded, byResearchPriority, worthResearchingEarly, rankCandidates, collectCandidates, checkSite, emptyCounters, findingsAsClaims, readiness, runBudget, pickResearchLinks, SIGNAL_LABEL, timingOf, isDecisionMaker, type RejectReason, type RunCounters, type SearchHit, type FindingLike } from "@shared/prospect";
 import { contactFormFinding, normalizeEnrichment, normalizeResearch, type FactDraft } from "@shared/prospect-intel";
 import { COUNTRIES, countryOfQuery, industryMatched, isSeniorDecisionMaker, prospectFit, type Icp, type ProspectProfile } from "@shared/icp";
+import { classifyHiring, knownBigApplies } from "@shared/opportunity-signals";
 import { scoreLead } from "@shared/lead-score";
 import { pickLinks, sameSite, type ResearchPage } from "@shared/research";
 import type { ProspectFindingRow, ProspectRow, ProspectRunRow } from "@shared/schema";
@@ -541,7 +542,7 @@ export async function researchOne(run: Pick<ProspectRunRow, "id" | "organization
   const p = item?.prospect ?? opts.prospect!, now = deps.now(), orgId = run.organizationId;
   try {
     if (!opts.force && fresh(p.researchedAt, now) && (await deps.store.findings(orgId, p.id)).some((f) => f.batch === "research")) {
-      await scoreProspect(orgId, p.id, deps);
+      await scoreProspect(orgId, p.id, deps, icp);
       if (item) await deps.store.setItem(item.id, { stage: "done", updatedAt: now });
       return { kept: 0 };
     }
@@ -572,7 +573,9 @@ export async function researchOne(run: Pick<ProspectRunRow, "id" | "organization
     // statement, not necessarily the event it describes). Confidence is provenance only: readiness reads the date and its precision.
     for (const s of r.signals) {
       localOf.set(s.index, list.length);
-      list.push({ kind: "signal", type: s.type, value: s.value, status: "confirmed", sourceUrl: s.url, sourceType: "website", quote: s.quote, observedAt: s.observedAt, confidence: s.observedAt && s.dateSource !== "page_published" ? "high" : "medium", meta: { dateQuote: s.dateQuote, datePrecision: s.datePrecision, dateYear: s.dateYear, dateSource: s.dateSource, dateIssue: s.dateIssue, pageTruncated: s.pageTruncated, pagePublishedSource: s.dateSource === "page_published" ? pages.find((pg) => pg.url === s.url)?.published?.source ?? null : null, label: SIGNAL_LABEL[s.type] } });
+      list.push({ kind: "signal", type: s.type, value: s.value, status: "confirmed", sourceUrl: s.url, sourceType: "website", quote: s.quote, observedAt: s.observedAt, confidence: s.observedAt && s.dateSource !== "page_published" ? "high" : "medium", meta: { dateQuote: s.dateQuote, datePrecision: s.datePrecision, dateYear: s.dateYear, dateSource: s.dateSource, dateIssue: s.dateIssue, pageTruncated: s.pageTruncated, pagePublishedSource: s.dateSource === "page_published" ? pages.find((pg) => pg.url === s.url)?.published?.source ?? null : null, label: SIGNAL_LABEL[s.type],
+        // What a hiring notice means FOR A FREELANCER, read from the quoted wording once, at storage time (pure rules).
+        ...(s.type === "HIRING" ? { hiringKind: classifyHiring(`${s.value} ${s.quote ?? ""}`) } : {}) } });
     }
     for (const m of r.people) {
       localOf.set(m.index, list.length);
@@ -587,7 +590,7 @@ export async function researchOne(run: Pick<ProspectRunRow, "id" | "organization
         supports: o.supports.map((s) => (s.findingId !== undefined ? { findingId: s.findingId } : { local: localOf.get(s.newIndex!) })) });
     }
     await deps.store.saveStep({ orgId, prospectId: p.id, batch: "research", findings: list, prospect: { researchedAt: now }, itemId: item?.id, item: item ? { stage: "done" } : undefined, now });
-    await scoreProspect(orgId, p.id, deps);
+    await scoreProspect(orgId, p.id, deps, icp);
     return { kept: list.length };
   } catch (e) {
     if (classify(e) === "stop") throw e;
@@ -598,20 +601,27 @@ export async function researchOne(run: Pick<ProspectRunRow, "id" | "organization
 
 /* ── score, ready, finalize ─────────────────────────────────────────────── */
 
-/** The deterministic score and readiness for one prospect, from everything stored about it. */
-export async function scoreProspect(orgId: string, prospectId: number, deps: Pick<PipelineDeps, "store" | "now">): Promise<ProspectRow | null> {
+/**
+ * The deterministic score and readiness for one prospect, from everything stored about it. With the run's ICP, the fit
+ * is also recomputed over the findings (the known-big rule reads funding and hiring signals research stored after the
+ * enrich-time fit was judged); without one — a caller that has no run in hand — the stored fit stands as it was.
+ */
+export async function scoreProspect(orgId: string, prospectId: number, deps: Pick<PipelineDeps, "store" | "now">, icp?: Icp | null): Promise<ProspectRow | null> {
   const p = await deps.store.getProspect(orgId, prospectId);
   if (!p) return null;
   const now = deps.now();
   const findings = await deps.store.findings(orgId, prospectId);
   const asLike: FindingLike[] = findings.map((f) => ({ id: f.id, kind: f.kind, type: f.type, value: f.value, status: f.status, sourceUrl: f.sourceUrl, observedAt: f.observedAt, retrievedAt: f.retrievedAt, meta: f.meta as Record<string, unknown> }));
-  const fit = (p.fit as any) ?? null;
-  const score = scoreLead(fit, {}, findingsAsClaims(asLike, now));
+  let fit = (p.fit as any) ?? null;
+  const profile = (p.profile ?? {}) as Record<string, { value: string } | undefined>;
+  const refit = !!icp?.industry && !!fit && Object.keys(profile).length > 0;
+  if (refit) fit = prospectFit(icp!, flatProfile(p.name, profile, p.domain), { findings: asLike });
+  const score = scoreLead(fit, {}, findingsAsClaims(asLike, now, { smallTeam: !!icp && knownBigApplies(icp) }));
   const ready = readiness({ verified: !!p.verifiedAt && p.status !== "rejected", fitVerdict: fit?.verdict ?? null, findings: asLike, now });
   const researched = findings.some((f) => f.batch === "research");
   // "qualified" only when it fits on evidence; a researched company whose fit can't be judged keeps its earlier status.
   const status = p.status === "rejected" ? "rejected" : ready.ready ? "ready" : researched && ready.classification === "qualified" ? "qualified" : p.status === "ready" || p.status === "qualified" ? "enriched" : p.status;
-  return deps.store.updateProspect(orgId, prospectId, { score: { ...score, readyMissing: ready.missing, classification: ready.classification, timing: ready.timing }, ready: ready.ready, status, updatedAt: now });
+  return deps.store.updateProspect(orgId, prospectId, { ...(refit ? { fit } : {}), score: { ...score, readyMissing: ready.missing, classification: ready.classification, timing: ready.timing }, ready: ready.ready, status, updatedAt: now });
 }
 
 export async function computeCounters(run: ProspectRunRow, deps: PipelineDeps): Promise<RunCountersExt> {
@@ -649,7 +659,7 @@ async function finalize(run: ProspectRunRow, icp: Icp, deps: PipelineDeps, stopp
   // Everything that reached enrichment gets its score; items left waiting (budget or a stop) are closed as they are.
   const items = await deps.store.runItems(run.organizationId, run.id);
   for (const i of items) {
-    if (i.stage === "enriched" || i.stage === "done") await scoreProspect(run.organizationId, i.prospectId, deps);
+    if (i.stage === "enriched" || i.stage === "done") await scoreProspect(run.organizationId, i.prospectId, deps, icp);
     if (i.stage === "enriched") await deps.store.setItem(i.id, { stage: "done", errorCode: stoppedBy ? stoppedBy : "not_researched", updatedAt: deps.now() });
     const why = stoppedBy === "daily_limit" || stoppedBy === "global_limit" || stoppedBy === "workspace_budget" ? stoppedBy : stoppedBy ? "failed" : "budget";
     if (i.stage === "found" || i.stage === "verified") await deps.store.setItem(i.id, { stage: "rejected", errorCode: why, updatedAt: deps.now() });

@@ -13,8 +13,10 @@ export const PREPARE_OUTREACH_URL = "/api/outbound/outreach/prepare";
 export interface Icp {
   industry: string; keywords: string[]; countries: string[]; locations: string[]; employeeMin: number | null; employeeMax: number | null;
   targetMarket: string[]; roles: string[]; exclusions: string[]; quantity: number;
+  /** What the person sells (fills opportunity-led searches) and who they sell to (a one-click preset). Runs stored before these existed omit them at runtime, so render with `?? []` / `?? null`. */
+  services: string[]; segment: import("@shared/opportunity-queries").Segment | null;
 }
-export interface ParsedIcp { icp: Icp; searches: string[]; description: string; /** "saved" = built from the saved ideal client, by deliberate plain rules (no model involved). */ source: "model" | "rules" | "saved"; /** The country was filled in from the market chosen at setup (client-side, removable). */ fromSetup?: boolean }
+export interface ParsedIcp { icp: Icp; searches: string[]; description: string; /** "saved" = built from the saved ideal client, "preset" = a one-click segment preset — both by deliberate plain rules (no model involved). */ source: "model" | "rules" | "saved" | "preset"; /** The country was filled in from the market chosen at setup (client-side, removable). */ fromSetup?: boolean }
 
 export interface Counters {
   searched: number; results: number; discovered: number; rejected: number; rejectedBy: Record<string, number>; verified: number; enriched: number;

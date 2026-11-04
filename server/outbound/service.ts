@@ -8,7 +8,7 @@
  */
 import { createHash } from "node:crypto";
 import { sanitizeQuery } from "@shared/discovery";
-import { describeIcp, icpSchema, mergeIcp, parseIcpFallback, searchStrategies, withSavedExclusions, type Icp } from "@shared/icp";
+import { describeIcp, icpSchema, mergeIcp, parseIcpFallback, searchStrategies, withSavedExclusions, withSavedServices, type Icp } from "@shared/icp";
 import { normalizeAngle, type Angle, type OpportunityPlan } from "@shared/prospect-intel";
 import { scoreOpportunity, weightsFrom, type CitedFinding, type OpportunityScore } from "@shared/opportunity-score";
 import { FRESHNESS_LABEL, PROSPECT_CLASS_LABEL, REJECT_LABEL, SIGNAL_LABEL, TIMING_LABEL, dateLabel, isContactFormRoute, isDecisionMaker, isSignalType, readiness, runBudget, signalDating, timingOf, type FindingLike, type ProspectClass, type RejectReason, type Timing, hasVerifiedEmail } from "@shared/prospect";
@@ -72,7 +72,9 @@ export async function parseIcp(user: Who, request: unknown, d: Partial<PipelineD
   const merged = mergeIcp(modelOut, fallback);
   if (!merged) return fail(422, "unclear", "I couldn't tell what kind of company you want. Name the kind of business, for example \"digital marketing agencies\".");
   const allowance = outboundAllowance(await outboundTier(user));
-  const icp = withSavedExclusions({ ...merged, quantity: Math.min(merged.quantity, allowance.maxCompanies) }, saved);
+  // The saved ideal client fills what the request didn't say: the standing exclusions, and the person's own services
+  // (which plan the opportunity-led searches). The person sees and edits all of it before anything starts.
+  const icp = withSavedServices(withSavedExclusions({ ...merged, quantity: Math.min(merged.quantity, allowance.maxCompanies) }, saved), saved);
   const extra = Array.isArray(modelOut?.searches) ? (modelOut!.searches as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 4) : [];
   return { ok: true, icp, searches: searchStrategies(icp, extra), description: describeIcp(icp), source: modelOut ? "model" : "rules" };
 }
@@ -429,7 +431,8 @@ export async function findContacts(user: Who, id: number, runId: unknown, d: Par
     meta: { name: c.name, title: c.title, rank: roleRank(icp, c.title), email: c.email, emailStatus: c.emailStatus, providerConfidence: c.confidence, provider: c.source },
   }));
   await deps.store.saveStep({ orgId, prospectId: id, batch: "contact", findings, now });
-  await scoreProspect(orgId, id, deps);
+  // Only a real run's ICP may re-judge the fit; the roles-only stub above exists just to rank titles.
+  await scoreProspect(orgId, id, deps, run ? (run.icp as Icp) : null);
   const b = await getProspect(user, id, d);
   return b.ok ? { ok: true, brief: b.brief, found: findings.length } : b;
 }

@@ -7,6 +7,8 @@
 import { z } from "zod";
 import { sanitizeQuery } from "./discovery";
 import { assessFit, normText, textMatches, verdictFrom, type FitResult, type FitSignal, type IdealClient } from "./fit";
+import { SEGMENTS, opportunityPhrasings } from "./opportunity-queries";
+import { bigCompanyIn, classifyHiring, knownBigApplies, outsideHelpIn } from "./opportunity-signals";
 
 export const MAX_QUANTITY = 50;
 export const DEFAULT_QUANTITY = 20;
@@ -31,6 +33,10 @@ export const icpSchema = z.object({
   roles: list(6, 60).default([]),
   exclusions: list(10, 60).default([]),
   quantity: z.number().int().min(1).max(MAX_QUANTITY).default(DEFAULT_QUANTITY),
+  /** What the PERSON sells ("web development"): fills opportunity-led searches (shared/opportunity-queries.ts). Empty = exactly the searches of before. */
+  services: list(6, 60).default([]),
+  /** Who they sell to, chosen as a one-click preset; null = none chosen. */
+  segment: z.enum(SEGMENTS).nullable().default(null),
 }).refine((x) => x.employeeMin === null || x.employeeMax === null || x.employeeMin <= x.employeeMax, { message: "The smallest company size must not be bigger than the largest." });
 export type Icp = z.infer<typeof icpSchema>;
 
@@ -125,6 +131,9 @@ export function mergeIcp(modelOutput: unknown, fallback: Icp | null): Icp | null
     exclusions: pick("exclusions", base.exclusions) ?? fallback?.exclusions ?? [],
     // The NUMBER the person asked for is read by the rules when they found one; a model never raises it.
     quantity: Math.min(fallback?.quantity ?? MAX_QUANTITY, pick("quantity", base.quantity) ?? fallback?.quantity ?? DEFAULT_QUANTITY),
+    services: pick("services", base.services) ?? fallback?.services ?? [],
+    // The segment is the person's one-click choice in the UI, never a model's guess.
+    segment: fallback?.segment ?? null,
   };
   const r = icpSchema.safeParse(merged);
   if (r.success) return r.data;
@@ -140,12 +149,22 @@ export function withSavedExclusions(icp: Icp, saved: { exclusions?: string[] } |
 }
 
 /**
+ * The ICP plus the saved ideal client's services (what the person sells), when the request named none. Fills the
+ * proposal the person sees and edits; a profile they confirmed with services removed is never refilled.
+ */
+export function withSavedServices(icp: Icp, saved: { services?: string[] } | null | undefined): Icp {
+  if (icp.services?.length || !saved?.services?.length) return icp;
+  const services = Array.from(new Set(saved.services.map((x) => String(x ?? "").replace(/\s+/g, " ").trim().slice(0, 60)).filter(Boolean))).slice(0, 6);
+  return services.length ? { ...icp, services } : icp;
+}
+
+/**
  * The saved ideal client (shared/fit.ts), read as a search profile by plain rules: no model call, nothing
  * invented. The first target industry says what kind of company to find and the rest become keywords; a
  * target location naming a recognised country becomes its code, anything else stays a place; the saved
  * exclusions carry over. Null when no target industry is saved — a search must know what to look for.
  */
-export function icpFromIdealClient(p: { targetIndustries?: string[]; targetLocations?: string[]; exclusions?: string[] } | null | undefined): Icp | null {
+export function icpFromIdealClient(p: { targetIndustries?: string[]; targetLocations?: string[]; exclusions?: string[]; services?: string[] } | null | undefined): Icp | null {
   const industries = (p?.targetIndustries ?? []).map((x) => x.replace(/\s+/g, " ").trim()).filter(Boolean);
   if (!industries.length) return null;
   const countries: string[] = [], locations: string[] = [];
@@ -161,6 +180,8 @@ export function icpFromIdealClient(p: { targetIndustries?: string[]; targetLocat
     countries: countries.slice(0, 5),
     locations: locations.slice(0, 5),
     exclusions: (p?.exclusions ?? []).map((x) => x.replace(/\s+/g, " ").trim().slice(0, 60)).filter(Boolean).slice(0, 10),
+    // The saved services carry over: the searches then also look for businesses asking for that work (opportunity-queries).
+    services: (p?.services ?? []).map((x) => x.replace(/\s+/g, " ").trim().slice(0, 60)).filter(Boolean).slice(0, 6),
   });
   return out.success ? out.data : null;
 }
@@ -223,11 +244,19 @@ export function countryOfQuery(q: string, i: Icp): string | undefined {
 
 export function searchStrategies(i: Icp, extra: string[] = [], max = MAX_QUERIES): string[] {
   // Every chosen place gets its own phrasings, interleaved so the first searches already cover all of them (with one
-  // place this is exactly the single-place plan).
-  const perPlace = searchPlaces(i).map((place) => phrasingsFor(i, place));
+  // place this is exactly the single-place plan). With services on the ICP, each place's phrasings alternate between
+  // company-describing ones and opportunity-led ones (businesses asking for that work); with none, nothing changes.
+  const perPlace = searchPlaces(i).map((place) => alternate(phrasingsFor(i, place), opportunityPhrasings(i, place)));
   const t: string[] = [];
   for (let r = 0; perPlace.some((xs) => r < xs.length); r++) for (const xs of perPlace) if (r < xs.length) t.push(xs[r]);
   return pickSearches(t, extra, max);
+}
+
+/** a[0], b[0], a[1], b[1], …: with `b` empty this is exactly `a`, so an ICP without services plans the same searches as before. */
+function alternate(a: string[], b: string[]): string[] {
+  const out: string[] = [];
+  for (let r = 0; r < a.length || r < b.length; r++) { if (r < a.length) out.push(a[r]); if (r < b.length) out.push(b[r]); }
+  return out;
 }
 
 /** The search phrasings for one place ("" = worldwide). */
@@ -343,11 +372,20 @@ const B2B_WORDS = /\b(b2b|saas|software|tech|technology|enterprise|business[- ]t
 const B2C_WORDS = /\b(b2c|d2c|dtc|direct[- ]to[- ]consumer|consumer brands?|consumer products?|e-?commerce brands?)\b/i;
 const B2B_MARKET = /\b(saas|b2b|software|tech)/i;
 
+/** What the known-big rule needs of a stored finding: enough to read funding and hiring signals, nothing more. */
+export interface FitFindingLike { kind: string; type: string; value: string; status: string; meta?: Record<string, unknown> | null }
+
 /**
  * How well a company matches the run's ICP: the lead fit check (industry, place, exclusions) plus company size and
  * target market, combined by the SAME verdict rule (verdictFrom). Unknown is never a mismatch.
+ *
+ * With a SMALL size cap on the ICP (shared/opportunity-signals.ts knownBigApplies, ≤ 20 people) a company KNOWN to be
+ * big — a stated headcount above the cap, disclosed funding or an accelerator badge, several confirmed full-time
+ * openings (`extras.findings`) — is a weak fit: it likely has an in-house team and an investor's budget. An explicit
+ * ask for outside help (freelance, contract, white-label…) cancels that, and a company that states none of it is
+ * untouched: silence is never evidence.
  */
-export function prospectFit(icp: Icp, p: ProspectProfile): FitResult {
+export function prospectFit(icp: Icp, p: ProspectProfile, extras: { findings?: FitFindingLike[] } = {}): FitResult {
   const ideal: IdealClient = {
     about: null, services: [], minDealMinor: null, currency: null,
     targetIndustries: [icp.industry, ...icp.keywords],
@@ -405,6 +443,28 @@ export function prospectFit(icp: Icp, p: ProspectProfile): FitResult {
   // The same for a market the company says it does not serve (only consumers, when you asked for B2B or software companies).
   const market = signals.find((x) => x.key === "market");
   if (market?.status === "mismatch" && verdict !== "excluded" && verdict !== "weak") { verdict = "weak"; headline = "It says it serves consumers, not the market you asked for."; }
+  // "Known big" (see the doc above): acts only on what the company itself states, and only for a small-team ICP.
+  if (knownBigApplies(icp) && verdict !== "excluded") {
+    const findings = extras.findings ?? [];
+    const ownText = [p.description, p.services, p.targetCustomers, p.employees].filter(Boolean).join(" · ");
+    const help = outsideHelpIn([ownText, ...findings.map((f) => f.value)].join(" · "));
+    const reasons: string[] = [];
+    const hc = parseHeadcount(p.employees);
+    if (hc && hc.min > icp.employeeMax!) reasons.push(`a stated team of ${String(p.employees).trim().slice(0, 40)}`);
+    const corp = bigCompanyIn(ownText);
+    if (corp) reasons.push(`it says "${corp}"`);
+    const funded = findings.find((f) => f.kind === "signal" && f.type === "FUNDING" && f.status === "confirmed");
+    if (funded) reasons.push(`announced funding (${funded.value.slice(0, 60)})`);
+    const fullTime = findings.filter((f) => f.kind === "signal" && f.type === "HIRING" && f.status === "confirmed"
+      && ((f.meta?.hiringKind ?? classifyHiring(f.value)) === "full_time"));
+    if (fullTime.length >= 2) reasons.push(`${fullTime.length} full-time openings`);
+    if (reasons.length && !help) {
+      signals.push({ key: "size", label: "Company scale", status: "mismatch", detail: `Signs of an in-house team or an investor's budget: ${reasons.join("; ")} — likely beyond a freelance engagement.` });
+      if (verdict !== "weak") { verdict = "weak"; headline = "Known to be bigger than the small clients you asked for."; }
+    } else if (reasons.length && help) {
+      signals.push({ key: "size", label: "Company scale", status: "match", detail: `Bigger-company signs (${reasons.join("; ")}), but they ask for outside help: "${help}".` });
+    }
+  }
   const missing = signals.filter((s) => s.status === "unknown").map((s) => s.label.toLowerCase());
   return { verdict, headline, signals, excludedBy: base.excludedBy, missing };
 }

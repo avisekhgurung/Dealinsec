@@ -435,3 +435,59 @@ describe("worth researching before every site is examined", () => {
     expect(worthResearchingEarly({ verdict: "partial", signals: sig("match", "match", "unknown", "unknown") }, 2)).toBe(true); // the threshold is a setting
   });
 });
+
+/* ── Phase 3A: what a hiring notice means for a freelancer, and the eval fixture ── */
+
+describe("3A: hiring classification in the score", () => {
+  const f = (over: Partial<FindingLike>): FindingLike => ({ id: 1, kind: "signal", type: "HIRING", value: "x", status: "confirmed", sourceUrl: "https://n.com", retrievedAt: NOW, observedAt: "2026-10-01T00:00:00Z", ...over });
+  it("an ask for a freelancer is a REAL buying signal (full credit), read from stored meta or from the wording", () => {
+    const viaMeta = findingsAsClaims([f({ meta: { hiringKind: "outside_help" } })], NOW);
+    expect(viaMeta.map((c) => c.field)).toEqual(["buying_signal", "timing"]);
+    const viaWords = findingsAsClaims([f({ value: "Looking for a freelance developer for client work" })], NOW);
+    expect(viaWords[0].field).toBe("buying_signal");
+    expect(scoreLead(null, {}, viaMeta).components.find((c) => c.key === "signal")!.points).toBe(20);
+  });
+  it("with a small-team ICP, a plain full-time opening earns no buying-signal credit; without that flag it scores as before", () => {
+    const smallTeam = findingsAsClaims([f({ meta: { hiringKind: "full_time" } })], NOW, { smallTeam: true });
+    expect(smallTeam.map((c) => c.field)).toEqual(["timing"]); // still a dated business event, just not a buying signal
+    const anyTeam = findingsAsClaims([f({ meta: { hiringKind: "full_time" } })], NOW);
+    expect(anyTeam.map((c) => c.field)).toEqual(["hiring", "timing"]);
+  });
+  it("wording that says neither keeps today's behaviour exactly (findings stored before 3A have no meta)", () => {
+    const claims = findingsAsClaims([f({ value: "Hiring an SEO strategist" })], NOW, { smallTeam: true });
+    expect(claims.map((c) => [c.field, c.status])).toEqual([["hiring", "confirmed"], ["timing", "inferred"]]);
+  });
+});
+
+describe("3A eval fixture: a funded SaaS with an engineering team ranks below a small agency asking for white-label help", () => {
+  it("fit, score and readiness all order them the right way round", async () => {
+    const { prospectFit } = await import("./icp");
+    const smallIcp = icpSchema.parse({ industry: "software company", keywords: ["digital agency"], employeeMax: 5, services: ["web development"] });
+    const funded = {
+      profile: { name: "ScaleRocket", domain: "scalerocket.com", industry: "software company", description: "Venture-backed, raised our Series A. We're scaling our in-house engineering team." },
+      findings: [
+        { id: 1, kind: "signal", type: "FUNDING", value: "Raised a $6M Series A round", status: "confirmed", observedAt: "2026-10-01T00:00:00Z" },
+        { id: 2, kind: "signal", type: "HIRING", value: "Hiring a full-time senior engineer", status: "confirmed", observedAt: "2026-10-01T00:00:00Z", meta: { hiringKind: "full_time" } },
+        { id: 3, kind: "signal", type: "HIRING", value: "Hiring a full-time product designer", status: "confirmed", observedAt: "2026-10-02T00:00:00Z", meta: { hiringKind: "full_time" } },
+      ] as FindingLike[],
+    };
+    const smallAgency = {
+      profile: { name: "Dot & Pixel", domain: "dotpixel.studio", industry: "digital agency", description: "A two-person studio. We're looking for a white-label web development partner for overflow client work." },
+      findings: [
+        { id: 4, kind: "signal", type: "HIRING", value: "Looking for a freelance web developer, contract basis", status: "confirmed", observedAt: "2026-10-03T00:00:00Z", meta: { hiringKind: "outside_help" } },
+      ] as FindingLike[],
+    };
+    const judge = (x: typeof funded) => {
+      const fit = prospectFit(smallIcp, x.profile, { findings: x.findings });
+      const score = scoreLead(fit, {}, findingsAsClaims(x.findings, NOW, { smallTeam: true }));
+      const ready = readiness({ verified: true, fitVerdict: fit.verdict, findings: x.findings, now: NOW });
+      return { fit, score, ready };
+    };
+    const big = judge(funded), small = judge(smallAgency);
+    expect(big.fit.verdict).toBe("weak");                      // known big, silent about outside help
+    expect(small.fit.verdict).not.toBe("weak");                // asks for exactly this work
+    expect(small.score.total).toBeGreaterThan(big.score.total);
+    expect(big.ready.classification).toBe("not_a_fit");
+    expect(["ready", "qualified"]).toContain(small.ready.classification);
+  });
+});
