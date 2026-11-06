@@ -12,7 +12,8 @@
  * crash redoes at most the slice in flight. The model only ever proposes; shared/prospect-intel.ts decides.
  */
 import { randomUUID } from "node:crypto";
-import { isSeeded, byResearchPriority, worthResearchingEarly, rankCandidates, collectCandidates, checkSite, emptyCounters, findingsAsClaims, readiness, runBudget, pickResearchLinks, SIGNAL_LABEL, timingOf, isDecisionMaker, type RejectReason, type RunCounters, type SearchHit, type FindingLike } from "@shared/prospect";
+import { isSeeded, isOpportunitySourced, byResearchPriority, worthResearchingEarly, rankCandidates, collectCandidates, checkSite, emptyCounters, findingsAsClaims, readiness, runBudget, pickResearchLinks, junkReason, canonicalUrl, domainOf, SIGNAL_LABEL, timingOf, isDecisionMaker, type Provenance, type RejectReason, type RunCounters, type SearchHit, type FindingLike } from "@shared/prospect";
+import { MAX_DIRECT_ASKS, MAX_OPPORTUNITY_PROSPECTS, directAskOf, relevantAsks, type DirectAsk } from "@shared/opportunity-sources";
 import { contactFormFinding, normalizeEnrichment, normalizeResearch, type FactDraft } from "@shared/prospect-intel";
 import { COUNTRIES, countryOfQuery, industryMatched, isSeniorDecisionMaker, prospectFit, type Icp, type ProspectProfile } from "@shared/icp";
 import { classifyHiring, knownBigApplies } from "@shared/opportunity-signals";
@@ -21,8 +22,8 @@ import { pickLinks, sameSite, type ResearchPage } from "@shared/research";
 import type { ProspectFindingRow, ProspectRow, ProspectRunRow } from "@shared/schema";
 import { ProviderError } from "../copilot/provider";
 import { parseJsonObject } from "../agent/extraction";
-import { DiscoveryError, type DiscoveryProvider } from "../discovery/types";
-import { outboundSearchProviders } from "../discovery/provider";
+import { DiscoveryError, type DiscoveryProvider, type OpportunitySource } from "../discovery/types";
+import { opportunitySources, outboundSearchProviders } from "../discovery/provider";
 import { leadsStore } from "../leads/store";
 import { CapExceeded, CapUnavailable, GlobalCapExceeded, WorkspaceBudgetExceeded, remainingToday, tracedChat, type TraceCtx } from "../llm/traced";
 import type { ChatMessage } from "../copilot/provider";
@@ -71,6 +72,8 @@ export interface PipelineDeps {
   searchDiagnostics?: string | null;
   /** Opt-in research date diagnostics: the local directory to write them to (OUTBOUND_RESEARCH_DIAGNOSTICS=1), or null (off). */
   researchDiagnostics?: string | null;
+  /** The community demand sources (OPPORTUNITY_SOURCES, Phase 3B). Empty (the default when unset) = no scan. */
+  opportunitySources?: () => OpportunitySource[];
 }
 
 /** This worker no longer holds the run (another claimed it, or it was cancelled): stop, write nothing more. */
@@ -86,12 +89,19 @@ export const pipelineDeps = (): PipelineDeps => ({
   store: outboundStore, chat: tracedChat, reader: pageReader(), sitemap: (s) => readSitemap(s), searchProviders: () => outboundSearchProviders(),
   company: companyProvider(), contact: contactProvider(), leadByDomain: (o, d) => leadsStore.findByDomain(o, d), now: () => new Date(), concurrency: 3,
   allowance: (task, orgId) => remainingToday(task, orgId), searchDiagnostics: searchDiagnosticsDir(), researchDiagnostics: researchDiagnosticsDir(),
+  opportunitySources: () => opportunitySources(),
 });
 
 /* ── small helpers ──────────────────────────────────────────────────────── */
 
 export interface QueryPlan { q: string; provider: string; done: boolean; ok?: boolean; results?: number; error?: string }
-export interface RunCountersExt extends RunCounters { searchRejectedBy?: Partial<Record<RejectReason, number>>; costMicroUsd?: number; stoppedBy?: string | null }
+export interface RunCountersExt extends RunCounters {
+  searchRejectedBy?: Partial<Record<RejectReason, number>>; costMicroUsd?: number; stoppedBy?: string | null;
+  /** The Phase 3B demand scan's outcome, once per run (idempotence marker; an error never fails the run). */
+  opportunityScan?: { done: boolean; posts?: number; asks?: number; error?: string };
+  /** Posts with no company site: shown read-only on the run ("open the post and reply yourself"). Bounded. */
+  directAsks?: DirectAsk[];
+}
 
 const pageCache = new Map<string, { at: number; page: PageRead }>();
 /** Who a page read is for: a paid read (`via`) is recorded against them as a provider call, with its estimated cost. */
@@ -236,6 +246,15 @@ async function searchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps:
   const plan = run.queries as QueryPlan[];
   const next = plan.find((q) => !q.done);
   const counters: RunCountersExt = { ...emptyCounters(), ...(run.counters as RunCountersExt) };
+  // The demand scan (Phase 3B) runs once, before the web queries. Free, no model; a failure is recorded and the
+  // ordinary search carries on exactly as before. With no source configured (the default) nothing here runs at all —
+  // not even the marker's write — so a deployment without OPPORTUNITY_SOURCES behaves exactly as it did before 3B.
+  const scanSources = counters.opportunityScan?.done || !icp.services?.length ? [] : (deps.opportunitySources ?? (() => []))();
+  if (scanSources.length) {
+    await opportunityScan(run, icp, counters, deps, scanSources);
+    await writeRun(deps, run, { counters, updatedAt: deps.now() });
+    run.counters = counters;
+  }
   if (next) {
     const providers = await deps.searchProviders();
     const provider = providers.find((p) => p.name === next.provider) ?? providers[0];
@@ -284,6 +303,54 @@ async function searchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps:
   return rankStep(run, icp, deps);
 }
 
+/**
+ * The Phase 3B demand scan: posts from community sources (people asking for the person's services), matched to the
+ * ICP by plain rules. A post that links a company site seeds that site into the ordinary pipeline — carrying the
+ * post as a confirmed, dated outside-help HIRING signal (batch "opportunity"; saveStep's replace-by-batch makes a
+ * re-run exact, never a duplicate) — and the rest are kept as read-only direct asks on the run. Runs only when the
+ * ICP has services AND a source is configured (OPPORTUNITY_SOURCES); otherwise it marks itself done and changes
+ * nothing. A source failure is recorded in the marker and never stops the run.
+ */
+export async function opportunityScan(run: Pick<ProspectRunRow, "id" | "organizationId">, icp: Icp, counters: RunCountersExt, deps: PipelineDeps, from?: OpportunitySource[]): Promise<void> {
+  const scan: NonNullable<RunCountersExt["opportunityScan"]> = { done: true };
+  counters.opportunityScan = scan;
+  const sources = from ?? (deps.opportunitySources ?? (() => []))();
+  if (!sources.length || !(icp.services?.length)) return;
+  const orgId = run.organizationId, now = deps.now();
+  for (const src of sources.slice(0, 2)) {
+    try {
+      const posts = await trackProvider(deps, { orgId, runId: run.id, provider: src.name, operation: "opportunity" }, () => src.scan());
+      const asks: DirectAsk[] = [];
+      let seeded = 0;
+      for (const post of relevantAsks(posts, icp)) {
+        const url = post.companyUrl ? canonicalUrl(post.companyUrl) : null;
+        const domain = url ? domainOf(url) : null;
+        const why = url && domain ? junkReason({ url, title: "", snippet: post.text.slice(0, 300) }, icp.exclusions) : null;
+        if (url && domain && !why && seeded < MAX_OPPORTUNITY_PROSPECTS) {
+          // The post's own link seeds its company; the home page gives the name (verifyOne), as a listing's site does.
+          const prov: Provenance = { provider: src.name, query: post.threadTitle.slice(0, 120), url, title: post.title.slice(0, 200), snippet: post.text.slice(0, 300), at: now.toISOString() };
+          const p = await deps.store.upsertProspect(orgId, { domain, name: domain, website: `https://${domain}`, sources: [prov] }, now);
+          await deps.store.addRunItem({ runId: run.id, orgId, prospectId: p.id, stage: "found", now });
+          // The ask itself is the evidence: the post's words, its own date, a link to it. 3A's scoring reads
+          // hiringKind "outside_help" as the real buying signal it is.
+          await deps.store.saveStep({ orgId, prospectId: p.id, batch: "opportunity", now, findings: [{
+            kind: "signal", type: "HIRING", value: post.title.slice(0, 400) || post.text.slice(0, 400), status: "confirmed",
+            sourceUrl: post.url, sourceType: "post", quote: post.text.slice(0, 500), observedAt: post.postedAt ? new Date(post.postedAt) : null,
+            confidence: "high", meta: { hiringKind: "outside_help", datePrecision: post.postedAt ? "day" : null, dateSource: "api", label: SIGNAL_LABEL.HIRING, source: src.name, thread: post.threadTitle.slice(0, 120) },
+          }] });
+          seeded++;
+        } else if (asks.length < MAX_DIRECT_ASKS) asks.push(directAskOf(post));
+      }
+      scan.posts = (scan.posts ?? 0) + seeded;
+      counters.directAsks = [...(counters.directAsks ?? []), ...asks].slice(0, MAX_DIRECT_ASKS);
+      scan.asks = counters.directAsks.length;
+    } catch (e) {
+      scan.error = e instanceof DiscoveryError ? e.code : "error";
+      console.log(JSON.stringify({ kind: "outbound_opportunity_scan_failed", source: src.name, errorType: scan.error }));
+    }
+  }
+}
+
 async function rankStep(run: ProspectRunRow, icp: Icp, deps: PipelineDeps): Promise<StepResult> {
   const plan = run.queries as QueryPlan[];
   const items = await deps.store.runItems(run.organizationId, run.id);
@@ -297,9 +364,10 @@ async function rankStep(run: ProspectRunRow, icp: Icp, deps: PipelineDeps): Prom
     const candidate = { domain: i.prospect.domain, name: i.prospect.name, website: i.prospect.website, sources: (i.prospect.sources as any[]) ?? [], rank: 0 };
     found.push({ i, order: i.id, candidate, isLead: !!i.prospect.leadId || !!(await deps.leadByDomain(run.organizationId, i.prospect.domain)) });
   }
-  // A website the person chose from a local listing is checked whatever its words say: it is there by their choice, not
-  // because a web search matched it (rankCandidates' relevance test is for search results).
-  const seeded = found.filter((x) => isSeeded(x.candidate.sources) && !x.isLead);
+  // A website the person chose from a local listing — or one a demand post explicitly linked — is checked whatever
+  // its words say: it is there by a choice or a link, not because a web search matched it (rankCandidates' relevance
+  // test is for search results).
+  const seeded = found.filter((x) => (isSeeded(x.candidate.sources) || isOpportunitySourced(x.candidate.sources)) && !x.isLead);
   const ranked = [
     ...seeded.map((x) => ({ ...x, score: 1, rel: 1, outcome: "keep" as const })),
     ...rankCandidates(found.filter((x) => !seeded.includes(x)), icp, Math.max(0, budget.verify - seeded.length)),
@@ -341,9 +409,9 @@ async function verifyOne(run: ProspectRunRow, item: ItemWithProspect, deps: Pipe
   else if (!sameSite(new URL(page.url).hostname, p.domain) && !new URL(page.url).hostname.endsWith(`.${p.domain}`)) reason = "offsite_redirect";
   else {
     const c = checkSite({ name: p.name, domain: p.domain }, page);
-    // A site a listing linked to is that business's own: a missing name match isn't a reason to set it aside (its listing
-    // name isn't kept to compare with). Parked and thin sites still are.
-    if (!c.ok && !(c.reason === "no_identity" && isSeeded(p.sources))) reason = c.reason!;
+    // A site a listing linked to is that business's own — and a site a demand post linked carries the post's words as
+    // its stand-in name: a missing name match isn't a reason to set either aside. Parked and thin sites still are.
+    if (!c.ok && !(c.reason === "no_identity" && (isSeeded(p.sources) || isOpportunitySourced(p.sources)))) reason = c.reason!;
   }
   if (reason === "unreachable" && item.attempts < 1) return void (await retryLater(deps, item, "unreachable"));
   if (reason) {
@@ -436,7 +504,11 @@ async function researchEarly(run: ProspectRunRow, icp: Icp, deadline: number, de
 export async function enrichOne(run: Pick<ProspectRunRow, "id" | "organizationId" | "createdByUser">, icp: Icp, item: ItemWithProspect | null, deps: PipelineDeps, p0?: ProspectRow): Promise<void> {
   const p = item?.prospect ?? p0!, now = deps.now(), orgId = run.organizationId;
   try {
-    let facts = (await deps.store.findings(orgId, p.id)).filter((f) => f.batch === "enrich" || f.batch === "company");
+    const existing = await deps.store.findings(orgId, p.id);
+    let facts = existing.filter((f) => f.batch === "enrich" || f.batch === "company");
+    // A seeding demand post (Phase 3B, batch "opportunity") reaches the fit gate: its ask for outside help is the
+    // known-big rule's override, so a bigger company that asked for exactly this work is not set aside here.
+    const posts = existing.filter((f) => f.batch === "opportunity").map((f) => ({ kind: f.kind, type: f.type, value: f.value, status: f.status, meta: f.meta as Record<string, unknown> | null }));
     if (!(facts.some((f) => f.batch === "enrich" && fresh(f.retrievedAt, now)) || (fresh(p.researchedAt, now) && facts.length))) {
       const readFor = { orgId, runId: run.id };
       const home = await readPage(deps, `https://${p.domain}/`, readFor);
@@ -487,7 +559,7 @@ export async function enrichOne(run: Pick<ProspectRunRow, "id" | "organizationId
       }
     }
     const profile = profileFrom(p.name, facts);
-    const fit = prospectFit(icp, flatProfile(p.name, profile, p.domain));
+    const fit = prospectFit(icp, flatProfile(p.name, profile, p.domain), { findings: posts });
     // Deeper work only for a business that is known to be the kind you asked for. Something else (a directory, a
     // publication, an institution) or not being able to tell what it does is set aside, with the reason.
     const nonBusiness = !!profile.business_type && profile.business_type.value !== "business" && profile.business_type.value !== "other";
@@ -630,7 +702,9 @@ export async function computeCounters(run: ProspectRunRow, deps: PipelineDeps): 
   const fs = await deps.store.findingsFor(run.organizationId, items.map((i) => i.prospectId));
   const by = new Map<number, ProspectFindingRow[]>();
   for (const f of fs) { const a = by.get(f.prospectId) ?? []; a.push(f); by.set(f.prospectId, a); }
-  const c: RunCountersExt = { ...emptyCounters(), searched: prev.searched ?? 0, results: prev.results ?? 0, searchRejectedBy: prev.searchRejectedBy ?? {}, stoppedBy: prev.stoppedBy ?? null };
+  const c: RunCountersExt = { ...emptyCounters(), searched: prev.searched ?? 0, results: prev.results ?? 0, searchRejectedBy: prev.searchRejectedBy ?? {}, stoppedBy: prev.stoppedBy ?? null,
+    // The demand scan's marker and direct asks are facts of this run, written once at search time: recomputing keeps them.
+    ...(prev.opportunityScan ? { opportunityScan: prev.opportunityScan } : {}), ...(prev.directAsks?.length ? { directAsks: prev.directAsks } : {}) };
   // Rejected AFTER verification (a poor fit, or not enriched for budget or allowance) still counts as verified.
   const reached = (i: ItemWithProspect, stages: string[]) => stages.includes(i.stage) || (i.stage === "rejected" && i.prospect.status !== "rejected" && !!i.prospect.verifiedAt && ["poor_fit", "unclear", "not_a_company", "budget", "daily_limit"].includes(i.errorCode ?? "") && stages.includes("verified"));
   c.discovered = items.length;

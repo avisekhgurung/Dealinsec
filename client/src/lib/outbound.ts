@@ -21,6 +21,9 @@ export interface ParsedIcp { icp: Icp; searches: string[]; description: string; 
 export interface Counters {
   searched: number; results: number; discovered: number; rejected: number; rejectedBy: Record<string, number>; verified: number; enriched: number;
   icpMatch: number; researched: number; signals: number; strongTiming?: number; decisionMakers: number; ready: number; failed: number; searchRejectedBy?: Record<string, number>; stoppedBy?: string | null;
+  /** Phase 3B: the demand scan's outcome and the posts with no company site ("open the post and reply yourself"). Older runs omit both. */
+  opportunityScan?: { done: boolean; posts?: number; asks?: number; error?: string };
+  directAsks?: { source: string; title: string; url: string; date?: string | null }[];
 }
 export interface RunView {
   id: string; status: "running" | "done" | "failed" | "cancelled"; stage: string; request: string; icp: Icp; description: string; quantity: number;

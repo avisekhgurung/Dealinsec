@@ -78,6 +78,14 @@ export function junkReason(r: SearchResult, exclusions: string[] = []): RejectRe
 export interface Provenance { provider: string; query: string; url: string; title: string; snippet?: string; at: string; /** A Google place ID (the only listing data that may be kept): the website came from that listing. */ placeId?: string }
 /** A candidate the person chose from a local listing (its website), rather than one found by web search. */
 export const isSeeded = (sources: unknown): boolean => Array.isArray(sources) && sources.some((s) => (s as Provenance)?.provider === "google_places");
+/** The community demand sources (shared/opportunity-sources.ts): a candidate from one is there because a POST linked its site. */
+export const OPPORTUNITY_PROVIDERS: ReadonlySet<string> = new Set(["hn"]);
+/**
+ * A candidate seeded by a demand post that linked its website. Like a listing-chosen site, it is there by an explicit
+ * link, not because a search result's words matched: it skips the words-only relevance test, and a missing name match
+ * on its home page is not a reason to set it aside (the post's text is not the company's name).
+ */
+export const isOpportunitySourced = (sources: unknown): boolean => Array.isArray(sources) && sources.some((s) => OPPORTUNITY_PROVIDERS.has(String((s as Provenance)?.provider)));
 export interface Candidate { domain: string; name: string; website: string; sources: Provenance[]; rank: number }
 export interface Rejected { url: string; reason: RejectReason }
 export interface SearchHit extends SearchResult { provider: string; query: string; at: string }

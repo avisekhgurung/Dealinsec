@@ -487,6 +487,13 @@ export const discoveryProviderMock = async () => {
   };
   return {
     outboundSearchProviders: async () => (world().discovery.configured ? [provider] : []),
+    // The whole module is replaced here, so every export the pipeline uses must exist: a missing one is not a
+    // mocked-away feature but a TypeError inside a step, which a run-driving test only shows as "run did not finish".
+    // The in-memory world has no community demand sources (shared/opportunity-sources.ts is tested on its own, and
+    // server/outbound/opportunity-scan.test.ts drives a scan with its own fake source), so a run here never scans.
+    opportunitySources: () => [],
+    /** No eval path reads this today; it is here so the mock cannot be a module with a hole in it. */
+    activeProviderName: () => (world().discovery.configured ? "brave" : null),
   };
 };
 

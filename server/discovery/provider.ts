@@ -7,8 +7,9 @@
  * LANGSEARCH_URL / BRAVE_SEARCH_URL point a client at a fake service in tests.
  */
 import { BraveProvider } from "./brave";
+import { HnSource } from "./hn";
 import { LangSearchProvider } from "./langsearch";
-import type { DiscoveryProvider } from "./types";
+import type { DiscoveryProvider, OpportunitySource } from "./types";
 
 export type ProviderName = "langsearch" | "brave";
 
@@ -19,6 +20,16 @@ export function activeProviderName(env: NodeJS.ProcessEnv = process.env): Provid
   if (env.LANGSEARCH_API_KEY) return "langsearch";
   if (env.BRAVE_SEARCH_API_KEY) return "brave";
   return null;
+}
+
+/**
+ * The community demand sources a run may scan (Phase 3B), opt-in per deployment: OPPORTUNITY_SOURCES=hn switches
+ * Hacker News on; unset (the default) means no scan and exactly the pre-3B behaviour. All current sources are free.
+ */
+export function opportunitySources(env: NodeJS.ProcessEnv = process.env): OpportunitySource[] {
+  const make: Record<string, () => OpportunitySource> = { hn: () => new HnSource(env.HN_ALGOLIA_URL || undefined) };
+  const wanted = (env.OPPORTUNITY_SOURCES ?? "").split(",").map((s) => s.trim().toLowerCase()).filter((s) => s in make);
+  return wanted.map((n) => make[n]());
 }
 
 /**

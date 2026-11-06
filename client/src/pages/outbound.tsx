@@ -190,6 +190,22 @@ function RunPanel({ id, canEdit, onOpen }: { id: string; canEdit: boolean; onOpe
         {good.length > 0 && <p className="text-[11px] text-muted-foreground" data-testid="outbound-ai-disclaimer">AI results may be incomplete or inaccurate. Check important details before contacting a client.</p>}
       </CardContent></Card>
 
+      {(run.counters.directAsks?.length ?? 0) > 0 && (
+        // People publicly asking for this work, with no company site to research: the post's own words, date and
+        // link, nothing more. Replying is the person's own act, on the platform, outside DealInSec.
+        <Card className="glass-card"><CardContent className="space-y-2 p-4" data-testid="direct-asks">
+          <p className="text-sm font-semibold">People asking for this work right now <span className="font-normal text-muted-foreground">· from community posts — open the post and reply yourself</span></p>
+          <ul className="divide-y rounded-xl border text-sm">
+            {run.counters.directAsks!.map((a) => (
+              <li key={a.url} className="flex items-center justify-between gap-3 px-3 py-2">
+                <a href={a.url} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate underline-offset-2 hover:underline">{a.title}</a>
+                <span className="shrink-0 text-xs text-muted-foreground">{a.source === "hn" ? "Hacker News" : a.source}{a.date ? ` · ${new Date(a.date).toLocaleDateString(undefined, { day: "numeric", month: "short" })}` : ""}</span>
+              </li>
+            ))}
+          </ul>
+        </CardContent></Card>
+      )}
+
       {good.length === 0 && running && <p className="text-sm text-muted-foreground" aria-live="polite">Companies appear here as they are checked. This usually takes a minute or two.</p>}
       {good.length === 0 && run.status === "done" && <p className="rounded-2xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">No company passed the checks. Try a broader description, or a different place.</p>}
       {good.length > 0 && (
