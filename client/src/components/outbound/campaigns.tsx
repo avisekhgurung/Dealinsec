@@ -39,9 +39,11 @@ interface Member {
   leadId: number; companyName: string; domain: string | null; contactName: string | null; leadStatus: string | null; stage: MemberStage; stageLabel: string; note: string | null;
   message: { id: number; status: string; subject: string | null; to: string | null; edited: boolean; approvedAt: string | null; sentAt: string | null } | null;
   outcomes: string[]; interested: boolean;
+  /** Older servers omit it. */
+  followUp?: { state: "due_later" | "to_review" | "approved" | "on_hold"; label: string; dueAt: string | null; waiting: boolean } | null;
 }
 interface ListResponse { campaigns: Campaign[]; queueEnabled: boolean; unsubscribeLinks?: boolean }
-interface DetailResponse { campaign: Campaign; members: Member[]; queueEnabled: boolean }
+interface DetailResponse { campaign: Campaign; members: Member[]; queueEnabled: boolean; followUps?: { waiting: number; planned: number } }
 interface AudienceLead { id: number; companyName: string; domain: string | null; industry: string | null; location: string | null; status: string; source: string; contactName: string | null; hasEmail: boolean; hasUnsent: boolean; blocked: string | null; /** Older servers omit these two. */ profileName?: string | null; ready?: boolean }
 
 const STAGE_TONE: Record<MemberStage, string> = {
@@ -305,6 +307,11 @@ function CampaignDetail({ id, canEdit, onBack }: { id: number; canEdit: boolean;
                       <span className="block truncate text-xs text-muted-foreground">{m.message ? `${m.message.subject || "(no subject)"} · to ${m.message.to ?? "no address"}` : m.contactName ?? m.domain ?? ""}</span>
                       {m.note && <span className="block text-xs text-amber-800 dark:text-amber-300" data-testid="campaign-member-note">{m.note}</span>}
                     </span>
+                    {m.followUp && (
+                      <span className={cn("rounded-full border px-2 py-0.5 text-[11px]", m.followUp.waiting ? "border-amber-300 bg-amber-50 font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300" : "text-muted-foreground")} data-testid="campaign-member-followup" data-state={m.followUp.state}>
+                        {m.followUp.state === "due_later" && m.followUp.dueAt ? `Follow-up planned for ${new Date(m.followUp.dueAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}` : m.followUp.state === "on_hold" ? "Follow-up on hold" : m.followUp.label}
+                      </span>
+                    )}
                     {m.interested && <span className="rounded-full border border-emerald-300 px-2 py-0.5 text-[11px] text-emerald-800 dark:border-emerald-800 dark:text-emerald-300">Interested</span>}
                     {m.outcomes.map((o) => <span key={o} className="rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground">{OUTCOME[o] ?? o}</span>)}
                     <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium", STAGE_TONE[m.stage])}><Icon className="h-3 w-3" aria-hidden />{m.stageLabel}</span>
@@ -332,6 +339,14 @@ function CampaignDetail({ id, canEdit, onBack }: { id: number; canEdit: boolean;
             ? <Button size="sm" variant="outline" onClick={() => act.mutate("send/pause")} disabled={act.isPending} data-testid="campaign-send-pause"><Pause className="mr-1.5 h-3.5 w-3.5" />Pause</Button>
             : <Button size="sm" onClick={() => { if (window.confirm(`Start sending ${plural(n.approved, "approved message")} from your Gmail? Later approvals in this campaign are sent too, until you pause it.`)) act.mutate("send"); }} disabled={act.isPending || n.approved === 0} className="gradient-btn text-white" data-testid="campaign-send-start"><Play className="mr-1.5 h-3.5 w-3.5" />Start sending</Button>)}
         </div>
+        {q.data.followUps && (q.data.followUps.waiting > 0 || q.data.followUps.planned > 0) && (
+          <p className="rounded-lg border px-3 py-2 text-xs" data-testid="campaign-followups">
+            <span className="font-semibold">Follow-ups.</span>{" "}
+            {q.data.followUps.waiting > 0 && <span className="text-amber-800 dark:text-amber-300">{plural(q.data.followUps.waiting, "follow-up")} waiting for you: open the lead above to read and approve it. </span>}
+            {q.data.followUps.planned > 0 && <span className="text-muted-foreground">{q.data.followUps.planned} planned for later. </span>}
+            <span className="text-muted-foreground">A follow-up is never sent by itself: when it falls due a draft is prepared for you, and a reply cancels it.</span>
+          </p>
+        )}
         <SenderCheck />
         {c.sendStopLabel && c.sendStop !== "paused" && <p className={cn("rounded-lg border px-3 py-2 text-xs", c.sendStop === "done" ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200" : "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200")} role="status" data-testid="campaign-send-stopped">{c.sendStop === "done" ? c.sendStopLabel : `Sending paused: ${c.sendStopLabel}.`}</p>}
         {queueEnabled && canEdit && active && (

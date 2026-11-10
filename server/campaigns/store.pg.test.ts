@@ -228,6 +228,30 @@ describe.skipIf(!URL_ || !loopback(URL_))("campaign store (real Postgres)", () =
     }
   });
 
+  it("each member carries the next OPEN follow-up on its message: planned, on hold, or a draft waiting; never one that is finished", async () => {
+    const o = org();
+    const ids = [await lead(o, "Planned"), await lead(o, "Drafted"), await lead(o, "Finished"), await lead(o, "None")];
+    const c = (await mod.campaignStore.create(o, "u", base, ids, NOW, 50))!;
+    const roots: number[] = [];
+    for (const l of ids) { const m = await message(o, l, "sent", { sentAt: NOW }); roots.push(m); await mod.campaignStore.settleMember((await memberOf(c.id, l)).id, { state: "drafted", messageId: m }, NOW); }
+    const followup = (leadId: number, root: number, step: number, status: string, due: string, draft: number | null = null) =>
+      q.query(`INSERT INTO outreach_followups (organization_id, lead_id, root_message_id, after_message_id, step, due_at, status, draft_message_id, created_at, updated_at) VALUES ($1, $2, $3, $3, $4, $5::timestamp, $6, $7, $8, $8)`, [o, leadId, root, step, due, status, draft, NOW]);
+    try {
+      await followup(ids[0], roots[0], 1, "scheduled", "2026-11-14 09:00:00");
+      const draft = await message(o, ids[1], "draft");
+      await followup(ids[1], roots[1], 1, "sent", "2026-11-05 09:00:00");            // step 1 already went out: history
+      await followup(ids[1], roots[1], 2, "drafted", "2026-11-09 09:00:00", draft);  // step 2 is the open one
+      await followup(ids[2], roots[2], 1, "cancelled", "2026-11-09 09:00:00");
+      const ms = await mod.campaignStore.members(o, c.id);
+      expect(ms.map((m) => m.followUp)).toEqual([
+        { status: "scheduled", step: 1, dueAt: "2026-11-14T09:00:00.000Z", draftStatus: null },
+        { status: "drafted", step: 2, dueAt: "2026-11-09T09:00:00.000Z", draftStatus: "draft" },
+        null,
+        null,
+      ]);
+    } finally { await q.query(`DELETE FROM outreach_followups WHERE organization_id = $1`, [o]).catch(() => {}); }
+  });
+
   it("another workspace's campaign, members and leads can't be read or changed", async () => {
     const a = org(), b = org();
     const la = await lead(a, "Mine"), lb = await lead(b, "Theirs");

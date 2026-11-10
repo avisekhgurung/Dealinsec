@@ -12,6 +12,7 @@ import { pgMailboxStore } from "./mailbox-store-pg";
 import { leadsStore } from "../leads/store";
 import { outreachSafetyReady } from "../sales/message-store";
 import { sendApproved, type SendDeps } from "./send-service";
+import { followupNotice, replyNotice } from "./notices";
 import { pgSendStore } from "./send-store-pg";
 import { registerGmailRoutes } from "./routes";
 import { gmailStatus, mailSyncSchemaReady } from "./status";
@@ -67,8 +68,7 @@ const applyDeps: ApplyDeps = {
   now: () => new Date(),
   log: (event, fields) => deps.log(event, fields),
   async notify(n) {
-    const what = { replied: "replied to your outreach", opted_out: "asked not to be contacted", bounced: "outreach bounced", review: "a reply needs your review" }[n.what];
-    await storage.logActivity({ organizationId: n.orgId, userId: n.userId ?? "system", userName: "Gmail", action: what, entityType: "lead", entityId: String(n.leadId), detail: n.companyName });
+    await storage.logActivity(replyNotice(n));
   },
 };
 
@@ -222,7 +222,7 @@ const followupDeps = {
     return name || (await storage.getOrganization(orgId))?.name || "The team";
   },
   async notify(n: { orgId: string; leadId: number; companyName: string }) {
-    await storage.logActivity({ organizationId: n.orgId, userId: "system", userName: "Follow-ups", action: "follow-up ready for review", entityType: "lead", entityId: String(n.leadId), detail: n.companyName });
+    await storage.logActivity(followupNotice(n));
   },
 };
 

@@ -160,6 +160,25 @@ export function sendRefusal(code: string): "hold" | "pause" | "later" {
   return "pause";
 }
 
+/* ── follow-ups ─────────────────────────────────────────────────────────── */
+
+export type FollowUpState = "due_later" | "to_review" | "approved" | "on_hold";
+export interface FollowUpView { state: FollowUpState; label: string; dueAt: string | null; /** It needs the person now (a draft to read, or one approved and not sent). */ waiting: boolean }
+/**
+ * What a member's next follow-up means for the person, from the follow-up's own row. Follow-ups are never sent by
+ * themselves: when one falls due a draft is prepared, and it waits like any other message.
+ */
+export function followUpView(f: { status: string; dueAt: string | null; draftStatus: string | null } | null | undefined): FollowUpView | null {
+  if (!f) return null;
+  if (f.status === "scheduled") return { state: "due_later", label: "Follow-up planned", dueAt: f.dueAt, waiting: false };
+  if (f.status === "held") return { state: "on_hold", label: "Follow-up on hold: a reply is waiting for you to read", dueAt: f.dueAt, waiting: true };
+  if (f.status === "drafted") {
+    if (f.draftStatus === "draft") return { state: "to_review", label: "Follow-up draft to review", dueAt: f.dueAt, waiting: true };
+    if (f.draftStatus === "approved" || f.draftStatus === "sending") return { state: "approved", label: "Follow-up approved, not sent", dueAt: f.dueAt, waiting: true };
+  }
+  return null; // sent, discarded or unknown: nothing to act on
+}
+
 /* ── pacing ─────────────────────────────────────────────────────────────── */
 
 /** The earliest moment for the next send: the gap, stretched by up to half again, so messages don't leave on a beat. */

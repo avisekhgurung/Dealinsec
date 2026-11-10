@@ -65,7 +65,7 @@ export const acquisitionProfileStoreMock = () => ({
   },
 });
 const evalCampaign = { id: 1, organizationId: "org-1", createdByUser: "u1", name: "Diwali", profileId: 1, profileName: "Brands that need growth", status: "active", footerNote: "", preparing: true, prepareUserId: "u1", prepareStop: null, sending: false, senderUserId: null, sendStop: null, dailyLimit: 20, gapSeconds: 180, nextSendAt: null, leaseUntil: null, createdAt: EVAL_T, updatedAt: EVAL_T };
-const evalMember = { id: 1, leadId: 1, state: "drafted", reason: null, attempts: 1, holdReason: null, holdHash: null, lead: { companyName: "Northwind", domain: "northwind.com", status: "qualified", contactName: null, contactEmail: null, doNotContact: false, archived: false }, message: { id: 1, status: "draft", subject: "Hello", to: "a@northwind.com", bodyHash: "h", edited: false, approvedAt: null, sentAt: null }, outcomes: [], interested: false };
+const evalMember = { id: 1, leadId: 1, state: "drafted", reason: null, attempts: 1, holdReason: null, holdHash: null, lead: { companyName: "Northwind", domain: "northwind.com", status: "qualified", contactName: null, contactEmail: null, doNotContact: false, archived: false }, message: { id: 1, status: "draft", subject: "Hello", to: "a@northwind.com", bodyHash: "h", edited: false, approvedAt: null, sentAt: null }, outcomes: [], interested: false, followUp: null };
 export const campaignStoreMock = () => ({
   campaignTablesReady: async () => true,
   campaignStore: {

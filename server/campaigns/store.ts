@@ -13,12 +13,15 @@ import { tablesReadyCheck } from "../leads/ready";
 export const campaignTablesReady = tablesReadyCheck(["campaigns", "campaign_members", "leads", "lead_messages", "outreach_events", "outreach_suppressions"]);
 const threadsReady = tablesReadyCheck(["mail_threads"]);
 const radarReady = tablesReadyCheck(["prospects", "prospect_run_items", "prospect_runs"]);
+const followupsReady = tablesReadyCheck(["outreach_followups"]);
 
 export interface MemberView {
   id: number; leadId: number; state: string; reason: string | null; attempts: number; holdReason: string | null; holdHash: string | null;
   lead: { companyName: string; domain: string | null; status: string; contactName: string | null; contactEmail: string | null; doNotContact: boolean; archived: boolean } | null;
   message: { id: number; status: string; subject: string | null; to: string | null; bodyHash: string; edited: boolean; approvedAt: Date | null; sentAt: Date | null } | null;
   outcomes: string[]; interested: boolean;
+  /** The next open follow-up on the member's message (server/sales/followups.ts), if any: when it falls due, or the draft waiting for review. */
+  followUp: { status: "scheduled" | "held" | "drafted"; step: number; dueAt: string | null; draftStatus: string | null } | null;
 }
 export interface AudienceLead {
   id: number; companyName: string; domain: string | null; industry: string | null; location: string | null; status: string; source: string;
@@ -129,13 +132,22 @@ export const campaignStore: CampaignStore = {
     const interested = (await threadsReady().catch(() => false))
       ? sql`EXISTS (SELECT 1 FROM mail_threads t WHERE t.organization_id = m.organization_id AND t.lead_message_id = m.message_id AND t.status = 'interested')`
       : sql`false`;
+    // The next follow-up still open on the member's message: scheduled (not due yet), held (a reply awaits review) or
+    // drafted (a draft is waiting). Sent, cancelled and skipped steps are history, not something to act on.
+    const followUp = (await followupsReady().catch(() => false))
+      ? sql`(SELECT json_build_object('status', f.status, 'step', f.step, 'dueAt', to_char(f.due_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+                                     'draftStatus', (SELECT dm.status FROM lead_messages dm WHERE dm.organization_id = f.organization_id AND dm.id = f.draft_message_id))
+             FROM outreach_followups f
+             WHERE f.organization_id = m.organization_id AND f.root_message_id = m.message_id AND f.status IN ('scheduled', 'held', 'drafted')
+             ORDER BY f.step LIMIT 1)`
+      : sql`NULL`;
     const r = await db.execute(sql`
       SELECT m.id, m.lead_id, m.state, m.reason, m.attempts, m.hold_reason, m.hold_hash,
              l.id AS l_id, l.company_name, l.domain, l.status AS lead_status, l.contact_name, l.contact_email, l.do_not_contact, l.archived_at,
              lm.id AS msg_id, lm.status AS msg_status, lm.subject, lm.to_address, lm.body_hash, lm.edited,
              to_char(lm.approved_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS approved_at, to_char(lm.sent_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS sent_at,
              COALESCE((SELECT array_agg(DISTINCT e.kind) FROM outreach_events e WHERE e.organization_id = m.organization_id AND e.message_id = m.message_id AND e.kind IN ('replied', 'bounced', 'opted_out')), '{}') AS outcomes,
-             ${interested} AS interested
+             ${interested} AS interested, ${followUp} AS follow_up
       FROM campaign_members m
       LEFT JOIN leads l ON l.organization_id = m.organization_id AND l.id = m.lead_id
       LEFT JOIN lead_messages lm ON lm.organization_id = m.organization_id AND lm.id = m.message_id
@@ -146,6 +158,7 @@ export const campaignStore: CampaignStore = {
       lead: x.l_id ? { companyName: x.company_name, domain: x.domain, status: x.lead_status, contactName: x.contact_name, contactEmail: x.contact_email, doNotContact: !!x.do_not_contact, archived: !!x.archived_at } : null,
       message: x.msg_id ? { id: Number(x.msg_id), status: x.msg_status, subject: x.subject, to: x.to_address, bodyHash: x.body_hash, edited: !!x.edited, approvedAt: x.approved_at ? new Date(x.approved_at) : null, sentAt: x.sent_at ? new Date(x.sent_at) : null } : null,
       outcomes: (x.outcomes ?? []) as string[], interested: !!x.interested,
+      followUp: x.follow_up && typeof x.follow_up === "object" ? { status: x.follow_up.status, step: Number(x.follow_up.step) || 1, dueAt: x.follow_up.dueAt ?? null, draftStatus: x.follow_up.draftStatus ?? null } : null,
     }));
   },
   async memberFacts(orgId) {

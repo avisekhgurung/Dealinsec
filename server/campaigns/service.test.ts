@@ -32,6 +32,7 @@ function world() {
   const calls = { draft: [] as any[], send: [] as any[], kick: 0, log: [] as any[], audience: [] as any[] };
   const audienceRow = (l: any) => ({ id: l.id, companyName: l.companyName, domain: null, industry: null, location: null, status: l.status, source: l.source, contactName: null, hasEmail: true, doNotContact: l.doNotContact, hasUnsent: false, inCampaign: campaigns.find((c) => c.status === "active" && members.some((m) => m.campaignId === c.id && m.leadId === l.id))?.name ?? null });
   const draftPlan = new Map<number, any>(); // leadId -> { ok:false, code } | "throw"; default ok
+  const followUps = new Map<number, any>(); // leadId -> the open follow-up row on its message
   let sendPlan: any = { ok: true, outcome: "sent" };
   let queueOn = true;
   let linkBase: string | null = null; // no unsubscribe link unless a test turns it on
@@ -50,6 +51,7 @@ function world() {
       lead: l ? { companyName: l.companyName, domain: null, status: l.status, contactName: null, contactEmail: null, doNotContact: l.doNotContact, archived: l.archived } : null,
       message: lm ? { id: lm.id, status: lm.status, subject: lm.subject, to: "a@x.example", bodyHash: lm.bodyHash, edited: false, approvedAt: lm.approvedAt, sentAt: lm.sentAt } : null,
       outcomes: events.filter((e) => e.messageId === m.messageId).map((e) => e.kind), interested: false,
+      followUp: followUps.get(m.leadId) ?? null,
     };
   };
   const store: any = {
@@ -142,7 +144,7 @@ function world() {
   const approve = (leadId: number) => { const m = messages.filter((x) => x.leadId === leadId).pop(); m.status = "approved"; m.approvedAt = now(); return m; };
   return {
     deps, calls, campaigns, members, messages, events, leads, users, draftPlan, addMessage, approve, msg,
-    setLinks: (base: string | null) => { linkBase = base; },
+    setLinks: (base: string | null) => { linkBase = base; }, followUps,
     tick: (ms: number) => { clock += ms; }, setSend: (p: any) => { sendPlan = p; }, setQueue: (on: boolean) => { queueOn = on; },
     member: (leadId: number) => members.find((m) => m.leadId === leadId),
   };
@@ -422,6 +424,39 @@ describe("preparing drafts", () => {
     await svc.startPreparing(ana, id, w.deps);
     expect(await svc.stopPreparing(ana, id, w.deps)).toMatchObject({ ok: true, campaign: { preparing: false, prepareStop: "stopped", prepareStopLabel: "Stopped by you" } });
     expect(await svc.draftStep(w.deps)).toBe("idle");
+  });
+});
+
+describe("follow-ups in a campaign", () => {
+  it("shows each sent lead's next follow-up, and counts the ones that need the person now", async () => {
+    const w = world();
+    const id = await prepared(w, [1, 2, 3, 4, 5]);
+    for (const l of [1, 2, 3, 4]) { const m = w.approve(l); m.status = "sent"; m.sentAt = T0; }
+    w.followUps.set(1, { status: "scheduled", step: 1, dueAt: "2026-11-14T09:00:00.000Z", draftStatus: null });
+    w.followUps.set(2, { status: "drafted", step: 1, dueAt: "2026-11-09T09:00:00.000Z", draftStatus: "draft" });
+    w.followUps.set(3, { status: "drafted", step: 2, dueAt: "2026-11-08T09:00:00.000Z", draftStatus: "approved" });
+    w.followUps.set(4, { status: "held", step: 1, dueAt: "2026-11-09T09:00:00.000Z", draftStatus: null });
+    w.followUps.set(5, { status: "drafted", step: 1, dueAt: null, draftStatus: "draft" }); // lead 5 was never sent: nothing to follow up
+    const r: any = await svc.getCampaign(ana, id, w.deps);
+    expect(r.members.map((m: any) => m.followUp && [m.followUp.state, m.followUp.label, m.followUp.waiting])).toEqual([
+      ["due_later", "Follow-up planned", false],
+      ["to_review", "Follow-up draft to review", true],
+      ["approved", "Follow-up approved, not sent", true],
+      ["on_hold", "Follow-up on hold: a reply is waiting for you to read", true],
+      null,
+    ]);
+    expect(r.members[0].followUp.dueAt).toBe("2026-11-14T09:00:00.000Z");
+    expect(r.followUps).toEqual({ waiting: 3, planned: 1 });
+  });
+  it("a follow-up whose draft was sent or discarded, or with nothing open, shows nothing", async () => {
+    const w = world();
+    const id = await prepared(w, [1, 2, 3]);
+    for (const l of [1, 2, 3]) { const m = w.approve(l); m.status = "sent"; m.sentAt = T0; }
+    w.followUps.set(1, { status: "drafted", step: 1, dueAt: null, draftStatus: "sent" });
+    w.followUps.set(2, { status: "drafted", step: 1, dueAt: null, draftStatus: "cancelled" });
+    const r: any = await svc.getCampaign(ana, id, w.deps);
+    expect(r.members.map((m: any) => m.followUp)).toEqual([null, null, null]);
+    expect(r.followUps).toEqual({ waiting: 0, planned: 0 });
   });
 });
 

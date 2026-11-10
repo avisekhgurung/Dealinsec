@@ -20,8 +20,8 @@
  */
 import {
   addMembersSchema, CAMPAIGN_MAX_MEMBERS, campaignCreateSchema, campaignRates, campaignUpdateSchema, countMembers, DAILY_LIMIT, DRAFT_TRIES, draftRefusal, EMPTY_COUNTS, GAP_SECONDS,
-  hasOptOutLine, MAX_CAMPAIGNS, MEMBER_STAGE_LABEL, memberStage, nextSendAt, reasonLabel, sendRefusal, stopLabel, tooManyBounces, withFooter,
-  type CampaignCounts, type CampaignRates, type MemberStage,
+  followUpView, hasOptOutLine, MAX_CAMPAIGNS, MEMBER_STAGE_LABEL, memberStage, nextSendAt, reasonLabel, sendRefusal, stopLabel, tooManyBounces, withFooter,
+  type CampaignCounts, type CampaignRates, type FollowUpView, type MemberStage,
 } from "@shared/campaign";
 import { LIMITS } from "@shared/outreach-check";
 import { hashDraft } from "@shared/outreach-hash";
@@ -110,6 +110,8 @@ export interface MemberRowView {
   stage: MemberStage; stageLabel: string; note: string | null;
   message: { id: number; status: string; subject: string | null; to: string | null; edited: boolean; approvedAt: string | null; sentAt: string | null; hasOptOutLine?: boolean } | null;
   outcomes: string[]; interested: boolean;
+  /** The next follow-up on this lead's sent message, when there is one still open. */
+  followUp: FollowUpView | null;
 }
 
 const campaignView = (c: CampaignRow, counts: CampaignCounts): CampaignView => ({
@@ -129,6 +131,8 @@ function memberView(m: MemberView): MemberRowView {
     stage, stageLabel: MEMBER_STAGE_LABEL[stage], note,
     message: m.message ? { id: m.message.id, status: m.message.status, subject: m.message.subject, to: m.message.to, edited: m.message.edited, approvedAt: iso(m.message.approvedAt), sentAt: iso(m.message.sentAt) } : null,
     outcomes: m.outcomes, interested: m.interested,
+    // Only a message that was sent has a follow-up worth showing; a reply, a bounce or an opt-out has already cancelled it.
+    followUp: stage === "sent" ? followUpView(m.followUp) : null,
   };
 }
 
@@ -191,7 +195,7 @@ export async function createCampaign(user: Who, raw: unknown, d: Partial<Campaig
  * re-pointed, and a job that should be running is woken). `readOnly` skips both: it is how a coworker's read tool
  * looks at a campaign, and a read tool must change nothing at all.
  */
-export async function getCampaign(user: Who, id: number, d: Partial<CampaignDeps> = {}, opts: { readOnly?: boolean } = {}): Promise<Result<{ campaign: CampaignView; members: MemberRowView[]; queueEnabled: boolean }>> {
+export async function getCampaign(user: Who, id: number, d: Partial<CampaignDeps> = {}, opts: { readOnly?: boolean } = {}): Promise<Result<{ campaign: CampaignView; members: MemberRowView[]; queueEnabled: boolean; /** Follow-ups of this campaign's sent messages: how many need the person now, and how many are planned for later. */ followUps: { waiting: number; planned: number } }>> {
   const deps = { ...defaults(), ...d };
   const gate = readGate(user);
   if (gate) return gate;
@@ -202,7 +206,9 @@ export async function getCampaign(user: Who, id: number, d: Partial<CampaignDeps
   if (!opts.readOnly) await deps.store.relink(orgId, id);
   const members = await deps.store.members(orgId, id);
   if (!opts.readOnly && (c.preparing || c.sending)) deps.kick();
-  return { ok: true, campaign: campaignView(c, countMembers(members.map(factOf))), members: members.map(memberView), queueEnabled: deps.queueEnabled() };
+  const rows = members.map(memberView);
+  const followUps = { waiting: rows.filter((r) => r.followUp?.waiting).length, planned: rows.filter((r) => r.followUp?.state === "due_later").length };
+  return { ok: true, campaign: campaignView(c, countMembers(members.map(factOf))), members: rows, queueEnabled: deps.queueEnabled(), followUps };
 }
 
 export async function updateCampaign(user: Who, id: number, raw: unknown, d: Partial<CampaignDeps> = {}): Promise<Result<{ campaign: CampaignView }>> {
