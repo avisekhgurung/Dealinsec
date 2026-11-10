@@ -42,7 +42,7 @@ interface Member {
 }
 interface ListResponse { campaigns: Campaign[]; queueEnabled: boolean; unsubscribeLinks?: boolean }
 interface DetailResponse { campaign: Campaign; members: Member[]; queueEnabled: boolean }
-interface AudienceLead { id: number; companyName: string; domain: string | null; industry: string | null; location: string | null; status: string; source: string; contactName: string | null; hasEmail: boolean; hasUnsent: boolean; blocked: string | null }
+interface AudienceLead { id: number; companyName: string; domain: string | null; industry: string | null; location: string | null; status: string; source: string; contactName: string | null; hasEmail: boolean; hasUnsent: boolean; blocked: string | null; /** Older servers omit these two. */ profileName?: string | null; ready?: boolean }
 
 const STAGE_TONE: Record<MemberStage, string> = {
   queued: "border-border text-muted-foreground", skipped: "border-border bg-muted text-muted-foreground", failed: "border-rose-300 text-rose-700 dark:border-rose-800 dark:text-rose-400",
@@ -84,8 +84,12 @@ function NewCampaign({ open, onOpenChange, onCreated }: { open: boolean; onOpenC
   const [stage, setStage] = useState("");
   const [source, setSource] = useState("");
   const [emailOnly, setEmailOnly] = useState(false);
+  // Who Client Radar found for a saved client profile, and which of them it marked Ready (asked of the server).
+  const [fromProfile, setFromProfile] = useState<number | null>(null);
+  const [readyOnly, setReadyOnly] = useState(false);
   const [picked, setPicked] = useState<Set<number>>(new Set());
   const params = new URLSearchParams(); if (search.trim()) params.set("q", search.trim()); if (stage) params.set("status", stage); if (source) params.set("source", source);
+  if (fromProfile) params.set("profileId", String(fromProfile)); if (readyOnly) params.set("ready", "1");
   const audienceKey = `${CAMPAIGNS_URL}/audience${params.toString() ? `?${params}` : ""}`;
   const audience = useQuery<{ leads: AudienceLead[]; limit: number }>({ queryKey: [audienceKey], enabled: open, retry: false });
   const profiles = useQuery<{ profiles: { id: number; name: string }[] }>({ queryKey: ["/api/client-profiles"], enabled: open, retry: false });
@@ -99,7 +103,7 @@ function NewCampaign({ open, onOpenChange, onCreated }: { open: boolean; onOpenC
   const links = !!queryClient.getQueryData<ListResponse>([CAMPAIGNS_URL])?.unsubscribeLinks;
   const create = useMutation({
     mutationFn: () => leadCall<{ campaign: Campaign; added: number }>("POST", CAMPAIGNS_URL, { name, leadIds: Array.from(picked), profileId, footerNote: note }),
-    onSuccess: (r) => { trackEvent("campaign_created", { leads: r.added }); refresh(); setName(""); setNote(""); setPicked(new Set()); setProfileId(null); onOpenChange(false); onCreated(r.campaign.id); },
+    onSuccess: (r) => { trackEvent("campaign_created", { leads: r.added }); refresh(); setName(""); setNote(""); setPicked(new Set()); setProfileId(null); setFromProfile(null); setReadyOnly(false); onOpenChange(false); onCreated(r.campaign.id); },
     onError: (e) => toast({ title: "Couldn't create the campaign", description: leadError(e), variant: "destructive" }),
   });
   return (
@@ -117,7 +121,7 @@ function NewCampaign({ open, onOpenChange, onCreated }: { open: boolean; onOpenC
           {(profiles.data?.profiles.length ?? 0) > 0 && (
             <div className="space-y-1.5">
               <label htmlFor="campaign-profile" className="text-sm font-medium">For which client profile? <span className="font-normal text-muted-foreground">· optional, a label for your results</span></label>
-              <select id="campaign-profile" value={profileId ?? ""} onChange={(e) => setProfileId(e.target.value ? Number(e.target.value) : null)} className="h-9 w-full rounded-md border bg-background px-2 text-sm" data-testid="campaign-profile">
+              <select id="campaign-profile" value={profileId ?? ""} onChange={(e) => { const v = e.target.value ? Number(e.target.value) : null; setProfileId(v); setFromProfile(v); }} className="h-9 w-full rounded-md border bg-background px-2 text-sm" data-testid="campaign-profile">
                 <option value="">None</option>
                 {profiles.data!.profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
@@ -143,11 +147,20 @@ function NewCampaign({ open, onOpenChange, onCreated }: { open: boolean; onOpenC
                 <div className="relative"><Search className="pointer-events-none absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" aria-hidden /><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Company, industry, city" className="h-8 w-44 pl-7 text-xs" aria-label="Search leads" data-testid="campaign-audience-search" /></div>
               </div>
             </div>
-            <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={emailOnly} onChange={(e) => setEmailOnly(e.target.checked)} data-testid="campaign-audience-email-only" />Only leads with a contact email</label>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              {(profiles.data?.profiles.length ?? 0) > 0 && (
+                <select value={fromProfile ?? ""} onChange={(e) => setFromProfile(e.target.value ? Number(e.target.value) : null)} className="h-8 w-auto rounded-md border bg-background px-2 py-0 text-xs" aria-label="Found for which client profile" data-testid="campaign-audience-profile">
+                  <option value="">Found for any profile</option>
+                  {profiles.data!.profiles.map((p) => <option key={p.id} value={p.id}>Found for: {p.name}</option>)}
+                </select>
+              )}
+              <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={readyOnly} onChange={(e) => setReadyOnly(e.target.checked)} data-testid="campaign-audience-ready-only" />Only Ready companies</label>
+              <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={emailOnly} onChange={(e) => setEmailOnly(e.target.checked)} data-testid="campaign-audience-email-only" />Only leads with a contact email</label>
+            </div>
             {audience.isLoading ? <Skeleton className="h-32 w-full rounded-xl" /> : audience.isError ? (
               <p className="rounded-xl border border-destructive/40 px-3 py-4 text-center text-sm">{leadError(audience.error, "The leads couldn't be loaded.")}</p>
             ) : leads.length === 0 ? (
-              <p className="rounded-xl border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">{search.trim() || stage || source || emailOnly ? "No open leads match these filters. Clear one to see more." : "No open leads yet. Add companies to Leads from Client Radar first."}</p>
+              <p className="rounded-xl border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">{search.trim() || stage || source || emailOnly || fromProfile || readyOnly ? "No open leads match these filters. Clear one to see more." : "No open leads yet. Add companies to Leads from Client Radar first."}</p>
             ) : (
               <>
                 <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={allShown} onChange={toggleAll} data-testid="campaign-audience-all" />Pick all {pickable.length} shown</label>
@@ -157,7 +170,10 @@ function NewCampaign({ open, onOpenChange, onCreated }: { open: boolean; onOpenC
                       <label className={cn("flex items-start gap-2.5 px-3 py-2 text-sm", l.blocked ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted/40")}>
                         <input type="checkbox" className="mt-0.5 h-4 w-4 accent-emerald-600" disabled={!!l.blocked} checked={picked.has(l.id)} onChange={() => toggle(l.id)} data-testid={`campaign-audience-lead-${l.id}`} />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate font-medium">{l.companyName}</span>
+                          <span className="flex flex-wrap items-center gap-1.5 font-medium"><span className="truncate">{l.companyName}</span>
+                            {l.ready && <span className="rounded-full border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">Ready</span>}
+                            {l.profileName && <span className="rounded-full border px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">for {l.profileName}</span>}
+                          </span>
                           <span className="block truncate text-xs text-muted-foreground">{[l.industry, l.location, l.contactName, l.status].filter(Boolean).join(" · ")}</span>
                           {l.blocked ? <span className="block text-xs text-rose-700 dark:text-rose-400">{l.blocked}</span>
                             : l.hasUnsent ? <span className="block text-xs text-muted-foreground">Already has a message waiting: the campaign will use it.</span>

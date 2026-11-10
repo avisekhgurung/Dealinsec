@@ -29,7 +29,8 @@ function world() {
   const leads: any[] = [1, 2, 3, 4, 5].map((id) => ({ id, org: "org-a", companyName: `Lead ${id}`, status: "new", source: "manual", doNotContact: false, archived: false }));
   leads.push({ id: 9, org: "org-b", companyName: "Other workspace's lead", status: "new", source: "manual", doNotContact: false, archived: false });
   let cSeq = 0, mSeq = 0, msgSeq = 100;
-  const calls = { draft: [] as any[], send: [] as any[], kick: 0, log: [] as any[] };
+  const calls = { draft: [] as any[], send: [] as any[], kick: 0, log: [] as any[], audience: [] as any[] };
+  const audienceRow = (l: any) => ({ id: l.id, companyName: l.companyName, domain: null, industry: null, location: null, status: l.status, source: l.source, contactName: null, hasEmail: true, doNotContact: l.doNotContact, hasUnsent: false, inCampaign: campaigns.find((c) => c.status === "active" && members.some((m) => m.campaignId === c.id && m.leadId === l.id))?.name ?? null });
   const draftPlan = new Map<number, any>(); // leadId -> { ok:false, code } | "throw"; default ok
   let sendPlan: any = { ok: true, outcome: "sent" };
   let queueOn = true;
@@ -77,7 +78,7 @@ function world() {
     members: async (o: string, id: number) => members.filter((m) => m.organizationId === o && m.campaignId === id).map(view),
     memberFacts: async (o: string) => members.filter((m) => m.organizationId === o).map((m) => ({ campaignId: m.campaignId, state: m.state, messageStatus: msg(m.messageId)?.status ?? null, outcomes: [], interested: false })),
     ownLeadIds: async (o: string, ids: number[]) => ids.filter((id) => leads.some((l) => l.id === id && l.org === o && !l.archived)),
-    audience: async (o: string) => leads.filter((l) => l.org === o).map((l) => ({ id: l.id, companyName: l.companyName, domain: null, industry: null, location: null, status: l.status, source: l.source, contactName: null, hasEmail: true, doNotContact: l.doNotContact, hasUnsent: false, inCampaign: campaigns.find((c) => c.status === "active" && members.some((m) => m.campaignId === c.id && m.leadId === l.id))?.name ?? null })),
+    audience: async (o: string, f: any) => { calls.audience.push(f); return leads.filter((l) => l.org === o).map((l) => ({ profileName: null, ready: false, ...audienceRow(l) })); },
     relink: async () => {},
     setPreparing: async (o: string, id: number, x: any) => {
       const c = await store.get(o, id); if (!c || c.status !== "active") return null;
@@ -185,6 +186,17 @@ describe("making a campaign", () => {
     const w = world();
     expect(await svc.createCampaign(ana, { name: "x", leadIds: [1], profileId: 99 }, w.deps)).toMatchObject({ ok: true, campaign: { profileName: null } });
     expect(w.campaigns[0].profileId).toBeNull();
+  });
+  it("the audience can be narrowed to a client profile's leads and to Ready companies; anything else in the query is ignored", async () => {
+    const w = world();
+    await svc.audience(ana, { profileId: "7", ready: "1", status: "qualified", source: "outbound", q: "  edtech   pune " }, w.deps);
+    await svc.audience(ana, { profileId: "abc", ready: "yes", status: "won", source: "DROP TABLE", q: 5 }, w.deps);
+    await svc.audience(ana, { profileId: "-3", ready: true }, w.deps);
+    expect(w.calls.audience).toEqual([
+      { status: "qualified", source: "outbound", q: "edtech pune", profileId: 7, ready: true },
+      { status: null, source: null, q: null, profileId: null, ready: false },
+      { status: null, source: null, q: null, profileId: null, ready: true },
+    ]);
   });
   it("the audience says which leads can't be picked, and why", async () => {
     const w = world();

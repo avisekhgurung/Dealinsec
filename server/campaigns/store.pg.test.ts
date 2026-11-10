@@ -194,6 +194,40 @@ describe.skipIf(!URL_ || !loopback(URL_))("campaign store (real Postgres)", () =
     expect(await mod.campaignStore.audience(o, {}, 2)).toHaveLength(2);
   });
 
+  it("the audience knows which client profile's search found a lead and whether it was Ready, and can be narrowed to either", async () => {
+    const o = org(), other = org();
+    const fromBrands = await lead(o, "FromBrands"), fromStartups = await lead(o, "FromStartups"), typed = await lead(o, "TypedSearch"), byHand = await lead(o, "ByHand");
+    const prospect = async (orgId: string, leadId: number, ready: boolean) => Number((await q.query(
+      `INSERT INTO prospects (organization_id, domain, name, website, status, ready, lead_id, created_at, updated_at) VALUES ($1, $2, 'P', 'https://p.example', 'ready', $3, $4, $5, $5) RETURNING id`,
+      [orgId, `p${leadId}-${orgId}.example`, ready, leadId, NOW])).rows[0].id);
+    const run = async (orgId: string, prospectId: number, profile: { id: number; name: string } | null) => {
+      const id = `pr_t${randomBytes(8).toString("hex")}`;
+      await q.query(`INSERT INTO prospect_runs (id, organization_id, created_by_user, request, icp, quantity, status, stage, idem_key, created_at, updated_at) VALUES ($1, $2, 'u', 'x', $3, 5, 'done', 'done', $1, $4, $4)`,
+        [id, orgId, JSON.stringify({ industry: "D2C brand", ...(profile ? { profile } : {}) }), NOW]);
+      await q.query(`INSERT INTO prospect_run_items (run_id, organization_id, prospect_id, stage, updated_at) VALUES ($1, $2, $3, 'done', $4)`, [id, orgId, prospectId, NOW]);
+    };
+    await run(o, await prospect(o, fromBrands, true), { id: 7, name: "Brands" });
+    await run(o, await prospect(o, fromStartups, false), { id: 8, name: "Startups" });
+    await run(o, await prospect(o, typed, true), null);
+    // The same profile id in another workspace is another profile.
+    const theirs = await lead(other, "Theirs");
+    await run(other, await prospect(other, theirs, true), { id: 7, name: "Their Brands" });
+    try {
+      const by = new Map((await mod.campaignStore.audience(o, {}, 50)).map((l) => [l.companyName, l]));
+      expect([by.get("FromBrands")!.profileName, by.get("FromBrands")!.ready]).toEqual(["Brands", true]);
+      expect([by.get("FromStartups")!.profileName, by.get("FromStartups")!.ready]).toEqual(["Startups", false]);
+      expect([by.get("TypedSearch")!.profileName, by.get("TypedSearch")!.ready]).toEqual([null, true]);
+      expect([by.get("ByHand")!.profileName, by.get("ByHand")!.ready]).toEqual([null, false]);
+      expect((await mod.campaignStore.audience(o, { profileId: 7 }, 50)).map((l) => l.companyName)).toEqual(["FromBrands"]);
+      expect((await mod.campaignStore.audience(o, { profileId: 999 }, 50))).toEqual([]);
+      expect((await mod.campaignStore.audience(o, { ready: true }, 50)).map((l) => l.companyName).sort()).toEqual(["FromBrands", "TypedSearch"]);
+      expect((await mod.campaignStore.audience(o, { ready: true, profileId: 8 }, 50))).toEqual([]);
+      expect((await mod.campaignStore.audience(other, { profileId: 7 }, 50)).map((l) => l.companyName)).toEqual(["Theirs"]);
+    } finally {
+      for (const orgId of [o, other]) for (const t of ["prospect_run_items", "prospect_runs", "prospects"]) await q.query(`DELETE FROM ${t} WHERE organization_id = $1`, [orgId]).catch(() => {});
+    }
+  });
+
   it("another workspace's campaign, members and leads can't be read or changed", async () => {
     const a = org(), b = org();
     const la = await lead(a, "Mine"), lb = await lead(b, "Theirs");

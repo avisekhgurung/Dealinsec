@@ -12,6 +12,7 @@ import { tablesReadyCheck } from "../leads/ready";
 /** Campaigns sit on top of outreach: without messages and the do-not-contact list there is nothing to group. */
 export const campaignTablesReady = tablesReadyCheck(["campaigns", "campaign_members", "leads", "lead_messages", "outreach_events", "outreach_suppressions"]);
 const threadsReady = tablesReadyCheck(["mail_threads"]);
+const radarReady = tablesReadyCheck(["prospects", "prospect_run_items", "prospect_runs"]);
 
 export interface MemberView {
   id: number; leadId: number; state: string; reason: string | null; attempts: number; holdReason: string | null; holdHash: string | null;
@@ -22,8 +23,10 @@ export interface MemberView {
 export interface AudienceLead {
   id: number; companyName: string; domain: string | null; industry: string | null; location: string | null; status: string; source: string;
   contactName: string | null; hasEmail: boolean; doNotContact: boolean; hasUnsent: boolean; inCampaign: string | null;
+  /** From Client Radar: the saved client profile its search started from (when there was one), and whether the company was Ready. */
+  profileName: string | null; ready: boolean;
 }
-export interface AudienceFilter { status?: string | null; source?: string | null; q?: string | null }
+export interface AudienceFilter { status?: string | null; source?: string | null; q?: string | null; /** Only leads found by a search started from this saved client profile. */ profileId?: number | null; /** Only leads whose company Client Radar marked Ready. */ ready?: boolean }
 export interface NewCampaign { name: string; profileId: number | null; profileName: string | null; footerNote: string; dailyLimit: number; gapSeconds: number }
 export type SettingsPatch = Partial<Pick<CampaignRow, "name" | "dailyLimit" | "gapSeconds" | "footerNote" | "status">>;
 export interface SendPick { memberId: number; leadId: number; messageId: number; bodyHash: string; body: string }
@@ -164,21 +167,38 @@ export const campaignStore: CampaignStore = {
   },
   async audience(orgId, f, limit) {
     const q = f.q ? `%${f.q.replace(/[%_\\]/g, (c) => `\\${c}`)}%` : null;
+    // Where a lead came from, read from Client Radar's own rows: the lead's company, the searches that found it, and the
+    // profile a search carried (prospect_runs.icp.profile). On a database without Client Radar these are simply absent,
+    // and a filter that needs them matches nothing rather than everything.
+    const radar = await radarReady().catch(() => false);
+    const fromProfile = (cond: ReturnType<typeof sql>) => sql`
+      SELECT r.icp->'profile'->>'name' FROM prospects p
+      JOIN prospect_run_items i ON i.organization_id = p.organization_id AND i.prospect_id = p.id
+      JOIN prospect_runs r ON r.organization_id = p.organization_id AND r.id = i.run_id
+      WHERE p.organization_id = l.organization_id AND p.lead_id = l.id AND r.icp->'profile'->>'id' IS NOT NULL AND ${cond}
+      ORDER BY r.created_at DESC LIMIT 1`;
+    const profileName = radar ? sql`(${fromProfile(sql`true`)})` : sql`NULL`;
+    const isReady = radar ? sql`EXISTS (SELECT 1 FROM prospects p WHERE p.organization_id = l.organization_id AND p.lead_id = l.id AND p.ready)` : sql`false`;
+    const wantProfile = f.profileId ? (radar ? sql`AND EXISTS (${fromProfile(sql`r.icp->'profile'->>'id' = ${String(f.profileId)}`)})` : sql`AND false`) : sql``;
+    const wantReady = f.ready ? sql`AND ${isReady}` : sql``;
     const r = await db.execute(sql`
       SELECT l.id, l.company_name, l.domain, l.industry, l.location, l.status, l.source, l.contact_name, l.do_not_contact,
              (l.contact_email IS NOT NULL AND l.contact_email <> '') AS has_email,
              EXISTS (SELECT 1 FROM lead_messages lm WHERE lm.organization_id = l.organization_id AND lm.lead_id = l.id AND lm.direction = 'out' AND lm.status IN ('draft', 'approved', 'sending', 'variant')) AS has_unsent,
-             (SELECT c.name FROM campaign_members m JOIN campaigns c ON c.id = m.campaign_id WHERE m.organization_id = l.organization_id AND m.lead_id = l.id AND c.status = 'active' ORDER BY c.id DESC LIMIT 1) AS in_campaign
+             (SELECT c.name FROM campaign_members m JOIN campaigns c ON c.id = m.campaign_id WHERE m.organization_id = l.organization_id AND m.lead_id = l.id AND c.status = 'active' ORDER BY c.id DESC LIMIT 1) AS in_campaign,
+             ${profileName} AS profile_name, ${isReady} AS ready
       FROM leads l
       WHERE l.organization_id = ${orgId} AND l.archived_at IS NULL AND l.converted_deal_id IS NULL
         AND l.status IN ('new', 'researching', 'qualified')
         AND (${f.status ?? null}::text IS NULL OR l.status = ${f.status ?? null})
         AND (${f.source ?? null}::text IS NULL OR l.source = ${f.source ?? null})
         AND (${q}::text IS NULL OR l.company_name ILIKE ${q} OR l.industry ILIKE ${q} OR l.location ILIKE ${q} OR l.domain ILIKE ${q})
+        ${wantProfile} ${wantReady}
       ORDER BY l.updated_at DESC, l.id DESC LIMIT ${limit}`);
     return rowsOf<any>(r).map((x) => ({
       id: Number(x.id), companyName: x.company_name, domain: x.domain, industry: x.industry, location: x.location, status: x.status, source: x.source,
       contactName: x.contact_name, hasEmail: !!x.has_email, doNotContact: !!x.do_not_contact, hasUnsent: !!x.has_unsent, inCampaign: x.in_campaign ?? null,
+      profileName: x.profile_name ? String(x.profile_name) : null, ready: !!x.ready,
     }));
   },
   async relink(orgId, id) {

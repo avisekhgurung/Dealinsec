@@ -161,8 +161,11 @@ export async function audience(user: Who, q: Record<string, unknown> = {}, d: Pa
   const status = typeof q.status === "string" && AUDIENCE_STATUS.has(q.status) ? q.status : null;
   const source = typeof q.source === "string" && /^[a-z_]{1,16}$/.test(q.source) ? q.source : null;
   const text = typeof q.q === "string" ? q.q.replace(/\s+/g, " ").trim().slice(0, 60) : "";
+  const pid = Number(q.profileId);
+  const profileId = Number.isInteger(pid) && pid > 0 ? pid : null;
+  const ready = q.ready === "1" || q.ready === "true" || q.ready === true;
   const limit = 300;
-  const leads = await deps.store.audience(user.organizationId!, { status, source, q: text || null }, limit);
+  const leads = await deps.store.audience(user.organizationId!, { status, source, q: text || null, profileId, ready }, limit);
   return { ok: true, leads: leads.map((l) => ({ ...l, blocked: audienceBlock(l) })), limit };
 }
 

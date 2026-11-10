@@ -4,7 +4,7 @@
  * is done through the existing outreach routes (/api/sales/...), not here.
  *
  *   GET    /api/campaigns                     the workspace's campaigns with their numbers
- *   GET    /api/campaigns/audience            leads that can be picked (?status=&source=&q=)
+ *   GET    /api/campaigns/audience            leads that can be picked (?status=&source=&q=&profileId=&ready=1)
  *   GET    /api/campaigns/sender-check        is the caller's own sending address set up to be trusted (SPF, DKIM, DMARC)
  *   POST   /api/campaigns                     create ({ name, leadIds, profileId?, dailyLimit?, gapSeconds?, footerNote? })
  *   GET    /api/campaigns/:id                 one campaign with every member
