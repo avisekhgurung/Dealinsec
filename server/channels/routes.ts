@@ -49,7 +49,7 @@ export function registerChannelRoutes(app: Express) {
   const message = (r: any) => ({ message: r.message });
 
   app.get("/api/channels/status", isAuthenticated, guarded("channels_status", async (req, res) => { res.setHeader("Cache-Control", "no-store"); send(res, await svc.channelStatuses(req.user), (r) => ({ channels: r.channels })); }));
-  app.get("/api/channels/leads/:id/messages", isAuthenticated, withId("channels_list", async (req, res, id) => send(res, await svc.listChannelMessages(req.user, id), (r) => ({ messages: r.messages, whatsappContacts: r.whatsappContacts }))));
+  app.get("/api/channels/leads/:id/messages", isAuthenticated, withId("channels_list", async (req, res, id) => send(res, await svc.listChannelMessages(req.user, id), (r) => ({ messages: r.messages, whatsappContacts: r.whatsappContacts, style: r.style }))));
   app.post("/api/channels/leads/:id/draft", isAuthenticated, sameOriginJson, withId("channels_draft", async (req, res, id) => send(res, await svc.draftChannelMessage(req.user, id, req.body), (r) => ({ message: r.message, retried: r.retried }), 201)));
   app.post("/api/channels/leads/:id/whatsapp/opt-in", isAuthenticated, sameOriginJson, withId("channels_opt_in", async (req, res, id) => send(res, await svc.recordWhatsappOptIn(req.user, id, req.body), (r) => ({ contact: r.contact }))));
   app.post("/api/channels/leads/:id/whatsapp/opt-out", isAuthenticated, sameOriginJson, withId("channels_opt_out", async (req, res, id) => send(res, await svc.recordWhatsappOptOut(req.user, id, req.body), () => ({ ok: true }))));

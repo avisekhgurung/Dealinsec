@@ -125,7 +125,7 @@ function world() {
   };
   const deps: any = {
     store, ready: async () => true, now, random: () => 0, profileName: async (_o: string, id: number) => (id === 7 ? "Brands" : null),
-    profileStyle: async (_o: string, id: number) => (id === 7 && !gone.profile ? { profileId: 7, profileName: "Brands", tone: "direct", note: "Mention our Shopify work." } : null),
+    profileStyle: async (_o: string, id: number) => (id === 7 && !gone.profile ? { profileId: 7, profileName: "Brands", tone: "direct", note: "Mention our Shopify work.", channels: ["email"] } : null),
     loadUser: async (o: string, id: string) => (users[id] && users[id].organizationId === o ? users[id] : null),
     draft: async (user: any, leadId: number, profileId?: number | null) => {
       calls.draft.push({ by: user.id, leadId });

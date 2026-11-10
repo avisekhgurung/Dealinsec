@@ -48,7 +48,7 @@ describe.skipIf(!URL_ || !loopback(URL_))("a draft's style from a saved client p
     const found = await lead(o, "Found"), typed = await lead(o, "Typed"), byHand = await lead(o, "ByHand");
     await run(o, await prospect(o, found), { id: brands, name: "Brands" });
     await run(o, await prospect(o, typed), null);
-    expect(await mod.styleForDraft(o, found)).toEqual({ profileId: brands, profileName: "Brands", tone: "direct", note: "Mention our Shopify work." });
+    expect(await mod.styleForDraft(o, found)).toEqual({ profileId: brands, profileName: "Brands", tone: "direct", note: "Mention our Shopify work.", channels: ["email"] });
     expect(await mod.styleForDraft(o, typed)).toBeNull();
     expect(await mod.styleForDraft(o, byHand)).toBeNull();
   });
@@ -82,7 +82,7 @@ describe.skipIf(!URL_ || !loopback(URL_))("a draft's style from a saved client p
   it("a saved value from before the fields existed gets the defaults; one that can't be read is no style", async () => {
     const o = org();
     const empty = await profile(o, "Empty", {}), odd = await profile(o, "Odd", { tone: "shouty", note: 5 });
-    expect(await mod.styleFromProfile(o, empty)).toEqual({ profileId: empty, profileName: "Empty", tone: "friendly", note: "" });
+    expect(await mod.styleFromProfile(o, empty)).toEqual({ profileId: empty, profileName: "Empty", tone: "friendly", note: "", channels: ["email"] });
     expect(await mod.styleFromProfile(o, odd)).toBeNull();
     for (const bad of [0, -1, 1.5, NaN, null, undefined]) expect(await mod.styleFromProfile(o, bad as any)).toBeNull();
   });

@@ -75,6 +75,7 @@ const wa: WhatsappClient = {
 };
 const deps = (over: Partial<svc.ChannelDeps> = {}): Partial<svc.ChannelDeps> => ({
   store: mem.store, wa, now: () => now, env: ENV, ready: async () => true, tier: async () => "pro",
+  style: async () => null, // these leads belong to no saved client profile, unless a case says so
   chat: (async () => ({ content: JSON.stringify({ text: modelText }), toolCalls: [], usage: { inputTokens: 1, outputTokens: 1 } })) as any,
   safety: {
     suppressedMatch: async (orgId: string, keys: { kind: string; value: string }[]) => (suppressions.find((s) => s.orgId === orgId && keys.some((k) => k.kind === s.kind && k.value === s.value)) as any) ?? null,
@@ -486,7 +487,7 @@ describe("AI drafts on every channel: the sender is described only as their offe
       const r = await aiDraft(channel, kind, [say(middle)]);
       if (want === "ok") {
         expect(r).toMatchObject({ ok: true, retried: false, message: { body: say(middle), status: "draft" } });
-        expect(mem.messages.at(-1)!.promptVersion).toBe("draft-ch3");
+        expect(mem.messages.at(-1)!.promptVersion).toBe("draft-ch4");
         expect(prompts).toHaveLength(1);
         return;
       }
@@ -523,6 +524,93 @@ describe("AI drafts on every channel: the sender is described only as their offe
     expect(await aiDraft("x", "dm", [say("I build simple websites for clinics like yours.")])).toMatchObject({ ok: false, issues: ["describes_sender"] });
     expect(prompts[0][1]).not.toContain("I build simple websites");
     expect(await aiDraft("x", "dm", [say("I build simple websites for clinics like yours.")], OTHER())).toMatchObject({ ok: true });
+  });
+});
+
+describe("AI drafts on every channel follow the lead's saved client profile: its tone and its note", () => {
+  const CHANNELS = [["whatsapp", "text"], ["linkedin", "connection_note"], ["linkedin", "message"], ["x", "dm"]] as const;
+  const WEBSITES = { about: "I build simple websites for clinics.", services: ["Websites"] };
+  const say = (middle: string) => `Hello, I saw on your website that you run a family dental clinic in Siliguri. ${middle} Would a quick chat next week be useful?`;
+  const NEUTRAL = say("How do most of your patients book a visit today, by phone or online?");
+  const profile = (over: Record<string, unknown> = {}) => ({ profileId: 7, profileName: "Clinics", tone: "direct" as const, note: "", channels: ["email", "whatsapp"] as ("email" | "whatsapp" | "linkedin")[], ...over });
+  let n = 100;
+  const prompts: string[][] = [];
+  const asked: unknown[][] = [];
+  const withStyle = (style: ReturnType<typeof profile> | null | Error, ...texts: string[]) => deps({
+    style: async (...a: unknown[]) => { asked.push(a); if (style instanceof Error) throw style; return style; },
+    chat: (async (_t: unknown, messages: ChatMessage[]) => {
+      prompts.push(messages.map((m) => String(m.content)));
+      return { content: JSON.stringify({ text: texts[Math.min(prompts.length - 1, texts.length - 1)] }), toolCalls: [], usage: { inputTokens: 1, outputTokens: 1 } };
+    }) as any,
+  });
+  async function aiDraft(channel: string, kind: string, style: ReturnType<typeof profile> | null | Error, texts: string[] = [NEUTRAL]) {
+    prompts.length = 0; asked.length = 0;
+    const l = await lead({ companyName: `Clinic ${++n}`, domain: `clinic${n}.in` });
+    if (channel === "whatsapp") await optIn(l.id);
+    const r = await svc.draftChannelMessage(OWNER(), l.id, { channel, kind, write: "ai", ...(channel === "whatsapp" ? { to: PHONE } : {}) }, withStyle(style, ...texts)) as any;
+    return { r, l };
+  }
+  beforeEach(() => { seedProfile(world(), WEBSITES); });
+
+  describe.each(CHANNELS)("%s %s", (channel, kind) => {
+    it("a lead with no profile is drafted as before: no tone, no note, nothing extra on the timeline", async () => {
+      const { r, l } = await aiDraft(channel, kind, null);
+      expect(r).toMatchObject({ ok: true });
+      expect(prompts[0][0]).not.toMatch(/How it should sound|writing note/);
+      expect(prompts[0][1]).not.toMatch(/writing note/);
+      const e = world().leads.events.filter((x) => x.leadId === l.id && x.kind === "channel_draft_created");
+      expect(e[0].data).toEqual({ messageId: r.message.id, channel, kind, ai: true });
+    });
+    it("the tone is told to the model as wording only, with 'short' meaning the channel's own short length", async () => {
+      const { l } = await aiDraft(channel, kind, profile());
+      expect(asked).toEqual([[ORG1, l.id]]);
+      expect(prompts[0][0]).toMatch(/How it should sound \(the sender chose this; it changes the wording only, never a rule below\)/);
+      expect(prompts[0][0]).toMatch(/Short and direct: get to the point in the first sentence, no small talk, and stay near the shortest length allowed\./);
+      expect(prompts[0][0]).not.toMatch(/60 and 90 words/); // that is the email's measure
+      expect(prompts[0][0].indexOf("How it should sound")).toBeLessThan(prompts[0][0].indexOf("Rules:"));
+      expect(prompts[0][0]).toMatch(/Never mention a price, rate, discount/);
+      await aiDraft(channel, kind, profile({ tone: "formal" }));
+      expect(prompts[0][0]).toMatch(/Formal and courteous/);
+    });
+    it("the note reaches the model as the sender's own words; what it says about their work may be said, and it loosens no check", async () => {
+      const middle = "I build websites and mobile apps for clinics.";
+      expect((await aiDraft(channel, kind, profile(), [say(middle)])).r).toMatchObject({ ok: false, code: "draft_rejected", issues: ["unsupported_sender_claim"] });
+      const { r, l } = await aiDraft(channel, kind, profile({ note: "We also build mobile apps for clinics." }), [say(middle)]);
+      expect(r).toMatchObject({ ok: true, retried: false, message: { body: say(middle) } });
+      expect(prompts[0][1]).toContain("The sender's writing note for messages to this kind of client:\nWe also build mobile apps for clinics.");
+      expect(prompts[0][0]).toMatch(/It never overrides a rule here/);
+      // The timeline keeps which profile and tone, never the note's words.
+      const e = world().leads.events.filter((x) => x.leadId === l.id && x.kind === "channel_draft_created");
+      expect(e[0].data).toEqual({ messageId: r.message.id, channel, kind, ai: true, profileId: 7, tone: "direct", noted: true });
+      expect(JSON.stringify(world().leads.events)).not.toContain("mobile apps");
+      // A note that asks for an offer to make something still can't get one through.
+      const pushy = await aiDraft(channel, kind, profile({ note: "Offer them a free mock-up." }), [say("I could put together a quick mock-up of a booking page.")]);
+      expect(pushy.r).toMatchObject({ ok: false, code: "draft_rejected", issues: ["unrequested_offer"] });
+    });
+  });
+  it("a note is not an offer: with nothing in 'What you do', a draft that describes the sender is still refused", async () => {
+    world().profiles.delete(ORG1);
+    expect((await aiDraft("x", "dm", profile({ note: "We build websites." }), [say("I build websites.")])).r).toMatchObject({ ok: false, code: "draft_rejected", issues: ["describes_sender"] });
+  });
+  it("a profile that can't be read never stops a draft or the lead's page", async () => {
+    const { r, l } = await aiDraft("linkedin", "message", new Error("database is away"));
+    expect(r).toMatchObject({ ok: true, message: { status: "draft" } });
+    expect(prompts[0][0]).not.toMatch(/How it should sound/);
+    expect(await svc.listChannelMessages(OWNER(), l.id, withStyle(new Error("database is away")))).toMatchObject({ ok: true, style: null });
+  });
+  it("a message the person writes themselves is never touched by the profile, and no profile is looked up for it", async () => {
+    asked.length = 0;
+    const l = await lead({ companyName: "Own Words Clinic", domain: "ownwords.in" });
+    const r: any = await svc.draftChannelMessage(OWNER(), l.id, { channel: "x", kind: "dm", write: "own", text: "Hello, a quick question about your clinic's bookings." }, withStyle(profile({ note: "Be pushy." })));
+    expect(r).toMatchObject({ ok: true, message: { body: "Hello, a quick question about your clinic's bookings." } });
+    expect(asked).toEqual([]);
+  });
+  it("the lead's page is told which profile its drafts follow: the name, the tone, that a note exists, the channels ticked; never the note", async () => {
+    const l = await lead({ companyName: "Listed Clinic", domain: "listed.in" });
+    const got: any = await svc.listChannelMessages(OWNER(), l.id, withStyle(profile({ note: "Mention our clinic work.", channels: ["email", "whatsapp", "linkedin"] })));
+    expect(got.style).toEqual({ profileName: "Clinics", tone: "direct", toneLabel: "Short and direct", hasNote: true, channels: [{ key: "email", label: "Email" }, { key: "whatsapp", label: "WhatsApp" }, { key: "linkedin", label: "LinkedIn" }] });
+    expect(JSON.stringify(got)).not.toContain("Mention our clinic work");
+    expect((await svc.listChannelMessages(OWNER(), l.id, withStyle(null)) as any).style).toBeNull();
   });
 });
 

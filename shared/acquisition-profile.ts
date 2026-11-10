@@ -16,8 +16,9 @@
  * and never a change to "Ready" or the score (shared/prospect.ts), which stay exactly as they were.
  *
  * Outreach preferences are saved with the profile. Nothing in a search uses them. The tone and the note are read when
- * a FIRST message is drafted (server/profiles/style.ts): for a lead found from this profile, and for a campaign built
- * for it. They change wording only; every drafting rule and check stays. The channels are saved and not yet read.
+ * a FIRST message is drafted (server/profiles/style.ts), an email or a short message for WhatsApp, LinkedIn or X: for
+ * a lead found from this profile, and for a campaign built for it. They change wording only; every drafting rule and
+ * check stays. The channels are shown on the lead's page as a reminder; nothing is sent or chosen by them.
  */
 import { z } from "zod";
 import { DEFAULT_QUANTITY, DEFAULT_ROLES, icpSchema, type Icp } from "./icp";
@@ -52,6 +53,14 @@ export const outreachPrefsSchema = z.object({
 });
 export type OutreachPrefs = z.infer<typeof outreachPrefsSchema>;
 export const DEFAULT_OUTREACH: OutreachPrefs = { channels: ["email"], tone: "friendly", note: "" };
+
+/** The outreach preferences of one saved profile, as drafting reads them (server/profiles/style.ts). */
+export interface ProfileStyle { profileId: number; profileName: string; tone: OutreachTone; note: string; /** The channels the person ticked for these clients. Shown to them; nothing sends by it. */ channels: OutreachChannel[] }
+/** What a page may show about the style a lead's drafts follow. The note's words stay on the profile. */
+export interface ProfileStyleView { profileName: string; tone: OutreachTone; toneLabel: string; hasNote: boolean; channels: { key: OutreachChannel; label: string }[] }
+export const profileStyleView = (s: ProfileStyle | null | undefined): ProfileStyleView | null => (s
+  ? { profileName: s.profileName, tone: s.tone, toneLabel: OUTREACH_TONE_LABEL[s.tone], hasNote: !!s.note.trim(), channels: s.channels.map((key) => ({ key, label: OUTREACH_CHANNEL_LABEL[key] })) }
+  : null);
 
 const size = z.number().int().min(1).max(1_000_000).nullable().default(null);
 

@@ -47,6 +47,7 @@ import { createTicket, fail, getLead, moveLead, readGate, updateLead, writeGate,
 import { storage } from "../storage";
 import { draftSystemPrompt, draftUserMessage, versionFor, type DraftInput } from "./outreach-prompt";
 import type { DraftStyle } from "../profiles/style";
+import { profileStyleView, type ProfileStyleView } from "@shared/acquisition-profile";
 import { DraftAllowanceReached, DraftExists, messageStore, messagesTablesReady, outreachSafetyReady, type MessageStore } from "./message-store";
 import { AI_DRAFT_VERSION_PREFIX, outboundTier } from "../outbound/plan";
 import { outboundAllowance } from "../outbound/limits";
@@ -157,7 +158,7 @@ const asDraft = (text: string | null): { subject: string; body: string } | null 
 };
 
 /** `sample`: the proof-of-value sample the lead's opportunity plan proposed (Client Radar), which a first draft can offer. */
-export async function listMessages(user: Who, leadId: number, d: Partial<OutreachDeps> = {}): Promise<Result<{ messages: MessageView[]; sample: { title: string; scope: string } | null }>> {
+export async function listMessages(user: Who, leadId: number, d: Partial<OutreachDeps> = {}): Promise<Result<{ messages: MessageView[]; sample: { title: string; scope: string } | null; /** The saved client profile whose tone and note this lead's AI drafts follow, when there is one. */ style: ProfileStyleView | null }>> {
   const deps = { ...defaults(), ...d };
   const gate = readGate(user);
   if (gate) return gate;
@@ -178,7 +179,8 @@ export async function listMessages(user: Who, leadId: number, d: Partial<Outreac
     v.status === "variant" || v.status === "draft"
       ? { ...v, scorecard: scoreDraft(v, { greetName: lead.contactName?.trim() || null, factValues: facts.map((f) => f.value), evidenceValues: (evidenceIds.get(v.strategy ?? "") ?? []).map((id) => valueOf.get(id)!).filter(Boolean) }) }
       : v;
-  return { ok: true, messages: rows.map((m) => withCard(messageView(m))), sample };
+  const style = await deps.style(user.organizationId!, leadId).catch(() => null);
+  return { ok: true, messages: rows.map((m) => withCard(messageView(m))), sample, style: profileStyleView(style) };
 }
 
 /** The cap refusals a draft can hit, in the person's words; null when `e` is something else. */

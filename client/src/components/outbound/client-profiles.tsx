@@ -148,7 +148,7 @@ function Editor({ draft, onChange, onSave, onCancel, saving }: { draft: Draft; o
           </select>
         </div>
         <Textarea value={draft.outreach.note} onChange={(e) => set({ outreach: { ...draft.outreach, note: e.target.value } })} rows={2} maxLength={280} placeholder="A note for your messages to these clients, for example: mention our Shopify work (optional)" aria-label="Note for messages" data-testid="profile-note" />
-        <p className="text-xs text-muted-foreground">The tone and the note shape the AI drafts written for leads found from this profile, and for campaigns built for it. Every draft is still checked by the same rules, and you read it before anything is sent. The channels are saved for later: a campaign sends by email only.</p>
+        <p className="text-xs text-muted-foreground">The tone and the note shape the AI drafts written for leads found from this profile (email, WhatsApp, LinkedIn and X), and for campaigns built for it. Every draft is still checked by the same rules, and you read it before anything is sent. The channels you tick are shown on each lead's page as a reminder; a campaign sends by email only.</p>
       </section>
 
       <div className="sticky -bottom-6 z-10 -mx-6 -mb-6 flex items-center gap-2 border-t bg-background px-6 py-3">

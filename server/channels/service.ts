@@ -44,6 +44,9 @@ import { messageStore, outreachSafetyReady } from "../sales/message-store";
 import { AI_DRAFT_VERSION_PREFIX, outboundTier } from "../outbound/plan";
 import { outboundAllowance } from "../outbound/limits";
 import { CHANNEL_PROMPT_VERSION, channelSystemPrompt, channelUserMessage } from "./prompt";
+import type { DraftInput } from "../sales/outreach-prompt";
+import { profileStyleView, type ProfileStyle as DraftStyle, type ProfileStyleView as StyleView } from "@shared/acquisition-profile";
+import { offerDescribed } from "@shared/outreach-check";
 import { ChannelAllowanceReached, ChannelDraftExists, ConnectionExists, channelStore, channelTablesReady, type ChannelStore } from "./store";
 import { WhatsappError, fillTemplate, whatsappClient, type WhatsappClient, type WhatsappTemplate } from "./whatsapp-api";
 import { parseNotification, verifySignature } from "./whatsapp-webhook";
@@ -77,6 +80,8 @@ export interface ChannelDeps {
   /** The email outreach's do-not-contact list and follow-ups (shared with email on purpose). */
   safety: Pick<typeof messageStore, "suppressedMatch" | "addSuppression" | "stopLeadFollowups">;
   safetyReady: () => Promise<boolean>;
+  /** The tone and note of the saved client profile this lead's drafts follow, or null (server/profiles/style.ts). */
+  style: (orgId: string, leadId: number) => Promise<DraftStyle | null>;
   /** Provider usage for cost accounting (provider_calls). */
   recordProviderCall: (r: { orgId: string; provider: string; operation: string; ok: boolean; errorCode: string | null; latencyMs: number; costMicroUsd: number; now: Date }) => Promise<void>;
 }
@@ -84,8 +89,11 @@ const defaults = (): ChannelDeps => ({
   store: channelStore, wa: whatsappClient(), chat: tracedChat, now: () => new Date(), env: process.env,
   ready: async () => { try { return await channelTablesReady(); } catch { return false; } },
   tier: outboundTier, safety: messageStore, safetyReady: async () => { try { return await outreachSafetyReady(); } catch { return false; } },
+  style: async (orgId, leadId) => { try { return await (await import("../profiles/style")).styleForDraft(orgId, leadId); } catch { return null; } },
   recordProviderCall: async (r) => { const { outboundStore } = await import("../outbound/store"); await outboundStore.recordProviderCall({ ...r, runId: null }); },
 });
+/** Never lets a profile that can't be read stop a draft or a page. */
+const styleOf = (deps: ChannelDeps, orgId: string, leadId: number) => deps.style(orgId, leadId).catch(() => null);
 
 /* ── views ───────────────────────────────────────────────────────────────── */
 
@@ -185,7 +193,7 @@ export async function channelStatuses(user: Who, d: Partial<ChannelDeps> = {}): 
 
 /* ── list ────────────────────────────────────────────────────────────────── */
 
-export async function listChannelMessages(user: Who, leadId: number, d: Partial<ChannelDeps> = {}): Promise<Result<{ messages: ChannelMessageView[]; whatsappContacts: WhatsappContactView[] }>> {
+export async function listChannelMessages(user: Who, leadId: number, d: Partial<ChannelDeps> = {}): Promise<Result<{ messages: ChannelMessageView[]; whatsappContacts: WhatsappContactView[]; /** The saved client profile whose tone and note this lead's AI drafts follow, when there is one. */ style: StyleView | null }>> {
   const deps = { ...defaults(), ...d };
   const gate = readGate(user);
   if (gate) return gate;
@@ -193,8 +201,8 @@ export async function listChannelMessages(user: Who, leadId: number, d: Partial<
   const got = await getLead(user, leadId);
   if (!got.ok) return got;
   const orgId = user.organizationId!, now = deps.now();
-  const [rows, contacts] = await Promise.all([deps.store.listForLead(orgId, leadId), deps.store.contactsForLead(orgId, leadId)]);
-  return { ok: true, messages: rows.map(channelMessageView), whatsappContacts: contacts.map((c) => contactView(c, now)) };
+  const [rows, contacts, style] = await Promise.all([deps.store.listForLead(orgId, leadId), deps.store.contactsForLead(orgId, leadId), styleOf(deps, orgId, leadId)]);
+  return { ok: true, messages: rows.map(channelMessageView), whatsappContacts: contacts.map((c) => contactView(c, now)), style: profileStyleView(style) };
 }
 
 /* ── draft ───────────────────────────────────────────────────────────────── */
@@ -270,7 +278,7 @@ export async function draftChannelMessage(user: Who, leadId: number, raw: unknow
     if (!perm.ok) return perm.refusal;
   }
 
-  let body: string, promptVersion: string | null = null, claimIds: number[] = [], retried = false;
+  let body: string, promptVersion: string | null = null, claimIds: number[] = [], retried = false, followed: DraftStyle | null = null;
   let template: { name: string; language: string; params: string[] } | null = null;
   if (kind === "template") {
     if (i.write !== "own" || !i.template) return fail(400, "invalid", "Pick an approved template and fill in its values.");
@@ -286,7 +294,7 @@ export async function draftChannelMessage(user: Who, leadId: number, raw: unknow
   } else {
     const ai = await aiDraft(user, lead, claims, channel, kind, deps);
     if (!ai.ok) return ai;
-    ({ body, claimIds, retried } = ai);
+    ({ body, claimIds, retried, style: followed } = ai);
     promptVersion = CHANNEL_PROMPT_VERSION;
   }
 
@@ -304,7 +312,7 @@ export async function draftChannelMessage(user: Who, leadId: number, raw: unknow
     if (e instanceof ChannelAllowanceReached) return draftLimit(tier!, plan!.monthlyDrafts);
     throw e;
   }
-  await leadsStore.addEvent(orgId, leadId, { kind: "channel_draft_created", data: { messageId: row.id, channel, kind, ai: !!promptVersion }, actor: "user", actorUserId: user.id });
+  await leadsStore.addEvent(orgId, leadId, { kind: "channel_draft_created", data: { messageId: row.id, channel, kind, ai: !!promptVersion, ...(followed ? { profileId: followed.profileId, tone: followed.tone, noted: !!followed.note.trim() } : {}) }, actor: "user", actorUserId: user.id });
   return { ok: true, message: channelMessageView(row), retried };
 }
 
@@ -312,7 +320,7 @@ const draftLimit = (tier: OutboundTier, max: number) => tier === "free"
   ? fail(402, "NO_CREDITS", `You've used the free plan's ${max} AI drafts for this 30-day period. Upgrade to Pro for more, or write this message yourself.`, { feature: "outbound" })
   : fail(429, "draft_allowance", `You've used the ${max} AI drafts included in ${TIER_LABEL[tier]} for this 30-day period; you can still write this message yourself.`);
 
-async function aiDraft(user: Who, lead: any, claims: any[], channel: ShortChannel, kind: MessageKind, deps: ChannelDeps): Promise<{ ok: true; body: string; claimIds: number[]; retried: boolean } | ReturnType<typeof fail>> {
+async function aiDraft(user: Who, lead: any, claims: any[], channel: ShortChannel, kind: MessageKind, deps: ChannelDeps): Promise<{ ok: true; body: string; claimIds: number[]; retried: boolean; style: DraftStyle | null } | ReturnType<typeof fail>> {
   if (kind === "template") return fail(400, "invalid", "A template's wording is fixed by WhatsApp; fill in its values instead.");
   const orgId = user.organizationId!;
   const scoreClaims: ScoreClaim[] = claims.map((c) => ({ id: c.id, field: c.field, value: c.value, status: c.status, evidenceUrl: c.evidenceUrl, createdAt: c.createdAt }));
@@ -330,18 +338,22 @@ async function aiDraft(user: Who, lead: any, claims: any[], channel: ShortChanne
 
   const { storage } = await import("../storage");
   const { getIdealClient } = await import("../services/ideal-client");
-  const [org, ideal] = await Promise.all([storage.getOrganization(orgId), getIdealClient(user)]);
-  const input = {
+  const [org, ideal, style] = await Promise.all([storage.getOrganization(orgId), getIdealClient(user), styleOf(deps, orgId, lead.id)]);
+  const input: DraftInput = {
     sender: { name: [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || org?.name || "The team", business: org?.name ?? "" },
     offer: ideal.ok ? { about: ideal.profile.about, services: ideal.profile.services } : { about: null, services: [] },
     company: lead.companyName, greetName: lead.contactName?.trim() || null, facts, angles, notes: [],
     angle: await import("../outbound/lead-angle").then((m) => m.angleForLead(orgId, lead.id)).catch(() => null),
+    // How the sender asked for messages to this kind of client to sound: wording only, every rule and check stays.
+    style: style ? { tone: style.tone, note: style.note } : null,
   };
   // As with email: no sample is ever offered on a channel, and the sender is described only as "What the sender offers" says.
-  const scope = { sampleOffered: false, offer: input.offer };
+  // The profile's note is the sender's own words too, but a note alone never counts as having described the offer.
+  const noted = offerDescribed(input.offer) && style?.note.trim() ? { about: [input.offer.about, style.note].filter(Boolean).join(". "), services: input.offer.services } : input.offer;
+  const scope = { sampleOffered: false, offer: noted };
   const site = siteHost(lead.domain || (() => { try { return new URL(lead.website ?? "").hostname; } catch { return ""; } })());
   const trace = { task: "draft" as const, orgId, userId: user.id, leadId: lead.id, promptVersion: CHANNEL_PROMPT_VERSION };
-  const messages: ChatMessage[] = [{ role: "system", content: channelSystemPrompt(channel, kind) }, { role: "user", content: channelUserMessage(input) }];
+  const messages: ChatMessage[] = [{ role: "system", content: channelSystemPrompt(channel, kind, input.style) }, { role: "user", content: channelUserMessage(input) }];
   let text: string | null = null, issues: { code: string; message: string }[] = [], retried = false;
   try {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -360,7 +372,7 @@ async function aiDraft(user: Who, lead: any, claims: any[], channel: ShortChanne
     return fail(502, "model_unavailable", "The writing assistant didn't answer. Try again in a moment.");
   }
   if (!text || issues.length) return fail(422, "draft_rejected", "The draft didn't pass the safety checks, so it wasn't saved. Try again, or write the message yourself.", { issues: issues.map((x) => x.code) });
-  return { ok: true, body: text, claimIds: [...facts, ...angles].map((f) => f.id), retried };
+  return { ok: true, body: text, claimIds: [...facts, ...angles].map((f) => f.id), retried, style };
 }
 
 /* ── edit, approve, cancel ───────────────────────────────────────────────── */

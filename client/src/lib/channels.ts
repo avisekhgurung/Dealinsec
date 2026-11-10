@@ -1,4 +1,5 @@
 /** Client side of the outreach channels (server/channels/routes.ts). Types mirror the server's views. */
+import type { ProfileStyleView } from "@shared/acquisition-profile";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import type { ChannelStatus, ShortChannel } from "@shared/channels";
@@ -23,7 +24,7 @@ export interface WhatsappTemplate { name: string; language: string; category: st
 export interface WhatsappStatus { configured: boolean; reason: string | null; canManage: boolean; connection: { status: string; displayPhone: string | null; verifiedName: string | null; connectedAt: string; lastErrorCode: string | null } | null; webhookPath: string }
 
 export const useChannelStatuses = () => useQuery<{ channels: ChannelStatus[] }>({ queryKey: [CHANNELS_STATUS_URL], retry: false, staleTime: 30_000 });
-export const useChannelMessages = (leadId: number) => useQuery<{ messages: ChannelMessage[]; whatsappContacts: WhatsappContact[] }>({ queryKey: [channelMessagesUrl(leadId)], retry: false });
+export const useChannelMessages = (leadId: number) => useQuery<{ messages: ChannelMessage[]; whatsappContacts: WhatsappContact[]; /** Older servers omit it. */ style?: ProfileStyleView | null }>({ queryKey: [channelMessagesUrl(leadId)], retry: false });
 export const useWhatsappStatus = () => useQuery<WhatsappStatus>({ queryKey: [WHATSAPP_URL], retry: false });
 
 export const refreshChannels = (leadId?: number) => Promise.all([

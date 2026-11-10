@@ -1,6 +1,7 @@
 /**
  * How a saved client profile wants its messages to sound: the tone and the note the person saved under "How you like
- * to reach out" (shared/acquisition-profile.ts). Read when a first message is drafted, and nowhere else.
+ * to reach out" (shared/acquisition-profile.ts). Read when a first message is drafted (an email, or a short message
+ * for WhatsApp, LinkedIn or X), and to tell the person on the lead's page which style its drafts follow.
  *
  * Which profile applies to a lead:
  *   1. the one a campaign was built for, when the draft is written for a campaign that has one;
@@ -12,11 +13,11 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "../db";
-import { outreachPrefsSchema, type OutreachTone } from "@shared/acquisition-profile";
+import { outreachPrefsSchema, type ProfileStyle } from "@shared/acquisition-profile";
 import { tablesReadyCheck } from "../leads/ready";
 import { acquisitionProfileStore, profilesTableReady } from "./store";
 
-export interface DraftStyle { profileId: number; profileName: string; tone: OutreachTone; note: string }
+export type DraftStyle = ProfileStyle;
 
 const radarReady = tablesReadyCheck(["prospects", "prospect_run_items", "prospect_runs"]);
 
@@ -27,7 +28,7 @@ export async function styleFromProfile(orgId: string, profileId: number | null |
     const row = await acquisitionProfileStore.get(orgId, profileId);
     if (!row) return null;
     const prefs = outreachPrefsSchema.safeParse(row.outreach ?? {});
-    return prefs.success ? { profileId: row.id, profileName: row.name, tone: prefs.data.tone, note: prefs.data.note } : null;
+    return prefs.success ? { profileId: row.id, profileName: row.name, tone: prefs.data.tone, note: prefs.data.note, channels: prefs.data.channels } : null;
   } catch { return null; }
 }
 

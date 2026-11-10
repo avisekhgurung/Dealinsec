@@ -6,6 +6,8 @@
  */
 import { trackEvent } from "@/lib/analytics";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import type { ProfileStyleView } from "@shared/acquisition-profile";
+import { ProfileStyleNote } from "./profile-style-note";
 import { useEffect, useState } from "react";
 import { Check, Copy, Loader2, Mail, Pencil, PenLine, Send, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,7 +41,7 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
   const { toast } = useToast();
   const canRun = memberCan(user as any, "deals.create");
   const gmail = useGmailCanSend(); // only offered (and mentioned) where this person can really send from Gmail
-  const q = useQuery<{ messages: Message[]; sample?: { title: string; scope: string } | null }>({ queryKey: [messagesUrl(leadId)], retry: false });
+  const q = useQuery<{ messages: Message[]; sample?: { title: string; scope: string } | null; /** Older servers omit it. */ style?: ProfileStyleView | null }>({ queryKey: [messagesUrl(leadId)], retry: false });
   const sample = q.data?.sample ?? null;
   // Offering the plan's sample commits the person's time, so it's their choice, off until they tick it.
   const [offerSample, setOfferSample] = useState(false);
@@ -117,6 +119,8 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
             </div>
           )}
         </div>
+
+        {!current && !lastSent && !variants.length && canRun && <ProfileStyleNote style={q.data?.style} channel="email" />}
 
         {!current && !lastSent && !variants.length && canRun && sample && (
           <label className="flex items-start gap-2 rounded-lg border border-border/70 p-2.5 text-sm" data-testid="outreach-offer-sample">

@@ -236,7 +236,7 @@ describe("what the email says about the sender: only what their offer says, and 
 });
 
 describe("a saved client profile's tone and note", () => {
-  const style = (over: Record<string, unknown> = {}) => ({ style: async () => ({ profileId: 7, profileName: "Hotel groups", tone: "direct" as const, note: "", ...over }) });
+  const style = (over: Record<string, unknown> = {}) => ({ style: async () => ({ profileId: 7, profileName: "Hotel groups", tone: "direct" as const, note: "", channels: ["email" as const], ...over }) });
   const SENTENCE = "I help small hotel groups keep their client paperwork tidy, and I wondered whether that is something you are thinking about as you grow.";
   const body = (middle: string) => BODY.replace(SENTENCE, `${middle} I wondered whether that is on your mind as you grow.`);
 
@@ -303,6 +303,14 @@ describe("a saved client profile's tone and note", () => {
     await draftOutreach(user(), l.id, {}, style({ note: "Mention our work with hotel groups." }));
     expect(events(l.id, "draft_created")[0].data).toEqual({ messageId: world().messages[0].id, claims: 3, profileId: 7, tone: "direct", noted: true });
     expect(JSON.stringify(world().leads.events)).not.toContain("Mention our work");
+  });
+  it("the lead's page is told which profile its drafts follow, never the note's words; a profile that can't be read shows none", async () => {
+    const l = await researched();
+    const got: any = await listMessages(user(), l.id, style({ note: "Mention our work with hotel groups.", channels: ["email", "linkedin"] }));
+    expect(got.style).toEqual({ profileName: "Hotel groups", tone: "direct", toneLabel: "Short and direct", hasNote: true, channels: [{ key: "email", label: "Email" }, { key: "linkedin", label: "LinkedIn" }] });
+    expect(JSON.stringify(got)).not.toContain("Mention our work");
+    expect(await listMessages(user(), l.id, { style: async () => null })).toMatchObject({ ok: true, style: null });
+    expect(await listMessages(user(), l.id, { style: async () => { throw new Error("away"); } })).toMatchObject({ ok: true, style: null });
   });
   it("a profile that can't be read never stops a draft", async () => {
     const l = await researched();

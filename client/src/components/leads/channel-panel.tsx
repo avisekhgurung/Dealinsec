@@ -10,6 +10,7 @@
  *     and since replies don't reach DealInSec, follow-ups only stop when the person records the reply.
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { ProfileStyleNote } from "./profile-style-note";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Check, CheckCheck, Copy, ExternalLink, Loader2, MessageCircle, Pencil, PenLine, Send, ShieldCheck, Sparkles, X as XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -96,6 +97,7 @@ function ChannelComposer({ leadId, channel, status, search }: { leadId: number; 
         </div>
 
         {channel === "whatsapp" && <OptInBox leadId={leadId} contacts={contacts} canRun={canRun} api={api} onChange={done} />}
+        {!current && canRun && <ProfileStyleNote style={q.data?.style} channel={channel} />}
 
         {current ? <MessageEditor m={current} api={api} canRun={canRun} contacts={contacts} search={search} onDone={done} onFail={fail} />
           : canRun && <NewMessage leadId={leadId} channel={channel} api={api} contacts={contacts} onDone={done} onFail={fail} />}
