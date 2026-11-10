@@ -247,10 +247,14 @@ function CampaignDetail({ id, canEdit, onBack, fromLink = false }: { id: number;
   const loaded = !!q.data;
   useEffect(() => {
     if (!fromLink || !loaded) return;
-    const go = () => section.current?.scrollIntoView({ block: "start" });
+    const go = () => section.current?.scrollIntoView({ block: "start", behavior: "instant" }); // an arrival jumps there; it isn't a journey to animate
     go();
-    const again = setTimeout(go, 700); // the search form above finishes loading a moment later and pushes the page down
-    return () => clearTimeout(again);
+    // Again as the search form above finishes loading and pushes the page down; never once the person has started to scroll.
+    const timers = [700, 1600].map((ms) => setTimeout(go, ms));
+    const stop = () => timers.forEach(clearTimeout);
+    const events = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+    events.forEach((e) => window.addEventListener(e, stop, { once: true, passive: true }));
+    return () => { stop(); events.forEach((e) => window.removeEventListener(e, stop)); };
   }, [fromLink, loaded]);
   const oops = (title: string) => (e: unknown) => { toast({ title, description: leadError(e), variant: "destructive" }); refresh(id); };
   const act = useMutation({

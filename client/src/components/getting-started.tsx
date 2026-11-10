@@ -58,7 +58,10 @@ function StepIcon({ done }: { done: boolean | null }) {
 const LEAGUE_HINT: Record<FirstGoal, string> = {
   find_clients: "Nibo can run the search and save qualified companies; Mika drafts first messages for you to approve.",
   manage_deals: "Mika drafts first messages for your leads; Zee briefs you on follow-ups and what's due.",
-  get_paid: "Zee briefs you on overdue invoices, follow-ups and what's due this week, from your own records.",
+  // While the deal pages are hidden Zee reads no invoices at all (server/ai-league/tasks/zee.ts), so the line doesn't promise them.
+  get_paid: DEAL_SUITE_HIDDEN
+    ? "Zee briefs you on follow-ups that are due, campaigns waiting for you and new replies, from your own records."
+    : "Zee briefs you on overdue invoices, follow-ups and what's due this week, from your own records.",
 };
 
 export function GettingStarted() {

@@ -50,6 +50,8 @@ import { getTargetMarket } from "@/lib/first-goal";
 import { cn } from "@/lib/utils";
 import { memberCan } from "@shared/permissions";
 
+/** The accessible name of the row of tabs; also how an arriving link finds it to bring it into view. */
+const VIEWS_LABEL = "Client Radar views";
 const EXAMPLES = [
   "Find 30 US digital marketing agencies with 5–30 employees that serve SaaS companies",
   "20 UK accounting firms that work with restaurants",
@@ -328,6 +330,20 @@ export default function OutboundPage() {
   const setView = (v: "prospects" | "searches" | "social" | "outreach" | "campaigns" | "inbox" | "results") => navigate(v === "searches" ? location : `${location}?view=${v}`, { replace: true });
   // Client Radar opened (counts only; which view, never a search or a company).
   useEffect(() => { trackEvent("outbound_opened", { view }); }, []);
+  // Arriving by a link to a tab ("Review in Outreach", "Open the Inbox"): land on the tabs. On a phone they sit a long
+  // way below the search form, and the link would otherwise look like it went nowhere. Once, on arrival only; a link
+  // to one campaign brings that campaign into view itself (components/outbound/campaigns.tsx).
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (!q.get("view") || q.get("view") === "searches" || q.get("campaign")) return;
+    const go = () => document.querySelector(`[role="tablist"][aria-label="${VIEWS_LABEL}"]`)?.scrollIntoView({ block: "start", behavior: "instant" }); // an arrival jumps there; it isn't a journey to animate
+    // Again as the form above finishes loading and pushes the page down; never once the person has started to scroll.
+    const timers = [50, 800, 1600].map((ms) => setTimeout(go, ms));
+    const stop = () => timers.forEach(clearTimeout);
+    const events = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+    events.forEach((e) => window.addEventListener(e, stop, { once: true, passive: true }));
+    return () => { stop(); events.forEach((e) => window.removeEventListener(e, stop)); };
+  }, []);
   const runs = useQuery<{ runs: RunView[] }>({ queryKey: [OUTBOUND_RUNS_URL], retry: false, refetchInterval: (q) => (q.state.data?.runs.some((r) => r.status === "running") ? 5000 : false) });
   // Open the most recent run on arrival, once.
   useEffect(() => { if (!runId && runs.data?.runs.length) setRunId(runs.data.runs[0].id); }, [runs.data, runId]);
@@ -616,7 +632,7 @@ export default function OutboundPage() {
               <p className="text-sm text-muted-foreground">You can see searches your team ran. Ask the workspace owner for permission to start one.</p>
             )}
 
-            <SegmentedTabs label="Client Radar views" value={view} onChange={setView} scroll
+            <SegmentedTabs label={VIEWS_LABEL} value={view} onChange={setView} scroll className="scroll-mt-28"
               tabs={[{ value: "searches", label: "Searches", testId: "view-searches" }, { value: "social", label: "Social Intent", testId: "view-social" }, { value: "prospects", label: "All prospects", testId: "view-prospects" }, { value: "outreach", label: "Outreach", testId: "view-outreach" }, { value: "campaigns", label: "Campaigns", testId: "view-campaigns" }, { value: "inbox", label: "Inbox", testId: "view-inbox" }, { value: "results", label: "Results", testId: "view-results" }]} />
 
             {view === "social" ? <SocialIntent canEdit={canEdit} />
