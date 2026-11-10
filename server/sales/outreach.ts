@@ -46,14 +46,22 @@ import { relatedKnowledge } from "../services/knowledge";
 import { createTicket, fail, getLead, moveLead, readGate, updateLead, writeGate, type Result, type Who } from "../services/leads";
 import { storage } from "../storage";
 import { draftSystemPrompt, draftUserMessage, versionFor, type DraftInput } from "./outreach-prompt";
+import type { DraftStyle } from "../profiles/style";
 import { DraftAllowanceReached, DraftExists, messageStore, messagesTablesReady, outreachSafetyReady, type MessageStore } from "./message-store";
 import { AI_DRAFT_VERSION_PREFIX, outboundTier } from "../outbound/plan";
 import { outboundAllowance } from "../outbound/limits";
 import { OUTBOUND_WINDOW_DAYS, TIER_LABEL } from "@shared/outbound-plans";
 import { researchStore, salesTablesReady } from "./research-store";
 
-export interface OutreachDeps { store: MessageStore; chat: typeof tracedChat; now: () => Date }
-const defaults = (): OutreachDeps => ({ store: messageStore, chat: tracedChat, now: () => new Date() });
+export interface OutreachDeps {
+  store: MessageStore; chat: typeof tracedChat; now: () => Date;
+  /** The tone and note of the saved client profile a draft to this lead should follow, or null (server/profiles/style.ts). Never throws. */
+  style: (orgId: string, leadId: number, campaignProfileId?: number | null) => Promise<DraftStyle | null>;
+}
+const defaults = (): OutreachDeps => ({
+  store: messageStore, chat: tracedChat, now: () => new Date(),
+  style: async (orgId, leadId, campaignProfileId) => { try { return await (await import("../profiles/style")).styleForDraft(orgId, leadId, campaignProfileId); } catch { return null; } },
+});
 
 export { hashDraft } from "@shared/outreach-hash";
 
@@ -181,12 +189,18 @@ const capFail = (e: unknown) =>
         : e instanceof CapUnavailable ? fail(503, "SALES_NOT_SETUP", "The sales agent isn't set up on this server yet.")
           : null;
 
-type DraftOpts = { by?: "user" | "agent"; offerSample?: boolean };
+type DraftOpts = {
+  by?: "user" | "agent"; offerSample?: boolean;
+  /** The saved client profile a campaign was built for: its tone and note win over the lead's own profile. */
+  profileId?: number | null;
+};
 interface PreparedDraft {
   orgId: string;
   to: { address: string; source: "lead" | "site" };
   input: DraftInput;
   scope: { sampleOffered: boolean; offer: DraftInput["offer"] };
+  /** The saved profile whose tone and note this draft follows, when there is one. */
+  style: DraftStyle | null;
   ctx: { to: string; siteHost: string };
   model: string;
   allowance: { since: Date; max: number; prefix: string };
@@ -251,10 +265,11 @@ async function prepareDraft(user: Who, leadId: number, opts: DraftOpts, deps: Ou
     throw e;
   }
 
-  const [org, ideal, notes] = await Promise.all([
+  const [org, ideal, notes, style] = await Promise.all([
     storage.getOrganization(orgId),
     getIdealClient(user),
     relatedKnowledge(user, [lead.companyName, lead.industry, lead.location, ...facts.map((f) => f.value)].filter(Boolean).join(" "), 2),
+    deps.style(orgId, leadId, opts.profileId).catch(() => null),
   ]);
   const senderName = [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || org?.name || "The team";
   const input: DraftInput = {
@@ -269,8 +284,13 @@ async function prepareDraft(user: Who, leadId: number, opts: DraftOpts, deps: Ou
   input.angle = angle && !described ? { ...angle, solution: null } : angle;
   // The sample is offered only when the person asked for it here (it commits their time); an agent never offers it.
   input.sample = opts.offerSample && opts.by !== "agent" && described ? angle?.sample ?? null : null;
+  // How the sender asked for messages to this kind of client to sound: wording only, every rule and check stays.
+  input.style = style ? { tone: style.tone, note: style.note } : null;
   // "What the sender offers" is the only source for what a draft says about the sender (shared/outreach-check.ts scopeIssues).
-  const scope = { sampleOffered: !!input.sample, offer: input.offer };
+  // The profile's note is the sender's own words too, so what it says about their work is allowed, but a note alone
+  // never counts as having described the offer.
+  const noted = described && style?.note.trim() ? { about: [input.offer.about, style.note].filter(Boolean).join(". "), services: input.offer.services } : input.offer;
+  const scope = { sampleOffered: !!input.sample, offer: noted };
   const ctx = { to: to.address, siteHost: siteHost(lead.domain || (() => { try { return new URL(lead.website ?? "").hostname; } catch { return ""; } })()) };
 
   const strategies = selectStrategies({
@@ -279,15 +299,18 @@ async function prepareDraft(user: Who, leadId: number, opts: DraftOpts, deps: Ou
     offerDescribed: described, sampleAvailable: !!input.sample,
   });
   return {
-    ok: true, orgId, to, input, scope, ctx, model: modelFor("draft"), allowance, draftLimit, strategies,
+    ok: true, orgId, to, input, scope, style, ctx, model: modelFor("draft"), allowance, draftLimit, strategies,
     claimIds: [...facts, ...angles].map((f) => f.id), claims: facts.length + angles.length, researchId: await latestResearchId(orgId, leadId),
   };
 }
 
+/** What the timeline keeps about the style a draft followed: the profile's id and the tone, never the note's words. */
+const styleData = (s: DraftStyle | null) => (s ? { profileId: s.profileId, tone: s.tone, noted: !!s.note.trim() } : {});
+
 /** One model-written version, opened the strategy's way: at most one retry, checked by the same rules as ever. Cap and provider errors are thrown to the caller. */
 async function writeOne(user: Who, leadId: number, p: PreparedDraft, strategy: StrategyChoice["strategy"], deps: OutreachDeps): Promise<{ draft: { subject: string; body: string } | null; issues: Issue[]; retried: boolean }> {
   const trace = { task: "draft" as const, orgId: p.orgId, userId: user.id, leadId, promptVersion: versionFor(strategy) };
-  const messages: ChatMessage[] = [{ role: "system", content: draftSystemPrompt(strategy) }, { role: "user", content: draftUserMessage(p.input) }];
+  const messages: ChatMessage[] = [{ role: "system", content: draftSystemPrompt(strategy, p.input.style) }, { role: "user", content: draftUserMessage(p.input) }];
   let issues: Issue[] = [], draft: { subject: string; body: string } | null = null, retried = false;
   for (let attempt = 0; attempt < 2; attempt++) {
     const reply = await deps.chat(trace, messages, { maxTokens: 2500, model: p.model });
@@ -314,7 +337,7 @@ async function storeSingle(user: Who, leadId: number, p: PreparedDraft, strategy
     if (e instanceof DraftAllowanceReached) return p.draftLimit();
     throw e;
   }
-  await leadsStore.addEvent(p.orgId, leadId, { kind: "draft_created", data: { messageId: row.id, claims: p.claims }, actor: opts.by ?? "user", actorUserId: user.id });
+  await leadsStore.addEvent(p.orgId, leadId, { kind: "draft_created", data: { messageId: row.id, claims: p.claims, ...styleData(p.style) }, actor: opts.by ?? "user", actorUserId: user.id });
   return { ok: true, message: messageView(row) };
 }
 
@@ -386,7 +409,7 @@ export async function draftOutreachVariants(user: Who, leadId: number, opts: Dra
     if (e instanceof DraftAllowanceReached) return p.draftLimit();
     throw e;
   }
-  await leadsStore.addEvent(p.orgId, leadId, { kind: "variants_created", data: { group, count: rows.length, strategies: good.map((g) => g.strategy), claims: p.claims }, actor: opts.by ?? "user", actorUserId: user.id });
+  await leadsStore.addEvent(p.orgId, leadId, { kind: "variants_created", data: { group, count: rows.length, strategies: good.map((g) => g.strategy), claims: p.claims, ...styleData(p.style) }, actor: opts.by ?? "user", actorUserId: user.id });
   return { ok: true, variants: rows.map(messageView), retried };
 }
 

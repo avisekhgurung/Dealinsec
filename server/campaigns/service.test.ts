@@ -29,8 +29,9 @@ function world() {
   const leads: any[] = [1, 2, 3, 4, 5].map((id) => ({ id, org: "org-a", companyName: `Lead ${id}`, status: "new", source: "manual", doNotContact: false, archived: false }));
   leads.push({ id: 9, org: "org-b", companyName: "Other workspace's lead", status: "new", source: "manual", doNotContact: false, archived: false });
   let cSeq = 0, mSeq = 0, msgSeq = 100;
-  const calls = { draft: [] as any[], send: [] as any[], kick: 0, log: [] as any[], audience: [] as any[] };
+  const calls = { draft: [] as any[], draftProfile: [] as any[], send: [] as any[], kick: 0, log: [] as any[], audience: [] as any[] };
   const audienceRow = (l: any) => ({ id: l.id, companyName: l.companyName, domain: null, industry: null, location: null, status: l.status, source: l.source, contactName: null, hasEmail: true, doNotContact: l.doNotContact, hasUnsent: false, inCampaign: campaigns.find((c) => c.status === "active" && members.some((m) => m.campaignId === c.id && m.leadId === l.id))?.name ?? null });
+  const gone = { profile: false }; // the saved profile was deleted after the campaign was made
   const draftPlan = new Map<number, any>(); // leadId -> { ok:false, code } | "throw"; default ok
   const followUps = new Map<number, any>(); // leadId -> the open follow-up row on its message
   let sendPlan: any = { ok: true, outcome: "sent" };
@@ -124,9 +125,11 @@ function world() {
   };
   const deps: any = {
     store, ready: async () => true, now, random: () => 0, profileName: async (_o: string, id: number) => (id === 7 ? "Brands" : null),
+    profileStyle: async (_o: string, id: number) => (id === 7 && !gone.profile ? { profileId: 7, profileName: "Brands", tone: "direct", note: "Mention our Shopify work." } : null),
     loadUser: async (o: string, id: string) => (users[id] && users[id].organizationId === o ? users[id] : null),
-    draft: async (user: any, leadId: number) => {
+    draft: async (user: any, leadId: number, profileId?: number | null) => {
       calls.draft.push({ by: user.id, leadId });
+      calls.draftProfile.push(profileId ?? null);
       const plan = draftPlan.get(leadId);
       if (plan === "throw") throw new Error("boom");
       if (plan) return plan;
@@ -143,7 +146,7 @@ function world() {
   };
   const approve = (leadId: number) => { const m = messages.filter((x) => x.leadId === leadId).pop(); m.status = "approved"; m.approvedAt = now(); return m; };
   return {
-    deps, calls, campaigns, members, messages, events, leads, users, draftPlan, addMessage, approve, msg,
+    deps, calls, campaigns, members, messages, events, leads, users, draftPlan, addMessage, approve, msg, gone,
     setLinks: (base: string | null) => { linkBase = base; }, followUps,
     tick: (ms: number) => { clock += ms; }, setSend: (p: any) => { sendPlan = p; }, setQueue: (on: boolean) => { queueOn = on; },
     member: (leadId: number) => members.find((m) => m.leadId === leadId),
@@ -424,6 +427,36 @@ describe("preparing drafts", () => {
     await svc.startPreparing(ana, id, w.deps);
     expect(await svc.stopPreparing(ana, id, w.deps)).toMatchObject({ ok: true, campaign: { preparing: false, prepareStop: "stopped", prepareStopLabel: "Stopped by you" } });
     expect(await svc.draftStep(w.deps)).toBe("idle");
+  });
+});
+
+describe("a campaign built for a saved client profile", () => {
+  it("has its drafts written the way that profile asks, and says so on the campaign", async () => {
+    const w = world();
+    const id = await make(w, [1, 2], { profileId: 7 });
+    await svc.startPreparing(ana, id, w.deps);
+    await svc.draftStep(w.deps); await svc.draftStep(w.deps);
+    expect(w.calls.draftProfile).toEqual([7, 7]);
+    const got: any = await svc.getCampaign(ana, id, w.deps);
+    // The tone and that a note exists are shown; the note's words stay on the profile.
+    expect(got.style).toEqual({ profileName: "Brands", tone: "direct", toneLabel: "Short and direct", hasNote: true });
+    expect(JSON.stringify(got)).not.toContain("Shopify");
+  });
+  it("a campaign for no profile names none: each lead's own profile decides, in the drafting service", async () => {
+    const w = world();
+    const id = await make(w, [1]);
+    await svc.startPreparing(ana, id, w.deps);
+    await svc.draftStep(w.deps);
+    expect(w.calls.draftProfile).toEqual([null]);
+    expect((await svc.getCampaign(ana, id, w.deps) as any).style).toBeNull();
+  });
+  it("a profile deleted since shows no style, and the campaign still opens", async () => {
+    const w = world();
+    const id = await make(w, [1], { profileId: 7 });
+    w.gone.profile = true;
+    expect(await svc.getCampaign(ana, id, w.deps)).toMatchObject({ ok: true, style: null });
+    w.deps.profileStyle = async () => { throw new Error("away"); };
+    expect(await svc.getCampaign(ana, id, w.deps)).toMatchObject({ ok: true, style: null });
   });
 });
 

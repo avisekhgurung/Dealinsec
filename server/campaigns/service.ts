@@ -23,6 +23,7 @@ import {
   followUpView, hasOptOutLine, MAX_CAMPAIGNS, MEMBER_STAGE_LABEL, memberStage, nextSendAt, reasonLabel, sendRefusal, stopLabel, tooManyBounces, withFooter,
   type CampaignCounts, type CampaignRates, type FollowUpView, type MemberStage,
 } from "@shared/campaign";
+import { OUTREACH_TONE_LABEL, type OutreachTone } from "@shared/acquisition-profile";
 import { LIMITS } from "@shared/outreach-check";
 import { hashDraft } from "@shared/outreach-hash";
 import type { CampaignRow } from "@shared/schema";
@@ -47,7 +48,10 @@ export interface CampaignDeps {
   profileName(orgId: string, id: number): Promise<string | null>;
   /** A member of `orgId` as the services see them (role, custom permissions), or null when they left or were removed. */
   loadUser(orgId: string, userId: string): Promise<Who | null>;
-  draft(user: Who, leadId: number): Promise<DraftResult>;
+  /** The tone and note saved with a client profile, or null when it has gone (server/profiles/style.ts). Never throws. */
+  profileStyle(orgId: string, id: number): Promise<{ profileName: string; tone: OutreachTone; note: string } | null>;
+  /** Writes the first message. `profileId` is the profile the campaign was built for: its tone and note are followed. */
+  draft(user: Who, leadId: number, profileId?: number | null): Promise<DraftResult>;
   send(user: Who, messageId: number, bodyHash: string): Promise<SendResult>;
   /** A message's own unsubscribe link for its footer, or null when the server can't sign one (server/sales/unsubscribe.ts). */
   unsubscribeUrl(orgId: string, messageId: number): string | null;
@@ -76,9 +80,13 @@ const defaults = (): CampaignDeps => ({
     }
     return user;
   },
-  async draft(user, leadId) {
+  async profileStyle(orgId, id) {
+    try { return await (await import("../profiles/style")).styleFromProfile(orgId, id); }
+    catch { return null; }
+  },
+  async draft(user, leadId, profileId) {
     const { draftOutreach } = await import("../sales/outreach");
-    const r = await draftOutreach(user, leadId, { by: "agent" });
+    const r = await draftOutreach(user, leadId, { by: "agent", profileId: profileId ?? null });
     return r.ok ? { ok: true, message: { id: r.message.id } } : { ok: false, code: r.code };
   },
   async send(user, messageId, bodyHash) {
@@ -105,6 +113,8 @@ export interface CampaignView {
   sending: boolean; sendStop: string | null; sendStopLabel: string | null; nextSendAt: string | null;
   createdAt: string; counts: CampaignCounts; rates: CampaignRates;
 }
+/** What a campaign's drafts follow from its saved client profile. The note's words stay on the profile. */
+export interface CampaignStyle { profileName: string; tone: OutreachTone; toneLabel: string; hasNote: boolean }
 export interface MemberRowView {
   leadId: number; companyName: string; domain: string | null; contactName: string | null; leadStatus: string | null;
   stage: MemberStage; stageLabel: string; note: string | null;
@@ -195,7 +205,7 @@ export async function createCampaign(user: Who, raw: unknown, d: Partial<Campaig
  * re-pointed, and a job that should be running is woken). `readOnly` skips both: it is how a coworker's read tool
  * looks at a campaign, and a read tool must change nothing at all.
  */
-export async function getCampaign(user: Who, id: number, d: Partial<CampaignDeps> = {}, opts: { readOnly?: boolean } = {}): Promise<Result<{ campaign: CampaignView; members: MemberRowView[]; queueEnabled: boolean; /** Follow-ups of this campaign's sent messages: how many need the person now, and how many are planned for later. */ followUps: { waiting: number; planned: number } }>> {
+export async function getCampaign(user: Who, id: number, d: Partial<CampaignDeps> = {}, opts: { readOnly?: boolean } = {}): Promise<Result<{ campaign: CampaignView; members: MemberRowView[]; queueEnabled: boolean; /** Follow-ups of this campaign's sent messages: how many need the person now, and how many are planned for later. */ followUps: { waiting: number; planned: number }; /** How the campaign's drafts are written, when it was built for a saved profile that still exists. */ style: CampaignStyle | null }>> {
   const deps = { ...defaults(), ...d };
   const gate = readGate(user);
   if (gate) return gate;
@@ -208,7 +218,9 @@ export async function getCampaign(user: Who, id: number, d: Partial<CampaignDeps
   if (!opts.readOnly && (c.preparing || c.sending)) deps.kick();
   const rows = members.map(memberView);
   const followUps = { waiting: rows.filter((r) => r.followUp?.waiting).length, planned: rows.filter((r) => r.followUp?.state === "due_later").length };
-  return { ok: true, campaign: campaignView(c, countMembers(members.map(factOf))), members: rows, queueEnabled: deps.queueEnabled(), followUps };
+  const saved = c.profileId ? await deps.profileStyle(orgId, c.profileId).catch(() => null) : null;
+  const style: CampaignStyle | null = saved ? { profileName: saved.profileName, tone: saved.tone, toneLabel: OUTREACH_TONE_LABEL[saved.tone], hasNote: !!saved.note.trim() } : null;
+  return { ok: true, campaign: campaignView(c, countMembers(members.map(factOf))), members: rows, queueEnabled: deps.queueEnabled(), followUps, style };
 }
 
 export async function updateCampaign(user: Who, id: number, raw: unknown, d: Partial<CampaignDeps> = {}): Promise<Result<{ campaign: CampaignView }>> {
@@ -358,7 +370,7 @@ export async function draftStep(d: Partial<CampaignDeps> = {}): Promise<DraftOut
     // A message already waiting for this lead (written by hand, or by a pass that crashed before recording it) is
     // taken as it is: one lead never gets two drafts, and no model call is spent to find that out.
     if ((await adopt()) === "adopted") { await deps.store.finishPreparing(now()); return "adopted"; }
-    const r = await deps.draft(user, member.leadId);
+    const r = await deps.draft(user, member.leadId, campaign.profileId ?? null);
     if (r.ok) {
       const note = await footer(deps, orgId, r.message.id, campaign.footerNote ?? "");
       await deps.store.settleMember(member.id, { state: "drafted", messageId: r.message.id, reason: note }, now());

@@ -70,7 +70,7 @@ describe("writing the versions", () => {
     expect(new Set(r.variants.map((v) => v.variantGroup)).size).toBe(1);
     expect(r.variants[0].variantGroup).toBeTruthy();
     expect(r.variants.map((v) => v.body)).toEqual([BODY, BODY2, BODY3]); // genuinely separate calls, one per strategy
-    expect(world().llmCalls.map((c: any) => c.promptVersion)).toEqual(["draft-v6:trigger", "draft-v6:problem", "draft-v6:direct"]);
+    expect(world().llmCalls.map((c: any) => c.promptVersion)).toEqual(["draft-v7:trigger", "draft-v7:problem", "draft-v7:direct"]);
     expect(rows()).toHaveLength(3);
     expect(world().leads.leads.find((x: any) => x.id === l.id)!.status).toBe("new"); // writing versions changes no stage
   });

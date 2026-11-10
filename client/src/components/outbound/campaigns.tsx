@@ -43,7 +43,7 @@ interface Member {
   followUp?: { state: "due_later" | "to_review" | "approved" | "on_hold"; label: string; dueAt: string | null; waiting: boolean } | null;
 }
 interface ListResponse { campaigns: Campaign[]; queueEnabled: boolean; unsubscribeLinks?: boolean }
-interface DetailResponse { campaign: Campaign; members: Member[]; queueEnabled: boolean; followUps?: { waiting: number; planned: number } }
+interface DetailResponse { campaign: Campaign; members: Member[]; queueEnabled: boolean; followUps?: { waiting: number; planned: number }; /** Older servers omit it. */ style?: { profileName: string; tone: string; toneLabel: string; hasNote: boolean } | null }
 interface AudienceLead { id: number; companyName: string; domain: string | null; industry: string | null; location: string | null; status: string; source: string; contactName: string | null; hasEmail: boolean; hasUnsent: boolean; blocked: string | null; /** Older servers omit these two. */ profileName?: string | null; ready?: boolean }
 
 const STAGE_TONE: Record<MemberStage, string> = {
@@ -288,6 +288,11 @@ function CampaignDetail({ id, canEdit, onBack }: { id: number; canEdit: boolean;
             ? <Button size="sm" variant="outline" onClick={() => act.mutate("prepare/stop")} disabled={act.isPending} data-testid="campaign-prepare-stop"><Square className="mr-1.5 h-3.5 w-3.5" />Stop</Button>
             : <Button size="sm" onClick={() => act.mutate("prepare")} disabled={act.isPending || waiting === 0} className="gradient-btn text-white" data-testid="campaign-prepare-start">{act.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <PenLine className="mr-1.5 h-3.5 w-3.5" />}Prepare drafts</Button>)}
         </div>
+        {q.data.style && (
+          <p className="text-xs text-muted-foreground" data-testid="campaign-style">
+            New drafts follow your profile "{q.data.style.profileName}": a <span className="font-semibold text-foreground">{q.data.style.toneLabel.toLowerCase()}</span> tone{q.data.style.hasNote ? ", and the note you saved for these messages" : ""}. Every draft is still checked by the same rules, and you read it before anything is sent.
+          </p>
+        )}
         {c.prepareStopLabel && c.prepareStop !== "stopped" && <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200" role="status" data-testid="campaign-prepare-stopped">Drafting stopped: {c.prepareStopLabel}. What was written is below; press Prepare drafts to carry on when you can.</p>}
       </div>
 

@@ -15,7 +15,9 @@
  * Both are judged by `profileMatch`, from the evidence already stored on a company — a rule, never a model's opinion,
  * and never a change to "Ready" or the score (shared/prospect.ts), which stay exactly as they were.
  *
- * Outreach preferences are saved with the profile for campaigns to read; nothing in a search uses them.
+ * Outreach preferences are saved with the profile. Nothing in a search uses them. The tone and the note are read when
+ * a FIRST message is drafted (server/profiles/style.ts): for a lead found from this profile, and for a campaign built
+ * for it. They change wording only; every drafting rule and check stays. The channels are saved and not yet read.
  */
 import { z } from "zod";
 import { DEFAULT_QUANTITY, DEFAULT_ROLES, icpSchema, type Icp } from "./icp";
