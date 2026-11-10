@@ -24,6 +24,7 @@ import { trackEvent } from "@/lib/analytics";
 import { leadCall, leadError } from "@/lib/leads";
 import { queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
+import type { SenderCheck as SenderCheckView } from "@shared/sender-check";
 import { CAMPAIGN_MAX_MEMBERS, DAILY_LIMIT, FOOTER_NOTE_MAX, GAP_SECONDS, OPT_OUT_LINE, type CampaignCounts, type CampaignRates, type MemberStage } from "@shared/campaign";
 
 const CAMPAIGNS_URL = "/api/campaigns";
@@ -81,12 +82,15 @@ function NewCampaign({ open, onOpenChange, onCreated }: { open: boolean; onOpenC
   const [profileId, setProfileId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [stage, setStage] = useState("");
+  const [source, setSource] = useState("");
+  const [emailOnly, setEmailOnly] = useState(false);
   const [picked, setPicked] = useState<Set<number>>(new Set());
-  const params = new URLSearchParams(); if (search.trim()) params.set("q", search.trim()); if (stage) params.set("status", stage);
+  const params = new URLSearchParams(); if (search.trim()) params.set("q", search.trim()); if (stage) params.set("status", stage); if (source) params.set("source", source);
   const audienceKey = `${CAMPAIGNS_URL}/audience${params.toString() ? `?${params}` : ""}`;
   const audience = useQuery<{ leads: AudienceLead[]; limit: number }>({ queryKey: [audienceKey], enabled: open, retry: false });
   const profiles = useQuery<{ profiles: { id: number; name: string }[] }>({ queryKey: ["/api/client-profiles"], enabled: open, retry: false });
-  const leads = audience.data?.leads ?? [];
+  // "With an email" narrows what is SHOWN (and so what "pick all" takes); the other filters are asked of the server.
+  const leads = (audience.data?.leads ?? []).filter((l) => !emailOnly || l.hasEmail);
   const pickable = leads.filter((l) => !l.blocked);
   const toggle = (id: number) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else if (n.size < CAMPAIGN_MAX_MEMBERS) n.add(id); return n; });
   const allShown = pickable.length > 0 && pickable.every((l) => picked.has(l.id));
@@ -132,13 +136,17 @@ function NewCampaign({ open, onOpenChange, onCreated }: { open: boolean; onOpenC
                 <select value={stage} onChange={(e) => setStage(e.target.value)} className="h-8 w-auto rounded-md border bg-background px-2 py-0 text-xs" aria-label="Lead stage" data-testid="campaign-audience-stage">
                   <option value="">Any stage</option><option value="new">New</option><option value="researching">Researching</option><option value="qualified">Qualified</option>
                 </select>
+                <select value={source} onChange={(e) => setSource(e.target.value)} className="h-8 w-auto rounded-md border bg-background px-2 py-0 text-xs" aria-label="Where the lead came from" data-testid="campaign-audience-source">
+                  <option value="">From anywhere</option><option value="outbound">Found by Client Radar</option><option value="agent">Added by your AI team</option><option value="manual">Added by hand</option><option value="import">Imported</option>
+                </select>
                 <div className="relative"><Search className="pointer-events-none absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" aria-hidden /><Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Company, industry, city" className="h-8 w-44 pl-7 text-xs" aria-label="Search leads" data-testid="campaign-audience-search" /></div>
               </div>
             </div>
+            <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={emailOnly} onChange={(e) => setEmailOnly(e.target.checked)} data-testid="campaign-audience-email-only" />Only leads with a contact email</label>
             {audience.isLoading ? <Skeleton className="h-32 w-full rounded-xl" /> : audience.isError ? (
               <p className="rounded-xl border border-destructive/40 px-3 py-4 text-center text-sm">{leadError(audience.error, "The leads couldn't be loaded.")}</p>
             ) : leads.length === 0 ? (
-              <p className="rounded-xl border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">No open leads match. Add companies to Leads from Client Radar first.</p>
+              <p className="rounded-xl border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">{search.trim() || stage || source || emailOnly ? "No open leads match these filters. Clear one to see more." : "No open leads yet. Add companies to Leads from Client Radar first."}</p>
             ) : (
               <>
                 <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={allShown} onChange={toggleAll} data-testid="campaign-audience-all" />Pick all {pickable.length} shown</label>
@@ -169,6 +177,39 @@ function NewCampaign({ open, onOpenChange, onCreated }: { open: boolean; onOpenC
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/* ── the sender check ───────────────────────────────────────────────────── */
+
+const CHECK_TONE: Record<string, string> = { ok: "text-emerald-700 dark:text-emerald-400", warn: "text-amber-700 dark:text-amber-400", missing: "text-rose-700 dark:text-rose-400", unknown: "text-muted-foreground" };
+const CHECK_WORD: Record<string, string> = { ok: "In place", warn: "Needs a look", missing: "Not set up", unknown: "Couldn't confirm" };
+
+/**
+ * Whether the address you send from is set up to be trusted by other mail servers (GET /api/campaigns/sender-check):
+ * SPF, DKIM and DMARC for your own connected Gmail's domain, read from public DNS. Advice, never a gate.
+ */
+function SenderCheck() {
+  const q = useQuery<{ check: SenderCheckView; mailbox: "none" | "active" | "needs_reconnect" }>({ queryKey: [`${CAMPAIGNS_URL}/sender-check`], retry: false, staleTime: 5 * 60_000 });
+  if (!q.data) return null;
+  const { check: c, mailbox } = q.data;
+  if (c.kind === "none") return <p className="rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground" data-testid="sender-check" data-kind="none">No Gmail is connected to your account. Connect it in Settings → Integrations to send from DealInSec, or send approved messages from your own email app.</p>;
+  return (
+    <div className="space-y-1.5 rounded-lg border px-3 py-2" data-testid="sender-check" data-kind={c.kind} data-ready={c.ready}>
+      <p className="text-xs"><span className="font-semibold">Sending from {c.address}</span>{mailbox === "needs_reconnect" && <span className="ml-1 text-amber-700 dark:text-amber-400">· reconnect it in Settings</span>}</p>
+      <p className={cn("text-xs", c.ready ? "text-muted-foreground" : "text-rose-700 dark:text-rose-400")} data-testid="sender-check-summary">{c.summary}</p>
+      {c.kind === "custom" && (
+        <ul className="space-y-1">
+          {c.items.map((i) => (
+            <li key={i.key} className="text-xs" data-testid={`sender-check-${i.key}`} data-state={i.state}>
+              <span className="font-medium">{i.label}</span> · <span className={cn("font-medium", CHECK_TONE[i.state])}>{CHECK_WORD[i.state]}</span>
+              {i.state !== "ok" && <span className="block text-muted-foreground">{i.detail}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {c.kind === "custom" && <p className="text-[11px] text-muted-foreground">Read from your domain's public DNS. These records are added where your domain is managed; a change can take an hour to show here.</p>}
+    </div>
   );
 }
 
@@ -274,6 +315,7 @@ function CampaignDetail({ id, canEdit, onBack }: { id: number; canEdit: boolean;
             ? <Button size="sm" variant="outline" onClick={() => act.mutate("send/pause")} disabled={act.isPending} data-testid="campaign-send-pause"><Pause className="mr-1.5 h-3.5 w-3.5" />Pause</Button>
             : <Button size="sm" onClick={() => { if (window.confirm(`Start sending ${plural(n.approved, "approved message")} from your Gmail? Later approvals in this campaign are sent too, until you pause it.`)) act.mutate("send"); }} disabled={act.isPending || n.approved === 0} className="gradient-btn text-white" data-testid="campaign-send-start"><Play className="mr-1.5 h-3.5 w-3.5" />Start sending</Button>)}
         </div>
+        <SenderCheck />
         {c.sendStopLabel && c.sendStop !== "paused" && <p className={cn("rounded-lg border px-3 py-2 text-xs", c.sendStop === "done" ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200" : "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200")} role="status" data-testid="campaign-send-stopped">{c.sendStop === "done" ? c.sendStopLabel : `Sending paused: ${c.sendStopLabel}.`}</p>}
         {queueEnabled && canEdit && active && (
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">

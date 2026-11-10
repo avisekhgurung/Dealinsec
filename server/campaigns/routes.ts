@@ -5,6 +5,7 @@
  *
  *   GET    /api/campaigns                     the workspace's campaigns with their numbers
  *   GET    /api/campaigns/audience            leads that can be picked (?status=&source=&q=)
+ *   GET    /api/campaigns/sender-check        is the caller's own sending address set up to be trusted (SPF, DKIM, DMARC)
  *   POST   /api/campaigns                     create ({ name, leadIds, profileId?, dailyLimit?, gapSeconds?, footerNote? })
  *   GET    /api/campaigns/:id                 one campaign with every member
  *   PATCH  /api/campaigns/:id                 name, pace, footer note
@@ -40,6 +41,7 @@ export function registerCampaignRoutes(app: Express) {
   const one = (r: any) => ({ campaign: r.campaign });
 
   app.get("/api/campaigns", isAuthenticated, guarded("campaigns_list", async (req, res) => send(res, await svc.listCampaigns(req.user), (r) => ({ campaigns: r.campaigns, queueEnabled: r.queueEnabled, limits: r.limits }))));
+  app.get("/api/campaigns/sender-check", isAuthenticated, guarded("campaigns_sender_check", async (req, res) => send(res, await (await import("./sender-check")).senderCheck(req.user), (r) => ({ check: r.check, mailbox: r.mailbox }))));
   app.get("/api/campaigns/audience", isAuthenticated, guarded("campaigns_audience", async (req, res) => send(res, await svc.audience(req.user, req.query ?? {}), (r) => ({ leads: r.leads, limit: r.limit }))));
   app.post("/api/campaigns", isAuthenticated, guarded("campaigns_create", async (req, res) => send(res, await svc.createCampaign(req.user, req.body), (r) => ({ campaign: r.campaign, added: r.added, left: r.left }), 201)));
   app.get("/api/campaigns/:id", isAuthenticated, withId("campaigns_get", async (req, res, id) => send(res, await svc.getCampaign(req.user, id), (r) => ({ campaign: r.campaign, members: r.members, queueEnabled: r.queueEnabled }))));
