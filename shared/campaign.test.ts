@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addMembersSchema, CAMPAIGN_MAX_MEMBERS, campaignCreateSchema, campaignRates, campaignUpdateSchema, countMembers, DAILY_LIMIT, draftRefusal, GAP_SECONDS, hasOptOutLine,
-  memberStage, nextSendAt, OPT_OUT_LINE, reasonLabel, sendRefusal, stopLabel, tooManyBounces, withFooter,
+  memberStage, memberSteps, type MemberStage, nextSendAt, OPT_OUT_LINE, reasonLabel, sendRefusal, stopLabel, tooManyBounces, withFooter,
 } from "./campaign";
 import { LIMITS, checkStructure } from "./outreach-check";
 
@@ -130,5 +130,37 @@ describe("the numbers", () => {
   it("a rate is unknown, not zero, while nothing has been sent", () => {
     expect(campaignRates({ sent: 0, replied: 0, bounced: 0, optedOut: 0 })).toEqual({ reply: null, bounce: null, optOut: null });
     expect(campaignRates({ sent: 3, replied: 1, bounced: 0, optedOut: 0 })).toEqual({ reply: 33.3, bounce: 0, optOut: 0 });
+  });
+});
+
+describe("working through a campaign one lead after another", () => {
+  const m = (leadId: number, stage: MemberStage) => ({ leadId, stage });
+  const list = [m(1, "sent"), m(2, "draft"), m(3, "approved"), m(4, "draft"), m(5, "skipped"), m(6, "approved")];
+
+  it("knows where the open lead sits and its neighbours, without wrapping", () => {
+    expect(memberSteps(list, 3)).toMatchObject({ position: 3, total: 6, previous: { leadId: 2 }, next: { leadId: 4 } });
+    expect(memberSteps(list, 1)).toMatchObject({ position: 1, previous: null, next: { leadId: 2 } });
+    expect(memberSteps(list, 6)).toMatchObject({ position: 6, previous: { leadId: 5 }, next: null });
+  });
+  it("the next draft to read is the next one AFTER the open lead, wrapping round, and never the open lead itself", () => {
+    expect(memberSteps(list, 1)).toMatchObject({ nextToReview: { leadId: 2 }, toReview: 2 });
+    expect(memberSteps(list, 2)).toMatchObject({ nextToReview: { leadId: 4 }, toReview: 1 });
+    expect(memberSteps(list, 4)).toMatchObject({ nextToReview: { leadId: 2 }, toReview: 1 }); // wrapped
+    expect(memberSteps(list, 5)).toMatchObject({ nextToReview: { leadId: 2 }, toReview: 2 });
+  });
+  it("the next message to send by hand works the same way, over approved messages only", () => {
+    expect(memberSteps(list, 3)).toMatchObject({ nextToSend: { leadId: 6 }, toSend: 1 });
+    expect(memberSteps(list, 6)).toMatchObject({ nextToSend: { leadId: 3 }, toSend: 1 });
+    expect(memberSteps(list, 4)).toMatchObject({ nextToSend: { leadId: 6 }, toSend: 2 });
+  });
+  it("when the open lead is the only one waiting, nothing else is offered", () => {
+    const one = [m(1, "sent"), m(2, "draft"), m(3, "sent")];
+    expect(memberSteps(one, 2)).toMatchObject({ nextToReview: null, toReview: 0, nextToSend: null, toSend: 0 });
+  });
+  it("with nothing open (the list itself), it names the first of each in the campaign's order", () => {
+    expect(memberSteps(list, null)).toMatchObject({ position: 0, previous: null, next: null, nextToReview: { leadId: 2 }, toReview: 2, nextToSend: { leadId: 3 }, toSend: 2 });
+    // A lead that has since been taken out of the campaign is treated the same way.
+    expect(memberSteps(list, 99)).toMatchObject({ position: 0, nextToReview: { leadId: 2 }, toReview: 2 });
+    expect(memberSteps([], null)).toEqual({ position: 0, total: 0, previous: null, next: null, nextToReview: null, toReview: 0, nextToSend: null, toSend: 0 });
   });
 });

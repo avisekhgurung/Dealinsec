@@ -11,8 +11,8 @@
  * On a server where campaigns aren't set up the tab says so and nothing else changes.
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { AlertTriangle, Archive, ArrowLeft, Ban, CheckCircle2, CircleDashed, Loader2, MailCheck, Megaphone, Pause, PenLine, Play, Plus, Search, Send, Square, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Archive, ArrowLeft, ArrowRight, Ban, CheckCircle2, ChevronLeft, ChevronRight, CircleDashed, Loader2, MailCheck, Megaphone, Pause, PenLine, Play, Plus, Search, Send, Square, X } from "lucide-react";
 import { OutreachPanel } from "@/components/leads/outreach-panel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -25,7 +25,7 @@ import { leadCall, leadError } from "@/lib/leads";
 import { queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import type { SenderCheck as SenderCheckView } from "@shared/sender-check";
-import { CAMPAIGN_MAX_MEMBERS, DAILY_LIMIT, FOOTER_NOTE_MAX, GAP_SECONDS, OPT_OUT_LINE, type CampaignCounts, type CampaignRates, type MemberStage } from "@shared/campaign";
+import { CAMPAIGN_MAX_MEMBERS, DAILY_LIMIT, FOOTER_NOTE_MAX, GAP_SECONDS, memberSteps, OPT_OUT_LINE, type CampaignCounts, type CampaignRates, type MemberStage, type MemberSteps } from "@shared/campaign";
 
 const CAMPAIGNS_URL = "/api/campaigns";
 const campaignUrl = (id: number, action = "") => `${CAMPAIGNS_URL}/${id}${action ? `/${action}` : ""}`;
@@ -256,6 +256,10 @@ function CampaignDetail({ id, canEdit, onBack }: { id: number; canEdit: boolean;
   const { campaign: c, members, queueEnabled } = q.data;
   const n = c.counts, active = c.status === "active", waiting = n.queued + n.failed;
   const open = members.find((m) => m.leadId === openLead) ?? null;
+  // Working through the campaign without going back to the list: where the open lead sits and who needs the person next.
+  const steps = memberSteps(members, openLead);
+  const first = memberSteps(members, null);
+  const go = (leadId: number) => { setOpenLead(leadId); refresh(id); };
   return (
     <section className="min-w-0 space-y-4" data-testid="campaign-detail">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -298,8 +302,15 @@ function CampaignDetail({ id, canEdit, onBack }: { id: number; canEdit: boolean;
 
       {/* Step 2: review */}
       <div className="space-y-2 rounded-xl border p-3">
-        <p className="text-sm font-semibold">2. Read and approve each one</p>
-        <p className="text-xs text-muted-foreground">Open a lead to read its draft beside the facts it was written from. Edit it, approve it, or discard it. Nothing is approved for you.</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">2. Read and approve each one</p>
+            <p className="text-xs text-muted-foreground">Open a lead to read its draft beside the facts it was written from. Edit it, approve it, or discard it. Nothing is approved for you.</p>
+          </div>
+          {canEdit && active && first.nextToReview && (
+            <Button size="sm" variant="outline" onClick={() => go(first.nextToReview!.leadId)} data-testid="campaign-review-start"><PenLine className="mr-1.5 h-3.5 w-3.5" />Review {plural(first.toReview, "draft")}, one after another</Button>
+          )}
+        </div>
         {members.length === 0 ? <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">No leads in this campaign.</p> : (
           <ul className="divide-y rounded-xl border" data-testid="campaign-members">
             {members.map((m) => {
@@ -340,6 +351,9 @@ function CampaignDetail({ id, canEdit, onBack }: { id: number; canEdit: boolean;
               ? <p className="text-xs text-muted-foreground">{c.sending ? `Sending approved messages from your Gmail, one at a time.${c.nextSendAt ? ` Next at about ${new Date(c.nextSendAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}.` : ""}` : `${plural(n.approved, "approved message")} ready. They leave from your own Gmail, at most ${c.dailyLimit} a day, a few minutes apart.`}</p>
               : <p className="text-xs text-muted-foreground" data-testid="campaign-queue-off">A sending queue isn't switched on for this server. Open each approved message and send it yourself: from Gmail if it is connected, or from your own email app.</p>}
           </div>
+          {canEdit && active && !queueEnabled && first.nextToSend && (
+            <Button size="sm" variant="outline" onClick={() => go(first.nextToSend!.leadId)} data-testid="campaign-send-by-hand"><Send className="mr-1.5 h-3.5 w-3.5" />Send {plural(first.toSend, "approved message")}, one after another</Button>
+          )}
           {canEdit && active && queueEnabled && (c.sending
             ? <Button size="sm" variant="outline" onClick={() => act.mutate("send/pause")} disabled={act.isPending} data-testid="campaign-send-pause"><Pause className="mr-1.5 h-3.5 w-3.5" />Pause</Button>
             : <Button size="sm" onClick={() => { if (window.confirm(`Start sending ${plural(n.approved, "approved message")} from your Gmail? Later approvals in this campaign are sent too, until you pause it.`)) act.mutate("send"); }} disabled={act.isPending || n.approved === 0} className="gradient-btn text-white" data-testid="campaign-send-start"><Play className="mr-1.5 h-3.5 w-3.5" />Start sending</Button>)}
@@ -371,13 +385,40 @@ function CampaignDetail({ id, canEdit, onBack }: { id: number; canEdit: boolean;
                 <SheetTitle>{open.companyName}</SheetTitle>
                 <SheetDescription>{[open.domain, open.leadStatus ? `lead stage ${open.leadStatus}` : null, open.stageLabel].filter(Boolean).join(" · ")}</SheetDescription>
               </SheetHeader>
+              <SheetSteps steps={steps} queueEnabled={queueEnabled} onGo={go} leadId={open.leadId} />
               {open.note && <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200" role="status">{open.note}.</p>}
-              <OutreachPanel leadId={open.leadId} />
+              <OutreachPanel key={open.leadId} leadId={open.leadId} />
             </div>
           )}
         </SheetContent>
       </Sheet>
     </section>
+  );
+}
+
+/**
+ * The strip at the top of an open lead: where it sits in the campaign, its neighbours, and one button to the next lead
+ * that needs the person. It only moves between leads; reading, approving and sending stay the lead's own buttons.
+ */
+function SheetSteps({ steps, queueEnabled, onGo, leadId }: { steps: MemberSteps<Member>; queueEnabled: boolean; onGo: (leadId: number) => void; leadId: number }) {
+  const top = useRef<HTMLDivElement>(null);
+  // A new lead starts at its top, not wherever the last one was scrolled to.
+  useEffect(() => { top.current?.scrollIntoView({ block: "start" }); }, [leadId]);
+  // With a sending queue on, approved messages leave by the queue; sending by hand is only offered without one.
+  const send = !queueEnabled ? steps.nextToSend : null;
+  return (
+    <div ref={top} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-2 py-1.5" data-testid="campaign-sheet-steps">
+      <div className="flex items-center gap-1">
+        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => steps.previous && onGo(steps.previous.leadId)} disabled={!steps.previous} aria-label="Previous lead" title="Previous lead" data-testid="campaign-sheet-prev"><ChevronLeft className="h-4 w-4" /></Button>
+        <span className="text-xs tabular-nums text-muted-foreground" data-testid="campaign-sheet-position">Lead {steps.position} of {steps.total}</span>
+        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => steps.next && onGo(steps.next.leadId)} disabled={!steps.next} aria-label="Next lead" title="Next lead" data-testid="campaign-sheet-next"><ChevronRight className="h-4 w-4" /></Button>
+      </div>
+      {steps.nextToReview
+        ? <Button size="sm" variant="outline" onClick={() => onGo(steps.nextToReview!.leadId)} data-testid="campaign-sheet-next-review">Next draft to review<span className="ml-1 text-muted-foreground">· {steps.toReview} left</span><ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button>
+        : send
+          ? <Button size="sm" variant="outline" onClick={() => onGo(send.leadId)} data-testid="campaign-sheet-next-send">Next message to send<span className="ml-1 text-muted-foreground">· {steps.toSend} left</span><ArrowRight className="ml-1.5 h-3.5 w-3.5" /></Button>
+          : <span className="px-1 text-xs text-muted-foreground" data-testid="campaign-sheet-done">No other lead here is waiting for you.</span>}
+    </div>
   );
 }
 

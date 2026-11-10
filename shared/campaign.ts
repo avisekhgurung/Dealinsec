@@ -218,3 +218,31 @@ export function countMembers(ms: { state: string; messageStatus: string | null; 
   }
   return c;
 }
+
+/**
+ * Working through a campaign one lead after another, without going back to the list each time: where the open lead
+ * sits, its neighbours, and the next lead that needs the person (a draft to read; an approved message to send by hand).
+ * "Next" looks forward from the open lead and wraps round, and never names the open lead itself. Pure.
+ */
+export interface MemberSteps<T> {
+  /** 1-based place of the open lead in the campaign's order; 0 when it isn't in the list. */
+  position: number; total: number;
+  previous: T | null; next: T | null;
+  /** The next OTHER lead whose draft is waiting to be read, and how many others are. */
+  nextToReview: T | null; toReview: number;
+  /** The next OTHER lead whose approved message hasn't been sent, and how many others are. */
+  nextToSend: T | null; toSend: number;
+}
+export function memberSteps<T extends { leadId: number; stage: MemberStage }>(members: T[], openLeadId: number | null): MemberSteps<T> {
+  const at = openLeadId === null ? -1 : members.findIndex((m) => m.leadId === openLeadId);
+  // From the lead after the open one, round to the lead before it. With nothing open, simply the list in order.
+  const others = at < 0 ? members : [...members.slice(at + 1), ...members.slice(0, at)];
+  const of = (stage: MemberStage) => others.filter((m) => m.stage === stage);
+  const drafts = of("draft"), approved = of("approved");
+  return {
+    position: at + 1, total: members.length,
+    previous: at > 0 ? members[at - 1] : null, next: at >= 0 && at < members.length - 1 ? members[at + 1] : null,
+    nextToReview: drafts[0] ?? null, toReview: drafts.length,
+    nextToSend: approved[0] ?? null, toSend: approved.length,
+  };
+}
