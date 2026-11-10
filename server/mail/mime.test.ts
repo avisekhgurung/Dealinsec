@@ -67,6 +67,32 @@ describe("buildMime", () => {
   });
 });
 
+describe("buildMime: the unsubscribe headers", () => {
+  const LINK = "https://www.dealinsec.com/u/4821.Zk3vQ9d_aB-cD1eF2gH3iJ4kL5mN6oP7";
+  it("without a link there is no such header: a one-to-one email is not dressed up as a mailing", () => {
+    expect(buildMime(mail())).not.toMatch(/List-Unsubscribe/i);
+  });
+  it("with a link, both headers a one-click unsubscribe needs, each on one line, and nothing else changes", () => {
+    const raw = buildMime(mail({ listUnsubscribe: LINK }));
+    const { headers, body, lines } = parse(raw);
+    expect(headers["List-Unsubscribe"]).toBe(`<${LINK}>`);
+    expect(headers["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
+    expect(lines.filter((l) => /^List-Unsubscribe/.test(l))).toEqual([`List-Unsubscribe: <${LINK}>`, "List-Unsubscribe-Post: List-Unsubscribe=One-Click"]);
+    expect(body).toBe(parse(buildMime(mail())).body);
+    const without = (r: string) => r.split("\r\n").filter((l) => !/^List-Unsubscribe/.test(l)).join("\r\n");
+    expect(without(raw)).toBe(buildMime(mail()));
+  });
+  it("refuses anything that isn't one plain https address: no injected header, no second address, no plain http", () => {
+    const bad = [
+      "http://www.dealinsec.com/u/1.abc", "https://www.dealinsec.com/u/1.abc\r\nBcc: x@y.test", "https://www.dealinsec.com/u/1.abc>, <mailto:x@y.test",
+      "https://www.dealinsec.com/u/1 abc", "https://www.dealinsec.com/u/1.abc?next=https://evil.test", "https://www.dealinsec.com/", "mailto:stop@dealinsec.com",
+      "https://user:pw@dealinsec.com/u/1.abc", `https://www.dealinsec.com/${"a".repeat(301)}`, "", " https://www.dealinsec.com/u/1.abc", "https://www.dealinsec.com/u/1.abc\u2028x",
+    ];
+    for (const b of bad) expect(() => buildMime(mail({ listUnsubscribe: b })), JSON.stringify(b)).toThrow(MailProviderError);
+    expect(() => buildMime(mail({ listUnsubscribe: 5 as any }))).toThrow(MailProviderError);
+  });
+});
+
 describe("buildMime: a follow-up in its conversation", () => {
   it("adds In-Reply-To and References, and refuses anything that isn't one Message-ID each", async () => {
     const { buildMime } = await import("./mime");

@@ -7,6 +7,9 @@
  *    a plain ASCII display name is quoted with its specials escaped.
  *  - The body is UTF-8, line endings normalized to CRLF, sent base64 encoded in 76-character lines, so its bytes
  *    reach the recipient exactly as approved and no body line can be mistaken for a header or the end of the message.
+ *  - With `listUnsubscribe`, the two List-Unsubscribe headers (RFC 2369 and RFC 8058 one-click) carry that one https
+ *    address, validated like every other header. It is written on one line: the address is capped far below the
+ *    998-character limit, and an unfolded line is read the same way by every mail system.
  * Pure: no network, no clock unless `mail.date` is omitted.
  */
 import { validateOutgoing, type OutgoingMail } from "./provider";
@@ -59,6 +62,8 @@ export function buildMime(mail: OutgoingMail): string {
     `Message-ID: ${mail.rfcMessageId}`,
     ...(mail.inReplyTo ? [`In-Reply-To: ${mail.inReplyTo}`] : []),
     ...(mail.references?.length ? [`References: ${mail.references.join(`${CRLF} `)}`] : []),
+    // One-click (RFC 8058): the receiver POSTs "List-Unsubscribe=One-Click" to the address; both headers are needed.
+    ...(mail.listUnsubscribe ? [`List-Unsubscribe: <${mail.listUnsubscribe}>`, "List-Unsubscribe-Post: List-Unsubscribe=One-Click"] : []),
     "MIME-Version: 1.0",
     "Content-Type: text/plain; charset=UTF-8",
     "Content-Transfer-Encoding: base64",

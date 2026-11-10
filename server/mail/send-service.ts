@@ -21,7 +21,7 @@ import { RESOLVE_DECISIONS, sendMessage, type ResolveDecision, type SendOutcome,
 import { forOrg, sendingAvailability, type GmailStatus } from "./config";
 import { mayConnect, type Member } from "./connect-service";
 import type { MailboxStore } from "./mailbox-store";
-import { capabilitiesOf, MailProviderError, type MailProvider } from "./provider";
+import { capabilitiesOf, LIST_UNSUBSCRIBE_URL, MailProviderError, type MailProvider } from "./provider";
 import type { ReserveRefusal, SendJobView, SendStore } from "./send-store";
 import type { GmailConfig } from "./config";
 
@@ -47,8 +47,19 @@ export interface SendDeps {
   log(event: string, fields?: Record<string, string | number | boolean | null>): void;
   /** For a follow-up: the Gmail thread and Message-IDs it answers, so it arrives in the same conversation. */
   threadFor?(orgId: string, messageId: number): Promise<{ threadId: string | null; inReplyTo: string; references: string[] } | null>;
+  /** A message's own unsubscribe link (server/sales/unsubscribe.ts), or null when the server can't sign one. */
+  unsubscribeLink?(orgId: string, messageId: number): string | null;
   /** The workspace plan's send allowance over 30 days (shared/outbound-plans.ts); none = only the mailbox's daily cap applies. */
   planSendCap?(user: Member): Promise<{ since: Date; max: number } | null>;
+}
+
+/**
+ * The address for the List-Unsubscribe headers, or null: this message's own link, only when it is a plain https
+ * address AND the approved text contains it. Anything else (no link, a local http address, a text without the link)
+ * sends the message exactly as before, with no header.
+ */
+export function listUnsubscribeFor(body: string, link: string | null | undefined): string | null {
+  return typeof link === "string" && LIST_UNSUBSCRIBE_URL.test(link) && body.includes(link) ? link : null;
 }
 
 export type Fail = { ok: false; status: number; code: string; message: string };
@@ -175,6 +186,10 @@ export async function sendApproved(user: Member, messageId: number, bodyHash: un
   let thread: Awaited<ReturnType<NonNullable<SendDeps["threadFor"]>>> = null;
   try { thread = (await deps.threadFor?.(orgId, messageId)) ?? null; } catch { thread = null; }
 
+  // The unsubscribe header, only when the approved text itself carries this message's own link (a campaign's footer):
+  // the header then says nothing the message doesn't, and a one-to-one email is never dressed up as a mailing.
+  const listUnsubscribe = listUnsubscribeFor(r.mail.body, (() => { try { return deps.unsubscribeLink?.(orgId, messageId) ?? null; } catch { return null; } })());
+
   // Outside any transaction: the provider call.
   let sent: { providerMessageId: string; providerThreadId: string | null };
   try {
@@ -182,6 +197,7 @@ export async function sendApproved(user: Member, messageId: number, bodyHash: un
       () => provider.send(accessToken, {
         from: conn.accountEmail, fromName: [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || undefined, to: r.mail.to, subject: r.mail.subject, text: r.mail.body, rfcMessageId: job.rfcMessageId, date: deps.now(),
         ...(thread ? { inReplyTo: thread.inReplyTo, references: thread.references, ...(thread.threadId ? { threadId: thread.threadId } : {}) } : {}),
+        ...(listUnsubscribe ? { listUnsubscribe } : {}),
       }),
       (e) => e.kind === "rate_limited", deps);
   } catch (e) {

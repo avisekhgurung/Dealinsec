@@ -80,7 +80,16 @@ export interface OutgoingMail {
   inReplyTo?: string;
   references?: string[];
   threadId?: string;
+  /**
+   * This message's own unsubscribe address (https), for the List-Unsubscribe headers (RFC 2369, one-click per RFC 8058):
+   * a mail app can then show its own "Unsubscribe" button. Set only when the same address is in the text the person
+   * approved, so the header never says more than the message does.
+   */
+  listUnsubscribe?: string;
 }
+
+/** One https address with nothing that could end the header or the angle brackets it is written in. */
+export const LIST_UNSUBSCRIBE_URL = /^https:\/\/[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?(:\d{1,5})?\/[A-Za-z0-9._~\/-]{1,300}$/i;
 
 export interface SentMail {
   providerMessageId: string;
@@ -195,6 +204,7 @@ export function validateOutgoing(mail: OutgoingMail): void {
   if (mail.inReplyTo !== undefined && !THREAD_ID.test(mail.inReplyTo)) throw new MailProviderError("rejected", "inReplyTo is not one <message-id>");
   if (mail.references !== undefined && (mail.references.length > 20 || mail.references.some((r) => !THREAD_ID.test(r)))) throw new MailProviderError("rejected", "references are not <message-id>s");
   if (mail.threadId !== undefined && !/^[A-Za-z0-9_-]{1,128}$/.test(mail.threadId)) throw new MailProviderError("rejected", "threadId is not a provider thread id");
+  if (mail.listUnsubscribe !== undefined && (typeof mail.listUnsubscribe !== "string" || !LIST_UNSUBSCRIBE_URL.test(mail.listUnsubscribe))) throw new MailProviderError("rejected", "listUnsubscribe is not one https address");
   if ((mail.fromName ?? "").length > 100 || /[\u0000-\u001f\u007f]/.test(mail.fromName ?? "") || /[\u0000\u0001-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(mail.text) || /[\u0000-\u001f\u007f]/.test(mail.subject)) {
     throw new MailProviderError("rejected", "control characters are not allowed");
   }

@@ -3,6 +3,7 @@
  * outreach side of a send (the do-not-contact tables, the lead timeline, the follow-up). Also the hook the team and
  * account routes call when a member is removed or deletes their account.
  */
+import { unsubscribeUrl } from "../sales/unsubscribe";
 import type { Express, Request } from "express";
 import { isAuthenticated } from "../auth";
 import { storage } from "../storage";
@@ -138,6 +139,7 @@ const sendDeps: SendDeps = {
   async threadFor(orgId, messageId) {
     return (await mailSyncSchemaReady()) ? followupThread(orgId, messageId) : null;
   },
+  unsubscribeLink: (orgId, messageId) => unsubscribeUrl(orgId, messageId),
 };
 
 /**

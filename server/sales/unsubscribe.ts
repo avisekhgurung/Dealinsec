@@ -141,21 +141,37 @@ export function unsubscribePage(o: { title: string; body: string; action?: strin
 <body><main><h1>${esc(o.title)}</h1>${o.body}${o.action ? `<form method="post" action="${esc(o.action)}"><button type="submit">Stop these emails</button></form>` : ""}<small>Sent with DealInSec. This page only stops emails to this address from this sender.</small></main></body></html>`;
 }
 
-const hits = new Map<string, number[]>();
-/** At most 30 requests per 10 minutes from one network address (in this process): plenty for a person, little for a script. */
-function allowed(ip: string, now: number): boolean {
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < 600_000);
-  if (recent.length >= 30) { hits.set(ip, recent); return false; }
-  recent.push(now); hits.set(ip, recent);
-  if (hits.size > 5_000) hits.delete(hits.keys().next().value as string);
-  return true;
+/**
+ * Guessing is what gets limited, not unsubscribing. A link that verifies is never counted: a mail provider's one-click
+ * requests (RFC 8058) arrive for many recipients from a handful of its own addresses, and refusing the 31st would
+ * lose a real person's opt-out. Only links that did NOT verify count: 30 of those in 10 minutes from one network
+ * address and it is refused until they age out. In this process only.
+ */
+export function linkGuard(max = 30, windowMs = 600_000, maxAddresses = 5_000) {
+  const misses = new Map<string, number[]>();
+  const recent = (ip: string, now: number) => (misses.get(ip) ?? []).filter((t) => now - t < windowMs);
+  return {
+    /** Whether this address has guessed too often lately. Counts nothing. */
+    blocked(ip: string, now: number): boolean {
+      const r = recent(ip, now);
+      if (r.length) misses.set(ip, r); else misses.delete(ip);
+      return r.length >= max;
+    },
+    /** A link from this address did not verify. */
+    miss(ip: string, now: number): void {
+      misses.set(ip, [...recent(ip, now), now].slice(-max));
+      if (misses.size > maxAddresses) misses.delete(misses.keys().next().value as string);
+    },
+  };
 }
 
 export function registerUnsubscribeRoutes(app: Express, deps: UnsubscribeDeps = defaultUnsubscribeDeps()): void {
+  const limiter = linkGuard();
+  const ipOf = (req: Request) => String(req.ip ?? "unknown");
   const head = (res: Response) => { res.setHeader("Cache-Control", "no-store"); res.setHeader("X-Robots-Tag", "noindex, nofollow"); res.setHeader("Referrer-Policy", "no-referrer"); res.type("html"); };
-  const notFound = (res: Response) => { head(res); res.status(404).send(unsubscribePage({ title: "This link isn't valid", body: "<p>It may have been copied incompletely. Open the link from the email again, or simply reply to the email and ask the sender to stop.</p>" })); };
+  const notFound = (req: Request, res: Response) => { limiter.miss(ipOf(req), Date.now()); head(res); res.status(404).send(unsubscribePage({ title: "This link isn't valid", body: "<p>It may have been copied incompletely. Open the link from the email again, or simply reply to the email and ask the sender to stop.</p>" })); };
   const guard = (req: Request, res: Response): boolean => {
-    if (allowed(String(req.ip ?? "unknown"), Date.now())) return true;
+    if (!limiter.blocked(ipOf(req), Date.now())) return true;
     head(res); res.status(429).send(unsubscribePage({ title: "Please try again in a few minutes", body: "<p>Too many requests came from your network just now.</p>" }));
     return false;
   };
@@ -164,7 +180,7 @@ export function registerUnsubscribeRoutes(app: Express, deps: UnsubscribeDeps = 
     if (!guard(req, res)) return;
     try {
       const v = await lookupUnsubscribe(req.params.token, deps);
-      if (!v) return notFound(res);
+      if (!v) return notFound(req, res);
       head(res);
       if (v.already) return res.send(unsubscribePage({ title: "You're already unsubscribed", body: `<p>${esc(v.orgName)} won't email ${esc(v.address)} again.</p>` }));
       res.send(unsubscribePage({ title: "Stop these emails?", body: `<p>${esc(v.orgName)} will not email ${esc(v.address)} again.</p>`, action: `${UNSUBSCRIBE_PATH}${encodeURIComponent(String(req.params.token))}` }));
@@ -174,7 +190,7 @@ export function registerUnsubscribeRoutes(app: Express, deps: UnsubscribeDeps = 
     if (!guard(req, res)) return;
     try {
       const r = await unsubscribe(req.params.token, deps);
-      if (!r.ok) return notFound(res);
+      if (!r.ok) return notFound(req, res);
       head(res);
       res.send(unsubscribePage({ title: r.view.already ? "You're already unsubscribed" : "You're unsubscribed", body: `<p>${esc(r.view.orgName)} won't email ${esc(r.view.address)} again.</p>` }));
     } catch {

@@ -3,7 +3,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 vi.mock("../db", () => ({ db: {} }));
-import { lookupUnsubscribe, publicBase, signToken, unsubscribe, unsubscribePage, unsubscribeSecret, unsubscribeUrl, type UnsubscribeDeps } from "./unsubscribe";
+import { lookupUnsubscribe, publicBase, signToken, unsubscribe, unsubscribePage, unsubscribeSecret, unsubscribeUrl, type UnsubscribeDeps, linkGuard } from "./unsubscribe";
 import { maskEmail, unsubscribeLine } from "@shared/unsubscribe";
 import { withFooter, OPT_OUT_LINE, hasOptOutLine } from "@shared/campaign";
 
@@ -130,6 +130,29 @@ describe("the click", () => {
     w.list.push("org-a|asha@organics.example");
     expect(await unsubscribe(tok("org-a", 7), w.deps)).toMatchObject({ ok: true, view: { already: false } });
     expect([w.list.length, w.events, w.marked]).toEqual([1, ["org-a|7"], ["org-a|70"]]);
+  });
+});
+
+describe("the guard on the public link: guessing is limited, unsubscribing never is", () => {
+  it("a link that verifies is never counted, however many arrive from one address (a mail provider's one-click requests)", () => {
+    const g = linkGuard(30, 600_000);
+    for (let i = 0; i < 5_000; i++) expect(g.blocked("66.249.0.1", 1_000 + i)).toBe(false);
+  });
+  it("30 links that don't verify in 10 minutes and that address is refused, until they age out; other addresses are untouched", () => {
+    const g = linkGuard(30, 600_000);
+    for (let i = 0; i < 29; i++) g.miss("203.0.113.9", i * 1_000);
+    expect(g.blocked("203.0.113.9", 30_000)).toBe(false);
+    g.miss("203.0.113.9", 30_000);
+    expect(g.blocked("203.0.113.9", 31_000)).toBe(true);
+    expect(g.blocked("198.51.100.4", 31_000)).toBe(false);
+    // Ten minutes after the first miss, it has aged out and the address is let in again.
+    expect(g.blocked("203.0.113.9", 600_001)).toBe(false);
+  });
+  it("remembers a bounded number of addresses", () => {
+    const g = linkGuard(2, 600_000, 3);
+    for (const ip of ["a", "b", "c", "d"]) { g.miss(ip, 1); g.miss(ip, 2); }
+    expect(g.blocked("a", 3)).toBe(false); // the oldest was dropped to make room
+    expect(g.blocked("d", 3)).toBe(true);
   });
 });
 

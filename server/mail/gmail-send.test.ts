@@ -8,7 +8,7 @@ import { SEND_MESSAGES } from "@shared/gmail-connect";
 import { hashDraft } from "@shared/outreach-hash";
 import { GMAIL_SEND_URL, GmailProvider, GOOGLE_TOKEN_URL } from "./gmail-provider";
 import { GMAIL_SEND_SCOPE, MailProviderError, normalizeScopes } from "./provider";
-import { resolveSend, sendApproved, sendStateFor, SEND_LEASE_MS, TRANSIENT_TRIES } from "./send-service";
+import { listUnsubscribeFor, resolveSend, sendApproved, sendStateFor, SEND_LEASE_MS, TRANSIENT_TRIES } from "./send-service";
 import { BODY, KEYS, makeWorld, SUBJECT } from "./send-world";
 import { loadKeyring } from "./token-crypto";
 
@@ -20,6 +20,63 @@ function parse(raw: string) {
   const headers = Object.fromEntries(raw.slice(0, at).replace(/\r\n /g, " ").split("\r\n").map((l) => [l.slice(0, l.indexOf(":")), l.slice(l.indexOf(":") + 2)]));
   return { headers, body: Buffer.from(raw.slice(at + 4).replace(/\r\n/g, ""), "base64").toString("utf8") };
 }
+
+describe("sending: the unsubscribe header", () => {
+  const linkFor = (orgId: string, messageId: number) => `https://www.dealinsec.com/u/${messageId}.sig-${orgId}`;
+  /** An approved message whose text ends with ITS OWN unsubscribe link, as a campaign's footer leaves it. */
+  const withLink = (w: ReturnType<typeof makeWorld>, link = linkFor) => {
+    const m = w.approved();
+    m.body = `${BODY}\n\nIf this isn't relevant, just tell me and I won't write again.\nUnsubscribe: ${link("org-a", m.id)}`;
+    m.bodyHash = hashDraft(m.subject!, m.body);
+    return m;
+  };
+
+  it("a message whose approved text carries its own link is sent with both List-Unsubscribe headers, pointing at that same link", async () => {
+    const w = makeWorld();
+    await w.connect("ana");
+    const m = withLink(w);
+    expect(ok(await sendApproved(w.members.ana, m.id, m.bodyHash, { ...w.deps, unsubscribeLink: linkFor })).outcome).toBe("sent");
+    const { headers, body } = parse(w.fake.outbox[0].raw);
+    expect(headers["List-Unsubscribe"]).toBe(`<${linkFor("org-a", m.id)}>`);
+    expect(headers["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
+    // The text is still exactly what was approved.
+    expect(hashDraft(headers.Subject, body.replace(/\r\n/g, "\n"))).toBe(m.bodyHash);
+  });
+  it("a one-to-one message (no link in its text) is sent exactly as before, with no such header", async () => {
+    const w = makeWorld();
+    await w.connect("ana");
+    const m = w.approved();
+    ok(await sendApproved(w.members.ana, m.id, m.bodyHash, { ...w.deps, unsubscribeLink: linkFor }));
+    expect(w.fake.outbox[0].raw).not.toMatch(/List-Unsubscribe/i);
+  });
+  it("the header is this message's link or nothing: another message's link in the text, a removed link, or a server that can't sign one, send without it", async () => {
+    const w = makeWorld();
+    await w.connect("ana");
+    // The person deleted the link from the footer before approving.
+    const edited = w.approved();
+    // Another message's link pasted into this one.
+    const other = w.approved();
+    other.body = `${BODY}\nUnsubscribe: ${linkFor("org-a", edited.id)}`; other.bodyHash = hashDraft(other.subject!, other.body);
+    // The server has no signing secret.
+    const unsigned = withLink(w);
+    // The lookup itself blows up.
+    const broken = withLink(w);
+    ok(await sendApproved(w.members.ana, edited.id, edited.bodyHash, { ...w.deps, unsubscribeLink: linkFor }));
+    ok(await sendApproved(w.members.ana, other.id, other.bodyHash, { ...w.deps, unsubscribeLink: linkFor }));
+    ok(await sendApproved(w.members.ana, unsigned.id, unsigned.bodyHash, { ...w.deps, unsubscribeLink: () => null }));
+    ok(await sendApproved(w.members.ana, broken.id, broken.bodyHash, { ...w.deps, unsubscribeLink: () => { throw new Error("no secret"); } }));
+    expect(w.fake.outbox).toHaveLength(4);
+    for (const sent of w.fake.outbox) expect(sent.raw).not.toMatch(/List-Unsubscribe/i);
+  });
+  it("only a plain https link ever becomes a header: a local http address is left as text", () => {
+    const body = "Hello\nUnsubscribe: http://localhost:5000/u/7.abc";
+    expect(listUnsubscribeFor(body, "http://localhost:5000/u/7.abc")).toBeNull();
+    expect(listUnsubscribeFor("Unsubscribe: https://x.test/u/7.abc", "https://x.test/u/7.abc")).toBe("https://x.test/u/7.abc");
+    expect(listUnsubscribeFor("no link here", "https://x.test/u/7.abc")).toBeNull();
+    expect(listUnsubscribeFor("Unsubscribe: https://x.test/u/7.abc", null)).toBeNull();
+    expect(listUnsubscribeFor("x https://x.test/u/7.abc\r\nBcc: a@b.test", "https://x.test/u/7.abc\r\nBcc: a@b.test")).toBeNull();
+  });
+});
 
 describe("sending: the happy path", () => {
   it("sends exactly the approved subject and body from the sender's own mailbox, records it once, and follows up once", async () => {
