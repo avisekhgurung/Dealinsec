@@ -7,6 +7,8 @@
  * and, for the companies first FOUND in the window (bulk lists included):
  *   discovered · verified site · qualified · ready · with a named person · with a verified email (contact coverage)
  *   est. spend per discovered · per qualified · per ready company, and the owner's plan
+ * and, per outreach campaign created in the window: leads · drafted · sent · replied · est. draft cost, per draft, sent, reply
+ * and, per workspace: payments completed in the window beside the estimated spend; with --usd-inr <rate>, a gross margin.
  * Workspace ids only, never names. Point DATABASE_URL at the database you mean; nothing is written.
  *
  * What it counts: every model call the app made (each try of a retried step is its own row, failed ones included);
@@ -16,13 +18,15 @@
  * price table for every DeepSeek model); a provider's own retry inside one call (only the final usage is reported);
  * free reads (the built-in page reader, robots.txt); WhatsApp conversation charges billed by Meta (recorded at 0);
  * Gmail sends (free); hosting.
- *   DATABASE_URL=postgresql://dealtest@localhost:5544/dealinsec_pdftest npx tsx script/sales-engine-report.mts --days 30 [--org <id>]
+ *   DATABASE_URL=postgresql://dealtest@localhost:5544/dealinsec_pdftest npx tsx script/sales-engine-report.mts --days 30 [--org <id>] [--usd-inr <rupees per dollar>]
  */
 const pg = (await import("pg")).default;
 
 const arg = (k: string) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : undefined; };
 const days = Math.min(365, Math.max(1, Number(arg("days") ?? 30) || 30));
 const org = arg("org") ?? null;
+/** Rupees per US dollar, for the margin line only. Not guessed: without it, revenue and spend are printed side by side and no margin is worked out. */
+const usdInr = (() => { const n = Number(arg("usd-inr")); return Number.isFinite(n) && n > 20 && n < 500 ? n : null; })();
 if (!process.env.DATABASE_URL) { console.error("Set DATABASE_URL to the database to read."); process.exit(2); }
 
 const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
@@ -82,6 +86,42 @@ try {
            coalesce(max(s.micro), 0)::bigint AS micro,
            coalesce((SELECT u.plan FROM users u WHERE u.organization_id = f.o AND u.org_role = 'OWNER' LIMIT 1), '?') AS plan
     FROM found f LEFT JOIN spend s ON s.o = f.o GROUP BY f.o ORDER BY discovered DESC`, [since.toISOString().replace("T", " ").replace("Z", ""), org]);
+  // Campaigns (when the tables exist): what each one's drafts cost. A draft's model calls carry the lead they were for,
+  // so a campaign's cost is the "draft" calls for its members made since the campaign was created.
+  const hasCampaigns = (await db.query(`SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = current_schema() AND table_name IN ('campaigns', 'campaign_members')`)).rows[0].n === 2;
+  const camp = hasCampaigns ? await db.query(`
+    SELECT c.organization_id AS o, c.id,
+           count(m.id)::int AS members,
+           count(*) FILTER (WHERE m.message_id IS NOT NULL)::int AS drafted,
+           count(*) FILTER (WHERE lm.status = 'sent')::int AS sent,
+           count(*) FILTER (WHERE lm.status = 'sent' AND EXISTS (SELECT 1 FROM outreach_events e WHERE e.organization_id = m.organization_id AND e.message_id = m.message_id AND e.kind = 'replied'))::int AS replied,
+           coalesce((SELECT sum(k.cost_micro_usd) FROM llm_calls k
+                     WHERE k.organization_id = c.organization_id AND k.task = 'draft' AND k.error_code IS DISTINCT FROM 'reserved' AND k.created_at >= c.created_at
+                       AND k.lead_id IN (SELECT lead_id FROM campaign_members x WHERE x.campaign_id = c.id)), 0)::bigint AS draft_micro
+    FROM campaigns c LEFT JOIN campaign_members m ON m.campaign_id = c.id
+    LEFT JOIN lead_messages lm ON lm.organization_id = m.organization_id AND lm.id = m.message_id
+    WHERE c.created_at >= $1 AND ($2::text IS NULL OR c.organization_id = $2)
+    GROUP BY c.id ORDER BY c.created_at DESC LIMIT 200`, [since.toISOString().replace("T", " ").replace("Z", ""), org]) : { rows: [] as any[] };
+
+  // Money in, against estimated spend out, per workspace: payments completed in the window (payu_orders holds every
+  // completed payment, Razorpay's included; its amount is WHOLE RUPEES — server/billing/purchase-rules.ts — so it is
+  // turned into paise here) beside the whole estimated spend of the same window.
+  const money = await db.query(`
+    WITH paid AS (
+      SELECT u.organization_id AS o, (sum(p.amount)::bigint * 100) AS paise, count(*)::int AS payments
+      FROM payu_orders p JOIN users u ON u.id = p.user_id
+      WHERE p.status = 'completed' AND p.completed_at >= $1 AND u.organization_id IS NOT NULL GROUP BY u.organization_id
+    ),
+    spend AS (
+      SELECT o, sum(micro)::bigint AS micro FROM (
+        SELECT organization_id AS o, cost_micro_usd AS micro FROM llm_calls WHERE created_at >= $1 AND error_code IS DISTINCT FROM 'reserved'
+        UNION ALL SELECT organization_id, cost_micro_usd FROM provider_calls WHERE created_at >= $1) x GROUP BY o
+    )
+    SELECT coalesce(paid.o, spend.o) AS o, coalesce(paid.paise, 0)::bigint AS paise, coalesce(paid.payments, 0)::int AS payments, coalesce(spend.micro, 0)::bigint AS micro,
+           coalesce((SELECT u.plan FROM users u WHERE u.organization_id = coalesce(paid.o, spend.o) AND u.org_role = 'OWNER' LIMIT 1), '?') AS plan
+    FROM paid FULL OUTER JOIN spend ON spend.o = paid.o
+    WHERE ($2::text IS NULL OR coalesce(paid.o, spend.o) = $2)
+    ORDER BY coalesce(spend.micro, 0) DESC LIMIT 200`, [since.toISOString().replace("T", " ").replace("Z", ""), org]);
   await db.query("ROLLBACK");
 
   const usd = (micro: number) => `$${(micro / 1e6).toFixed(4)}`;
@@ -111,7 +151,38 @@ try {
   }
   console.log(["TOTAL", "", t2.d, `${t2.v} (${pct(t2.v, t2.d)})`, `${t2.q} (${pct(t2.q, t2.d)})`, t2.r, `${t2.p} (${pct(t2.p, t2.d)})`, `${t2.e} (${pct(t2.e, t2.d)})`, usd(t2.m), per(t2.m, t2.d), per(t2.m, t2.q), per(t2.m, t2.r)].join("\t"));
   console.log("Spend here is the workspace's whole estimated spend in the window, so the per-unit figures are upper bounds. \"Verified email\" stays 0 until a contact provider is connected.");
-  console.log("Margin: compare a workspace's est. spend with what its plan pays for the same window. Prices and currency conversion are not in this database, so no margin figure is printed.");
+
+  // Third table: campaigns.
+  if (hasCampaigns) {
+    console.log(`\nCampaigns created in the window (drafting cost only; sending from Gmail costs nothing):`);
+    console.log(["workspace", "campaign", "leads", "drafted", "sent", "replied", "est. draft cost", "per draft", "per sent", "per reply"].join("\t"));
+    const t3 = { m: 0, d: 0, s: 0, r: 0, c: 0 };
+    for (const x of camp.rows) {
+      const c = Number(x.draft_micro);
+      t3.m += x.members; t3.d += x.drafted; t3.s += x.sent; t3.r += x.replied; t3.c += c;
+      console.log([String(x.o).slice(0, 12), `#${x.id}`, x.members, x.drafted, x.sent, x.replied, usd(c), per(c, x.drafted), per(c, x.sent), per(c, x.replied)].join("\t"));
+    }
+    console.log(["TOTAL", `${camp.rows.length}`, t3.m, t3.d, t3.s, t3.r, usd(t3.c), per(t3.c, t3.d), per(t3.c, t3.s), per(t3.c, t3.r)].join("\t"));
+    console.log("A draft a campaign took over from before it existed (written by hand, or earlier) has no cost counted here. Campaign ids only, never names.");
+  } else console.log("\nCampaigns: the tables aren't on this database.");
+
+  // Fourth table: money in against estimated spend out.
+  const inr = (paise: number) => `${paise < 0 ? "-" : ""}₹${(Math.abs(paise) / 100).toFixed(2)}`;
+  console.log(`\nMoney in, against estimated spend, per workspace (payments completed in the window):`);
+  console.log(["workspace", "owner plan", "payments", "paid", "est. spend", usdInr ? `est. spend at ₹${usdInr}/$` : "est. spend in ₹", usdInr ? "gross margin" : "gross margin", usdInr ? "margin %" : ""].join("\t"));
+  const t4 = { paise: 0, micro: 0, n: 0 };
+  for (const x of money.rows) {
+    const paise = Number(x.paise), micro = Number(x.micro);
+    t4.paise += paise; t4.micro += micro; t4.n += x.payments;
+    const spendPaise = usdInr ? Math.round((micro / 1e6) * usdInr * 100) : null;
+    console.log([String(x.o).slice(0, 12), x.plan, x.payments, inr(paise), usd(micro), spendPaise === null ? "-" : inr(spendPaise), spendPaise === null ? "-" : inr(paise - spendPaise), spendPaise === null || !paise ? (spendPaise === null ? "" : "-") : `${Math.round((100 * (paise - spendPaise)) / paise)}%`].join("\t"));
+  }
+  const totSpendPaise = usdInr ? Math.round((t4.micro / 1e6) * usdInr * 100) : null;
+  console.log(["TOTAL", "", t4.n, inr(t4.paise), usd(t4.micro), totSpendPaise === null ? "-" : inr(totSpendPaise), totSpendPaise === null ? "-" : inr(t4.paise - totSpendPaise), totSpendPaise === null || !t4.paise ? (totSpendPaise === null ? "" : "-") : `${Math.round((100 * (t4.paise - totSpendPaise)) / t4.paise)}%`].join("\t"));
+  console.log(usdInr
+    ? `Margin = payments received minus estimated AI and research spend, at the rate you gave (₹${usdInr} per $). It leaves out hosting, payment fees, GST and refunds made after capture, and the spend is an estimate from the app's price table, not the providers' bills.`
+    : "No margin is worked out: the spend is in dollars and the payments in rupees, and the rate is not guessed. Pass --usd-inr <rupees per dollar> to get one.");
+  console.log("A workspace in UNLIMITED_ORG_IDS (yours) pays nothing and still spends: read its row as a cost, not a loss on a customer.");
 } finally {
   await db.end();
 }

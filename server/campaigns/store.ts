@@ -129,7 +129,8 @@ export const campaignStore: CampaignStore = {
     const r = await db.execute(sql`
       SELECT m.id, m.lead_id, m.state, m.reason, m.attempts, m.hold_reason, m.hold_hash,
              l.id AS l_id, l.company_name, l.domain, l.status AS lead_status, l.contact_name, l.contact_email, l.do_not_contact, l.archived_at,
-             lm.id AS msg_id, lm.status AS msg_status, lm.subject, lm.to_address, lm.body_hash, lm.edited, lm.approved_at, lm.sent_at,
+             lm.id AS msg_id, lm.status AS msg_status, lm.subject, lm.to_address, lm.body_hash, lm.edited,
+             to_char(lm.approved_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS approved_at, to_char(lm.sent_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS sent_at,
              COALESCE((SELECT array_agg(DISTINCT e.kind) FROM outreach_events e WHERE e.organization_id = m.organization_id AND e.message_id = m.message_id AND e.kind IN ('replied', 'bounced', 'opted_out')), '{}') AS outcomes,
              ${interested} AS interested
       FROM campaign_members m

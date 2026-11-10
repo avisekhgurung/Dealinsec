@@ -40,6 +40,7 @@ import { MAX_QUANTITY as LIST_MAX_COMPANIES, describeIcp, icpFromIdealClient, ic
 import { SEGMENT_LABEL, SEGMENT_PRESETS, offerLine, type SegmentPreset } from "@shared/opportunity-queries";
 import { ClientProfiles } from "@/components/outbound/client-profiles";
 import { Campaigns } from "@/components/outbound/campaigns";
+import { PlanUsage, ResultsOverview } from "@/components/outbound/results-overview";
 import { profileMatch } from "@shared/acquisition-profile";
 import { REQUIREMENT_LABEL } from "@shared/profile-keys";
 import { SIGNAL_LABEL } from "@shared/prospect";
@@ -619,7 +620,7 @@ export default function OutboundPage() {
               tabs={[{ value: "searches", label: "Searches", testId: "view-searches" }, { value: "social", label: "Social Intent", testId: "view-social" }, { value: "prospects", label: "All prospects", testId: "view-prospects" }, { value: "outreach", label: "Outreach", testId: "view-outreach" }, { value: "campaigns", label: "Campaigns", testId: "view-campaigns" }, { value: "inbox", label: "Inbox", testId: "view-inbox" }, { value: "results", label: "Results", testId: "view-results" }]} />
 
             {view === "social" ? <SocialIntent canEdit={canEdit} />
-              : view === "results" ? <div className="space-y-4"><SalesFunnel /><StrategyStats /></div>
+              : view === "results" ? <div className="space-y-4"><PlanUsage /><ResultsOverview /><SalesFunnel /><StrategyStats /></div>
               : view === "campaigns" ? <Campaigns canEdit={canEdit} />
               : view === "inbox" ? <OutreachInbox />
               : view === "outreach" ? <OutreachQueue canEdit={canEdit} onShowReady={() => navigate(`${location}?view=prospects&readiness=ready`, { replace: true })} />

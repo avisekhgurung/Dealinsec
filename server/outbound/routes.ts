@@ -7,6 +7,7 @@
  *   GET  /api/outbound/runs                      recent runs
  *   GET  /api/outbound/usage                     this workspace's allowances and the platform's state, before a search
  *   GET  /api/outbound/funnel?days=30|90|365     researched → opportunity → lead → … → won, for the companies researched in the window
+ *   GET  /api/outbound/results?days=30|90|365    what searches found and how reachable it is; what each campaign sent and got back
  *   GET  /api/outbound/runs/:id                  a run's funnel and its prospect cards
  *   POST /api/outbound/runs/:id/cancel           stop a run
  *   GET  /api/outbound/prospects                 the workspace table: one page of the organization's prospects (filters, sort, page in the query)
@@ -53,6 +54,7 @@ export function registerOutboundRoutes(app: Express) {
   app.post("/api/outbound/runs", isAuthenticated, guarded("outbound_start", async (req, res) => send(res, await svc.startRun(req.user, { request: req.body?.request, icp: req.body?.icp, searches: req.body?.searches, mode: req.body?.mode }), (r) => ({ run: r.run, existing: r.existing }), 201)));
   app.get("/api/outbound/usage", isAuthenticated, guarded("outbound_usage", async (req, res) => { res.setHeader("Cache-Control", "no-store"); send(res, await outboundUsage(req.user), (r) => ({ usage: r.usage })); }));
   app.get("/api/outbound/funnel", isAuthenticated, guarded("outbound_funnel", async (req, res) => { res.setHeader("Cache-Control", "no-store"); send(res, await (await import("./funnel")).getFunnel(req.user, req.query.days), (r) => ({ funnel: r.funnel })); }));
+  app.get("/api/outbound/results", isAuthenticated, guarded("outbound_results", async (req, res) => { res.setHeader("Cache-Control", "no-store"); send(res, await (await import("./results")).getResults(req.user, req.query.days), (r) => ({ results: r.results })); }));
   app.get("/api/outbound/runs", isAuthenticated, guarded("outbound_runs", async (req, res) => send(res, await svc.listRuns(req.user), (r) => ({ runs: r.runs }))));
   app.get("/api/outbound/runs/:id", isAuthenticated, guarded("outbound_run", async (req, res) => send(res, await svc.getRun(req.user, String(req.params.id).slice(0, 40)), (r) => ({ run: r.run, prospects: r.prospects }))));
   app.post("/api/outbound/runs/:id/cancel", isAuthenticated, guarded("outbound_cancel", async (req, res) => send(res, await svc.cancelRun(req.user, String(req.params.id).slice(0, 40)), (r) => ({ run: r.run }))));
