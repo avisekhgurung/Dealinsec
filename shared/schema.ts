@@ -2130,3 +2130,57 @@ export const acquisitionProfiles = pgTable("acquisition_profiles", {
   oneDefault: uniqueIndex("acquisition_profiles_one_default").on(t.organizationId).where(sql`${t.isDefault}`),
 }));
 export type AcquisitionProfileRow = typeof acquisitionProfiles.$inferSelect;
+
+// ── Campaigns: a named group of leads written to together (shared/campaign.ts) ──
+// A campaign adds no new kind of message: each member points at an ordinary lead_messages row, approved one at a time.
+// A missing table switches only this feature off (script/migrate-campaigns.ts).
+export const campaigns = pgTable("campaigns", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  createdByUser: varchar("created_by_user").notNull(),
+  name: varchar("name", { length: 80 }).notNull(),
+  profileId: integer("profile_id"), // the client profile it was built for, when there was one (acquisition_profiles)
+  profileName: varchar("profile_name", { length: 80 }), // kept as text: the profile may be renamed or deleted later
+  status: varchar("status", { length: 10 }).notNull().default("active"), // active | archived
+  footerNote: varchar("footer_note", { length: 200 }).notNull().default(""),
+  // Drafting: on while the background job writes drafts; `prepareStop` says why it stopped before finishing.
+  preparing: boolean("preparing").notNull().default(false),
+  prepareUserId: varchar("prepare_user_id"),
+  prepareStop: varchar("prepare_stop", { length: 24 }),
+  // The paced queue: on while approved messages are being sent from `senderUserId`'s mailbox.
+  sending: boolean("sending").notNull().default(false),
+  senderUserId: varchar("sender_user_id"),
+  sendStop: varchar("send_stop", { length: 24 }),
+  dailyLimit: integer("daily_limit").notNull().default(20),
+  gapSeconds: integer("gap_seconds").notNull().default(180),
+  nextSendAt: timestamp("next_send_at"),
+  leaseUntil: timestamp("lease_until"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  orgIdx: index("campaigns_org_idx").on(t.organizationId, t.createdAt),
+  workIdx: index("campaigns_work_idx").on(t.preparing, t.sending),
+}));
+export type CampaignRow = typeof campaigns.$inferSelect;
+
+export const campaignMembers = pgTable("campaign_members", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaign_id").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  organizationId: varchar("organization_id").notNull(),
+  leadId: integer("lead_id").notNull(),
+  messageId: integer("message_id"), // lead_messages.id once a draft exists
+  state: varchar("state", { length: 10 }).notNull().default("queued"), // queued | drafted | skipped | failed
+  reason: varchar("reason", { length: 24 }), // why it was skipped or failed
+  attempts: integer("attempts").notNull().default(0),
+  // An approved message the queue must not try again as it is: the reason, and the text it applied to.
+  holdReason: varchar("hold_reason", { length: 24 }),
+  holdHash: varchar("hold_hash", { length: 64 }),
+  leaseUntil: timestamp("lease_until"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  onePerLead: uniqueIndex("campaign_members_campaign_lead_uq").on(t.campaignId, t.leadId),
+  leadIdx: index("campaign_members_lead_idx").on(t.organizationId, t.leadId),
+  queueIdx: index("campaign_members_queue_idx").on(t.campaignId, t.state),
+}));
+export type CampaignMemberRow = typeof campaignMembers.$inferSelect;

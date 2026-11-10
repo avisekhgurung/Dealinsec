@@ -11,7 +11,7 @@ import { disconnectMailboxes, type MailServiceDeps, type Member } from "./connec
 import { pgMailboxStore } from "./mailbox-store-pg";
 import { leadsStore } from "../leads/store";
 import { outreachSafetyReady } from "../sales/message-store";
-import type { SendDeps } from "./send-service";
+import { sendApproved, type SendDeps } from "./send-service";
 import { pgSendStore } from "./send-store-pg";
 import { registerGmailRoutes } from "./routes";
 import { gmailStatus, mailSyncSchemaReady } from "./status";
@@ -139,6 +139,12 @@ const sendDeps: SendDeps = {
     return (await mailSyncSchemaReady()) ? followupThread(orgId, messageId) : null;
   },
 };
+
+/**
+ * The campaign queue's way in (server/campaigns/service.ts sendStep): the SAME send a person's click makes, with the
+ * same dependencies, so every lock, limit and do-not-contact check applies. `user` is the member who started the queue.
+ */
+export const sendFromQueue = (user: Member, messageId: number, bodyHash: string) => sendApproved(user, messageId, bodyHash, sendDeps);
 
 export function registerGmail(app: Express): void {
   registerGmailRoutes(app, { ...deps, auth: isAuthenticated, currentUser, send: sendDeps, syncNow });

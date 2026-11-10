@@ -39,6 +39,7 @@ import { COUNTRY_NAME, ICP_URL, OUTBOUND_RUNS_URL, RUN_ERROR, RUN_STAGE_LABEL, c
 import { MAX_QUANTITY as LIST_MAX_COMPANIES, describeIcp, icpFromIdealClient, icpSchema, searchStrategies } from "@shared/icp";
 import { SEGMENT_LABEL, SEGMENT_PRESETS, offerLine, type SegmentPreset } from "@shared/opportunity-queries";
 import { ClientProfiles } from "@/components/outbound/client-profiles";
+import { Campaigns } from "@/components/outbound/campaigns";
 import { profileMatch } from "@shared/acquisition-profile";
 import { REQUIREMENT_LABEL } from "@shared/profile-keys";
 import { SIGNAL_LABEL } from "@shared/prospect";
@@ -322,8 +323,8 @@ export default function OutboundPage() {
   // ?run=<id>: open that search (the agent's "Open in Client Radar" link).
   const runParam = new URLSearchParams(search).get("run");
   useEffect(() => { if (runParam) setRunId(runParam); }, [runParam]);
-  const view = viewParam === "prospects" || viewParam === "outreach" || viewParam === "inbox" || viewParam === "results" || viewParam === "social" ? viewParam : "searches";
-  const setView = (v: "prospects" | "searches" | "social" | "outreach" | "inbox" | "results") => navigate(v === "searches" ? location : `${location}?view=${v}`, { replace: true });
+  const view = viewParam === "prospects" || viewParam === "outreach" || viewParam === "campaigns" || viewParam === "inbox" || viewParam === "results" || viewParam === "social" ? viewParam : "searches";
+  const setView = (v: "prospects" | "searches" | "social" | "outreach" | "campaigns" | "inbox" | "results") => navigate(v === "searches" ? location : `${location}?view=${v}`, { replace: true });
   // Client Radar opened (counts only; which view, never a search or a company).
   useEffect(() => { trackEvent("outbound_opened", { view }); }, []);
   const runs = useQuery<{ runs: RunView[] }>({ queryKey: [OUTBOUND_RUNS_URL], retry: false, refetchInterval: (q) => (q.state.data?.runs.some((r) => r.status === "running") ? 5000 : false) });
@@ -465,7 +466,7 @@ export default function OutboundPage() {
   const listed = runs.data?.runs.find((r) => r.id === runId) ?? null;
   const flowRun = view === "searches" ? runCache.data?.run ?? listed : listed ?? runCache.data?.run ?? null;
   const flow = flowState({
-    view: view === "inbox" || view === "results" ? "outreach" : view === "social" ? "searches" : view, // the inbox is the outreach step's other half; results come after it; Social Intent is another way of finding
+    view: view === "inbox" || view === "results" || view === "campaigns" ? "outreach" : view === "social" ? "searches" : view, // the inbox is the outreach step's other half; results come after it; Social Intent is another way of finding
     composing: parse.isPending ? "reading" : parsed ? "confirming" : null,
     run: flowRun ? { status: flowRun.status, stage: flowRun.stage } : null,
     results: runCache.data ? splitProspects(runCache.data.prospects)[0].length : null,
@@ -615,10 +616,11 @@ export default function OutboundPage() {
             )}
 
             <SegmentedTabs label="Client Radar views" value={view} onChange={setView}
-              tabs={[{ value: "searches", label: "Searches", testId: "view-searches" }, { value: "social", label: "Social Intent", testId: "view-social" }, { value: "prospects", label: "All prospects", testId: "view-prospects" }, { value: "outreach", label: "Outreach", testId: "view-outreach" }, { value: "inbox", label: "Inbox", testId: "view-inbox" }, { value: "results", label: "Results", testId: "view-results" }]} />
+              tabs={[{ value: "searches", label: "Searches", testId: "view-searches" }, { value: "social", label: "Social Intent", testId: "view-social" }, { value: "prospects", label: "All prospects", testId: "view-prospects" }, { value: "outreach", label: "Outreach", testId: "view-outreach" }, { value: "campaigns", label: "Campaigns", testId: "view-campaigns" }, { value: "inbox", label: "Inbox", testId: "view-inbox" }, { value: "results", label: "Results", testId: "view-results" }]} />
 
             {view === "social" ? <SocialIntent canEdit={canEdit} />
               : view === "results" ? <div className="space-y-4"><SalesFunnel /><StrategyStats /></div>
+              : view === "campaigns" ? <Campaigns canEdit={canEdit} />
               : view === "inbox" ? <OutreachInbox />
               : view === "outreach" ? <OutreachQueue canEdit={canEdit} onShowReady={() => navigate(`${location}?view=prospects&readiness=ready`, { replace: true })} />
               : view === "prospects" ? <ProspectWorkspace canExport={canEdit} onOpen={(r, focus) => setOpen({ id: r.id, runId: r.latestRunId, focus })} onPrepared={() => setView("outreach")} /> : <>

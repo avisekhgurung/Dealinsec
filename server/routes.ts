@@ -23,6 +23,7 @@ import { registerSalesRoutes } from "./sales/routes";
 import { registerOutboundRoutes } from "./outbound/routes";
 import { registerSocialRoutes } from "./social/routes";
 import { registerClientProfileRoutes } from "./profiles/routes";
+import { registerCampaignRoutes } from "./campaigns/routes";
 import { registerChannelRoutes } from "./channels/routes";
 import { registerAiLeagueRoutes } from "./ai-league/routes";
 import { disconnectMailboxesOf, registerGmail } from "./mail/register";
@@ -629,6 +630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerOutboundRoutes(app);
   registerSocialRoutes(app);
   registerClientProfileRoutes(app);
+  registerCampaignRoutes(app);
   registerChannelRoutes(app);
   registerAiLeagueRoutes(app);
   registerGmail(app);
