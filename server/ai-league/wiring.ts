@@ -60,6 +60,13 @@ export function buildHandlers(): Record<LeagueTask, TaskHandler> {
       createCampaign: async (u, raw) => (await import("../campaigns/service")).createCampaign(u as any, raw) as any,
       getCampaign: async (u, id) => (await import("../campaigns/service")).getCampaign(u as any, id) as any,
       startPreparing: async (u, id) => (await import("../campaigns/service")).startPreparing(u as any, id) as any,
+      leadsFromSearch: async (u, runId) => {
+        const r = await (await import("../outbound/service")).getRun(u as any, runId);
+        if (!r.ok) return r as any;
+        // Ready first, then by score: if the campaign has to be cut to its limit, the best companies are the ones kept.
+        const saved = r.prospects.filter((p) => p.leadId).sort((a, b) => Number(b.ready) - Number(a.ready) || (b.score?.total ?? 0) - (a.score?.total ?? 0));
+        return { ok: true as const, leadIds: Array.from(new Set(saved.map((p) => p.leadId!))), description: r.run.description };
+      },
     }),
     "team.huddle": huddleTask({
       chat: async (ctx, messages, opts) => {

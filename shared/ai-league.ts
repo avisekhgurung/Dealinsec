@@ -138,6 +138,8 @@ export const TASK_INPUT = {
     leadIds: z.array(z.number().int().positive()).max(LEAGUE_LIMITS.campaignLeads).default([]),
     /** With no leadIds: how many of the newest open leads to put in the new campaign. */
     max: z.number().int().min(1).max(LEAGUE_LIMITS.campaignLeads).default(10),
+    /** A Client Radar search: the new campaign takes the companies that search found AND that were saved to Leads. */
+    runId: z.string().regex(/^pr_[A-Za-z0-9]{6,40}$/).nullable().default(null),
   }).strict(),
   "team.huddle": z.object({
     topic: z.string().trim().min(8, "Say what the team should think about, for example \"How do we get 5 new dental clients this month?\"").max(LEAGUE_LIMITS.requestChars),

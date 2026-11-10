@@ -57,7 +57,7 @@ describe("Mika's campaign drafts tool", () => {
     const { start } = starter();
     const tool = mikaCampaignTool(start, campaigns);
     const existing: any = await tool.prepare!(ctx(), { campaignId: 5 });
-    expect(existing).toMatchObject({ ok: true, forceApproval: true, args: { campaignId: 5, name: "", leadIds: [], max: 10 } });
+    expect(existing).toMatchObject({ ok: true, forceApproval: true, args: { campaignId: 5, name: "", leadIds: [], max: 10, runId: null } });
     expect(existing.preview.lines).toEqual([{ label: "Campaign", value: "Diwali" }, { label: "Leads waiting for a draft", value: "6" }]);
     expect(existing.preview.effects).toEqual(["Uses one of your plan's AI drafts for each draft written", "Writes drafts only: nothing is approved or sent", "Each draft waits in Client Radar → Campaigns for you"]);
     const fresh: any = await tool.prepare!(ctx(), { name: "D2C, November", leadIds: [3, 4, 9] });
@@ -69,7 +69,7 @@ describe("Mika's campaign drafts tool", () => {
   it("with an existing campaign, leads named alongside it are dropped: it prepares that campaign, nothing else", async () => {
     const { start } = starter();
     const p: any = await mikaCampaignTool(start, campaigns).prepare!(ctx(), { campaignId: 5, leadIds: [1, 2] });
-    expect(p.args).toEqual({ campaignId: 5, name: "", leadIds: [], max: 10 });
+    expect(p.args).toEqual({ campaignId: 5, name: "", leadIds: [], max: 10, runId: null });
   });
   it("refuses a campaign that isn't open in the workspace, a viewer, and anything outside its limits", async () => {
     const { start, starts } = starter();
@@ -91,9 +91,52 @@ describe("Mika's campaign drafts tool", () => {
     expect(out.summary).toMatch(/NOT finished yet/);
     expect(out.summary).toMatch(/nothing has been approved or sent/);
   });
+  it("can take the companies a search saved to Leads; a campaign that exists or leads that are named come first", async () => {
+    const { start } = starter();
+    const tool = mikaCampaignTool(start, campaigns);
+    const fromSearch: any = await tool.prepare!(ctx(), { runId: "pr_abc123def456" });
+    expect(fromSearch.args).toEqual({ campaignId: null, name: "", leadIds: [], max: 10, runId: "pr_abc123def456" });
+    expect(fromSearch.preview.lines).toEqual([{ label: "New campaign", value: "Named after the search" }, { label: "Leads", value: "The companies that search saved to Leads" }]);
+    expect((await tool.prepare!(ctx(), { runId: "pr_abc123def456", leadIds: [4] }) as any).args).toMatchObject({ leadIds: [4], runId: null });
+    expect((await tool.prepare!(ctx(), { runId: "pr_abc123def456", campaignId: 5 }) as any).args).toMatchObject({ campaignId: 5, runId: null });
+    for (const bad of ["abc", "pr_", "pr_x y", "pr_../../etc", 7]) expect(tool.input.safeParse({ runId: bad }).success, String(bad)).toBe(false);
+  });
   it("is a change that needs the person, not a read", () => {
     const { start } = starter();
     expect(mikaCampaignTool(start, campaigns).risk).toBe("SAFE_MUTATION");
+  });
+});
+
+describe("Nibo hands a search's companies to Mika as a campaign", () => {
+  const campaigns = async () => null;
+  it("is its own tool, always asks first, and the card says who handed it over and whose report it will be", async () => {
+    const { start, starts } = starter();
+    const tool = mikaCampaignTool(start, campaigns, "nibo");
+    expect(tool.name).toBe("handoff_nibo_to_mika_campaign");
+    expect(tool.risk).toBe("SAFE_MUTATION");
+    const p: any = await tool.prepare!(ctx(), { runId: "pr_abc123def456" });
+    expect(p).toMatchObject({ ok: true, forceApproval: true, args: { runId: "pr_abc123def456", campaignId: null, leadIds: [] } });
+    expect(p.preview.title).toBe("Nibo asks Mika: Campaign drafts");
+    expect(p.preview.lines).toEqual([{ label: "Handed over by", value: "Nibo" }, { label: "New campaign", value: "Named after the search" }, { label: "Leads", value: "The companies that search saved to Leads" }]);
+    expect(p.preview.effects).toContain("Mika's report appears in Mika's chat and in The Nest → Activity");
+    expect(p.preview.effects).toContain("Writes drafts only: nothing is approved or sent");
+    const out: any = await tool.execute!(ctx("agentrun-4"), p.args);
+    expect(starts).toEqual([{ user: "u1", task: "mika.campaign", input: p.args, idemKey: "handoffcampaign:nibo:agentrun-4" }]);
+    expect(out.route).toBe("/ai-league/mika?run=lr_x");
+    expect(out.summary).toMatch(/Mika has started: Campaign drafts .*handed over by Nibo/);
+    expect(out.summary).toMatch(/NOT finished yet, and nothing has been approved or sent/);
+  });
+  it("a viewer can't hand anything over, and it can't carry a send or an approval", () => {
+    const { start } = starter();
+    const tool = mikaCampaignTool(start, campaigns, "nibo");
+    expect(tool.authorize(READER, {})).toMatch(/doesn't allow/);
+    for (const extra of [{ send: true }, { approve: true }, { runId: "pr_abc123def456", dailyLimit: 50 }]) expect(tool.input.safeParse(extra).success, JSON.stringify(extra)).toBe(false);
+  });
+  it("Nibo is told when to use it, and that only companies saved to Leads can be in a campaign", () => {
+    const nibo = personaPrompt("nibo", []);
+    expect(nibo).toMatch(/handoff_nibo_to_mika_campaign/);
+    expect(nibo).toMatch(/Only companies saved to Leads can be in a campaign/);
+    expect(personaPrompt("mika", [])).not.toMatch(/handoff_nibo_to_mika_campaign/);
   });
 });
 

@@ -1,8 +1,9 @@
 /**
  * Mika, "campaign drafts" (mika.campaign): get an outreach campaign's drafts written and report what is ready.
  *
- *   start      an existing campaign is checked; otherwise a new one is made from the leads the person named, or from
- *              the newest open leads that can be picked (never one marked do-not-contact or already in a campaign)
+ *   start      an existing campaign is checked; otherwise a new one is made from the leads the person named, from the
+ *              companies a Client Radar search found and saved to Leads (a hand-off from Nibo), or from the newest
+ *              open leads that can be picked (never one marked do-not-contact or already in a campaign)
  *   prepare    "Prepare drafts" is pressed for the campaign, AS THE PERSON: the campaign's own background job writes
  *              one draft at a time through the ordinary drafting service (verified facts only, the do-not-contact
  *              list, the plan's AI drafts). Mika does not draft here herself — there is one piece of code that does.
@@ -25,6 +26,8 @@ export interface MikaCampaignDeps {
   createCampaign(user: unknown, raw: { name: string; leadIds: number[] }): Promise<Result<{ campaign: CampaignLike; added: number; left: number }>>;
   getCampaign(user: unknown, id: number): Promise<Result<{ campaign: CampaignLike; members: MemberLike[] }>>;
   startPreparing(user: unknown, id: number): Promise<Result<{ campaign: CampaignLike; waiting: number }>>;
+  /** The leads a Client Radar search produced: the companies it found that are in Leads now, and the search's own one-line description. */
+  leadsFromSearch?(user: unknown, runId: string): Promise<Result<{ leadIds: number[]; description: string }>>;
 }
 
 const CHECK_EVERY_MS = 20_000;
@@ -32,6 +35,17 @@ export const campaignLink = (id: number) => `/outbound?view=campaigns&campaign=$
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 /** A default name a person can tell apart later: "Mika's campaign, 10 Nov". */
 export const defaultName = (now: Date) => `Mika's campaign, ${now.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}`;
+
+/**
+ * A campaign's name from the search it came from, inside the 80 characters a name may have. A description too long
+ * to fit is cut at one of its own " · " breaks (never mid-word), and only as a last resort mid-text, with an ellipsis.
+ */
+export function nameFromSearch(description: string): string {
+  const full = `From search: ${String(description ?? "").replace(/\s+/g, " ").trim()}`;
+  if (full.length <= 80) return full;
+  const cut = full.slice(0, 80), at = cut.lastIndexOf(" · ");
+  return at > 24 ? cut.slice(0, at) : `${cut.slice(0, 79).trimEnd()}…`;
+}
 
 export function mikaCampaignTask(deps: MikaCampaignDeps): TaskHandler {
   return {
@@ -48,6 +62,20 @@ export function mikaCampaignTask(deps: MikaCampaignDeps): TaskHandler {
           return { kind: "continue", stage: "prepare", checkpoint: { ...cp, campaignId: got.campaign.id, name: got.campaign.name, created: false } };
         }
         let leadIds = (input.leadIds ?? []).slice(0, LEAGUE_LIMITS.campaignLeads);
+        let fromSearch: string | null = null;
+        // From a search (a hand-off from Nibo): exactly the companies that search found and that were saved to Leads.
+        // If it saved none, that is the answer — the newest leads are NOT taken instead: they are not what was asked for.
+        if (!leadIds.length && input.runId) {
+          if (!deps.leadsFromSearch) return failed("I can't read searches on this server.", "unavailable");
+          const s = await deps.leadsFromSearch(ctx.user, input.runId);
+          if (!s.ok) return failed(`I couldn't read that search: ${s.message}`, s.code.slice(0, 40));
+          if (!s.leadIds.length) {
+            return { kind: "finish", status: "completed", report: { headline: "That search hasn't saved any company to Leads", counts: [{ label: "Drafts to review", value: 0 }], items: [], next: { label: "Open the search and add companies to Leads", href: `/outbound?run=${encodeURIComponent(input.runId)}` }, notes: ["A campaign is made from leads. Add the companies you want from the search to Leads, then ask again."] } };
+          }
+          leadIds = s.leadIds.slice(0, LEAGUE_LIMITS.campaignLeads);
+          fromSearch = s.description;
+          await ctx.event("search_read", `${plural(leadIds.length, "company", "companies")} from the search ${leadIds.length === 1 ? "is" : "are"} in Leads`, { href: `/outbound?run=${encodeURIComponent(input.runId)}` });
+        }
         if (!leadIds.length) {
           const a = await deps.audience(ctx.user);
           if (!a.ok) return failed(`I couldn't read your leads: ${a.message}`, a.code.slice(0, 40));
@@ -56,7 +84,7 @@ export function mikaCampaignTask(deps: MikaCampaignDeps): TaskHandler {
             return { kind: "finish", status: "completed", report: { headline: "No open leads are free for a campaign", counts: [{ label: "Drafts to review", value: 0 }], items: [], next: { label: "Find companies in Client Radar", href: "/outbound" }, notes: ["A campaign groups leads that are new, being researched or qualified, not marked do-not-contact, and not already in another campaign."] } };
           }
         }
-        const name = (input.name ?? "").trim() || defaultName(ctx.now());
+        const name = (input.name ?? "").trim() || (fromSearch ? nameFromSearch(fromSearch) : defaultName(ctx.now()));
         const made = await deps.createCampaign(ctx.user, { name, leadIds });
         if (!made.ok) return failed(`I couldn't create the campaign: ${made.message}`, made.code.slice(0, 40));
         await ctx.event("campaign_created", `Created "${made.campaign.name}" with ${plural(made.added, "lead")}`.slice(0, 300), { href: campaignLink(made.campaign.id) });

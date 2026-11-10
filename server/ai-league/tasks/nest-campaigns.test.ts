@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { LEAGUE_LIMITS, TASK_INPUT } from "@shared/ai-league";
 import type { LeagueRunRow } from "@shared/schema";
 import { niboTask, type NiboDeps } from "./nibo";
-import { campaignLink, defaultName, mikaCampaignTask, type MikaCampaignDeps } from "./mika-campaign";
+import { campaignLink, defaultName, mikaCampaignTask, nameFromSearch, type MikaCampaignDeps } from "./mika-campaign";
 import { campaignItems, zeeTask, type ZeeCampaign, type ZeeDeps } from "./zee";
 import type { StepOutcome, TaskCtx } from "./types";
 
@@ -199,8 +199,50 @@ describe("Mika: campaign drafts", () => {
     expect(calls.create).toHaveLength(1);
     expect(calls.prepare).toEqual([5, 5]); // pressing Prepare twice is harmless: the campaign has one job
   });
+  it("from a search it takes exactly the companies that search saved to Leads, and names the campaign after it", async () => {
+    const asked: string[] = [];
+    const { task, calls } = mika({ leadsFromSearch: async (_u, runId) => { asked.push(runId); return { ok: true, leadIds: [31, 32, 33], description: "D2C brand · India" }; } });
+    const { c, events } = ctx("mika.campaign", { campaignId: null, name: "", leadIds: [], max: 2, runId: "pr_abc123def456" });
+    const out = await task.step(c, "start");
+    expect(asked).toEqual(["pr_abc123def456"]);
+    expect(calls.create).toEqual([{ name: "From search: D2C brand · India", leadIds: [31, 32, 33] }]); // `max` is for "newest leads", not for a search
+    expect(calls.audience).toBe(0);
+    expect(out).toMatchObject({ kind: "continue", stage: "prepare", checkpoint: { created: true } });
+    expect(events[0]).toMatchObject({ kind: "search_read", message: "3 companies from the search are in Leads", data: { href: "/outbound?run=pr_abc123def456" } });
+  });
+  it("a search that saved nothing to Leads is reported as that: the newest leads are NOT taken instead", async () => {
+    const { task, calls } = mika({ leadsFromSearch: async () => ({ ok: true, leadIds: [], description: "D2C brand · India" }) });
+    const out = finish(await task.step(ctx("mika.campaign", { campaignId: null, name: "", leadIds: [], max: 10, runId: "pr_abc123def456" }).c, "start"));
+    expect(out).toMatchObject({ status: "completed", report: { headline: "That search hasn't saved any company to Leads", next: { href: "/outbound?run=pr_abc123def456" } } });
+    expect([calls.create, calls.audience]).toEqual([[], 0]);
+  });
+  it("a search that isn't the person's, or can't be read, fails the task without making a campaign; leads named win over a search", async () => {
+    const gone = mika({ leadsFromSearch: async () => ({ ok: false, status: 404, code: "not_found", message: "That search isn't in your workspace." }) });
+    expect(finish(await gone.task.step(ctx("mika.campaign", { runId: "pr_abc123def456", leadIds: [] }).c, "start"))).toMatchObject({ status: "failed", errorCode: "not_found" });
+    expect(gone.calls.create).toEqual([]);
+    const none = mika(); // a server whose wiring has no search reader
+    expect(finish(await none.task.step(ctx("mika.campaign", { runId: "pr_abc123def456", leadIds: [] }).c, "start"))).toMatchObject({ status: "failed", errorCode: "unavailable" });
+    let asked = 0;
+    const named = mika({ leadsFromSearch: async () => { asked++; return { ok: true, leadIds: [9], description: "x" }; } });
+    await named.task.step(ctx("mika.campaign", { runId: "pr_abc123def456", leadIds: [4, 5], name: "Mine" }).c, "start");
+    expect([asked, named.calls.create]).toEqual([0, [{ name: "Mine", leadIds: [4, 5] }]]);
+  });
+  it("a name from a long search description is cut at one of its own breaks, never mid-word", () => {
+    expect(nameFromSearch("D2C brand · India")).toBe("From search: D2C brand · India");
+    // The real case from a local run, which used to end "… · serves Saa".
+    expect(nameFromSearch("digital marketing agency · United States · 5–30 people · serves SaaS companies")).toBe("From search: digital marketing agency · United States · 5–30 people");
+    const noBreaks = nameFromSearch("x".repeat(300));
+    expect([noBreaks.length, noBreaks.endsWith("…")]).toEqual([80, true]);
+    expect(nameFromSearch("  spaced    out  ")).toBe("From search: spaced out");
+  });
+  it("a long search description still gives a name that fits", async () => {
+    const { task, calls } = mika({ leadsFromSearch: async () => ({ ok: true, leadIds: [1], description: "x".repeat(300) }) });
+    await task.step(ctx("mika.campaign", { runId: "pr_abc123def456", leadIds: [] }).c, "start");
+    expect(calls.create[0].name.length).toBeLessThanOrEqual(80);
+  });
   it("its input has safe defaults and limits", () => {
-    expect(TASK_INPUT["mika.campaign"].parse({})).toEqual({ campaignId: null, name: "", leadIds: [], max: 10 });
+    expect(TASK_INPUT["mika.campaign"].parse({})).toEqual({ campaignId: null, name: "", leadIds: [], max: 10, runId: null });
+    expect(TASK_INPUT["mika.campaign"].safeParse({ runId: "not a run id" }).success).toBe(false);
     expect(TASK_INPUT["mika.campaign"].safeParse({ leadIds: Array.from({ length: LEAGUE_LIMITS.campaignLeads + 1 }, (_, i) => i + 1) }).success).toBe(false);
     expect(TASK_INPUT["mika.campaign"].safeParse({ max: LEAGUE_LIMITS.campaignLeads + 1 }).success).toBe(false);
     expect(TASK_INPUT["mika.campaign"].safeParse({ send: true }).success).toBe(false);
