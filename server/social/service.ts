@@ -134,7 +134,7 @@ export async function overview(user: Who, d: Partial<SocialDeps> = {}): Promise<
     ok: true,
     overview: {
       platforms: SOCIAL_PLATFORMS.map((p) => ({ id: p.id, label: p.label, mode: p.mode, connected: p.mode === "search" && connected.has(p.id), paid: p.paid, access: p.access, limitation: p.limitation })),
-      allowance, stats: await deps.store.stats(orgId, HIGH_INTENT_SCORE), services: (await deps.savedServices(orgId)).slice(0, 8),
+      allowance, stats: await deps.store.stats(orgId, HIGH_INTENT_SCORE), services: (await deps.savedServices(orgId)).map((x) => String(x ?? "").replace(/\s+/g, " ").trim().slice(0, 60).trim()).filter((x) => x.length >= 2).slice(0, 8), // a scan's phrases are short; the saved list may not be
       highIntentScore: HIGH_INTENT_SCORE, scheduleEnabled: deps.scheduleEnabled(),
     },
   };

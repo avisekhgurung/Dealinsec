@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EMPTY_IDEAL_CLIENT, assessFit, hasCriteria, idealClientInputSchema, textMatches, type IdealClient } from "./fit";
+import { EMPTY_IDEAL_CLIENT, IDEAL_ABOUT_MAX, IDEAL_ITEM_MAX, MAX_LIST, assessFit, hasCriteria, idealClientInputSchema, textMatches, tidyList, type IdealClient } from "./fit";
 
 const P = (over: Partial<IdealClient> = {}): IdealClient => ({ ...EMPTY_IDEAL_CLIENT, targetIndustries: ["logistics", "e-commerce"], targetLocations: ["India"], minDealMinor: 5_000_000, currency: "INR", ...over });
 const money = (m: number, c: string) => `${c} ${m / 100}`;
@@ -81,9 +81,43 @@ describe("assessFit", () => {
 describe("input schema", () => {
   it("trims, de-duplicates and caps the lists", () => {
     const r = idealClientInputSchema.parse({ targetIndustries: [" Logistics ", "logistics", "Logistics", "Retail"], minDealMajor: 50000 });
-    expect(r.targetIndustries).toEqual(["Logistics", "logistics", "Retail"]);
-    expect(idealClientInputSchema.safeParse({ services: Array.from({ length: 11 }, (_, i) => `s${i}`) }).success).toBe(false);
+    expect(r.targetIndustries).toEqual(["Logistics", "Retail"]); // the same word in another case is the same industry
+    // More than the list holds is cut to MAX_LIST, never refused.
+    expect(idealClientInputSchema.parse({ services: Array.from({ length: MAX_LIST + 5 }, (_, i) => `s${i}`) }).services).toHaveLength(MAX_LIST);
     expect(idealClientInputSchema.safeParse({ minDealMajor: -1 }).success).toBe(false);
-    expect(idealClientInputSchema.safeParse({ about: "x".repeat(601) }).success).toBe(false);
+    expect(idealClientInputSchema.safeParse({ about: "x".repeat(601) }).success).toBe(true); // a long description is kept, not refused
+  });
+});
+
+describe("the ideal client takes whatever a person types or pastes", () => {
+  it("a column of lines pasted into a one-line box (line breaks turned into double spaces) is read as the list it was", () => {
+    // Exactly what was refused on the live site with "String must contain at most 60 character(s)".
+    const pasted = "Custom AI applications and LLM integrations  AI agents and AI assistants  Workflow automation for agencies  Custom web applications";
+    expect(idealClientInputSchema.parse({ services: [pasted] }).services).toEqual(["Custom AI applications and LLM integrations", "AI agents and AI assistants", "Workflow automation for agencies", "Custom web applications"]);
+    expect(idealClientInputSchema.parse({ exclusions: ["Clients expecting free development or unpaid trials  Clients with no budget"] }).exclusions).toEqual(["Clients expecting free development or unpaid trials", "Clients with no budget"]);
+  });
+  it("splits on commas, semicolons, lines and bullets, drops a leading dash, and leaves a dash inside a phrase alone", () => {
+    expect(tidyList("SEO, Paid ads; Web design\n- Shopify builds\n• Email marketing\n* B2B SaaS - mid-market", 30)).toEqual(["SEO", "Paid ads", "Web design", "Shopify builds", "Email marketing", "B2B SaaS - mid-market"]);
+    expect(tidyList(["United States, United Kingdom", "Canada", " canada "], 30)).toEqual(["United States", "United Kingdom", "Canada"]);
+    expect(tidyList("", 30)).toEqual([]);
+    expect(tidyList([null, 5, "  ", "ok"], 30)).toEqual(["ok"]);
+  });
+  it("nothing is refused for being long: one long entry is kept (cut at the limit), a long description too", () => {
+    const sentence = "We build custom web applications, AI-powered products".repeat(1).replace(",", "") + " " + "x".repeat(400);
+    const r = idealClientInputSchema.safeParse({ about: "a".repeat(IDEAL_ABOUT_MAX + 500), services: [sentence], targetIndustries: ["y".repeat(1000)] });
+    expect(r.success).toBe(true);
+    if (!r.success) return;
+    expect(r.data.about).toHaveLength(IDEAL_ABOUT_MAX);
+    expect(r.data.services![0]).toHaveLength(IDEAL_ITEM_MAX);
+    expect(r.data.targetIndustries![0]).toHaveLength(IDEAL_ITEM_MAX);
+  });
+  it("a whole field sent as one string, not a list, is read the same way; a field left out stays left out", () => {
+    const r = idealClientInputSchema.parse({ services: "SEO, Paid ads" });
+    expect(r.services).toEqual(["SEO", "Paid ads"]);
+    expect("targetIndustries" in r).toBe(false);
+    expect(idealClientInputSchema.parse({ services: [] }).services).toEqual([]);
+  });
+  it("still refuses what was never a length problem: a negative minimum deal", () => {
+    expect(idealClientInputSchema.safeParse({ minDealMajor: -1 }).success).toBe(false);
   });
 });

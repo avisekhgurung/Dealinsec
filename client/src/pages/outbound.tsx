@@ -431,7 +431,7 @@ export default function OutboundPage() {
     const fromSetup = !!target && target !== "WW" && target in COUNTRY_NAME;
     const base = icpSchema.parse({
       industry: p.industry, keywords: p.keywords, targetMarket: p.targetMarket, employeeMax: p.employeeMax,
-      segment: p.segment, services: (ideal.data?.isSet ? ideal.data.profile?.services ?? [] : []).slice(0, 6),
+      segment: p.segment, services: (ideal.data?.isSet ? ideal.data.profile?.services ?? [] : []).map((x) => x.slice(0, 60).trim()).filter(Boolean).slice(0, 6),
       countries: fromSetup ? [target!] : [],
     });
     setParsed({ icp: base, searches: searchStrategies(base), description: describeIcp(base), source: "preset", fromSetup });

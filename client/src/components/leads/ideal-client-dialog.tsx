@@ -9,8 +9,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useMoney } from "@/hooks/use-locale";
 import { useToast } from "@/hooks/use-toast";
 import { IDEAL_CLIENT_URL, leadCall, leadError, refreshProfile, type IdealClientResponse } from "@/lib/leads";
+import { MAX_LIST, tidyList } from "@shared/fit";
 
-const split = (v: string) => v.split(/[,\n]/).map((x) => x.trim()).filter(Boolean);
+/** However the list was typed or pasted (commas, lines, bullets): the server tidies it the same way (shared/fit.ts tidyList). */
+const split = (v: string) => tidyList(v, MAX_LIST);
 const join = (xs: string[]) => xs.join(", ");
 
 export function IdealClientDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
@@ -48,7 +50,10 @@ export function IdealClientDialog({ open, onOpenChange }: { open: boolean; onOpe
   const field = (k: Exclude<keyof typeof f, "about">, label: string, hint: string, props: Record<string, unknown> = {}) => (
     <div className="space-y-1.5">
       <Label htmlFor={`ic-${k}`} className="text-xs">{label}</Label>
-      <Input id={`ic-${k}`} value={f[k]} onChange={set(k)} placeholder={hint} data-testid={`input-ic-${k}`} {...props} />
+      {k === "minDeal"
+        ? <Input id={`ic-${k}`} value={f[k]} onChange={set(k)} placeholder={hint} data-testid={`input-ic-${k}`} {...props} />
+        // A box that keeps line breaks: a pasted column of items stays a column, instead of becoming one long line.
+        : <Textarea id={`ic-${k}`} rows={2} value={f[k]} onChange={set(k)} placeholder={hint} data-testid={`input-ic-${k}`} {...props} />}
     </div>
   );
 
@@ -62,14 +67,14 @@ export function IdealClientDialog({ open, onOpenChange }: { open: boolean; onOpe
         <form onSubmit={(e) => { e.preventDefault(); setError(null); save.mutate(); }} className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="ic-about" className="text-xs">What you do, and for whom</Label>
-            <Textarea id="ic-about" rows={2} maxLength={600} value={f.about} onChange={set("about")} placeholder="I design websites for small logistics companies" data-testid="input-ic-about" />
+            <Textarea id="ic-about" rows={3} value={f.about} onChange={set("about")} placeholder="I design websites for small logistics companies" data-testid="input-ic-about" />
           </div>
           {field("services", "What you sell", "Website design, Branding")}
           {field("targetIndustries", "Industries you want", "Logistics, Retail")}
           {field("targetLocations", "Where", "India, UK")}
           {field("minDeal", "Smallest deal worth taking", "50000", { inputMode: "decimal" })}
           {field("exclusions", "Never work with", "Gambling, Tobacco")}
-          <p className="text-[11px] text-muted-foreground">Separate items with commas. Leave a field blank to leave it out.</p>
+          <p className="text-[11px] text-muted-foreground">Separate items with commas, or put each on its own line. Paste as much as you like; nothing is too long. Leave a field blank to leave it out.</p>
           {error && <p role="alert" className="text-sm text-rose-600 dark:text-rose-400" data-testid="ic-error">{error}</p>}
           <DialogFooter className="gap-2 sm:gap-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

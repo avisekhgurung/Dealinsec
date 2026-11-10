@@ -65,6 +65,10 @@ describe("taking a model's ICP", () => {
   });
   it("adds the workspace's standing exclusions", () => {
     expect(withSavedExclusions(icp({ exclusions: ["crypto"] }), { exclusions: ["gambling", "crypto"] }).exclusions).toEqual(["crypto", "gambling"]);
+    // The saved list may hold long entries (the ideal client takes anything): a search's exclusions stay valid short phrases.
+    const long = withSavedExclusions(icp({ exclusions: [] }), { exclusions: ["Clients expecting free development or unpaid trials, with no budget at all and no timeline", "  ", "gambling"] });
+    expect(long.exclusions).toEqual(["Clients expecting free development or unpaid trials, with no", "gambling"]);
+    expect(icpSchema.safeParse(long).success).toBe(true);
   });
   it("describes itself in one line", () => {
     expect(describeIcp(icp())).toBe("digital marketing agency · United States · 5–30 people · serves SaaS");

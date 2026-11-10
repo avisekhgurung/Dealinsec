@@ -10,19 +10,38 @@
  */
 import { z } from "zod";
 
-const list = (maxItems: number, maxLen: number) =>
-  z.array(z.string().trim().min(1).max(maxLen)).max(maxItems)
-    .transform((xs) => Array.from(new Set(xs.map((x) => x.trim()).filter(Boolean))));
+/** How much of what a person writes is kept. Generous on purpose: this is their own description of their business. */
+export const IDEAL_ITEM_MAX = 200;
+export const IDEAL_ABOUT_MAX = 4000;
 
-export const MAX_LIST = 10;
+/**
+ * One list a person typed or pasted, however they laid it out. Nothing is refused for its length or its shape: a
+ * pasted column of lines arrives in a one-line box with its line breaks turned into spaces, and an entry that was
+ * meant as five items would otherwise be "one item, too long" and an error the person can't act on. So every entry is
+ * split on commas, semicolons, line breaks, bullet marks and runs of two or more spaces (a leading dash or star is a
+ * bullet and is dropped; a dash inside a phrase is left alone); then each item is trimmed,
+ * cut to IDEAL_ITEM_MAX, de-duplicated without regard to case, and the list kept to `maxItems`.
+ */
+export function tidyList(raw: unknown, maxItems: number, maxLen = IDEAL_ITEM_MAX): string[] {
+  const parts = (Array.isArray(raw) ? raw : [raw]).filter((x): x is string => typeof x === "string")
+    .flatMap((x) => x.split(/[,;\n\r\u2022\u00b7\u25aa\u25cf\u2023]+|\s{2,}/))
+    .map((x) => x.replace(/^[-\u2013\u2014*\s]+/, "").replace(/\s+/g, " ").trim().slice(0, maxLen).trim())
+    .filter(Boolean);
+  const seen = new Set<string>();
+  return parts.filter((x) => { const k = x.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, maxItems);
+}
+const list = (maxItems: number) => z.union([z.array(z.unknown()), z.string()]).transform((v) => tidyList(v, maxItems));
+
+export const MAX_LIST = 30;
 
 /** What the user typed. Money is in whole units here; the service converts it. */
 export const idealClientInputSchema = z.object({
-  about: z.string().trim().max(600).optional(),
-  services: list(MAX_LIST, 60).optional(),
-  targetIndustries: list(MAX_LIST, 60).optional(),
-  targetLocations: list(MAX_LIST, 60).optional(),
-  exclusions: list(MAX_LIST, 60).optional(),
+  // Any length is accepted and the first IDEAL_ABOUT_MAX characters kept: a long description is never an error.
+  about: z.string().transform((v) => v.trim().slice(0, IDEAL_ABOUT_MAX).trim()).optional(),
+  services: list(MAX_LIST).optional(),
+  targetIndustries: list(MAX_LIST).optional(),
+  targetLocations: list(MAX_LIST).optional(),
+  exclusions: list(MAX_LIST).optional(),
   minDealMajor: z.number().positive().max(10_000_000_000).nullable().optional(),
 });
 export type IdealClientInput = z.infer<typeof idealClientInputSchema>;

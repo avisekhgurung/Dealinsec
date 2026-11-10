@@ -154,7 +154,9 @@ export function mergeIcp(modelOutput: unknown, fallback: Icp | null): Icp | null
 
 /** The ICP plus the workspace's saved exclusions (the person's standing "never these"). */
 export function withSavedExclusions(icp: Icp, saved: { exclusions?: string[] } | null | undefined): Icp {
-  const ex = Array.from(new Set([...icp.exclusions, ...(saved?.exclusions ?? [])])).slice(0, 10);
+  // The saved list may hold long entries (the ideal client takes anything); a search's own exclusions are short phrases.
+  const savedShort = (saved?.exclusions ?? []).map((x) => String(x ?? "").replace(/\s+/g, " ").trim().slice(0, 60).trim()).filter(Boolean);
+  const ex = Array.from(new Set([...icp.exclusions, ...savedShort])).slice(0, 10);
   return { ...icp, exclusions: ex };
 }
 
