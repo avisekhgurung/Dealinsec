@@ -27,6 +27,7 @@ import { LIMITS } from "@shared/outreach-check";
 import { hashDraft } from "@shared/outreach-hash";
 import type { CampaignRow } from "@shared/schema";
 import { fail, firstIssue, readGate, writeGate, type Result, type Who } from "../services/leads";
+import { unsubscribeUrl } from "../sales/unsubscribe";
 import { campaignStore, campaignTablesReady, type AudienceLead, type CampaignStore, type MemberView } from "./store";
 
 export const DRAFT_LEASE_MS = 3 * 60_000;
@@ -48,6 +49,8 @@ export interface CampaignDeps {
   loadUser(orgId: string, userId: string): Promise<Who | null>;
   draft(user: Who, leadId: number): Promise<DraftResult>;
   send(user: Who, messageId: number, bodyHash: string): Promise<SendResult>;
+  /** A message's own unsubscribe link for its footer, or null when the server can't sign one (server/sales/unsubscribe.ts). */
+  unsubscribeUrl(orgId: string, messageId: number): string | null;
   /** CAMPAIGN_SENDING_ENABLED: the server-wide switch for the paced queue. Off unless set to "true". */
   queueEnabled(): boolean;
   log(event: string, fields?: Record<string, string | number | boolean | null>): void;
@@ -83,6 +86,7 @@ const defaults = (): CampaignDeps => ({
     const r = await sendFromQueue(user as any, messageId, bodyHash);
     return r.ok ? { ok: true, outcome: r.outcome, reconnect: r.reconnect } : { ok: false, code: r.code };
   },
+  unsubscribeUrl: (orgId, messageId) => unsubscribeUrl(orgId, messageId),
   queueEnabled: () => queueSwitch(),
   // Ids and codes only: never a name, an address or a word of a message.
   log: (event, fields) => console.log(JSON.stringify({ ts: new Date().toISOString(), src: "campaigns", event, ...(fields ?? {}) })),
@@ -130,7 +134,7 @@ function memberView(m: MemberView): MemberRowView {
 
 /* ── what a person does ─────────────────────────────────────────────────── */
 
-export async function listCampaigns(user: Who, d: Partial<CampaignDeps> = {}): Promise<Result<{ campaigns: CampaignView[]; queueEnabled: boolean; limits: { members: number; campaigns: number; dailyLimit: typeof DAILY_LIMIT; gapSeconds: typeof GAP_SECONDS } }>> {
+export async function listCampaigns(user: Who, d: Partial<CampaignDeps> = {}): Promise<Result<{ campaigns: CampaignView[]; queueEnabled: boolean; /** Campaign emails carry an unsubscribe link (the server has a secret to sign them with). */ unsubscribeLinks: boolean; limits: { members: number; campaigns: number; dailyLimit: typeof DAILY_LIMIT; gapSeconds: typeof GAP_SECONDS } }>> {
   const deps = { ...defaults(), ...d };
   const gate = readGate(user);
   if (gate) return gate;
@@ -139,7 +143,7 @@ export async function listCampaigns(user: Who, d: Partial<CampaignDeps> = {}): P
   const [rows, facts] = await Promise.all([deps.store.list(orgId), deps.store.memberFacts(orgId)]);
   const by = new Map<number, typeof facts>();
   for (const f of facts) { const a = by.get(f.campaignId) ?? []; a.push(f); by.set(f.campaignId, a); }
-  return { ok: true, campaigns: rows.map((c) => campaignView(c, by.has(c.id) ? countMembers(by.get(c.id)!) : { ...EMPTY_COUNTS })), queueEnabled: deps.queueEnabled(), limits: { members: CAMPAIGN_MAX_MEMBERS, campaigns: MAX_CAMPAIGNS, dailyLimit: DAILY_LIMIT, gapSeconds: GAP_SECONDS } };
+  return { ok: true, campaigns: rows.map((c) => campaignView(c, by.has(c.id) ? countMembers(by.get(c.id)!) : { ...EMPTY_COUNTS })), queueEnabled: deps.queueEnabled(), unsubscribeLinks: deps.unsubscribeUrl(orgId, 1) !== null, limits: { members: CAMPAIGN_MAX_MEMBERS, campaigns: MAX_CAMPAIGNS, dailyLimit: DAILY_LIMIT, gapSeconds: GAP_SECONDS } };
 }
 
 const AUDIENCE_STATUS = new Set(["new", "researching", "qualified"]);
@@ -312,7 +316,7 @@ export type DraftOutcome = "idle" | "drafted" | "adopted" | "skipped" | "stopped
 async function footer(deps: CampaignDeps, orgId: string, messageId: number, note: string): Promise<string | null> {
   const m = await deps.store.draftBody(orgId, messageId);
   if (!m || m.status !== "draft" || hasOptOutLine(m.body)) return null; // approved already, or it has the line: not ours to change
-  const body = withFooter(m.body, note);
+  const body = withFooter(m.body, note, deps.unsubscribeUrl(orgId, messageId));
   if (body.length > LIMITS.bodyMax) return "footer_too_long";
   await deps.store.setDraftBody(orgId, messageId, m.bodyHash, body, hashDraft(m.subject ?? "", body), deps.now());
   return null;

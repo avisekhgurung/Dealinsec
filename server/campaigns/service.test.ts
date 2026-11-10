@@ -33,6 +33,7 @@ function world() {
   const draftPlan = new Map<number, any>(); // leadId -> { ok:false, code } | "throw"; default ok
   let sendPlan: any = { ok: true, outcome: "sent" };
   let queueOn = true;
+  let linkBase: string | null = null; // no unsubscribe link unless a test turns it on
   const users: Record<string, any> = { ana, bob, vic: viewer };
   const now = () => new Date(clock);
   const msg = (id: number | null) => messages.find((m) => m.id === id) ?? null;
@@ -134,11 +135,13 @@ function world() {
       if (r.ok && r.outcome === "sent") { const m = msg(messageId); m.status = "sent"; m.sentAt = now(); }
       return r;
     },
+    unsubscribeUrl: (_o: string, messageId: number) => (linkBase ? `${linkBase}/u/${messageId}.sig` : null),
     queueEnabled: () => queueOn, log: (event: string, fields: any) => calls.log.push({ event, ...fields }), kick: () => { calls.kick++; },
   };
   const approve = (leadId: number) => { const m = messages.filter((x) => x.leadId === leadId).pop(); m.status = "approved"; m.approvedAt = now(); return m; };
   return {
     deps, calls, campaigns, members, messages, events, leads, users, draftPlan, addMessage, approve, msg,
+    setLinks: (base: string | null) => { linkBase = base; },
     tick: (ms: number) => { clock += ms; }, setSend: (p: any) => { sendPlan = p; }, setQueue: (on: boolean) => { queueOn = on; },
     member: (leadId: number) => members.find((m) => m.leadId === leadId),
   };
@@ -272,6 +275,28 @@ describe("preparing drafts", () => {
     const got: any = await svc.getCampaign(ana, id, w.deps);
     expect(got.campaign.counts).toMatchObject({ members: 2, queued: 0, draft: 2, approved: 0, sent: 0 });
     expect(got.members.map((m: any) => m.stage)).toEqual(["draft", "draft"]);
+  });
+  it("when the server can sign links, each draft ends with ITS OWN unsubscribe link, after the opt-out line, and is still sendable", async () => {
+    const w = world();
+    w.setLinks("https://www.dealinsec.com");
+    const id = await make(w, [1, 2], { footerNote: "Pixel Studio, Pune" });
+    await svc.startPreparing(ana, id, w.deps);
+    await svc.draftStep(w.deps); await svc.draftStep(w.deps);
+    const [m1, m2] = [w.msg(w.member(1).messageId), w.msg(w.member(2).messageId)];
+    expect(m1.body).toBe(`${BODY}\n\nPixel Studio, Pune\n${OPT_OUT_LINE}\nTo stop these emails: https://www.dealinsec.com/u/${m1.id}.sig`);
+    expect(m2.body.endsWith(`/u/${m2.id}.sig`)).toBe(true);
+    expect(m1.bodyHash).toBe(hashDraft("Hello", m1.body)); // the link is part of what gets approved
+    expect((await svc.listCampaigns(ana, w.deps) as any).unsubscribeLinks).toBe(true);
+    // The footer with its link doesn't read as an opt-out when a reply quotes it.
+    expect(classifyReply({ kind: "reply", subject: "Re: Hello", text: `Yes, let's talk.\n\n> ${OPT_OUT_LINE}\n> To stop these emails: https://www.dealinsec.com/u/${m1.id}.sig` } as any)).toBe("interested");
+    w.approve(1);
+    await svc.startSending(ana, id, w.deps);
+    expect(await svc.sendStep(w.deps)).toBe("sent");
+  });
+  it("without a secret there is no link, and the page is told so", async () => {
+    const w = world();
+    await make(w, [1]);
+    expect((await svc.listCampaigns(ana, w.deps) as any).unsubscribeLinks).toBe(false);
   });
   it("a lead that already has a message waiting keeps it: no second draft, no model call", async () => {
     const w = world();

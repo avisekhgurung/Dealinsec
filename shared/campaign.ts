@@ -13,6 +13,7 @@
  *   - the queue stops itself on anything that needs a person: a mailbox problem, a limit, an uncertain send, bounces.
  */
 import { z } from "zod";
+import { unsubscribeLine } from "./unsubscribe";
 
 export const MAX_CAMPAIGNS = 50;
 export const CAMPAIGN_MAX_MEMBERS = 200;
@@ -32,14 +33,16 @@ const squash = (s: string) => s.replace(/\s+/g, " ").trim();
 export const hasOptOutLine = (body: string | null | undefined): boolean => squash(String(body ?? "")).includes(OPT_OUT_LINE);
 
 /**
- * A draft with the campaign's footer: the person's own note (their business name and address, if they gave one) and
- * the opt-out line. Added BEFORE anyone approves, so what is approved is what is sent. Idempotent.
+ * A draft with the campaign's footer: the person's own note (their business name and address, if they gave one), the
+ * opt-out line, and (when the server can sign one) this message's own unsubscribe link. Added BEFORE anyone approves, so what is approved is what is sent. Idempotent.
  */
-export function withFooter(body: string, note: string | null | undefined): string {
+export function withFooter(body: string, note: string | null | undefined, unsubscribeUrl?: string | null): string {
   const text = String(body ?? "").replace(/\r\n/g, "\n").trim();
   if (hasOptOutLine(text)) return text;
   const n = squash(String(note ?? "")).slice(0, FOOTER_NOTE_MAX);
-  return [text, [n, OPT_OUT_LINE].filter(Boolean).join("\n")].join("\n\n");
+  // The link is a second way out, beside replying. It is this message's own link (server/sales/unsubscribe.ts).
+  const link = unsubscribeUrl && /^https?:\/\/\S+$/.test(unsubscribeUrl) ? unsubscribeLine(unsubscribeUrl) : "";
+  return [text, [n, OPT_OUT_LINE, link].filter(Boolean).join("\n")].join("\n\n");
 }
 
 const int = (min: number, max: number, def: number) => z.number().int().min(min).max(max).default(def);

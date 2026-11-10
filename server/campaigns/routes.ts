@@ -40,7 +40,7 @@ export function registerCampaignRoutes(app: Express) {
   const withId = (where: string, fn: (req: any, res: Response, id: number) => Promise<unknown>) => guarded(where, async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); await fn(req, res, id); });
   const one = (r: any) => ({ campaign: r.campaign });
 
-  app.get("/api/campaigns", isAuthenticated, guarded("campaigns_list", async (req, res) => send(res, await svc.listCampaigns(req.user), (r) => ({ campaigns: r.campaigns, queueEnabled: r.queueEnabled, limits: r.limits }))));
+  app.get("/api/campaigns", isAuthenticated, guarded("campaigns_list", async (req, res) => send(res, await svc.listCampaigns(req.user), (r) => ({ campaigns: r.campaigns, queueEnabled: r.queueEnabled, unsubscribeLinks: r.unsubscribeLinks, limits: r.limits }))));
   app.get("/api/campaigns/sender-check", isAuthenticated, guarded("campaigns_sender_check", async (req, res) => send(res, await (await import("./sender-check")).senderCheck(req.user), (r) => ({ check: r.check, mailbox: r.mailbox }))));
   app.get("/api/campaigns/audience", isAuthenticated, guarded("campaigns_audience", async (req, res) => send(res, await svc.audience(req.user, req.query ?? {}), (r) => ({ leads: r.leads, limit: r.limit }))));
   app.post("/api/campaigns", isAuthenticated, guarded("campaigns_create", async (req, res) => send(res, await svc.createCampaign(req.user, req.body), (r) => ({ campaign: r.campaign, added: r.added, left: r.left }), 201)));

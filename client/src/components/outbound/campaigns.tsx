@@ -40,7 +40,7 @@ interface Member {
   message: { id: number; status: string; subject: string | null; to: string | null; edited: boolean; approvedAt: string | null; sentAt: string | null } | null;
   outcomes: string[]; interested: boolean;
 }
-interface ListResponse { campaigns: Campaign[]; queueEnabled: boolean }
+interface ListResponse { campaigns: Campaign[]; queueEnabled: boolean; unsubscribeLinks?: boolean }
 interface DetailResponse { campaign: Campaign; members: Member[]; queueEnabled: boolean }
 interface AudienceLead { id: number; companyName: string; domain: string | null; industry: string | null; location: string | null; status: string; source: string; contactName: string | null; hasEmail: boolean; hasUnsent: boolean; blocked: string | null }
 
@@ -96,6 +96,7 @@ function NewCampaign({ open, onOpenChange, onCreated }: { open: boolean; onOpenC
   const allShown = pickable.length > 0 && pickable.every((l) => picked.has(l.id));
   const toggleAll = () => setPicked((p) => { const n = new Set(p); if (allShown) pickable.forEach((l) => n.delete(l.id)); else for (const l of pickable) { if (n.size >= CAMPAIGN_MAX_MEMBERS) break; n.add(l.id); } return n; });
   const noteBad = /https?:\/\/|www\.|@/i.test(note);
+  const links = !!queryClient.getQueryData<ListResponse>([CAMPAIGNS_URL])?.unsubscribeLinks;
   const create = useMutation({
     mutationFn: () => leadCall<{ campaign: Campaign; added: number }>("POST", CAMPAIGNS_URL, { name, leadIds: Array.from(picked), profileId, footerNote: note }),
     onSuccess: (r) => { trackEvent("campaign_created", { leads: r.added }); refresh(); setName(""); setNote(""); setPicked(new Set()); setProfileId(null); onOpenChange(false); onCreated(r.campaign.id); },
@@ -126,7 +127,7 @@ function NewCampaign({ open, onOpenChange, onCreated }: { open: boolean; onOpenC
             <label htmlFor="campaign-note" className="text-sm font-medium">Footer note <span className="font-normal text-muted-foreground">· optional: your business name and address</span></label>
             <Input id="campaign-note" value={note} onChange={(e) => setNote(e.target.value)} maxLength={FOOTER_NOTE_MAX} placeholder="Pixel Studio, 12 MG Road, Pune" data-testid="campaign-note" />
             {noteBad && <p className="text-xs text-rose-600">The footer note can't contain a link or an email address.</p>}
-            <p className="text-xs text-muted-foreground">Every draft ends with{note.trim() ? " this note and" : ""} the line: <span className="italic">"{OPT_OUT_LINE}"</span> You see it before you approve.</p>
+            <p className="text-xs text-muted-foreground">Every draft ends with{note.trim() ? " this note and" : ""} the line: <span className="italic">"{OPT_OUT_LINE}"</span>{links ? " and a link the person can click to stop these emails." : ""} You see it before you approve.</p>
           </div>
 
           <div className="space-y-2">

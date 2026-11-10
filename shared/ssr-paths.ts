@@ -40,6 +40,8 @@ export const SSR_PATH_PREFIXES: readonly string[] = [
   "bonsai-alternatives",
   "bonsai-vs-dealinsec",
   "about",
+  // the unsubscribe page in campaign emails (server/sales/unsubscribe.ts): public, rendered by the server, never the app shell
+  "u",
 ];
 
 /** Matches "/tools", "/tools/anything", "/blog/x" … but not "/toolsx". */
