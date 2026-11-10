@@ -18,6 +18,7 @@ import { hashDraft } from "@shared/outreach-hash";
 import { normalEmail, suppressionKeys } from "@shared/outreach-safety";
 import { DraftExists, messageStore } from "./message-store";
 import { followupText } from "./followup-text";
+import { tablesReadyCheck } from "../leads/ready";
 
 export { followupText };
 
@@ -103,4 +104,24 @@ export async function draftDueFollowups(deps: FollowupDeps, opts: { limit?: numb
     deps.log("outreach_followup_failed", { where: "sweep", errorType: (e as Error)?.name ?? "Error" });
   }
   return counts;
+}
+
+const followupsReady = tablesReadyCheck(["outreach_followups"]);
+/**
+ * The lead's next follow-up that is still open: planned (not due yet), on hold (a reply is waiting to be read) or
+ * drafted (a draft is waiting). For the lead's own page, so a person who has sent a message can see what comes next.
+ * The moment is UTC text, as the campaign's member list reads it. Never throws: no table, or an error, is "none".
+ */
+export async function openFollowUpForLead(orgId: string, leadId: number): Promise<{ status: string; dueAt: string | null; draftStatus: string | null } | null> {
+  try {
+    if (!(await followupsReady())) return null;
+    const r = await db.execute(sql`
+      SELECT f.status, to_char(f.due_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS due_at,
+             (SELECT dm.status FROM lead_messages dm WHERE dm.organization_id = f.organization_id AND dm.id = f.draft_message_id) AS draft_status
+      FROM outreach_followups f
+      WHERE f.organization_id = ${orgId} AND f.lead_id = ${leadId} AND f.status IN ('scheduled', 'held', 'drafted')
+      ORDER BY f.due_at, f.step LIMIT 1`);
+    const x = (r.rows ?? [])[0] as { status?: unknown; due_at?: unknown; draft_status?: unknown } | undefined;
+    return x ? { status: String(x.status), dueAt: x.due_at ? String(x.due_at) : null, draftStatus: x.draft_status ? String(x.draft_status) : null } : null;
+  } catch { return null; }
 }

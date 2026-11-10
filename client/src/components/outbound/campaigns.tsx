@@ -238,10 +238,20 @@ function Tile({ label, value, sub, testId }: { label: string; value: string | nu
   return <div className="rounded-xl border px-3 py-2" data-testid={testId}><p className="text-xl font-bold tabular-nums leading-tight">{value}</p><p className="text-xs text-muted-foreground">{label}{sub ? ` · ${sub}` : ""}</p></div>;
 }
 
-function CampaignDetail({ id, canEdit, onBack }: { id: number; canEdit: boolean; onBack: () => void }) {
+function CampaignDetail({ id, canEdit, onBack, fromLink = false }: { id: number; canEdit: boolean; onBack: () => void; /** Opened by a ?campaign= link: bring it into view, it sits below the search form. */ fromLink?: boolean }) {
   const { toast } = useToast();
   const [openLead, setOpenLead] = useState<number | null>(null);
+  const section = useRef<HTMLElement>(null);
   const q = useQuery<DetailResponse>({ queryKey: [campaignUrl(id)], retry: false, refetchInterval: (query) => { const c = query.state.data?.campaign; return c?.preparing || c?.sending || openLead !== null ? 4000 : false; } });
+  // A link to a campaign lands on the campaign, once it has loaded: on a phone it is a long way below the search form.
+  const loaded = !!q.data;
+  useEffect(() => {
+    if (!fromLink || !loaded) return;
+    const go = () => section.current?.scrollIntoView({ block: "start" });
+    go();
+    const again = setTimeout(go, 700); // the search form above finishes loading a moment later and pushes the page down
+    return () => clearTimeout(again);
+  }, [fromLink, loaded]);
   const oops = (title: string) => (e: unknown) => { toast({ title, description: leadError(e), variant: "destructive" }); refresh(id); };
   const act = useMutation({
     mutationFn: (action: "prepare" | "prepare/stop" | "send" | "send/pause" | "archive") => leadCall("POST", campaignUrl(id, action), {}),
@@ -261,7 +271,7 @@ function CampaignDetail({ id, canEdit, onBack }: { id: number; canEdit: boolean;
   const first = memberSteps(members, null);
   const go = (leadId: number) => { setOpenLead(leadId); refresh(id); };
   return (
-    <section className="min-w-0 space-y-4" data-testid="campaign-detail">
+    <section ref={section} className="min-w-0 scroll-mt-28 space-y-4" data-testid="campaign-detail">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <button onClick={onBack} className="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" data-testid="campaign-back"><ArrowLeft className="h-3 w-3" />All campaigns</button>
@@ -318,7 +328,7 @@ function CampaignDetail({ id, canEdit, onBack }: { id: number; canEdit: boolean;
               return (
                 <li key={m.leadId} className="flex items-center gap-1" data-testid="campaign-member" data-stage={m.stage}>
                   <button onClick={() => setOpenLead(m.leadId)} className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2.5 text-left transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none">
-                    <span className="min-w-0 flex-1">
+                    <span className="min-w-0 flex-1 basis-full sm:basis-0">
                       <span className="block truncate text-sm font-medium">{m.companyName}</span>
                       <span className="block truncate text-xs text-muted-foreground">{m.message ? `${m.message.subject || "(no subject)"} · to ${m.message.to ?? "no address"}` : m.contactName ?? m.domain ?? ""}</span>
                       {m.note && <span className="block text-xs text-amber-800 dark:text-amber-300" data-testid="campaign-member-note">{m.note}</span>}
@@ -431,6 +441,7 @@ const linkedCampaign = (): number | null => {
 
 export function Campaigns({ canEdit }: { canEdit: boolean }) {
   const [openId, setOpenId] = useState<number | null>(linkedCampaign);
+  const [linked] = useState<number | null>(linkedCampaign);
   const [creating, setCreating] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const q = useQuery<ListResponse>({ queryKey: [CAMPAIGNS_URL], retry: false, refetchInterval: (query) => (query.state.data?.campaigns.some((c) => c.preparing || c.sending) ? 8000 : false) });
@@ -438,7 +449,7 @@ export function Campaigns({ canEdit }: { canEdit: boolean }) {
   const list = useMemo(() => (q.data?.campaigns ?? []).filter((c) => showArchived || c.status === "active"), [q.data, showArchived]);
   const archived = (q.data?.campaigns ?? []).filter((c) => c.status !== "active").length;
 
-  if (openId !== null) return <CampaignDetail id={openId} canEdit={canEdit} onBack={() => { setOpenId(null); refresh(); }} />;
+  if (openId !== null) return <CampaignDetail key={openId} id={openId} canEdit={canEdit} fromLink={openId === linked} onBack={() => { setOpenId(null); refresh(); }} />;
   return (
     <section className="min-w-0 space-y-4" aria-labelledby="campaigns-title" data-testid="campaigns">
       <div className="flex flex-wrap items-start justify-between gap-3">

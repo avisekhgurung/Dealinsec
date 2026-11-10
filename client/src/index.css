@@ -183,6 +183,9 @@
 }
 
 .dark {
+  /* Tell the browser the page is dark, so what it draws itself (scrollbars, checkboxes, select menus, number
+     spinners, date pickers) is dark too instead of bright white on a dark page. */
+  color-scheme: dark;
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .05);
   --opaque-button-border-intensity: 0;

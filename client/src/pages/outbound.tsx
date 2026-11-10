@@ -616,7 +616,7 @@ export default function OutboundPage() {
               <p className="text-sm text-muted-foreground">You can see searches your team ran. Ask the workspace owner for permission to start one.</p>
             )}
 
-            <SegmentedTabs label="Client Radar views" value={view} onChange={setView}
+            <SegmentedTabs label="Client Radar views" value={view} onChange={setView} scroll
               tabs={[{ value: "searches", label: "Searches", testId: "view-searches" }, { value: "social", label: "Social Intent", testId: "view-social" }, { value: "prospects", label: "All prospects", testId: "view-prospects" }, { value: "outreach", label: "Outreach", testId: "view-outreach" }, { value: "campaigns", label: "Campaigns", testId: "view-campaigns" }, { value: "inbox", label: "Inbox", testId: "view-inbox" }, { value: "results", label: "Results", testId: "view-results" }]} />
 
             {view === "social" ? <SocialIntent canEdit={canEdit} />

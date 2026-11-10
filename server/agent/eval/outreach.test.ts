@@ -313,10 +313,36 @@ describe("a saved client profile's tone and note", () => {
     expect(await listMessages(user(), l.id, { style: async () => { throw new Error("away"); } })).toMatchObject({ ok: true, style: null });
   });
   it("a profile that can't be read never stops a draft", async () => {
+    // (the same holds for the follow-up lookup the lead's page makes: see "what comes after a sent message")
     const l = await researched();
     const r = await draftOutreach(user(), l.id, {}, { style: async () => { throw new Error("database is away"); } });
     expect(r).toMatchObject({ ok: true, message: { status: "draft" } });
     expect(prompts[0][0].content).not.toMatch(/How it should sound/);
+  });
+});
+
+describe("what comes after a sent message, on the lead's own page", () => {
+  const at = "2026-11-14T09:00:00.000Z";
+  const next = (f: { status: string; dueAt: string | null; draftStatus: string | null } | null) => ({ followUp: async () => f, style: async () => null });
+  it("a planned follow-up is shown with its day; one on hold says a reply is waiting; none is none", async () => {
+    const l = await researched();
+    expect((await listMessages(user(), l.id, next({ status: "scheduled", dueAt: at, draftStatus: null })) as any).followUp).toEqual({ state: "due_later", label: "Follow-up planned", dueAt: at, waiting: false });
+    expect((await listMessages(user(), l.id, next({ status: "held", dueAt: at, draftStatus: null })) as any).followUp).toMatchObject({ state: "on_hold", waiting: true });
+    expect((await listMessages(user(), l.id, next({ status: "drafted", dueAt: at, draftStatus: "draft" })) as any).followUp).toMatchObject({ state: "to_review", waiting: true });
+    expect((await listMessages(user(), l.id, next(null)) as any).followUp).toBeNull();
+    // A step that was sent or cancelled is history, not something to show.
+    expect((await listMessages(user(), l.id, next({ status: "sent", dueAt: at, draftStatus: "sent" })) as any).followUp).toBeNull();
+  });
+  it("it is asked for this workspace's lead only, and a lookup that fails never breaks the page", async () => {
+    const l = await researched();
+    const asked: unknown[][] = [];
+    await listMessages(user(), l.id, { followUp: async (...a) => { asked.push(a); return null; }, style: async () => null });
+    expect(asked).toEqual([[ORG1, l.id]]);
+    expect(await listMessages(user(), l.id, { followUp: async () => { throw new Error("away"); }, style: async () => null })).toMatchObject({ ok: true, followUp: null });
+    // Another workspace can't open the lead at all, so nothing is looked up for it.
+    asked.length = 0;
+    expect(await listMessages(OTHER(), l.id, { followUp: async (...a) => { asked.push(a); return null; }, style: async () => null })).toMatchObject({ ok: false });
+    expect(asked).toEqual([]);
   });
 });
 

@@ -4,13 +4,17 @@
  * Arrow keys move between tabs, one tab stop for the whole bar.
  */
 import { motion } from "framer-motion";
-import { useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { tSpring } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 export interface SegmentedTab<T extends string> { value: T; label: ReactNode; testId?: string }
 
-export function SegmentedTabs<T extends string>({ value, onChange, tabs, label, className }: { value: T; onChange: (v: T) => void; tabs: readonly SegmentedTab<T>[]; label: string; className?: string }) {
+export function SegmentedTabs<T extends string>({ value, onChange, tabs, label, className, scroll = false }: {
+  value: T; onChange: (v: T) => void; tabs: readonly SegmentedTab<T>[]; label: string; className?: string;
+  /** For a long row of tabs: on a narrow screen they keep their own width and the row scrolls sideways, instead of being squeezed until the labels run over each other. */
+  scroll?: boolean;
+}) {
   const id = useId();
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const current = Math.max(0, tabs.findIndex((t) => t.value === value));
@@ -19,8 +23,17 @@ export function SegmentedTabs<T extends string>({ value, onChange, tabs, label, 
     onChange(tabs[n].value);
     refs.current[n]?.focus();
   };
+  // In a scrolling row the chosen tab is brought into view (it may have been chosen by a link, or by the arrow keys).
+  // Only the row itself is moved, sideways: the page is never scrolled by this.
+  useEffect(() => {
+    const el = scroll ? refs.current[current] : null, row = el?.parentElement;
+    if (!el || !row) return;
+    const left = el.offsetLeft, right = left + el.offsetWidth;
+    if (left < row.scrollLeft) row.scrollLeft = Math.max(0, left - 8);
+    else if (right > row.scrollLeft + row.clientWidth) row.scrollLeft = right - row.clientWidth + 8;
+  }, [scroll, current]);
   return (
-    <div className={cn("flex max-w-full gap-1 rounded-xl border bg-muted/40 p-1 sm:w-fit", className)} role="tablist" aria-label={label}>
+    <div className={cn("flex max-w-full gap-1 rounded-xl border bg-muted/40 p-1 sm:w-fit", scroll && "relative overflow-x-auto scrollbar-hide", className)} role="tablist" aria-label={label}>
       {tabs.map((t, i) => {
         const active = t.value === value;
         return (
@@ -39,7 +52,8 @@ export function SegmentedTabs<T extends string>({ value, onChange, tabs, label, 
               if (e.key === "End") { e.preventDefault(); move(tabs.length - 1); }
             }}
             className={cn(
-              "relative z-0 min-w-0 flex-1 rounded-lg px-2 py-1.5 text-sm sm:px-4 sm:text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500/60 sm:flex-none",
+              "relative z-0 rounded-lg py-1.5 text-sm sm:px-4 sm:text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-emerald-500/60 sm:flex-none",
+              scroll ? "flex-none whitespace-nowrap px-3" : "min-w-0 flex-1 px-2",
               active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
             )}
             data-testid={t.testId}

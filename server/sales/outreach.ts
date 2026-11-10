@@ -48,6 +48,7 @@ import { storage } from "../storage";
 import { draftSystemPrompt, draftUserMessage, versionFor, type DraftInput } from "./outreach-prompt";
 import type { DraftStyle } from "../profiles/style";
 import { profileStyleView, type ProfileStyleView } from "@shared/acquisition-profile";
+import { followUpView, type FollowUpView } from "@shared/campaign";
 import { DraftAllowanceReached, DraftExists, messageStore, messagesTablesReady, outreachSafetyReady, type MessageStore } from "./message-store";
 import { AI_DRAFT_VERSION_PREFIX, outboundTier } from "../outbound/plan";
 import { outboundAllowance } from "../outbound/limits";
@@ -56,11 +57,14 @@ import { researchStore, salesTablesReady } from "./research-store";
 
 export interface OutreachDeps {
   store: MessageStore; chat: typeof tracedChat; now: () => Date;
+  /** The lead's next follow-up still open (planned, on hold, drafted), or null (server/sales/followups.ts openFollowUpForLead). */
+  followUp: (orgId: string, leadId: number) => Promise<{ status: string; dueAt: string | null; draftStatus: string | null } | null>;
   /** The tone and note of the saved client profile a draft to this lead should follow, or null (server/profiles/style.ts). Never throws. */
   style: (orgId: string, leadId: number, campaignProfileId?: number | null) => Promise<DraftStyle | null>;
 }
 const defaults = (): OutreachDeps => ({
   store: messageStore, chat: tracedChat, now: () => new Date(),
+  followUp: async (orgId, leadId) => { try { return await (await import("./followups")).openFollowUpForLead(orgId, leadId); } catch { return null; } },
   style: async (orgId, leadId, campaignProfileId) => { try { return await (await import("../profiles/style")).styleForDraft(orgId, leadId, campaignProfileId); } catch { return null; } },
 });
 
@@ -158,7 +162,7 @@ const asDraft = (text: string | null): { subject: string; body: string } | null 
 };
 
 /** `sample`: the proof-of-value sample the lead's opportunity plan proposed (Client Radar), which a first draft can offer. */
-export async function listMessages(user: Who, leadId: number, d: Partial<OutreachDeps> = {}): Promise<Result<{ messages: MessageView[]; sample: { title: string; scope: string } | null; /** The saved client profile whose tone and note this lead's AI drafts follow, when there is one. */ style: ProfileStyleView | null }>> {
+export async function listMessages(user: Who, leadId: number, d: Partial<OutreachDeps> = {}): Promise<Result<{ messages: MessageView[]; sample: { title: string; scope: string } | null; /** The saved client profile whose tone and note this lead's AI drafts follow, when there is one. */ style: ProfileStyleView | null; /** What comes next after a sent message: a planned follow-up, one on hold, or a draft waiting. */ followUp: FollowUpView | null }>> {
   const deps = { ...defaults(), ...d };
   const gate = readGate(user);
   if (gate) return gate;
@@ -179,8 +183,8 @@ export async function listMessages(user: Who, leadId: number, d: Partial<Outreac
     v.status === "variant" || v.status === "draft"
       ? { ...v, scorecard: scoreDraft(v, { greetName: lead.contactName?.trim() || null, factValues: facts.map((f) => f.value), evidenceValues: (evidenceIds.get(v.strategy ?? "") ?? []).map((id) => valueOf.get(id)!).filter(Boolean) }) }
       : v;
-  const style = await deps.style(user.organizationId!, leadId).catch(() => null);
-  return { ok: true, messages: rows.map((m) => withCard(messageView(m))), sample, style: profileStyleView(style) };
+  const [style, next] = await Promise.all([deps.style(user.organizationId!, leadId).catch(() => null), deps.followUp(user.organizationId!, leadId).catch(() => null)]);
+  return { ok: true, messages: rows.map((m) => withCard(messageView(m))), sample, style: profileStyleView(style), followUp: followUpView(next) };
 }
 
 /** The cap refusals a draft can hit, in the person's words; null when `e` is something else. */
