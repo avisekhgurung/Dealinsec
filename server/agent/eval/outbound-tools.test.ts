@@ -3,7 +3,7 @@
  * Each case pins down a boundary: what always asks, what can never be done by the agent, that a hostile website can't
  * steer it, and that nothing becomes a lead or an email without the person.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../storage", async () => (await import("./world-mocks")).storageMock());
 vi.mock("../../entitlements", async () => (await import("./world-mocks")).entitlementsMock());
@@ -34,6 +34,12 @@ import { createWorld, userRow, ORG1, ORG2, type World } from "./world";
 const world = () => (globalThis as any).__world as World;
 const OWNER = () => world().users.get("u1")!;
 const NOW = new Date("2026-10-08T12:00:00Z");
+// The fixtures below are dated around NOW, and the tools read the clock to say how fresh a signal is ("Last 30 days",
+// "strong timing"). Without a pinned clock these tests are only true for a few weeks after they were written: the
+// freshness one started failing in November 2026, and the "strong timing" ones would have followed in January. Only
+// Date is faked — timers stay real, so nothing that awaits is affected.
+beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW); });
+afterEach(() => { vi.useRealTimers(); });
 const ASKED = say("Waiting for your approval.");
 const failed = (ev: ReturnType<typeof collect>) => ev.events.filter((e) => e.type === "agent.tool_failed").map((e) => e.data);
 
