@@ -220,6 +220,8 @@ export interface ProspectCard {
   contact: "verified" | "public" | "none";
   /** Deterministic observations from their home page's markup (shared/site-signals.ts): hints, never proof of need. */
   siteSignals: string[];
+  /** Types of its confirmed signals that are not over a year old: what a saved profile's buying signals are checked against (shared/acquisition-profile.ts profileMatch). */
+  signalTypes: string[];
   /** The person's own verdict on this prospect, when the feedback table exists (prospect-feedback.ts). */
   feedback?: ProspectFeedback | null;
 }
@@ -281,6 +283,7 @@ export function prospectCard(p: ProspectRow, fs: ProspectFindingRow[], now: Date
     contact: fs.some((f) => hasVerifiedEmail(likeOf(f))) ? "verified"
       : fs.some((f) => (f.kind === "fact" && f.type === "business_email" && f.status === "confirmed") || isContactFormRoute(likeOf(f))) ? "public" : "none",
     siteSignals: fs.filter((f) => f.kind === "fact" && f.type === "site_signal").map((f) => f.value),
+    signalTypes: Array.from(new Set(fs.filter((f) => f.kind === "signal" && f.status === "confirmed" && isSignalType(f.type) && signalDating(likeOf(f), now).band !== "stale").map((f) => f.type))),
   };
 }
 

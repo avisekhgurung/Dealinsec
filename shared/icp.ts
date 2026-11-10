@@ -9,6 +9,7 @@ import { sanitizeQuery } from "./discovery";
 import { assessFit, normText, textMatches, verdictFrom, type FitResult, type FitSignal, type IdealClient } from "./fit";
 import { SEGMENTS, opportunityPhrasings } from "./opportunity-queries";
 import { bigCompanyIn, classifyHiring, knownBigApplies, outsideHelpIn } from "./opportunity-signals";
+import { REQUIREMENT_KEYS, WANTED_SIGNALS } from "./profile-keys";
 
 export const MAX_QUANTITY = 50;
 export const DEFAULT_QUANTITY = 20;
@@ -37,6 +38,15 @@ export const icpSchema = z.object({
   services: list(6, 60).default([]),
   /** Who they sell to, chosen as a one-click preset; null = none chosen. */
   segment: z.enum(SEGMENTS).nullable().default(null),
+  /**
+   * From a saved client profile (shared/acquisition-profile.ts), all optional so a typed request, a preset and every
+   * search stored before profiles existed are exactly what they were: which buying signals the person cares about,
+   * what a company must have, and which profile the search started from. They are READ when a company is shown
+   * (profileMatch); they never change what is searched, the score, or "Ready".
+   */
+  signals: z.array(z.enum(WANTED_SIGNALS)).max(WANTED_SIGNALS.length).optional(),
+  requirements: z.array(z.enum(REQUIREMENT_KEYS)).max(REQUIREMENT_KEYS.length).optional(),
+  profile: z.object({ id: z.number().int().positive(), name: z.string().trim().min(1).max(80) }).optional(),
 }).refine((x) => x.employeeMin === null || x.employeeMax === null || x.employeeMin <= x.employeeMax, { message: "The smallest company size must not be bigger than the largest." });
 export type Icp = z.infer<typeof icpSchema>;
 
@@ -54,7 +64,7 @@ export const COUNTRY_NAME: Record<string, string> = {
 };
 export const countryLabel = (code: string) => COUNTRY_NAME[code] ?? code;
 
-const DEFAULT_ROLES = ["Founder", "CEO", "Owner", "Managing Director", "Head of Growth", "Head of Sales"];
+export const DEFAULT_ROLES = ["Founder", "CEO", "Owner", "Managing Director", "Head of Growth", "Head of Sales"];
 
 /**
  * The plain-rules reading of a request such as "Find 30 US digital marketing agencies with 5-30 employees that serve

@@ -2097,3 +2097,36 @@ export const socialOpportunities = pgTable("social_opportunities", {
   expiryIdx: index("social_opportunities_expiry_idx").on(t.expiresAt),
 }));
 export type SocialOpportunityRow = typeof socialOpportunities.$inferSelect;
+
+// ── Client profiles: who a workspace wants as clients, saved and named (shared/acquisition-profile.ts) ──
+// Many per workspace. A profile is what a Client Radar search starts from; it is not the single "ideal client" row
+// (client_profiles), which says what the workspace itself sells and is applied to every search.
+// A missing table switches only this feature off (script/migrate-acquisition-profiles.ts).
+export const acquisitionProfiles = pgTable("acquisition_profiles", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  createdByUser: varchar("created_by_user").notNull(),
+  name: varchar("name", { length: 80 }).notNull(),
+  nameKey: varchar("name_key", { length: 80 }).notNull(), // the name in lower case: one profile per name per workspace
+  kind: varchar("kind", { length: 20 }).notNull().default("custom"), // freelancer | marketing_agency | dev_agency | custom
+  services: jsonb("services").notNull().default(sql`'[]'::jsonb`), // string[]
+  industries: jsonb("industries").notNull().default(sql`'[]'::jsonb`), // string[]: kinds of company to look for
+  keywords: jsonb("keywords").notNull().default(sql`'[]'::jsonb`), // string[]
+  countries: jsonb("countries").notNull().default(sql`'[]'::jsonb`), // ISO 3166-1 alpha-2 codes
+  locations: jsonb("locations").notNull().default(sql`'[]'::jsonb`), // string[]: cities or regions
+  employeeMin: integer("employee_min"),
+  employeeMax: integer("employee_max"),
+  exclusions: jsonb("exclusions").notNull().default(sql`'[]'::jsonb`), // string[]: kinds of company never to return
+  signals: jsonb("signals").notNull().default(sql`'[]'::jsonb`), // shared/profile-keys.ts WANTED_SIGNALS
+  requirements: jsonb("requirements").notNull().default(sql`'[]'::jsonb`), // shared/profile-keys.ts REQUIREMENT_KEYS
+  roles: jsonb("roles").notNull().default(sql`'[]'::jsonb`), // string[]: who to contact, most relevant first
+  outreach: jsonb("outreach").notNull().default(sql`'{}'::jsonb`), // { channels, tone, note }
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  orgIdx: index("acquisition_profiles_org_idx").on(t.organizationId, t.createdAt),
+  oneName: uniqueIndex("acquisition_profiles_org_name_uq").on(t.organizationId, t.nameKey),
+  oneDefault: uniqueIndex("acquisition_profiles_one_default").on(t.organizationId).where(sql`${t.isDefault}`),
+}));
+export type AcquisitionProfileRow = typeof acquisitionProfiles.$inferSelect;

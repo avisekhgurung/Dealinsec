@@ -15,8 +15,10 @@ export interface Icp {
   targetMarket: string[]; roles: string[]; exclusions: string[]; quantity: number;
   /** What the person sells (fills opportunity-led searches) and who they sell to (a one-click preset). Runs stored before these existed omit them at runtime, so render with `?? []` / `?? null`. */
   services: string[]; segment: import("@shared/opportunity-queries").Segment | null;
+  /** From a saved client profile (shared/acquisition-profile.ts): the buying signals it cares about, what a company must have, and which profile it was. Absent on every other search. */
+  signals?: import("@shared/profile-keys").WantedSignal[]; requirements?: import("@shared/profile-keys").RequirementKey[]; profile?: { id: number; name: string };
 }
-export interface ParsedIcp { icp: Icp; searches: string[]; description: string; /** "saved" = built from the saved ideal client, "preset" = a one-click segment preset — both by deliberate plain rules (no model involved). */ source: "model" | "rules" | "saved" | "preset"; /** The country was filled in from the market chosen at setup (client-side, removable). */ fromSetup?: boolean }
+export interface ParsedIcp { icp: Icp; searches: string[]; description: string; /** "saved" = built from the saved ideal client, "preset" = a one-click segment preset — both by deliberate plain rules (no model involved). */ source: "model" | "rules" | "saved" | "preset" | "profile"; /** The country was filled in from the market chosen at setup (client-side, removable). */ fromSetup?: boolean }
 
 export interface Counters {
   searched: number; results: number; discovered: number; rejected: number; rejectedBy: Record<string, number>; verified: number; enriched: number;
@@ -51,6 +53,8 @@ export interface ProspectCard {
   contact?: "verified" | "public" | "none";
   /** Observations from their home page's markup: hints, never proof of need. */
   siteSignals?: string[];
+  /** Types of its confirmed, not-stale signals (checked against a saved profile's buying signals). */
+  signalTypes?: string[];
   feedback?: ProspectFeedback | null;
 }
 export interface Angle { problem: string; opportunity: string; positioning: string; targetPerson: string | null; reason: string; evidenceIds: number[]; confidence: "low" | "medium"; plan?: OpportunityPlan | null }

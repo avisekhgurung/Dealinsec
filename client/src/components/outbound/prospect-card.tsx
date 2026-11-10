@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { countryName, type Evidence, type ProspectCard as Card } from "@/lib/outbound";
 import { PROSPECT_FEEDBACK_LABEL } from "@shared/prospect-feedback";
 import { SITE_SIGNAL_NOTE } from "@shared/site-signals";
+import type { ProfileMatch } from "@shared/acquisition-profile";
+import { SIGNAL_LABEL } from "@shared/prospect";
 
 export function ScoreBadge({ score, size = "md" }: { score: Card["score"]; size?: "md" | "lg" }) {
   if (!score) return <div className={cn("flex shrink-0 flex-col items-center justify-center rounded-xl border border-dashed text-muted-foreground", size === "lg" ? "h-16 w-16" : "h-12 w-12")}><CircleHelp className="h-4 w-4" /><span className="text-[9px]">no score</span></div>;
@@ -61,7 +63,7 @@ export function qualificationOf(p: Card): { key: QualKey; label: string; reason:
   return null;
 }
 
-export function ProspectCard({ p, onOpen, onEvidence, onAdd, adding, canEdit }: { p: Card; onOpen: () => void; /** Opens the brief at its evidence. */ onEvidence?: () => void; onAdd: () => void; adding: boolean; canEdit: boolean }) {
+export function ProspectCard({ p, onOpen, onEvidence, onAdd, adding, canEdit, match }: { p: Card; onOpen: () => void; /** Opens the brief at its evidence. */ onEvidence?: () => void; onAdd: () => void; adding: boolean; canEdit: boolean; /** This company against the saved profile its search started from; absent for every other search. */ match?: ProfileMatch | null }) {
   const where = [p.profile.location, countryName(p.profile.country)].filter(Boolean).join(", ");
   const meta = [where, p.profile.industry, p.profile.employees].filter(Boolean);
   const fits = (p.fit?.signals ?? []).filter((s) => s.status === "match").slice(0, 3);
@@ -103,6 +105,13 @@ export function ProspectCard({ p, onOpen, onEvidence, onAdd, adding, canEdit }: 
         {p.contact === "public" && <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium" title="A business email or contact form found on their own site. Found, not verified." data-testid="prospect-contact" data-state="public"><Link2 className="h-3 w-3" aria-hidden />Public contact · not verified</span>}
         {p.contact === "none" && <span className="inline-flex items-center gap-1 rounded-full border border-dashed px-2 py-0.5 text-[11px] text-muted-foreground" data-testid="prospect-contact" data-state="none"><CircleDashed className="h-3 w-3" aria-hidden />No contact found yet</span>}
         {(p.siteSignals?.length ?? 0) > 0 && <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground" title={`${p.siteSignals!.join(". ")}. ${SITE_SIGNAL_NOTE}`} data-testid="prospect-site-signals">Website: {p.siteSignals!.length} observation{p.siteSignals!.length === 1 ? "" : "s"}</span>}
+        {match && match.total > 0 && (
+          <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium", match.meetsAll ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" : "text-muted-foreground")}
+            title={match.requirements.map((r) => `${r.met ? "Found" : "Not found yet"}: ${r.label}`).join("\n")} data-testid="prospect-profile-match" data-state={match.meetsAll ? "all" : "some"}>
+            {match.meetsAll ? <Check className="h-3 w-3" aria-hidden /> : <CircleDashed className="h-3 w-3" aria-hidden />}Your profile: {match.met} of {match.total}
+          </span>
+        )}
+        {match && match.signalsFound.length > 0 && <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300" title="A buying signal your profile asks for was found" data-testid="prospect-wanted-signal"><Flame className="h-3 w-3" aria-hidden />{match.signalsFound.map((x) => SIGNAL_LABEL[x]).join(", ")}</span>}
         {p.feedback && <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium" data-testid="prospect-feedback">You marked: {PROSPECT_FEEDBACK_LABEL[p.feedback]}</span>}
       </div>
 

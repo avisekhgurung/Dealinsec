@@ -38,6 +38,10 @@ import { queryClient } from "@/lib/queryClient";
 import { COUNTRY_NAME, ICP_URL, OUTBOUND_RUNS_URL, RUN_ERROR, RUN_STAGE_LABEL, countryName, runUrl, prospectUrl, type ParsedIcp, type ProspectCard as Card_, type RunView } from "@/lib/outbound";
 import { MAX_QUANTITY as LIST_MAX_COMPANIES, describeIcp, icpFromIdealClient, icpSchema, searchStrategies } from "@shared/icp";
 import { SEGMENT_LABEL, SEGMENT_PRESETS, offerLine, type SegmentPreset } from "@shared/opportunity-queries";
+import { ClientProfiles } from "@/components/outbound/client-profiles";
+import { profileMatch } from "@shared/acquisition-profile";
+import { REQUIREMENT_LABEL } from "@shared/profile-keys";
+import { SIGNAL_LABEL } from "@shared/prospect";
 import { DISCOVERY_PRESETS, suggestDiscoveryMode, type DiscoveryMode, type DiscoveryPreset } from "@shared/local-discovery";
 import { takeOutboundPrefill } from "@/lib/outbound-prefill";
 import { getTargetMarket } from "@/lib/first-goal";
@@ -109,6 +113,8 @@ function RunPanel({ id, canEdit, onOpen }: { id: string; canEdit: boolean; onOpe
   const q = useQuery<RunData>({ queryKey: [runUrl(id)], refetchInterval: (query) => (query.state.data?.run.status === "running" ? 3000 : false) });
   const [showAside, setShowAside] = useState(false);
   const [adding, setAdding] = useState<number | null>(null);
+  // A search started from a saved client profile: show only the companies that have everything the profile asks for.
+  const [onlyMatches, setOnlyMatches] = useState(false);
   const calm = useCalmMotion();
   const cancel = useMutation({ mutationFn: () => leadCall("POST", `${runUrl(id)}/cancel`, {}), onSuccess: () => void queryClient.invalidateQueries({ queryKey: [runUrl(id)] }) });
   const add = useMutation({
@@ -141,6 +147,14 @@ function RunPanel({ id, canEdit, onOpen }: { id: string; canEdit: boolean; onOpe
   const readyN = good.filter((p) => (p.classification ? p.classification === "ready" : p.ready)).length;
   const qualifiedN = good.filter((p) => p.classification === "qualified").length;
   const errorText = run.errorCode ? RUN_ERROR[run.errorCode] : undefined;
+  // What the profile this search started from asks of a company, checked against each card's stored evidence
+  // (shared/acquisition-profile.ts profileMatch). A company nobody researched yet has nothing to check, so it gets no verdict.
+  const wants = (run.icp.requirements?.length ?? 0) > 0 || (run.icp.signals?.length ?? 0) > 0;
+  const matchOf = (p: Card_) => (wants && p.classification !== "not_researched"
+    ? profileMatch(run.icp, { contact: p.contact ?? "none", hasDecisionMaker: !!p.decisionMaker, timing: p.timing ?? "none", signalTypes: p.signalTypes ?? [] }) : null);
+  const hasRequirements = (run.icp.requirements?.length ?? 0) > 0;
+  const matching = hasRequirements ? good.filter((p) => matchOf(p)?.meetsAll) : good;
+  const shown = hasRequirements && onlyMatches ? matching : good;
   return (
     <div className="min-w-0 space-y-4" data-testid="run-panel">
       <Card className="glass-card"><CardContent className="space-y-4 p-4">
@@ -209,11 +223,27 @@ function RunPanel({ id, canEdit, onOpen }: { id: string; canEdit: boolean; onOpe
 
       {good.length === 0 && running && <p className="text-sm text-muted-foreground" aria-live="polite">Companies appear here as they are checked. This usually takes a minute or two.</p>}
       {good.length === 0 && run.status === "done" && <p className="rounded-2xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">No company passed the checks. Try a broader description, or a different place.</p>}
-      {good.length > 0 && (
+      {wants && good.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border bg-muted/30 px-3 py-2 text-sm" data-testid="run-profile-match">
+          <span className="min-w-0">
+            {run.icp.profile ? <>From your profile <strong>{run.icp.profile.name}</strong>. </> : null}
+            {hasRequirements
+              ? <><strong className="tabular-nums">{matching.length}</strong> of {good.length} {good.length === 1 ? "company has" : "companies have"} everything it asks for.</>
+              : <>Each card shows which of your buying signals were found.</>}
+          </span>
+          {hasRequirements && (
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+              <input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={onlyMatches} onChange={(e) => setOnlyMatches(e.target.checked)} data-testid="run-only-matches" />Show only those
+            </label>
+          )}
+        </div>
+      )}
+      {good.length > 0 && shown.length === 0 && <p className="rounded-2xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground" data-testid="run-no-matches">No company has everything your profile asks for yet. Untick "Show only those" to see what was found, and research a company to look for what is missing.</p>}
+      {shown.length > 0 && (
         <motion.div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" variants={stagger} initial={calm ? false : "hidden"} animate="visible" data-testid="prospect-grid">
-          {good.map((p, i) => (
+          {shown.map((p, i) => (
             <motion.div key={p.id} className="min-w-0" variants={staggerItem(i)} initial={firstIds.current?.has(p.id) ? undefined : false}>
-              <ProspectCard p={p} canEdit={canEdit} adding={adding === p.id} onOpen={() => onOpen(p)} onEvidence={() => onOpen(p, "evidence")} onAdd={() => add.mutate(p.id)} />
+              <ProspectCard p={p} canEdit={canEdit} adding={adding === p.id} onOpen={() => onOpen(p)} onEvidence={() => onOpen(p, "evidence")} onAdd={() => add.mutate(p.id)} match={matchOf(p)} />
             </motion.div>
           ))}
         </motion.div>
@@ -404,6 +434,15 @@ export default function OutboundPage() {
     });
     setParsed({ icp: base, searches: searchStrategies(base), description: describeIcp(base), source: "preset", fromSetup });
   };
+  // A saved client profile, already turned into a search proposal by the server (plain rules, no model call). A
+  // profile that names no place starts from the market chosen at setup, like every other way of starting.
+  const applyProfile = (r: ParsedIcp) => {
+    setMode("web"); setText("");
+    const target = getTargetMarket(user?.id);
+    const fromSetup = !!target && target !== "WW" && target in COUNTRY_NAME && !r.icp.countries.length && !r.icp.locations.length;
+    const next = fromSetup ? { ...r.icp, countries: [target!] } : r.icp;
+    setParsed({ icp: next, searches: fromSetup ? searchStrategies(next) : r.searches, description: r.description, source: "profile", fromSetup });
+  };
   const applyPreset = (p: DiscoveryPreset) => {
     trackEvent("outbound_preset_used", { preset: p.key });
     if (p.mode === "local") { setMode("local"); setLocalFields((f) => ({ ...f, ...p.local })); }
@@ -475,6 +514,7 @@ export default function OutboundPage() {
                 {!text && !firstTime && !runs.isLoading && <div className="flex flex-wrap gap-2">
                   {EXAMPLES.map((x) => <button key={x} onClick={() => pickExample(x)} className="rounded-full border px-3 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">{x}</button>)}
                 </div>}
+                {!text && !parsed && !runs.isLoading && <ClientProfiles disabled={!!blocked} onUse={applyProfile} />}
                 {!text && !parsed && !runs.isLoading && (
                   <div className="space-y-1.5" data-testid="outbound-segments">
                     <p className="text-xs font-medium text-muted-foreground">Or start from who you sell to — one click builds a search profile you can edit:</p>
@@ -535,7 +575,13 @@ export default function OutboundPage() {
                     </div>
                     {parsed.fromSetup && icp.countries.length > 0 && <p className="text-xs text-muted-foreground" data-testid="outbound-from-setup">The country comes from the market you chose at setup. Remove it to search worldwide.</p>}
                     {!icp.countries.length && !icp.locations.length && <p className="text-xs text-muted-foreground" data-testid="outbound-worldwide">Searching worldwide. Pick a country (the US, the UK, Canada, Australia, the UAE, India…) for more relevant companies.</p>}
-                    <p className="text-xs text-muted-foreground">Reaching: {icp.roles.slice(0, 4).join(", ") || "decision makers"} · {parsed.searches.length} searches planned{parsed.source === "rules" ? " · read by simple rules (the AI was unavailable)" : parsed.source === "saved" ? " · from your saved ideal client" : parsed.source === "preset" ? " · a ready-made profile, change anything" : ""}</p>
+                    <p className="text-xs text-muted-foreground">Reaching: {icp.roles.slice(0, 4).join(", ") || "decision makers"} · {parsed.searches.length} searches planned{parsed.source === "rules" ? " · read by simple rules (the AI was unavailable)" : parsed.source === "saved" ? " · from your saved ideal client" : parsed.source === "preset" ? " · a ready-made profile, change anything" : parsed.source === "profile" ? ` · from your profile “${icp.profile?.name ?? ""}”, no AI used` : ""}</p>
+                    {((icp.signals?.length ?? 0) > 0 || (icp.requirements?.length ?? 0) > 0) && (
+                      <p className="text-xs text-muted-foreground" data-testid="outbound-profile-wants">
+                        {(icp.signals?.length ?? 0) > 0 && <>Buying signals you care about: <span className="font-medium text-foreground">{icp.signals!.map((x) => SIGNAL_LABEL[x]).join(", ")}</span>. </>}
+                        {(icp.requirements?.length ?? 0) > 0 && <>Each company is checked for: <span className="font-medium text-foreground">{icp.requirements!.map((x) => REQUIREMENT_LABEL[x].toLowerCase()).join(", ")}</span>.</>}
+                      </p>
+                    )}
                     <div className="flex flex-col gap-2" role="radiogroup" aria-label="How far to go">
                       {([
                         ["deep", "Research each one", `Up to ${maxCompanies} companies, each read in depth: why now, who decides, evidence you can quote.`, usage.data?.usage.plan?.searches],
