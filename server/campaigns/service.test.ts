@@ -206,6 +206,20 @@ describe("who may do what", () => {
     expect(w.campaigns[0]).toMatchObject({ name: "Diwali", status: "active", preparing: false, sending: false });
     expect(w.members).toHaveLength(3);
   });
+  it("a coworker's look at a campaign changes nothing: no tidy-up, no job woken, even mid-drafting", async () => {
+    const w = world();
+    const id = await make(w);
+    await svc.startPreparing(ana, id, w.deps);
+    const kicksBefore = w.calls.kick;
+    let relinked = 0;
+    const deps = { ...w.deps, store: { ...w.deps.store, relink: async () => { relinked++; } } };
+    const quiet: any = await svc.getCampaign(ana, id, deps, { readOnly: true });
+    expect(quiet).toMatchObject({ ok: true, campaign: { preparing: true, counts: { members: 3, queued: 3 } } });
+    expect([relinked, w.calls.kick - kicksBefore]).toEqual([0, 0]);
+    // The page's own read does both.
+    await svc.getCampaign(ana, id, deps);
+    expect([relinked, w.calls.kick - kicksBefore]).toEqual([1, 1]);
+  });
   it("on a server without the tables it says so, and the job does nothing", async () => {
     const w = world();
     const deps = { ...w.deps, ready: async () => false };

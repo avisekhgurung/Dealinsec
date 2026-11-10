@@ -28,6 +28,7 @@ const SCOPE: Record<LeagueTask, string> = {
   "zee.briefing": "Reads your own invoices, agreements, deals, follow-ups and outreach in DealInSec and reports what needs attention. Nothing is changed.",
   "team.huddle": "Nibo, Mika and Zee each give their view from your workspace records, twice, then the lead sums up with suggested next steps. Nothing is changed or sent.",
   "nibo.campaign": "Runs on DealInSec's server, so you can close this page: one Client Radar search at a time (each from your plan, up to 10 companies), qualified companies saved to Leads with evidence, and a report at the time you choose. Nobody is contacted.",
+  "mika.campaign": "Writes one first email per lead from what's verified about it, inside your plan's AI drafts. A lead with no email or no verified facts is skipped and the report says why. Nothing is approved or sent: every draft waits for you in Client Radar → Campaigns.",
 };
 
 /** A coworker's own task, or (`huddle`) a team huddle that coworker leads. */

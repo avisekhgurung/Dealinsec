@@ -42,7 +42,9 @@ describe("which tools an MCP client is offered", () => {
     const names = offered.map((t) => t.name);
     for (const never of ["create_lead", "draft_outreach", "approve_outreach", "mark_outreach_sent", "discover_prospects", "research_prospect", "add_prospect_to_leads", "create_invoice", "mark_paid", "archive_lead"]) expect(names).not.toContain(never);
     for (const has of ["social_intent_overview", "list_social_opportunities", "analyze_post"]) expect(names).toContain(has);
-  });
+    // The newest reads are offered too, and they are reads: profiles and campaigns, never a message's text.
+    for (const has of ["list_client_profiles", "list_campaigns", "get_campaign"]) expect(names).toContain(has);
+  }, 30_000); // loading the whole real registry is slow on a cold or busy machine; the default 5 s made this test flaky
   it("describes each tool with an object schema a client can validate against", () => {
     const [spec] = toSpecs([read("get_lead", { input: z.object({ id: z.number().int() }).strict() })]);
     expect(spec).toMatchObject({ name: "get_lead", description: "get_lead tool", inputSchema: { type: "object" } });

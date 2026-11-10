@@ -47,6 +47,39 @@ export const profileStoreMock = () => ({
 });
 
 /** The document-style store: the world's map, behind the module name the service imports. */
+/**
+ * Saved client profiles and outreach campaigns, for the read tools over them (server/agent/tools/campaigns.ts): one
+ * profile and one campaign in org-1. Every write throws while the world is read-only, so a read tool that changed
+ * anything — even the page's own tidy-up — fails its test.
+ */
+const noWrite = async (): Promise<never> => { if (world().readOnly) throw new Error("WRITE ATTEMPTED BY A READ-ONLY TOOL"); throw new Error("not implemented in the eval world"); };
+const EVAL_T = new Date("2026-11-01T00:00:00Z");
+const evalProfile = { id: 1, organizationId: "org-1", createdByUser: "u1", name: "Brands that need growth", nameKey: "brands that need growth", kind: "marketing_agency", services: ["SEO"], industries: ["D2C brand", "edtech company"], keywords: [], countries: ["IN"], locations: ["Pune"], employeeMin: 5, employeeMax: 200, exclusions: [], signals: ["FUNDING"], requirements: ["decision_maker"], roles: ["Founder"], outreach: {}, isDefault: true, createdAt: EVAL_T, updatedAt: EVAL_T };
+export const acquisitionProfileStoreMock = () => ({
+  profilesTableReady: async () => true,
+  NameTaken: class NameTaken extends Error {},
+  acquisitionProfileStore: {
+    list: async (orgId: string) => (orgId === "org-1" ? [{ ...evalProfile }] : []),
+    get: async (orgId: string, id: number) => (orgId === "org-1" && id === 1 ? { ...evalProfile } : null),
+    create: noWrite, update: noWrite, setDefault: noWrite, remove: noWrite,
+  },
+});
+const evalCampaign = { id: 1, organizationId: "org-1", createdByUser: "u1", name: "Diwali", profileId: 1, profileName: "Brands that need growth", status: "active", footerNote: "", preparing: true, prepareUserId: "u1", prepareStop: null, sending: false, senderUserId: null, sendStop: null, dailyLimit: 20, gapSeconds: 180, nextSendAt: null, leaseUntil: null, createdAt: EVAL_T, updatedAt: EVAL_T };
+const evalMember = { id: 1, leadId: 1, state: "drafted", reason: null, attempts: 1, holdReason: null, holdHash: null, lead: { companyName: "Northwind", domain: "northwind.com", status: "qualified", contactName: null, contactEmail: null, doNotContact: false, archived: false }, message: { id: 1, status: "draft", subject: "Hello", to: "a@northwind.com", bodyHash: "h", edited: false, approvedAt: null, sentAt: null }, outcomes: [], interested: false };
+export const campaignStoreMock = () => ({
+  campaignTablesReady: async () => true,
+  campaignStore: {
+    list: async (orgId: string) => (orgId === "org-1" ? [{ ...evalCampaign }] : []),
+    get: async (orgId: string, id: number) => (orgId === "org-1" && id === 1 ? { ...evalCampaign } : null),
+    members: async (orgId: string, id: number) => (orgId === "org-1" && id === 1 ? [{ ...evalMember }] : []),
+    memberFacts: async (orgId: string) => (orgId === "org-1" ? [{ campaignId: 1, state: "drafted", messageStatus: "draft", outcomes: [], interested: false }] : []),
+    ownLeadIds: async () => [], audience: async () => [],
+    create: noWrite, update: noWrite, addMembers: noWrite, removeMember: noWrite, relink: noWrite, setPreparing: noWrite, setSending: noWrite,
+    claimDraft: noWrite, settleMember: noWrite, finishPreparing: noWrite, claimSend: noWrite, releaseSend: noWrite, setDraftBody: noWrite,
+    nextApproved: async () => null, sendFacts: async () => ({ sentSince: 0, sent: 0, bounced: 0 }), unsentMessageId: async () => null, draftBody: async () => null,
+  },
+});
+
 export const documentStyleStoreMock = () => ({
   documentStyleTableReady: async () => true,
   documentStyleStore: {

@@ -22,6 +22,8 @@ vi.mock("../../storage", async () => (await import("./world-mocks")).storageMock
 vi.mock("../../entitlements", async () => (await import("./world-mocks")).entitlementsMock());
 vi.mock("../../emails", async () => (await import("./world-mocks")).emailsMock());
 vi.mock("../../leads/profile-store", async () => (await import("./world-mocks")).profileStoreMock());
+vi.mock("../../profiles/store", async () => (await import("./world-mocks")).acquisitionProfileStoreMock());
+vi.mock("../../campaigns/store", async () => (await import("./world-mocks")).campaignStoreMock());
 vi.mock("../../discovery/provider", async () => (await import("./world-mocks")).discoveryProviderMock());
 vi.mock("../../documents/style-store", async () => (await import("./world-mocks")).documentStyleStoreMock());
 vi.mock("../../knowledge/store", async () => (await import("./world-mocks")).knowledgeStoreMock());
@@ -446,6 +448,8 @@ describe("cross-cutting guarantees", () => {
       list_leads: {}, get_lead: { leadId: lead.id }, get_lead_followups: {}, get_ideal_client: {}, assess_lead_fit: { leadId: lead.id }, get_document_style: {}, search_knowledge: { question: "hotels in Lisbon" },
       get_lead_score: { leadId: lead.id }, get_outreach_draft: { leadId: lead.id },
       parse_icp: { request: "US SEO agencies" }, get_discovery_run: {}, get_prospect_intelligence: { prospectId: 1 },
+      // The campaign here is mid-drafting, which is exactly when the PAGE's read tidies up and wakes the job: the tool must do neither.
+      list_client_profiles: {}, list_campaigns: {}, get_campaign: { campaignId: 1 },
     };
     const reads = AGENT_TOOLS.filter((t) => t.risk === "READ_ONLY" && t.name !== "analyze_deal_message");
     expect(reads.map((t) => t.name).sort()).toEqual(Object.keys(args).sort());

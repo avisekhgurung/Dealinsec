@@ -26,9 +26,9 @@ type StartFn = (user: any, task: LeagueTask, input: unknown, idemKey: string) =>
 
 /** The agent's own tools each coworker may use (reads, mostly). Anything else is simply not offered to the model. */
 export const BOT_TOOLS: Record<Bot, readonly string[]> = {
-  nibo: ["list_leads", "get_lead", "get_ideal_client", "parse_icp", "get_discovery_run", "get_prospect_intelligence", "assess_lead_fit"],
-  mika: ["list_leads", "get_lead", "get_lead_followups", "get_lead_score", "get_outreach_draft", "search_deals", "get_deal", "get_workflow_status"],
-  zee: ["get_pending_work", "get_money_radar", "search_invoices", "search_quotations", "search_agreements", "get_lead_followups", "get_deal_health", "get_recent_activity", "get_account_status"],
+  nibo: ["list_leads", "get_lead", "get_ideal_client", "parse_icp", "get_discovery_run", "get_prospect_intelligence", "assess_lead_fit", "list_client_profiles"],
+  mika: ["list_leads", "get_lead", "get_lead_followups", "get_lead_score", "get_outreach_draft", "search_deals", "get_deal", "get_workflow_status", "list_campaigns", "get_campaign"],
+  zee: ["get_pending_work", "get_money_radar", "search_invoices", "search_quotations", "search_agreements", "get_lead_followups", "get_deal_health", "get_recent_activity", "get_account_status", "list_campaigns", "get_campaign"],
 };
 
 const canWrite = needsPermission("deals.create", "starting AI team tasks");
@@ -37,7 +37,7 @@ const canWrite = needsPermission("deals.create", "starting AI team tasks");
 /** What the person reads before a task starts: the same lines whether the coworker starts it or a teammate hands it over. */
 function taskPreview(task: (typeof BOT_TASK)[Bot], input: any) {
   const lines = task === "nibo.find_clients"
-    ? [{ label: "Looking for", value: String(input.request ?? "").slice(0, 200) }, { label: "Save to Leads", value: input.saveLeads === false ? "No, just report" : `Up to ${input.maxLeads ?? 3} qualified companies` }]
+    ? [{ label: "Looking for", value: String(input.request ?? "").slice(0, 200) }, ...(input.profileId ? [{ label: "From your saved profile", value: `${String(input.profileName ?? `#${input.profileId}`).slice(0, 80)}${input.kind ? ` · ${String(input.kind).slice(0, 80)}` : ""}` }] : []), { label: "Save to Leads", value: input.saveLeads === false ? "No, just report" : `Up to ${input.maxLeads ?? 3} qualified companies` }]
     : task === "mika.first_messages"
       ? [{ label: "Leads", value: input.leadIds?.length ? `${input.leadIds.length} chosen lead(s)` : "Newest researched leads with nothing sent" }, { label: "At most", value: `${input.max ?? 3} drafts` }]
       : [{ label: "From", value: "Your invoices, agreements, deals, follow-ups and outreach" }];
@@ -45,7 +45,25 @@ function taskPreview(task: (typeof BOT_TASK)[Bot], input: any) {
   return { lines, effects };
 }
 
-export function startTaskTool(bot: Bot, start: StartFn): AgentTool {
+/**
+ * A research task that names a saved client profile: the profile must be the person's own, and its NAME is what the
+ * approval card shows (an id means nothing to a person). The name is for the card only; the task is started with the
+ * id, and reads the profile again itself.
+ */
+type ProfileNameFn = (user: any, profileId: number) => Promise<string | null>;
+const profileNameOf: ProfileNameFn = async (user, profileId) => {
+  const { listProfiles } = await import("../profiles/service");
+  const r = await listProfiles(user);
+  return r.ok ? r.profiles.find((p) => p.id === profileId)?.name ?? null : null;
+};
+async function withProfile(user: any, input: any, lookup: ProfileNameFn): Promise<{ ok: true; shown: any } | { ok: false; code: string; message: string }> {
+  if (!input?.profileId) return { ok: true, shown: input };
+  const name = await lookup(user, Number(input.profileId)).catch(() => null);
+  if (!name) return { ok: false, code: "profile_not_found", message: "That saved client profile isn't in the workspace. Call list_client_profiles for the ones that are, or describe who to look for instead." };
+  return { ok: true, shown: { ...input, profileName: name } };
+}
+
+export function startTaskTool(bot: Bot, start: StartFn, profileName: ProfileNameFn = profileNameOf): AgentTool {
   const task = BOT_TASK[bot];
   const describe: Record<(typeof BOT_TASK)[Bot], string> = {
     "nibo.find_clients": `Start research to find potential clients: Client Radar searches the web, checks each company's own website, scores them, and (if saveLeads) saves up to ${LEAGUE_LIMITS.leadsPerRun} qualified companies to Leads with evidence. Runs in the background for a few minutes; uses the workspace's Client Radar search allowance, so it always asks first. Say it has STARTED, never that it is finished.`,
@@ -58,8 +76,10 @@ export function startTaskTool(bot: Bot, start: StartFn): AgentTool {
     risk: "SAFE_MUTATION",
     input: TASK_INPUT[task] as any,
     authorize: canWrite,
-    async prepare(_ctx, input) {
-      const { lines, effects } = taskPreview(task, input);
+    async prepare(ctx, input) {
+      const p = task === "nibo.find_clients" ? await withProfile(ctx.user, input, profileName) : { ok: true as const, shown: input };
+      if (!p.ok) return p;
+      const { lines, effects } = taskPreview(task, p.shown);
       return {
         ok: true, args: input,
         preview: { title: `${BOT_IDENTITY[bot].name}: ${TASK_LABEL[task]}`, lines, effects },
@@ -76,7 +96,7 @@ export function startTaskTool(bot: Bot, start: StartFn): AgentTool {
 }
 
 /** A coworker hands real work to a teammate. Always asks the person first: it spends the teammate's allowance. */
-export function handoffTool(from: Bot, to: Bot, start: StartFn): AgentTool {
+export function handoffTool(from: Bot, to: Bot, start: StartFn, profileName: ProfileNameFn = profileNameOf): AgentTool {
   const task = BOT_TASK[to];
   const f = BOT_IDENTITY[from].name, t = BOT_IDENTITY[to].name;
   return {
@@ -85,8 +105,10 @@ export function handoffTool(from: Bot, to: Bot, start: StartFn): AgentTool {
     risk: "SAFE_MUTATION",
     input: TASK_INPUT[task] as any,
     authorize: canWrite,
-    async prepare(_ctx, input) {
-      const { lines, effects } = taskPreview(task, input);
+    async prepare(ctx, input) {
+      const p = task === "nibo.find_clients" ? await withProfile(ctx.user, input, profileName) : { ok: true as const, shown: input };
+      if (!p.ok) return p;
+      const { lines, effects } = taskPreview(task, p.shown);
       return {
         ok: true, args: input, forceApproval: true,
         preview: { title: `${f} asks ${t}: ${TASK_LABEL[task]}`, lines: [{ label: "Handed over by", value: f }, ...lines], effects: [...effects, `${t}'s report appears in ${t}'s chat and in The Nest → Activity`] },
@@ -186,6 +208,53 @@ export function campaignTool(start: StartFn): AgentTool {
   };
 }
 
+/**
+ * Mika's campaign drafts from a chat: put leads into an outreach campaign (a new one, or one that exists) and have its
+ * drafts written. Always asks first: every draft written uses one of the plan's AI drafts. The approval card names the
+ * campaign and how many leads, so the person agrees to exactly that. Nothing is approved or sent by it.
+ */
+type CampaignNameFn = (user: any, campaignId: number) => Promise<{ name: string; waiting: number } | null>;
+const campaignNameOf: CampaignNameFn = async (user, campaignId) => {
+  const { getCampaign } = await import("../campaigns/service");
+  const r = await getCampaign(user, campaignId, {}, { readOnly: true });
+  return r.ok && r.campaign.status === "active" ? { name: r.campaign.name, waiting: r.campaign.counts.queued + r.campaign.counts.failed } : null;
+};
+export function mikaCampaignTool(start: StartFn, lookup: CampaignNameFn = campaignNameOf): AgentTool {
+  const input = z.object({
+    campaignId: z.number().int().positive().optional().describe("An existing campaign's id (from list_campaigns) to prepare drafts for"),
+    name: z.string().trim().max(80).optional().describe("A name for a NEW campaign, in the person's words"),
+    leadIds: z.array(z.number().int().positive()).max(LEAGUE_LIMITS.campaignLeads).optional().describe("The leads for a NEW campaign; leave out to take the newest open leads"),
+    max: z.number().int().min(1).max(LEAGUE_LIMITS.campaignLeads).optional().describe("With no leadIds: how many of the newest open leads to take (default 10)"),
+  }).strict();
+  return {
+    name: "league_mika_campaign",
+    description: `Prepare the drafts of an outreach campaign (a group of leads written to together). Either give campaignId to write drafts for a campaign that exists, or make a new one: give leadIds (at most ${LEAGUE_LIMITS.campaignLeads}), or leave them out to take the newest open leads that aren't already in a campaign. Each lead gets ONE first message from its verified facts, ending with the campaign's opt-out line; a lead with no email or no verified facts is skipped and the report says why. Uses one of the plan's AI drafts per draft written and stops when they run out. Nothing is approved or sent: every draft waits in the campaign for the person. Runs in the background; use it when the person asks for a campaign, or for drafts for more than ${LEAGUE_LIMITS.draftsPerRun} leads. For a few leads, use league_mika_task instead.`,
+    risk: "SAFE_MUTATION",
+    input,
+    authorize: canWrite,
+    async prepare(ctx, a) {
+      const args = { campaignId: a.campaignId ?? null, name: a.name ?? "", leadIds: a.campaignId ? [] : a.leadIds ?? [], max: a.max ?? 10 };
+      let lines: { label: string; value: string }[];
+      if (args.campaignId) {
+        const c = await lookup(ctx.user, args.campaignId).catch(() => null);
+        if (!c) return { ok: false, code: "not_found", message: "That campaign isn't open in the workspace. Call list_campaigns for the ones that are." };
+        lines = [{ label: "Campaign", value: c.name.slice(0, 80) }, { label: "Leads waiting for a draft", value: String(c.waiting) }];
+      } else {
+        lines = [{ label: "New campaign", value: args.name || "Named for today" }, { label: "Leads", value: args.leadIds.length ? `${args.leadIds.length} chosen lead(s)` : `Up to ${args.max} of your newest open leads` }];
+      }
+      return {
+        ok: true, args, forceApproval: true,
+        preview: { title: `${BOT_IDENTITY.mika.name}: ${TASK_LABEL["mika.campaign"]}`, lines, effects: ["Uses one of your plan's AI drafts for each draft written", "Writes drafts only: nothing is approved or sent", "Each draft waits in Client Radar → Campaigns for you"] },
+      };
+    },
+    async execute(ctx, args): Promise<ToolOutcome> {
+      const r = await start(ctx.user, "mika.campaign", args, `mikacampaign:${ctx.runId}`);
+      if (!r.ok) return { ok: false, code: r.code, message: r.message };
+      return { ok: true, route: `/ai-league/mika?run=${r.run.id}`, summary: `${r.existing ? "Already running" : "Started"}: ${TASK_LABEL["mika.campaign"]} (task ${r.run.id}). The drafts are written in the background, one at a time; the report appears in this chat's task panel and the drafts in Client Radar → Campaigns. It is NOT finished yet, and nothing has been approved or sent.` };
+    },
+  };
+}
+
 /** Per reply (the agent's run id): how many times this coworker has already asked a teammate. Bounded map. */
 const consults = new Map<string, number>();
 type ConsultFn = (user: any, from: Bot, to: Bot, question: string) => Promise<{ text: string | null; tokensIn: number; tokensOut: number; dropped: boolean }>;
@@ -240,6 +309,9 @@ Personality: ${id.voice}. Keep replies short and concrete.
 - Real work happens through the tool ${tool}: it starts a background task that keeps running if the person leaves. Use it when they ask for that work; if something essential is missing (for ${bot === "nibo" ? "research: what kind of company and where" : bot === "mika" ? "drafts: which leads, if they named specific ones" : "a briefing: nothing is needed"}), ask ONE short question first.
 - After starting a task, say it has started and that the report will appear here. Never say it is done, never invent its results.
 ${bot === "nibo" ? `- For big or overnight research (many companies, "work tonight", a report at a set time) use league_nibo_campaign; for one quick search use ${tool}.${clock ? ` It is now ${showTime(clock.now, clock.tz)} (the person's timezone ${clock.tz}); give campaign times as local YYYY-MM-DDTHH:mm in that timezone ("8 AM tomorrow" = tomorrow's date at 08:00).` : ""}
+- The person may have saved client profiles (who they want as clients). When they name one, or ask to search for a kind of client they have saved, call list_client_profiles and start ${tool} with that profile's id as profileId and one of ITS kinds of company as kind: the search is then built from the profile exactly, and you must not add or change anything it says. If the profile has several kinds of company and they didn't say which, ask which one.
+` : ""}${bot === "mika" ? `- For a campaign (a group of leads written to together), or drafts for more than ${LEAGUE_LIMITS.draftsPerRun} leads, use league_mika_campaign; for a few leads use ${tool}. Questions about how a campaign is doing: list_campaigns, then get_campaign. You never approve a draft and never start a campaign's sending: those are the person's own clicks in Client Radar → Campaigns.
+` : ""}${bot === "zee" ? `- Questions about campaigns (how one is doing, what needs doing in it, why it paused): list_campaigns, then get_campaign. Report the numbers as they are; a reply rate is unknown until something was sent. You never see what an email says: for replies you know only how many there are and how the rules labelled them, so send the person to the Inbox to read them.
 ` : ""}- You only have the tools you are given. For other work, point the person to ${others}, or to the right page.
 - Nothing is ever sent to anyone by you. Drafts wait for the person's approval.
 - You work as a team with ${others}. When a teammate's records or skills would help, ask them with ask_teammate (say you're checking with them, then use what they said and credit them). When the work belongs to a teammate, hand it over with handoff_${bot}_to_<teammate>; the person always approves that first. For open questions that need all three of you (planning, strategy), offer a team huddle with league_${bot}_huddle. Don't ask a teammate about something you can answer yourself.
@@ -260,6 +332,7 @@ export async function leagueConversationDeps(bot: Bot): Promise<ConversationDeps
     ...BOTS.filter((b) => b !== bot).map((to) => handoffTool(bot, to, start)),
     huddleTool(bot, start),
     ...(bot === "nibo" ? [campaignTool(start)] : []),
+    ...(bot === "mika" ? [mikaCampaignTool(start)] : []),
     askTeammateTool(bot, (user, from, to, question) => consultTeammate(teamDeps(AGENT_TOOLS), user, from, to, question)),
   ]);
   return {
@@ -288,6 +361,7 @@ export async function allLeagueTools(): Promise<readonly AgentTool[]> {
     ...BOTS.flatMap((from) => BOTS.filter((to) => to !== from).map((to) => handoffTool(from, to, start))),
     ...BOTS.map((b) => huddleTool(b, start)),
     campaignTool(start),
+    mikaCampaignTool(start),
   ]);
 }
 

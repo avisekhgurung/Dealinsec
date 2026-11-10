@@ -179,7 +179,12 @@ export async function createCampaign(user: Who, raw: unknown, d: Partial<Campaig
   return { ok: true, campaign: campaignView(row, { ...EMPTY_COUNTS, members: own.length, queued: own.length }), added: own.length, left: p.leadIds.length - own.length };
 }
 
-export async function getCampaign(user: Who, id: number, d: Partial<CampaignDeps> = {}): Promise<Result<{ campaign: CampaignView; members: MemberRowView[]; queueEnabled: boolean }>> {
+/**
+ * One campaign with its members. Opening it on the page also tidies up (a discarded draft that was replaced is
+ * re-pointed, and a job that should be running is woken). `readOnly` skips both: it is how a coworker's read tool
+ * looks at a campaign, and a read tool must change nothing at all.
+ */
+export async function getCampaign(user: Who, id: number, d: Partial<CampaignDeps> = {}, opts: { readOnly?: boolean } = {}): Promise<Result<{ campaign: CampaignView; members: MemberRowView[]; queueEnabled: boolean }>> {
   const deps = { ...defaults(), ...d };
   const gate = readGate(user);
   if (gate) return gate;
@@ -187,9 +192,9 @@ export async function getCampaign(user: Who, id: number, d: Partial<CampaignDeps
   const orgId = user.organizationId!;
   const c = await deps.store.get(orgId, id);
   if (!c) return NOT_FOUND();
-  await deps.store.relink(orgId, id);
+  if (!opts.readOnly) await deps.store.relink(orgId, id);
   const members = await deps.store.members(orgId, id);
-  if (c.preparing || c.sending) deps.kick();
+  if (!opts.readOnly && (c.preparing || c.sending)) deps.kick();
   return { ok: true, campaign: campaignView(c, countMembers(members.map(factOf))), members: members.map(memberView), queueEnabled: deps.queueEnabled() };
 }
 

@@ -18,6 +18,8 @@ import type { ProspectCard, RunView } from "../../outbound/service";
 type Result<T> = ({ ok: true } & T) | { ok: false; status: number; code: string; message: string };
 export interface NiboDeps {
   parseIcp(user: unknown, request: string): Promise<Result<{ icp: unknown; searches: string[]; description: string }>>;
+  /** The search a saved client profile starts, for one of its kinds of company: built by rules, no model call. */
+  fromProfile?(user: unknown, profileId: number, kind: string | null): Promise<Result<{ icp: unknown; searches: string[]; description: string }>>;
   startRun(user: unknown, raw: { request: string; icp: unknown; searches: string[] }, opts: { by: "agent" }): Promise<Result<{ run: RunView; existing: boolean }>>;
   getRun(user: unknown, id: string): Promise<Result<{ run: RunView; prospects: ProspectCard[] }>>;
   addToLeads(user: unknown, prospectId: number): Promise<Result<{ leadId: number; existing: boolean }>>;
@@ -40,9 +42,12 @@ export function niboTask(deps: NiboDeps): TaskHandler {
       const cp = ctx.checkpoint;
 
       if (stage === "start") {
-        const parsed = await deps.parseIcp(ctx.user, input.request);
-        if (!parsed.ok) return failed(`I couldn't start the research: ${parsed.message}`, LIMIT_CODES.has(parsed.code) ? "limit" : parsed.code.slice(0, 40));
-        await ctx.event("understood", `Looking for: ${parsed.description}`.slice(0, 300));
+        // From a saved client profile the search is exactly what the profile says: nothing is read from the request and
+        // no model is asked. A profile that is gone is an error to report, never a reason to guess from the words instead.
+        const useProfile = !!input.profileId && !!deps.fromProfile;
+        const parsed = useProfile ? await deps.fromProfile!(ctx.user, input.profileId!, input.kind ?? null) : await deps.parseIcp(ctx.user, input.request);
+        if (!parsed.ok) return failed(useProfile ? `I couldn't start from that client profile: ${parsed.message}` : `I couldn't start the research: ${parsed.message}`, LIMIT_CODES.has(parsed.code) ? "limit" : parsed.code.slice(0, 40));
+        await ctx.event("understood", `${useProfile ? "From your saved profile. " : ""}Looking for: ${parsed.description}`.slice(0, 300));
         // The profile is saved before the search starts: a retried launch sends the SAME profile, which Client Radar
         // recognizes as the search already running (its idempotency key), instead of a re-parse starting a second search.
         return { kind: "continue", stage: "launch", checkpoint: { ...cp, icp: parsed.icp, searches: parsed.searches } };

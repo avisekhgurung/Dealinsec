@@ -29,7 +29,7 @@ describe("starting a task", () => {
     expect(await svc.startLeagueRun(OWNER, "nibo.wire_money", {}, { source: "page" }, d())).toMatchObject({ ok: false, status: 400 });
     const r = ok<any>(await svc.startLeagueRun(OWNER, "nibo.find_clients", { request: "10 dentists in Siliguri" }, { source: "page", idemKey: "page:abc" }, d()));
     expect(r.run).toMatchObject({ bot: "nibo", task: "nibo.find_clients", status: "queued", request: "10 dentists in Siliguri" });
-    expect(mem.runs[0].input).toEqual({ request: "10 dentists in Siliguri", saveLeads: true, maxLeads: 3 });
+    expect(mem.runs[0].input).toEqual({ request: "10 dentists in Siliguri", saveLeads: true, maxLeads: 3, profileId: null, kind: null });
     expect(kicks).toBe(1);
   });
 
@@ -147,7 +147,8 @@ describe("the coworkers' chat tools", () => {
     const all = Object.values(BOT_TOOLS).flat();
     for (const banned of ["approve_outreach", "mark_outreach_sent", "mark_paid", "mark_unpaid", "create_invoice", "create_agreement", "create_signing_link", "share_quotation", "archive_lead", "convert_lead_to_deal", "draft_outreach", "discover_prospects", "add_prospect_to_leads"])
       expect(all, banned).not.toContain(banned);
-    expect(BOT_TOOLS.zee.every((t) => t.startsWith("get_") || t.startsWith("search_"))).toBe(true);
+    // Zee only reads: every tool of hers is a get, a search or a list (list_campaigns: campaign numbers, never message text).
+    expect(BOT_TOOLS.zee.every((t) => t.startsWith("get_") || t.startsWith("search_") || t.startsWith("list_"))).toBe(true);
   });
 
   it("the persona prompt fences remembered preferences as data and says tasks run in the background", () => {

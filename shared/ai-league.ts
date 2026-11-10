@@ -68,15 +68,15 @@ export const LEAGUE_WINDOW_DAYS = 30;
 
 /* ── tasks ───────────────────────────────────────────────────────────────── */
 
-export const TASKS = ["nibo.find_clients", "mika.first_messages", "zee.briefing", "team.huddle", "nibo.campaign"] as const;
+export const TASKS = ["nibo.find_clients", "mika.first_messages", "zee.briefing", "team.huddle", "nibo.campaign", "mika.campaign"] as const;
 export type LeagueTask = (typeof TASKS)[number];
 /** The coworker a task belongs to. A huddle belongs to whoever leads it (see botForTask); "zee" is only its default. */
-export const TASK_BOT: Record<LeagueTask, Bot> = { "nibo.find_clients": "nibo", "mika.first_messages": "mika", "zee.briefing": "zee", "team.huddle": "zee", "nibo.campaign": "nibo" };
+export const TASK_BOT: Record<LeagueTask, Bot> = { "nibo.find_clients": "nibo", "mika.first_messages": "mika", "zee.briefing": "zee", "team.huddle": "zee", "nibo.campaign": "nibo", "mika.campaign": "mika" };
 export const botForTask = (task: LeagueTask, input: unknown): Bot => {
   const lead = (input as { lead?: unknown } | null)?.lead;
   return task === "team.huddle" && isBot(lead) ? lead : TASK_BOT[task];
 };
-export const TASK_LABEL: Record<LeagueTask, string> = { "nibo.find_clients": "Find potential clients", "mika.first_messages": "Draft first messages", "zee.briefing": "Business briefing", "team.huddle": "Team huddle", "nibo.campaign": "Research campaign" };
+export const TASK_LABEL: Record<LeagueTask, string> = { "nibo.find_clients": "Find potential clients", "mika.first_messages": "Draft first messages", "zee.briefing": "Business briefing", "team.huddle": "Team huddle", "nibo.campaign": "Research campaign", "mika.campaign": "Campaign drafts" };
 
 /** Hard limits the server enforces whatever a model or a request says. */
 export const LEAGUE_LIMITS = {
@@ -91,6 +91,10 @@ export const LEAGUE_LIMITS = {
   campaignMaxHours: 24,
   /** How far ahead a campaign may be scheduled to start or deliver. */
   campaignHorizonDays: 7,
+  /** Mika's campaign drafts: at most this many leads put into a NEW outreach campaign in one task (the plan's AI drafts still cap what gets written). */
+  campaignLeads: 50,
+  /** How long Mika follows a campaign's drafting before reporting what is done so far (inside the 45-minute task limit; the campaign itself carries on). */
+  campaignFollowMinutes: 30,
 } as const;
 
 export const TASK_INPUT = {
@@ -99,6 +103,13 @@ export const TASK_INPUT = {
     /** Save the qualified ones to Leads (at most leadsPerRun); otherwise they stay in Client Radar for you to pick. */
     saveLeads: z.boolean().default(true),
     maxLeads: z.number().int().min(1).max(LEAGUE_LIMITS.leadsPerRun).default(3),
+    /**
+     * A saved client profile to start from (shared/acquisition-profile.ts), and which of its kinds of company. With a
+     * profile the search is built from it by plain rules: `request` is then only the line shown on the search, and no
+     * model reads it. null = read `request`, exactly as before profiles existed.
+     */
+    profileId: z.number().int().positive().nullable().default(null),
+    kind: z.string().trim().max(80).nullable().default(null),
   }).strict(),
   "mika.first_messages": z.object({
     /** Specific leads, or (empty) the newest researched leads with nothing sent yet. */
@@ -119,6 +130,14 @@ export const TASK_INPUT = {
     deliverAt: z.string().datetime().nullable().default(null),
     /** IANA timezone the person gave the times in (reports and messages use it). */
     timezone: z.string().min(3).max(64).default("Asia/Kolkata"),
+  }).strict(),
+  "mika.campaign": z.object({
+    /** An outreach campaign that already exists (prepare its drafts), or null to make a new one from `leadIds` / the newest open leads. */
+    campaignId: z.number().int().positive().nullable().default(null),
+    name: z.string().trim().max(80).default(""),
+    leadIds: z.array(z.number().int().positive()).max(LEAGUE_LIMITS.campaignLeads).default([]),
+    /** With no leadIds: how many of the newest open leads to put in the new campaign. */
+    max: z.number().int().min(1).max(LEAGUE_LIMITS.campaignLeads).default(10),
   }).strict(),
   "team.huddle": z.object({
     topic: z.string().trim().min(8, "Say what the team should think about, for example \"How do we get 5 new dental clients this month?\"").max(LEAGUE_LIMITS.requestChars),

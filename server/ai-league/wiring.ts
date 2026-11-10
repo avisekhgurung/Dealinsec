@@ -10,6 +10,7 @@ import { mikaTask } from "./tasks/mika";
 import { localeOf, zeeTask } from "./tasks/zee";
 import { huddleTask } from "./team";
 import { campaignTask } from "./tasks/campaign";
+import { mikaCampaignTask } from "./tasks/mika-campaign";
 import { CapExceeded, CapUnavailable } from "../llm/traced";
 
 export function buildHandlers(): Record<LeagueTask, TaskHandler> {
@@ -19,6 +20,7 @@ export function buildHandlers(): Record<LeagueTask, TaskHandler> {
       startRun: async (u, raw, opts) => (await import("../outbound/service")).startRun(u as any, raw, opts),
       getRun: async (u, id) => (await import("../outbound/service")).getRun(u as any, id),
       addToLeads: async (u, id) => (await import("../outbound/service")).addToLeads(u as any, id),
+      fromProfile: async (u, profileId, kind) => (await import("../profiles/service")).searchFromProfile(u as any, profileId, { industry: kind }),
     }),
     "mika.first_messages": mikaTask({
       listLeads: async (u, limit) => (await import("../services/leads")).listLeads(u as any, { limit }) as any,
@@ -28,6 +30,9 @@ export function buildHandlers(): Record<LeagueTask, TaskHandler> {
       briefing: async (u) => (await import("../copilot/insights")).computeBriefing(u as any),
       followUps: async (u) => (await import("../services/leads")).listFollowUps(u as any),
       waitingDrafts: async (u) => (await import("../sales/outreach")).listOutreachQueue(u as any, { status: "waiting" }) as any,
+      campaigns: async (u) => (await import("../campaigns/service")).listCampaigns(u as any) as any,
+      // Counts only: the list itself (subjects, addresses) is dropped here and never reaches the task.
+      replies: async (u) => { const r = await (await import("../mail/inbox")).listInbox(u as any, {}); return r.ok ? { ok: true as const, counts: { needs_review: r.counts.needs_review, interested: r.counts.interested } } : (r as any); },
       locale: async (u) => { const { storage } = await import("../storage"); return localeOf(await storage.getOrganization((u as any).organizationId), u as any); },
       summarize: async (u, facts) => {
         const user = u as { id: string; organizationId: string };
@@ -49,6 +54,12 @@ export function buildHandlers(): Record<LeagueTask, TaskHandler> {
       getRun: async (u, id) => (await import("../outbound/service")).getRun(u as any, id),
       addToLeads: async (u, id) => (await import("../outbound/service")).addToLeads(u as any, id),
       cancelRun: async (u, id) => (await import("../outbound/service")).cancelRun(u as any, id),
+    }),
+    "mika.campaign": mikaCampaignTask({
+      audience: async (u) => (await import("../campaigns/service")).audience(u as any, {}) as any,
+      createCampaign: async (u, raw) => (await import("../campaigns/service")).createCampaign(u as any, raw) as any,
+      getCampaign: async (u, id) => (await import("../campaigns/service")).getCampaign(u as any, id) as any,
+      startPreparing: async (u, id) => (await import("../campaigns/service")).startPreparing(u as any, id) as any,
     }),
     "team.huddle": huddleTask({
       chat: async (ctx, messages, opts) => {

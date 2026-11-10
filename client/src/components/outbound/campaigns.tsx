@@ -304,8 +304,13 @@ function CampaignDetail({ id, canEdit, onBack }: { id: number; canEdit: boolean;
 
 /* ── the tab ────────────────────────────────────────────────────────────── */
 
+/** ?campaign=<id> opens that campaign straight away (a coworker's "Review in Campaigns" link). Read once, on arrival. */
+const linkedCampaign = (): number | null => {
+  try { const n = Number(new URLSearchParams(window.location.search).get("campaign")); return Number.isInteger(n) && n > 0 ? n : null; } catch { return null; }
+};
+
 export function Campaigns({ canEdit }: { canEdit: boolean }) {
-  const [openId, setOpenId] = useState<number | null>(null);
+  const [openId, setOpenId] = useState<number | null>(linkedCampaign);
   const [creating, setCreating] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const q = useQuery<ListResponse>({ queryKey: [CAMPAIGNS_URL], retry: false, refetchInterval: (query) => (query.state.data?.campaigns.some((c) => c.preparing || c.sending) ? 8000 : false) });

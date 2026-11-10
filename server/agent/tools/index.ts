@@ -45,5 +45,6 @@ import { READ_TOOLS } from "./reads";
 import { OUTBOUND_TOOLS } from "./outbound";
 import { SALES_TOOLS } from "./sales";
 import { WORKSPACE_TOOLS } from "./workspace";
+import { CAMPAIGN_TOOLS } from "./campaigns";
 
-export const AGENT_TOOLS: readonly AgentTool<any>[] = validateRegistry([...READ_TOOLS, ...DEAL_TOOLS, ...DOCUMENT_TOOLS, ...PAYMENT_TOOLS, ...LEAD_TOOLS, ...IDEAL_CLIENT_TOOLS, ...REVISE_TOOLS, ...DOCUMENT_STYLE_TOOLS, ...WORKSPACE_TOOLS, ...KNOWLEDGE_TOOLS, ...SALES_TOOLS, ...OUTBOUND_TOOLS]);
+export const AGENT_TOOLS: readonly AgentTool<any>[] = validateRegistry([...READ_TOOLS, ...DEAL_TOOLS, ...DOCUMENT_TOOLS, ...PAYMENT_TOOLS, ...LEAD_TOOLS, ...IDEAL_CLIENT_TOOLS, ...REVISE_TOOLS, ...DOCUMENT_STYLE_TOOLS, ...WORKSPACE_TOOLS, ...KNOWLEDGE_TOOLS, ...SALES_TOOLS, ...OUTBOUND_TOOLS, ...CAMPAIGN_TOOLS]);

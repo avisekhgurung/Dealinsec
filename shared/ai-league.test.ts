@@ -34,13 +34,13 @@ describe("schedules in the person's timezone", () => {
 describe("tasks: the server's bounds, whatever is asked", () => {
   it("Nibo saves at most 5 leads a run and needs a real request; Mika drafts at most 5; Zee takes nothing", () => {
     expect(TASK_INPUT["nibo.find_clients"].safeParse({ request: "dentists in Siliguri", maxLeads: 50 }).success).toBe(false);
-    expect(TASK_INPUT["nibo.find_clients"].parse({ request: "10 dentists in Siliguri" })).toEqual({ request: "10 dentists in Siliguri", saveLeads: true, maxLeads: 3 });
+    expect(TASK_INPUT["nibo.find_clients"].parse({ request: "10 dentists in Siliguri" })).toEqual({ request: "10 dentists in Siliguri", saveLeads: true, maxLeads: 3, profileId: null, kind: null });
     expect(TASK_INPUT["nibo.find_clients"].safeParse({ request: "x" }).success).toBe(false);
     expect(TASK_INPUT["nibo.find_clients"].safeParse({ request: "10 dentists in Siliguri", sendEmails: true }).success).toBe(false); // strict: no smuggled options
     expect(TASK_INPUT["mika.first_messages"].safeParse({ max: 9 }).success).toBe(false);
     expect(TASK_INPUT["mika.first_messages"].safeParse({ leadIds: [1, 2, 3, 4, 5, 6] }).success).toBe(false);
     expect(TASK_INPUT["zee.briefing"].safeParse({ anything: 1 }).success).toBe(false);
-    expect(LEAGUE_LIMITS).toEqual({ leadsPerRun: 5, draftsPerRun: 5, requestChars: 500, huddleRounds: 2, consultsPerReply: 2, campaignTarget: 50, campaignSearches: 10, campaignMaxHours: 24, campaignHorizonDays: 7 });
+    expect(LEAGUE_LIMITS).toEqual({ leadsPerRun: 5, draftsPerRun: 5, requestChars: 500, huddleRounds: 2, consultsPerReply: 2, campaignTarget: 50, campaignSearches: 10, campaignMaxHours: 24, campaignHorizonDays: 7, campaignLeads: 50, campaignFollowMinutes: 30 });
   });
 
   it("three distinct coworkers; terminal states are terminal", () => {
