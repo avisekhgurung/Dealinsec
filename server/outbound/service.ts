@@ -18,16 +18,17 @@ import { parseJsonObject } from "../agent/extraction";
 import { agentLog } from "../agent/log";
 import { DiscoveryError } from "../discovery/types";
 import { CapExceeded, CapUnavailable, GlobalCapExceeded, WorkspaceBudgetExceeded, tracedChat } from "../llm/traced";
-import { dailyLimit } from "@shared/llm-cost";
+import { dailyLimit, utcDayStart } from "@shared/llm-cost";
 import { profileStore } from "../leads/profile-store";
 import { addClaim, addNote, createLead, fail, readGate, writeGate, type Result, type Who } from "../services/leads";
 import { PROMPT_VERSIONS, angleSystemPrompt, angleUserMessage, icpSystemPrompt, icpUserMessage } from "./prompts";
-import { pipelineDeps, newRunId, researchOne, enrichOne, scoreProspect, type PipelineDeps, type QueryPlan, type RunCountersExt } from "./pipeline";
+import { pipelineDeps, newRunId, researchOne, enrichOne, scoreProspect, runModeOf, settledSearch, type PipelineDeps, type QueryPlan, type RunCountersExt } from "./pipeline";
+import { OUTSIDE_BATCH, OUTSIDE_KIND, OUTSIDE_LABEL, outsideFindings, outsideQuery, type OutsideType } from "@shared/outside-research";
 import { prospectsTablesReady, RunActive, RunLimitReached } from "./store";
 import { isProspectFeedback, type ProspectFeedback } from "@shared/prospect-feedback";
-import { dailyContactLimit, dailyRunLimit, outboundAllowance } from "./limits";
+import { dailyContactLimit, dailyRunLimit, dailySearchLimit, globalSearchLimit, outboundAllowance, workspaceMonthlySpendMicroUsd } from "./limits";
 import { outboundTier } from "./plan";
-import { OUTBOUND_WINDOW_DAYS, TIER_LABEL } from "@shared/outbound-plans";
+import { OUTBOUND_WINDOW_DAYS, TIER_LABEL, isRunMode, type RunMode } from "@shared/outbound-plans";
 import { outboundRunner } from "./runner";
 import { costMicroUsd } from "./providers";
 
@@ -83,6 +84,8 @@ export async function parseIcp(user: Who, request: unknown, d: Partial<PipelineD
 
 export interface RunView {
   id: string; status: string; stage: string; request: string; icp: Icp; description: string; quantity: number;
+  /** "deep" researches each company it keeps; "list" is a bulk sweep that stops after checking each website. */
+  mode: RunMode;
   counters: RunCountersExt; costUsd: number; errorCode: string | null; createdAt: string; finishedAt: string | null;
   queries: { q: string; provider: string; done: boolean; ok?: boolean; results?: number; error?: string }[];
   /** Who started it: the person on the Client Radar page, or the agent on their behalf (after their approval). */
@@ -90,7 +93,7 @@ export interface RunView {
 }
 const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : null);
 export const runView = (r: ProspectRunRow): RunView => ({
-  id: r.id, status: r.status, stage: r.stage, request: r.request, icp: r.icp as Icp, description: describeIcp(r.icp as Icp), quantity: r.quantity,
+  id: r.id, status: r.status, stage: r.stage, request: r.request, icp: r.icp as Icp, description: describeIcp(r.icp as Icp), quantity: r.quantity, mode: runModeOf(r),
   counters: (r.counters ?? {}) as RunCountersExt, costUsd: Math.round(r.costMicroUsd / 100) / 10_000, errorCode: r.errorCode, createdAt: iso(r.createdAt)!, finishedAt: iso(r.finishedAt),
   queries: ((r.queries as QueryPlan[]) ?? []).map((q) => ({ q: q.q, provider: q.provider, done: q.done, ok: q.ok, results: q.results, error: q.error })),
   by: r.createdBy === "agent" ? "agent" : "user",
@@ -104,7 +107,7 @@ export async function searchAvailable(d: Partial<PipelineDeps> = {}): Promise<bo
   return (await deps.searchProviders()).length > 0;
 }
 
-export async function startRun(user: Who, raw: { request?: unknown; icp?: unknown; searches?: unknown }, opts: { by?: "user" | "agent" } = {}, d: Partial<PipelineDeps> = {}): Promise<Result<{ run: RunView; existing: boolean }>> {
+export async function startRun(user: Who, raw: { request?: unknown; icp?: unknown; searches?: unknown; mode?: unknown }, opts: { by?: "user" | "agent" } = {}, d: Partial<PipelineDeps> = {}): Promise<Result<{ run: RunView; existing: boolean }>> {
   const deps = { ...pipelineDeps(), ...d };
   const gate = writeGate(user);
   if (gate) return gate;
@@ -115,29 +118,39 @@ export async function startRun(user: Who, raw: { request?: unknown; icp?: unknow
   // The plan decides how many searches a month and how many companies one search may look for (shared/outbound-plans.ts).
   const tier = await outboundTier(user);
   const allowance = outboundAllowance(tier);
-  const icp = withSavedExclusions({ ...parsed.data, quantity: Math.min(parsed.data.quantity, allowance.maxCompanies) }, await savedProfile(orgId));
+  const mode: RunMode = isRunMode(raw.mode) ? raw.mode : "deep";
+  const list = mode === "list";
+  // maxCompanies exists to cap what a search RESEARCHES, which is where the model money goes. A list sweep researches
+  // nothing, so that cap would only make it needlessly narrow: it is bounded instead by the run budget's verify ceiling
+  // (shared/prospect.ts runBudget) and by what the search index actually returns.
+  const quantity = list ? parsed.data.quantity : Math.min(parsed.data.quantity, allowance.maxCompanies);
+  const icp = withSavedExclusions({ ...parsed.data, quantity }, await savedProfile(orgId));
   const providers = await deps.searchProviders();
   if (!providers.length) return fail(503, "DISCOVERY_NOT_SETUP", "Web search isn't set up on this server yet, so I can't search for companies.");
   const now = deps.now();
   // Checked here for a quick answer, and again by createRun under a per-workspace lock with the insert, so searches
   // started at the same moment can't go past either limit together.
+  const monthly = list ? allowance.monthlyLists : allowance.monthlySearches;
   const limits = [
-    { since: new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY), max: allowance.monthlySearches },
+    { since: new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY), max: monthly, mode },
+    // The daily cap counts every run of either kind: it is there to protect the server, not to ration a plan.
     { since: new Date(now.getTime() - DAY), max: dailyRunLimit(orgId) },
   ];
-  // The researched-prospects allowance: a new search may research only what is left of it (index limits.length).
-  const prospects = { since: limits[0].since, max: allowance.monthlyProspects };
+  // The researched-prospects allowance: a new deep search may research only what is left of it (index limits.length).
+  // A list sweep researches nothing, so it neither checks nor holds any of it.
+  const prospects = list ? undefined : { since: limits[0].since, max: allowance.monthlyProspects };
+  const what = list ? "bulk list sweeps" : "Client Radar searches";
   const limitReached = (i: number) => i === 0 || i === limits.length
     ? tier === "free"
       ? fail(402, "NO_CREDITS", i === 0
-        ? `You've used the free plan's ${allowance.monthlySearches} Client Radar searches for this 30-day period. Upgrade to Pro for more.`
+        ? `You've used the free plan's ${monthly} ${what} for this 30-day period. Upgrade to Pro for more.`
         : `You've used the free plan's ${allowance.monthlyProspects} researched prospects for this 30-day period. Upgrade to Pro for more.`, { feature: "outbound" })
       : fail(429, "monthly_limit", i === 0
-        ? `You've used the ${allowance.monthlySearches} Client Radar searches included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`
+        ? `You've used the ${monthly} ${what} included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier ones pass 30 days.`
         : `You've used the ${allowance.monthlyProspects} researched prospects included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`)
     : fail(429, "daily_limit", `You've started today's ${dailyRunLimit(orgId)} prospect searches. Try again tomorrow.`);
-  for (let i = 0; i < limits.length; i++) if ((await deps.store.countRunsSince(orgId, limits[i].since)) >= limits[i].max) return limitReached(i);
-  if ((await deps.store.prospectsHeldSince(orgId, prospects.since)) >= prospects.max) return limitReached(limits.length);
+  for (let i = 0; i < limits.length; i++) if ((await deps.store.countRunsSince(orgId, limits[i].since, limits[i].mode)) >= limits[i].max) return limitReached(i);
+  if (prospects && (await deps.store.prospectsHeldSince(orgId, prospects.since)) >= prospects.max) return limitReached(limits.length);
   // The searches the person saw (and may have edited) are the plan, each re-checked; none given = the default strategies.
   const given = Array.isArray(raw.searches) ? (raw.searches as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 12) : [];
   const max = runBudget(icp.quantity).queries;
@@ -146,9 +159,9 @@ export async function startRun(user: Who, raw: { request?: unknown; icp?: unknow
   const queries: QueryPlan[] = plan.map((q, i) => ({ q, provider: providers[i % providers.length].name, done: false }));
   if (!queries.length) return fail(422, "unclear", "I couldn't build a search from that profile. Add the kind of business you want.");
   const request = typeof raw.request === "string" && raw.request.trim() ? raw.request.trim().slice(0, 500) : describeIcp(icp);
-  const idemKey = createHash("sha256").update(`${orgId}|${stable(icp)}`).digest("hex");
+  const idemKey = createHash("sha256").update(`${orgId}|${mode}|${stable(icp)}`).digest("hex");
   try {
-    const run = await deps.store.createRun({ id: newRunId(), orgId, userId: user.id, by: opts.by ?? "user", request, icp, quantity: icp.quantity, idemKey, queries, now, limits, prospects });
+    const run = await deps.store.createRun({ id: newRunId(), orgId, userId: user.id, by: opts.by ?? "user", request, icp, quantity: icp.quantity, mode, idemKey, queries, now, limits, prospects });
     (deps.kick ?? (() => outboundRunner.kick()))();
     return { ok: true, run: runView(run), existing: false };
   } catch (e) {
@@ -219,10 +232,10 @@ export function evidenceOf(f: ProspectFindingRow, now: Date): Evidence {
   const d = f.kind === "signal" ? signalDating(likeOf(f), now) : null;
   const fr = d ? (d.usable ? { band: d.band } : { band: "unknown" as const }) : null;
   // A named employee who is not a senior decision-maker is labelled for what they are.
-  const label = f.kind === "signal" ? (isSignalType(f.type) ? SIGNAL_LABEL[f.type] : f.type) : f.kind === "decision_maker" ? (senior(f) ? "Decision maker" : "Employee") : f.kind === "opportunity" ? "Opportunity" : f.type === "contact_form" && !isContactFormRoute(likeOf(f)) ? "Contact page (no form confirmed)" : LABEL[f.type] ?? f.type;
+  const label = f.kind === OUTSIDE_KIND ? (OUTSIDE_LABEL[f.type as OutsideType] ?? f.type) : f.kind === "signal" ? (isSignalType(f.type) ? SIGNAL_LABEL[f.type] : f.type) : f.kind === "decision_maker" ? (senior(f) ? "Decision maker" : "Employee") : f.kind === "opportunity" ? "Opportunity" : f.type === "contact_form" && !isContactFormRoute(likeOf(f)) ? "Contact page (no form confirmed)" : LABEL[f.type] ?? f.type;
   return {
     id: f.id, kind: f.kind, type: f.type, label, value: f.value, status: f.status, source: f.sourceType, url: f.sourceUrl, quote: f.quote, observedAt: iso(f.observedAt),
-    freshness: fr ? FRESHNESS_LABEL[fr.band] : undefined, date: d ? dateLabel(likeOf(f)) : undefined, datePrecision: d ? d.precision : undefined, timing: d ? timingOf([{ ...likeOf(f), status: "confirmed" }], now).timing : undefined, supports: (f.supportingIds as number[]) ?? [], meta: f.kind === "decision_maker" ? (f.meta as Record<string, unknown>) : undefined, senior: f.kind === "decision_maker" ? senior(f) : undefined,
+    freshness: fr ? FRESHNESS_LABEL[fr.band] : undefined, date: d ? dateLabel(likeOf(f)) : undefined, datePrecision: d ? d.precision : undefined, timing: d ? timingOf([{ ...likeOf(f), status: "confirmed" }], now).timing : undefined, supports: (f.supportingIds as number[]) ?? [], meta: f.kind === "decision_maker" || f.kind === OUTSIDE_KIND ? (f.meta as Record<string, unknown>) : undefined, senior: f.kind === "decision_maker" ? senior(f) : undefined,
     confidence: f.confidence, retrievedAt: iso(f.retrievedAt),
   };
 }
@@ -264,7 +277,7 @@ export function prospectCard(p: ProspectRow, fs: ProspectFindingRow[], now: Date
     classification, classificationLabel: PROSPECT_CLASS_LABEL[classification], timing: r.timing, timingLabel: TIMING_LABEL[r.timing], blockers: r.missing,
     profile: { industry: prof.industry?.value ?? null, location: prof.location?.value ?? null, country: prof.country?.value ?? null, employees: prof.team_size?.value ?? null, serves: prof.target_customers?.value ?? null },
     whyNow: sig ? evidenceOf(sig, now) : null, opportunity: opp ? evidenceOf(opp, now) : null, decisionMaker: person && senior(person) ? evidenceOf(person, now) : null, contactPerson: person && !senior(person) ? evidenceOf(person, now) : null,
-    evidenceCount: fs.filter((f) => f.kind !== "opportunity").length, leadId: p.leadId, researched: fs.some((f) => f.batch === "research"),
+    evidenceCount: fs.filter((f) => f.kind !== "opportunity" && f.kind !== OUTSIDE_KIND).length, leadId: p.leadId, researched: fs.some((f) => f.batch === "research"),
     contact: fs.some((f) => hasVerifiedEmail(likeOf(f))) ? "verified"
       : fs.some((f) => (f.kind === "fact" && f.type === "business_email" && f.status === "confirmed") || isContactFormRoute(likeOf(f))) ? "public" : "none",
     siteSignals: fs.filter((f) => f.kind === "fact" && f.type === "site_signal").map((f) => f.value),
@@ -292,7 +305,9 @@ export async function getRun(user: Who, id: string, d: Partial<PipelineDeps> = {
 }
 
 export interface StoredAngle { problem: string; opportunity: string; positioning: string; targetPerson: string | null; reason: string; evidenceIds: number[]; confidence: "low" | "medium"; plan?: OpportunityPlan | null; promptVersion?: string; at?: string }
-export interface ProspectBrief { prospect: ProspectCard; facts: Evidence[]; signals: Evidence[]; people: Evidence[]; inferences: Evidence[]; opportunities: Evidence[]; sources: { provider: string; query: string; url: string; title: string }[]; angle: StoredAngle | null; providers: { contact: boolean };
+export interface ProspectBrief { prospect: ProspectCard; facts: Evidence[]; signals: Evidence[]; people: Evidence[]; inferences: Evidence[]; opportunities: Evidence[];
+  /** What other sites say about the company (shared/outside-research.ts): unverified, shown apart, read by nothing else. */
+  outside: Evidence[]; sources: { provider: string; query: string; url: string; title: string }[]; angle: StoredAngle | null; providers: { contact: boolean };
   /** The angle's opportunity score (shared/opportunity-score.ts), worked out again from today's evidence; null without an angle. */
   opportunityScore: OpportunityScore | null }
 
@@ -355,6 +370,7 @@ export async function getProspect(user: Who, id: number, d: Partial<PipelineDeps
       people: ev.filter((e) => e.kind === "decision_maker").sort((a, b) => Number(!!b.senior) - Number(!!a.senior) || Number((a.meta as any)?.rank ?? 99) - Number((b.meta as any)?.rank ?? 99)),
       inferences: ev.filter((e) => e.kind === "fact" && e.status !== "confirmed"),
       opportunities: ev.filter((e) => e.kind === "opportunity"),
+      outside: ev.filter((e) => e.kind === OUTSIDE_KIND),
       sources: (p.sources as ProspectBrief["sources"]) ?? [], angle: (p.angle as StoredAngle | null) ?? null, providers: { contact: !!deps.contact },
       opportunityScore: opportunityScoreOf(p, ev),
     },
@@ -398,6 +414,58 @@ export async function researchProspect(user: Who, id: number, runId: unknown, d:
     return fail(502, "model_unavailable", "The research didn't finish. Try again in a moment.");
   }
   return getProspect(user, id, d);
+}
+
+/**
+ * Looks OUTSIDE the company's own website: one web search for what other sites say about it (funding, hiring, a
+ * launch, a partnership, an expansion, a leadership change). On demand only, one company at a time — never part of
+ * a run — because it is a billed search and most companies have nothing written about them.
+ *
+ * No model reads the results: shared/outside-research.ts keeps a result only when it names the company and reads
+ * like a business event. What is kept is stored as its own kind of finding that nothing else reads, so it cannot
+ * make a prospect "Ready", change its score or reach a drafted message; it is shown apart, as unverified.
+ *
+ * The search is reserved against the same budgets as any Client Radar web search (the workspace's daily searches,
+ * the platform's daily cap, the workspace's spend ceiling) and settled with what really happened.
+ */
+export async function researchOutside(user: Who, id: number, d: Partial<PipelineDeps> = {}): Promise<Result<{ brief: ProspectBrief; found: number; read: number }>> {
+  const deps = { ...pipelineDeps(), ...d };
+  const gate = writeGate(user);
+  if (gate) return gate;
+  if (!(await ready())) return NOT_SETUP();
+  const orgId = user.organizationId!;
+  const p = await deps.store.getProspect(orgId, id);
+  if (!p) return fail(404, "not_found", "That company isn't in your workspace.");
+  if (p.status === "rejected") return fail(409, "rejected", `This company was set aside: ${REJECT_LABEL[(p.rejectReason ?? "failed") as RejectReason] ?? "it couldn't be checked"}.`);
+  const providers = await deps.searchProviders();
+  // The provider that can limit a search to the last year, when there is one: old news is not a reason to get in touch.
+  const provider = providers.find((x) => x.name === "tavily") ?? providers[0];
+  if (!provider) return fail(503, "DISCOVERY_NOT_SETUP", "Web search isn't set up on this server yet.");
+  const now = deps.now();
+  if ((await deps.store.countProviderCalls({ orgId, operation: "search", since: new Date(now.getTime() - DAY) })) >= dailySearchLimit(orgId)) return fail(429, "daily_limit", "Today's web searches for this workspace are used. Try again tomorrow.");
+  let reservation: number | null | "workspace";
+  try {
+    reservation = await deps.store.reserveSearch({
+      orgId, runId: null, provider: provider.name, costMicroUsd: costMicroUsd(provider.name), limit: globalSearchLimit(), since: utcDayStart(now), now,
+      workspace: { since: new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY), maxMicroUsd: workspaceMonthlySpendMicroUsd(process.env, orgId) },
+    });
+  } catch { return fail(503, "cap_unavailable", "The search allowance couldn't be checked just now, so nothing was searched. Try again in a moment."); }
+  if (reservation === null) return fail(429, "global_limit", "Today's web searches are used up. Try again tomorrow.");
+  if (reservation === "workspace") return fail(429, "workspace_budget", "This workspace's usage for the last 30 days has reached its limit. It frees up as earlier usage passes 30 days.");
+  let results: { url: string; title: string; snippet?: string }[];
+  try { results = await settledSearch(deps, reservation, provider.name, () => provider.search(outsideQuery(p.name, p.domain), { count: 10, recency: "year" })); }
+  catch (e) {
+    agentLog("error", { errorType: (e as Error)?.name ?? "Error", where: "outbound_outside" });
+    return fail(502, "search_unavailable", "The web search didn't finish, so nothing was changed. Try again in a moment.");
+  }
+  const found = outsideFindings(results, { name: p.name, domain: p.domain, now });
+  // Replaces the last look: what the web said then is not kept beside what it says now.
+  await deps.store.saveStep({ orgId, prospectId: p.id, batch: OUTSIDE_BATCH, now, findings: found.map((f) => ({
+    kind: OUTSIDE_KIND, type: f.type, value: f.value, status: "inferred", sourceUrl: f.url, sourceType: "web", quote: f.quote, observedAt: f.observedAt, confidence: "low",
+    meta: { label: f.label, publisher: f.publisher, datePrecision: f.datePrecision },
+  })) });
+  const brief = await getProspect(user, id, d);
+  return brief.ok ? { ok: true, brief: brief.brief, found: found.length, read: results.length } : brief;
 }
 
 /** Named people at the company from the connected contact provider, with the provider's own verification status. */

@@ -46,6 +46,8 @@ export interface OutboundUsage {
     tier: OutboundTier; label: string; searches: Allowance | null; maxCompanies: number; windowDays: number;
     /** The plan's other allowances over the same 30 days (shared/outbound-plans.ts says what each counts); null = couldn't be counted. */
     prospects: Allowance | null; drafts: Allowance | null; sends: Allowance | null;
+    /** Bulk list sweeps over the same 30 days: its own pool, because a sweep makes no model call. */
+    lists: Allowance | null;
     /** How much of the workspace's AI and provider spend ceiling the last 30 days used, 0–100 (never dollars). */
     spendPercent: number | null;
   };
@@ -61,7 +63,7 @@ export interface UsageDeps {
   contactReady: () => boolean;
   localReady?: () => boolean;
   /** Runs started in the window, newest first (enough of them to cover the allowance). */
-  recentRuns: (orgId: string, since: Date, limit: number) => Promise<Pick<ProspectRunRow, "status" | "counters" | "createdAt">[]>;
+  recentRuns: (orgId: string, since: Date, limit: number) => Promise<Pick<ProspectRunRow, "status" | "counters" | "createdAt" | "mode">[]>;
   /** The workspace's plan for Client Radar. */
   tier: (user: Who) => Promise<OutboundTier>;
   countProviderCalls: (o: { orgId?: string; operation: string; since: Date }) => Promise<number>;
@@ -98,13 +100,20 @@ export async function outboundUsage(user: Who, d: Partial<UsageDeps> = {}): Prom
   });
   const tier = (await safe(() => deps.tier(user))) ?? "free";
   const planAllowance = outboundAllowance(tier);
-  const monthly = await safe(async () => {
-    const windowMs = OUTBOUND_WINDOW_DAYS * DAY;
-    const counted = (await deps.recentRuns(orgId, new Date(now.getTime() - windowMs), Math.max(40, planAllowance.monthlySearches + 5))).filter(runCountsTowardLimit);
+  const windowMs = OUTBOUND_WINDOW_DAYS * DAY;
+  // One read of the window, split by mode: deep searches and list sweeps have separate allowances, so a sweep must
+  // not show up as a used search (and vice versa). A row from before list mode has no mode and is a deep search.
+  const monthlyRuns = await safe(async () =>
+    (await deps.recentRuns(orgId, new Date(now.getTime() - windowMs), Math.max(80, planAllowance.monthlySearches + planAllowance.monthlyLists + 5))).filter(runCountsTowardLimit));
+  const pool = (want: "deep" | "list", limit: number): Allowance | null => {
+    if (!monthlyRuns) return null;
+    const counted = monthlyRuns.filter((r) => (r.mode === "list" ? "list" : "deep") === want);
     const oldest = counted.length ? counted.reduce((a, r) => (r.createdAt < a ? r.createdAt : a), counted[0].createdAt) : null;
-    return allowance(counted.length, planAllowance.monthlySearches, oldest ? new Date(new Date(oldest).getTime() + windowMs) : null);
-  });
-  const windowStart = new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY);
+    return allowance(counted.length, limit, oldest ? new Date(new Date(oldest).getTime() + windowMs) : null);
+  };
+  const monthly = pool("deep", planAllowance.monthlySearches);
+  const lists = pool("list", planAllowance.monthlyLists);
+  const windowStart = new Date(now.getTime() - windowMs);
   const prospects = await safe(async () => allowance(await deps.prospectsHeld(orgId, windowStart), planAllowance.monthlyProspects, null));
   const drafts = await safe(async () => allowance(await deps.aiDrafts(orgId, windowStart), planAllowance.monthlyDrafts, null));
   const sends = await safe(async () => allowance(await deps.gmailSends(orgId, windowStart), planAllowance.monthlySends, null));
@@ -128,7 +137,7 @@ export async function outboundUsage(user: Who, d: Partial<UsageDeps> = {}): Prom
       localReady: deps.localReady ? deps.localReady() : false,
       charge: "included",
       workspace: { searches, webSearches, contactLookups },
-      plan: { tier, label: TIER_LABEL[tier], searches: monthly, maxCompanies: planAllowance.maxCompanies, windowDays: OUTBOUND_WINDOW_DAYS, prospects, drafts, sends, spendPercent },
+      plan: { tier, label: TIER_LABEL[tier], searches: monthly, maxCompanies: planAllowance.maxCompanies, windowDays: OUTBOUND_WINDOW_DAYS, prospects, drafts, sends, lists, spendPercent },
       perSearch: { webSearches: perSearch },
       platform: { state: state ?? "unknown", resetsAt: new Date(dayStart.getTime() + DAY).toISOString() },
     },

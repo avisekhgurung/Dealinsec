@@ -9,6 +9,8 @@
  *
  * Per plan, over a rolling 30 days (shared/outbound-plans.ts says exactly what each one counts):
  *   OUTBOUND_MONTHLY_SEARCHES_FREE / _TRIAL / _PRO   searches                         (defaults 3 / 10 / 10)
+ *   OUTBOUND_MONTHLY_LISTS_FREE / _TRIAL / _PRO      bulk list sweeps                 (defaults 3 / 30 / 30)
+ *   SOCIAL_MONTHLY_SCANS_FREE / _TRIAL / _PRO        Social Intent scans              (defaults 3 / 30 / 30)
  *   OUTBOUND_MAX_COMPANIES_FREE / _TRIAL / _PRO      companies one search may look for (defaults 10 / 10 / 10)
  *   OUTBOUND_MONTHLY_PROSPECTS_FREE / _TRIAL / _PRO  researched prospects              (defaults 30 / 100 / 100)
  *   OUTBOUND_MONTHLY_DRAFTS_FREE / _TRIAL / _PRO     AI first-message drafts           (defaults 3 / 10 / 10)
@@ -40,6 +42,8 @@ export function outboundAllowance(tier: OutboundTier): OutboundAllowance {
   const d = OUTBOUND_ALLOWANCE_DEFAULTS[tier], up = tier.toUpperCase(), env = process.env;
   return {
     monthlySearches: int(env[`OUTBOUND_MONTHLY_SEARCHES_${up}`], d.monthlySearches),
+    monthlyLists: int(env[`OUTBOUND_MONTHLY_LISTS_${up}`], d.monthlyLists),
+    monthlySocialScans: int(env[`SOCIAL_MONTHLY_SCANS_${up}`], d.monthlySocialScans),
     maxCompanies: int(env[`OUTBOUND_MAX_COMPANIES_${up}`], d.maxCompanies),
     monthlyProspects: int(env[`OUTBOUND_MONTHLY_PROSPECTS_${up}`], d.monthlyProspects),
     monthlyDrafts: int(env[`OUTBOUND_MONTHLY_DRAFTS_${up}`], d.monthlyDrafts),

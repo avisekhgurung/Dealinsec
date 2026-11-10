@@ -33,6 +33,29 @@ export function opportunitySources(env: NodeJS.ProcessEnv = process.env): Opport
 }
 
 /**
+ * The demand sources Social Intent may scan, in the order they are shown. Each exists only when it can honestly work:
+ *   hn      always (a free, keyless, official public API)
+ *   reddit  only with BOTH REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET (see reddit.ts: Reddit's approval comes first)
+ *   web     only with TAVILY_API_KEY: the one provider here that can restrict a search to given sites, which is what
+ *           keeps a paid query on forums instead of on agencies' own sales pages
+ * SOCIAL_SOURCES=hn,web narrows the set (a kill switch per source); it can never add one that isn't configured.
+ */
+export async function socialSources(env: NodeJS.ProcessEnv = process.env): Promise<OpportunitySource[]> {
+  const { RedditSource, DEFAULT_REDDIT_USER_AGENT } = await import("./reddit");
+  const { WebDiscussionSource } = await import("./web-discussions");
+  const { TavilyProvider } = await import("./tavily");
+  const make: Record<string, () => OpportunitySource | null> = {
+    hn: () => new HnSource(env.HN_ALGOLIA_URL || undefined),
+    reddit: () => (env.REDDIT_CLIENT_ID && env.REDDIT_CLIENT_SECRET
+      ? new RedditSource(env.REDDIT_CLIENT_ID, env.REDDIT_CLIENT_SECRET, env.REDDIT_USER_AGENT?.trim() || DEFAULT_REDDIT_USER_AGENT, env.REDDIT_API_URL || undefined, env.REDDIT_TOKEN_URL || undefined)
+      : null),
+    web: () => (env.TAVILY_API_KEY ? new WebDiscussionSource(new TavilyProvider(env.TAVILY_API_KEY, env.TAVILY_URL || undefined)) : null),
+  };
+  const only = (env.SOCIAL_SOURCES ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  return Object.keys(make).filter((n) => !only.length || only.includes(n)).map((n) => make[n]()).filter((x): x is OpportunitySource => !!x);
+}
+
+/**
  * Every search provider that has a key, for the Client Radar engine, which may spread its queries over several.
  * OUTBOUND_SEARCH_PROVIDERS=tavily,brave picks and orders them; otherwise the configured discovery provider alone.
  */

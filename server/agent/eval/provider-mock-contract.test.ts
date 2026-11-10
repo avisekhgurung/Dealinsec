@@ -22,4 +22,9 @@ describe("the discovery provider mock", () => {
     const mock = (await discoveryProviderMock()) as { opportunitySources: () => unknown[] };
     expect(mock.opportunitySources()).toEqual([]);
   });
+
+  it("reports no Social Intent source either: an eval can't reach Hacker News, Reddit or a billed web search", async () => {
+    const mock = (await discoveryProviderMock()) as { socialSources: () => Promise<unknown[]> };
+    expect(await mock.socialSources()).toEqual([]);
+  });
 });

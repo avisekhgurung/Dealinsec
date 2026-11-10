@@ -22,6 +22,8 @@ export interface OutboundUsage {
     tier: "free" | "trial" | "pro" | "unlimited"; label: string; searches: Allowance | null; maxCompanies: number; windowDays: number;
     /** Separate allowances over the same days (absent from an older server; null = couldn't be counted). */
     prospects?: Allowance | null; drafts?: Allowance | null; sends?: Allowance | null; spendPercent?: number | null;
+    /** Bulk list sweeps, a pool of its own (absent from an older server; null = couldn't be counted). */
+    lists?: Allowance | null;
   };
   perSearch: { webSearches: number };
   platform: { state: "available" | "limited" | "paused" | "unknown"; resetsAt: string };
@@ -82,9 +84,10 @@ export function UsageNote({ usage, mode = "web" }: { usage: OutboundUsage | unde
           {usage.plan?.tier === "free" && <> <Link href="/pricing" className="font-semibold text-primary hover:underline" data-testid="outbound-upgrade">Pro includes more</Link>.</>}
         </span>
       </p>
-      {usage.plan && usage.plan.tier !== "unlimited" && (usage.plan.prospects || usage.plan.drafts || usage.plan.sends) && (
+      {usage.plan && usage.plan.tier !== "unlimited" && (usage.plan.prospects || usage.plan.drafts || usage.plan.sends || usage.plan.lists) && (
         <p className="pl-5 text-muted-foreground" data-testid="outbound-plan-allowances">
           {[
+            usage.plan.lists && `${usage.plan.lists.remaining} of ${usage.plan.lists.limit} list sweeps left`,
             usage.plan.prospects && `${usage.plan.prospects.remaining} of ${usage.plan.prospects.limit} researched prospects left`,
             usage.plan.drafts && `${usage.plan.drafts.remaining} of ${usage.plan.drafts.limit} AI drafts`,
             usage.plan.sends && `${usage.plan.sends.remaining} of ${usage.plan.sends.limit} sends from Gmail or WhatsApp Business`,

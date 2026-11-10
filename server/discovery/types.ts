@@ -10,7 +10,13 @@ export class DiscoveryError extends Error {
   }
 }
 
-export interface SearchOptions { country?: string; count?: number; signal?: AbortSignal }
+export interface SearchOptions {
+  country?: string; count?: number; signal?: AbortSignal;
+  /** Search only these sites (a provider that can't restrict by site ignores it, and the caller filters the results). */
+  includeDomains?: readonly string[];
+  /** Only results from about this long ago, where the provider supports it. */
+  recency?: "week" | "month" | "year";
+}
 
 /**
  * A community source of DEMAND posts (people publicly asking for the kind of work the person sells), beside the
@@ -24,8 +30,21 @@ export interface OpportunitySource {
   readonly label: string;
   /** Whether a scan costs money (every current source is free). */
   readonly paid: boolean;
-  /** The current demand posts, already filtered to genuine asks for outside help; the caller matches them to the ICP. */
-  scan(opts?: { signal?: AbortSignal }): Promise<import("@shared/opportunity-sources").OpportunityPost[]>;
+  /**
+   * The current demand posts; the caller matches them to the person's services. A source that reads fixed threads
+   * (Hacker News) ignores `services`; one that has to be asked a question (Reddit, a web search) builds its queries
+   * from them and returns nothing without any.
+   */
+  scan(opts?: ScanOptions): Promise<import("@shared/opportunity-sources").OpportunityPost[]>;
+}
+export interface ScanOptions {
+  signal?: AbortSignal; services?: string[]; keywords?: string[];
+  /**
+   * How a PAID source makes each billed call: the caller reserves it against its budgets first and settles it after.
+   * Resolves to null when the call couldn't be afforded (the source then stops). A paid source given no guard makes
+   * no call at all.
+   */
+  paidCall?: <T>(provider: string, fn: () => Promise<T>) => Promise<T | null>;
 }
 
 /** Anything that can turn a short description into web results. Brave is the first; the interface is what lets it be swapped. */

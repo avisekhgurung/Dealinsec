@@ -31,9 +31,11 @@ export interface RunView {
   queries: { q: string; provider: string; done: boolean; ok?: boolean; results?: number }[];
   /** "agent" when the search was started from Agent mode. Older servers omit it. */
   by?: "user" | "agent";
+  /** "list" is a bulk sweep that stopped after checking each website — many companies, none researched. Older servers omit it. */
+  mode?: "deep" | "list";
 }
 export interface Evidence {
-  id: number; kind: "fact" | "signal" | "decision_maker" | "opportunity"; type: string; label: string; value: string; status: string;
+  id: number; kind: "fact" | "signal" | "decision_maker" | "opportunity" | "outside"; type: string; label: string; value: string; status: string;
   source: string; url: string | null; quote: string | null; observedAt: string | null; freshness?: string; date?: string; datePrecision?: "day" | "month" | "year" | null; timing?: "strong" | "context" | "stale" | "undated" | "none"; senior?: boolean; supports?: number[]; meta?: Record<string, any>;
   confidence?: "high" | "medium" | "low"; retrievedAt?: string | null;
 }
@@ -42,7 +44,7 @@ export interface ProspectCard {
   id: number; runItemId?: number; name: string; domain: string; website: string; status: string; stage?: string; rejectReason: string | null; rejectLabel: string | null;
   score: { total: number; knownMax: number; unknownPoints: number; confidence: "low" | "medium" | "high"; components: ScoreComponent[]; missing: string[]; readyMissing?: string[] } | null;
   ready: boolean; fit: { verdict: string; headline: string; signals: { key: string; label: string; status: string; detail: string }[] } | null;
-  classification?: "ready" | "qualified" | "insufficient_evidence" | "not_a_fit"; classificationLabel?: string; timing?: "strong" | "context" | "stale" | "undated" | "none"; timingLabel?: string; blockers?: string[];
+  classification?: "ready" | "qualified" | "not_researched" | "insufficient_evidence" | "not_a_fit"; classificationLabel?: string; timing?: "strong" | "context" | "stale" | "undated" | "none"; timingLabel?: string; blockers?: string[];
   profile: { industry: string | null; location: string | null; country: string | null; employees: string | null; serves: string | null };
   whyNow: Evidence | null; opportunity: Evidence | null; decisionMaker: Evidence | null; contactPerson?: Evidence | null; evidenceCount: number; leadId: number | null; researched: boolean;
   /** "verified": a provider-verified email; "public": a business email or confirmed contact form on their site (found, not verified). */
@@ -54,6 +56,8 @@ export interface ProspectCard {
 export interface Angle { problem: string; opportunity: string; positioning: string; targetPerson: string | null; reason: string; evidenceIds: number[]; confidence: "low" | "medium"; plan?: OpportunityPlan | null }
 export interface Brief {
   prospect: ProspectCard; facts: Evidence[]; signals: Evidence[]; people: Evidence[]; inferences: Evidence[]; opportunities: Evidence[];
+  /** What other sites say about the company: unverified, shown apart. Older servers omit it. */
+  outside?: Evidence[];
   sources: { provider: string; query: string; url: string; title: string }[]; angle: Angle | null; providers: { contact: boolean };
   /** Older servers omit it. */
   opportunityScore?: OpportunityScore | null;

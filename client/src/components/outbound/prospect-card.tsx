@@ -32,11 +32,13 @@ const line = (e: Evidence | null) => (e ? e.value : null);
 /** A readiness blocker without its long explanation in brackets: "a dated reason to get in touch". */
 const short = (m: string) => m.replace(/\s*\(.*\)\s*$/, "");
 
-type QualKey = "ready" | "qualified" | "partial" | "insufficient" | "not_a_fit" | "aside";
+type QualKey = "ready" | "qualified" | "partial" | "unresearched" | "insufficient" | "not_a_fit" | "aside";
 const QUAL: Record<QualKey, { Icon: typeof Check; tone: string }> = {
   ready: { Icon: CheckCircle2, tone: "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" },
   qualified: { Icon: BadgeCheck, tone: "border-sky-300 bg-sky-50 text-sky-800 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300" },
   partial: { Icon: CircleDashed, tone: "border-sky-300 bg-background text-sky-800 dark:border-sky-800 dark:text-sky-300" },
+  // Neutral on purpose: nobody has looked yet, so this is a state, not a warning.
+  unresearched: { Icon: CircleDashed, tone: "border-border bg-background text-muted-foreground" },
   insufficient: { Icon: CircleHelp, tone: "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300" },
   not_a_fit: { Icon: XCircle, tone: "border-border bg-muted text-muted-foreground" },
   aside: { Icon: XCircle, tone: "border-border bg-muted text-muted-foreground" },
@@ -53,6 +55,7 @@ export function qualificationOf(p: Card): { key: QualKey; label: string; reason:
   const cls = p.classification ?? (p.ready ? "ready" : undefined);
   if (cls === "ready") return { key: "ready", label: "Ready", reason: "Fits, with a reason to get in touch and a way in" };
   if (cls === "qualified") return p.fit?.verdict === "partial" ? { key: "partial", label: "Partial", reason: ["Partial fit", missing].filter(Boolean).join(" · ") } : { key: "qualified", label: "Qualified", reason: missing ?? "Fits on evidence" };
+  if (cls === "not_researched") return { key: "unresearched", label: "Not researched yet", reason: "Real and reachable — research it to see whether it fits" };
   if (cls === "insufficient_evidence") return { key: "insufficient", label: "Not enough evidence", reason: missing };
   if (cls === "not_a_fit") return { key: "not_a_fit", label: "Not a fit", reason: p.fit?.headline ?? null };
   return null;

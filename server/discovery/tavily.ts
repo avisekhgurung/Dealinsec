@@ -16,7 +16,11 @@ export class TavilyProvider implements DiscoveryProvider {
   async search(query: string, opts: SearchOptions = {}): Promise<SearchResult[]> {
     const body = await callJson(this.fetchImpl, this.endpoint, {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${this.apiKey}` },
-      body: JSON.stringify({ query, max_results: Math.min(20, Math.max(1, opts.count ?? 20)), search_depth: "basic", include_answer: false }),
+      body: JSON.stringify({
+        query, max_results: Math.min(20, Math.max(1, opts.count ?? 20)), search_depth: "basic", include_answer: false,
+        ...(opts.includeDomains?.length ? { include_domains: opts.includeDomains.slice(0, 20) } : {}),
+        ...(opts.recency ? { time_range: opts.recency } : {}),
+      }),
     }, { timeoutMs: 15_000, signal: opts.signal, what: "The search service" });
     const rows = (body as { results?: unknown })?.results;
     if (!Array.isArray(rows)) return [];

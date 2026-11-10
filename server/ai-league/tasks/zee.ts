@@ -8,12 +8,20 @@
  * An invoice is "overdue" only when its due date has passed and it isn't paid (the radar's own rule). Nothing is
  * estimated. An empty day is reported as an empty day.
  *
+ * While DEAL_SUITE_HIDDEN (shared/flags.ts) is on, the money half of the briefing — overdue invoices, invoices due
+ * this week, agreements ready to invoice and deal next steps — is not read at all. Those four can only ever be
+ * empty with the suite hidden, so reading them costs four database round-trips to report nothing, and any item
+ * they produced would link to a page the product no longer shows. Follow-ups and outreach drafts are unaffected:
+ * they are the find-clients half, and they are what Zee is for now. Flip the flag back and the money half returns
+ * with it, unchanged.
+ *
  * The model may add a two-sentence summary ("Zee's take") written ONLY from the items above. It is checked: any
  * figure or currency amount it mentions must appear in the items, or it is dropped and the plain summary stands.
  */
 import { formatMoney } from "@shared/money";
 import { resolveLocaleSettings } from "@shared/schema";
 import type { LeagueReport } from "@shared/ai-league";
+import { DEAL_SUITE_HIDDEN } from "@shared/flags";
 import type { Briefing } from "../../copilot/insights";
 import type { StepOutcome, TaskCtx, TaskHandler } from "./types";
 
@@ -39,36 +47,41 @@ export function summaryIsGrounded(text: string, facts: string): boolean {
 export function zeeTask(deps: ZeeDeps): TaskHandler {
   return {
     async step(ctx: TaskCtx): Promise<StepOutcome> {
+      const suiteVisible: boolean = !DEAL_SUITE_HIDDEN;
       const [b, fu, q, loc] = await Promise.all([
-        deps.briefing(ctx.user),
+        suiteVisible ? deps.briefing(ctx.user) : Promise.resolve(null),
         deps.followUps(ctx.user),
         deps.waitingDrafts(ctx.user).catch(() => ({ ok: false as const, status: 503, code: "unavailable", message: "Outreach isn't set up" })),
         deps.locale(ctx.user),
       ]);
-      await ctx.event("records_read", "Read your invoices, agreements, deals, follow-ups and outreach");
+      await ctx.event("records_read", b ? "Read your invoices, agreements, deals, follow-ups and outreach" : "Read your follow-ups and outreach");
       const money = (m: number) => formatMoney(m, loc.currency, loc.locale);
       const items: LeagueReport["items"] = [];
-      for (const i of b.radar.overdue.invoices) items.push({ title: `Overdue: ${i.invoiceNumber} · ${i.brandName}`, detail: `${money(i.amountMinor)}, ${i.daysOverdue} day${i.daysOverdue === 1 ? "" : "s"} past due`, href: `/brand-invoices/${i.id}`, status: "needs_you" });
+      if (b) for (const i of b.radar.overdue.invoices) items.push({ title: `Overdue: ${i.invoiceNumber} · ${i.brandName}`, detail: `${money(i.amountMinor)}, ${i.daysOverdue} day${i.daysOverdue === 1 ? "" : "s"} past due`, href: `/brand-invoices/${i.id}`, status: "needs_you" });
       const fuOverdue = fu.ok ? fu.overdue : [], fuToday = fu.ok ? fu.dueToday : [];
       for (const f of [...fuOverdue, ...fuToday]) items.push({ title: `Follow up: ${f.companyName}`, detail: `${f.title} · due ${f.due}${f.due < (fu.ok ? fu.today : "") ? " (overdue)" : " (today)"}`, href: `/leads/${f.leadId}`, status: "needs_you" });
       const drafts = q.ok ? q.items.filter((x) => x.message.status === "draft" || x.message.status === "approved") : [];
       for (const d of drafts.slice(0, 5)) items.push({ title: `Message waiting for you: ${d.lead.companyName}`, detail: d.message.status === "approved" ? "Approved, not sent yet" : "Draft to review and approve", href: `/leads/${d.lead.id}`, status: "needs_you" });
-      for (const i of b.radar.dueThisWeek.invoices) items.push({ title: `Due this week: ${i.invoiceNumber} · ${i.brandName}`, detail: `${money(i.amountMinor)}, due ${String(i.dueDate).slice(0, 10)}`, href: `/brand-invoices/${i.id}`, status: "info" });
-      for (const c of b.radar.readyToInvoice.contracts) items.push({ title: `Ready to invoice: ${c.brandName}`, detail: `${money(c.remainingMinor)} of a signed agreement not invoiced yet`, href: `/deals/${c.dealId}`, status: "info" });
-      for (const a of b.nextActions.filter((x) => x.urgency !== "green").slice(0, 5)) items.push({ title: `${a.brandName}: ${a.action}`, detail: a.dealTitle, href: a.route, status: a.urgency === "red" ? "needs_you" : "info" });
+      if (b) for (const i of b.radar.dueThisWeek.invoices) items.push({ title: `Due this week: ${i.invoiceNumber} · ${i.brandName}`, detail: `${money(i.amountMinor)}, due ${String(i.dueDate).slice(0, 10)}`, href: `/brand-invoices/${i.id}`, status: "info" });
+      if (b) for (const c of b.radar.readyToInvoice.contracts) items.push({ title: `Ready to invoice: ${c.brandName}`, detail: `${money(c.remainingMinor)} of a signed agreement not invoiced yet`, href: `/deals/${c.dealId}`, status: "info" });
+      if (b) for (const a of b.nextActions.filter((x) => x.urgency !== "green").slice(0, 5)) items.push({ title: `${a.brandName}: ${a.action}`, detail: a.dealTitle, href: a.route, status: a.urgency === "red" ? "needs_you" : "info" });
 
       const needs = items.filter((i) => i.status === "needs_you").length;
       const counts = [
-        { label: "Overdue invoices", value: b.radar.overdue.count }, { label: "Follow-ups due", value: fuOverdue.length + fuToday.length },
-        { label: "Messages waiting", value: drafts.length }, { label: "Due this week", value: b.radar.dueThisWeek.count }, { label: "Ready to invoice", value: b.radar.readyToInvoice.count },
+        ...(b ? [{ label: "Overdue invoices", value: b.radar.overdue.count }] : []),
+        { label: "Follow-ups due", value: fuOverdue.length + fuToday.length },
+        { label: "Messages waiting", value: drafts.length },
+        ...(b ? [{ label: "Due this week", value: b.radar.dueThisWeek.count }, { label: "Ready to invoice", value: b.radar.readyToInvoice.count }] : []),
       ];
       const plain = needs === 0 && items.length === 0
-        ? "All clear: nothing is overdue, no follow-up is due and no message is waiting for you."
-        : [b.radar.overdue.count ? `${b.radar.overdue.count} overdue invoice${b.radar.overdue.count === 1 ? "" : "s"} (${money(b.radar.overdue.totalMinor)})` : null,
+        ? b
+          ? "All clear: nothing is overdue, no follow-up is due and no message is waiting for you."
+          : "All clear: no follow-up is due and no message is waiting for you."
+        : [b && b.radar.overdue.count ? `${b.radar.overdue.count} overdue invoice${b.radar.overdue.count === 1 ? "" : "s"} (${money(b.radar.overdue.totalMinor)})` : null,
           fuOverdue.length + fuToday.length ? `${fuOverdue.length + fuToday.length} follow-up${fuOverdue.length + fuToday.length === 1 ? "" : "s"} due` : null,
           drafts.length ? `${drafts.length} message${drafts.length === 1 ? "" : "s"} waiting for your approval` : null,
-          b.radar.dueThisWeek.count ? `${b.radar.dueThisWeek.count} invoice${b.radar.dueThisWeek.count === 1 ? "" : "s"} due this week` : null,
-          b.radar.readyToInvoice.count ? `${b.radar.readyToInvoice.count} agreement${b.radar.readyToInvoice.count === 1 ? "" : "s"} ready to invoice` : null,
+          b && b.radar.dueThisWeek.count ? `${b.radar.dueThisWeek.count} invoice${b.radar.dueThisWeek.count === 1 ? "" : "s"} due this week` : null,
+          b && b.radar.readyToInvoice.count ? `${b.radar.readyToInvoice.count} agreement${b.radar.readyToInvoice.count === 1 ? "" : "s"} ready to invoice` : null,
         ].filter(Boolean).join(" · ");
 
       let summary: string | null = null;

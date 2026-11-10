@@ -10,7 +10,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { CheckCircle2, CircleDashed, CircleHelp, ExternalLink, Flame, Lightbulb, Loader2, RefreshCw, Sparkles, UserRound, UserSearch, XCircle } from "lucide-react";
+import { CheckCircle2, CircleDashed, CircleHelp, ExternalLink, Flame, Globe, Lightbulb, Loader2, RefreshCw, Sparkles, UserRound, UserSearch, XCircle } from "lucide-react";
 import { MISSING_CONTACT, MISSING_REASON } from "@shared/prospect";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -138,9 +138,10 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit, focus = 
   });
   const research = act("research", { runId });
   const contacts = act("contacts", { runId }, (r) => toast({ title: r.found ? `Found ${r.found} ${r.found === 1 ? "person" : "people"}` : "No one found", description: "From the connected data provider; check before you write." }));
+  const outside = act("outside", {}, (r) => toast({ title: r.found ? `${r.found} ${r.found === 1 ? "mention" : "mentions"} found` : "Nothing found about them elsewhere", description: r.found ? "Unverified: open each one before you rely on it." : "No other site names this company alongside a business event." }));
   const angle = act("angle");
   const add = act("lead", contact ? { contactFindingId: contact } : {}, (r) => toast({ title: r.existing ? "Already in your leads" : "Added to Leads", description: "Its evidence is on the lead's Facts tab." }));
-  const busy = research.isPending || contacts.isPending || angle.isPending || add.isPending;
+  const busy = research.isPending || contacts.isPending || angle.isPending || add.isPending || outside.isPending;
   // The person's verdict: stored as given, changes nothing else; the same choice again clears it.
   const verdict = useMutation({
     mutationFn: (value: ProspectFeedback | null) => leadCall("POST", prospectUrl(id!, "feedback"), { value }),
@@ -285,6 +286,18 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit, focus = 
                 )) : <p className="text-sm text-muted-foreground">Nothing confirmed yet.</p>}
               </Section>
             </div>
+
+            <Section title="Around the web · not verified" tone="inference" hint="what other sites say, not their own">
+              <p className="text-[11px] text-muted-foreground" data-testid="brief-outside-note">Headlines from other websites that name this company. DealInSec has not opened or checked these pages, so they don't count toward the score or “Ready”, and are never written into a message. Open one before you rely on it.</p>
+              {(b.outside ?? []).map((e) => (
+                <div key={e.id} className="rounded-lg border border-dashed px-3 py-2 text-sm" data-testid="brief-outside-item">
+                  <p className="text-[11px] font-semibold text-violet-700 dark:text-violet-400">{e.label}{e.meta?.publisher ? ` · according to ${String(e.meta.publisher)}` : ""}{e.observedAt ? ` · ${new Date(e.observedAt).toLocaleDateString(undefined, e.meta?.datePrecision === "day" ? { day: "numeric", month: "short", year: "numeric" } : e.meta?.datePrecision === "month" ? { month: "short", year: "numeric" } : { year: "numeric" })}` : " · no date given"}</p>
+                  <p className="break-words">{e.value}</p>
+                  <Quote e={e} />
+                </div>
+              ))}
+              {canEdit && <Button size="sm" variant="outline" onClick={() => outside.mutate()} disabled={busy} data-testid="brief-outside">{outside.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Globe className="mr-1.5 h-4 w-4" />}{(b.outside ?? []).length ? "Look again" : "Look outside their website"}<span className="ml-1.5 font-normal text-muted-foreground">· 1 web search</span></Button>}
+            </Section>
 
             {(b.inferences.length > 0 || b.opportunities.length > 0) && (
               <Section title="Inferences · not confirmed" tone="inference">

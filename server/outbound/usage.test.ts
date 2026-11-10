@@ -34,12 +34,30 @@ describe("Client Radar usage: the plan's 30-day allowance (one credit = one sear
   const DAY = 24 * HOUR;
   const ran = (daysAgo: number) => ({ status: "done", counters: { searched: 8 }, createdAt: new Date(NOW.getTime() - daysAgo * DAY) });
 
-  it("each plan shows its own four allowances, the most companies a search may look for, and the spend share", async () => {
+  it("each plan shows its own allowances, the most companies a search may look for, and the spend share", async () => {
     const free = (n: number) => ({ used: 0, limit: n, remaining: n, nextFreesAt: null });
-    for (const [tier, limit, maxCompanies, label, prospects, drafts, sends] of [["free", 3, 10, "Free plan", 30, 3, 3], ["trial", 10, 10, "Pro trial", 100, 10, 10], ["pro", 10, 10, "Pro", 100, 10, 10]] as const) {
+    for (const [tier, limit, maxCompanies, label, prospects, drafts, sends, lists] of [["free", 3, 10, "Free plan", 30, 3, 3, 3], ["trial", 10, 10, "Pro trial", 100, 10, 10, 30], ["pro", 10, 10, "Pro", 100, 10, 10, 30]] as const) {
       const u = ok(await outboundUsage(ana, deps({ tier: async () => tier }).d));
-      expect(u.plan).toEqual({ tier, label, searches: free(limit), maxCompanies, windowDays: 30, prospects: free(prospects), drafts: free(drafts), sends: free(sends), spendPercent: 0 });
+      expect(u.plan).toEqual({ tier, label, searches: free(limit), maxCompanies, windowDays: 30, prospects: free(prospects), drafts: free(drafts), sends: free(sends), lists: free(lists), spendPercent: 0 });
     }
+  });
+
+  // The whole point of the separate pool: a cheap sweep must not eat a deep search, nor the other way round.
+  it("deep searches and list sweeps are counted in separate pools", async () => {
+    const sweep = (daysAgo: number) => ({ ...ran(daysAgo), mode: "list" });
+    const u = ok(await outboundUsage(ana, deps({
+      tier: async () => "pro",
+      recentRuns: async () => [ran(1), ran(2), sweep(3), sweep(4), sweep(5)],
+    }).d));
+    expect(u.plan.searches).toMatchObject({ used: 2, limit: 10, remaining: 8 });
+    expect(u.plan.lists).toMatchObject({ used: 3, limit: 30, remaining: 27 });
+  });
+
+  // Rows written before list mode carry no mode at all; they are the only kind there was, so they are deep searches.
+  it("a run from before list mode counts as a deep search, never as a sweep", async () => {
+    const u = ok(await outboundUsage(ana, deps({ tier: async () => "pro", recentRuns: async () => [ran(1), ran(2)] }).d));
+    expect(u.plan.searches).toMatchObject({ used: 2 });
+    expect(u.plan.lists).toMatchObject({ used: 0 });
   });
 
   it("prospects, drafts and sends are counted separately, and the spend shows as a share of the ceiling, never dollars", async () => {

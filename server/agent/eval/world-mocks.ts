@@ -492,6 +492,9 @@ export const discoveryProviderMock = async () => {
     // The in-memory world has no community demand sources (shared/opportunity-sources.ts is tested on its own, and
     // server/outbound/opportunity-scan.test.ts drives a scan with its own fake source), so a run here never scans.
     opportunitySources: () => [],
+    // Social Intent's sources: none in the in-memory world, so nothing an eval drives can reach Hacker News, Reddit
+    // or a paid web search. (Social Intent is tested on its own: server/social/service.test.ts, with fake sources.)
+    socialSources: async () => [],
     /** No eval path reads this today; it is here so the mock cannot be a module with a hole in it. */
     activeProviderName: () => (world().discovery.configured ? "brave" : null),
   };

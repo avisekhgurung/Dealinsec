@@ -23,9 +23,10 @@ async function main() {
   if (!process.env.DATABASE_URL) { log("worker_config_error", { missing: "DATABASE_URL" }); process.exit(1); }
   const league = await import("./ai-league/runtime");
   const { outboundRunner } = await import("./outbound/runner");
+  const { socialScheduleRunner } = await import("./social/schedule");
   await league.wireHandlers();
 
-  const kickAll = () => { league.leagueRunner.kick(); league.scheduleRunner.kick(); outboundRunner.kick(); };
+  const kickAll = () => { league.leagueRunner.kick(); league.scheduleRunner.kick(); outboundRunner.kick(); socialScheduleRunner.kick(); };
   kickAll();
   // The runners wake themselves for parked jobs; this is the safety net for anything a missed wake would leave behind.
   const kicker = setInterval(kickAll, SAFETY_KICK_MS);

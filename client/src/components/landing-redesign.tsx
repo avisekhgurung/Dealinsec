@@ -451,7 +451,7 @@ const TEAM = [
     points: ["Drafts only: nothing is sent for you", "You edit and approve the exact text", "Skips anyone on your do-not-contact list"],
   },
   {
-    key: "zee", name: "Zee", role: "Business Buddy", emoji: "🌱", does: "keeps you on top of briefings and follow-ups", bar: "bg-emerald-600", tint: "bg-emerald-50 dark:bg-emerald-950/40", fg: "text-emerald-700 dark:text-emerald-300",
+    key: "zee", name: "Zee", role: "Business Buddy", emoji: "🌱", does: "tells you which follow-ups are due and which messages are waiting", bar: "bg-emerald-600", tint: "bg-emerald-50 dark:bg-emerald-950/40", fg: "text-emerald-700 dark:text-emerald-300",
     line: "Keeps you on top of the hunt: a morning briefing from your own records, follow-up tasks due and messages waiting for you.",
     points: ["A briefing each day, from your own records", "Follow-ups due and messages waiting", "Never invents a number: checked against your records"],
   },

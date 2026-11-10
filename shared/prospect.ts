@@ -414,14 +414,18 @@ export interface ReadyInput {
 /**
  * Where a prospect stands. Four separate things, never merged:
  *   not_a_fit              the evidence contradicts what you asked for (a weak or excluded fit)
- *   insufficient_evidence  there isn't enough evidence to say it fits (not verified, or the fit can't be judged)
+ *   not_researched         a real, reachable company nobody has looked into yet: verified, and no fit judged at all.
+ *                          A list sweep ends every company here on purpose, and a deep search leaves any it ran out of
+ *                          budget for. It is NOT a verdict on the company — saying "not enough evidence" about a
+ *                          company we never read would be a judgement we haven't earned.
+ *   insufficient_evidence  we looked and still can't say it fits (it couldn't be verified, or the fit came back unclear)
  *   qualified              it fits on evidence, but something needed to reach out is missing (listed in `missing`)
  *   ready                  qualified, with a way in and a dated reason to get in touch from the last 12 months
  * and, alongside, its `timing` (timingOf): a "strong" timing signal is a concrete event from the last 90 days. That is
  * NOT a requirement for "ready" (most companies that fit have none); a blog post is context and never strong timing.
  */
-export type ProspectClass = "ready" | "qualified" | "insufficient_evidence" | "not_a_fit";
-export const PROSPECT_CLASS_LABEL: Record<ProspectClass, string> = { ready: "Ready", qualified: "Qualified", insufficient_evidence: "Insufficient evidence", not_a_fit: "Not a fit" };
+export type ProspectClass = "ready" | "qualified" | "not_researched" | "insufficient_evidence" | "not_a_fit";
+export const PROSPECT_CLASS_LABEL: Record<ProspectClass, string> = { ready: "Ready", qualified: "Qualified", not_researched: "Not researched yet", insufficient_evidence: "Insufficient evidence", not_a_fit: "Not a fit" };
 export const MISSING_CONTACT = "a way to reach them (a senior decision-maker named on their site, a business email or a contact form)";
 export const MISSING_REASON = "a dated reason to get in touch (a signal from the last 12 months, dated to the day or month)";
 export interface Readiness { ready: boolean; missing: string[]; classification: ProspectClass; timing: Timing; strongTiming: boolean }
@@ -446,7 +450,10 @@ export function readiness(i: ReadyInput): Readiness {
   if (!contact) missing.push(MISSING_CONTACT);
   if (i.doNotContact) missing.push("permission to contact (marked do-not-contact)");
   const ready = missing.length === 0;
-  const classification: ProspectClass = i.fitVerdict === "weak" || i.fitVerdict === "excluded" ? "not_a_fit" : !i.verified || !fitOk ? "insufficient_evidence" : ready ? "ready" : "qualified";
+  const classification: ProspectClass = i.fitVerdict === "weak" || i.fitVerdict === "excluded" ? "not_a_fit"
+    : i.verified && i.fitVerdict == null ? "not_researched"
+    : !i.verified || !fitOk ? "insufficient_evidence"
+    : ready ? "ready" : "qualified";
   return { ready, missing, classification, timing: t.timing, strongTiming: t.timing === "strong" };
 }
 

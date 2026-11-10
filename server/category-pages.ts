@@ -255,7 +255,7 @@ function aiTeamSection(): string {
   const mates = [
     { bot: "nibo", name: "Nibo 🔎", role: "Deal Finder", colour: "#92400e", line: "Finds potential clients and researches businesses, with sources." },
     { bot: "mika", name: "Mika 💌", role: "Deal Closer", colour: "#be123c", line: "Drafts personalised outreach and follow-ups for you to approve and send." },
-    { bot: "zee", name: "Zee 🌱", role: "Business Buddy", colour: "#047857", line: "Briefs you on tasks, payments and what needs you today." },
+    { bot: "zee", name: "Zee 🌱", role: "Business Buddy", colour: "#047857", line: "Tells you which follow-ups are due and which messages are waiting for you." },
   ];
   const cards = mates.map((m) => `<div class="mate"><img src="/ai-league/plush/${m.bot}-${m.bot === "nibo" ? "search" : m.bot === "mika" ? "letter" : "tea"}-sm.webp" width="64" height="64" loading="lazy" decoding="async" alt="${m.name.split(" ")[0]}, the ${m.role}"><div><b>${m.name}</b><div class="role" style="color:${m.colour}">${m.role}</div><p>${m.line}</p></div></div>`).join("");
   return `<section><div class="wrap">
@@ -904,7 +904,7 @@ export const PAGES: CategoryPage[] = [
     description:
       "Three AI coworkers inside DealInSec: Nibo researches companies that fit, Mika drafts first messages you approve, Zee briefs you from your own records.",
     h1: "AI coworkers for your business workflow",
-    sub: "Meet The Nest 🪺, your AI team. Nibo 🔎, the Deal Finder, researches companies that fit what you sell; Mika 💌, the Deal Closer, drafts outreach and follow-ups for you to approve; and Zee 🌱, your Business Buddy, tells you what needs you today, from your own invoices, deals and follow-ups. They work in the background and ask before anything that spends your allowance or changes something.",
+    sub: "Meet The Nest 🪺, your AI team. Nibo 🔎, the Deal Finder, researches companies that fit what you sell; Mika 💌, the Deal Closer, drafts outreach and follow-ups for you to approve; and Zee 🌱, your Business Buddy, tells you what needs you today, from your own follow-ups and the messages waiting for your approval. They work in the background and ask before anything that spends your allowance or changes something.",
     chips: ["Research with sources", "Drafts only, you send", "Briefings from your records", "Run in the background", "Free plan, no card"],
     shortLabel: "AI Coworkers",
     sections: `
@@ -914,7 +914,7 @@ export const PAGES: CategoryPage[] = [
   <div class="feat">
     <div class="ft"><b>Nibo 🔎, Deal Finder: finds companies that fit</b><p>Describe who you want to work with. Nibo runs an Client Radar search, checks each company's own website, scores it against your ideal client and saves up to ${LEAGUE_LIMITS.leadsPerRun} qualified companies to your leads, each with the evidence and the page it came from. Research always asks before it starts, because it uses one of your searches.</p></div>
     <div class="ft"><b>Mika 💌, Deal Closer: drafts first messages</b><p>For leads you pick, or your newest researched leads, Mika writes a short first email from what was verified about each company. Nothing is sent: you read it, edit it, approve the exact text and send it yourself from your own email. Leads marked do-not-contact are skipped.</p></div>
-    <div class="ft"><b>Zee 🌱, Business Buddy: briefs you on what needs you</b><p>Overdue invoices, follow-ups due, messages waiting for approval, invoices due this week and agreements ready to invoice, read from your own records. Zee's short summary is checked against those records: one that mentions a figure they don't contain is left out.</p></div>
+    <div class="ft"><b>Zee 🌱, Business Buddy: briefs you on what needs you</b><p>Which leads are due a follow-up, which are overdue, and which drafted messages are waiting for your approval, read from your own records. Zee's short summary is checked against those records: one that mentions a figure they don't contain is left out.</p></div>
   </div>
 </div></section>
 <section><div class="wrap">

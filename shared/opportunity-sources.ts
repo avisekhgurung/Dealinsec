@@ -160,3 +160,82 @@ export function relevantAsks(posts: OpportunityPost[], icp: { services?: string[
 }
 
 export const directAskOf = (p: OpportunityPost): DirectAsk => ({ source: p.source, title: p.title, url: p.url, date: p.postedAt });
+
+/* ── Reddit (official Data API) parsing ─────────────────────────────────── */
+
+/** Bodies Reddit shows in place of content that is gone: never kept, never shown. */
+const REDDIT_GONE = /^\s*\[(?:removed|deleted)(?: by [^\]]+)?\]\s*$/i;
+
+/**
+ * A Reddit search listing (`/search` on oauth.reddit.com), as demand posts. Kept: the post's own title and text, its
+ * own timestamp, its subreddit and a link back to it. NOT kept: the author. A username is personal data the person
+ * has no use for here — they follow the link to the post, where Reddit shows it under Reddit's own rules — and not
+ * holding it means a deleted account leaves nothing behind in our database.
+ *
+ * Skipped: removed or deleted posts, adult communities, pinned moderator posts, and anything without a permalink.
+ * Whether a post is an ASK at all is decided later (shared/social-intent.ts), from its words.
+ */
+export function redditPostsFrom(listing: unknown): OpportunityPost[] {
+  const rows = Array.isArray((listing as any)?.data?.children) ? ((listing as any).data.children as any[]) : [];
+  const out: OpportunityPost[] = [];
+  for (const row of rows) {
+    const d = row?.data;
+    if (!d || row?.kind !== "t3") continue;
+    const permalink = typeof d.permalink === "string" && d.permalink.startsWith("/r/") ? d.permalink : "";
+    const title = String(d.title ?? "").replace(/\s+/g, " ").trim();
+    const body = String(d.selftext ?? "");
+    if (!permalink || !title || d.over_18 === true || d.stickied === true) continue;
+    if (REDDIT_GONE.test(body) || d.removed_by_category || /^\[(?:removed|deleted)/i.test(title)) continue;
+    const text = `${title}\n${body}`.trim().slice(0, 2000);
+    const created = Number(d.created_utc);
+    const at = Number.isFinite(created) && created > 0 ? new Date(created * 1000) : null;
+    const sub = String(d.subreddit ?? "").replace(/[^A-Za-z0-9_]/g, "").slice(0, 30);
+    out.push({
+      source: "reddit", threadTitle: sub ? `r/${sub}` : "Reddit",
+      title: title.slice(0, 160),
+      url: `https://www.reddit.com${permalink}`,
+      text,
+      postedAt: at && Number.isFinite(at.getTime()) ? at.toISOString() : null,
+      companyUrl: siteLinkOf(body),
+    });
+  }
+  return out;
+}
+
+/* ── public web discussions (through a search provider) ─────────────────── */
+
+/**
+ * Search results as demand posts — only those on one of the discussion sites that were asked for. A provider that
+ * can't restrict a search by site returns whatever it likes, so the restriction is enforced here as well: a blog
+ * post or an agency's own sales page that slipped in is not a discussion and is dropped.
+ *
+ * What a search result gives is a title, a short snippet and a link — never the page, and usually no date. So the
+ * post's date is unknown (and the score says so) rather than guessed from the day we happened to find it.
+ */
+export function discussionPostsFrom(results: { url: string; title: string; snippet?: string }[], domains: readonly string[]): OpportunityPost[] {
+  const out: OpportunityPost[] = [];
+  const seen = new Set<string>();
+  for (const r of results) {
+    let u: URL;
+    try { u = new URL(r.url); } catch { continue; }
+    if (u.protocol !== "https:" && u.protocol !== "http:") continue;
+    const host = u.hostname.toLowerCase().replace(/^www\./, "");
+    const site = domains.find((d) => host === d || host.endsWith(`.${d}`));
+    if (!site) continue;
+    const key = `${host}${u.pathname.replace(/\/+$/, "")}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const title = String(r.title ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
+    const snippet = String(r.snippet ?? "").replace(/\s+/g, " ").trim();
+    if (!title) continue;
+    const sub = site === "reddit.com" ? u.pathname.match(/^\/r\/([A-Za-z0-9_]{2,30})\//)?.[1] : null;
+    out.push({
+      source: "web", threadTitle: sub ? `r/${sub}` : host,
+      title, url: u.toString().slice(0, 500),
+      text: `${title}\n${snippet}`.trim().slice(0, 1000),
+      postedAt: null,
+      companyUrl: null,
+    });
+  }
+  return out;
+}

@@ -45,14 +45,14 @@ export const BOT_IDENTITY: Record<Bot, BotIdentity> = {
     pitch: "Drafts personalised outreach and follow-ups for your leads from what's been verified about them, and lines them up for your approval.",
     voice: "warm, thoughtful and professional: short, specific messages, never pushy, never invented",
     accent: { fg: "text-rose-700 dark:text-rose-300", bg: "bg-rose-600", ring: "ring-rose-500/40", soft: "bg-rose-50 dark:bg-rose-950/40" },
-    suggestions: ["Draft first messages for my newest researched leads", "Which leads are waiting on a follow-up?", "Ask Zee which clients owe us money before I follow up"],
+    suggestions: ["Draft first messages for my newest researched leads", "Which leads are waiting on a follow-up?", "Ask Zee which follow-ups are due today"],
   },
   zee: {
     bot: "zee", name: "Zee", role: "Business Buddy", emoji: "🌱",
-    pitch: "Helps you organise tasks, payments and business updates, from your own records: what's overdue, what's due and what needs you today.",
+    pitch: "Tells you what needs you today, from your own records: which leads are due a follow-up, which are overdue and which drafted messages are waiting for your approval.",
     voice: "calm, organized and reassuring: leads with what matters most and links to the record",
     accent: { fg: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-600", ring: "ring-emerald-500/40", soft: "bg-emerald-50 dark:bg-emerald-950/40" },
-    suggestions: ["Give me today's business briefing", "What's overdue right now?", "Hold a team huddle: how do we land 3 new clients this month?"],
+    suggestions: ["What needs me today?", "Which follow-ups are overdue?", "Hold a team huddle: how do we land 3 new clients this month?"],
   },
 };
 

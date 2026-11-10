@@ -14,6 +14,7 @@
  *   POST /api/outbound/outreach/prepare          add selected Ready prospects to Leads and write one draft each, for review ({ prospectIds })
  *   GET  /api/outbound/prospects/:id             the brief: facts, signals, people, inferences, opportunities, angle
  *   POST /api/outbound/prospects/:id/research    research again now   ({ runId })
+ *   POST /api/outbound/prospects/:id/outside     one web search for what OTHER sites say about it (unverified, shown apart)
  *   POST /api/outbound/prospects/:id/contacts    named people from the connected contact provider ({ runId })
  *   POST /api/outbound/prospects/:id/angle       the outreach angle and its opportunity plan (scored in the brief)
  *   POST /api/outbound/prospects/:id/lead        add to Leads ({ contactFindingId? })
@@ -49,7 +50,7 @@ export function registerOutboundRoutes(app: Express) {
   const nf = (res: Response) => res.status(404).json({ code: "not_found", error: "That isn't in your workspace." });
 
   app.post("/api/outbound/icp", isAuthenticated, guarded("outbound_icp", async (req, res) => send(res, await svc.parseIcp(req.user, req.body?.request), (r) => ({ icp: r.icp, searches: r.searches, description: r.description, source: r.source }))));
-  app.post("/api/outbound/runs", isAuthenticated, guarded("outbound_start", async (req, res) => send(res, await svc.startRun(req.user, { request: req.body?.request, icp: req.body?.icp, searches: req.body?.searches }), (r) => ({ run: r.run, existing: r.existing }), 201)));
+  app.post("/api/outbound/runs", isAuthenticated, guarded("outbound_start", async (req, res) => send(res, await svc.startRun(req.user, { request: req.body?.request, icp: req.body?.icp, searches: req.body?.searches, mode: req.body?.mode }), (r) => ({ run: r.run, existing: r.existing }), 201)));
   app.get("/api/outbound/usage", isAuthenticated, guarded("outbound_usage", async (req, res) => { res.setHeader("Cache-Control", "no-store"); send(res, await outboundUsage(req.user), (r) => ({ usage: r.usage })); }));
   app.get("/api/outbound/funnel", isAuthenticated, guarded("outbound_funnel", async (req, res) => { res.setHeader("Cache-Control", "no-store"); send(res, await (await import("./funnel")).getFunnel(req.user, req.query.days), (r) => ({ funnel: r.funnel })); }));
   app.get("/api/outbound/runs", isAuthenticated, guarded("outbound_runs", async (req, res) => send(res, await svc.listRuns(req.user), (r) => ({ runs: r.runs }))));
@@ -69,6 +70,7 @@ export function registerOutboundRoutes(app: Express) {
   app.post("/api/outbound/outreach/prepare", isAuthenticated, guarded("outbound_outreach_prepare", async (req, res) => send(res, await prepareOutreach(req.user, req.body), (r) => ({ results: r.results }))));
   app.get("/api/outbound/prospects/:id", isAuthenticated, guarded("outbound_prospect", async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); send(res, await svc.getProspect(req.user, id), (r) => ({ brief: r.brief })); }));
   app.post("/api/outbound/prospects/:id/research", isAuthenticated, guarded("outbound_research", async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); send(res, await svc.researchProspect(req.user, id, req.body?.runId), (r) => ({ brief: r.brief })); }));
+  app.post("/api/outbound/prospects/:id/outside", isAuthenticated, guarded("outbound_outside", async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); send(res, await svc.researchOutside(req.user, id), (r) => ({ brief: r.brief, found: r.found, read: r.read })); }));
   app.post("/api/outbound/prospects/:id/contacts", isAuthenticated, guarded("outbound_contacts", async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); send(res, await svc.findContacts(req.user, id, req.body?.runId), (r) => ({ brief: r.brief, found: r.found })); }));
   app.post("/api/outbound/prospects/:id/angle", isAuthenticated, guarded("outbound_angle", async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); send(res, await svc.generateAngle(req.user, id), (r) => ({ brief: r.brief })); }));
   app.post("/api/outbound/prospects/:id/feedback", isAuthenticated, guarded("outbound_feedback", async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); send(res, await svc.setProspectFeedback(req.user, id, req.body?.value ?? null), (r) => ({ feedback: r.feedback })); }));

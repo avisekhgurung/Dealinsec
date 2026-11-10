@@ -18,20 +18,22 @@ import { contactFormFinding, normalizeEnrichment, normalizeResearch, type FactDr
 import { COUNTRIES, countryOfQuery, industryMatched, isSeniorDecisionMaker, prospectFit, type Icp, type ProspectProfile } from "@shared/icp";
 import { classifyHiring, knownBigApplies } from "@shared/opportunity-signals";
 import { scoreLead } from "@shared/lead-score";
-import { pickLinks, sameSite, type ResearchPage } from "@shared/research";
+import { pickLinks, sameSite, type ResearchPage, siteHost } from "@shared/research";
 import type { ProspectFindingRow, ProspectRow, ProspectRunRow } from "@shared/schema";
 import { ProviderError } from "../copilot/provider";
 import { parseJsonObject } from "../agent/extraction";
 import { DiscoveryError, type DiscoveryProvider, type OpportunitySource } from "../discovery/types";
 import { opportunitySources, outboundSearchProviders } from "../discovery/provider";
+import { localBusinessProvider, type LocalBusinessProvider } from "../discovery/google-places";
+import { localQuery, mapsUrlFor } from "@shared/local-discovery";
 import { leadsStore } from "../leads/store";
 import { CapExceeded, CapUnavailable, GlobalCapExceeded, WorkspaceBudgetExceeded, remainingToday, tracedChat, type TraceCtx } from "../llm/traced";
 import type { ChatMessage } from "../copilot/provider";
 import { PROMPT_VERSIONS, SIGNALS_PAGE_CHARS, enrichSystemPrompt, enrichUserMessage, signalsSystemPrompt, signalsUserMessage } from "./prompts";
 import { companyProvider, contactProvider, costMicroUsd, pageReader, readSitemap, researchPage, type CompanyEnrichmentProvider, type ContactEnrichmentProvider, type PageRead, type PageReader } from "./providers";
 import { outboundStore, type ItemWithProspect, type NewFinding, type OutboundStore } from "./store";
-import { dailyCompanyLimit, dailySearchLimit, globalSearchLimit, workspaceMonthlySpendMicroUsd } from "./limits";
-import { OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
+import { dailyCompanyLimit, dailySearchLimit, globalSearchLimit, workspaceMonthlySpendMicroUsd, globalLocalSearchLimit } from "./limits";
+import { OUTBOUND_WINDOW_DAYS, type RunMode } from "@shared/outbound-plans";
 import { utcDayStart } from "@shared/llm-cost";
 import { siteSignals } from "@shared/site-signals";
 import { failureCode, retryCode } from "./diagnostics";
@@ -41,6 +43,11 @@ import { queryRecord, rankRecord } from "@shared/search-diagnostics";
 import type { StepResult } from "../workflow/runner";
 
 export const CACHE_DAYS = 14;
+/**
+ * What this run is for. A row written before list mode existed, or a test's run object that doesn't set it, is deep —
+ * the only kind there used to be — so nothing that already works changes behaviour.
+ */
+export const runModeOf = (run: { mode?: string | null }): RunMode => (run.mode === "list" ? "list" : "deep");
 /**
  * The most companies a run researches in depth: its requested number, which is what it holds of the workspace's
  * researched-prospects allowance (shared/outbound-plans.ts). Enrichment may look at more to find them; research doesn't.
@@ -74,6 +81,8 @@ export interface PipelineDeps {
   researchDiagnostics?: string | null;
   /** The community demand sources (OPPORTUNITY_SOURCES, Phase 3B). Empty (the default when unset) = no scan. */
   opportunitySources?: () => OpportunitySource[];
+  /** The map listings source for the combined search. null (no key, or LOCAL_IN_RADAR=off) = web search alone. */
+  localProvider?: () => LocalBusinessProvider | null;
 }
 
 /** This worker no longer holds the run (another claimed it, or it was cancelled): stop, write nothing more. */
@@ -88,6 +97,8 @@ async function writeRun(deps: PipelineDeps, run: ProspectRunRow, set: Partial<Pr
 export const pipelineDeps = (): PipelineDeps => ({
   store: outboundStore, chat: tracedChat, reader: pageReader(), sitemap: (s) => readSitemap(s), searchProviders: () => outboundSearchProviders(),
   company: companyProvider(), contact: contactProvider(), leadByDomain: (o, d) => leadsStore.findByDomain(o, d), now: () => new Date(), concurrency: 3,
+  // One kill switch for the combined search: LOCAL_IN_RADAR=off falls back to the web-only search of before.
+  localProvider: () => (String(process.env.LOCAL_IN_RADAR ?? "").trim().toLowerCase() === "off" ? null : localBusinessProvider()),
   allowance: (task, orgId) => remainingToday(task, orgId), searchDiagnostics: searchDiagnosticsDir(), researchDiagnostics: researchDiagnosticsDir(),
   opportunitySources: () => opportunitySources(),
 });
@@ -101,6 +112,8 @@ export interface RunCountersExt extends RunCounters {
   opportunityScan?: { done: boolean; posts?: number; asks?: number; error?: string };
   /** Posts with no company site: shown read-only on the run ("open the post and reply yourself"). Bounded. */
   directAsks?: DirectAsk[];
+  /** The map scan's outcome, once per run (idempotence marker; an error never fails the run). */
+  localScan?: { done: boolean; listings?: number; seeded?: number; noWebsite?: number; error?: string };
 }
 
 const pageCache = new Map<string, { at: number; page: PageRead }>();
@@ -156,7 +169,7 @@ async function askJson(deps: PipelineDeps, ctx: TraceCtx, messages: ChatMessage[
 }
 
 /** A search whose platform-wide reservation is completed with what really happened (a failure keeps its cost: it may be billed, and it is not retried). */
-async function settledSearch<T>(deps: PipelineDeps, id: number, provider: string, fn: () => Promise<T>): Promise<T> {
+export async function settledSearch<T>(deps: Pick<PipelineDeps, "store">, id: number, provider: string, fn: () => Promise<T>): Promise<T> {
   const t0 = Date.now();
   const settle = (ok: boolean, errorCode: string | null) => deps.store.settleProviderCall(id, { ok, errorCode, latencyMs: Date.now() - t0, costMicroUsd: ok || errorCode !== "auth" ? costMicroUsd(provider) : 0 }).catch(() => {});
   try { const r = await fn(); await settle(true, null); return r; }
@@ -300,7 +313,77 @@ async function searchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps:
     run.queries = plan; run.counters = counters;
     if (plan.some((q) => !q.done)) return "more";
   }
+  // The map half of the combined search, spent only as a FALLBACK (the rule Firecrawl already follows). Every web
+  // query is done by the time we get here, so we know whether they filled the request. Google's Places Text Search is
+  // the most expensive single call this engine makes — $35 per 1,000 beyond the first 1,000 a month, and that free
+  // thousand is shared by every workspace with the manual local search — so it is spent only when the web half came
+  // up short of the companies the person asked for. That is exactly when local businesses the web doesn't rank are
+  // the missing recall; on a search the web already filled, it never runs and costs nothing.
+  // Once per run: the marker survives a checkpoint (computeCounters keeps it), so a resumed run never scans twice.
+  if (!counters.localScan?.done && plan.every((q) => q.done)) {
+    const found = (await deps.store.runItems(run.organizationId, run.id)).filter((i) => i.stage === "found").length;
+    if (found < run.quantity) {
+      await localScan(run, icp, counters, deps);
+      await writeRun(deps, run, { counters, updatedAt: deps.now() });
+      run.counters = counters;
+    }
+  }
   return rankStep(run, icp, deps);
+}
+
+/**
+ * The map half of the combined search.
+ *
+ * Google's terms do not allow a listing's content to be stored or sent to a model, so nothing of the listing is kept
+ * except the one thing that is not its content: the website it points at, plus the place ID as provenance. The
+ * company's NAME is its domain until the pipeline reads the site itself — exactly what researchLocalSites does for a
+ * listing the person picks by hand (server/outbound/local-search.ts). Everything after this point is the ordinary
+ * pipeline reading the company's own website, so every fact still comes from the company, never from the listing.
+ *
+ * A listing with no website is not seeded: there is nothing to research. Those remain the manual flow, where the
+ * person names the business themselves.
+ */
+export async function localScan(run: Pick<ProspectRunRow, "id" | "organizationId">, icp: Icp, counters: RunCountersExt, deps: PipelineDeps, from?: LocalBusinessProvider | null): Promise<void> {
+  const scan: NonNullable<RunCountersExt["localScan"]> = { done: true };
+  counters.localScan = scan;
+  const provider = from !== undefined ? from : (deps.localProvider ?? (() => null))();
+  const city = icp.locations?.[0]?.trim(), regionCode = icp.countries?.[0]?.trim();
+  // No source, nowhere to look it up, or no country to look it up in: the web search alone, as before.
+  if (!provider || !city || !regionCode || !icp.industry?.trim()) { scan.done = true; return; }
+  const now = deps.now(), orgId = run.organizationId;
+  try {
+    const reservation = await deps.store.reserveSearch({
+      orgId, runId: run.id, provider: provider.name, costMicroUsd: costMicroUsd(provider.name),
+      limit: globalLocalSearchLimit(), since: utcDayStart(now), now,
+      workspace: { since: new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY), maxMicroUsd: workspaceMonthlySpendMicroUsd(process.env, orgId) },
+    });
+    // Out of the platform's daily map budget, or the workspace's ceiling: skip the map half, keep the web search.
+    if (reservation === null || reservation === "workspace") { scan.error = reservation === null ? "global_limit" : "workspace_budget"; return; }
+    const listings = await settledSearch(deps, reservation, provider.name, () =>
+      provider.searchText(localQuery({ category: icp.industry, city }), { regionCode, pageSize: 20 }));
+    scan.listings = listings.length;
+    let seeded = 0, noWebsite = 0;
+    const seen = new Set<string>();
+    for (const l of listings) {
+      if (!l.website) { noWebsite += 1; continue; }
+      let domain = "";
+      try { const u = new URL(l.website); if (u.protocol === "http:" || u.protocol === "https:") domain = siteHost(u.hostname); } catch { domain = ""; }
+      if (!domain || !domain.includes(".") || seen.has(domain)) continue;
+      seen.add(domain);
+      // name = the domain, never the listing's name; url = the place link, never its address or phone.
+      const p = await deps.store.upsertProspect(orgId, {
+        domain, name: domain, website: `https://${domain}/`,
+        sources: [{ provider: "google_places", query: "", url: mapsUrlFor(l.placeId), title: "", at: now.toISOString(), placeId: l.placeId }],
+      }, now);
+      await deps.store.addRunItem({ runId: run.id, orgId, prospectId: p.id, stage: "found", now });
+      seeded += 1;
+    }
+    scan.seeded = seeded; scan.noWebsite = noWebsite;
+  } catch (e) {
+    // Never the message, which could carry listing text: only the type, so the failure is visible and nothing leaks.
+    scan.error = e instanceof DiscoveryError ? e.code : `error:${String((e as Error)?.name ?? "unknown").slice(0, 20)}`;
+    console.log(JSON.stringify({ kind: "outbound_local_scan_failed", errorType: scan.error }));
+  }
 }
 
 /**
@@ -387,7 +470,10 @@ async function verifyStep(run: ProspectRunRow, deadline: number, deps: PipelineD
   const batch = await deps.store.itemsAt(run.id, "found", deps.concurrency * 2, deps.now());
   if (!batch.length) {
     if ((await deps.store.itemsAt(run.id, "found", 1, new Date(deps.now().getTime() + 365 * DAY))).length) return waitFor(run, "found", deps); // waiting on a retry
-    await setStage(deps, run, "enrich");
+    // A list sweep ends here, by design: checking the company's own home page is the last step that costs no model
+    // call. Everything past this point (enrich, research, score) is spent one company at a time, when the person
+    // asks for it (service.researchProspect), not on all of them up front.
+    await setStage(deps, run, runModeOf(run) === "list" ? "finalize" : "enrich");
     return "more";
   }
   await inSlices(batch, deps.concurrency, deadline, () => Date.now(), holds(deps), run.id, (item) => verifyOne(run, item, deps));
@@ -703,8 +789,10 @@ export async function computeCounters(run: ProspectRunRow, deps: PipelineDeps): 
   const by = new Map<number, ProspectFindingRow[]>();
   for (const f of fs) { const a = by.get(f.prospectId) ?? []; a.push(f); by.set(f.prospectId, a); }
   const c: RunCountersExt = { ...emptyCounters(), searched: prev.searched ?? 0, results: prev.results ?? 0, searchRejectedBy: prev.searchRejectedBy ?? {}, stoppedBy: prev.stoppedBy ?? null,
-    // The demand scan's marker and direct asks are facts of this run, written once at search time: recomputing keeps them.
-    ...(prev.opportunityScan ? { opportunityScan: prev.opportunityScan } : {}), ...(prev.directAsks?.length ? { directAsks: prev.directAsks } : {}) };
+    // The demand and map scans' markers and the direct asks are facts of this run, written once at search time:
+    // recomputing keeps them. Dropping a marker here would let a checkpoint mid-search make the run scan — and pay — twice.
+    ...(prev.opportunityScan ? { opportunityScan: prev.opportunityScan } : {}), ...(prev.localScan ? { localScan: prev.localScan } : {}),
+    ...(prev.directAsks?.length ? { directAsks: prev.directAsks } : {}) };
   // Rejected AFTER verification (a poor fit, or not enriched for budget or allowance) still counts as verified.
   const reached = (i: ItemWithProspect, stages: string[]) => stages.includes(i.stage) || (i.stage === "rejected" && i.prospect.status !== "rejected" && !!i.prospect.verifiedAt && ["poor_fit", "unclear", "not_a_company", "budget", "daily_limit"].includes(i.errorCode ?? "") && stages.includes("verified"));
   c.discovered = items.length;
@@ -732,7 +820,12 @@ export async function computeCounters(run: ProspectRunRow, deps: PipelineDeps): 
 async function finalize(run: ProspectRunRow, icp: Icp, deps: PipelineDeps, stoppedBy: string | null): Promise<"done"> {
   // Everything that reached enrichment gets its score; items left waiting (budget or a stop) are closed as they are.
   const items = await deps.store.runItems(run.organizationId, run.id);
+  const listMode = runModeOf(run) === "list";
   for (const i of items) {
+    // A list sweep's verified company was never meant to be researched, so it is not a company that ran out of
+    // budget: it is the result. It is closed with the same benign marker an enriched-but-unresearched company gets,
+    // and left unscored, because a score with no profile and no fit would be a number standing for nothing.
+    if (listMode && i.stage === "verified") { await deps.store.setItem(i.id, { stage: "done", errorCode: "not_researched", updatedAt: deps.now() }); continue; }
     if (i.stage === "enriched" || i.stage === "done") await scoreProspect(run.organizationId, i.prospectId, deps, icp);
     if (i.stage === "enriched") await deps.store.setItem(i.id, { stage: "done", errorCode: stoppedBy ? stoppedBy : "not_researched", updatedAt: deps.now() });
     const why = stoppedBy === "daily_limit" || stoppedBy === "global_limit" || stoppedBy === "workspace_budget" ? stoppedBy : stoppedBy ? "failed" : "budget";

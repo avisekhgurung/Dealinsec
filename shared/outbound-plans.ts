@@ -11,13 +11,42 @@
  * percentile (search provider + model calls). At Pro's ₹199 (about $2.40), 10 searches a month is about $0.73 on
  * average and about $2.35 at the 90th percentile; the earlier 25 (sized for ₹499) could cost more than the plan earns.
  * The trial gets Pro's allowance; free is a small, real taste.
+ *
+ * List sweeps are sized differently because they cost differently: a sweep makes NO model calls, so its whole cost is
+ * web-search credits (inside the provider's free monthly allowance, which OUTBOUND_GLOBAL_DAILY_SEARCHES is set to stay
+ * within) and page fetches. 30 a month on Pro is generous on purpose — the limit that actually binds is the platform's
+ * own daily search cap, shared by every workspace, not the plan.
  */
 /** "unlimited": a workspace listed in UNLIMITED_ORG_IDS (server/unlimited.ts), never a plan anyone buys. */
 export type OutboundTier = "free" | "trial" | "pro" | "unlimited";
 
+/**
+ * What a search is for, and so how far it goes and which allowance it spends.
+ *   deep  the full pipeline: search, verify, enrich, research, score. Model calls. Spends `monthlySearches`.
+ *   list  a bulk sweep that stops after verification: real, reachable companies and nothing more. No model calls
+ *         at all after the profile. Spends `monthlyLists`, and holds none of the researched-prospects allowance —
+ *         each company is researched later, one at a time, and only then is a researched prospect spent.
+ */
+export type RunMode = "deep" | "list";
+export const RUN_MODES: readonly RunMode[] = ["deep", "list"];
+export const isRunMode = (v: unknown): v is RunMode => typeof v === "string" && (RUN_MODES as readonly string[]).includes(v);
+
 export interface OutboundAllowance {
-  /** Searches per rolling 30 days. */
+  /** Searches per rolling 30 days: the deep kind, which researches each company it keeps. */
   monthlySearches: number;
+  /**
+   * Bulk list sweeps per rolling 30 days: a search that stops after checking each company's own website — many
+   * companies, no model calls, nothing researched. Its own pool, because it costs a fraction of a deep search:
+   * free web-search credits and page fetches only. Each company in the list can be researched later, one at a
+   * time, and only then does it cost a researched prospect.
+   */
+  monthlyLists: number;
+  /**
+   * Social Intent scans per rolling 30 days: one look across the connected demand sources for people asking for the
+   * person's services. Rules only, no model. Free sources cost nothing; the web-discussion source spends web-search
+   * credits, which the platform's daily search cap and the workspace's spend ceiling ration on their own.
+   */
+  monthlySocialScans: number;
   /** The most companies one search may look for, and so the most it researches in depth. */
   maxCompanies: number;
   /** Researched prospects per rolling 30 days: companies a search researched in depth (careers, news, team pages). */
@@ -38,11 +67,11 @@ export interface OutboundAllowance {
  * Pro's 10 searches of up to 10 companies make the 100-prospect allowance; a search often finds fewer than 10 that fit.
  */
 export const OUTBOUND_ALLOWANCE_DEFAULTS: Readonly<Record<OutboundTier, OutboundAllowance>> = {
-  free: { monthlySearches: 3, maxCompanies: 10, monthlyProspects: 30, monthlyDrafts: 3, monthlySends: 3 },
-  trial: { monthlySearches: 10, maxCompanies: 10, monthlyProspects: 100, monthlyDrafts: 10, monthlySends: 10 },
-  pro: { monthlySearches: 10, maxCompanies: 10, monthlyProspects: 100, monthlyDrafts: 10, monthlySends: 10 },
+  free: { monthlySearches: 3, monthlyLists: 3, monthlySocialScans: 3, maxCompanies: 10, monthlyProspects: 30, monthlyDrafts: 3, monthlySends: 3 },
+  trial: { monthlySearches: 10, monthlyLists: 30, monthlySocialScans: 30, maxCompanies: 10, monthlyProspects: 100, monthlyDrafts: 10, monthlySends: 10 },
+  pro: { monthlySearches: 10, monthlyLists: 30, monthlySocialScans: 30, maxCompanies: 10, monthlyProspects: 100, monthlyDrafts: 10, monthlySends: 10 },
   // Per search it looks for as many companies as Pro (one search stays one search); there is just no monthly count.
-  unlimited: { monthlySearches: 1_000_000, maxCompanies: 10, monthlyProspects: 1_000_000, monthlyDrafts: 1_000_000, monthlySends: 1_000_000 },
+  unlimited: { monthlySearches: 1_000_000, monthlyLists: 1_000_000, monthlySocialScans: 1_000_000, maxCompanies: 10, monthlyProspects: 1_000_000, monthlyDrafts: 1_000_000, monthlySends: 1_000_000 },
 };
 
 /**

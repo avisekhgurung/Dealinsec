@@ -1490,6 +1490,9 @@ export const prospectRuns = pgTable("prospect_runs", {
   request: text("request").notNull(),
   icp: jsonb("icp").notNull(),
   quantity: integer("quantity").notNull(),
+  // deep: the full pipeline, through enrichment and research (the only kind before list mode, hence the default).
+  // list: a bulk sweep that stops after verification — many companies, zero model calls, each researched later on demand.
+  mode: varchar("mode", { length: 8 }).notNull().default("deep"), // deep | list
   status: varchar("status", { length: 12 }).notNull(), // running | done | failed | cancelled
   stage: varchar("stage", { length: 16 }).notNull(), // search | verify | enrich | research | finalize | done
   counters: jsonb("counters").notNull().default(sql`'{}'::jsonb`),
@@ -2015,3 +2018,82 @@ export const leagueMemory = pgTable("league_memory", {
   keyUq: uniqueIndex("league_memory_key_uq").on(t.organizationId, t.userId, t.bot, t.key),
 }));
 export type LeagueMemoryRow = typeof leagueMemory.$inferSelect;
+
+/* ── Social Intent: people publicly asking for the work the person sells (script/migrate-social-intent.ts) ──────────── */
+
+/** A saved Social Intent search: what the person sells, where to look, and how often. */
+export const socialProfiles = pgTable("social_profiles", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  createdByUser: varchar("created_by_user").notNull(),
+  name: varchar("name", { length: 80 }).notNull(),
+  services: jsonb("services").notNull().default(sql`'[]'::jsonb`), // string[]: what the person offers
+  keywords: jsonb("keywords").notNull().default(sql`'[]'::jsonb`), // string[]: extra phrases to match
+  platforms: jsonb("platforms").notNull().default(sql`'[]'::jsonb`), // searchable platform ids; empty = every available one
+  minScore: integer("min_score").notNull().default(0),
+  status: varchar("status", { length: 8 }).notNull().default("active"), // active | paused
+  schedule: varchar("schedule", { length: 8 }).notNull().default("off"), // off | daily | weekly
+  lastRunAt: timestamp("last_run_at"),
+  nextRunAt: timestamp("next_run_at"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  orgIdx: index("social_profiles_org_idx").on(t.organizationId, t.createdAt),
+  dueIdx: index("social_profiles_due_idx").on(t.nextRunAt),
+}));
+export type SocialProfileRow = typeof socialProfiles.$inferSelect;
+
+/** One scan: which sources answered and what it found. The plan's scan allowance is counted from these rows. */
+export const socialScans = pgTable("social_scans", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  profileId: integer("profile_id"),
+  createdByUser: varchar("created_by_user").notNull(),
+  trigger: varchar("trigger", { length: 10 }).notNull(), // manual | scheduled
+  sources: jsonb("sources").notNull().default(sql`'[]'::jsonb`), // [{ name, ok, posts, error? }]
+  read: integer("read").notNull().default(0), // posts read from every source
+  kept: integer("kept").notNull().default(0), // of those, qualifying opportunities
+  fresh: integer("fresh").notNull().default(0), // of those, not seen before
+  createdAt: timestamp("created_at").notNull(),
+}, (t) => ({
+  orgIdx: index("social_scans_org_idx").on(t.organizationId, t.createdAt),
+}));
+export type SocialScanRow = typeof socialScans.$inferSelect;
+
+/**
+ * A post that asks for the person's kind of work. Deliberately small: a title, a short excerpt, the link and what
+ * the rules made of it — never the whole post, never its author. The link is the record; the row is a pointer to it.
+ * One row per workspace and post. `expiresAt` is when an opportunity nobody acted on is deleted (null = kept:
+ * saved and contacted ones are the person's own records).
+ */
+export const socialOpportunities = pgTable("social_opportunities", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  profileId: integer("profile_id"),
+  source: varchar("source", { length: 16 }).notNull(), // shared/social-intent.ts SocialPlatformId
+  origin: varchar("origin", { length: 8 }).notNull().default("scan"), // scan | manual (a link the person pasted)
+  url: varchar("url", { length: 500 }).notNull(),
+  community: varchar("community", { length: 80 }),
+  title: varchar("title", { length: 160 }).notNull(),
+  excerpt: varchar("excerpt", { length: 300 }).notNull(),
+  postedAt: timestamp("posted_at"), // the platform's own date; null when the source gives none
+  discoveredAt: timestamp("discovered_at").notNull(),
+  lastSeenAt: timestamp("last_seen_at").notNull(), // the last scan that still returned it
+  intent: varchar("intent", { length: 16 }).notNull(),
+  intentMatched: varchar("intent_matched", { length: 120 }),
+  service: varchar("service", { length: 80 }),
+  signals: jsonb("signals").notNull().default(sql`'{}'::jsonb`),
+  score: integer("score").notNull(),
+  scoreDetail: jsonb("score_detail").notNull().default(sql`'{}'::jsonb`),
+  companyUrl: varchar("company_url", { length: 300 }),
+  status: varchar("status", { length: 10 }).notNull().default("new"), // new | saved | ignored | contacted
+  leadId: integer("lead_id"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").notNull(),
+  updatedAt: timestamp("updated_at").notNull(),
+}, (t) => ({
+  onePerPost: uniqueIndex("social_opportunities_org_url").on(t.organizationId, t.url),
+  listIdx: index("social_opportunities_list_idx").on(t.organizationId, t.status, t.score),
+  expiryIdx: index("social_opportunities_expiry_idx").on(t.expiresAt),
+}));
+export type SocialOpportunityRow = typeof socialOpportunities.$inferSelect;

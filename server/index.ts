@@ -404,6 +404,8 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
       import("./outbound/runner").then((m) => m.outboundRunner.kick()).catch(() => {});
       // AI League: resume runs a restart interrupted and wake for the next scheduled task. Does nothing without the tables.
       import("./ai-league/runtime").then((m) => m.kickLeague()).catch(() => {});
+      // Social Intent: wake for the next scheduled scan. Claims nothing unless SOCIAL_SCHEDULE_ENABLED=on and the tables exist.
+      import("./social/schedule").then((m) => m.socialScheduleRunner.kick()).catch(() => {});
     },
   );
 })();

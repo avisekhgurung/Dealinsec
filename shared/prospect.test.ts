@@ -288,11 +288,15 @@ describe("revised policy: qualified, ready, strong timing and insufficient evide
     expect(evidenceDate(`Published March 3, 2024 · Updated: ${d}`, today())!.at.toISOString().slice(0, 10)).toBe("2024-03-03");
   });
 
-  it("not a fit, insufficient evidence, qualified and ready never collapse into each other", () => {
+  it("not a fit, not researched, insufficient evidence, qualified and ready never collapse into each other", () => {
     expect(judge([sig("HIRING", 10, "day"), dm], "weak").classification).toBe("not_a_fit");
     expect(judge([sig("HIRING", 10, "day"), dm], "excluded").classification).toBe("not_a_fit");
     expect(judge([sig("HIRING", 10, "day"), dm], "unclear").classification).toBe("insufficient_evidence");
-    expect(judge([sig("HIRING", 10, "day"), dm], null).classification).toBe("insufficient_evidence");
+    // Verified with no fit judged at all: nobody looked. That is a different thing from looking and coming up short,
+    // and it is where every company in a bulk list sweep ends up, so it must not read as a verdict on the company.
+    expect(judge([sig("HIRING", 10, "day"), dm], null).classification).toBe("not_researched");
+    // Not verified is still insufficient evidence, whatever the fit says: we couldn't even reach the site.
+    expect(judge([sig("HIRING", 10, "day"), dm], null, false).classification).toBe("insufficient_evidence");
     expect(judge([sig("HIRING", 10, "day"), dm], "strong", false).classification).toBe("insufficient_evidence");
     expect(judge([sig("HIRING", 10, "day")], "partial")).toMatchObject({ classification: "qualified", ready: false, strongTiming: true }); // strong timing, but no way in
     expect(judge([sig("HIRING", 10, "day"), dm], "partial")).toMatchObject({ classification: "ready", ready: true });

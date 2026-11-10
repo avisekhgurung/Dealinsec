@@ -2,7 +2,7 @@
  * The three coworkers' tasks with fake services: what each one does, what it refuses, and that reports only say what
  * really happened (counts from results, sources from evidence, no invented contacts, no invented money).
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { LeagueRunRow } from "@shared/schema";
 import { niboTask, qualified, type NiboDeps } from "./tasks/nibo";
 import { mikaTask, type MikaDeps } from "./tasks/mika";
@@ -21,6 +21,13 @@ function ctx(task: string, input: Record<string, unknown>, checkpoint: Record<st
   };
   return { c, events, usage: () => usage };
 }
+// Zee's money half — overdue invoices, invoices due this week, agreements ready to invoice and deal next steps —
+// is read only while the deal suite is visible (DEAL_SUITE_HIDDEN, shared/flags.ts), and today it is hidden. The
+// Zee tests below are the tests OF that half, so they pin the flag off and keep covering it; what Zee does while
+// the suite is hidden has its own file, tasks/zee-suite-hidden.test.ts. shared/flags.ts exports exactly this one
+// constant, and a vi.mock replaces the WHOLE module, so a missing export would be a TypeError inside a step.
+vi.mock("@shared/flags", () => ({ DEAL_SUITE_HIDDEN: false }));
+
 const finish = (o: StepOutcome) => { if (o.kind !== "finish") throw new Error(`expected finish, got ${o.kind}`); return o; };
 
 /* ── Nibo ───────────────────────────────────────────────────────────────── */

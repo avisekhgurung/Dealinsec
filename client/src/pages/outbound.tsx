@@ -22,6 +22,7 @@ import { SegmentedTabs } from "@/components/outbound/segmented-tabs";
 import { SalesFunnel } from "@/components/outbound/sales-funnel";
 import { StrategyStats } from "@/components/outbound/strategy-stats";
 import { OutreachInbox } from "@/components/outbound/outreach-inbox";
+import { SocialIntent } from "@/components/outbound/social-intent";
 import { OUTBOUND_USAGE_URL, UsageNote, searchBlockedReason, useOutboundUsage } from "@/components/outbound/usage-note";
 import { LocalSearch, type LocalFields } from "@/components/outbound/local-search";
 import { LoadError } from "@/components/load-error";
@@ -35,7 +36,7 @@ import { IDEAL_CLIENT_URL, leadCall, leadError, type IdealClientResponse } from 
 import { stagger, staggerItem, useCalmMotion } from "@/lib/motion";
 import { queryClient } from "@/lib/queryClient";
 import { COUNTRY_NAME, ICP_URL, OUTBOUND_RUNS_URL, RUN_ERROR, RUN_STAGE_LABEL, countryName, runUrl, prospectUrl, type ParsedIcp, type ProspectCard as Card_, type RunView } from "@/lib/outbound";
-import { describeIcp, icpFromIdealClient, icpSchema, searchStrategies } from "@shared/icp";
+import { MAX_QUANTITY as LIST_MAX_COMPANIES, describeIcp, icpFromIdealClient, icpSchema, searchStrategies } from "@shared/icp";
 import { SEGMENT_LABEL, SEGMENT_PRESETS, offerLine, type SegmentPreset } from "@shared/opportunity-queries";
 import { DISCOVERY_PRESETS, suggestDiscoveryMode, type DiscoveryMode, type DiscoveryPreset } from "@shared/local-discovery";
 import { takeOutboundPrefill } from "@/lib/outbound-prefill";
@@ -277,6 +278,7 @@ export default function OutboundPage() {
   // Two sources, one search: companies found online (web research) or local businesses in a city (map listings). The
   // person chooses; a suggestion never switches it by itself. The country is where to look, never the account's own.
   const [mode, setMode] = useState<DiscoveryMode>("web");
+  const [depth, setDepth] = useState<"deep" | "list">("deep");
   const [localFields, setLocalFields] = useState<LocalFields>(() => {
     const t = getTargetMarket(user?.id);
     return { category: "", city: "", country: t && t !== "WW" && t in COUNTRY_NAME ? t : "IN", website: "any", max: 10 };
@@ -290,8 +292,8 @@ export default function OutboundPage() {
   // ?run=<id>: open that search (the agent's "Open in Client Radar" link).
   const runParam = new URLSearchParams(search).get("run");
   useEffect(() => { if (runParam) setRunId(runParam); }, [runParam]);
-  const view = viewParam === "prospects" || viewParam === "outreach" || viewParam === "inbox" || viewParam === "results" ? viewParam : "searches";
-  const setView = (v: "prospects" | "searches" | "outreach" | "inbox" | "results") => navigate(v === "searches" ? location : `${location}?view=${v}`, { replace: true });
+  const view = viewParam === "prospects" || viewParam === "outreach" || viewParam === "inbox" || viewParam === "results" || viewParam === "social" ? viewParam : "searches";
+  const setView = (v: "prospects" | "searches" | "social" | "outreach" | "inbox" | "results") => navigate(v === "searches" ? location : `${location}?view=${v}`, { replace: true });
   // Client Radar opened (counts only; which view, never a search or a company).
   useEffect(() => { trackEvent("outbound_opened", { view }); }, []);
   const runs = useQuery<{ runs: RunView[] }>({ queryKey: [OUTBOUND_RUNS_URL], retry: false, refetchInterval: (q) => (q.state.data?.runs.some((r) => r.status === "running") ? 5000 : false) });
@@ -324,7 +326,7 @@ export default function OutboundPage() {
     parse.mutate(request);
   }, [canEdit]);
   const start = useMutation({
-    mutationFn: () => leadCall<{ run: RunView; existing: boolean }>("POST", OUTBOUND_RUNS_URL, { request: text, icp: parsed!.icp, searches: parsed!.searches }),
+    mutationFn: () => leadCall<{ run: RunView; existing: boolean }>("POST", OUTBOUND_RUNS_URL, { request: text, icp: parsed!.icp, searches: parsed!.searches, mode: depth }),
     onSuccess: (r) => {
       // Counts only: never the request, the profile or a company. first_search marks the workspace's first search in its window.
       if (!r.existing) trackEvent("outbound_search_started", { first_search: (usage.data?.usage.plan?.searches?.used ?? 0) === 0 });
@@ -338,7 +340,7 @@ export default function OutboundPage() {
     },
   });
   const icp = parsed?.icp;
-  const setQty = (n: number) => setParsed((p) => (p ? { ...p, icp: { ...p.icp, quantity: Math.max(1, Math.min(maxCompanies, n || 1)) } } : p));
+  const setQty = (n: number) => setParsed((p) => (p ? { ...p, icp: { ...p.icp, quantity: Math.max(1, Math.min(qtyMax, n || 1)) } } : p));
   const chip = (label: string, onRemove?: () => void) => <span key={label} className="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-1 text-xs">{label}{onRemove && <button onClick={onRemove} aria-label={`Remove ${label}`}><X className="h-3 w-3" /></button>}</span>;
 
   const off = notSetUp(runs.error);
@@ -361,6 +363,20 @@ export default function OutboundPage() {
   const localReady = !!usage.data?.usage.localReady;
   // The most companies one search may look for on this plan (the server caps it the same way).
   const maxCompanies = usage.data?.usage.plan?.maxCompanies ?? 50;
+  // How far a search goes. "deep" researches each company it keeps and spends the plan's searches; "list" is a bulk
+  // sweep that stops after checking each company's own website — many more companies, nothing researched, its own
+  // allowance. maxCompanies caps what a search RESEARCHES, so it doesn't bind a sweep.
+  const qtyMax = depth === "list" ? LIST_MAX_COMPANIES : maxCompanies;
+  // Switching moves the number to that mode's natural one: a sweep goes as wide as it can, a deep search back under
+  // its research cap. Done on the switch, not on render, so any number the person types afterwards is still theirs.
+  const pickDepth = (d: "deep" | "list") => {
+    setDepth(d);
+    setParsed((p) => (p ? { ...p, icp: { ...p.icp, quantity: d === "list" ? LIST_MAX_COMPANIES : Math.min(maxCompanies, p.icp.quantity) } } : p));
+  };
+  // A profile can arrive asking for more companies than this mode allows — a preset asks for 20, a deep search may
+  // research 10 — and the server would silently clamp it. Showing a number the search will not honour is a small lie,
+  // so the field is brought to the real ceiling as soon as the profile or the mode makes it exceed one.
+  useEffect(() => { if (parsed && parsed.icp.quantity > qtyMax) setQty(qtyMax); }, [parsed, qtyMax]);
   // Where to look is the person's choice (never their own account's country): editing it re-plans the searches with the
   // same rules the server uses (shared/icp.ts searchStrategies).
   const editPlaces = (patch: Partial<ParsedIcp["icp"]>) =>
@@ -410,7 +426,7 @@ export default function OutboundPage() {
   const listed = runs.data?.runs.find((r) => r.id === runId) ?? null;
   const flowRun = view === "searches" ? runCache.data?.run ?? listed : listed ?? runCache.data?.run ?? null;
   const flow = flowState({
-    view: view === "inbox" || view === "results" ? "outreach" : view, // the inbox is the outreach step's other half; results come after it
+    view: view === "inbox" || view === "results" ? "outreach" : view === "social" ? "searches" : view, // the inbox is the outreach step's other half; results come after it; Social Intent is another way of finding
     composing: parse.isPending ? "reading" : parsed ? "confirming" : null,
     run: flowRun ? { status: flowRun.status, stage: flowRun.stage } : null,
     results: runCache.data ? splitProspects(runCache.data.prospects)[0].length : null,
@@ -435,9 +451,9 @@ export default function OutboundPage() {
           <div className="rounded-2xl border px-6 py-14 text-center"><p className="font-semibold">Client Radar isn't switched on yet</p><p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">This workspace is still being set up for it. Try again shortly.</p></div>
         ) : (
           <>
-            <FlowSteps state={flow} />
+            {view !== "social" && <FlowSteps state={flow} />}
 
-            {canEdit ? (
+            {view === "social" ? null : canEdit ? (
               <Card className="glass-card"><CardContent className="space-y-3 p-4">
                 <SegmentedTabs label="Where to look" value={mode} onChange={(m) => { setMode(m); trackEvent("outbound_mode_changed", { mode: m }); }} className="w-full sm:w-fit"
                   tabs={[
@@ -520,9 +536,23 @@ export default function OutboundPage() {
                     {parsed.fromSetup && icp.countries.length > 0 && <p className="text-xs text-muted-foreground" data-testid="outbound-from-setup">The country comes from the market you chose at setup. Remove it to search worldwide.</p>}
                     {!icp.countries.length && !icp.locations.length && <p className="text-xs text-muted-foreground" data-testid="outbound-worldwide">Searching worldwide. Pick a country (the US, the UK, Canada, Australia, the UAE, India…) for more relevant companies.</p>}
                     <p className="text-xs text-muted-foreground">Reaching: {icp.roles.slice(0, 4).join(", ") || "decision makers"} · {parsed.searches.length} searches planned{parsed.source === "rules" ? " · read by simple rules (the AI was unavailable)" : parsed.source === "saved" ? " · from your saved ideal client" : parsed.source === "preset" ? " · a ready-made profile, change anything" : ""}</p>
+                    <div className="flex flex-col gap-2" role="radiogroup" aria-label="How far to go">
+                      {([
+                        ["deep", "Research each one", `Up to ${maxCompanies} companies, each read in depth: why now, who decides, evidence you can quote.`, usage.data?.usage.plan?.searches],
+                        ["list", "Just build me a list", `Up to ${LIST_MAX_COMPANIES} companies, each checked that it is real and reachable. Nothing researched — research any of them later, one at a time.`, usage.data?.usage.plan?.lists],
+                      ] as const).map(([value, title, detail, left]) => (
+                        <button key={value} type="button" role="radio" aria-checked={depth === value} onClick={() => pickDepth(value)} data-testid={`outbound-depth-${value}`}
+                          className={`rounded-lg border px-3 py-2 text-left text-sm transition ${depth === value ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}>
+                          <span className="flex flex-wrap items-center gap-2 font-medium">{title}
+                            {left && usage.data?.usage.plan?.tier !== "unlimited" && <span className="rounded-full border px-2 py-0.5 text-xs font-normal text-muted-foreground">{left.remaining} of {left.limit} left</span>}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">{detail}</span>
+                        </button>
+                      ))}
+                    </div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <label className="flex items-center gap-2 text-sm">How many <input type="number" min={1} max={maxCompanies} value={icp.quantity} onChange={(e) => setQty(Number(e.target.value))} className="w-16 rounded-md border bg-background px-2 py-1 text-sm" data-testid="outbound-quantity" /></label>
-                      <Button onClick={() => start.mutate()} disabled={start.isPending || !!blocked} className="gradient-btn text-white" data-testid="outbound-start">{start.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-1.5 h-4 w-4" />}Start search</Button>
+                      <label className="flex items-center gap-2 text-sm">How many <input type="number" min={1} max={qtyMax} value={icp.quantity} onChange={(e) => setQty(Number(e.target.value))} className="w-16 rounded-md border bg-background px-2 py-1 text-sm" data-testid="outbound-quantity" /></label>
+                      <Button onClick={() => start.mutate()} disabled={start.isPending || !!blocked} className="gradient-btn text-white" data-testid="outbound-start">{start.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-1.5 h-4 w-4" />}{depth === "list" ? "Build the list" : "Start search"}</Button>
                       <Button variant="ghost" onClick={() => setParsed(null)}>Change</Button>
                     </div>
                     {suggestLocal && <p className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-xs dark:border-emerald-900 dark:bg-emerald-950/30" data-testid="outbound-suggest-local">
@@ -539,9 +569,10 @@ export default function OutboundPage() {
             )}
 
             <SegmentedTabs label="Client Radar views" value={view} onChange={setView}
-              tabs={[{ value: "searches", label: "Searches", testId: "view-searches" }, { value: "prospects", label: "All prospects", testId: "view-prospects" }, { value: "outreach", label: "Outreach", testId: "view-outreach" }, { value: "inbox", label: "Inbox", testId: "view-inbox" }, { value: "results", label: "Results", testId: "view-results" }]} />
+              tabs={[{ value: "searches", label: "Searches", testId: "view-searches" }, { value: "social", label: "Social Intent", testId: "view-social" }, { value: "prospects", label: "All prospects", testId: "view-prospects" }, { value: "outreach", label: "Outreach", testId: "view-outreach" }, { value: "inbox", label: "Inbox", testId: "view-inbox" }, { value: "results", label: "Results", testId: "view-results" }]} />
 
-            {view === "results" ? <div className="space-y-4"><SalesFunnel /><StrategyStats /></div>
+            {view === "social" ? <SocialIntent canEdit={canEdit} />
+              : view === "results" ? <div className="space-y-4"><SalesFunnel /><StrategyStats /></div>
               : view === "inbox" ? <OutreachInbox />
               : view === "outreach" ? <OutreachQueue canEdit={canEdit} onShowReady={() => navigate(`${location}?view=prospects&readiness=ready`, { replace: true })} />
               : view === "prospects" ? <ProspectWorkspace canExport={canEdit} onOpen={(r, focus) => setOpen({ id: r.id, runId: r.latestRunId, focus })} onPrepared={() => setView("outreach")} /> : <>

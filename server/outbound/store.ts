@@ -10,6 +10,7 @@ import {
   type ProspectFindingRow, type ProspectRow, type ProspectRunItemRow, type ProspectRunRow,
 } from "@shared/schema";
 import type { Provenance } from "@shared/prospect";
+import type { RunMode } from "@shared/outbound-plans";
 import { tablesReadyCheck } from "../leads/ready";
 import { clipCodeOrNull } from "@shared/error-code";
 import { WORKSPACE_SPEND_LOCK, workspaceSpendTx, type WorkspaceCeiling } from "../llm/trace-store";
@@ -28,12 +29,19 @@ export class RunLimitReached extends Error { constructor(public index: number) {
 export interface NewRun {
   id: string; orgId: string; userId: string; by: "user" | "agent"; request: string; icp: unknown; quantity: number;
   idemKey: string; queries: unknown[]; now: Date;
-  /** Checked under a per-workspace lock together with the insert, so concurrent starts can't both fit under a limit. */
-  limits?: { since: Date; max: number }[];
+  /** "deep" (the full pipeline) or "list" (a bulk sweep that stops after verification). Omitted means deep. */
+  mode?: RunMode;
+  /**
+   * Checked under a per-workspace lock together with the insert, so concurrent starts can't both fit under a limit.
+   * `mode` counts only runs of that kind, which is what keeps the deep-search and list-sweep allowances separate; a
+   * limit without one (the daily cap) counts every run.
+   */
+  limits?: { since: Date; max: number; mode?: RunMode }[];
   /**
    * The researched-prospects allowance, under the same lock: a running search holds its requested number, a finished one
    * counts what it really researched (never more than it asked for). The new run is trimmed to what's left; at zero
-   * createRun throws RunLimitReached with index = limits.length.
+   * createRun throws RunLimitReached with index = limits.length. List sweeps research nothing, so they hold none of it
+   * and never pass this.
    */
   prospects?: { since: Date; max: number };
   /** Inserted already finished (a local search: its results are shown, never stored), with these counters. */
@@ -55,7 +63,8 @@ export interface OutboundStore {
   listRuns(orgId: string, limit: number): Promise<ProspectRunRow[]>;
   /** Runs started since `since`, newest first, at most `limit` (the usage view's rolling window). */
   listRunsSince(orgId: string, since: Date, limit: number): Promise<ProspectRunRow[]>;
-  countRunsSince(orgId: string, since: Date): Promise<number>;
+  /** Runs counting toward a limit since `since`; with `mode`, only that kind (the two allowances are counted apart). */
+  countRunsSince(orgId: string, since: Date, mode?: RunMode): Promise<number>;
   /** Researched prospects this workspace's runs hold or used since `since` (see NewRun.prospects). */
   prospectsHeldSince(orgId: string, since: Date): Promise<number>;
   /** A finished run's counters replaced (a local search that failed is set to searched: 0, so it isn't charged). */
@@ -131,7 +140,7 @@ export const GLOBAL_SEARCH_BUDGET_LOCK = 7_310_002;
 export const RUN_START_LOCK = 7_310_003;
 /** runCountsTowardLimit (shared/outbound-usage.ts), in SQL: a finished run that made no web search doesn't count. */
 /** What one run holds of the researched-prospects allowance (shared/outbound-plans.ts), as SQL; prospectsHeld below is the same rule. */
-const PROSPECTS_HELD = sql`CASE WHEN ${prospectRuns.status} = 'running' THEN ${prospectRuns.quantity} ELSE LEAST(${prospectRuns.quantity}, COALESCE((${prospectRuns.counters}->>'researched')::int, 0)) END`;
+const PROSPECTS_HELD = sql`CASE WHEN ${prospectRuns.mode} = 'list' THEN 0 WHEN ${prospectRuns.status} = 'running' THEN ${prospectRuns.quantity} ELSE LEAST(${prospectRuns.quantity}, COALESCE((${prospectRuns.counters}->>'researched')::int, 0)) END`;
 const COUNTS_TOWARD_LIMIT = sql`(${prospectRuns.status} = 'running' OR COALESCE((${prospectRuns.counters}->>'searched')::int, 0) > 0)`;
 
 export const outboundStore: OutboundStore = {
@@ -147,7 +156,8 @@ export const outboundStore: OutboundStore = {
           for (let i = 0; i < limits.length; i++) {
             const l = limits[i];
             const [c] = await tx.select({ n: sql<number>`count(*)::int` }).from(prospectRuns).where(and(
-              eq(prospectRuns.organizationId, r.orgId), gte(prospectRuns.createdAt, l.since), COUNTS_TOWARD_LIMIT));
+              eq(prospectRuns.organizationId, r.orgId), gte(prospectRuns.createdAt, l.since), COUNTS_TOWARD_LIMIT,
+              ...(l.mode ? [eq(prospectRuns.mode, l.mode)] : [])));
             if ((c?.n ?? 0) >= l.max) throw new RunLimitReached(i);
           }
           if (r.prospects) {
@@ -159,7 +169,7 @@ export const outboundStore: OutboundStore = {
           }
         }
         const [row] = await tx.insert(prospectRuns).values({
-          id: r.id, organizationId: r.orgId, createdByUser: r.userId, createdBy: r.by, request: r.request, icp: r.icp, quantity,
+          id: r.id, organizationId: r.orgId, createdByUser: r.userId, createdBy: r.by, request: r.request, icp: r.icp, quantity, mode: r.mode ?? "deep",
           status: r.finished ? "done" : "running", stage: r.finished ? "done" : "search", counters: r.finished?.counters ?? {}, queries: r.queries, idemKey: r.idemKey,
           createdAt: r.now, updatedAt: r.now, ...(r.finished ? { finishedAt: r.now } : {}), ...(r.holdUntil ? { leaseUntil: r.holdUntil } : {}),
         }).returning();
@@ -203,9 +213,10 @@ export const outboundStore: OutboundStore = {
       .where(and(eq(prospectRuns.organizationId, orgId), gte(prospectRuns.createdAt, since), COUNTS_TOWARD_LIMIT));
     return Number(r?.n ?? 0);
   },
-  async countRunsSince(orgId, since) {
+  async countRunsSince(orgId, since, mode) {
     const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(prospectRuns).where(and(
-      eq(prospectRuns.organizationId, orgId), gte(prospectRuns.createdAt, since), COUNTS_TOWARD_LIMIT));
+      eq(prospectRuns.organizationId, orgId), gte(prospectRuns.createdAt, since), COUNTS_TOWARD_LIMIT,
+      ...(mode ? [eq(prospectRuns.mode, mode)] : [])));
     return r?.n ?? 0;
   },
   async claimRun(now, leaseMs) {
