@@ -42,7 +42,7 @@ export type AfterSendResult = { result: "done"; movedTo: string | null; ticketId
 export type MessageStatus = "variant" | "draft" | "approved" | "sending" | "sent" | "cancelled";
 export interface NewMessage {
   orgId: string; leadId: number; subject: string; body: string; bodyHash: string; toAddress: string; toSource: "lead" | "site";
-  researchId: number | null; claimIds: number[]; promptVersion: string; by: "user" | "agent"; userId: string; now: Date;
+  researchId: number | null; claimIds: number[]; /** The prompt a model wrote it from; null for a message the person wrote themselves (never counted as an AI draft). */ promptVersion: string | null; by: "user" | "agent"; userId: string; now: Date;
   /** How the message opens (shared/outreach-strategy.ts). Follow-ups and old callers leave it unset. */
   strategy?: string | null;
   /**

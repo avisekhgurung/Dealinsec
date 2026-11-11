@@ -76,7 +76,7 @@ export const CAPABILITIES: readonly Capability[] = [
   },
   {
     key: "outreach_drafts", name: "Outreach drafts with approval", status: "live", plan: "all",
-    text: "AI drafts a first message from verified facts about the company. You edit and approve the exact text, send it yourself from your own email, and mark it sent; a follow-up task is added and the do-not-contact list is checked first.",
+    text: "AI drafts a first message from verified facts about the company, or you write it yourself, which doesn't use one of the plan's AI drafts. You edit and approve the exact text, send it yourself from your own email, and mark it sent; a follow-up task is added and the do-not-contact list is checked first.",
   },
   {
     key: "leads", name: "Leads pipeline", status: "live", plan: "all",

@@ -75,6 +75,8 @@ export interface MessageView {
   to: string | null; toSource: string | null; edited: boolean; createdBy: string; createdAt: string; approvedAt: string | null; sentAt: string | null;
   /** How this version opens (shared/outreach-strategy.ts) and its batch, for messages written since variants exist. */
   strategy: string | null; variantGroup: string | null;
+  /** Written by a model (false: the person wrote it themselves). A follow-up's fixed text counts as written for them. */
+  byAi: boolean;
   /** The deterministic quality card (shared/draft-scorecard.ts), measured on read for versions and drafts. Never a prediction. */
   scorecard?: Scorecard;
 }
@@ -82,7 +84,7 @@ const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOStrin
 export const messageView = (m: LeadMessageRow): MessageView => ({
   id: m.id, leadId: m.leadId, status: m.status, subject: m.subject ?? "", body: m.body, bodyHash: m.bodyHash, to: m.toAddress, toSource: m.toSource,
   edited: m.edited, createdBy: m.createdBy, createdAt: iso(m.createdAt)!, approvedAt: iso(m.approvedAt), sentAt: iso(m.sentAt),
-  strategy: m.strategy ?? null, variantGroup: m.variantGroup ?? null,
+  strategy: m.strategy ?? null, variantGroup: m.variantGroup ?? null, byAi: !!m.promptVersion,
 });
 
 const NOT_SETUP = () => fail(503, "MESSAGES_NOT_SETUP", "Outreach drafts aren't set up on this server yet.");
@@ -192,7 +194,8 @@ export async function listMessages(user: Who, leadId: number, d: Partial<Outreac
   const valueOf = new Map([...facts, ...angles].map((f) => [f.id, f.value]));
   const evidenceIds = new Map(selectStrategies({ facts, angles, radar: null, offerDescribed: true, sampleAvailable: false }).map((c) => [c.strategy as string, c.evidenceIds]));
   const withCard = (v: MessageView): MessageView =>
-    v.status === "variant" || v.status === "draft"
+    // Only what a model wrote is marked: a person's own message is theirs to judge.
+    v.byAi && (v.status === "variant" || v.status === "draft")
       ? { ...v, scorecard: scoreDraft(v, { greetName: lead.contactName?.trim() || null, factValues: facts.map((f) => f.value), evidenceValues: (evidenceIds.get(v.strategy ?? "") ?? []).map((id) => valueOf.get(id)!).filter(Boolean) }) }
       : v;
   const [style, next] = await Promise.all([deps.style(user.organizationId!, leadId).catch(() => null), deps.followUp(user.organizationId!, leadId).catch(() => null)]);
@@ -235,7 +238,12 @@ interface PreparedDraft {
  * the message may be written from, the sender's offer, the plan's allowance, and which strategies the evidence
  * supports. Shared by the single draft and the versions, so both answer every refusal the same way.
  */
-async function prepareDraft(user: Who, leadId: number, opts: DraftOpts, deps: OutreachDeps): Promise<Result<PreparedDraft>> {
+/**
+ * What starting ANY first message to a lead needs, whoever writes it: the gates, a lead that may be contacted and has
+ * not been yet, nothing already waiting for it, somewhere to send it, and an address that is not on the do-not-contact
+ * list. Shared by the AI draft and the message a person writes themselves, so neither can skip a refusal the other gives.
+ */
+async function prepareFirstMessage(user: Who, leadId: number, deps: OutreachDeps) {
   const gate = writeGate(user);
   if (gate) return gate;
   if (!(await ready())) return NOT_SETUP();
@@ -263,6 +271,13 @@ async function prepareDraft(user: Who, leadId: number, opts: DraftOpts, deps: Ou
   if (!to) return fail(422, "no_address", "There is no email address for this lead yet. Add one, or research the lead's website to find a business address.");
   const listed = await suppressionBlock(orgId, to.address, deps);
   if (listed) return listed;
+  return { ok: true as const, orgId, lead, scoreClaims, to };
+}
+
+async function prepareDraft(user: Who, leadId: number, opts: DraftOpts, deps: OutreachDeps): Promise<Result<PreparedDraft>> {
+  const first = await prepareFirstMessage(user, leadId, deps);
+  if (!first.ok) return first;
+  const { orgId, lead, scoreClaims, to } = first;
   const { facts, angles } = draftFacts(scoreClaims);
   if (!facts.length) return fail(422, "no_facts", "There is nothing verified about this company to write from yet. Research the lead first, so the message says something true.");
 
@@ -429,6 +444,35 @@ export async function draftOutreachVariants(user: Who, leadId: number, opts: Dra
   }
   await leadsStore.addEvent(p.orgId, leadId, { kind: "variants_created", data: { group, count: rows.length, strategies: good.map((g) => g.strategy), claims: p.claims, ...styleData(p.style) }, actor: opts.by ?? "user", actorUserId: user.id });
   return { ok: true, variants: rows.map(messageView), retried };
+}
+
+/**
+ * The person writes the first message themselves: no model, no allowance, nothing about the company needed. It is
+ * held to every gate a first message has (prepareFirstMessage) and to the structural rules of a person's own text
+ * (editDraft's: length, no placeholder left in), then waits as a draft like any other: read, approve, send. It carries
+ * no prompt version, so it is never counted as an AI draft and never appears in the strategy numbers.
+ */
+export async function writeOwnMessage(user: Who, leadId: number, raw: unknown, d: Partial<OutreachDeps> = {}): Promise<Result<{ message: MessageView }>> {
+  const deps = { ...defaults(), ...d };
+  const parsed = editSchema.safeParse(raw);
+  const first = await prepareFirstMessage(user, leadId, deps);
+  if (!first.ok) return first;
+  if (!parsed.success) return fail(400, "invalid", "Send the subject and the message.");
+  const subject = parsed.data.subject.trim(), body = parsed.data.body.replace(/\r\n/g, "\n").trim();
+  const issues = checkStructure({ subject, body });
+  if (issues.length) return fail(422, "invalid_text", issues[0].message, { issues: issues.map((i) => i.code) });
+  let row: LeadMessageRow;
+  try {
+    row = await deps.store.create({
+      orgId: first.orgId, leadId, subject, body, bodyHash: hashDraft(subject, body), toAddress: first.to.address, toSource: first.to.source,
+      researchId: null, claimIds: [], promptVersion: null, by: "user", userId: user.id, now: deps.now(),
+    });
+  } catch (e) {
+    if (e instanceof DraftExists) return fail(409, "draft_exists", "This lead already has a message waiting. Send or cancel it first.");
+    throw e;
+  }
+  await leadsStore.addEvent(first.orgId, leadId, { kind: "draft_created", data: { messageId: row.id, own: true }, actor: "user", actorUserId: user.id });
+  return { ok: true, message: messageView(row) };
 }
 
 /**

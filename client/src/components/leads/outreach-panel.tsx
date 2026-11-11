@@ -20,7 +20,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { draftUrl, leadCall, leadError, messageUrl, messagesUrl, refreshLeads } from "@/lib/leads";
 import { chipText, chipTone, pendingVariants, shortcomings } from "@/lib/outreach-variants";
-import { gapNote, type Gap } from "@/lib/first-message-gap";
+import { canWriteOwn, gapNote, ownMessageProblem, type Gap } from "@/lib/first-message-gap";
 import { useGmailStatus } from "@/lib/gmail";
 import { DraftAllowanceLine, refreshDraftAllowance, useDraftAllowance } from "./draft-allowance-line";
 import { followUpEnds, repliesAreRead } from "@/lib/reply-reading";
@@ -34,6 +34,8 @@ interface Message {
   id: number; status: "variant" | "draft" | "approved" | "sending" | "sent" | "cancelled"; subject: string; body: string; bodyHash: string;
   to: string | null; toSource: "lead" | "site" | null; edited: boolean; createdBy: string; createdAt: string; approvedAt: string | null; sentAt: string | null;
   strategy?: string | null; variantGroup?: string | null; scorecard?: Scorecard;
+  /** false: the person wrote it themselves. Older servers omit it (then it was a model). */
+  byAi?: boolean;
 }
 /** What a person who has sent the first message should expect next, from the lead's own follow-up. */
 const afterSent = (f: FollowUpView | null | undefined, /** Whether a reply is noticed without the person recording it. */ read: boolean): string => {
@@ -80,6 +82,14 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
 
   const done = () => { void refreshLeads(); };
   const drafted = () => { done(); void refreshDraftAllowance(); };
+  // Writing it yourself: the form opens in place of the buttons, and what is saved becomes the draft like any other.
+  const [own, setOwn] = useState(false), [ownSubject, setOwnSubject] = useState(""), [ownBody, setOwnBody] = useState("");
+  const ownProblem = ownMessageProblem(ownSubject, ownBody, LIMITS);
+  const saveOwn = useMutation({
+    mutationFn: () => leadCall("POST", draftUrl(leadId), { write: "own", subject: ownSubject, body: ownBody }),
+    onSuccess: () => { setOwn(false); setOwnSubject(""); setOwnBody(""); trackEvent("outreach_own_message_saved", { source: "lead" }); done(); },
+    onError: (e) => { done(); fail("Couldn't save your message")(e); },
+  });
   const fail = (title: string) => (e: unknown) => toast({ title, description: leadError(e), variant: "destructive" });
   const draft = useMutation({ mutationFn: () => leadCall("POST", draftUrl(leadId), { offerSample: !!sample && offerSample }), onSuccess: drafted, onError: (e) => { void refreshDraftAllowance(); fail("Couldn't write the message")(e); } });
   const writeVariants = useMutation({ mutationFn: () => leadCall("POST", draftUrl(leadId), { offerSample: !!sample && offerSample, variants: true }), onSuccess: drafted, onError: (e) => { void refreshDraftAllowance(); fail("Couldn't write the versions")(e); } });
@@ -102,7 +112,7 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
     },
     onError: (e) => { done(); fail("Couldn't hand it over")(e); },
   });
-  const busy = draft.isPending || writeVariants.isPending || choose.isPending || discardAll.isPending || save.isPending || approve.isPending || sent.isPending || cancel.isPending || handOut.isPending;
+  const busy = saveOwn.isPending || draft.isPending || writeVariants.isPending || choose.isPending || discardAll.isPending || save.isPending || approve.isPending || sent.isPending || cancel.isPending || handOut.isPending;
 
   if (q.error) return null; // not set up on this server: the card simply has no outreach section
   if (q.isLoading) return null;
@@ -112,13 +122,15 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
   return (
     <Card className="glass-card" data-testid="outreach-panel">
       <CardContent className="space-y-3 p-4">
-        {/* On a phone the two buttons left the words a column one word wide: there the words go above, the buttons below. */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        {/* Words above, buttons below, at every width: this card also sits in narrow places (a campaign's side sheet, the
+            review queue), where three buttons beside the words left the words a column one word wide. */}
+        <div className="flex flex-col gap-3">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">First message</p>
             {gap && canRun && (
               <p className="text-sm" data-testid="outreach-gap">
                 {gap.why} <span className="text-muted-foreground">{gap.fix}</span>
+                {q.data?.gap === "facts" && <span className="text-muted-foreground"> Or write the message yourself.</span>}
                 {!onLeadPage && <> <Link href={`/leads/${leadId}`} className="font-medium text-primary underline-offset-2 hover:underline" data-testid="outreach-gap-open">Open the lead</Link></>}
               </p>
             )}
@@ -132,26 +144,44 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
                 {variants.length} versions, each opening a different way. Pick the one that sounds like you — you can still change every word before approving.
               </p>
             )}
-            {current?.status === "draft" && <p className="text-sm" data-testid="outreach-draft-note">Written by AI. Read it and change anything before you approve it.</p>}
+            {current?.status === "draft" && <p className="text-sm" data-testid="outreach-draft-note">{current.byAi === false ? "Written by you. Read it once more, change anything, then approve it." : "Written by AI. Read it and change anything before you approve it."}</p>}
             {current?.status === "approved" && (
               <p className="text-sm" data-testid="outreach-approved-note">
                 {gmail.ready ? "Approved. Send it from your connected Gmail, or open it in your email app, send it, then tell me here." : "Approved. Open it in your email app, send it, then tell me here."}
               </p>
             )}
           </div>
-          {!current && !lastSent && !variants.length && canRun && (
-            <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+          {!current && !lastSent && !variants.length && canRun && !own && (
+            <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={() => draft.mutate()} disabled={busy || !!gap || outOfDrafts} title={gap?.why ?? (outOfDrafts ? allowance?.text : undefined)} data-testid="outreach-write">
                 {draft.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="mr-1.5 h-4 w-4" />}Write a message
               </Button>
               <Button size="sm" variant="outline" onClick={() => writeVariants.mutate()} disabled={busy || !!gap || outOfDrafts} title={gap?.why ?? (outOfDrafts ? allowance?.text : undefined) ?? "Three versions, each opening a different way, to pick from. Counts as one AI draft."} data-testid="outreach-write-variants">
                 {writeVariants.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}3 versions
               </Button>
+              <Button size="sm" variant="outline" onClick={() => setOwn(true)} disabled={busy || !canWriteOwn(q.data?.gap)} title={canWriteOwn(q.data?.gap) ? "Write the subject and the message yourself. It doesn't use an AI draft." : gap?.why} data-testid="outreach-write-own">
+                <Pencil className="mr-1.5 h-4 w-4" />Write my own
+              </Button>
             </div>
           )}
         </div>
 
-        {!current && !lastSent && !variants.length && canRun && !gap && <DraftAllowanceLine note={allowance} />}
+        {!current && !lastSent && !variants.length && canRun && own && (
+          <div className="space-y-2" data-testid="outreach-own">
+            <Input value={ownSubject} onChange={(e) => setOwnSubject(e.target.value)} maxLength={LIMITS.subjectMax} placeholder="Subject" aria-label="Subject" disabled={saveOwn.isPending} data-testid="outreach-own-subject" />
+            <Textarea value={ownBody} onChange={(e) => setOwnBody(e.target.value)} rows={9} maxLength={LIMITS.bodyMax} placeholder="Your message" aria-label="Message" disabled={saveOwn.isPending} className="text-sm leading-relaxed" data-testid="outreach-own-body" />
+            <p className="text-xs text-muted-foreground" aria-live="polite" data-testid="outreach-own-hint">
+              {ownProblem || "It is saved as a draft: you read it once more and approve it before it can be sent. It doesn't use an AI draft."}
+              <span className="float-right tabular-nums">{ownBody.trim().length}/{LIMITS.bodyMax}</span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => saveOwn.mutate()} disabled={saveOwn.isPending || ownProblem !== null} data-testid="outreach-own-save">{saveOwn.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="mr-1.5 h-4 w-4" />}Save draft</Button>
+              <Button size="sm" variant="ghost" onClick={() => setOwn(false)} disabled={saveOwn.isPending} data-testid="outreach-own-cancel">Cancel</Button>
+            </div>
+          </div>
+        )}
+
+        {!current && !lastSent && !variants.length && canRun && !gap && !own && <DraftAllowanceLine note={allowance} own />}
         {!current && !lastSent && !variants.length && canRun && <ProfileStyleNote style={q.data?.style} channel="email" />}
 
         {!current && !lastSent && !variants.length && canRun && sample && (

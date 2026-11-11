@@ -23,7 +23,7 @@ vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")
 import { checkDraft } from "@shared/outreach-check";
 import { ProviderError } from "../../copilot/provider";
 import { messageStore } from "../../sales/message-store";
-import { approveMessage, cancelMessage, draftOutreach, editDraft, hashDraft, listMessages, markSent, pathToContacted } from "../../sales/outreach";
+import { addSuppression, approveMessage, cancelMessage, draftOutreach, editDraft, hashDraft, listMessages, markSent, pathToContacted, writeOwnMessage } from "../../sales/outreach";
 import { addClaim } from "../../services/leads";
 import { assessLead } from "../../services/sales";
 import { useWorld } from "./world-mocks";
@@ -652,6 +652,106 @@ describe("listing", () => {
     const m2 = await draft(l.id); await draft(other.id);
     const r = await listMessages(user(), l.id) as any;
     expect(r.messages.map((m: any) => m.id)).toEqual([m2.id, m1.id]);
+  });
+});
+
+describe("writing the first message yourself", () => {
+  const MY_SUBJECT = "Hello from a neighbour in Lisbon";
+  const MY_BODY = "Hello,\n\nI run a small studio two streets from Casa Alma and wanted to introduce myself. My rate is 40 euros an hour. Could we talk this week?\n\nAna";
+  const own = (id: number, u = user(), text: Record<string, unknown> = { subject: MY_SUBJECT, body: MY_BODY }) => writeOwnMessage(u, id, text);
+
+  it("saves the person's own words as the draft, addressed like any first message, and calls no model", async () => {
+    const l = lead({ contactEmail: "owner@casaalma.pt" });          // nothing researched, nothing verified
+    const r: any = await own(l.id, user(), { subject: `  ${MY_SUBJECT} `, body: MY_BODY.replace(/\n/g, "\r\n") + "  " });
+    expect(r).toMatchObject({ ok: true, message: { status: "draft", subject: MY_SUBJECT, body: MY_BODY, to: "owner@casaalma.pt", toSource: "lead", byAi: false, createdBy: "user" } });
+    expect(r.message.bodyHash).toBe(hashDraft(MY_SUBJECT, MY_BODY));
+    expect(prompts).toHaveLength(0);
+    expect(world().messages[0]).toMatchObject({ promptVersion: null, claimIds: [], researchId: null, strategy: null });
+    // The timeline records that it happened and that the person wrote it, never the words.
+    expect(events(l.id, "draft_created")[0].data).toEqual({ messageId: r.message.id, own: true });
+    expect(JSON.stringify(events(l.id, "draft_created"))).not.toContain("neighbour");
+  });
+
+  it("is held to a person's rules, not the model's: their own price is theirs to quote; length and leftover placeholders are not", async () => {
+    const l = lead({ contactEmail: "owner@casaalma.pt" });
+    expect(code(await own(l.id, user(), { subject: MY_SUBJECT, body: "Too short." }))).toBe("invalid_text");
+    expect(code(await own(l.id, user(), { subject: "Hi", body: MY_BODY }))).toBe("invalid_text");
+    expect(code(await own(l.id, user(), { subject: MY_SUBJECT, body: MY_BODY.replace("Hello,", "Hello [Name],") }))).toBe("invalid_text");
+    expect(code(await own(l.id, user(), { subject: MY_SUBJECT }))).toBe("invalid");
+    expect(code(await own(l.id, user(), { subject: 7, body: MY_BODY } as any))).toBe("invalid");
+    expect(world().messages).toHaveLength(0);
+    expect(await own(l.id)).toMatchObject({ ok: true });            // "40 euros an hour" stays
+  });
+
+  it("is not an AI draft: it is never counted, and it still works when the AI drafts are used up", async () => {
+    process.env.OUTBOUND_MONTHLY_DRAFTS_PRO = "1";
+    const a = await researched();
+    await cancelMessage(user(), (await draft(a.id)).id);            // the one AI draft is spent
+    const b = await researched({ companyName: "Casa Beira", website: "https://casabeira.pt", domain: "casabeira.pt" });
+    expect(code(await draftOutreach(user(), b.id))).toBe("draft_allowance");
+    expect(await own(b.id)).toMatchObject({ ok: true, message: { byAi: false } });
+    // Writing more of your own never uses the allowance either.
+    const c = await researched({ companyName: "Casa Cedro", website: "https://casacedro.pt", domain: "casacedro.pt" });
+    expect(await own(c.id)).toMatchObject({ ok: true });
+    expect(world().messages.filter((m) => String(m.promptVersion ?? "").startsWith("draft-"))).toHaveLength(1);
+  });
+
+  it("every gate of a first message still applies", async () => {
+    const calls = () => world().messages.length;
+    const noAddress = lead({ companyName: "No Address", domain: "noaddress.pt" });
+    expect(code(await own(noAddress.id))).toBe("no_address");
+    const dnc = lead({ companyName: "Asked To Stop", domain: "stop.pt", contactEmail: "a@stop.pt", doNotContact: true });
+    expect(code(await own(dnc.id))).toBe("do_not_contact");
+    const lost = lead({ companyName: "Lost", domain: "lost.pt", contactEmail: "a@lost.pt", status: "lost" });
+    expect(code(await own(lost.id))).toBe("closed");
+    const moved = lead({ companyName: "Meeting", domain: "meeting.pt", contactEmail: "a@meeting.pt", status: "meeting" });
+    expect(code(await own(moved.id))).toBe("already_contacted");
+    expect(calls()).toBe(0);
+
+    // One unsent message per lead, whoever wrote it, in either order.
+    const l = await researched();
+    expect(await own(l.id)).toMatchObject({ ok: true });
+    expect(code(await own(l.id))).toBe("draft_exists");
+    expect(code(await draftOutreach(user(), l.id))).toBe("draft_exists");
+    const m = await draft((await researched({ companyName: "Casa Dois", website: "https://casadois.pt", domain: "casadois.pt" })).id);
+    expect(code(await own(m.leadId))).toBe("draft_exists");
+  });
+
+  it("an address on the do-not-contact list is refused before anything is saved", async () => {
+    const l = lead({ contactEmail: "owner@casaalma.pt" });
+    expect(await addSuppression(user(), { value: "owner@casaalma.pt" })).toMatchObject({ ok: true });
+    expect(code(await own(l.id))).toBe(code(await draftOutreach(user(), (await researched({ contactEmail: "owner@casaalma.pt", companyName: "Same Address", domain: "same.pt" })).id)));   // the very refusal an AI draft gets
+    expect(code(await own(l.id))).not.toBe("ok");
+    expect(world().messages).toHaveLength(0);
+  });
+
+  it("needs the same permission and the same workspace as any draft", async () => {
+    const l = lead({ contactEmail: "owner@casaalma.pt" });
+    for (const who of [nobody(), viewer()]) expect(code(await own(l.id, who))).toBe("forbidden");
+    expect(code(await own(l.id, OTHER()))).toBe("not_found");
+    expect(world().messages).toHaveLength(0);
+  });
+
+  it("then goes the way of every message: read, approve the exact text, send, and the follow-up is planned", async () => {
+    const l = lead({ contactEmail: "owner@casaalma.pt" });
+    const m = (await own(l.id) as any).message;
+    // The quality card marks what a model wrote; a person's own message carries none.
+    const listed: any = await listMessages(user(), l.id);
+    expect(listed.messages[0]).toMatchObject({ id: m.id, byAi: false });
+    expect(listed.messages[0].scorecard).toBeUndefined();
+    expect(code(await approveMessage(user(), m.id, "not-the-text"))).not.toBeUndefined();
+    expect(await approveMessage(user(), m.id, m.bodyHash)).toMatchObject({ ok: true, message: { status: "approved" } });
+    expect(await markSent(user(), m.id)).toMatchObject({ ok: true, message: { status: "sent" }, movedTo: "contacted" });
+    // And once it went out, a first message can't be started again, by hand or by AI.
+    expect(code(await own(l.id))).toBe("already_contacted");
+  });
+
+  it("an AI draft still says it was written by AI, and keeps its quality card", async () => {
+    const l = await researched();
+    const m = await draft(l.id);
+    expect(m.byAi).toBe(true);
+    const listed: any = await listMessages(user(), l.id);
+    expect(listed.messages[0].scorecard).toBeDefined();
   });
 });
 

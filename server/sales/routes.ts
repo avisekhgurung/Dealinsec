@@ -7,6 +7,7 @@
  *   GET  /api/sales/leads/:id/research     the latest run: status, pages read, what was kept and what was thrown away
  *   GET  /api/sales/leads/:id/messages     the lead's outreach messages, newest first
  *   POST /api/sales/leads/:id/draft        write the first message (one model call; stored as a draft for review)
+ *                                          or, with { write: "own", subject, body }, save the person's own text as the draft
  *   PATCH /api/sales/messages/:id          edit the text (an approved message returns to draft)
  *   POST /api/sales/messages/:id/approve   approve the text the person read ({ bodyHash })
  *   POST /api/sales/messages/:id/sent      the person says they sent it from their own email app
@@ -21,7 +22,7 @@ import { agentLog } from "../agent/log";
 import { leadsTablesReady } from "../leads/store";
 import * as sales from "../services/sales";
 import { getResearch, startResearch } from "./research";
-import { addSuppression, approveMessage, cancelMessage, chooseVariant, draftOutreach, draftOutreachVariants, editDraft, listMessages, listOutreachQueue, listSuppressions, markSent, openApproved, recordOutcome, removeSuppression } from "./outreach";
+import { addSuppression, approveMessage, cancelMessage, chooseVariant, draftOutreach, draftOutreachVariants, editDraft, listMessages, listOutreachQueue, listSuppressions, markSent, openApproved, recordOutcome, removeSuppression, writeOwnMessage } from "./outreach";
 import { messagesTablesReady } from "./message-store";
 import { strategyStats } from "./strategy-stats";
 import { salesTablesReady } from "./research-store";
@@ -118,6 +119,8 @@ export function registerSalesRoutes(app: Express) {
   };
   app.get("/api/sales/leads/:id/messages", isAuthenticated, gate, messagesGate, guarded("sales_messages", async (req, res, id) => reply(res, await listMessages(req.user, id), (r) => ({ messages: r.messages, sample: r.sample, style: r.style, followUp: r.followUp, gap: r.gap, hasWebsite: r.hasWebsite }))));
   app.post("/api/sales/leads/:id/draft", isAuthenticated, gate, messagesGate, guarded("sales_draft", async (req, res, id) => {
+    // `write: "own"` saves the person's own subject and message as the draft: no model call, not an AI draft.
+    if (req.body?.write === "own") return reply(res, await writeOwnMessage(req.user, id, { subject: req.body?.subject, body: req.body?.body }), (r) => ({ message: r.message }), 201);
     const opts = { offerSample: req.body?.offerSample === true };
     // `variants: true` writes up to three versions to choose from (one AI draft against the allowance); without it, the single draft as ever.
     if (req.body?.variants === true) return reply(res, await draftOutreachVariants(req.user, id, opts), (r) => ({ variants: r.variants, retried: r.retried }), 201);

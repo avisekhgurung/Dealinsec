@@ -11,7 +11,9 @@
   are unknown shown as unknown). Every fact links to its source and date;
   guesses are labelled. Nothing is contacted and nothing becomes a lead until
   you add it. Daily limits per workspace apply.
-- Outreach drafts: AI writes a first message only from verified facts. You
+- Outreach drafts: AI writes a first message only from verified facts, or
+  you write it yourself with "Write my own" on the lead's First message box
+  (that does not use one of the plan's AI drafts). Either way you
   edit and approve the exact text, send it from your own email app, and mark
   it sent; a follow-up task is added. Messages to addresses on the
   do-not-contact list are refused.

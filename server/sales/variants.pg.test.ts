@@ -91,6 +91,26 @@ describe.skipIf(!URL_ || !loopback(URL_))("message versions under the one-unsent
     expect((await statuses(o, lead3)).variant).toBeUndefined();
   });
 
+  it("a message the person wrote themselves is stored with no prompt version, is never counted as an AI draft, and still obeys one-unsent-per-lead", async () => {
+    const o = org();
+    const a = await seedLead(o), b = await seedLead(o);
+    const own = (leadId: number) => store.messageStore.create({
+      orgId: o, leadId, subject: "Hello from a neighbour", body: "My own words, written by hand.", bodyHash: "a".repeat(64), toAddress: "ceo@acme.test", toSource: "lead",
+      researchId: null, claimIds: [], promptVersion: null, by: "user", userId: "u1", now: new Date(),
+    });
+    const row = await own(a);
+    expect(row).toMatchObject({ status: "draft", promptVersion: null, createdBy: "user", edited: false });
+    expect(await store.messageStore.countAiDrafts(o, allowance().since, "draft-")).toBe(0);
+    await expect(own(a)).rejects.toBeInstanceOf(store.DraftExists);                      // the index decides, as for any draft
+    // With the AI allowance at nothing, an AI draft is refused and the person's own still goes in.
+    await expect(store.messageStore.create({
+      orgId: o, leadId: b, subject: "s", body: "b", bodyHash: "b".repeat(64), toAddress: "ceo@acme.test", toSource: "lead",
+      researchId: null, claimIds: [], promptVersion: "draft-v7:direct", by: "user", userId: "u1", now: new Date(), allowance: allowance(0),
+    })).rejects.toBeInstanceOf(store.DraftAllowanceReached);
+    expect((await own(b)).status).toBe("draft");
+    expect(await store.messageStore.countAiDrafts(o, allowance().since, "draft-")).toBe(0);
+  });
+
   it("a stale hash or a cancelled version can't be chosen; the chosen one answers a second click once", async () => {
     const o = org(), lead = await seedLead(o);
     const rows = await store.messageStore.createVariants(newVariants(o, lead));
