@@ -135,6 +135,17 @@ export function draftFacts(claims: ScoreClaim[]): { facts: { id: number; field: 
   return { facts, angles };
 }
 
+/**
+ * What a first message to this lead still lacks, in the order writing one refuses it: nowhere to send it, then nothing
+ * verified to write from. The page shows this before the click, so nobody presses "Write a message" only to be told no.
+ * Built from the same two rules the draft itself uses, so the hint and the refusal cannot disagree.
+ */
+export type FirstMessageGap = "address" | "facts";
+export function firstMessageGap(lead: { contactEmail?: string | null }, claims: ScoreClaim[]): FirstMessageGap | null {
+  if (!recipientFor(lead, claims)) return "address";
+  return draftFacts(claims).facts.length ? null : "facts";
+}
+
 /** The refusal for an address or domain on the organization's list. */
 function listedFail(hit: { kind: string; value: string; reason: string }) {
   const why = SUPPRESSION_REASON_LABEL[hit.reason as SuppressionReason] ?? "on your list";
@@ -162,7 +173,7 @@ const asDraft = (text: string | null): { subject: string; body: string } | null 
 };
 
 /** `sample`: the proof-of-value sample the lead's opportunity plan proposed (Client Radar), which a first draft can offer. */
-export async function listMessages(user: Who, leadId: number, d: Partial<OutreachDeps> = {}): Promise<Result<{ messages: MessageView[]; sample: { title: string; scope: string } | null; /** The saved client profile whose tone and note this lead's AI drafts follow, when there is one. */ style: ProfileStyleView | null; /** What comes next after a sent message: a planned follow-up, one on hold, or a draft waiting. */ followUp: FollowUpView | null }>> {
+export async function listMessages(user: Who, leadId: number, d: Partial<OutreachDeps> = {}): Promise<Result<{ messages: MessageView[]; sample: { title: string; scope: string } | null; /** The saved client profile whose tone and note this lead's AI drafts follow, when there is one. */ style: ProfileStyleView | null; /** What comes next after a sent message: a planned follow-up, one on hold, or a draft waiting. */ followUp: FollowUpView | null; /** What a first message still lacks (an address, or anything verified), or null when one can be written. */ gap: FirstMessageGap | null; /** Whether the lead has a website to research, which decides the advice that goes with a gap. */ hasWebsite: boolean }>> {
   const deps = { ...defaults(), ...d };
   const gate = readGate(user);
   if (gate) return gate;
@@ -176,7 +187,8 @@ export async function listMessages(user: Who, leadId: number, d: Partial<Outreac
   // The quality card a person compares versions (and reviews a draft) with: measured NOW from the message and
   // the lead's claims, stored nowhere. Each strategy is marked against its own evidence, found by the same rules
   // that offered it; a strategy grounded outside the claims (a sample, the Client Radar angle) has none to mark.
-  const { facts, angles } = draftFacts(claims.map((c) => ({ id: c.id, field: c.field, value: c.value, status: c.status, evidenceUrl: c.evidenceUrl, createdAt: c.createdAt })));
+  const scoreClaims: ScoreClaim[] = claims.map((c) => ({ id: c.id, field: c.field, value: c.value, status: c.status, evidenceUrl: c.evidenceUrl, createdAt: c.createdAt }));
+  const { facts, angles } = draftFacts(scoreClaims);
   const valueOf = new Map([...facts, ...angles].map((f) => [f.id, f.value]));
   const evidenceIds = new Map(selectStrategies({ facts, angles, radar: null, offerDescribed: true, sampleAvailable: false }).map((c) => [c.strategy as string, c.evidenceIds]));
   const withCard = (v: MessageView): MessageView =>
@@ -184,7 +196,7 @@ export async function listMessages(user: Who, leadId: number, d: Partial<Outreac
       ? { ...v, scorecard: scoreDraft(v, { greetName: lead.contactName?.trim() || null, factValues: facts.map((f) => f.value), evidenceValues: (evidenceIds.get(v.strategy ?? "") ?? []).map((id) => valueOf.get(id)!).filter(Boolean) }) }
       : v;
   const [style, next] = await Promise.all([deps.style(user.organizationId!, leadId).catch(() => null), deps.followUp(user.organizationId!, leadId).catch(() => null)]);
-  return { ok: true, messages: rows.map((m) => withCard(messageView(m))), sample, style: profileStyleView(style), followUp: followUpView(next) };
+  return { ok: true, messages: rows.map((m) => withCard(messageView(m))), sample, style: profileStyleView(style), followUp: followUpView(next), gap: firstMessageGap(lead, scoreClaims), hasWebsite: !!lead.website?.trim() };
 }
 
 /** The cap refusals a draft can hit, in the person's words; null when `e` is something else. */

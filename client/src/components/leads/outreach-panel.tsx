@@ -10,6 +10,7 @@ import type { ProfileStyleView } from "@shared/acquisition-profile";
 import type { FollowUpView } from "@shared/campaign";
 import { ProfileStyleNote } from "./profile-style-note";
 import { useEffect, useState } from "react";
+import { Link, useLocation } from "wouter";
 import { Check, Copy, Loader2, Mail, Pencil, PenLine, Send, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,6 +20,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { draftUrl, leadCall, leadError, messageUrl, messagesUrl, refreshLeads } from "@/lib/leads";
 import { chipText, chipTone, pendingVariants, shortcomings } from "@/lib/outreach-variants";
+import { gapNote, type Gap } from "@/lib/first-message-gap";
 import { memberCan } from "@shared/permissions";
 import { GmailSendState, SendFromGmailButton, useGmailCanSend } from "./gmail-send";
 import { LIMITS } from "@shared/outreach-check";
@@ -51,13 +53,17 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
   const { toast } = useToast();
   const canRun = memberCan(user as any, "deals.create");
   const gmail = useGmailCanSend(); // only offered (and mentioned) where this person can really send from Gmail
-  const q = useQuery<{ messages: Message[]; sample?: { title: string; scope: string } | null; /** Older servers omit it. */ style?: ProfileStyleView | null; /** Older servers omit it. */ followUp?: FollowUpView | null }>({ queryKey: [messagesUrl(leadId)], retry: false });
+  const q = useQuery<{ messages: Message[]; sample?: { title: string; scope: string } | null; /** Older servers omit it. */ style?: ProfileStyleView | null; /** Older servers omit it. */ followUp?: FollowUpView | null; /** Older servers omit both. */ gap?: Gap | null; hasWebsite?: boolean }>({ queryKey: [messagesUrl(leadId)], retry: false });
   const sample = q.data?.sample ?? null;
   // Offering the plan's sample commits the person's time, so it's their choice, off until they tick it.
   const [offerSample, setOfferSample] = useState(false);
   const current = q.data?.messages.find((m) => m.status === "draft" || m.status === "approved" || m.status === "sending") ?? null;
   const lastSent = q.data?.messages.find((m) => m.status === "sent") ?? null;
   const variants = pendingVariants(q.data?.messages ?? []);
+  // Asked before the click: what a first message still lacks. Only said where a first message could be started at all.
+  const gap = !current && !lastSent && !variants.length ? gapNote(q.data?.gap, !!q.data?.hasWebsite) : null;
+  const [here] = useLocation();
+  const onLeadPage = here === `/leads/${leadId}`;
 
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -101,7 +107,13 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">First message</p>
-            {!current && !variants.length && (
+            {gap && canRun && (
+              <p className="text-sm" data-testid="outreach-gap">
+                {gap.why} <span className="text-muted-foreground">{gap.fix}</span>
+                {!onLeadPage && <> <Link href={`/leads/${leadId}`} className="font-medium text-primary underline-offset-2 hover:underline" data-testid="outreach-gap-open">Open the lead</Link></>}
+              </p>
+            )}
+            {!current && !variants.length && !(gap && canRun) && (
               <p className="text-sm text-muted-foreground" data-testid="outreach-none">
                 {lastSent ? `Sent ${when(lastSent.sentAt)}. ${afterSent(q.data?.followUp)}` : "No message yet. I write it from what's been verified about the company; you read it, change it and approve it. Nothing is sent for you."}
               </p>
@@ -120,10 +132,10 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
           </div>
           {!current && !lastSent && !variants.length && canRun && (
             <div className="flex shrink-0 flex-wrap justify-end gap-2">
-              <Button size="sm" onClick={() => draft.mutate()} disabled={busy} data-testid="outreach-write">
+              <Button size="sm" onClick={() => draft.mutate()} disabled={busy || !!gap} title={gap?.why} data-testid="outreach-write">
                 {draft.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="mr-1.5 h-4 w-4" />}Write a message
               </Button>
-              <Button size="sm" variant="outline" onClick={() => writeVariants.mutate()} disabled={busy} title="Three versions, each opening a different way, to pick from. Counts as one AI draft." data-testid="outreach-write-variants">
+              <Button size="sm" variant="outline" onClick={() => writeVariants.mutate()} disabled={busy || !!gap} title={gap?.why ?? "Three versions, each opening a different way, to pick from. Counts as one AI draft."} data-testid="outreach-write-variants">
                 {writeVariants.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}3 versions
               </Button>
             </div>

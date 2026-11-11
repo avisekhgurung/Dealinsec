@@ -116,7 +116,7 @@ export function registerSalesRoutes(app: Express) {
       res.status(500).json({ code: "internal", error: "Something went wrong on our side." });
     }
   };
-  app.get("/api/sales/leads/:id/messages", isAuthenticated, gate, messagesGate, guarded("sales_messages", async (req, res, id) => reply(res, await listMessages(req.user, id), (r) => ({ messages: r.messages, sample: r.sample, style: r.style, followUp: r.followUp }))));
+  app.get("/api/sales/leads/:id/messages", isAuthenticated, gate, messagesGate, guarded("sales_messages", async (req, res, id) => reply(res, await listMessages(req.user, id), (r) => ({ messages: r.messages, sample: r.sample, style: r.style, followUp: r.followUp, gap: r.gap, hasWebsite: r.hasWebsite }))));
   app.post("/api/sales/leads/:id/draft", isAuthenticated, gate, messagesGate, guarded("sales_draft", async (req, res, id) => {
     const opts = { offerSample: req.body?.offerSample === true };
     // `variants: true` writes up to three versions to choose from (one AI draft against the allowance); without it, the single draft as ever.

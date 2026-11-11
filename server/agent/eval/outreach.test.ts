@@ -105,6 +105,34 @@ describe("writing a draft", () => {
     expect(prompts).toHaveLength(0);
     expect(world().messages).toHaveLength(0);
   });
+  it("the page is told what is missing before the click, by the same rules that refuse the draft", async () => {
+    const gapOf = async (id: number) => { const r: any = await listMessages(user(), id); expect(r.ok).toBe(true); return { gap: r.gap, hasWebsite: r.hasWebsite }; };
+    const codeOf = async (id: number) => { const r: any = await draftOutreach(user(), id); return r.ok ? null : r.code; };
+    reply();
+
+    const bare = lead({ website: null, domain: null });
+    expect(await gapOf(bare.id)).toEqual({ gap: "address", hasWebsite: false });
+    expect(await codeOf(bare.id)).toBe("no_address");
+
+    // An address, and still nothing verified to write from.
+    const addressed = lead({ contactEmail: "owner@casaalma.pt" });
+    expect(await gapOf(addressed.id)).toEqual({ gap: "facts", hasWebsite: true });
+    expect(await codeOf(addressed.id)).toBe("no_facts");
+
+    // Facts but nowhere to send: the address is named first, as the draft refuses it first.
+    const known = lead();
+    await claim(known.id, "description", "Runs boutique hotels in Lisbon");
+    await claim(known.id, "business_email", "hello@casaalma.pt", "inferred");
+    expect(await gapOf(known.id)).toEqual({ gap: "address", hasWebsite: true });
+    expect(await codeOf(known.id)).toBe("no_address");
+
+    // Nothing missing: no gap, and the draft is written.
+    const ready = await researched();
+    expect(await gapOf(ready.id)).toEqual({ gap: null, hasWebsite: true });
+    expect(await codeOf(ready.id)).toBeNull();
+    expect(prompts).toHaveLength(1); // only the lead with nothing missing reached the model
+  });
+
   it("a business address on the site that is only inferred is not an address to write to", async () => {
     const l = lead(); await claim(l.id, "description", "Runs hotels"); await claim(l.id, "business_email", "info@casaalma.pt", "inferred");
     expect(code(await draftOutreach(user(), l.id))).toBe("no_address");
