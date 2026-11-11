@@ -123,7 +123,9 @@ export async function localSearch(user: Who, raw: unknown, d: Partial<LocalDeps>
     // A refused key isn't billed; anything else may have been.
     await deps.store.settleProviderCall(reservation, { ok: false, errorCode: code, latencyMs: Date.now() - t0, costMicroUsd: code === "auth" ? 0 : cost }).catch(() => {});
     await refund("search_unavailable");
-    return fail(code === "auth" ? 503 : 502, "local_unavailable", "The local business search didn't answer. Nothing was used from your allowance; try again in a moment.");
+    // A refused key never fixes itself, so "try again in a moment" would be a false promise; say it is down on our side.
+    if (code === "auth") return fail(503, "local_unavailable", "Local business search isn't working on DealInSec right now, and trying again won't help until we fix it. Nothing was used from your allowance. Search for companies online meanwhile.");
+    return fail(502, "local_unavailable", "The local business search didn't answer. Nothing was used from your allowance; try again in a moment.");
   }
   const shown = filterByWebsite(listings, input.website).slice(0, max);
   // Already in this workspace: by the website's domain (prospects, leads) or by the place ID (prospects researched from a

@@ -8,6 +8,7 @@
  */
 import type { SearchResult } from "@shared/discovery";
 import { DiscoveryError, type DiscoveryProvider, type SearchOptions } from "./types";
+import { keyRefused } from "./http";
 
 const DEFAULT_URL = "https://api.search.brave.com/res/v1/web/search";
 const TIMEOUT_MS = 10_000;
@@ -39,7 +40,7 @@ export class BraveProvider implements DiscoveryProvider {
       opts.signal?.removeEventListener("abort", onAbort);
     }
 
-    if (res.status === 401 || res.status === 403) throw new DiscoveryError("auth", "The search service didn't accept the configured key.");
+    if (res.status === 401 || res.status === 403) throw await keyRefused(res, this.endpoint, "The search service");
     if (res.status === 429) throw new DiscoveryError("rate_limited", "The search service is busy or its limit was reached. Try again later.");
     if (!res.ok) throw new DiscoveryError("unavailable", "The search service had a problem.");
 

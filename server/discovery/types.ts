@@ -2,9 +2,12 @@ import type { SearchResult } from "@shared/discovery";
 
 export type DiscoveryErrorCode = "auth" | "rate_limited" | "unavailable" | "bad_response" | "timeout" | "aborted";
 
-/** A search that did not complete. The message is safe to show a person and never contains the key. */
+/**
+ * A search that did not complete. The message is safe to show a person and never contains the key.
+ * `reason` is for the operator only: the provider's own short codes for a refused key (see refusalReason in http.ts).
+ */
 export class DiscoveryError extends Error {
-  constructor(readonly code: DiscoveryErrorCode, message: string) {
+  constructor(readonly code: DiscoveryErrorCode, message: string, readonly reason?: string) {
     super(message);
     this.name = "DiscoveryError";
   }

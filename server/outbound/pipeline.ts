@@ -382,7 +382,7 @@ export async function localScan(run: Pick<ProspectRunRow, "id" | "organizationId
   } catch (e) {
     // Never the message, which could carry listing text: only the type, so the failure is visible and nothing leaks.
     scan.error = e instanceof DiscoveryError ? e.code : `error:${String((e as Error)?.name ?? "unknown").slice(0, 20)}`;
-    console.log(JSON.stringify({ kind: "outbound_local_scan_failed", errorType: scan.error }));
+    console.log(JSON.stringify({ kind: "outbound_local_scan_failed", errorType: scan.error, reason: (e instanceof DiscoveryError && e.reason) || null }));
   }
 }
 

@@ -155,6 +155,19 @@ describe("credits and caps", () => {
     expect(world().outbound.providerCalls.filter((c) => c.errorCode === "auth").map((c) => c.costMicroUsd)).toEqual([0]);
   });
 
+  it("a refused key is said plainly: it is down on our side, and trying again will not help", async () => {
+    const r: any = await search({}, deps({ provider: places(() => new DiscoveryError("auth", "bad key", "PERMISSION_DENIED/API_KEY_IP_ADDRESS_BLOCKED")) }));
+    expect(r).toMatchObject({ ok: false, status: 503, code: "local_unavailable" });
+    expect(r.message).toMatch(/isn't working on DealInSec right now/);
+    expect(r.message).toMatch(/Nothing was used from your allowance/);
+    expect(r.message).not.toMatch(/try again in a moment|PERMISSION|API_KEY|key/i); // never a false promise, never the reason
+    expect(world().outbound.runs.every((x) => x.counters.searched === 0)).toBe(true); // the credit came back
+    // Any other failure may pass by itself, so that one still says to try again.
+    const busy: any = await search({}, deps({ provider: places(() => new DiscoveryError("unavailable", "down")) }));
+    expect(busy).toMatchObject({ ok: false, status: 502, code: "local_unavailable" });
+    expect(busy.message).toMatch(/try again in a moment/);
+  });
+
   it("the platform's daily cap for local searches stops the paid call and refunds the credit", async () => {
     process.env.OUTBOUND_GLOBAL_DAILY_LOCAL_SEARCHES = "1";
     expect((await search()).ok).toBe(true);
