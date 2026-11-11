@@ -31,3 +31,6 @@ eval-results/
 # Opt-in local diagnostics (AI Outbound search traces): never committed
 .diagnostics/
 .neon
+
+# Where script/deploy.sh sends the build (a server address; kept out of the public repo)
+.deploy.env

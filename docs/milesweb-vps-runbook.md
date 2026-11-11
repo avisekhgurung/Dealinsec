@@ -508,13 +508,21 @@ jobs:
       - name: Ship dist
         run: |
           echo "${{ secrets.DEPLOY_KEY }}" > /tmp/k && chmod 600 /tmp/k
-          rsync -az --delete -e "ssh -i /tmp/k -o StrictHostKeyChecking=accept-new" \
+          # No --delete: the running site's page still names the old script files until the restart, and deleting
+          # them blanks every fresh visit in between. script/deploy.sh removes week-old files AFTER it has checked the site.
+          rsync -az -e "ssh -i /tmp/k -o StrictHostKeyChecking=accept-new" \
             dist/ package.json package-lock.json \
             deploy@${{ secrets.DEPLOY_HOST }}:/srv/dealinsec/current/
           ssh -i /tmp/k -o StrictHostKeyChecking=accept-new \
             deploy@${{ secrets.DEPLOY_HOST }} \
             'cd /srv/dealinsec/current && npm ci --omit=dev && sudo systemctl restart dealinsec'
 ```
+
+**Until this workflow exists, deploys are by hand with one command: `bash script/deploy.sh`** (upload without
+deleting, restart, check that the live page's script loads, then tidy; `--check` looks and changes nothing). It reads
+the server's address from `.deploy.env`, which is not committed. Its tests run against a pretend server:
+`bash script/deploy.test.sh`. Do not go back to a separate upload and restart: on 10 Nov 2026 the restart was missed
+and fresh visits got a blank page for five minutes.
 
 Needs: a deploy SSH key (`DEPLOY_KEY`, `DEPLOY_HOST` as repo secrets) and a sudoers rule letting `deploy` restart
 just that one unit:
