@@ -61,6 +61,36 @@ describe.skipIf(!URL_ || !loopback(URL_))("a lead's next open follow-up (real Po
     expect(await mod.openFollowUpForLead(o, l)).toBeNull();
   });
 
+  it("a planned step stops counting once the job would skip it: the lead moved on, was archived, marked do-not-contact or became a deal", async () => {
+    const o = org();
+    const due = new Date(NOW.getTime() + 4 * DAY);
+    const planned = async () => { const l = await lead(o); await followUp(o, l, await message(o, l, "sent"), 1, "scheduled", due); return l; };
+    const set = (l: number, sqlSet: string) => q.query(`UPDATE leads SET ${sqlSet} WHERE organization_id = $1 AND id = $2`, [o, l]);
+
+    // Every stage the job still writes to keeps the plan; every later stage drops it, and moving back restores it.
+    const l = await planned();
+    for (const stage of ["contacted", "qualified", "new", "researching"]) { await set(l, `status = '${stage}'`); expect(await mod.openFollowUpForLead(o, l), stage).toMatchObject({ status: "scheduled" }); }
+    for (const stage of ["replied", "meeting", "proposal", "won", "lost"]) { await set(l, `status = '${stage}'`); expect(await mod.openFollowUpForLead(o, l), stage).toBeNull(); }
+    await set(l, `status = 'contacted'`);
+    expect(await mod.openFollowUpForLead(o, l)).toMatchObject({ status: "scheduled", dueAt: due.toISOString() });
+
+    for (const closed of ["archived_at = now()", "do_not_contact = true", "converting = true"]) {
+      const c = await planned();
+      await set(c, closed);
+      expect(await mod.openFollowUpForLead(o, c), closed).toBeNull();
+    }
+  });
+
+  it("a held step or a waiting draft is still shown after the lead moved on: it is something to act on", async () => {
+    const o = org();
+    const a = await lead(o), b = await lead(o);
+    await followUp(o, a, await message(o, a, "sent"), 1, "held", new Date(NOW.getTime() + DAY));
+    await followUp(o, b, await message(o, b, "sent"), 1, "drafted", new Date(NOW.getTime() - DAY), await message(o, b, "draft"));
+    for (const l of [a, b]) await q.query(`UPDATE leads SET status = 'replied' WHERE organization_id = $1 AND id = $2`, [o, l]);
+    expect(await mod.openFollowUpForLead(o, a)).toMatchObject({ status: "held" });
+    expect(await mod.openFollowUpForLead(o, b)).toMatchObject({ status: "drafted", draftStatus: "draft" });
+  });
+
   it("another workspace's follow-up is never read, even for the same lead id", async () => {
     const o = org(), other = org();
     const theirs = await lead(other);

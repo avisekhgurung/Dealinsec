@@ -8,6 +8,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db";
 import { campaignMembers, campaigns, type CampaignMemberRow, type CampaignRow } from "@shared/schema";
 import { tablesReadyCheck } from "../leads/ready";
+import { plannedStillHappens } from "../sales/followups";
 
 /** Campaigns sit on top of outreach: without messages and the do-not-contact list there is nothing to group. */
 export const campaignTablesReady = tablesReadyCheck(["campaigns", "campaign_members", "leads", "lead_messages", "outreach_events", "outreach_suppressions"]);
@@ -134,11 +135,12 @@ export const campaignStore: CampaignStore = {
       : sql`false`;
     // The next follow-up still open on the member's message: scheduled (not due yet), held (a reply awaits review) or
     // drafted (a draft is waiting). Sent, cancelled and skipped steps are history, not something to act on.
+    // A planned step counts only while it would still happen for the member's lead (`l`, joined below).
     const followUp = (await followupsReady().catch(() => false))
       ? sql`(SELECT json_build_object('status', f.status, 'step', f.step, 'dueAt', to_char(f.due_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
                                      'draftStatus', (SELECT dm.status FROM lead_messages dm WHERE dm.organization_id = f.organization_id AND dm.id = f.draft_message_id))
              FROM outreach_followups f
-             WHERE f.organization_id = m.organization_id AND f.root_message_id = m.message_id AND f.status IN ('scheduled', 'held', 'drafted')
+             WHERE f.organization_id = m.organization_id AND f.root_message_id = m.message_id AND f.status IN ('scheduled', 'held', 'drafted') AND ${plannedStillHappens}
              ORDER BY f.step LIMIT 1)`
       : sql`NULL`;
     const r = await db.execute(sql`

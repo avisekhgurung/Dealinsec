@@ -22,6 +22,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { trackEvent } from "@/lib/analytics";
 import { leadCall, leadError } from "@/lib/leads";
+import { useGmailStatus } from "@/lib/gmail";
+import { followUpEnds, repliesAreRead } from "@/lib/reply-reading";
 import { queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import type { SenderCheck as SenderCheckView } from "@shared/sender-check";
@@ -242,6 +244,7 @@ function CampaignDetail({ id, canEdit, onBack, fromLink = false }: { id: number;
   const { toast } = useToast();
   const [openLead, setOpenLead] = useState<number | null>(null);
   const section = useRef<HTMLElement>(null);
+  const repliesRead = repliesAreRead(useGmailStatus().data);
   const q = useQuery<DetailResponse>({ queryKey: [campaignUrl(id)], retry: false, refetchInterval: (query) => { const c = query.state.data?.campaign; return c?.preparing || c?.sending || openLead !== null ? 4000 : false; } });
   // A link to a campaign lands on the campaign, once it has loaded: on a phone it is a long way below the search form.
   const loaded = !!q.data;
@@ -377,7 +380,7 @@ function CampaignDetail({ id, canEdit, onBack, fromLink = false }: { id: number;
             <span className="font-semibold">Follow-ups.</span>{" "}
             {q.data.followUps.waiting > 0 && <span className="text-amber-800 dark:text-amber-300">{plural(q.data.followUps.waiting, "follow-up")} waiting for you: open the lead above to read and approve it. </span>}
             {q.data.followUps.planned > 0 && <span className="text-muted-foreground">{q.data.followUps.planned} planned for later. </span>}
-            <span className="text-muted-foreground">A follow-up is never sent by itself: when it falls due a draft is prepared for you, and a reply cancels it.</span>
+            <span className="text-muted-foreground">A follow-up is never sent by itself: when it falls due a draft is prepared for you, and {followUpEnds(repliesRead)}.</span>
           </p>
         )}
         <SenderCheck />

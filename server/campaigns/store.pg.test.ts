@@ -249,6 +249,14 @@ describe.skipIf(!URL_ || !loopback(URL_))("campaign store (real Postgres)", () =
         null,
         null,
       ]);
+      // Once the lead has moved on, the planned step would be skipped when due, so it is no longer shown as planned.
+      // A draft already waiting is still something to act on, whatever the lead's stage.
+      await q.query(`UPDATE leads SET status = 'replied' WHERE organization_id = $1 AND id = ANY($2)`, [o, [ids[0], ids[1]]]);
+      const moved = await mod.campaignStore.members(o, c.id);
+      expect(moved[0].followUp).toBeNull();
+      expect(moved[1].followUp).toMatchObject({ status: "drafted", step: 2 });
+      await q.query(`UPDATE leads SET status = 'contacted' WHERE organization_id = $1 AND id = $2`, [o, ids[0]]);
+      expect((await mod.campaignStore.members(o, c.id))[0].followUp).toMatchObject({ status: "scheduled", step: 1 });
     } finally { await q.query(`DELETE FROM outreach_followups WHERE organization_id = $1`, [o]).catch(() => {}); }
   });
 

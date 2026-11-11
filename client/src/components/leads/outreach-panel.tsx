@@ -21,6 +21,8 @@ import { useToast } from "@/hooks/use-toast";
 import { draftUrl, leadCall, leadError, messageUrl, messagesUrl, refreshLeads } from "@/lib/leads";
 import { chipText, chipTone, pendingVariants, shortcomings } from "@/lib/outreach-variants";
 import { gapNote, type Gap } from "@/lib/first-message-gap";
+import { useGmailStatus } from "@/lib/gmail";
+import { followUpEnds, repliesAreRead } from "@/lib/reply-reading";
 import { memberCan } from "@shared/permissions";
 import { GmailSendState, SendFromGmailButton, useGmailCanSend } from "./gmail-send";
 import { LIMITS } from "@shared/outreach-check";
@@ -33,10 +35,10 @@ interface Message {
   strategy?: string | null; variantGroup?: string | null; scorecard?: Scorecard;
 }
 /** What a person who has sent the first message should expect next, from the lead's own follow-up. */
-const afterSent = (f: FollowUpView | null | undefined): string => {
+const afterSent = (f: FollowUpView | null | undefined, /** Whether a reply is noticed without the person recording it. */ read: boolean): string => {
   if (f?.state === "due_later") {
     const day = (() => { try { return f.dueAt ? new Date(f.dueAt).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : ""; } catch { return ""; } })();
-    return `A follow-up is planned${day ? ` for ${day}` : ""}: a draft will be prepared here for you to read. It is never sent by itself, and a reply cancels it.`;
+    return `A follow-up is planned${day ? ` for ${day}` : ""}: a draft will be prepared here for you to read. It is never sent by itself, and ${followUpEnds(read)}.`;
   }
   if (f?.state === "on_hold") return "The follow-up is on hold: a reply is waiting for you to read.";
   return "No follow-up is planned: after a reply, the conversation carries on in your email.";
@@ -53,6 +55,7 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
   const { toast } = useToast();
   const canRun = memberCan(user as any, "deals.create");
   const gmail = useGmailCanSend(); // only offered (and mentioned) where this person can really send from Gmail
+  const read = repliesAreRead(useGmailStatus().data); // the same status the line above reads: no extra request
   const q = useQuery<{ messages: Message[]; sample?: { title: string; scope: string } | null; /** Older servers omit it. */ style?: ProfileStyleView | null; /** Older servers omit it. */ followUp?: FollowUpView | null; /** Older servers omit both. */ gap?: Gap | null; hasWebsite?: boolean }>({ queryKey: [messagesUrl(leadId)], retry: false });
   const sample = q.data?.sample ?? null;
   // Offering the plan's sample commits the person's time, so it's their choice, off until they tick it.
@@ -115,7 +118,7 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
             )}
             {!current && !variants.length && !(gap && canRun) && (
               <p className="text-sm text-muted-foreground" data-testid="outreach-none">
-                {lastSent ? `Sent ${when(lastSent.sentAt)}. ${afterSent(q.data?.followUp)}` : "No message yet. I write it from what's been verified about the company; you read it, change it and approve it. Nothing is sent for you."}
+                {lastSent ? `Sent ${when(lastSent.sentAt)}. ${afterSent(q.data?.followUp, read)}` : "No message yet. I write it from what's been verified about the company; you read it, change it and approve it. Nothing is sent for you."}
               </p>
             )}
             {!current && variants.length > 0 && (

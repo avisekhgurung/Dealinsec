@@ -24,7 +24,15 @@ export { followupText };
 
 export const FOLLOWUP_PROMPT_VERSION = "followup-t1"; // a template, not a model prompt
 const LEASE_MS = 5 * 60_000;
-const STILL_CONTACTING = new Set(["contacted", "qualified", "new", "researching"]);
+/** Lead stages in which a planned follow-up still happens. Past them (replied, meeting, proposal, won, lost) a person is on it. */
+export const STILL_CONTACTING = new Set(["contacted", "qualified", "new", "researching"]);
+/**
+ * SQL, for a follow-up `f` and its lead `l`: a step that is only planned counts as open while the job would still
+ * prepare its draft for this lead. Once the lead has moved on, is archived, is marked do-not-contact or has become a
+ * deal, the job skips the step when it falls due, so the page must not go on saying "a follow-up is planned". Steps
+ * already held or drafted are something to act on whatever the lead's stage.
+ */
+export const plannedStillHappens = sql`(f.status <> 'scheduled' OR (l.status IN (${sql.join(Array.from(STILL_CONTACTING).map((v) => sql`${v}`), sql`, `)}) AND l.archived_at IS NULL AND NOT l.do_not_contact AND NOT l.converting AND l.converted_deal_id IS NULL))`;
 
 export interface FollowupDeps {
   now(): Date;
@@ -118,8 +126,8 @@ export async function openFollowUpForLead(orgId: string, leadId: number): Promis
     const r = await db.execute(sql`
       SELECT f.status, to_char(f.due_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS due_at,
              (SELECT dm.status FROM lead_messages dm WHERE dm.organization_id = f.organization_id AND dm.id = f.draft_message_id) AS draft_status
-      FROM outreach_followups f
-      WHERE f.organization_id = ${orgId} AND f.lead_id = ${leadId} AND f.status IN ('scheduled', 'held', 'drafted')
+      FROM outreach_followups f JOIN leads l ON l.organization_id = f.organization_id AND l.id = f.lead_id
+      WHERE f.organization_id = ${orgId} AND f.lead_id = ${leadId} AND f.status IN ('scheduled', 'held', 'drafted') AND ${plannedStillHappens}
       ORDER BY f.due_at, f.step LIMIT 1`);
     const x = (r.rows ?? [])[0] as { status?: unknown; due_at?: unknown; draft_status?: unknown } | undefined;
     return x ? { status: String(x.status), dueAt: x.due_at ? String(x.due_at) : null, draftStatus: x.draft_status ? String(x.draft_status) : null } : null;

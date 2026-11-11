@@ -66,8 +66,9 @@ function SyncBar() {
   }
   const rs = data.replySync;
   const settings = <Link href="/settings?tab=integrations" className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400">Settings</Link>;
-  if (!data.connection) return <p className="rounded-lg border bg-muted/40 p-3 text-sm" data-testid="inbox-sync" data-state="disconnected">Connect your Gmail in {settings} to see replies to your outreach here.</p>;
+  // Asked first: where reading replies is off, connecting Gmail would not bring replies here, so don't suggest it.
   if (!rs?.available) return <p className="rounded-lg border bg-muted/40 p-3 text-sm" data-testid="inbox-sync" data-state="off">Reply sync isn't switched on for your workspace yet, so only conversations synced earlier appear here.</p>;
+  if (!data.connection) return <p className="rounded-lg border bg-muted/40 p-3 text-sm" data-testid="inbox-sync" data-state="disconnected">Connect your Gmail in {settings} to see replies to your outreach here.</p>;
   if (rs.state === "needs_permission" || rs.state === "needs_reconnect") {
     return (
       <div className="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/40" role="status" data-testid="inbox-sync" data-state={rs.state}>
