@@ -3,7 +3,8 @@
  *
  * Branded, table-based HTML (works across all email clients). Each send is
  * best-effort: failures are logged but never throw, so an email outage can't
- * break a payment or contract flow.
+ * break a payment or contract flow. A send counts as done only when the service
+ * accepted it (see sendProblem): its library reports a refusal as a value, not a throw.
  *
  * Required env var:
  *   RESEND_API_KEY
@@ -40,21 +41,47 @@ interface SendArgs {
   html: string;
 }
 
-/** Fire-and-forget send. Never throws — logs and returns false on failure. */
+const CODE = /^[a-z][a-z0-9_]{2,49}$/;
+/**
+ * Why a send did not go out, from what the email service answered; null when it went out.
+ *
+ * The service's library never throws: a refused key, an unverified sending domain, a rate limit and even a failed
+ * connection all come back as `{ data: null, error }`. Reading only "did it throw" counted every one of those as sent.
+ * Only the service's short reason code and the HTTP status are kept: its message can quote an email address.
+ */
+export function sendProblem(result: unknown): { reason: string; status: number | null } | null {
+  const r = (result ?? {}) as { data?: unknown; error?: unknown };
+  if (!r.error && r.data) return null;
+  const e = (r.error ?? {}) as { name?: unknown; statusCode?: unknown };
+  const reason = typeof e.name === "string" && CODE.test(e.name) ? e.name : r.error ? "unknown_error" : "no_answer";
+  return { reason, status: typeof e.statusCode === "number" && Number.isInteger(e.statusCode) ? e.statusCode : null };
+}
+
+/** The part after the @, so the log says where a mail was going without naming the person. */
+const domainOf = (to: string): string | null => { const at = to.lastIndexOf("@"); return at > 0 && at < to.length - 1 ? to.slice(at + 1).trim().toLowerCase().slice(0, 100) : null; };
+const logEmail = (kind: "email_send_failed" | "email_skipped", reason: string, status: number | null, to: string) =>
+  console.log(JSON.stringify({ kind, reason, status, toDomain: domainOf(to) }));
+
+/**
+ * Fire-and-forget send. Never throws: it answers true only when the email service accepted the message, and
+ * otherwise writes one line to the log (the reason code, never the recipient or the text) and answers false.
+ */
 export async function sendEmail({ to, subject, html }: SendArgs): Promise<boolean> {
-  if (!isEmailConfigured()) {
-    console.warn(`[email] skipped (RESEND_API_KEY not set): "${subject}" -> ${to}`);
-    return false;
-  }
   if (!to) return false;
+  if (!isEmailConfigured()) { logEmail("email_skipped", "no_key", null, to); return false; }
   try {
-    await getResend().emails.send({ from: fromAddress(), to, subject, html });
-    return true;
+    const problem = sendProblem(await getResend().emails.send({ from: fromAddress(), to, subject, html }));
+    if (!problem) return true;
+    logEmail("email_send_failed", problem.reason, problem.status, to);
+    return false;
   } catch (err) {
-    console.error(`[email] send failed: "${subject}" -> ${to}`, err);
+    logEmail("email_send_failed", "threw", null, to);
     return false;
   }
 }
+
+/** Tests only: forget the cached client, so a changed key or a replaced library is picked up. */
+export function resetEmailClientForTests(): void { _resend = null; }
 
 // ───────────────────────────────────────────────────────────────────────
 // Shared branded layout
