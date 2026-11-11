@@ -22,6 +22,7 @@ import { draftUrl, leadCall, leadError, messageUrl, messagesUrl, refreshLeads } 
 import { chipText, chipTone, pendingVariants, shortcomings } from "@/lib/outreach-variants";
 import { gapNote, type Gap } from "@/lib/first-message-gap";
 import { useGmailStatus } from "@/lib/gmail";
+import { DraftAllowanceLine, refreshDraftAllowance, useDraftAllowance } from "./draft-allowance-line";
 import { followUpEnds, repliesAreRead } from "@/lib/reply-reading";
 import { memberCan } from "@shared/permissions";
 import { GmailSendState, SendFromGmailButton, useGmailCanSend } from "./gmail-send";
@@ -66,6 +67,9 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
   // Asked before the click: what a first message still lacks. Only said where a first message could be started at all.
   const gap = !current && !lastSent && !variants.length ? gapNote(q.data?.gap, !!q.data?.hasWebsite) : null;
   const [here] = useLocation();
+  // Asked only where a first message could be started; the gap comes first (it is the thing to fix).
+  const allowance = useDraftAllowance(canRun && !current && !lastSent && !variants.length);
+  const outOfDrafts = !gap && !!allowance?.out;
   const onLeadPage = here === `/leads/${leadId}`;
 
   const [subject, setSubject] = useState("");
@@ -75,9 +79,10 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
   useEffect(() => { setSubject(current?.subject ?? ""); setBody(current?.body ?? ""); setEditing(false); }, [current?.id, current?.bodyHash]);
 
   const done = () => { void refreshLeads(); };
+  const drafted = () => { done(); void refreshDraftAllowance(); };
   const fail = (title: string) => (e: unknown) => toast({ title, description: leadError(e), variant: "destructive" });
-  const draft = useMutation({ mutationFn: () => leadCall("POST", draftUrl(leadId), { offerSample: !!sample && offerSample }), onSuccess: done, onError: fail("Couldn't write the message") });
-  const writeVariants = useMutation({ mutationFn: () => leadCall("POST", draftUrl(leadId), { offerSample: !!sample && offerSample, variants: true }), onSuccess: done, onError: fail("Couldn't write the versions") });
+  const draft = useMutation({ mutationFn: () => leadCall("POST", draftUrl(leadId), { offerSample: !!sample && offerSample }), onSuccess: drafted, onError: (e) => { void refreshDraftAllowance(); fail("Couldn't write the message")(e); } });
+  const writeVariants = useMutation({ mutationFn: () => leadCall("POST", draftUrl(leadId), { offerSample: !!sample && offerSample, variants: true }), onSuccess: drafted, onError: (e) => { void refreshDraftAllowance(); fail("Couldn't write the versions")(e); } });
   // Choosing re-checks everything server-side (the exact text read, the lead's flag, the list); a refusal refreshes the page's picture of the batch.
   const choose = useMutation({ mutationFn: (v: Message) => leadCall("POST", messageUrl(v.id, "choose"), { bodyHash: v.bodyHash }), onSuccess: done, onError: (e) => { done(); fail("Couldn't use that version")(e); } });
   const discardAll = useMutation({ mutationFn: () => leadCall("POST", messageUrl(variants[0]!.id, "cancel"), {}), onSuccess: done, onError: (e) => { done(); fail("Couldn't discard them")(e); } });
@@ -135,16 +140,17 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
           </div>
           {!current && !lastSent && !variants.length && canRun && (
             <div className="flex shrink-0 flex-wrap justify-end gap-2">
-              <Button size="sm" onClick={() => draft.mutate()} disabled={busy || !!gap} title={gap?.why} data-testid="outreach-write">
+              <Button size="sm" onClick={() => draft.mutate()} disabled={busy || !!gap || outOfDrafts} title={gap?.why ?? (outOfDrafts ? allowance?.text : undefined)} data-testid="outreach-write">
                 {draft.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="mr-1.5 h-4 w-4" />}Write a message
               </Button>
-              <Button size="sm" variant="outline" onClick={() => writeVariants.mutate()} disabled={busy || !!gap} title={gap?.why ?? "Three versions, each opening a different way, to pick from. Counts as one AI draft."} data-testid="outreach-write-variants">
+              <Button size="sm" variant="outline" onClick={() => writeVariants.mutate()} disabled={busy || !!gap || outOfDrafts} title={gap?.why ?? (outOfDrafts ? allowance?.text : undefined) ?? "Three versions, each opening a different way, to pick from. Counts as one AI draft."} data-testid="outreach-write-variants">
                 {writeVariants.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}3 versions
               </Button>
             </div>
           )}
         </div>
 
+        {!current && !lastSent && !variants.length && canRun && !gap && <DraftAllowanceLine note={allowance} />}
         {!current && !lastSent && !variants.length && canRun && <ProfileStyleNote style={q.data?.style} channel="email" />}
 
         {!current && !lastSent && !variants.length && canRun && sample && (

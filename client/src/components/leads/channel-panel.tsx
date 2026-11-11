@@ -26,6 +26,7 @@ import { memberCan } from "@shared/permissions";
 import { CHANNEL_LABEL, KIND_LABEL, MESSAGE_KINDS, externalUrl, maxFor, type Channel, type ChannelStatus, type MessageKind, type ShortChannel } from "@shared/channels";
 import { SegmentedTabs } from "@/components/outbound/segmented-tabs";
 import { OutreachPanel } from "./outreach-panel";
+import { DraftAllowanceLine, refreshDraftAllowance, useDraftAllowance } from "./draft-allowance-line";
 import {
   WHATSAPP_TEMPLATES_URL, channelDraftUrl, channelMessageUrl, optInUrl, refreshChannels, useChannelMessages, useChannelStatuses, waMeUrl,
   type ChannelMessage, type WhatsappContact, type WhatsappTemplate,
@@ -176,13 +177,14 @@ function NewMessage({ leadId, channel, api, contacts, onDone, onFail }: { leadId
   const templates = useQuery<{ templates: WhatsappTemplate[] }>({ queryKey: [WHATSAPP_TEMPLATES_URL], enabled: kind === "template", retry: false });
   const chosen = templates.data?.templates.find((t) => `${t.name}|${t.language}` === tpl.key) ?? null;
   const max = maxFor(kind, premium);
+  const allowance = useDraftAllowance();
   const create = useMutation({
     mutationFn: (write: "ai" | "own") => leadCall("POST", channelDraftUrl(leadId), {
       channel, kind, to: to || null, write, premium,
       ...(kind === "template" ? { template: { name: chosen?.name, language: chosen?.language, params: tpl.params } } : write === "own" ? { text } : {}),
     }),
-    onSuccess: () => { setText(""); setOwn(false); onDone(); },
-    onError: onFail("Couldn't write the message"),
+    onSuccess: () => { setText(""); setOwn(false); onDone(); void refreshDraftAllowance(); },
+    onError: (e) => { void refreshDraftAllowance(); onFail("Couldn't write the message")(e); },
   });
   const needsPermission = channel === "whatsapp" && !optedIn.length;
   return (
@@ -229,8 +231,9 @@ function NewMessage({ leadId, channel, api, contacts, onDone, onFail }: { leadId
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => create.mutate("ai")} disabled={create.isPending} data-testid="channel-write-ai">{create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}Write it with AI</Button>
+            <Button size="sm" onClick={() => create.mutate("ai")} disabled={create.isPending || !!allowance?.out} title={allowance?.out ? allowance.text : undefined} data-testid="channel-write-ai">{create.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="mr-1.5 h-4 w-4" />}Write it with AI</Button>
             <Button size="sm" variant="outline" onClick={() => setOwn(true)} data-testid="channel-write-own"><PenLine className="mr-1.5 h-4 w-4" />Write my own</Button>
+            <div className="w-full"><DraftAllowanceLine note={allowance} own /></div>
             {channel === "linkedin" && kind === "connection_note" && <p className="w-full text-[11px] text-muted-foreground">Kept within LinkedIn's 200-character note limit (300 with Premium). AI writes only from what's been verified about the company.</p>}
           </div>
         )}
