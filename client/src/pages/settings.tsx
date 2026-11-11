@@ -677,7 +677,7 @@ export default function SettingsPage() {
                   <div className="divide-y divide-border/60">
                     {members.map((m) => (
                       <div key={m.id} className="py-3 flex items-center gap-3" data-testid={`member-${m.email}`}>
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary/70 text-white text-sm font-bold flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary/70 dark:to-primary/80 text-white dark:text-primary-foreground text-sm font-bold flex items-center justify-center flex-shrink-0 overflow-hidden">
                           {m.avatar
                             ? <img src={m.avatar} alt="" className="w-full h-full object-cover" />
                             : ((m.firstName?.[0] ?? "") + (m.lastName?.[0] ?? "") || m.email[0].toUpperCase())}

@@ -1282,7 +1282,7 @@ export default function DashboardPage() {
                 {/* Finding the client comes first; the deal button exists only while the deal suite is visible. */}
                 {canSeeOutbound && (
                   <Link href="/outbound">
-                    <Button className="gradient-btn" data-testid="button-empty-find-clients">
+                    <Button className="gradient-btn text-white" data-testid="button-empty-find-clients">
                       <Radar className="w-4 h-4 mr-2" />
                       Find your first client
                     </Button>
@@ -1290,7 +1290,7 @@ export default function DashboardPage() {
                 )}
                 {canCreateDeal && !DEAL_SUITE_HIDDEN && (
                   <Link href="/deals/new">
-                    <Button variant={canSeeOutbound ? "outline" : "default"} className={canSeeOutbound ? "font-semibold" : "gradient-btn"} data-testid="button-create-first-deal">
+                    <Button variant={canSeeOutbound ? "outline" : "default"} className={canSeeOutbound ? "font-semibold" : "gradient-btn text-white"} data-testid="button-create-first-deal">
                       <Plus className="w-4 h-4 mr-2" />
                       {audience.newDealCta}
                     </Button>

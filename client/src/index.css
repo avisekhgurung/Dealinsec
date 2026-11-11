@@ -201,7 +201,7 @@
   --sidebar-foreground: 210 20% 96%;
   --sidebar-border: 215 20% 15%;
   --sidebar-primary: 160 70% 45%;
-  --sidebar-primary-foreground: 0 0% 98%;
+  --sidebar-primary-foreground: 160 84% 6%;
   --sidebar-accent: 160 30% 18%;
   --sidebar-accent-foreground: 160 30% 92%;
   --sidebar-ring: 160 70% 45%;
@@ -209,7 +209,9 @@
   --popover-foreground: 210 20% 96%;
   --popover-border: 215 20% 16%;
   --primary: 160 70% 45%;
-  --primary-foreground: 0 0% 100%;
+  /* Dark ink on the bright green: white was 2.3:1 here. 7.9:1 at rest, 6.6:1 pressed. --primary itself is unchanged,
+     so green links, focus rings, tints and charts look as before. */
+  --primary-foreground: 160 84% 6%;
   --secondary: 215 20% 16%;
   --secondary-foreground: 210 20% 96%;
   --muted: 215 20% 14%;
@@ -396,6 +398,12 @@
   background: linear-gradient(135deg, #059669 0%, #047857 100%);
   box-shadow: 0 4px 14px -2px rgba(5, 150, 105, 0.35);
   transition: all 0.3s ease;
+}
+
+/* Dark mode: one shade deeper, so the white label reads at 4.5:1 or better across the whole button, hover and
+   pressed included (the lighter corner was 3.8:1, and less under the dark hover tint). Light mode is as it was. */
+.dark .gradient-btn {
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
 }
 
 .gradient-btn:hover {

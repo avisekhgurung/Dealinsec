@@ -470,7 +470,7 @@ export default function OnboardingPage() {
                   </motion.div>
 
                   <motion.div variants={itemVariants}>
-                    <Button type="submit" className="gradient-btn h-11 w-full" data-testid="button-onboarding-next">
+                    <Button type="submit" className="gradient-btn h-11 w-full text-white" data-testid="button-onboarding-next">
                       Continue <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
                     </Button>
                   </motion.div>
@@ -581,7 +581,7 @@ export default function OnboardingPage() {
                       <ArrowLeft className="mr-2 h-4 w-4" aria-hidden /> Back
                     </Button>
                     <span className="text-xs text-muted-foreground">Step 2 of 3</span>
-                    <Button type="submit" className="gradient-btn h-11 px-6" data-testid="button-onboarding-next">
+                    <Button type="submit" className="gradient-btn h-11 px-6 text-white" data-testid="button-onboarding-next">
                       Continue <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
                     </Button>
                   </motion.div>
@@ -642,7 +642,7 @@ export default function OnboardingPage() {
                     <Button type="button" variant="outline" className="h-11 w-full sm:w-auto" disabled={isLoading} onClick={() => go(1)} data-testid="button-onboarding-back">
                       <ArrowLeft className="mr-2 h-4 w-4" aria-hidden /> Back
                     </Button>
-                    <Button type="submit" className="gradient-btn h-11 w-full sm:flex-1" disabled={isLoading} data-testid="button-complete-profile">
+                    <Button type="submit" className="gradient-btn h-11 w-full text-white sm:flex-1" disabled={isLoading} data-testid="button-complete-profile">
                       {isLoading ? (
                         <Loader2 className="h-4 w-4 animate-spin" aria-label="Saving" />
                       ) : (

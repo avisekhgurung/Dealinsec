@@ -440,7 +440,7 @@ export default function EditDealPage() {
                           : "border-input/60 group-hover:border-primary/40"
                       }`}
                     >
-                      {selected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      {selected && <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />}
                     </div>
                   </div>
                   <div className={`text-sm font-semibold leading-tight ${selected ? "text-primary" : "text-foreground"}`}>
