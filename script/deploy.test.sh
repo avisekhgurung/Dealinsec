@@ -87,6 +87,7 @@ check "restarted exactly once, after the upload" '[ "$(grep -c "^restart" "$T/lo
 check "the live page now asks for the new script" 'grep -q "index-NEW.js" "$T/served.html"'
 check "a copy of the old build was kept to go back to" 'ls -d "$S"/dist.prev-* >/dev/null 2>&1 && grep -q "old server" "$S"/dist.prev-*/index.cjs'
 check "the upload never asked rsync to delete anything" '! grep "^rsync" "$T/log" | grep -q -- "--delete"'
+check "it checked that the server file that landed is from this build" 'out | grep -q "the server file there matches this build"'
 teardown
 
 echo "old build files"
@@ -143,6 +144,16 @@ setup; run --check
 check "looks only: no upload, no restart, no copy; says the site is up and on a different build" '[ "$(code)" = 0 ] && ! grep -q "^rsync\|^restart" "$T/log" && ! ls -d "$S"/dist.prev-* >/dev/null 2>&1 && out | grep -q "nothing was changed" && out | grep -q "different build" && out | grep -q "The site is up"'
 setup; rm "$S/current/dist/public/assets/index-OLD.js"; run --check
 check "sees a blank site: the script the live page asks for does not load" '[ "$(code)" = 0 ] && out | grep -q "does NOT load"'
+teardown
+setup
+# A change to the server only: the page and its script are the same as what is live; only the server file differs.
+cp "$S/current/dist/public/index.html" "$P/dist/public/index.html"; cp "$S/current/dist/public/assets/index-OLD.js" "$P/dist/public/assets/"; rm "$P/dist/public/assets/index-NEW.js"
+run --check
+check "a server-only change is still seen as a different build" '[ "$(code)" = 0 ] && out | grep -q "different build" && ! out | grep -q "already on this build"'
+run
+check "and it deploys: the new server file is there, and the same page still loads" '[ "$(code)" = 0 ] && grep -q "new server" "$S/current/dist/index.cjs" && out | grep -q "DONE"'
+run --check
+check "afterwards the check says the site is on this build" 'out | grep -q "already on this build"'
 teardown
 setup; run bogus
 check "an unknown option is refused" '[ "$(code)" != 0 ] && out | grep -q "Unknown option"'

@@ -69,7 +69,11 @@ if git rev-parse HEAD >/dev/null 2>&1; then
   build_at="$(stat -f %m dist/index.cjs 2>/dev/null || stat -c %Y dist/index.cjs)"
   [ "$build_at" -ge "$commit_at" ] || die "The build is older than the latest commit, so it would put old code live. Run: npm run build"
 fi
-note "build is whole; its page asks for $NEW_SCRIPT"
+# A build is two things: the screens (the page and its script) and the server file. A change may touch only one.
+fingerprint() { { shasum -a 256 "$1" 2>/dev/null || sha256sum "$1"; } | cut -c1-16; }
+NEW_SERVER="$(fingerprint dist/index.cjs)"
+server_on_disk() { retry as_deploy "sha256sum $DIR/dist/index.cjs | cut -c1-16"; }
+note "build is whole; its page asks for $NEW_SCRIPT; server file $NEW_SERVER"
 
 # ── 2. the server ───────────────────────────────────────────────────────────────────────────────────────────────
 say "2/7  Checking the server"
@@ -77,11 +81,12 @@ local_lock="$(shasum -a 256 package-lock.json 2>/dev/null | cut -c1-64 || sha256
 remote_lock="$(retry as_deploy "sha256sum $DIR/package-lock.json | cut -c1-64")" || die "Could not reach the server after $TRIES tries. Nothing was changed. Try again in a minute."
 [ "$local_lock" = "$remote_lock" ] || die "package-lock.json differs from the server's: new packages need installing there first. Nothing was changed. Tell Claude."
 was="$(live_script)"
-note "server reached; packages match; the live page asks for ${was:-nothing we could read}"
+was_server="$(server_on_disk || true)"
+note "server reached; packages match; the live page asks for ${was:-nothing we could read}; server file ${was_server:-unknown}"
 
 if [ "$MODE" = "--check" ]; then
   say "Check only: nothing was changed."
-  if [ "$was" = "$NEW_SCRIPT" ]; then note "The live site is already on this build."; else note "The live site is on a different build from the one on this computer."; fi
+  if [ "$was" = "$NEW_SCRIPT" ] && [ "$was_server" = "$NEW_SERVER" ]; then note "The live site is already on this build."; else note "The live site is on a different build from the one on this computer."; fi
   if [ -n "$was" ] && loads_as_script "$was"; then note "The live page's script loads. The site is up."; else note "!! The live page's script does NOT load. The site is showing a blank page."; fi
   exit 0
 fi
@@ -95,7 +100,8 @@ note "kept as $ROOT/dist.prev-$stamp"
 # ── 4. upload, deleting nothing ─────────────────────────────────────────────────────────────────────────────────
 say "4/7  Uploading the new build (old files stay, so the live page keeps working)"
 retry rsync -az -e "$SSH" dist package.json package-lock.json "deploy@$HOST:$DIR/" || die "The upload did not finish after $TRIES tries. The live site is untouched and still working. Run this again."
-note "uploaded"
+[ "$(server_on_disk || true)" = "$NEW_SERVER" ] || die "The upload finished but the server file there is not the one from this build. The site is still up on the old code. Run this again."
+note "uploaded; the server file there matches this build"
 
 # ── 5. restart ──────────────────────────────────────────────────────────────────────────────────────────────────
 say "5/7  Restarting the app"
