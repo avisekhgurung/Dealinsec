@@ -1,8 +1,9 @@
-import express, { type Express } from "express";
+import express, { type Express, type Response } from "express";
 import fs from "fs";
 import path from "path";
 import { injectLandingSeo } from "./landing-seo";
 import { SPA_PAGE_HEADS, withHomeHead, withPageHead } from "./site-head";
+import { precompressed } from "./precompressed";
 
 /**
  * Something built from a file, kept in memory and rebuilt when the file on disk changes.
@@ -47,16 +48,17 @@ export function serveStatic(app: Express, distPath: string = path.resolve(__dirn
   // Hashed assets cache forever; everything that DECIDES freshness (sw.js,
   // the manifest, index.html) must never be cached, or devices keep serving
   // yesterday's build no matter what we deploy.
-  app.use(express.static(distPath, {
-    index: false,
-    setHeaders(res, filePath) {
-      if (filePath.includes(`${path.sep}assets${path.sep}`)) {
-        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-      } else if (/\.(js|json|webmanifest|html)$/.test(filePath)) {
-        res.setHeader("Cache-Control", "no-cache");
-      }
-    },
-  }));
+  const cacheHeaders = (res: Response, filePath: string) => {
+    if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    } else if (/\.(js|json|webmanifest|html)$/.test(filePath)) {
+      res.setHeader("Cache-Control", "no-cache");
+    }
+  };
+  // The squeezed copy the build left beside a script or style file, for a browser that can read it (precompressed.ts);
+  // everything else, and every browser that cannot, gets the file itself from the ordinary handler below.
+  app.use(precompressed(distPath, cacheHeaders));
+  app.use(express.static(distPath, { index: false, setHeaders: cacheHeaders }));
 
   const indexPath = path.resolve(distPath, "index.html");
   // Built at boot, and again whenever index.html changes on disk (freshFromFile): the marketing routes get a crawlable
