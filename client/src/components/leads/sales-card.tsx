@@ -61,7 +61,8 @@ function ResearchPanel({ leadId, hasWebsite }: { leadId: number; hasWebsite: boo
   return (
     <Card className="glass-card" data-testid="research-panel">
       <CardContent className="space-y-2.5 p-4">
-        <div className="flex items-start justify-between gap-3">
+        {/* On a phone the words go above the button, not into the narrow column beside it. */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Research</p>
             {!r && <p className="text-sm text-muted-foreground" data-testid="research-none">{hasWebsite ? "Not researched yet. I read the company's own website and record what it says, with the exact words as evidence." : "Add the company's website to this lead to research it."}</p>}
@@ -75,7 +76,7 @@ function ResearchPanel({ leadId, hasWebsite }: { leadId: number; hasWebsite: boo
             {r?.status === "failed" && <p className="text-sm text-amber-700 dark:text-amber-400" data-testid="research-failed">{FAILED[r.errorCode ?? ""] ?? "The research didn't finish."}</p>}
           </div>
           {canRun && hasWebsite && !wasRunning && (
-            <Button size="sm" variant={r ? "outline" : "default"} className="shrink-0" onClick={() => run.mutate()} disabled={run.isPending} data-testid="research-run">
+            <Button size="sm" variant={r ? "outline" : "default"} className="shrink-0 self-start" onClick={() => run.mutate()} disabled={run.isPending} data-testid="research-run">
               {run.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="mr-1.5 h-4 w-4" />}{r ? "Research again" : "Research this company"}
             </Button>
           )}

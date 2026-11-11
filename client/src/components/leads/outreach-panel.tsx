@@ -112,7 +112,8 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
   return (
     <Card className="glass-card" data-testid="outreach-panel">
       <CardContent className="space-y-3 p-4">
-        <div className="flex items-start justify-between gap-3">
+        {/* On a phone the two buttons left the words a column one word wide: there the words go above, the buttons below. */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">First message</p>
             {gap && canRun && (
@@ -139,7 +140,7 @@ export function OutreachPanel({ leadId }: { leadId: number }) {
             )}
           </div>
           {!current && !lastSent && !variants.length && canRun && (
-            <div className="flex shrink-0 flex-wrap justify-end gap-2">
+            <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
               <Button size="sm" onClick={() => draft.mutate()} disabled={busy || !!gap || outOfDrafts} title={gap?.why ?? (outOfDrafts ? allowance?.text : undefined)} data-testid="outreach-write">
                 {draft.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="mr-1.5 h-4 w-4" />}Write a message
               </Button>
