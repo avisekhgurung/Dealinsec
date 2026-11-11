@@ -19,6 +19,7 @@ import { registerLegacyRedirects } from './legacy-redirects';
 // The ledger key only, from a module with no side effects. NEVER import
 // script/migrate-money-minor-units.ts here: that bundles its CLI into the server.
 import { MONEY_MINOR_UNITS_KEY } from '@shared/migration-keys';
+import { useSecurityHeaders } from "./security-headers";
 
 const app = express();
 
@@ -68,6 +69,7 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
 }
 
 (async () => {
+  useSecurityHeaders(app);
   app.use(canonicalRedirect);
 
   // Liveness probe. Deliberately dependency-free (no DB, session or auth) and
