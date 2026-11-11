@@ -64,6 +64,7 @@ say "1/7  Checking the build on this computer"
 [ -f dist/index.cjs ] && [ -f dist/public/index.html ] || die "There is no build here (dist/ is missing). Run: npm run build"
 NEW_SCRIPT="$(script_in < dist/public/index.html || true)"
 [ -n "$NEW_SCRIPT" ] && [ -f "dist/public/$NEW_SCRIPT" ] || die "The build is incomplete: its page names a script that is not in dist/. Run: npm run build"
+ls dist/ai-knowledge/*.md >/dev/null 2>&1 || die "The build is incomplete: the assistant's product knowledge (dist/ai-knowledge) is missing. Run: npm run build"
 if git rev-parse HEAD >/dev/null 2>&1; then
   commit_at="$(git log -1 --format=%ct)"
   build_at="$(stat -f %m dist/index.cjs 2>/dev/null || stat -c %Y dist/index.cjs)"
@@ -124,7 +125,9 @@ for _ in $(seq 1 10); do
   sleep "$PAUSE"
 done
 [ -n "$good" ] || die "The live page is not serving the new build's script (it asks for '${now:-nothing}'). TELL CLAUDE NOW. The previous build is kept at $ROOT/dist.prev-$stamp"
-note "the live page asks for $NEW_SCRIPT and it loads as a script"
+have="$(retry as_deploy "ls $DIR/dist/ai-knowledge/*.md 2>/dev/null | wc -l" | tr -d ' ' || true)"
+[ "${have:-0}" -gt 0 ] || die "The assistant's product knowledge did not arrive on the server (dist/ai-knowledge is empty there). TELL CLAUDE NOW."
+note "the live page asks for $NEW_SCRIPT and it loads as a script; $have knowledge files are on the server"
 
 # ── 7. tidy, only now ───────────────────────────────────────────────────────────────────────────────────────────
 say "7/7  Removing build files more than $KEEP_DAYS days old"

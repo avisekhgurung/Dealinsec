@@ -34,21 +34,45 @@ let docs: KnowledgeDoc[] | null = null;
 const tokenize = (s: string): string[] =>
   s.toLowerCase().split(/[^a-z0-9₹]+/).filter((w) => w.length > 2);
 
+/**
+ * Where the knowledge files may be, in order. In a built app they sit INSIDE the build, beside the server file
+ * (script/build.ts copies them to dist/ai-knowledge), because a deploy ships dist and nothing else: for a day after
+ * the move to our own server (Nov 2026) they were read from the project folder, which wasn't there, and the assistant
+ * answered without them. Running from source, they are in the project folder.
+ */
+// The built server is one CommonJS file, where __dirname is its folder (dist). Run from source as an ES module there is
+// no __dirname at all, and only the project folder applies.
+const HERE: string | null = typeof __dirname === "string" ? __dirname : null;
+export const knowledgeDirs = (here: string | null = HERE, cwd: string = process.cwd()): string[] =>
+  [...(here ? [path.resolve(here, "ai-knowledge")] : []), path.resolve(cwd, "ai-knowledge")];
+
+/** The markdown files of the first folder that has any, or [] with the reason. Never throws. */
+export function readKnowledgeFiles(dirs: string[] = knowledgeDirs()): { dir: string | null; files: { name: string; text: string }[]; error?: string } {
+  let error: string | undefined;
+  for (const dir of dirs) {
+    try {
+      const files = fs.readdirSync(dir).filter((f) => f.endsWith(".md")).sort().map((name) => ({ name, text: fs.readFileSync(path.join(dir, name), "utf8") }));
+      if (files.length) return { dir, files };
+    } catch (err) { error = (err as NodeJS.ErrnoException)?.code ?? "unreadable"; }
+  }
+  return { dir: null, files: [], error: error ?? "empty" };
+}
+
 function load(): KnowledgeDoc[] {
   if (docs) return docs;
-  const dir = path.resolve(process.cwd(), "ai-knowledge");
   const facts = productFactsMarkdown();
   docs = [{ name: FACTS_DOC, text: facts, words: new Set(tokenize(facts)) }];
-  try {
-    for (const file of fs.readdirSync(dir)) {
-      if (!file.endsWith(".md")) continue;
-      const text = fs.readFileSync(path.join(dir, file), "utf8");
-      docs.push({ name: file, text, words: new Set(tokenize(text)) });
-    }
-  } catch (err) {
-    console.error("[copilot] knowledge load failed:", err);
-  }
+  const found = readKnowledgeFiles();
+  for (const f of found.files) docs.push({ name: f.name, text: f.text, words: new Set(tokenize(f.text)) });
+  // Said once, loudly, with where it looked: the assistant still answers from the verified facts, but without the how-to detail.
+  if (!found.files.length) console.error(`[copilot] knowledge load failed: no ai-knowledge/*.md found (${found.error}); looked in ${knowledgeDirs().join(" and ")}`);
   return docs;
+}
+
+/** How much product knowledge is loaded: for the startup line and for tests. */
+export function knowledgeStatus(): { documents: number; howTo: number; names: string[] } {
+  const all = load();
+  return { documents: all.length, howTo: all.length - 1, names: all.map((d) => d.name) };
 }
 
 /** Top-K knowledge files for a query, always including the verified facts and product.md as the grounding context.

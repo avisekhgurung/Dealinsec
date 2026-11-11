@@ -400,6 +400,8 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
     () => {
       log(`serving on ${host}:${port}`);
       log(`PayU configured: KEY=${!!process.env.PAYU_MERCHANT_KEY} SALT=${!!process.env.PAYU_SALT}`);
+      // Said at every start, so a build that lost the assistant's how-to files is seen at once (it logs its own error too).
+      import("./copilot/knowledge").then((m) => { const k = m.knowledgeStatus(); log(`assistant knowledge: ${k.howTo} how-to files loaded${k.howTo ? "" : " — NONE FOUND, the assistant is answering from the product facts only"}`); }).catch(() => {});
       // Resume any prospect run a restart or sleep interrupted (its lease has expired). Does nothing without the tables.
       import("./outbound/runner").then((m) => m.outboundRunner.kick()).catch(() => {});
       // AI League: resume runs a restart interrupted and wake for the next scheduled task. Does nothing without the tables.

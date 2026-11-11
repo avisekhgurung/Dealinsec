@@ -18,7 +18,8 @@ check() { if eval "$2"; then ok "$1"; else bad "$1" "not true: $2"; fi; }
 # One fresh world per case: a project with a new build, and a server running an old one.
 setup() {
   T="$(mktemp -d)"; P="$T/project"; S="$T/srv/dealinsec"; BIN="$T/bin"
-  mkdir -p "$P/script" "$P/dist/public/assets" "$S/current/dist/public/assets" "$BIN"
+  mkdir -p "$P/script" "$P/dist/public/assets" "$P/dist/ai-knowledge" "$S/current/dist/public/assets" "$BIN"
+  echo '# How to' > "$P/dist/ai-knowledge/product.md"   # the assistant's knowledge travels inside the build
   cp "$HERE/deploy.sh" "$P/script/deploy.sh"
   echo '{"name":"x"}' > "$P/package.json"; echo 'lock-1' > "$P/package-lock.json"
   echo 'new server' > "$P/dist/index.cjs"
@@ -111,6 +112,12 @@ check "a different package-lock.json: stops, uploads nothing, restarts nothing" 
 teardown
 setup; rm -rf "$P/dist"; run
 check "no build: stops and says to build" '[ "$(code)" != 0 ] && out | grep -q "There is no build here" && ! grep -q "^rsync" "$T/log"'
+teardown
+setup; rm -rf "$P/dist/ai-knowledge"; run
+check "a build without the assistant knowledge: stops before anything changes" '[ "$(code)" != 0 ] && out | grep -q "product knowledge (dist/ai-knowledge) is missing" && ! grep -q "^rsync" "$T/log"'
+teardown
+setup; run
+check "after a deploy the knowledge is on the server, and the command says how many files" '[ -f "$S/current/dist/ai-knowledge/product.md" ] && out | grep -q "1 knowledge files are on the server"'
 teardown
 setup; rm "$P/dist/public/assets/index-NEW.js"; run
 check "a build whose page names a missing script: stops" '[ "$(code)" != 0 ] && out | grep -q "The build is incomplete" && ! grep -q "^rsync" "$T/log"'

@@ -1,6 +1,6 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile, readdir, cp } from "fs/promises";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -74,6 +74,14 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  // The assistant's product knowledge (ai-knowledge/*.md) is read at run time, and a deploy ships dist and nothing
+  // else. So it goes INSIDE the build (server/copilot/knowledge.ts looks beside the server file first). A build
+  // without it fails here rather than going live with an assistant that has lost its how-to knowledge.
+  await cp("ai-knowledge", "dist/ai-knowledge", { recursive: true });
+  const knowledge = (await readdir("dist/ai-knowledge")).filter((f) => f.endsWith(".md"));
+  if (!knowledge.length) throw new Error("ai-knowledge has no .md files: the assistant would go live without its product knowledge");
+  console.log(`copied ${knowledge.length} knowledge files into dist/ai-knowledge`);
 }
 
 buildAll().catch((err) => {
