@@ -26,6 +26,11 @@ const TABLES = ["agent_sessions", "agent_messages", "agent_runs", "agent_tool_ca
 let ready = false;
 let lastCheck = 0;
 let inflight: Promise<boolean> | null = null;
+
+/** A text cut to a column's width, ending in "…" when it was longer. */
+export const clip = (v: string | null | undefined, max: number): string | null =>
+  v == null ? null : v.length <= max ? v : `${v.slice(0, max - 1)}…`;
+
 export function agentTablesReady(): Promise<boolean> {
   if (ready) return Promise.resolve(true);
   if (inflight) return inflight;
@@ -86,9 +91,12 @@ export class DbAgentStore implements AgentStore {
   }
 
   async recordToolCall(c: Parameters<AgentStore["recordToolCall"]>[0]) {
+    // Cut to the columns' widths here, for every caller: an approved campaign hand-off's summary is about 315
+    // characters, the insert failed on result_summary varchar(300), and callers swallow the error, so the audit row
+    // for an approved action was silently lost (found by the real-model test, 12 Nov 2026).
     await db.insert(agentToolCalls).values({
-      runId: c.runId, tool: c.tool, risk: c.risk, status: c.status, args: c.args ?? null,
-      resultSummary: c.resultSummary ?? null, errorCode: c.errorCode ?? null, durationMs: c.durationMs,
+      runId: c.runId, tool: clip(c.tool, 48)!, risk: clip(c.risk, 24)!, status: clip(c.status, 24)!, args: c.args ?? null,
+      resultSummary: clip(c.resultSummary, 300), errorCode: clip(c.errorCode, 40), durationMs: c.durationMs,
     });
   }
 
