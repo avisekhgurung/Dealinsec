@@ -24,7 +24,7 @@ import {
 } from "@shared/channels";
 import { hashDraft } from "@shared/outreach-hash";
 import { contentIssues, scopeIssues } from "@shared/outreach-check";
-import { REWRITES_PER_MESSAGE, REWRITE_ACTIONS, REWRITE_PROMPT_VERSION, rewriteSystemPrompt, rewriteUserMessage, type RewriteAction } from "../outreach-studio/rewrite-prompt";
+import { REWRITES_PER_MESSAGE, REWRITE_ACTIONS, rewriteShortfall, rewriteVersion, rewriteSystemPrompt, rewriteUserMessage, type RewriteAction } from "../outreach-studio/rewrite-prompt";
 import { pathToContacted } from "@shared/outreach-safety";
 import { canMove, type LeadStatus } from "@shared/leads";
 import { siteHost } from "@shared/research";
@@ -497,7 +497,7 @@ export async function rewriteChannelMessage(user: Who, id: number, raw: unknown,
   const style = await styleOf(deps, orgId, row.leadId);
   const noted = offerDescribed(offer) && style?.note.trim() ? { about: [offer.about, style.note].filter(Boolean).join(". "), services: offer.services } : offer;
   const site = siteHost(l.lead.domain || (() => { try { return new URL(l.lead.website ?? "").hostname; } catch { return ""; } })());
-  const trace = { task: "draft" as const, orgId, userId: user.id, leadId: row.leadId, promptVersion: `${REWRITE_PROMPT_VERSION}:${action}` };
+  const trace = { task: "draft" as const, orgId, userId: user.id, leadId: row.leadId, promptVersion: rewriteVersion(action as RewriteAction) };
   const messages: ChatMessage[] = [{ role: "system", content: rewriteSystemPrompt("short", action as RewriteAction) }, { role: "user", content: rewriteUserMessage({ body: row.body ?? "", channel: CHANNEL_LABEL[channel] }) }];
   let text: string | null = null, issues: { code: string; message: string }[] = [];
   try {
@@ -507,7 +507,12 @@ export async function rewriteChannelMessage(user: Who, id: number, raw: unknown,
       text = parsed && typeof parsed.text === "string" ? parsed.text.replace(/\r\n/g, "\n").trim() : null;
       // The person's own length is fine (it may be longer than a model draft aims for); the content rules are a draft's.
       issues = text ? [...checkChannelText(text, kind), ...contentIssues(text.slice(0, 2000), { to: "", siteHost: site }), ...scopeIssues({ subject: "", body: text }, { sampleOffered: false, offer: noted })] : [{ code: "body_length", message: "Reply with only the JSON object: {\"text\":...}." }];
-      if (!issues.length) break;
+      if (!issues.length) {
+        const short = attempt === 0 && text ? rewriteShortfall(action as RewriteAction, row.body ?? "", text) : null;
+        if (!short) break;
+        messages.push({ role: "assistant", content: reply.content ?? "" }, { role: "user", content: `${short} Return the JSON object again.` });
+        continue;
+      }
       messages.push({ role: "assistant", content: reply.content ?? "" }, { role: "user", content: `That version cannot be used. Fix these problems and return the JSON object again:\n${issues.map((x) => `- ${x.message}`).join("\n")}` });
     }
   } catch (e) {

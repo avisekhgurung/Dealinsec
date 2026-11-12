@@ -4,7 +4,8 @@
  * /api/sales/leads/:id/messages and the others from /api/channels/leads/:id/messages; nothing here invents a state:
  * "sent" is either "sent from your Gmail" (DealInSec did it) or "you marked it sent" (the person told us).
  */
-import { CHANNELS, CHANNEL_LABEL, externalUrl, type Channel, type ShortChannel } from "@shared/channels";
+import { CHANNELS, CHANNEL_LABEL, externalUrl, normalPhone, type Channel, type ShortChannel } from "@shared/channels";
+import type { SocialLinks } from "@shared/social-links";
 import type { DraftBasis, DraftEvidence } from "@shared/draft-evidence";
 import type { LeadEventView } from "@/lib/leads";
 import type { ChannelMessage } from "@/lib/channels";
@@ -20,12 +21,17 @@ export const followUpsUrl = (leadId: number) => `/api/outreach/leads/${leadId}/f
 export const followUpDoneUrl = (leadId: number, ticketId: number) => `/api/outreach/leads/${leadId}/follow-ups/${ticketId}/done`;
 export const replyNoteUrl = (leadId: number) => `/api/outreach/leads/${leadId}/reply-note`;
 export const overviewUrl = (days: number) => `/api/outreach/overview?days=${days}`;
+export const contactLinksUrl = (leadId: number) => `/api/outreach/leads/${leadId}/contact-links`;
 export const OVERVIEW_PREFIX = "/api/outreach/overview";
 
 export interface LeadIntelligence {
   evidence: DraftEvidence;
   counts: { facts: number; guesses: number; datedSignals: number };
-  contact: { name: string | null; role: string | null; email: string | null; emailSource: "you" | "website" | null; phone: string | null; contactForm: string | null };
+  contact: {
+    name: string | null; role: string | null; email: string | null; emailSource: "you" | "website" | null; phone: string | null; contactForm: string | null;
+    /** Older servers omit these. */
+    socials?: SocialLinks; socialSources?: Record<keyof SocialLinks, string | null>; socialsCheckedAt?: string | null; country?: string | null;
+  };
   sources: { url: string; host: string; items: number }[];
   prospectId: number | null;
 }
@@ -191,3 +197,23 @@ export const REWRITE_ACTIONS = [
   { action: "opening", label: "Better first line", hint: "Opens with something about them, not you." },
   { action: "ask", label: "Clearer ask", hint: "Makes the next step an easy yes." },
 ] as const;
+
+/**
+ * Where each channel's message goes, filled in from what is already known about the lead: the WhatsApp link on their
+ * website (or their phone number, with India's code when the lead is in India), and their own Instagram, X, LinkedIn
+ * and Facebook pages. Only a suggestion: the person can change it, and the Studio says where it came from.
+ */
+export function suggestedDestinations(c: LeadIntelligence["contact"] | undefined): Partial<Record<Channel, { to: string; from: string }>> {
+  if (!c) return {};
+  const out: Partial<Record<Channel, { to: string; from: string }>> = {};
+  const s = c.socials;
+  const india = /india|bharat|mumbai|delhi|bengaluru|bangalore|pune|chennai|kolkata|hyderabad|\bgoa\b|siliguri|jaipur|ahmedabad/i.test(c.country ?? "") || /(^|,\s*)IN$/.test((c.country ?? "").trim());
+  const phone = c.phone ? normalPhone(c.phone) ?? (india || /^[6-9]\d{9}$/.test(c.phone.replace(/\D/g, "")) ? normalPhone(c.phone, "91") : null) : null;
+  if (s?.whatsapp) out.whatsapp = { to: s.whatsapp, from: "the WhatsApp link on their website" };
+  else if (phone) out.whatsapp = { to: phone, from: "the phone number on their website. Check it's on WhatsApp" };
+  if (s?.linkedin) out.linkedin = { to: s.linkedin, from: "the LinkedIn link on their website" };
+  if (s?.instagram) out.instagram = { to: s.instagram, from: "the Instagram link on their website" };
+  if (s?.x) out.x = { to: s.x, from: "the X link on their website" };
+  if (s?.facebook) out.messenger = { to: s.facebook, from: "the Facebook link on their website" };
+  return out;
+}

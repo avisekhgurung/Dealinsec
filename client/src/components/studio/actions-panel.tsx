@@ -39,6 +39,10 @@ export interface ActionsPanelProps {
   pendingTo: string;
   setPendingTo: (v: string) => void;
   refresh: () => void;
+  /** Where the message could go, from what is known about the lead (shared by the page), and where that came from. */
+  suggested?: { to: string; from: string } | null;
+  /** The website is being read for their social profiles right now. */
+  looking?: boolean;
 }
 
 const Spin = () => <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />;
@@ -68,7 +72,7 @@ export function ActionsPanel(p: ActionsPanelProps) {
 
   /* destination */
   const [to, setTo] = useState(m?.to ?? "");
-  useEffect(() => { setTo(m?.to ?? p.pendingTo); }, [m?.id, m?.to, p.channel]);
+  useEffect(() => { setTo(m?.to ?? p.pendingTo); }, [m?.id, m?.to, p.channel, m ? null : p.pendingTo]);
   const toEditable = !isEmail && p.canEdit && (!m || m.status === "draft" || m.status === "approved");
   const toDirty = !!m && toEditable && to.trim() !== (m.to ?? "");
   const saveTo = useMutation({ mutationFn: () => act("edit", { to: to.trim() || null }), onSuccess: () => { p.refresh(); toast({ title: "Saved" }); }, onError: fail("Couldn't save where it goes") });
@@ -131,7 +135,12 @@ export function ActionsPanel(p: ActionsPanelProps) {
                 onChange={(e) => { setTo(e.target.value); if (!m) p.setPendingTo(e.target.value); }} inputMode={p.channel === "whatsapp" ? "tel" : "text"} autoComplete="off" data-testid="studio-to" />
               {toDirty && <Button size="sm" variant="outline" className="h-10" onClick={() => saveTo.mutate()} disabled={busy}>{saveTo.isPending ? <Spin /> : "Save"}</Button>}
             </div>
-            <p className="text-xs text-muted-foreground">{DESTINATION[p.channel].label}{!to.trim() ? `. ${DESTINATION[p.channel].missing}` : ""}</p>
+            <p className="text-xs text-muted-foreground" data-testid="studio-to-hint">
+              {p.suggested && to.trim() === p.suggested.to ? `Filled in from ${p.suggested.from}${/check/i.test(p.suggested.from) ? "." : ". Check it's theirs."}` : `${DESTINATION[p.channel].label}${!to.trim() ? `. ${p.looking ? "Looking on their website…" : DESTINATION[p.channel].missing}` : ""}`}
+            </p>
+            {p.suggested && m && !m.to && toEditable && to.trim() !== p.suggested.to && (
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setTo(p.suggested!.to)} data-testid="studio-to-use-suggested">Use {p.suggested.to} (from their website)</Button>
+            )}
           </div>
         )}
         {p.doNotContact && <p className="text-xs font-medium text-destructive">This lead is marked do-not-contact.</p>}

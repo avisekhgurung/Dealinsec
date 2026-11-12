@@ -13,6 +13,18 @@ import { StageBadge } from "@/components/leads/stage-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { scoreUrl, type LeadView } from "@/lib/leads";
 import { intelligenceUrl, type LeadIntelligence } from "@/lib/studio";
+import type { Channel } from "@shared/channels";
+import type { SocialLinks } from "@shared/social-links";
+import { ChannelIcon } from "./channel-selector";
+
+/** The company's own profiles, in the order the Studio's channels run, and where each opens. */
+const SOCIAL_ROWS: [keyof SocialLinks, Channel, (v: string) => string][] = [
+  ["whatsapp", "whatsapp", (v) => `https://wa.me/${v.replace(/^\+/, "")}`],
+  ["linkedin", "linkedin", (v) => v],
+  ["instagram", "instagram", (v) => `https://www.instagram.com/${v}/`],
+  ["x", "x", (v) => `https://x.com/${v}`],
+  ["facebook", "messenger", (v) => `https://www.facebook.com/${v}`],
+];
 import { cn } from "@/lib/utils";
 
 const initials = (s: string) => s.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";
@@ -111,7 +123,19 @@ export function IntelPanel({ lead, leadId }: { lead: LeadView; leadId: number })
               <li className="flex items-center gap-2"><User className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />{intel.contact.name ? <span>{intel.contact.name}{intel.contact.role ? <span className="text-muted-foreground"> · {intel.contact.role}</span> : null}</span> : <span className="text-muted-foreground">No contact person found yet.</span>}</li>
               <li className="flex items-center gap-2"><Mail className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />{intel.contact.email ? <span className="min-w-0 truncate">{intel.contact.email}<span className="text-muted-foreground"> · {intel.contact.emailSource === "you" ? "you added it" : "found on their website"}</span></span> : <span className="text-muted-foreground">No email address yet.</span>}</li>
               {intel.contact.phone && <li className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-muted-foreground" aria-hidden /><span>{intel.contact.phone}<span className="text-muted-foreground"> · on their website (not confirmed as WhatsApp)</span></span></li>}
+              {SOCIAL_ROWS.map(([k, channel, href]) => {
+                const v = intel.contact.socials?.[k];
+                return v ? (
+                  <li key={k} className="flex items-center gap-2" data-testid={`intel-social-${k}`}>
+                    <ChannelIcon channel={channel} size={14} />
+                    <a href={href(v)} target="_blank" rel="noopener noreferrer" className="min-w-0 truncate text-primary underline-offset-2 hover:underline">{k === "linkedin" ? v.replace(/^https:\/\/www\.linkedin\.com\//, "").replace(/\/$/, "") : k === "whatsapp" ? v : `@${v}`}</a>
+                    <span className="shrink-0 text-muted-foreground">· their website</span>
+                  </li>
+                ) : null;
+              })}
             </ul>
+            {intel.contact.socials && intel.contact.socialsCheckedAt && !Object.values(intel.contact.socials).some(Boolean) && <p className="text-xs text-muted-foreground">No social profiles linked on their website.</p>}
+            {intel.contact.socials && !intel.contact.socialsCheckedAt && lead.website && <p className="text-xs text-muted-foreground" aria-live="polite">Looking on their website for social profiles…</p>}
           </Section>
 
           <Section title="Recent news" hint={signals.length ? undefined : "No news found on their website."} testId="intel-signals">

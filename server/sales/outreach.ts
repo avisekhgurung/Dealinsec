@@ -43,7 +43,7 @@ import { parseJsonObject } from "../agent/extraction";
 import { leadsStore } from "../leads/store";
 import { CapExceeded, CapUnavailable, GlobalCapExceeded, WorkspaceBudgetExceeded, assertWithinCap, tracedChat } from "../llm/traced";
 import { getIdealClient } from "../services/ideal-client";
-import { REWRITES_PER_MESSAGE, REWRITE_ACTIONS, REWRITE_PROMPT_VERSION, rewriteSystemPrompt, rewriteUserMessage, type RewriteAction } from "../outreach-studio/rewrite-prompt";
+import { REWRITES_PER_MESSAGE, REWRITE_ACTIONS, rewriteShortfall, rewriteVersion, rewriteSystemPrompt, rewriteUserMessage, type RewriteAction } from "../outreach-studio/rewrite-prompt";
 import { relatedKnowledge } from "../services/knowledge";
 import { createTicket, fail, getLead, moveLead, readGate, updateLead, writeGate, type Result, type Who } from "../services/leads";
 import { storage } from "../storage";
@@ -373,6 +373,16 @@ async function prepareDraft(user: Who, leadId: number, opts: DraftOpts, deps: Ou
     claims: claims.map((c) => ({ id: c.id, field: c.field, value: c.value, status: c.status, evidenceUrl: c.evidenceUrl, source: (c as { source?: string | null }).source ?? null, createdAt: c.createdAt })),
     findings: await radarFindingsFor(orgId, leadId), offer: input.offer, now: deps.now(),
   });
+  // The openings above are offered from the lead's own facts only; Client Radar's dated news and opportunities live in
+  // its findings. Offer those openings too when the research holds them (found 12 Nov 2026 in the real-model test: with
+  // fresh, dated news the single draft opened on a guess, and "3 versions" made two).
+  if (!strategies.some((s) => s.strategy === "trigger") && evidence.leads.some((x) => x.kind === "signal" && x.grade === "fact")) {
+    const first = evidence.leads.find((x) => x.kind === "signal" && x.grade === "fact")!;
+    strategies.unshift({ strategy: "trigger", reason: `Opens with their ${first.label.toLowerCase()}${first.date ? ` (${first.date})` : ""}.`, evidenceIds: [] });
+  }
+  if (described && !strategies.some((s) => s.strategy === "value") && evidence.leads.some((x) => x.kind === "opportunity" && x.offerMatch > 0)) {
+    strategies.splice(Math.max(0, strategies.findIndex((s) => s.strategy === "direct")), 0, { strategy: "value", reason: "Centres a concrete opportunity the research found.", evidenceIds: [] });
+  }
   return {
     ok: true, orgId, to, input, scope, style, ctx, model: modelFor("draft"), allowance, draftLimit, strategies,
     claimIds: [...facts, ...angles].map((f) => f.id), claims: facts.length + angles.length, researchId: await latestResearchId(orgId, leadId), evidence,
@@ -597,7 +607,7 @@ export async function editDraft(user: Who, id: number, raw: unknown, d: Partial<
  * Mika improves a draft already written (Outreach Studio): shorter, more professional, warmer, a better first line or a
  * clearer ask. Only the words change: the result must pass every check a first message has, and it replaces the text
  * only if the person is still looking at the same version (`bodyHash`). It is not a new AI draft against the plan's
- * allowance (prompt version "rewrite-…"); the daily drafting cap, the workspace's AI budget and a limit of
+ * allowance (prompt version "rw-…"); the daily drafting cap, the workspace's AI budget and a limit of
  * REWRITES_PER_MESSAGE per message apply instead. An approved message goes back to draft, as with any edit.
  */
 export async function rewriteDraft(user: Who, id: number, raw: unknown, d: Partial<OutreachDeps> = {}): Promise<Result<{ message: MessageView; action: RewriteAction }>> {
@@ -626,7 +636,7 @@ export async function rewriteDraft(user: Who, id: number, raw: unknown, d: Parti
   const style = await deps.style(orgId, l.row.leadId).catch(() => null);
   const noted = offerDescribed(offer) && style?.note.trim() ? { about: [offer.about, style.note].filter(Boolean).join(". "), services: offer.services } : offer;
   const ctx = { to: l.row.toAddress ?? "", siteHost: siteHost(l.lead.domain || (() => { try { return new URL(l.lead.website ?? "").hostname; } catch { return ""; } })()) };
-  const trace = { task: "draft" as const, orgId, userId: user.id, leadId: l.row.leadId, promptVersion: `${REWRITE_PROMPT_VERSION}:${action}` };
+  const trace = { task: "draft" as const, orgId, userId: user.id, leadId: l.row.leadId, promptVersion: rewriteVersion(action as RewriteAction) };
   const messages: ChatMessage[] = [{ role: "system", content: rewriteSystemPrompt("email", action as RewriteAction) }, { role: "user", content: rewriteUserMessage({ subject: l.row.subject ?? "", body: l.row.body, channel: "email" }) }];
   let draft: { subject: string; body: string } | null = null, issues: Issue[] = [];
   try {
@@ -634,7 +644,12 @@ export async function rewriteDraft(user: Who, id: number, raw: unknown, d: Parti
       const reply = await deps.chat(trace, messages, { maxTokens: 2500, model: modelFor("draft") });
       draft = asDraft(reply.content);
       issues = draft ? [...checkDraft(draft, ctx), ...scopeIssues(draft, { sampleOffered: false, offer: noted })] : [{ code: "body_length", message: "Reply with only the JSON object: {\"subject\":...,\"body\":...}." }];
-      if (!issues.length) break;
+      if (!issues.length) {
+        const short = attempt === 0 && draft ? rewriteShortfall(action as RewriteAction, l.row.body, draft.body) : null;
+        if (!short) break;
+        messages.push({ role: "assistant", content: reply.content ?? "" }, { role: "user", content: `${short} Return the JSON object again.` });
+        continue;
+      }
       messages.push({ role: "assistant", content: reply.content ?? "" }, { role: "user", content: `That version cannot be used. Fix these problems and return the JSON object again:\n${issuesForRetry(issues)}` });
     }
   } catch (e) {

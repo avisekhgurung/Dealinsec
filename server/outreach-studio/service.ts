@@ -7,6 +7,7 @@
  *   - what a reply said, as the person recorded it (interested, not now, a meeting...)
  *   - the lead's research for the left panel, ranked the way drafts use it (shared/draft-evidence.ts)
  *   - honest overview numbers: what DealInSec saw happen versus what the person recorded
+ *   - the company's own social profiles and WhatsApp link, read once from its website (plain rules, no model)
  * Workspace isolation: every read and write is filtered by the caller's organization; another workspace's lead
  * answers "not found", like the rest of the leads module.
  */
@@ -15,7 +16,8 @@ import { sql } from "drizzle-orm";
 import { db } from "../db";
 import { CHANNELS, CHANNEL_LABEL, type Channel } from "@shared/channels";
 import { buildDraftEvidence, type DraftEvidence, type EvidenceFinding } from "@shared/draft-evidence";
-import { closeTicket, createTicket, getLead, readGate, writeGate } from "../services/leads";
+import { SOCIAL_FIELDS, SOCIAL_KINDS, socialLinksFrom, type SocialLinks } from "@shared/social-links";
+import { addClaim, closeTicket, createTicket, getLead, readGate, writeGate } from "../services/leads";
 import { leadsStore } from "../leads/store";
 import type { Result, Who } from "../services/leads";
 
@@ -121,7 +123,15 @@ export interface LeadIntelligence {
   evidence: DraftEvidence;
   /** Facts read on their site (or entered by the person) vs Mika's guesses, as counts. */
   counts: { facts: number; guesses: number; datedSignals: number };
-  contact: { name: string | null; role: string | null; email: string | null; emailSource: "you" | "website" | null; phone: string | null; contactForm: string | null };
+  contact: {
+    name: string | null; role: string | null; email: string | null; emailSource: "you" | "website" | null; phone: string | null; contactForm: string | null;
+    /** The company's own profiles found on its website (shared/social-links.ts), and the page each was on. */
+    socials: SocialLinks; socialSources: Record<keyof SocialLinks, string | null>;
+    /** When the website was last read for them; null = never (the Studio asks once). */
+    socialsCheckedAt: string | null;
+    /** The lead's location as entered, so a local phone number can be given its country code. */
+    country: string | null;
+  };
   sources: { url: string; host: string; items: number }[];
   /** The Client Radar company this lead came from, when there is one. */
   prospectId: number | null;
@@ -166,11 +176,65 @@ export async function leadIntelligence(user: Who, leadId: number, now = new Date
         name: lead.contactName ?? null, role: lead.contactRole ?? null,
         email: lead.contactEmail ?? siteEmail?.value ?? null, emailSource: lead.contactEmail ? "you" : siteEmail ? "website" : null,
         phone: phone?.value ?? null, contactForm: form?.value ?? null,
+        socials: Object.fromEntries(SOCIAL_KINDS.map((k) => [k, confirmed(SOCIAL_FIELDS[k])?.value ?? null])) as unknown as SocialLinks,
+        socialSources: Object.fromEntries(SOCIAL_KINDS.map((k) => [k, confirmed(SOCIAL_FIELDS[k])?.evidenceUrl ?? null])) as Record<keyof SocialLinks, string | null>,
+        socialsCheckedAt: (() => { const e = got.detail.events.find((x) => x.kind === "contacts_checked"); return e ? new Date(e.createdAt as unknown as string).toISOString() : null; })(),
+        country: lead.location ?? null,
       },
       sources: Array.from(urls.entries()).map(([url, items]) => ({ url, host: host(url), items })).slice(0, 8),
       prospectId,
     },
   };
+}
+
+/* ── contact links from the company's own website ───────────────────────── */
+
+/** How long one look at the website counts, before the Studio may read it again. */
+export const CONTACT_CHECK_DAYS = 7;
+const CONTACT_PATH = /(contact|connect|reach|get-in-touch|enquir|inquir)/i;
+
+/**
+ * Reads the company's own homepage (and its contact page, when linked) once, and saves the social profiles and WhatsApp
+ * link it finds as facts on the lead, each with the page it was on. Free: the built-in page reader only (robots.txt
+ * respected, no paid reader, no model). Done at most once every CONTACT_CHECK_DAYS days per lead.
+ */
+export async function findContactLinks(user: Who, leadId: number, deps: { read?: (url: string) => Promise<{ ok: boolean; url?: string; links?: { href: string }[] }>; now?: Date } = {}): Promise<Result<{ socials: SocialLinks; checked: boolean }>> {
+  const gate = writeGate(user);
+  if (gate) return gate;
+  const got = await getLead(user, leadId);
+  if (!got.ok) return got;
+  const { lead, events, claims } = got.detail;
+  const now = deps.now ?? new Date();
+  const current = () => Object.fromEntries(SOCIAL_KINDS.map((k) => [k, claims.filter((c) => c.field === SOCIAL_FIELDS[k] && c.status === "confirmed").sort((a, b) => b.id - a.id)[0]?.value ?? null])) as unknown as SocialLinks;
+  const last = events.find((e) => e.kind === "contacts_checked");
+  if (last && now.getTime() - new Date(last.createdAt as unknown as string).getTime() < CONTACT_CHECK_DAYS * DAY) return { ok: true, socials: current(), checked: false };
+  let home: URL;
+  try { home = new URL(/^https?:\/\//i.test(lead.website ?? "") ? lead.website! : `https://${lead.website ?? lead.domain ?? ""}`); } catch { return fail(400, "no_website", "This lead has no website to read."); }
+  if (!lead.website && !lead.domain) return fail(400, "no_website", "This lead has no website to read.");
+  const read = deps.read ?? (async (url: string) => { const { RobotsReader, builtinReader } = await import("../outbound/providers"); return new RobotsReader(builtinReader).read(url); });
+  const sameSite = (u: string) => { try { const h = new URL(u).hostname.replace(/^www\./, ""); const base = home.hostname.replace(/^www\./, ""); return h === base || h.endsWith(`.${base}`); } catch { return false; } };
+  const pages: { url: string; links: { href: string }[] }[] = [];
+  const first = await read(`${home.protocol}//${home.hostname}/`).catch(() => null);
+  if (first?.ok) {
+    pages.push({ url: first.url ?? home.toString(), links: first.links ?? [] });
+    const contact = (first.links ?? []).map((l) => { try { return new URL(l.href, first.url ?? home.toString()).toString(); } catch { return null; } })
+      .find((u): u is string => !!u && sameSite(u) && CONTACT_PATH.test(new URL(u).pathname));
+    if (contact) { const c = await read(contact).catch(() => null); if (c?.ok) pages.push({ url: c.url ?? contact, links: c.links ?? [] }); }
+  }
+  const have = current();
+  const found: string[] = [];
+  for (const page of pages) {
+    const s = socialLinksFrom(page.links);
+    for (const k of SOCIAL_KINDS) {
+      const v = s[k];
+      if (!v || have[k] || found.includes(k)) continue;
+      const href = page.links.find((l) => socialLinksFrom([l])[k] === v)?.href ?? v;
+      const r = await addClaim(user, leadId, { field: SOCIAL_FIELDS[k], value: v, status: "confirmed", evidenceUrl: page.url, evidenceSnippet: `Link on their website: ${href}`.slice(0, 500) }, { actor: "agent" });
+      if (r.ok) { have[k] = v; found.push(k); }
+    }
+  }
+  await leadsStore.addEvent(user.organizationId!, leadId, { kind: "contacts_checked", data: { read: pages.length, found }, actor: "agent", actorUserId: user.id, quiet: true });
+  return { ok: true, socials: have, checked: true };
 }
 
 /* ── overview: honest numbers ───────────────────────────────────────────── */

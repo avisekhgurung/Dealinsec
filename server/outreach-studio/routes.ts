@@ -7,6 +7,7 @@
  *   POST /api/outreach/leads/:id/reply-note              { channel, outcome, note?, messageId? }          what their reply said
  *   GET  /api/outreach/leads/:id/intelligence            the research, ranked the way drafts use it
  *   GET  /api/outreach/overview?days=7|30|90             honest numbers: seen by DealInSec vs recorded by you
+ *   POST /api/outreach/leads/:id/contact-links            read the company's own site once for its social profiles (free)
  */
 import type { Express, Response } from "express";
 import { isAuthenticated } from "../auth";
@@ -41,5 +42,6 @@ export function registerOutreachStudioRoutes(app: Express) {
   }));
   app.post("/api/outreach/leads/:id/reply-note", isAuthenticated, sameOriginJson, withId("studio_reply_note", async (req, res, id) => send(res, await svc.recordReplyNote(req.user, id, req.body), () => ({ ok: true }), 201)));
   app.get("/api/outreach/leads/:id/intelligence", isAuthenticated, withId("studio_intelligence", async (req, res, id) => { res.setHeader("Cache-Control", "no-store"); send(res, await svc.leadIntelligence(req.user, id), (r) => ({ intelligence: r.intelligence })); }));
+  app.post("/api/outreach/leads/:id/contact-links", isAuthenticated, sameOriginJson, withId("studio_contact_links", async (req, res, id) => send(res, await svc.findContactLinks(req.user, id), (r) => ({ socials: r.socials, checked: r.checked }))));
   app.get("/api/outreach/overview", isAuthenticated, guarded("studio_overview", async (req, res) => { res.setHeader("Cache-Control", "no-store"); send(res, await svc.outreachOverview(req.user, { days: req.query.days }), (r) => ({ overview: r.overview })); }));
 }

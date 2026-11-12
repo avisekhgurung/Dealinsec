@@ -45,6 +45,34 @@ describe.skipIf(!URL_ || !loopback(URL_))("Outreach Studio records and overview 
     expect(await svc.recordHandoff(owner(org()), l, { channel: "email", action: "copied" })).toMatchObject({ ok: false, status: 404 }); // another workspace
   });
 
+  it("social profiles are read once from the company's own website and saved with the page they were on", async () => {
+    const o = org(), l = await lead(o);
+    await q.query(`UPDATE leads SET website = 'https://casaalma.test', domain = 'casaalma.test' WHERE id = $1`, [l]);
+    const reads: string[] = [];
+    const read = async (url: string) => {
+      reads.push(url);
+      if (url === "https://casaalma.test/") return { ok: true, url, links: [{ href: "/contact-us" }, { href: "https://www.instagram.com/casaalma/" }, { href: "https://www.facebook.com/sharer/sharer.php?u=x" }, { href: "https://webdesignco.test/" }] };
+      return { ok: true, url, links: [{ href: "https://wa.me/919812345678" }, { href: "https://www.linkedin.com/company/casa-alma/" }, { href: "https://instagram.com/someone-else" }] };
+    };
+    const r: any = await svc.findContactLinks(owner(o), l, { read, now: NOW });
+    expect(r).toMatchObject({ ok: true, checked: true, socials: { instagram: "casaalma", whatsapp: "+919812345678", linkedin: "https://www.linkedin.com/company/casa-alma/", facebook: null, x: null } });
+    expect(reads).toEqual(["https://casaalma.test/", "https://casaalma.test/contact-us"]);
+    const claims = (await q.query(`SELECT field, value, status, evidence_url FROM lead_claims WHERE organization_id = $1 AND lead_id = $2 ORDER BY field`, [o, l])).rows;
+    expect(claims).toEqual([
+      { field: "social_instagram", value: "casaalma", status: "confirmed", evidence_url: "https://casaalma.test/" },
+      { field: "social_linkedin", value: "https://www.linkedin.com/company/casa-alma/", status: "confirmed", evidence_url: "https://casaalma.test/contact-us" },
+      { field: "social_whatsapp", value: "+919812345678", status: "confirmed", evidence_url: "https://casaalma.test/contact-us" },
+    ]);
+    // Read once: a second ask within a week doesn't fetch again.
+    const again: any = await svc.findContactLinks(owner(o), l, { read, now: new Date(NOW.getTime() + 86_400_000) });
+    expect(again).toMatchObject({ ok: true, checked: false, socials: { instagram: "casaalma" } });
+    expect(reads).toHaveLength(2);
+    const intel: any = await svc.leadIntelligence(owner(o), l, NOW);
+    expect(intel.intelligence.contact.socials).toMatchObject({ instagram: "casaalma", whatsapp: "+919812345678" });
+    expect(intel.intelligence.contact.socialsCheckedAt).not.toBeNull();
+    expect(await svc.findContactLinks(owner(org()), l, { read })).toMatchObject({ ok: false, status: 404 }); // another workspace
+  });
+
   it("a follow-up is the lead's own reminder at noon UTC, today or later; done closes it and says so", async () => {
     const o = org(), l = await lead(o);
     expect(await svc.scheduleFollowUp(owner(o), l, { channel: "linkedin", dueOn: "2026-11-11" }, NOW)).toMatchObject({ ok: false, status: 400 }); // yesterday

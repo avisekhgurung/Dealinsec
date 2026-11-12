@@ -16,6 +16,7 @@ export const ACTIVITY_LABEL: Record<string, string> = {
   // Outreach Studio (12 Nov 2026): what the person did with a message outside DealInSec. Never a delivery.
   outreach_copied: "Message copied", outreach_opened: "Opened to send", draft_rewritten: "Draft improved by Mika",
   followup_scheduled: "Follow-up planned", followup_done: "Follow-up done", reply_recorded: "Reply noted by you",
+  contacts_checked: "Website checked for social profiles",
 };
 
 const CHANNEL_NAME: Record<string, string> = { email: "Email", whatsapp: "WhatsApp", linkedin: "LinkedIn", instagram: "Instagram", x: "X", messenger: "Messenger" };

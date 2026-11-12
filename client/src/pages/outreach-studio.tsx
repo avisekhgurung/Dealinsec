@@ -6,7 +6,7 @@
  * Desktop shows all three; a tablet keeps the research behind a button; a phone stacks them with the message first.
  * The old outreach card on the lead page and the campaign sheets keep working: this page uses the same endpoints.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useRoute, useSearch } from "wouter";
 import { ArrowDown, ArrowLeft, BookOpen } from "lucide-react";
@@ -25,9 +25,10 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import { refreshChannels, useChannelMessages, useChannelStatuses } from "@/lib/channels";
-import { detailUrl, messagesUrl, refreshLeads, type LeadDetailView } from "@/lib/leads";
+import { detailUrl, leadCall, messagesUrl, refreshLeads, type LeadDetailView } from "@/lib/leads";
 import { useCalmMotion } from "@/lib/motion";
-import { STUDIO_CHANNELS, basisFor, currentFor, fromChannel, fromEmail, isStudioChannel, type EmailMessages, type StudioMessage } from "@/lib/studio";
+import { STUDIO_CHANNELS, basisFor, contactLinksUrl, currentFor, fromChannel, fromEmail, intelligenceUrl, isStudioChannel, suggestedDestinations, type EmailMessages, type LeadIntelligence, type StudioMessage } from "@/lib/studio";
+import { queryClient } from "@/lib/queryClient";
 
 const SHORT_STATE: Record<string, string> = { variant: "Versions", draft: "Draft", approved: "Approved", sending: "Sending", sent: "Sent", failed: "Not sent", uncertain: "Check" };
 
@@ -52,6 +53,23 @@ export default function OutreachStudioPage() {
   const allowance = useDraftAllowance(canEdit);
   const lead = detail.data?.lead;
   const events = detail.data?.events ?? [];
+  // The same research query the left panel uses (one request): it also says what the website showed for reaching them.
+  const intel = useQuery<{ intelligence: LeadIntelligence }>({ queryKey: [intelligenceUrl(id)], enabled: id > 0, retry: false });
+  const contact = intel.data?.intelligence.contact;
+  const suggested = suggestedDestinations(contact);
+  // Once per lead (the server keeps it for 7 days): read their own website for social profiles and a WhatsApp link.
+  const looked = useRef(false);
+  const [looking, setLooking] = useState(false);
+  useEffect(() => {
+    if (looked.current || !contact || contact.socialsCheckedAt !== null || contact.socials === undefined || !lead?.website || !canEdit || lead.archivedAt || lead.doNotContact) return;
+    looked.current = true;
+    setLooking(true);
+    leadCall("POST", contactLinksUrl(id), {})
+      .then(() => Promise.all([queryClient.invalidateQueries({ queryKey: [intelligenceUrl(id)] }), queryClient.invalidateQueries({ queryKey: [detailUrl(id)] })]))
+      .catch(() => undefined)
+      .finally(() => setLooking(false));
+  }, [contact, lead?.website, canEdit, id]);
+  const toFor = (c: Channel) => pendingTo[c] ?? suggested[c]?.to ?? "";
 
   const all = useMemo<StudioMessage[]>(() => [
     ...(email.data?.messages ?? []).map((m) => fromEmail(m, events)),
@@ -140,7 +158,7 @@ export default function OutreachStudioPage() {
             leadId={id} company={lead.companyName} sender={sender} channel={channel}
             current={current} variants={variants} basis={current ? basisFor(events, current) : null}
             canEdit={writable} gap={channel === "email" ? email.data?.gap ?? null : null} hasWebsite={!!lead.website}
-            allowance={allowance} pendingTo={pendingTo[channel] ?? ""} channelOff={offFor(channel)}
+            allowance={allowance} pendingTo={toFor(channel)} channelOff={offFor(channel)}
             refresh={refresh} onDirtyChange={setDirty}
           />
         </div>
@@ -150,7 +168,8 @@ export default function OutreachStudioPage() {
             <ActionsPanel
               leadId={id} company={lead.companyName} channel={channel} current={current} leadEmail={lead.contactEmail ?? null}
               doNotContact={!!lead.doNotContact} events={events} tickets={detail.data?.tickets ?? []} canEdit={writable} dirty={dirty}
-              pendingTo={pendingTo[channel] ?? ""} setPendingTo={(v) => setPendingTo((p) => ({ ...p, [channel]: v }))} refresh={refresh}
+              pendingTo={toFor(channel)} setPendingTo={(v) => setPendingTo((p) => ({ ...p, [channel]: v }))} refresh={refresh}
+              suggested={suggested[channel] ?? null} looking={looking}
             />
           </div>
         </div>
