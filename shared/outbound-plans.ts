@@ -8,7 +8,7 @@
  * every workspace has.
  *
  * Sizing (measured on production runs, Oct 2026): a completed search cost $0.073 on average and $0.235 at the 90th
- * percentile (search provider + model calls). At Pro's ₹199 (about $2.40), 10 searches a month is about $0.73 on
+ * percentile (search provider + model calls). At Pro's ₹299 (about $3.60), 10 searches a month is about $0.73 on
  * average and about $2.35 at the 90th percentile; the earlier 25 (sized for ₹499) could cost more than the plan earns.
  * The trial gets Pro's allowance; free is a small, real taste.
  *
@@ -78,7 +78,7 @@ export const OUTBOUND_ALLOWANCE_DEFAULTS: Readonly<Record<OutboundTier, Outbound
 
 /**
  * A workspace's AI and provider spend ceiling over the same rolling 30 days, in US dollars (WORKSPACE_MONTHLY_SPEND_USD).
- * A safeguard against runaway cost, sized against Pro's ₹199 (about $2.40): at the measured $0.05–0.12 per 10-company
+ * A safeguard against runaway cost, sized against Pro's ₹299 (about $3.60): at the measured $0.05–0.12 per 10-company
  * search plus about $0.002 per draft, Pro's allowances fit well inside it. Every metered model call and web search
  * reserves against it before it is made.
  */

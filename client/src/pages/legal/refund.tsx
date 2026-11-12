@@ -15,7 +15,7 @@ export default function RefundPolicy() {
       </header>
 
       <main className="px-4 py-8 max-w-2xl mx-auto prose prose-sm dark:prose-invert animate-fade-in">
-        <p className="text-muted-foreground text-xs">Last updated: 18 October 2026</p>
+        <p className="text-muted-foreground text-xs">Last updated: 12 November 2026</p>
 
         <p>
           This Refund Policy applies to all purchases made on DealInSec ("Platform"),
@@ -28,7 +28,7 @@ export default function RefundPolicy() {
           of purchase):
         </p>
         <ul>
-          <li><strong>DealInSec Pro (₹199 a month)</strong>: Client Radar with the Pro research allowance and the full workflow (unlimited deals, quotations, agreements, invoices and payment tracking) for 1 month.</li>
+          <li><strong>DealInSec Pro (₹299 a month)</strong>: Client Radar with the Pro research allowance and the full workflow (unlimited deals, quotations, agreements, invoices and payment tracking) for 1 month.</li>
           <li><strong>Extra team seats (₹99 per seat a month)</strong>: an add-on for Pro.</li>
           <li>Pro Annual purchased before October 2026 remains valid for its paid term; it is no longer sold.</li>
         </ul>

@@ -12,7 +12,7 @@ import { toMinor } from "@shared/schema";
 import { globalYearlyPriceFor } from "@shared/globalPlans";
 
 export const PLAN_PRICE_DEFAULTS = {
-  proMonthlyPrice: 199,
+  proMonthlyPrice: 299,
   /** Pro Annual is no longer sold; kept only so older code paths reading it don't break. */
   proYearlyPrice: 999,
   extraSeatPrice: 99,

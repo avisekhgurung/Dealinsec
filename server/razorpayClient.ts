@@ -11,7 +11,7 @@
  *
  * Pricing (₹, env-overridable for test-mode runs; a value that isn't a whole
  * number of rupees ≥ 1 is ignored in favour of the default):
- *   PRO_MONTHLY_PRICE (default 199)   — DealInSec Pro, 1 month. The ONE plan on
+ *   PRO_MONTHLY_PRICE (default 299)   — DealInSec Pro, 1 month. The ONE plan on
  *                                       sale (launch-test price from 18 Oct 2026; ₹499 before). An order
  *                                       keeps the amount it was created with: payment checks compare
  *                                       against the order's own amount, never today's price.
@@ -79,7 +79,7 @@ function rupees(name: string, fallback: number): number {
 }
 
 export function getProMonthlyPrice(): number {
-  return rupees("PRO_MONTHLY_PRICE", 199);
+  return rupees("PRO_MONTHLY_PRICE", 299);
 }
 
 // Pro Annual is no longer sold (Oct 2026: one monthly plan). Kept for the records

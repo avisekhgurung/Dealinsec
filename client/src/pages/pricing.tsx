@@ -63,7 +63,7 @@ export default function PricingPage() {
   const [purchasedPlan, setPurchasedPlan] = useState<CheckoutPlan>("pro_monthly");
 
   // Live pricing — driven by server env vars (PRO_MONTHLY_PRICE etc.)
-  // Defaults (₹199 Pro, ₹99 per extra seat) are shared with the other surfaces.
+  // Defaults (₹299 Pro, ₹99 per extra seat) are shared with the other surfaces.
   const [proMonthlyPrice, setProMonthlyPrice] = useState<number>(PLAN_PRICE_DEFAULTS.proMonthlyPrice);
   const [extraSeatPrice, setExtraSeatPrice] = useState<number>(PLAN_PRICE_DEFAULTS.extraSeatPrice);
   const [seatQty, setSeatQty] = useState<number>(1);
