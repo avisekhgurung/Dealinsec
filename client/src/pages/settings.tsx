@@ -1137,6 +1137,10 @@ export default function SettingsPage() {
                       : <>Need more? Extra seats aren't available in your country yet.</>}
                   </p>
                 )}
+                <p className="text-sm text-muted-foreground max-w-md">
+                  See what your plan includes, the extra searches and AI drafts you&apos;ve bought, and your history.{" "}
+                  <Link href="/wallet" className="font-semibold text-primary hover:underline" data-testid="link-wallet">Credits &amp; usage</Link>
+                </p>
                 {!canBilling && (
                   <PermissionNote>Only the Owner can manage billing{isSolo ? "" : " and seats"}.</PermissionNote>
                 )}

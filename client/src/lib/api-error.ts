@@ -22,6 +22,8 @@ export interface ParsedApiError {
   credits?: { monthly: number; purchased: number; resetsAt: string | null };
   /** A 400 that names the one field it refused (the deal's engagement details). */
   field?: string;
+  /** Which credits would unblock a refused search or draft (the top-up packs to offer). */
+  topUp?: "search" | "draft";
 }
 
 export function parseApiError(err: unknown): ParsedApiError {
@@ -41,6 +43,7 @@ export function parseApiError(err: unknown): ParsedApiError {
       errorId: typeof body?.errorId === "string" ? body.errorId : undefined,
       credits: body?.credits,
       field: typeof body?.field === "string" ? body.field : undefined,
+      topUp: body?.topUp === "search" || body?.topUp === "draft" ? body.topUp : undefined,
     };
   } catch {
     return { status, code: null };

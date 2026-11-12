@@ -37,6 +37,7 @@ export function registerOutboundRoutes(app: Express) {
     if (r.ok) return res.status(status).json(ok(r));
     const extra: Record<string, unknown> = {};
     if (r.why) extra.why = r.why;
+    if (r.topUp) extra.topUp = r.topUp; // which purchased credits would unblock this (search | draft)
     return res.status(r.status).json({ code: r.code, error: r.message, ...extra });
   };
   const guarded = (where: string, fn: (req: any, res: Response) => Promise<unknown>) => async (req: any, res: Response) => {

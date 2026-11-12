@@ -23,7 +23,7 @@ import { campaignRunner } from "./runner";
 export function registerCampaignRoutes(app: Express) {
   const send = (res: Response, r: any, ok: (r: any) => Record<string, unknown>, status = 200) => {
     if (r.ok) return res.status(status).json(ok(r));
-    return res.status(r.status).json({ code: r.code, error: r.message });
+    return res.status(r.status).json({ code: r.code, error: r.message, ...(r.topUp ? { topUp: r.topUp } : {}) });
   };
   const guarded = (where: string, fn: (req: any, res: Response) => Promise<unknown>) => async (req: any, res: Response) => {
     if (!req.user?.organizationId) return res.status(403).json({ code: "no_organization", error: "Finish setting up your workspace first." });

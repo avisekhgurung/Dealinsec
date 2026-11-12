@@ -17,7 +17,7 @@ import * as svc from "./service";
 
 export function registerOutreachStudioRoutes(app: Express) {
   const send = (res: Response, r: any, ok: (r: any) => Record<string, unknown>, status = 200) =>
-    r.ok ? res.status(status).json(ok(r)) : res.status(r.status).json({ code: r.code, error: r.message });
+    r.ok ? res.status(status).json(ok(r)) : res.status(r.status).json({ code: r.code, error: r.message, ...(r.topUp ? { topUp: r.topUp } : {}) });
   const guarded = (where: string, fn: (req: any, res: Response) => Promise<unknown>) => async (req: any, res: Response) => {
     if (!req.user?.organizationId) return res.status(403).json({ code: "no_organization", error: "Finish setting up your workspace first." });
     try { await fn(req, res); }

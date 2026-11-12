@@ -3,12 +3,13 @@
  * verify on our server → invalidate user/credit queries.
  *
  * Used by the pricing page and the UpgradeModal. One-time payments only
- * (pro_monthly, extra_seat — non-auto-renewing terms).
+ * (pro_monthly, extra_seat, credit_pack — non-auto-renewing terms).
  */
 import { useState, useCallback } from "react";
 import { queryClient } from "@/lib/queryClient";
 import { trackEvent } from "@/lib/analytics";
 import { fromMinor } from "@shared/schema";
+import { refreshCreditViews } from "@/lib/credit-keys";
 
 const RAZORPAY_SCRIPT = "https://checkout.razorpay.com/v1/checkout.js";
 
@@ -36,8 +37,8 @@ function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
-/** What can be bought: DealInSec Pro (monthly) and, for Pro, extra seats. Annual and Deal Boost are no longer sold. */
-export type CheckoutPlan = "pro_monthly" | "extra_seat";
+/** What can be bought: DealInSec Pro (monthly), extra seats for Pro, and search / AI-draft credit packs (extra body: { packId }). Annual and Deal Boost are no longer sold. */
+export type CheckoutPlan = "pro_monthly" | "extra_seat" | "credit_pack";
 
 export interface CheckoutCallbacks {
   onSuccess?: () => void;
@@ -121,6 +122,7 @@ export function useRazorpayCheckout() {
 
             await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
             await queryClient.invalidateQueries({ queryKey: ["/api/credits/balance"] });
+            await refreshCreditViews();
             cbs.onSuccess?.();
           } catch {
             cbs.onPendingVerification?.();

@@ -6,68 +6,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { AlertTriangle, Info } from "lucide-react";
+import { TopUpPrompt } from "@/components/credits/top-up";
+import { featureStatus } from "@/lib/credits";
+import { searchBlockedReason, searchTopUpOffered, when, type OutboundUsage } from "@/lib/search-usage";
+export { searchBlockedReason, searchTopUpOffered };
+export type { OutboundUsage };
 
 export const OUTBOUND_USAGE_URL = "/api/outbound/usage";
 
-interface Allowance { used: number; limit: number; remaining: number; nextFreesAt: string | null }
-export interface OutboundUsage {
-  asOf: string;
-  searchReady: boolean;
-  /** Local business search (Google Places) is configured (absent from an older server = not available). */
-  localReady?: boolean;
-  charge: "included";
-  workspace: { searches: Allowance | null; webSearches: Allowance | null; contactLookups: Allowance | null };
-  /** The plan's 30-day allowance (absent from an older server). */
-  plan?: {
-    tier: "free" | "trial" | "pro" | "unlimited"; label: string; searches: Allowance | null; maxCompanies: number; windowDays: number;
-    /** Separate allowances over the same days (absent from an older server; null = couldn't be counted). */
-    prospects?: Allowance | null; drafts?: Allowance | null; sends?: Allowance | null; spendPercent?: number | null;
-    /** Bulk list sweeps, a pool of its own (absent from an older server; null = couldn't be counted). */
-    lists?: Allowance | null;
-  };
-  perSearch: { webSearches: number };
-  platform: { state: "available" | "limited" | "paused" | "unknown"; resetsAt: string };
-}
-
 export const useOutboundUsage = (enabled = true) =>
   useQuery<{ usage: OutboundUsage }>({ queryKey: [OUTBOUND_USAGE_URL], enabled, retry: false, staleTime: 15_000 });
-
-const time = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-const when = (iso: string) => {
-  const d = new Date(iso), today = new Date();
-  return d.toDateString() === today.toDateString() ? `at ${time(iso)}` : `${d.toLocaleDateString(undefined, { weekday: "short" })} at ${time(iso)}`;
-};
-
-/** Why a search can't start right now, from the server's answer, or null. The server refuses it either way. A local
- *  business search needs its own source, uses one search credit and researches nothing by itself (so the researched
- *  prospects allowance and the web-search platform cap don't stop it). */
-export function searchBlockedReason(u: OutboundUsage | undefined, mode: "web" | "local" = "web"): string | null {
-  if (!u) return null;
-  if (mode === "local" && !u.localReady) return "Local business search isn't switched on yet. Search for companies online meanwhile.";
-  if (mode === "web" && !u.searchReady) return "Web search isn't set up on this server yet, so a search can't start.";
-  const m = u.plan?.searches;
-  if (m && m.remaining <= 0) {
-    return u.plan!.tier === "free"
-      ? `You've used the free plan's ${m.limit} Client Radar searches for this ${u.plan!.windowDays}-day period. Upgrade to Pro for more.`
-      : `You've used the ${m.limit} searches included in ${u.plan!.label} for this ${u.plan!.windowDays}-day period.${m.nextFreesAt ? ` The next one frees up ${when(m.nextFreesAt)}.` : ""}`;
-  }
-  const pr = u.plan?.prospects;
-  if (mode === "web" && pr && pr.remaining <= 0) {
-    return u.plan!.tier === "free"
-      ? `You've used the free plan's ${pr.limit} researched prospects for this ${u.plan!.windowDays}-day period. Upgrade to Pro for more.`
-      : `You've used the ${pr.limit} researched prospects included in ${u.plan!.label} for this ${u.plan!.windowDays}-day period. More become available as earlier searches pass ${u.plan!.windowDays} days.`;
-  }
-  if ((u.plan?.spendPercent ?? 0) >= 100) return `This workspace's AI usage for the last ${u.plan!.windowDays} days has reached its limit. It frees up as earlier usage passes ${u.plan!.windowDays} days.`;
-  const s = u.workspace.searches;
-  if (s && s.remaining <= 0) return `You've used today's ${s.limit} searches.${s.nextFreesAt ? ` The next one frees up ${when(s.nextFreesAt)}.` : ""}`;
-  if (mode === "web" && u.platform.state === "paused") return `Client Radar has reached today's limit across DealInSec. It starts again ${when(u.platform.resetsAt)}. This doesn't use any of your searches.`;
-  return null;
-}
 
 export function UsageNote({ usage, mode = "web" }: { usage: OutboundUsage | undefined; mode?: "web" | "local" }) {
   if (!usage) return null;
   const s = usage.workspace.searches;
   const blocked = searchBlockedReason(usage, mode);
+  const status = usage.plan && usage.plan.tier !== "unlimited" ? featureStatus(usage.plan.searches, usage.credits?.search, usage.warn) : null;
   return (
     <div className="space-y-1.5 text-xs" data-testid="outbound-usage" aria-live="polite">
       <p className="flex items-start gap-1.5 text-muted-foreground">
@@ -95,6 +49,17 @@ export function UsageNote({ usage, mode = "web" }: { usage: OutboundUsage | unde
           {typeof usage.plan.spendPercent === "number" && usage.plan.spendPercent >= 80 && <> · AI usage at {usage.plan.spendPercent}% of this period&apos;s limit</>}
         </p>
       )}
+      {status?.state === "warn" && !blocked && (
+        <p className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400" role="status" data-testid="outbound-warn">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />You&apos;ve used {status.percent}% of this period&apos;s searches.
+        </p>
+      )}
+      {status?.state === "credits" && (
+        <p className="flex items-start gap-1.5 text-muted-foreground" role="status" data-testid="outbound-credits">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />Your plan&apos;s searches are used. This search uses {status.cost} of your {status.balance} purchased search credit{status.balance === 1 ? "" : "s"}.
+        </p>
+      )}
+      {searchTopUpOffered(usage) && <div className="pl-5"><TopUpPrompt kind="search" label="Buy extra searches" /></div>}
       {blocked ? (
         <p className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400" role="status" data-testid="outbound-blocked">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />{blocked}

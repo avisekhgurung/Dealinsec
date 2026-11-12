@@ -57,6 +57,8 @@ const PrivacyPage             = lazy(() => import("@/pages/legal/privacy"));
 const CookiePage              = lazy(() => import("@/pages/legal/cookies"));
 const RefundPage              = lazy(() => import("@/pages/legal/refund"));
 const SettingsPage            = lazy(() => import("@/pages/settings"));
+const WalletPage              = lazy(() => import("@/pages/wallet"));
+const AdminCreditsPage        = lazy(() => import("@/pages/admin-credits"));
 const AcceptInvitePage        = lazy(() => import("@/pages/accept-invite"));
 const DealsImportPage         = lazy(() => import("@/pages/deals-import"));
 const AuthPage                = lazy(() => import("@/pages/auth"));
@@ -246,6 +248,8 @@ function Router() {
             <Route path="/brand-invoices/:id" component={BrandInvoiceDetailsPage} />
             <Route path="/profile" component={ProfilePage} />
             <Route path="/settings" component={SettingsPage} />
+            <Route path="/wallet" component={WalletPage} />
+            <Route path="/admin/credits" component={AdminCreditsPage} />
             <Route path="/invite/:token" component={AcceptInvitePage} />
             <Route path="/pricing" component={PricingPage} />
             <Route path="/pitch" component={PitchPage} />

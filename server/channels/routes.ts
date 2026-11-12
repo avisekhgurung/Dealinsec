@@ -33,7 +33,7 @@ export function registerChannelRoutes(app: Express) {
   const send = (res: Response, r: any, ok: (r: any) => Record<string, unknown>, status = 200) => {
     if (r.ok) return res.status(status).json(ok(r));
     const extra: Record<string, unknown> = {};
-    for (const k of ["issues", "feature"]) if (r[k]) extra[k] = r[k];
+    for (const k of ["issues", "feature", "topUp"]) if (r[k]) extra[k] = r[k];
     return res.status(r.status).json({ code: r.code, error: r.message, ...extra });
   };
   const guarded = (where: string, fn: (req: any, res: Response) => Promise<unknown>) => async (req: any, res: Response) => {

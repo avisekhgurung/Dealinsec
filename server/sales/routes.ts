@@ -105,6 +105,7 @@ export function registerSalesRoutes(app: Express) {
     const extra: Record<string, unknown> = {};
     if (r.issues) extra.issues = r.issues;
     if (r.messageId) extra.messageId = r.messageId;
+    if (r.topUp) extra.topUp = r.topUp; // which purchased credits would unblock this (draft)
     return res.status(r.status).json({ code: r.code, error: r.message, ...extra });
   };
   const guarded = (where: string, fn: (req: any, res: Response, id: number) => Promise<unknown>) => async (req: any, res: Response) => {
