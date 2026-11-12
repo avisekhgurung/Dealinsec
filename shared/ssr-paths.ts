@@ -33,6 +33,12 @@ export const SSR_PATH_PREFIXES: readonly string[] = [
   "find-local-clients",
   "ai-coworkers",
   "crm-for-freelancers",
+  "for-web-developers",
+  "for-seo-freelancers",
+  "for-digital-marketing-agencies",
+  "for-web-development-agencies",
+  "for-software-agencies",
+  "for-ai-automation-consultants",
   // retired page kept for its 301 (server/legacy-redirects.ts)
   "interior-design-software",
   // comparison pages (server/comparison-pages.ts)

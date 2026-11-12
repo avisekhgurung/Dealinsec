@@ -35,7 +35,8 @@ import type { Express } from "express";
 import { esc, SITE_ORIGIN, LOGO_SVG, gaSnippet, COOKIE_FOOTER_LINKS } from "./tools/layout";
 import { FONT_HEAD, FONT_STACK_SANS } from "./fonts";
 import { consentBanner } from "@shared/consent-script";
-import { PRICING, TAGLINE } from "@shared/product-facts";
+import { EXTRA_SEAT_PRICE_INR, PRICING, TAGLINE } from "@shared/product-facts";
+import { PRO_INCLUDED_SEATS } from "@shared/permissions";
 import { OUTBOUND_ALLOWANCE_DEFAULTS as OB, OUTBOUND_WINDOW_DAYS } from "@shared/outbound-plans";
 import { LEAGUE_LIMITS } from "@shared/ai-league";
 import { leagueAllowance, LEAGUE_WINDOW_DAYS } from "./ai-league/limits";
@@ -1197,12 +1198,411 @@ export const PAGES: CategoryPage[] = [
     ],
   },
 
+  /* ── /for-web-developers — solo web developers in India ───────────────── */
+  {
+    path: "/for-web-developers",
+    region: "IN",
+    updated: "2026-11-12",
+    metaTitle: "Find Web Development Clients with AI",
+    description:
+      "How freelance web developers in India find clients with DealInSec: AI research of businesses that are growing or visibly under-served online, dated evidence with sources, and outreach drafts you approve and send yourself.",
+    h1: "Find web development clients, with evidence instead of bidding",
+    sub: "Describe the businesses you build for — MERN, Next.js, WordPress or Shopify work, in India or abroad — and Client Radar researches companies against that profile: what they do, how they're moving and why now, each with its source. You approve every message and send it yourself.",
+    chips: ["For freelance web developers", "India and international clients", "Evidence with sources", "You send every message", "Free plan, no card"],
+    shortLabel: "For Web Developers",
+    sections: `
+<section><div class="wrap">
+  <h2>The web developer's client problem</h2>
+  <p class="sec-sub">You can build anything, and that is exactly the problem: “web developer” is a commodity on a marketplace. On Upwork you bid against the world's lowest price; on referrals you wait. Meanwhile the businesses that would happily pay for your work — growing companies whose web presence trails the business — never see you, because nobody is systematically looking for them.</p>
+  <div class="feat">
+    <div class="ft"><b>Marketplaces own the client</b><p>The platform holds the relationship, the reviews and the ranking. One algorithm change and next month is empty. Direct clients are the ones who come back and refer.</p></div>
+    <div class="ft"><b>Referrals aren't a pipeline</b><p>They are the best clients and the worst strategy: unpredictable in timing, price-anchored by whoever referred you, and gone the quarter you need them most.</p></div>
+    <div class="ft"><b>Prospecting by hand is a second job</b><p>Finding a growing business, reading its site, spotting why now, finding who to write to — 20 minutes per company, so it never happens consistently.</p></div>
+    <div class="ft"><b>Generic outreach burns the niche</b><p>“We provide best website development services” has trained every founder to delete. A message that names something true about their business is the only kind that works.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>What Client Radar does with a developer's profile</h2>
+  <p class="sec-sub">You describe who you build for once — say, <i>“D2C brands and clinics in India, 5–100 people, whose site or booking doesn't match the size of the business; I build Next.js and Shopify”</i> — and each search researches companies against it.</p>
+  <div class="feat">
+    <div class="ft"><b>It reads their actual website</b><p>Not a stale directory: each company's own site is checked against your profile — industry, size, location, what they sell — and the fit is scored with reasons.</p></div>
+    <div class="ft"><b>It finds the “why now”</b><p>Hiring posts, launches, new locations, an expanding catalogue — recent, dated signals shown with their sources, because “you opened a second branch last month” is what makes a message land.</p></div>
+    <div class="ft"><b>It names decision makers where public</b><p>Founders and directors named on the site or publicly listed are surfaced. Contact details aren't always available, and DealInSec never invents them — unknowns are shown as unknowns.</p></div>
+    <div class="ft"><b>Local mode for your city</b><p>For local work — clinics, gyms, CA firms — it can list businesses in any city from Google Maps and research the listed websites you pick. A listing without a website link says only that; DealInSec won't claim a business “has no website”. See <a href="/find-local-clients">finding local clients</a>.</p></div>
+  </div>
+  <div class="callout honest"><b>What it honestly can't do</b><p>No tool can guarantee you clients, replies or projects, and research is never unlimited: the free plan includes ${OB.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each), Pro ${OB.pro.monthlySearches} (up to ${OB.pro.maxCompanies} each). What it replaces is the hours of searching and reading — the judgement and the sending stay yours.</p></div>
+</div></section>
+<section><div class="wrap">
+  <h2>Outreach a developer can stand behind</h2>
+  <p class="sec-sub">Mika drafts the first message from the facts that were verified about each company — the hiring post, the launch, the gap you chose to raise — never from imagination. You edit it, approve the exact text and send it from your own email or WhatsApp. Nothing is ever sent automatically, and a do-not-contact list is checked first.</p>
+  <p class="sec-sub">A first message built this way reads like one professional writing to another: <i>“Congrats on the Baner branch — noticed bookings still run on calls. I build booking systems for clinics; worth a 2-minute example?”</i> The craft is in our guide to <a href="/blog/personalized-cold-email">personalised cold email</a>, and the research routine behind it in <a href="/blog/how-to-research-a-company-before-outreach">researching a company before outreach</a>.</p>
+</div></section>
+<section><div class="wrap">
+  <h2>From reply to project</h2>
+  <p class="sec-sub">Interested replies become leads with stages, next steps and follow-up dates, so “ask me next quarter” actually gets asked. Zee briefs you each day on which follow-ups are due, and when you win the work, the deal, quotation and agreement side is there for the paperwork. Start with the guide: <a href="/blog/how-to-find-web-development-clients">how to find web development clients</a>.</p>
+</div></section>`,
+    faq: [
+      {
+        q: "How does DealInSec help a web developer find clients?",
+        a: "You describe the businesses you build for, and Client Radar searches the web or lists local businesses in a city, reads each company's own website against your profile, and shows recent dated signals — hiring, launches, expansion — with their sources. You pick who is worth contacting, approve an AI-drafted first message based on those verified facts, and send it yourself.",
+      },
+      {
+        q: "Can it find businesses that need a new website?",
+        a: "It finds businesses that fit your profile and are visibly moving — growing, hiring, launching — which is when companies invest in their web presence. It won't claim a business 'needs a website': what a listing or site shows is presented as what was observed, inferences are labelled as inferences, and the conversation about what they need is yours to have.",
+      },
+      {
+        q: "Does it work for international clients too?",
+        a: "Yes. Searches can target the US, the UK, Canada, Australia, the UAE, India and other countries, whichever you choose. Many Indian developers use it for both: local businesses in their city and project clients abroad.",
+      },
+      {
+        q: "Does DealInSec send the outreach for me?",
+        a: "No, and that is deliberate. It drafts the message from verified facts; you edit, approve the exact text and send it from your own email or WhatsApp. A message from you converts better, and your sender reputation stays in your hands.",
+      },
+      {
+        q: "What does it cost for a freelance developer?",
+        a: `The free plan is permanent and needs no card: ${OB.free.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each), ${OB.free.monthlyDrafts} AI outreach drafts, the leads pipeline and the AI coworkers. Pro is ₹${PRICING.proMonthlyInr} a month in India with larger allowances, paid monthly with no auto-renewal.`,
+      },
+      {
+        q: "Is this a freelance marketplace or a contact database?",
+        a: "Neither. There are no job posts to bid on and no stored database of contacts being resold. Each search researches companies fresh against your profile, with sources shown, and contact details aren't always available — it is a research tool, not a directory.",
+      },
+    ],
+  },
+
+  /* ── /for-seo-freelancers — SEO specialists and consultants ────────────── */
+  {
+    path: "/for-seo-freelancers",
+    region: "IN",
+    updated: "2026-11-12",
+    metaTitle: "Find SEO Clients: AI Prospecting for SEO Freelancers",
+    description:
+      "How SEO freelancers and consultants in India find clients with DealInSec: AI research that spots businesses investing in growth, evidence with sources and dates, and personalised outreach you approve and send yourself.",
+    h1: "Find SEO clients who are already investing in growth",
+    sub: "The best SEO client isn't the site with the worst rankings — it's the business that is moving: launching, hiring, publishing, running ads. Client Radar finds and researches those businesses against your profile, with dated evidence, and you approve and send every message yourself.",
+    chips: ["For SEO freelancers and consultants", "Buying signals with dates", "India and international", "Drafts you approve", "Free plan, no card"],
+    shortLabel: "For SEO Freelancers",
+    sections: `
+<section><div class="wrap">
+  <h2>Why SEO prospecting is harder than SEO</h2>
+  <p class="sec-sub">You can rank a client's site, but ranking yourself for “SEO services” against funded agencies is a different war — and inbound alone decides who finds you, at what budget. The freelancers with full retainers run outbound too: they find businesses that are spending on growth and show them, specifically, what their search presence is leaving on the table.</p>
+  <div class="feat">
+    <div class="ft"><b>The wrong prospect wastes months</b><p>A business with no budget and no urgency “would love SEO” and never signs. The right prospect is already paying for growth somewhere — ads, content hires, new locations.</p></div>
+    <div class="ft"><b>Audits sent cold get deleted</b><p>An unsolicited 14-point teardown insults whoever built the site. One observed, dated fact plus one question starts conversations.</p></div>
+    <div class="ft"><b>Research by hand doesn't scale</b><p>Reading a company's site, checking what they publish, finding who decides — twenty minutes each is why most SEO freelancers prospect only in dry months.</p></div>
+    <div class="ft"><b>Retainers need a pipeline</b><p>SEO is sold on trust and timing. A pipeline of researched conversations, warmed over weeks, is what turns “maybe later” into a retainer when later arrives.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>Signals that say “this business will pay for SEO”</h2>
+  <p class="sec-sub">Describe your ideal client — say, <i>“D2C and services businesses in India, 10–200 people, already publishing or advertising, where search is an obvious growth channel”</i> — and Client Radar researches companies against it, surfacing the signals that matter to an SEO pitch:</p>
+  <div class="feat">
+    <div class="ft"><b>Growth investment</b><p>Hiring for marketing, content or sales roles; new product or location launches — dated, sourced, and the natural first line of your message.</p></div>
+    <div class="ft"><b>Content activity — or its absence</b><p>What the company's own site shows: an active blog, a dead one, thin service pages. Shown as what was observed on which page, so your pitch quotes reality.</p></div>
+    <div class="ft"><b>Fit against your niche</b><p>Industry, size and location are checked against your profile and scored with reasons, so a thin market is said plainly instead of padded with bad fits.</p></div>
+    <div class="ft"><b>The person to write to</b><p>Founders and marketing leads named publicly are surfaced with the source. Where no contact is public, it says so — guessed emails burn sender domains, so DealInSec never invents one.</p></div>
+  </div>
+  <div class="callout honest"><b>No ranking promises — theirs or ours</b><p>You already know not to guarantee rankings; we don't guarantee clients. What DealInSec replaces is the slow part: finding and reading companies. The free plan includes ${OB.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, Pro ${OB.pro.monthlySearches}, and research is never unlimited.</p></div>
+</div></section>
+<section><div class="wrap">
+  <h2>Outreach that reads like a consultant, not a cold blast</h2>
+  <p class="sec-sub">Mika drafts the first message from the verified facts on each company — <i>“you're hiring two content writers, but the blog hasn't published since March; usually that means distribution is the gap”</i> — framed as an observation and a question, never an accusation. You edit, approve the exact text and send from your own email or LinkedIn. Follow-ups are drafted when due; you send those too. Templates and structure: <a href="/blog/personalized-cold-email">the personalised cold email guide</a>.</p>
+</div></section>
+<section><div class="wrap">
+  <h2>A pipeline built for long SEO sales cycles</h2>
+  <p class="sec-sub">SEO deals close on the second or fifth touch, months after the first. Every conversation lives on a lead with a stage, recorded facts with sources, and a follow-up date; <a href="/ai-coworkers">Zee's briefing</a> tells you each day which follow-ups are due, so no warm prospect goes cold by accident. The wider method is in <a href="/blog/how-to-find-clients-as-a-freelancer-in-india">the client-finding system</a> and <a href="/blog/how-to-research-a-company-before-outreach">researching a company before outreach</a>.</p>
+</div></section>`,
+    faq: [
+      {
+        q: "How does DealInSec find SEO clients?",
+        a: "You describe your ideal client once, and each Client Radar search researches companies against that profile: it reads each company's own website, checks fit by industry, size and location, and surfaces dated growth signals — hiring, launches, content activity — with sources. You choose who to contact and send every message yourself.",
+      },
+      {
+        q: "Does it audit a prospect's SEO?",
+        a: "No — it is prospect research, not an SEO audit tool. It records what was observed on the company's own pages (an inactive blog, thin service pages, what they sell and to whom) with sources, which gives your outreach true, specific material. The audit you sell remains your craft.",
+      },
+      {
+        q: "Can I find clients outside India?",
+        a: "Yes. Searches target whichever countries you choose — the US, the UK, Canada, Australia, the UAE, India and others — so an Indian SEO consultant can prospect internationally and locally from the same workspace.",
+      },
+      {
+        q: "Will it send cold emails for me?",
+        a: "No. It drafts from verified facts; you approve the exact text and send it from your own email or LinkedIn. Nothing is sent automatically, follow-ups included, and a do-not-contact list is checked before any draft.",
+      },
+      {
+        q: "What does it cost?",
+        a: `The free plan is permanent: ${OB.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each), ${OB.free.monthlyDrafts} AI drafts, the pipeline and the AI coworkers, no card. Pro is ₹${PRICING.proMonthlyInr} a month in India with larger allowances and team seats, paid monthly with no auto-renewal.`,
+      },
+    ],
+  },
+
+  /* ── /for-digital-marketing-agencies — 2–10 person agencies ────────────── */
+  {
+    path: "/for-digital-marketing-agencies",
+    region: "IN",
+    updated: "2026-11-12",
+    metaTitle: "Client Acquisition for Digital Marketing Agencies",
+    description:
+      "How 2–10 person digital marketing agencies in India build a client pipeline with DealInSec: AI prospect research with evidence, founder-approved outreach, shared leads and follow-ups, and team seats on one plan.",
+    h1: "Give your agency the pipeline you'd build for a client",
+    sub: "Your agency sells systematic growth — and runs on referrals. DealInSec gives a 2–10 person marketing agency its own engine: AI research of businesses showing real buying signals, outreach the founder approves rather than writes, and one shared pipeline with owners and follow-up dates.",
+    chips: ["For agencies of 2–10 people", "Buying signals with sources", "Founder-approved outreach", "Shared pipeline and seats", "Free plan, no card"],
+    shortLabel: "For Marketing Agencies",
+    sections: `
+<section><div class="wrap">
+  <h2>The cobbler's children problem</h2>
+  <p class="sec-sub">Every small agency knows the irony: you build acquisition systems for clients while your own growth hangs on referrals and the founder's network. It works until a retainer churns in a quiet month. The fix isn't a sales hire you can't afford yet — it's running, for yourselves, the discipline you sell.</p>
+  <div class="feat">
+    <div class="ft"><b>Referral dependence</b><p>Referrals are wonderful and unownable. An agency that can't generate its own conversations can't choose its clients or defend its pricing.</p></div>
+    <div class="ft"><b>Founder-bottlenecked sales</b><p>The founder's voice closes deals, but the founder writing every message from scratch caps outbound at whatever a stolen Sunday allows.</p></div>
+    <div class="ft"><b>Leads scattered across DMs</b><p>Prospects live in WhatsApp, LinkedIn and three inboxes. “Ask me next quarter” is forgotten by next week — the pipeline leaks from memory, not rejection.</p></div>
+    <div class="ft"><b>Research nobody has time for</b><p>Knowing a prospect before writing — their business, their activity, why now — is the difference between agency-grade outreach and spam. At twenty minutes a company, it loses to client work every time.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>Prospecting that spots businesses already buying growth</h2>
+  <p class="sec-sub">Describe the clients your agency wants — industry, size, geography, the problem you solve — and Client Radar researches companies against that profile: it reads each company's own website, scores the fit with reasons, and surfaces dated buying signals with sources. For a marketing agency those signals are the pitch: hiring a first sales lead, launching a product, opening a city, visible marketing under-investment next to same-size competitors. Local-business agencies can start from <a href="/find-local-clients">Google Maps listings in any city</a>; agencies hunting nationally or abroad choose the countries per search.</p>
+  <div class="callout honest"><b>Research, not a contact database</b><p>Companies are researched fresh against your profile, with sources shown; inferences are labelled and unknowns stay unknowns. Contact details aren't always available, and nothing here guarantees replies or retainers — it makes the researched conversation affordable at agency volume. Free: ${OB.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days; Pro: ${OB.pro.monthlySearches} (up to ${OB.pro.maxCompanies} companies each).</p></div>
+</div></section>
+<section><div class="wrap">
+  <h2>The founder approves; the team and the AI do the legwork</h2>
+  <p class="sec-sub">In <a href="/ai-coworkers">The Nest</a>, Nibo researches companies against your profile and saves qualified ones to Leads with their evidence; Mika drafts first messages and follow-ups from verified facts only; Zee briefs the team each morning on which follow-ups are due and which drafts await approval. A person — usually the founder — edits and approves every message and sends it from the agency's own email, WhatsApp or LinkedIn. Outreach keeps the founder's voice without consuming the founder's week, and nothing is ever sent automatically.</p>
+</div></section>
+<section><div class="wrap">
+  <h2>One pipeline the whole team works</h2>
+  <p class="sec-sub">Every lead carries a stage, an owner, recorded facts with sources, and a follow-up date. Pro includes ${PRO_INCLUDED_SEATS} team members with roles, so the pipeline is shared rather than forwarded, and the weekly review takes fifteen minutes instead of an archaeology session. The playbook in long form: <a href="/blog/how-digital-marketing-agencies-get-clients">how small marketing agencies get clients</a>.</p>
+</div></section>`,
+    faq: [
+      {
+        q: "How does DealInSec help a marketing agency win clients?",
+        a: "It runs the acquisition system an agency would design for itself: AI research of companies matching your ideal-client profile with dated buying signals and sources, outreach drafted from those verified facts for the founder to approve and send, and a shared pipeline of leads with owners and follow-up dates. The agency sends every message itself.",
+      },
+      {
+        q: "What buying signals does it surface?",
+        a: "Recent, dated, sourced events from each company's own site and public pages: hiring (and for which roles), product and location launches, expansion, content activity or its absence. Signals are shown with where they were found; inferences are labelled as inferences.",
+      },
+      {
+        q: "Can my team use it together?",
+        a: `Yes. Pro includes ${PRO_INCLUDED_SEATS} team members with roles and an activity log, so research, drafting and follow-ups are shared work on one pipeline instead of forwarded screenshots. Extra seats are ₹${EXTRA_SEAT_PRICE_INR} each a month.`,
+      },
+      {
+        q: "Does it send campaigns automatically?",
+        a: "No. DealInSec never sends email, WhatsApp or social messages on its own. Mika drafts; a person approves the exact text and sends it from the agency's own accounts. That is a deliberate product rule, not a missing feature — agency reputation rides on every message.",
+      },
+      {
+        q: "Can we prospect for clients abroad as well as in India?",
+        a: "Yes. Each search targets whichever countries you choose — the US, the UK, Canada, Australia, the UAE, India and others — and local mode lists businesses in a specific city from Google Maps for local-client work.",
+      },
+      {
+        q: "What does it cost an agency?",
+        a: `Start free, no card: ${OB.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, ${OB.free.monthlyDrafts} AI drafts and the pipeline. Pro is ₹${PRICING.proMonthlyInr} a month in India — larger allowances, unlimited deals and ${PRO_INCLUDED_SEATS} seats — paid monthly with no auto-renewal, so a quiet month costs nothing further.`,
+      },
+    ],
+  },
+
+  /* ── /for-web-development-agencies — small dev shops ───────────────────── */
+  {
+    path: "/for-web-development-agencies",
+    region: "IN",
+    updated: "2026-11-12",
+    metaTitle: "Find Clients for Your Web Development Agency",
+    description:
+      "How small web development agencies in India keep a project pipeline full with DealInSec: AI research of growing businesses in India and abroad, decision-maker discovery, and personalised outreach your team approves and sends.",
+    h1: "Keep your dev agency's project pipeline full between referrals",
+    sub: "Project businesses die of gaps: the bench between one build ending and the next beginning. Client Radar researches growing businesses — in India and the markets you choose abroad — with dated evidence of why now, and your team approves and sends every message itself.",
+    chips: ["For web development agencies", "Project pipeline, not job boards", "India + international markets", "Decision makers where public", "Free plan, no card"],
+    shortLabel: "For Web Dev Agencies",
+    sections: `
+<section><div class="wrap">
+  <h2>The bench is the business killer</h2>
+  <p class="sec-sub">A small development agency's economics break not on rates but on gaps — the three weeks between projects when salaries run and revenue doesn't. Subcontracting fills benches at half-rates; job boards mean bidding against twenty agencies on price. The agencies that escape both keep a steady outbound rhythm, so the next project is in conversation before the current one ships.</p>
+  <div class="feat">
+    <div class="ft"><b>Project work needs constant refill</b><p>Retainers renew; projects end. A dev agency needs new conversations every single month, even when — especially when — delivery is busy.</p></div>
+    <div class="ft"><b>RFPs and boards are price wars</b><p>Where twenty agencies see the same brief, the cheapest competent bid wins. Outreach you originated has no competing bids attached.</p></div>
+    <div class="ft"><b>International work needs targeting</b><p>US and UK projects pay multiples of Indian rates, but “abroad” isn't a strategy — finding the right overseas businesses to write to is the hard part.</p></div>
+    <div class="ft"><b>Nobody owns prospecting</b><p>Between sprints, code reviews and client calls, “business development” is everyone's job and no one's — until the bench makes it an emergency.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>Research aimed at project-sized problems</h2>
+  <p class="sec-sub">Describe the clients you build for — <i>“funded startups and SMEs, 10–200 people, in India, the US or the UK, investing in product or expansion”</i> — and Client Radar reads each company's own website against that profile, scores the fit with reasons, and surfaces the dated signals that precede development budgets: new funding or products, hiring engineers or product roles, second locations, a site visibly behind the business. Each finding carries its source and date, decision makers are named where public, and thin markets are said plainly. Searches target whichever countries you choose per run — prospect Pune and Portland from the same workspace.</p>
+  <div class="callout honest"><b>Limits, stated upfront</b><p>Research is never unlimited (${OB.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days free, ${OB.pro.monthlySearches} on Pro, up to ${OB.pro.maxCompanies} companies each), contact details aren't always findable, and no tool can promise projects. It makes researched targeting affordable; winning the work stays your job.</p></div>
+</div></section>
+<section><div class="wrap">
+  <h2>Outreach with an engineer's respect for facts</h2>
+  <p class="sec-sub">Mika drafts first messages strictly from what was verified about each company — the funding note, the hiring page, what their site shows — with inferences framed as questions. Your team edits, approves the exact text and sends from your own email or LinkedIn; follow-ups are drafted when due and sent the same way. Nothing goes out automatically. The message structure that earns replies is in <a href="/blog/personalized-cold-email">the personalised cold email guide</a>; the overseas specifics in <a href="/blog/find-international-clients-from-india">finding international clients from India</a>.</p>
+</div></section>
+<section><div class="wrap">
+  <h2>A pipeline that survives delivery crunches</h2>
+  <p class="sec-sub">Leads carry stages, owners, recorded evidence and follow-up dates; <a href="/ai-coworkers">Zee's daily briefing</a> resurfaces what delivery weeks buried, and Nibo can keep researching on a schedule so the top of the funnel never empties. Pro includes ${PRO_INCLUDED_SEATS} seats, so prospecting is a team rhythm rather than a founder's midnight task. When a project is won, the deal and its paperwork follow on the same record. Longer read: <a href="/blog/how-to-find-web-development-clients">how to find web development clients</a>.</p>
+</div></section>`,
+    faq: [
+      {
+        q: "How does DealInSec keep a dev agency's pipeline full?",
+        a: "By making researched outbound a weekly rhythm instead of a bench-time emergency: Client Radar researches businesses matching your profile with dated evidence, Nibo can run those searches on a schedule, Mika drafts outreach from the verified facts, and your team approves and sends every message. Leads, owners and follow-up dates live on one shared pipeline.",
+      },
+      {
+        q: "Can we target US, UK or Gulf clients?",
+        a: "Yes — each search targets the countries you choose: the US, the UK, Canada, Australia, the UAE, India and others. Many Indian dev agencies run both motions from one workspace: local and national clients plus one overseas market.",
+      },
+      {
+        q: "Does it find decision makers' contact details?",
+        a: "It surfaces founders and relevant leads where they are publicly named, with the source shown. Public contact details aren't always available, and DealInSec never invents or sells them — where nothing is public, it says so, and a contact form or company inbox is the honest route.",
+      },
+      {
+        q: "Is this like bidding on job boards?",
+        a: "No — there are no briefs to bid on. It is the opposite motion: you originate conversations with businesses showing real investment signals, before a brief exists, so there is no twenty-agency price war attached.",
+      },
+      {
+        q: "Does anything get sent automatically?",
+        a: "No. Every message — first touch and follow-ups — is approved as exact text by a person on your team and sent from your own accounts. A do-not-contact list is checked before drafting.",
+      },
+      {
+        q: "What does it cost?",
+        a: `Free to start, no card: ${OB.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days with the pipeline and AI coworkers. Pro is ₹${PRICING.proMonthlyInr} a month in India: ${OB.pro.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, ${OB.pro.monthlyDrafts} drafts, unlimited deals and ${PRO_INCLUDED_SEATS} team seats, paid monthly with no auto-renewal.`,
+      },
+    ],
+  },
+
+  /* ── /for-software-agencies — SaaS / mobile / custom dev shops ─────────── */
+  {
+    path: "/for-software-agencies",
+    region: "IN",
+    updated: "2026-11-12",
+    metaTitle: "Find Clients for Your Software Development Agency",
+    description:
+      "How small software agencies in India — SaaS, mobile and custom development teams — find qualified business clients with DealInSec: AI company research, buying signals with sources, and outreach your team approves and sends.",
+    h1: "Find software clients by evidence, not by bidding portals",
+    sub: "Custom software is bought on trust, by named people, over weeks — exactly the sale that researched, personal outreach wins. Client Radar researches companies against your profile across the countries you choose, shows the evidence, and your team approves and sends every message.",
+    chips: ["For software development agencies", "SaaS, mobile and custom builds", "Longer B2B sales cycles", "Evidence with sources", "Free plan, no card"],
+    shortLabel: "For Software Agencies",
+    sections: `
+<section><div class="wrap">
+  <h2>Selling software projects is a trust sale</h2>
+  <p class="sec-sub">Nobody signs a custom development engagement from a cold catalogue. The buyer is a founder or operations head with a process that hurts; the sale happens over weeks of credible conversation. That is bad news for bulk blasts and bidding portals — and exactly the terrain where a small agency with researched, specific outreach beats bigger names.</p>
+  <div class="feat">
+    <div class="ft"><b>The buyer is a person, not a company</b><p>A 120-person logistics firm doesn't buy software; its operations director does. Knowing who, and what their month looks like, is half the sale.</p></div>
+    <div class="ft"><b>Pain is visible before the RFP</b><p>Hiring a fourth support executive, scaling a manual process, launching a second product — the signals that precede a build are public and dated, if someone is looking.</p></div>
+    <div class="ft"><b>Portals commoditise you</b><p>On a bidding portal your senior team competes with a price list. In an originated conversation you're the specialist who noticed something true.</p></div>
+    <div class="ft"><b>Long cycles leak</b><p>A warm prospect in week two goes cold by week nine because nobody owned the follow-up. Software sales die of silence more than of rejection.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>Company research built for a software pitch</h2>
+  <p class="sec-sub">Describe your ideal client — <i>“SMEs and startups, 20–500 people, in India or the US, running operations-heavy businesses: logistics, healthcare, education, D2C”</i> — and Client Radar reads each company's own website against it: what they do, how big they are, what they're hiring for, what changed recently. Each finding is dated and carries its source; what the AI infers (“a growing support team may mean repetitive tickets worth automating”) is labelled as inference, never dressed as fact. Decision makers publicly named are surfaced with the page they came from. Searches run across whichever countries you choose, so a Bengaluru team can prospect Mumbai and Boston in the same week.</p>
+  <div class="callout honest"><b>What stays yours</b><p>Scoping, estimating and closing stay your craft; DealInSec doesn't promise projects, replies or contacts for every company. The free plan includes ${OB.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each); Pro ${OB.pro.monthlySearches} (up to ${OB.pro.maxCompanies}). Research is never unlimited.</p></div>
+</div></section>
+<section><div class="wrap">
+  <h2>First messages a technical founder would send</h2>
+  <p class="sec-sub">Mika drafts from the verified facts on each company — the hiring post, the launch, the process their own pages describe — in the shape that works for considered sales: one observation, one plausible connection framed as a question, one line of proof, a small ask. Your team edits and approves the exact text and sends it from your own email or LinkedIn. Nothing sends automatically, and follow-ups — where most software deals are actually won — are drafted when due for the same approval. See <a href="/blog/how-to-research-a-company-before-outreach">researching a company before outreach</a> and <a href="/blog/personalized-cold-email">the personalised cold email structure</a>.</p>
+</div></section>
+<section><div class="wrap">
+  <h2>Weeks-long deals, tracked like engineering work</h2>
+  <p class="sec-sub">Every prospect is a lead with a stage, an owner, the recorded evidence and a follow-up date — so the week-nine silence never happens by accident. <a href="/ai-coworkers">Zee briefs the team daily</a> on due follow-ups and waiting drafts; Nibo keeps scheduled research filling the funnel during delivery crunches; and Pro's ${PRO_INCLUDED_SEATS} seats make it the team's pipeline, not a founder's spreadsheet. For overseas motion specifics: <a href="/blog/find-international-clients-from-india">finding international clients from India</a>.</p>
+</div></section>`,
+    faq: [
+      {
+        q: "How does DealInSec help a software agency find clients?",
+        a: "It researches companies against your ideal-client profile — reading each company's own website, scoring fit, surfacing dated signals like hiring, launches and scaling operations, with sources — and drafts personalised first messages from those verified facts. Your team approves and sends everything itself, and tracks the long sales cycle on a shared pipeline.",
+      },
+      {
+        q: "We sell big-ticket custom builds. Does cold outreach even work for that?",
+        a: "Bulk blasts don't; researched, specific, person-to-person notes do — big engagements still begin with one credible conversation. DealInSec's role is making each conversation researched (evidence with dates and sources) and making the weeks of follow-up systematic, which is where considered sales are usually lost.",
+      },
+      {
+        q: "Can it find CTOs or operations heads to write to?",
+        a: "It surfaces decision makers where they are publicly named — on the company's site or public pages — with the source shown. It doesn't buy, scrape or invent personal contact data; where no contact is public, it says so and the company's own channels are the route.",
+      },
+      {
+        q: "Does it work for international prospecting?",
+        a: "Yes. Each search targets the countries you choose — the US, the UK, Canada, Australia, the UAE, India and others — which suits agencies running an India-plus-one-overseas-market motion.",
+      },
+      {
+        q: "Will it ever send something without us?",
+        a: "No. Drafts become messages only after a person approves the exact text, and sending happens from your own email, WhatsApp or LinkedIn. The do-not-contact list is checked before drafting. This is a product rule — your agency's name is on every message.",
+      },
+      {
+        q: "What does it cost?",
+        a: `The free plan is permanent and needs no card: ${OB.free.monthlySearches} Client Radar searches every ${OUTBOUND_WINDOW_DAYS} days, ${OB.free.monthlyDrafts} AI drafts, pipeline and coworkers. Pro is ₹${PRICING.proMonthlyInr} a month in India with ${OB.pro.monthlySearches} searches, ${OB.pro.monthlyDrafts} drafts, unlimited deals and ${PRO_INCLUDED_SEATS} seats — paid monthly, no auto-renewal.`,
+      },
+    ],
+  },
+
+  /* ── /for-ai-automation-consultants — AI/automation specialists ────────── */
+  {
+    path: "/for-ai-automation-consultants",
+    region: "IN",
+    updated: "2026-11-12",
+    metaTitle: "Find Clients for AI Automation Services",
+    description:
+      "How AI automation consultants and agencies in India find clients with DealInSec: research that spots manual, repetitive processes in growing businesses, labelled inferences with sources, and outreach you approve and send.",
+    h1: "Find businesses whose manual work is your next project",
+    sub: "You sell time back — but the businesses drowning in manual processes aren't searching for “AI automation consultant”. Client Radar finds growing companies and reads their own pages for the signals of repetitive work, labels every inference honestly, and you approve and send each message yourself.",
+    chips: ["For AI automation consultants", "Process-pain signals", "Inference labelled as inference", "You send every message", "Free plan, no card"],
+    shortLabel: "For AI Automation",
+    sections: `
+<section><div class="wrap">
+  <h2>Your market doesn't know your category exists</h2>
+  <p class="sec-sub">The clinic re-typing bookings into three systems, the exporter answering the same forty WhatsApp questions, the D2C brand with a support team growing faster than sales — they experience pain, not “a need for AI automation”. They won't find you by searching. You find them by spotting, from the outside, the shape of repetitive work — and starting an honest conversation about it.</p>
+  <div class="feat">
+    <div class="ft"><b>Demand is latent</b><p>Nobody budgets for a category they can't name. The sale starts with showing a specific business its own specific time-sink — which takes research, not ads.</p></div>
+    <div class="ft"><b>Hype has salted the field</b><p>Founders get ten “AI will transform your business” blasts a week. Credibility now belongs to the message that names one concrete process and asks one modest question.</p></div>
+    <div class="ft"><b>Guessing wrong is fatal</b><p>Tell a company it “clearly struggles with manual invoicing” when it doesn't, and you're spam. Automation outreach must keep observed facts and inferences rigorously apart.</p></div>
+    <div class="ft"><b>Every niche is yours — so none is</b><p>Automation sells everywhere, which makes targeting everything tempting and fatal. A profile — industry, size, process — is what turns searches into conversations.</p></div>
+  </div>
+</div></section>
+<section><div class="wrap">
+  <h2>Research that respects the line between fact and inference</h2>
+  <p class="sec-sub">Describe who you automate for — <i>“operations-heavy SMEs in India, 10–200 people: clinics, logistics, coaching institutes, D2C brands”</i> — and Client Radar reads each company's own site against it. The facts come dated and sourced: hiring three support executives, opening a second branch, a catalogue that doubled. The automation-shaped reading — “a growing support team may be handling repetitive status questions” — is shown as a <b>labelled inference</b>, kept apart from evidence, because that distinction is exactly what keeps your outreach credible in a hype-soaked inbox.</p>
+  <div class="callout honest"><b>Built-in honesty, because your pitch needs it</b><p>Sources on every finding, unknowns shown as unknowns, no invented contacts, and no promise of clients or replies. Free: ${OB.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days (up to ${OB.free.maxCompanies} companies each); Pro: ${OB.pro.monthlySearches} (up to ${OB.pro.maxCompanies}). Research is never unlimited.</p></div>
+</div></section>
+<section><div class="wrap">
+  <h2>Outreach that sounds like a consultant, not a gold rush</h2>
+  <p class="sec-sub">Mika drafts from the verified facts and frames the automation angle as a question: <i>“Saw you're hiring a third support executive for the Pune warehouse — congrats. Teams at that stage often spend hours on repeated status queries; is that true for you? I automate exactly that for logistics firms.”</i> You edit, approve the exact text and send from your own email or WhatsApp; follow-ups draft when due for the same approval. Nothing sends itself. Structure and examples: <a href="/blog/personalized-cold-email">the personalised cold email guide</a>.</p>
+</div></section>
+<section><div class="wrap">
+  <h2>From first reply to scoped pilot</h2>
+  <p class="sec-sub">Automation deals move through discovery calls and small pilots — weeks where follow-up discipline is the whole game. Leads hold the evidence, the stage and the next date; <a href="/ai-coworkers">Zee's briefing</a> surfaces what's due; Nibo keeps scheduled research running while you deliver. And you'll recognise the product's own ethic — an AI that does the legwork while a person approves everything that matters is precisely what you sell. Wider system: <a href="/blog/how-to-find-clients-as-a-freelancer-in-india">the client-finding system</a>.</p>
+</div></section>`,
+    faq: [
+      {
+        q: "How does DealInSec find clients for an AI automation consultant?",
+        a: "You describe the businesses and processes you automate, and Client Radar researches companies against that profile: dated, sourced facts from each company's own pages (hiring, growth, expanding operations) plus clearly labelled inferences about where repetitive work may live. You decide who is worth contacting, approve a draft grounded in those facts, and send it yourself.",
+      },
+      {
+        q: "Won't my outreach drown in the AI hype flood?",
+        a: "Generic AI pitches do drown. What survives is specificity: a message naming one true, dated fact about the business and asking one modest question about one concrete process. That is the shape DealInSec's research and drafting push you toward — and why inferences are labelled, so you never assert what you haven't verified.",
+      },
+      {
+        q: "Does it identify which processes a company should automate?",
+        a: "It surfaces signals — roles being hired, how the business describes its own operations — and offers possible readings, always labelled as inference. The actual process discovery is your discovery call; presenting a guess as a diagnosis would be dishonest, and the product refuses to do it.",
+      },
+      {
+        q: "Can I prospect internationally?",
+        a: "Yes. Searches target whichever countries you choose — the US, the UK, Canada, Australia, the UAE, India and others — and local mode lists businesses in a specific city for local automation work.",
+      },
+      {
+        q: "Does DealInSec send messages or run campaigns on its own?",
+        a: "Never. Every message — first touch and follow-up — is approved as exact text by you and sent from your own email, WhatsApp or LinkedIn, with a do-not-contact list checked first.",
+      },
+      {
+        q: "What does it cost?",
+        a: `Free forever to start, no card: ${OB.free.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, ${OB.free.monthlyDrafts} AI drafts, pipeline and AI coworkers. Pro is ₹${PRICING.proMonthlyInr} a month in India with larger allowances and ${PRO_INCLUDED_SEATS} team seats, paid monthly with no auto-renewal.`,
+      },
+    ],
+  },
+
 ];
 
 /* ── Rendering ─────────────────────────────────────────────────────────── */
 
 const THREAD_HIGHLIGHT: Record<string, ThreadStep> = {
   "/find-local-clients": "find",
+  "/for-web-developers": "find",
+  "/for-seo-freelancers": "find",
+  "/for-digital-marketing-agencies": "find",
+  "/for-web-development-agencies": "find",
+  "/for-software-agencies": "find",
+  "/for-ai-automation-consultants": "find",
   "/crm-for-freelancers": "lead",
   "/quotation-software": "quote",
   "/contract-management": "contract",

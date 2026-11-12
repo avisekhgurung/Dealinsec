@@ -699,7 +699,7 @@ describe("homepage crawler fallback: small agencies first, freelancers and creat
     expect(body).toContain("<h1>Your AI team finds clients for you.</h1>");
     expect(body.match(/<h1[\s>]/g)?.length).toBe(1);
     expect(body).toContain("AI researches and drafts; you approve every message and send it yourself, and nothing is sent automatically.");
-    for (const step of ["Research a potential client", "Save the prospect and manage the lead", "Create a deal and send a quotation", "Create an agreement and collect a signature", "Generate an invoice and track payment"]) expect(body, step).toContain(step);
+    for (const step of ["Describe who you want; AI researches", "Approve the first message and send it", "Track replies, next steps and follow-ups", "When you win the work, the paperwork follows"]) expect(body, step).toContain(step);
     for (const kind of ["Freelance web developers", "Designers and creatives", "Digital marketers and SEO consultants", "Independent consultants", "web development and software services, digital marketing, SEO and growth, AI automation"]) expect(body, kind).toContain(kind);
     // An inference is never presented as a verified need, and no outcome is promised.
     expect(body).toMatch(/Inferences are labelled as possible opportunities, not facts/);
@@ -727,7 +727,7 @@ describe("homepage crawler fallback: small agencies first, freelancers and creat
   });
 
   it("is honest about outreach, payments, signatures and US checkout", () => {
-    expect(body).toMatch(/doesn't send email for you and never contacts anyone on its own/);
+    expect(body).toMatch(/doesn't send (email|messages) for you and never contacts anyone on its own/);
     expect(body).toMatch(/does not process them/);
     expect(body).toMatch(/isn't a certified digital signature/);
     expect(body).toMatch(/paid plans can't be bought from the US yet/);

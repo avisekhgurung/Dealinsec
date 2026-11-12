@@ -67,6 +67,18 @@ export const AUDIENCE_DESCRIPTIONS: Record<string, string> = {
     "how a client deal runs from request to payment for freelancers and independent professionals: scope, quotation, agreement, invoice and payment tracking, with a Protection Check of the terms",
   "/for-creators":
     "how a brand deal runs from offer to payment for creators, UGC creators and influencers: deliverables, usage rights, exclusivity, quotation, agreement, invoice and payment tracking, with a Protection Check of the terms",
+  "/for-web-developers":
+    "how freelance web developers find clients: AI research of businesses that fit a written client profile, dated signals with sources, local businesses in a city from Google Maps, and outreach drafts the developer approves and sends from their own email",
+  "/for-seo-freelancers":
+    "how SEO freelancers and consultants find clients that are already investing in growth: buying signals such as hiring and launches with sources and dates, content activity observed on the company's own pages, and outreach the consultant approves and sends",
+  "/for-digital-marketing-agencies":
+    "how a 2–10 person digital marketing agency builds its own client pipeline: researched prospects with dated buying signals, founder-approved outreach drafted from verified facts, and a shared leads pipeline with team seats",
+  "/for-web-development-agencies":
+    "how a small web development agency keeps its project pipeline full: AI research of growing businesses in India and chosen countries abroad, decision makers where publicly named, and outreach the team approves and sends itself",
+  "/for-software-agencies":
+    "how a small software development agency finds clients for SaaS, mobile and custom builds: company research with sourced, dated signals, labelled inferences, long-cycle follow-up tracking and team seats",
+  "/for-ai-automation-consultants":
+    "how AI automation consultants find clients: research that spots growing companies with signals of manual, repetitive work, with inferences labelled apart from facts, and outreach the consultant approves and sends",
 };
 
 export function llmsTxt(origin: string): string {

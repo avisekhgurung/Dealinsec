@@ -22,7 +22,7 @@ import type { Express } from "express";
 import { esc, SITE_ORIGIN, LOGO_SVG, gaSnippet, COOKIE_FOOTER_LINKS } from "./tools/layout";
 import { FONT_HEAD, FONT_STACK_SANS } from "./fonts";
 import { consentBanner } from "@shared/consent-script";
-import { TAGLINE } from "@shared/product-facts";
+import { PRICING, TAGLINE } from "@shared/product-facts";
 
 // ?ref=, not utm_*: an internal UTM would overwrite the organic session source in GA4.
 const SIGNUP = "/auth?mode=signup&ref=blog";
@@ -40,7 +40,7 @@ interface HeroImage {
   h: number;
 }
 
-export type Cluster = "getting-paid" | "client-workflow" | "protection" | "business";
+export type Cluster = "finding-clients" | "getting-paid" | "client-workflow" | "protection" | "business";
 
 export interface BlogPost {
   slug: string;
@@ -1809,6 +1809,421 @@ ${ctaInline("Run the deal, not just the document", "Quotation, e-signed agreemen
 </ul>`,
   },
 
+  /* ══ Finding-clients cluster — written for India ═════════════════════════ */
+  {
+    slug: "how-to-find-clients-as-a-freelancer-in-india",
+    cluster: "finding-clients",
+    region: "IN",
+    related: ["find-international-clients-from-india", "how-to-research-a-company-before-outreach", "personalized-cold-email"],
+    title: "How to Find Clients as a Freelancer in India: A System, Not Luck",
+    metaTitle: "How to Find Clients as a Freelancer in India",
+    description:
+      "A practical client-finding system for Indian freelancers: define who you serve, build a weekly prospecting habit, research companies before you write, and send outreach worth replying to.",
+    date: "2026-11-12",
+    readMins: 8,
+    excerpt:
+      "Referrals dry up and marketplaces race to the bottom. Here is a repeatable weekly system for finding clients: a sharp client profile, researched prospects and outreach you'd reply to yourself.",
+    hero: { src: "/blog/make-quotation-online-desk.webp", alt: "A freelancer working through a client list at a desk with a laptop", w: 1600, h: 1067 },
+    faq: [
+      {
+        q: "What is the best way for a freelancer in India to find clients?",
+        a: "There is no single channel that works for everyone. What works is a system: a written ideal-client profile, a weekly block of time spent finding and researching companies that fit it, and short, personalised outreach that names something true about each company. Referrals, marketplaces and content can all feed that system, but none of them replaces it.",
+      },
+      {
+        q: "Are freelance marketplaces like Upwork and Fiverr worth it in India?",
+        a: "They can bring early work, but you compete on price with the whole world, the platform owns the client relationship, and a profile change or algorithm shift can empty your pipeline overnight. Treat marketplaces as one channel, never the only one, and build direct client relationships alongside them.",
+      },
+      {
+        q: "How many outreach messages should I send a week?",
+        a: "Fewer, better-researched messages beat volume. Ten messages that each name something specific and true about the company will usually do more than a hundred copies of the same template — and they protect your name and your email domain. Consistency matters more than quantity: a fixed weekly block you never skip.",
+      },
+      {
+        q: "Can AI find clients for me automatically?",
+        a: "AI can do the slow parts — searching, reading company websites, spotting recent signals and drafting a first message — but no honest tool can guarantee you clients, and the sending and the relationship stay yours. DealInSec, for example, researches companies against your profile with sources shown, and you approve and send every message yourself.",
+      },
+    ],
+    body: `<p class="lead">Every freelancer in India knows the cycle. A referral lands, the next two months are full, and prospecting stops — then the project ends, the pipeline is empty, and the scramble starts again. The problem is not your skill or your portfolio. It is that finding clients was never made a system.</p>
+
+<div class="answer"><p><b>Quick answer:</b> Write down exactly who you serve and what you fix for them. Block two hours a week, every week, to find and research companies that fit that profile. Before you write to anyone, learn one true, recent thing about their business. Send short, specific messages from your own email, and track every lead and follow-up in one place so nothing goes quiet by accident.</p></div>
+
+<h2>Step 1: Decide who you serve — in writing</h2>
+<p>"I build websites" or "I do digital marketing" is a skill, not a market. A client profile is: <i>"D2C brands in India doing their first serious e-commerce push"</i> or <i>"clinics and diagnostics labs in Tier-2 cities whose booking still runs on phone calls"</i>. Write down the industry, the size, the geography and the problem you fix. Everything downstream — where you look, what you say, what you charge — gets easier when this is specific.</p>
+<p>A useful test: could someone else read your profile and point at a company you'd want? If not, it is still too vague.</p>
+
+<h2>Step 2: Make prospecting a weekly habit, not an emergency</h2>
+<p>The feast-and-famine cycle comes from prospecting only when you're hungry. The fix is boring: a recurring block — say Tuesday morning, two hours — in which you only find, research and contact potential clients. Not portfolio polishing, not course-watching. The block runs even when you're busy, because the clients you contact this month are the invoices of the month after next.</p>
+
+<h2>Step 3: Research before you write — every single time</h2>
+<p>The difference between outreach that gets replies and outreach that gets ignored is almost always research. Before you contact a company, know: what they sell, who they sell to, and one <b>recent, dated</b> reason your message makes sense now — a new product, hiring for a role near your service, a site that doesn't match the size of the business, a review pattern, an expansion announcement.</p>
+<p>Doing this by hand takes 15–30 minutes per company, which is exactly why most freelancers skip it — and why outreach gets a bad name. This is the part AI genuinely helps with: <a href="/">DealInSec's Client Radar</a> takes your client profile, searches the web or lists local businesses in a city, reads each company's own website and shows dated signals with their sources, so you spend your time on the companies worth writing to. It labels guesses as guesses, and it doesn't promise that every company has findable contact details — no honest tool can. The full method is in <a href="/blog/how-to-research-a-company-before-outreach">how to research a company before outreach</a>.</p>
+
+<h2>Step 4: Send messages you would reply to yourself</h2>
+<p>A good first message is short, names the true thing you found, connects it to a problem you solve, and asks a small question. It does not open with your life story, attach a 12-page portfolio or ask for a call in the first line. Write it, read it as if you were the founder receiving it, then send it from your own email or WhatsApp — a message from you beats a message from a tool. The craft is covered in <a href="/blog/personalized-cold-email">how to write a personalised cold email</a>.</p>
+
+<h2>Step 5: Track leads like invoices, not like memories</h2>
+<p>Most freelance pipelines die of forgetfulness, not rejection. A prospect says "ask me next month" and nobody asks. Keep every lead in one place with a stage, a next step and a follow-up date — a notebook works at five leads; a <a href="/crm-for-freelancers">simple CRM</a> works at fifty. The rule that matters: no lead without a written next step.</p>
+
+<h2>Where the usual channels fit</h2>
+<ul>
+<li><b>Referrals</b> are the best clients and the worst strategy — accept them gratefully, never depend on them.</li>
+<li><b>Marketplaces</b> (Upwork, Fiverr, Freelancer) can bring early work, but you rent the client relationship and compete on price. One channel among several, never the foundation. More in <a href="/blog/how-to-find-web-development-clients">finding web development clients</a>.</li>
+<li><b>Content and LinkedIn</b> compound slowly and are worth doing — but "post and pray" is not a pipeline. Content warms up the people your outreach reaches.</li>
+<li><b>Direct outreach</b> is the only channel you fully control: who you contact, when, and at what price point. That is why it is worth doing well.</li>
+</ul>
+
+<h2>Going beyond India</h2>
+<p>Nothing in this system is India-only: the same profile-research-outreach loop works for US, UK, Australian or Gulf clients, with billing in their currency. The specifics — time zones, pricing, payment rails and proof — are in <a href="/blog/find-international-clients-from-india">how to find international clients from India</a>.</p>
+
+__CTA__
+
+<p>None of this guarantees a client — nothing honest does. What a system guarantees is that your pipeline stops depending on luck: every week, a few more right-fit companies know you exist, for reasons specific to them.</p>`.replace(
+      "__CTA__",
+      ctaInline(
+        "Let an AI team do the slow parts",
+        `Describe your ideal client once; Client Radar researches companies with sources shown, and you approve and send every message yourself. Free plan, no card; Pro ₹${PRICING.proMonthlyInr}/month.`,
+        SIGNUP,
+        "Start free →",
+      ),
+    ),
+  },
+
+  {
+    slug: "find-international-clients-from-india",
+    cluster: "finding-clients",
+    region: "IN",
+    related: ["how-to-find-clients-as-a-freelancer-in-india", "personalized-cold-email", "how-to-research-a-company-before-outreach"],
+    title: "How to Find International Clients From India (Without a Marketplace)",
+    metaTitle: "Find International Clients From India: A Guide",
+    description:
+      "How Indian freelancers and agencies find US, UK, Australian and Gulf clients directly: positioning, researched outreach, time zones, pricing in foreign currency and the proof that closes deals.",
+    date: "2026-11-12",
+    readMins: 7,
+    excerpt:
+      "International clients pay better and plan longer — and you don't need a marketplace to reach them. Positioning, researched outreach, time zones, pricing and proof, step by step.",
+    hero: { src: "/blog/deal-management-handshake.webp", alt: "Two people agreeing on deal terms with a handshake", w: 1600, h: 1068 },
+    faq: [
+      {
+        q: "Can an Indian freelancer work with US or UK clients directly?",
+        a: "Yes. Indian freelancers and agencies routinely bill overseas clients directly; payments commonly arrive through wire transfer or services built for international payouts, and your invoice is raised in the client's currency. Ask a CA about the export-of-services paperwork (such as FIRC/FIRA records and GST treatment) that applies to your situation.",
+      },
+      {
+        q: "How do I find international clients without Upwork?",
+        a: "The same way you find Indian ones, aimed abroad: define which overseas businesses you serve, research specific companies until you know one recent true thing about each, and write short, personalised messages. Communities, content and referrals help; researched direct outreach is the channel you control.",
+      },
+      {
+        q: "What should Indian freelancers charge international clients?",
+        a: "Price against the client's local alternatives, not against Indian rates. A US agency quoting the same work at several times your price is your real comparison. Quote in the client's currency, state payment terms in writing, and take an advance — distance makes written terms more important, not less.",
+      },
+      {
+        q: "Do international clients trust Indian freelancers?",
+        a: "The hesitation is rarely about nationality and mostly about risk: will communication be clear, will deadlines hold, is the work real? You answer it with specifics — a relevant portfolio, a researched first message that shows you understood their business, clear written terms, and responsiveness in their working hours overlap.",
+      },
+    ],
+    body: `<p class="lead">The maths is simple: a client in Austin or Manchester often pays three to five times what the same work earns in India. The reach is simple too — your email arrives in Texas as fast as in Thane. What's usually missing is not talent; it is a deliberate way of being found, or finding them, that doesn't route through a marketplace taking twenty per cent.</p>
+
+<div class="answer"><p><b>Quick answer:</b> Pick one overseas market and one kind of business you serve. Research specific companies there until you can name a recent, true reason to write. Send short, personalised messages in their business hours, with proof of relevant work. Quote in their currency with written terms and an advance, and keep the export-of-services paperwork your CA tells you to keep.</p></div>
+
+<h2>Pick a market, not "abroad"</h2>
+<p>"International clients" is not a target. <i>"Independent e-commerce brands in the UK"</i> or <i>"US real-estate agencies with outdated listing sites"</i> is. One market means one time zone to learn, one business culture to read, one set of portfolio pieces to lead with. You can add a second market after the first one works.</p>
+
+<h2>Research works the same across an ocean</h2>
+<p>An international prospect gets more cold email than an Indian one, so researched specificity matters more, not less. The one-true-recent-thing rule holds: a hiring post, a product launch, a site that undersells the business. Doing this across time zones and unfamiliar markets is where tools earn their keep — <a href="/">Client Radar</a> searches whichever countries you choose (the US, the UK, Canada, Australia, the UAE and others), reads each company's website against your profile and shows dated signals with sources. You still decide who is worth your time, and contact details aren't always findable — plan for a mixed bag of email, LinkedIn and contact forms. The craft of the message itself is in <a href="/blog/personalized-cold-email">how to write a personalised cold email</a>.</p>
+
+<h2>Respect the clock and the inbox</h2>
+<ul>
+<li><b>Send in their morning,</b> not yours. A message landing at 3 a.m. local time is page two of the inbox by breakfast.</li>
+<li><b>Name your overlap.</b> "I'm available until 7 p.m. IST, which is your 9:30 a.m.–1:30 p.m. ET" answers the unasked question about collaboration.</li>
+<li><b>Write plainly.</b> Short sentences, no jargon, no over-formality. "Respected Sir" reads as spam in the US; a clear, direct note reads as competence.</li>
+</ul>
+
+<h2>Price against their alternatives, not your costs</h2>
+<p>The client's comparison is their local agency quote, not your rent. Undercutting local rates by 30–50% while staying far above Indian rates is common positioning: cheap enough to be attractive, expensive enough to be taken seriously. Quote in their currency, put scope and payment terms in writing, and take an advance before starting — a <a href="/tools/service-agreement-template">simple service agreement</a> and a clear <a href="/blog/freelance-payment-terms">payment-terms structure</a> matter more when your client is nine time zones away. On the Indian side, ask a CA about export-of-services treatment, foreign-inward-remittance records and GST — it is routine paperwork, but it is yours to keep.</p>
+
+<h2>Proof beats promises</h2>
+<p>An overseas client who has never met you buys evidence: two or three portfolio pieces aimed at their industry, a specific first message that shows you read their site, and terms that look professional. One strong case study in their market is worth ten generic ones. If you don't have one yet, your first international project can be priced to win it — deliberately, once.</p>
+
+<h2>Keep the pipeline in one place</h2>
+<p>International sales cycles run longer: a reply this week, a call next month, a project next quarter. That only works if every lead has a stage, a next step and a follow-up date you'll actually see — the discipline from <a href="/blog/how-to-find-clients-as-a-freelancer-in-india">the client-finding system</a>, applied with more patience. DealInSec keeps leads, follow-ups and the facts you learned about each company on one record, and drafts follow-ups you approve and send yourself.</p>
+
+__CTA__`.replace(
+      "__CTA__",
+      ctaInline(
+        "Research overseas prospects with evidence",
+        "Choose the country, describe the client; Client Radar reads each company's site and shows dated signals with sources. You approve and send everything yourself.",
+        SIGNUP,
+        "Start free →",
+      ),
+    ),
+  },
+
+  {
+    slug: "how-to-find-web-development-clients",
+    cluster: "finding-clients",
+    region: "IN",
+    related: ["how-to-find-clients-as-a-freelancer-in-india", "find-international-clients-from-india", "how-to-research-a-company-before-outreach"],
+    title: "How to Find Web Development Clients (Beyond Upwork and Referrals)",
+    metaTitle: "How to Find Web Development Clients in India",
+    description:
+      "Where web developers in India actually find clients: businesses with visible website problems, hiring and growth signals, local businesses, and researched outreach that names what you saw.",
+    date: "2026-11-12",
+    readMins: 7,
+    excerpt:
+      "The web's advantage for web developers: a prospect's main problem is publicly visible. How to spot businesses that need development work, and reach them without bidding wars.",
+    hero: { src: "/blog/quotation-software-vs-excel-laptop.webp", alt: "A developer comparing websites on a laptop", w: 1600, h: 1140 },
+    faq: [
+      {
+        q: "How do web developers find clients without Upwork?",
+        a: "By going direct: identify businesses whose web presence visibly lags their business — an outdated site, no mobile experience, a growing company with a template page — research them enough to write a specific first message, and send it yourself. Local businesses, niche industries and companies showing growth signals are the usual starting points.",
+      },
+      {
+        q: "How do I know if a business needs a new website?",
+        a: "You don't, until they tell you — treat what you observe as a reason to start a conversation, not a diagnosis. A dated design, slow pages or a missing mobile layout are signals worth raising; the business may also have a rebuild underway or reasons you can't see. Messages that ask beat messages that lecture.",
+      },
+      {
+        q: "Should web developers niche down to one industry?",
+        a: "It usually pays. 'Websites for diagnostics labs' or 'e-commerce builds for D2C food brands' makes your portfolio, your outreach and your referrals compound in one direction, and lets you charge for industry understanding, not just code. You can serve clients outside the niche while you build it.",
+      },
+      {
+        q: "What growth signals suggest a company might invest in development work?",
+        a: "Hiring (especially sales, support or marketing roles), new funding, new locations, product launches and expanding service pages are all dated, public signals that a business is investing. None guarantees a project — they tell you who is moving, which is who is worth writing to first.",
+      },
+    ],
+    body: `<p class="lead">Web developers have an unfair advantage in prospecting that most never use: your prospect's problem is on public display. A restaurant's unreadable menu page, a growing exporter's 2019-era template, a clinic whose booking is a phone number — you can see the work from the street. The question is only how to turn what you can see into conversations, without racing to the bottom on a bidding platform.</p>
+
+<div class="answer"><p><b>Quick answer:</b> Decide which businesses you build for. Look where their web problems are visible: local businesses in your city, niche industries you understand, and companies showing growth signals like hiring or expansion. Research each one — the site, the business, one recent dated fact — then send a short message that names what you noticed and asks, rather than lectures. Keep every lead with a follow-up date.</p></div>
+
+<h2>Why marketplaces keep you poor</h2>
+<p>Upwork and Fiverr solve distribution and take the client relationship in exchange. You compete with the lowest global bid, the platform owns the history and the reviews, and a ranking change can empty next month. Fine as one channel for early work; corrosive as the whole business. The developers who escape the ₹15,000-website trap are the ones a client found directly — or who found the client directly.</p>
+
+<h2>Three places the work is visible</h2>
+<h3>1. Local businesses in your city</h3>
+<p>Dentists, gyms, CA firms, boutique hotels, coaching centres — businesses that live on local customers and whose web presence often trails the business badly. Walk Google Maps for a category and an area and look at the listed websites: some don't match the size of the business, some are unusable on a phone. (A listing with no website link only means the listing shows none — say "I couldn't find it from your listing", never "you have no website".) <a href="/find-local-clients">DealInSec's local mode</a> lists businesses in a city from Google Maps and researches the listed websites you choose, with the same honesty rule built in.</p>
+<h3>2. A niche you understand</h3>
+<p>Pick an industry where you've built once and liked it. Study ten sites in that industry and you'll see the same three problems repeat — which becomes your pitch, your portfolio page and your referral engine. Specialists get the "who do you know" calls; generalists get the bidding invites.</p>
+<h3>3. Companies that are moving</h3>
+<p>A company hiring salespeople, opening a second city or launching a product is investing — and investing companies fix their web presence. These signals are public and dated: job posts, announcements, new pages. This is exactly the kind of searching-and-reading that <a href="/">Client Radar</a> automates against your client profile, with each signal shown with its source and date, so your Tuesday prospecting block starts from researched companies instead of a blank search bar.</p>
+
+<h2>The message: name what you saw, then ask</h2>
+<p>Developers' cold messages fail in two standard ways: the generic blast ("we provide best web development services") and the unsolicited audit ("your website has 14 problems"). The first is spam; the second insults someone's past decisions. What works is one observation plus one question:</p>
+<p><i>"Saw you're hiring two more physios at the Baner branch — congrats. Noticed the booking still runs through calls; is online booking something you've considered as the team grows? I build exactly this for clinics — happy to share two examples if useful."</i></p>
+<p>Specific, short, respectful of what you don't know. The full structure is in <a href="/blog/personalized-cold-email">the personalised cold email guide</a>.</p>
+
+<h2>From reply to project, without drift</h2>
+<p>A warm reply becomes a scoped project only if the next steps are managed: a clear quotation, a revision limit, an advance, a signed agreement for bigger builds — the unglamorous machinery in <a href="/blog/freelance-contract-terms">freelance contract terms</a> and the <a href="/tools/quotation-maker">free quotation maker</a>. And every "maybe next quarter" goes into the pipeline with a date, because next quarter actually comes.</p>
+
+__CTA__`.replace(
+      "__CTA__",
+      ctaInline(
+        "Find businesses worth building for",
+        "Describe your ideal client; Client Radar finds and researches companies — or lists local businesses in your city — with evidence shown. You approve and send every message.",
+        SIGNUP,
+        "Start free →",
+      ),
+    ),
+  },
+
+  {
+    slug: "how-to-research-a-company-before-outreach",
+    cluster: "finding-clients",
+    region: "IN",
+    related: ["personalized-cold-email", "how-to-find-clients-as-a-freelancer-in-india", "find-international-clients-from-india"],
+    title: "How to Research a Company Before Outreach (in 15 Minutes or With AI)",
+    metaTitle: "How to Research a Company Before Outreach",
+    description:
+      "A repeatable pre-outreach research routine: what to read on a company's website, which recent signals matter, how to find the decision maker, and what AI research tools can and can't do.",
+    date: "2026-11-12",
+    readMins: 6,
+    excerpt:
+      "Research is what separates outreach from spam. The 15-minute routine: the company's own site, one dated signal, the right person — and where AI honestly speeds it up.",
+    hero: { src: "/blog/quotation-format-review.webp", alt: "Reviewing business documents and notes at a desk", w: 1600, h: 1068 },
+    faq: [
+      {
+        q: "What should I research about a company before contacting them?",
+        a: "Four things: what they sell and to whom (their own website says this best), roughly how big they are, one recent dated signal that makes contact timely — hiring, a launch, an expansion — and who the right person to write to is. If you can't find a current reason to write, the message can wait.",
+      },
+      {
+        q: "How long should pre-outreach research take?",
+        a: "About 10–15 minutes per company by hand, once you have a routine — enough to write one specific paragraph. Spending an hour is usually procrastination; spending zero minutes is spam. AI research tools compress the reading part to minutes, but you should still glance at the source before you trust a claim.",
+      },
+      {
+        q: "How do I find the decision maker at a small company?",
+        a: "At companies under about 50 people, the founder or a named director is usually the right start — check the site's about and team pages and the company's LinkedIn. Public contact details aren't always available for the exact person; writing to a general address while naming the person you hope reaches it is a fair fallback.",
+      },
+      {
+        q: "Can AI do company research for me?",
+        a: "AI can read a company's website against your profile, pull out recent dated signals and draft a first message far faster than you can by hand. What it cannot honestly do is guarantee accuracy without sources or guarantee contact details exist. Prefer tools that show where each fact came from and label inferences — and read the evidence before you hit send.",
+      },
+    ],
+    body: `<p class="lead">Everyone says "personalise your outreach". Almost nobody says what that means in practice, so freelancers bolt a first name onto a template and call it personal. Real personalisation is downstream of research — and research is a routine, not a talent. Here is the 15-minute version, and what an AI tool changes about it.</p>
+
+<div class="answer"><p><b>Quick answer:</b> Read the company's own website first: what they sell, to whom, and how they talk about it. Find one recent, dated signal — hiring, a launch, new locations — that makes your message timely. Identify the likely decision maker. Write down what you actually observed, separately from what you're guessing. That's enough to write one honest, specific paragraph.</p></div>
+
+<h2>Minutes 0–6: the company's own website</h2>
+<p>Skip third-party summaries and read the source. The homepage tells you how they position themselves; the services or product pages tell you what they actually sell; the about page gives size, age and names; a careers page is a live feed of what they're investing in. You're answering two questions: <i>is this a company my service fits?</i> and <i>what would I say that shows I looked?</i></p>
+
+<h2>Minutes 6–10: one dated signal</h2>
+<p>The difference between "you might need marketing" and "you opened a Pune office last month" is the difference between noise and relevance. Signals worth hunting: job postings (what roles, how many), product or feature launches, new branches, press mentions, a blog that went active or dead, event appearances. Date matters — a two-year-old funding round is not a reason to write today. One good signal beats five vague ones, and it becomes the first line of your message.</p>
+
+<h2>Minutes 10–13: the person</h2>
+<p>Small company: founder or director, usually named on the site or LinkedIn. Mid-size: the function head your service touches — marketing lead for a marketing service, operations for automation. Be honest with yourself about what you found: a personal email verified nowhere is a guess, and guessed emails bounce and burn domains. A general inbox with the right name in the first line is often the realistic route, and a contact form is better than a fabricated address.</p>
+
+<h2>Minutes 13–15: facts vs guesses</h2>
+<p>Write two lists. <b>Observed:</b> "hiring 3 support executives (careers page, dated this month)", "site not mobile-friendly (checked)". <b>Inferred:</b> "growing support team may mean repetitive tickets". Your message may use both — but only if the inference is framed as a question, not an accusation. Mixing the lists is how outreach ends up confidently wrong, which is worse than generic.</p>
+
+<h2>What an AI researcher changes — and what it can't</h2>
+<p>The routine above is exactly what <a href="/">DealInSec's Client Radar</a> runs at scale: describe your ideal client, and it searches, reads each company's own website, scores the fit, extracts dated signals with their sources and names decision makers where they're public. The honest limits don't disappear: findings carry sources so you can check them, inferences are labelled as inferences, unknowns are shown as unknowns, and contact details simply aren't always available. AI compresses the fifteen minutes to a review; it doesn't remove your judgement — the two minutes you spend reading the evidence before approving a message is the step that keeps your outreach true.</p>
+
+<h2>Then write the message</h2>
+<p>Research earns its value only when the message uses it: observed fact, connection to your service, small question. The structure, with examples, is in <a href="/blog/personalized-cold-email">how to write a personalised cold email</a> — and the weekly system this routine slots into is in <a href="/blog/how-to-find-clients-as-a-freelancer-in-india">how to find clients as a freelancer</a>.</p>
+
+__CTA__`.replace(
+      "__CTA__",
+      ctaInline(
+        "Research with sources, not vibes",
+        "Client Radar reads each company's own website, shows dated signals with sources and labels inferences — so your 15 minutes becomes a review, not a hunt.",
+        SIGNUP,
+        "Start free →",
+      ),
+    ),
+  },
+
+  {
+    slug: "personalized-cold-email",
+    cluster: "finding-clients",
+    region: "IN",
+    related: ["how-to-research-a-company-before-outreach", "how-to-find-clients-as-a-freelancer-in-india", "find-international-clients-from-india"],
+    title: "How to Write a Personalized Cold Email That Gets Replies",
+    metaTitle: "How to Write a Personalized Cold Email",
+    description:
+      "A working structure for cold email: an observed fact about the company, one clear connection to your service, a small ask — with examples for freelancers and agencies, and the mistakes that kill replies.",
+    date: "2026-11-12",
+    readMins: 7,
+    excerpt:
+      "Personalisation is not a first-name token. The four-line structure that earns replies — observation, relevance, proof, small ask — with real examples and the follow-up that isn't a nag.",
+    hero: { src: "/blog/fake-quotation-check.webp", alt: "Writing a message draft by hand over documents", w: 1600, h: 1068 },
+    faq: [
+      {
+        q: "What makes a cold email personalized?",
+        a: "One specific, true, recent observation about the recipient's business that could not be pasted into any other email — a hiring post, a launch, something on their site — connected to the problem you solve. A first-name token and 'I love what you're doing' are not personalisation; everyone can tell.",
+      },
+      {
+        q: "How long should a cold email be?",
+        a: "Under 120 words, usually four to six sentences: the observation, why you're writing, one line of proof, a small ask. It should read comfortably on a phone screen without scrolling. Everything else — pricing, process, your history — belongs in the conversation the email starts, not the email.",
+      },
+      {
+        q: "How many follow-ups should I send, and when?",
+        a: "Two or three, spaced several days apart, each adding something new — a relevant example, a different angle — never 'just bumping this'. If there's no reply after that, move on gracefully; a polite break-up note sometimes gets the reply the reminders didn't. Always honour an opt-out immediately.",
+      },
+      {
+        q: "Can AI write my cold emails?",
+        a: "AI can draft a solid first version from researched facts — that's what DealInSec's Mika does, drafting only from what was verified about each company, for you to edit, approve and send yourself. What AI shouldn't do is invent claims about the prospect or send anything without you; a wrong 'personalised' fact is worse than a generic email.",
+      },
+    ],
+    body: `<p class="lead">Cold email has a bad name because most of it deserves one: "Dear Sir, we provide best quality services" sent to ten thousand addresses. Yet a short, researched note from one professional to another — about something true and current in the recipient's business — reliably starts conversations. The difference is not luck or copywriting magic. It is structure plus research.</p>
+
+<div class="answer"><p><b>Quick answer:</b> Four parts, under 120 words. <b>Observation:</b> one dated, true fact about their business. <b>Relevance:</b> one sentence connecting it to a problem you solve. <b>Proof:</b> one line showing you've done it before. <b>Ask:</b> a small question, not a meeting demand. Send it from your own email, follow up twice with something new each time, and stop when asked.</p></div>
+
+<h2>The structure, line by line</h2>
+<p><b>1. The observation.</b> The first sentence proves you looked: "Saw you're hiring three support executives for the Pune warehouse" or "Noticed your new Shopify store launched last week." It must be specific enough that the email could not be sent to anyone else. This is why <a href="/blog/how-to-research-a-company-before-outreach">research comes before writing</a> — without it there is nothing honest to say.</p>
+<p><b>2. The relevance.</b> One sentence from their fact to your service: "Teams at that stage usually start drowning in repeated status questions — that's the problem I automate." Frame inferences as possibilities, not diagnoses; "you probably struggle with X" lands as presumptuous when X is wrong.</p>
+<p><b>3. The proof.</b> One line, concrete: "I built this for two logistics firms last year — happy to share what changed." No logos you don't have, no numbers you can't back. If you're early and the honest proof is thin, a relevant idea can stand in: "two specific things I'd look at first".</p>
+<p><b>4. The small ask.</b> "Worth a look?" or "Should I send the two examples?" — a question answerable in one word beats "do you have 30 minutes for a call this week". The email's job is a reply, not a contract.</p>
+
+<h2>An example, assembled</h2>
+<p><i>Subject: the Baner branch + online booking</i></p>
+<p><i>Hi Dr. Mehta — congrats on the second branch in Baner (saw the announcement last week). Clinics usually hit a wall around then: the front desk can't hold two locations' bookings on phone calls alone. I build booking systems for exactly this — did it for two Pune clinics last year. Worth sending a 2-minute example of how it works? — Priya</i></p>
+<p>Fifty-nine words. An observed fact, a plausible problem offered without arrogance, modest proof, a one-word-answerable ask.</p>
+
+<h2>What kills replies</h2>
+<ul>
+<li><b>Length.</b> Anything that needs scrolling on a phone gets saved for later, forever.</li>
+<li><b>Fake familiarity.</b> "I've been following your journey for years" from a stranger reads exactly as it is.</li>
+<li><b>The unsolicited audit.</b> Fourteen things wrong with their website insults whoever built it — often the reader.</li>
+<li><b>Invented facts.</b> One wrong "personalised" claim and the whole email is spam with extra steps. Draft only from what you verified.</li>
+<li><b>Attachment soup.</b> A PDF portfolio on first contact triggers filters and suspicion alike. Links, later, when asked.</li>
+</ul>
+
+<h2>Follow-ups that aren't nagging</h2>
+<p>Most replies come from a follow-up, but "just bumping this to the top of your inbox" adds nothing. Each follow-up earns its place with new value: a relevant example, a short answer to a likely objection, a different angle on the same observation. Two or three, days apart, then a graceful close. Keep a do-not-contact list and honour it without exception — your sender reputation and your name outlast any single campaign.</p>
+
+<h2>Where AI fits honestly</h2>
+<p>In DealInSec, <a href="/ai-coworkers">Mika drafts the first message</a> from the facts Client Radar verified about each company — the observation and relevance lines come from real sources, not imagination — and nothing sends until you've edited and approved the exact text and sent it from your own email or WhatsApp. The system around the sending — who to write to, and what happens after a reply — is in <a href="/blog/how-to-find-clients-as-a-freelancer-in-india">the client-finding system</a>.</p>
+
+__CTA__`.replace(
+      "__CTA__",
+      ctaInline(
+        "Drafts from verified facts, sent by you",
+        "Mika drafts outreach from what was actually verified about each company. You edit, approve and send every message yourself — nothing goes out on its own.",
+        SIGNUP,
+        "Start free →",
+      ),
+    ),
+  },
+
+  {
+    slug: "how-digital-marketing-agencies-get-clients",
+    cluster: "finding-clients",
+    region: "IN",
+    related: ["how-to-research-a-company-before-outreach", "personalized-cold-email", "how-to-find-clients-as-a-freelancer-in-india"],
+    title: "How Small Digital Marketing Agencies Get Clients (When Referrals Slow Down)",
+    metaTitle: "How Digital Marketing Agencies Get Clients",
+    description:
+      "A client-acquisition playbook for 2–10 person marketing agencies in India: niche positioning, spotting businesses that are investing, researched outreach at agency scale and a pipeline the whole team works.",
+    date: "2026-11-12",
+    readMins: 7,
+    excerpt:
+      "An agency that only grows on referrals doesn't control its growth. Positioning, buying signals, outreach the founder doesn't have to write alone, and a pipeline with owners and dates.",
+    hero: { src: "/blog/best-quotation-software-team.webp", alt: "A small agency team working together around a table", w: 1600, h: 1067 },
+    faq: [
+      {
+        q: "How do small marketing agencies find new clients?",
+        a: "The reliable pattern: a clear niche or service positioning, a steady weekly volume of researched outreach to businesses showing buying signals (hiring, launches, ad activity, expansion), content that supports the outreach, and disciplined follow-up on a shared pipeline. Referrals then compound on top instead of carrying everything.",
+      },
+      {
+        q: "What buying signals suggest a business will pay for marketing?",
+        a: "Signals that the business is investing in growth: hiring sales or marketing roles, launching products or locations, running ads inconsistently, a site or content presence visibly behind competitors of the same size. Each is public and dated. None guarantees a deal — they rank who is worth researching first.",
+      },
+      {
+        q: "Should an agency niche down to one industry?",
+        a: "Positioning beats generality for small agencies. 'Performance marketing for D2C food brands' wins against 'full-service digital marketing' because the case studies, the outreach and the referrals all compound in one market. You can still take opportunistic work outside the niche while the niche builds.",
+      },
+      {
+        q: "How can a small agency do outreach without a dedicated sales team?",
+        a: "Make it a shared weekly ritual with numbers attached: a fixed research-and-outreach block, a target of researched (not blasted) messages, one owner per lead, and follow-up dates nobody has to remember. AI research tools compress the per-company work from twenty minutes to a review, which is what makes founder-led sales sustainable at 2–10 people.",
+      },
+    ],
+    body: `<p class="lead">Most small agencies are born from referrals — a first client, their friend, their friend's vendor. It works until it doesn't: one lost retainer, a quiet quarter, and the founder is doing sales panic instead of sales. An agency that wants to control its growth needs what it sells its clients: a pipeline it owns.</p>
+
+<div class="answer"><p><b>Quick answer:</b> Position narrowly enough that the right client recognises themselves. Hunt businesses showing dated buying signals — hiring, launches, visible under-investment in marketing. Research each one before anyone writes, send founder-signed personalised outreach at a steady weekly rhythm, and run every lead on one shared pipeline with an owner and a follow-up date.</p></div>
+
+<h2>Positioning: be findable for something</h2>
+<p>"Full-service digital marketing agency" is a category, not a reason to choose you. "SEO for clinics and hospitals", "performance marketing for D2C brands doing ₹1–10 crore" — that specificity writes your outreach for you, makes two case studies feel like authority, and tells referrers exactly who to send. The narrower promise also survives procurement: a founder comparing three generic agencies compares prices; one comparing a specialist against generalists compares fit.</p>
+
+<h2>Find businesses that are already investing</h2>
+<p>The best marketing prospect isn't the business with the worst marketing — it's the one that is <i>moving</i>: hiring its first sales lead, opening a second city, launching on a marketplace, running ads that start and stop. Movement means budget and urgency. These signals are public and dated: careers pages, announcements, new store pages. Doing this scan manually across a city or an industry is a day's work per week — which is why it usually doesn't happen. <a href="/">Client Radar</a> runs it from a written ideal-client profile: it searches, reads each company's own site, scores fit against your profile and shows each signal with its source and date, and your team picks who deserves a message. For agencies serving local businesses, <a href="/find-local-clients">the local mode</a> starts from Google Maps listings in a chosen city.</p>
+
+<h2>Outreach the founder doesn't carry alone</h2>
+<p>Founder-signed messages convert best; founder-written-everything doesn't scale past month two. The division that works at 2–10 people: a teammate (or an AI coworker) assembles the research and the draft; the founder edits for voice, approves and sends. In DealInSec that's the shape of <a href="/ai-coworkers">The Nest</a> — Nibo researches companies against the profile and saves qualified ones with evidence, Mika drafts the first message from verified facts only, and a person always approves and sends from the agency's own email or WhatsApp. The message structure itself — observation, relevance, proof, small ask — is in <a href="/blog/personalized-cold-email">the personalised cold email guide</a>, and it matters doubly for an agency: your outreach <i>is</i> your portfolio.</p>
+
+<h2>Content supports outreach; it doesn't replace it</h2>
+<p>A small agency's content works best as armour for its outreach: the case study your message links to, the teardown that makes a prospect trust the audit call, the LinkedIn presence that makes the founder's name searchable. Posting into the void and waiting is a strategy for year three, not quarter one. Pair every content piece with the question "which prospect conversation does this help?"</p>
+
+<h2>One pipeline, owners and dates</h2>
+<p>Agency leads die in DMs and memory. The fix is the same discipline you'd sell a client: every lead on one board with a stage, an owner and a next follow-up date; replies and facts recorded on the lead, not in someone's head; a weekly fifteen-minute review of what's overdue. DealInSec's <a href="/crm-for-freelancers">pipeline</a> does this with follow-up reminders and Zee's daily briefing of what needs attention — and Pro includes seats for the team, so the pipeline is shared, not forwarded.</p>
+
+__CTA__
+
+<p>None of this is glamorous, and that is rather the point: an agency that acquires clients on a system can decline bad-fit work, price with a spine and grow on purpose. The agencies stuck at referral mercy can't.</p>`.replace(
+      "__CTA__",
+      ctaInline(
+        "Give your agency its own pipeline",
+        `Client Radar finds and researches businesses showing real buying signals; your team approves and sends every message. Free plan; Pro ₹${PRICING.proMonthlyInr}/month with team seats.`,
+        SIGNUP,
+        "Start free →",
+      ),
+    ),
+  },
+
 ];
 
 /* ── Rendering ─────────────────────────────────────────────────────────── */
@@ -1840,6 +2255,7 @@ function relatedPosts(current: string): string {
 }
 
 const CLUSTER_LABEL: Record<Cluster, string> = {
+  "finding-clients": "Finding clients",
   "getting-paid": "Getting paid",
   "client-workflow": "Client workflow",
   protection: "Protecting your work",

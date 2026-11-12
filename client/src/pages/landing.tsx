@@ -99,6 +99,13 @@ const SERVER_ROUTE_PREFIXES = [
   "/find-local-clients",
   "/ai-coworkers",
   "/crm-for-freelancers",
+  // audience pages (server/category-pages.ts)
+  "/for-web-developers",
+  "/for-seo-freelancers",
+  "/for-digital-marketing-agencies",
+  "/for-web-development-agencies",
+  "/for-software-agencies",
+  "/for-ai-automation-consultants",
 ];
 const isServerRoute = (href: string) => SERVER_ROUTE_PREFIXES.some((p) => href.startsWith(p));
 
@@ -119,6 +126,8 @@ const NAV_LINKS: (NavLink | { label: string; items: NavLink[] })[] = [
     { label: "Deal risk checker", href: "/tools/deal-risk-checker" },
     { label: "CRM for freelancers", href: "/crm-for-freelancers" },
     { label: "For freelancers", href: "/for-freelancers" },
+    { label: "For web developers", href: "/for-web-developers" },
+    { label: "For marketing agencies", href: "/for-digital-marketing-agencies" },
     { label: "For creators", href: "/for-creators" },
     { label: "FAQ", href: "#faq" },
   ] },
@@ -863,7 +872,10 @@ function Footer() {
     { label: "Support", href: "mailto:support@dealinsec.com" }, { label: "Privacy", href: "/privacy" }, { label: "Terms", href: "/terms" },
   ];
   const more = [
-    { label: "CRM for freelancers", href: "/crm-for-freelancers" }, { label: "For freelancers", href: "/for-freelancers" }, { label: "For creators", href: "/for-creators" }, { label: "Free tools", href: "/tools" },
+    { label: "CRM for freelancers", href: "/crm-for-freelancers" }, { label: "For freelancers", href: "/for-freelancers" }, { label: "For creators", href: "/for-creators" },
+    { label: "For web developers", href: "/for-web-developers" }, { label: "For SEO freelancers", href: "/for-seo-freelancers" }, { label: "For marketing agencies", href: "/for-digital-marketing-agencies" },
+    { label: "For web dev agencies", href: "/for-web-development-agencies" }, { label: "For software agencies", href: "/for-software-agencies" }, { label: "For AI automation", href: "/for-ai-automation-consultants" },
+    { label: "Free tools", href: "/tools" },
     { label: "Deal risk checker", href: "/tools/deal-risk-checker" }, { label: "Freelancer invoice software", href: "/freelancer-invoice-software" },
     { label: "Quotation software", href: "/quotation-software" }, { label: "Contract management", href: "/contract-management" },
     { label: "Proposal management", href: "/proposal-management" }, { label: "Invoice management", href: "/invoice-management" },
