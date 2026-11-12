@@ -13,9 +13,19 @@ export const ACTIVITY_LABEL: Record<string, string> = {
   reply_labelled: "Reply label changed", reply_match_confirmed: "Reply confirmed as theirs", reply_match_dismissed: "Reply marked not related",
   channel_draft_created: "Message draft written", channel_message_sent: "Message sent", channel_reply: "They replied",
   channel_opt_in: "WhatsApp permission recorded", channel_opted_out: "They asked to stop WhatsApp messages",
+  // Outreach Studio (12 Nov 2026): what the person did with a message outside DealInSec. Never a delivery.
+  outreach_copied: "Message copied", outreach_opened: "Opened to send", draft_rewritten: "Draft improved by Mika",
+  followup_scheduled: "Follow-up planned", followup_done: "Follow-up done", reply_recorded: "Reply noted by you",
 };
 
-const CHANNEL_NAME: Record<string, string> = { whatsapp: "WhatsApp", linkedin: "LinkedIn", x: "X" };
+const CHANNEL_NAME: Record<string, string> = { email: "Email", whatsapp: "WhatsApp", linkedin: "LinkedIn", instagram: "Instagram", x: "X", messenger: "Messenger" };
+const on = (d: Record<string, unknown>) => (typeof d.channel === "string" && CHANNEL_NAME[d.channel] ? `On ${CHANNEL_NAME[d.channel]}` : null);
+
+const REWRITE_TEXT: Record<string, string> = { shorten: "made shorter", professional: "made more professional", conversational: "made more conversational", opening: "a better first line", ask: "a clearer ask" };
+
+const REPLY_OUTCOME_TEXT: Record<string, string> = {
+  interested: "interested", question: "asked a question", meeting: "wants to meet", not_now: "not right now", not_interested: "not interested", other: "something else",
+};
 
 const WHY_STOPPED: Record<string, string> = {
   replied: "they replied", opted_out: "they asked not to be contacted", bounced: "the address bounced", won: "the lead became a deal",
@@ -44,12 +54,28 @@ export function activityDetail(kind: string, d: Record<string, unknown>, stage: 
     case "channel_draft_created":
     case "channel_message_sent":
     case "channel_reply": {
-      const on = typeof d.channel === "string" && CHANNEL_NAME[d.channel] ? `On ${CHANNEL_NAME[d.channel]}` : null;
-      if (!on) return null;
-      if (kind === "channel_message_sent") return d.via === "manual" ? `${on}, sent by you outside DealInSec` : `${on}, from your business number`;
-      if (kind === "channel_reply") return d.via === "manual" ? `${on}, recorded by you` : on;
-      return d.ai ? `${on}, written by AI for you to review` : on;
+      const where = on(d);
+      if (!where) return null;
+      if (kind === "channel_message_sent") return d.via === "manual" ? `${where}, sent by you outside DealInSec` : `${where}, from your business number`;
+      if (kind === "channel_reply") return d.via === "manual" ? `${where}, recorded by you` : where;
+      return d.ai ? `${where}, written by AI for you to review` : where;
     }
+    case "message_sent":
+      // `channel` on an email send is HOW it went out, not the medium.
+      return d.channel === "manual" ? "Marked sent by you, from your own email" : d.channel === "gmail" || d.channel === "gmail_confirmed" ? "Sent from your connected Gmail" : null;
+    case "outreach_copied":
+      return on(d) ? `${on(d)}, copied by you` : "Copied by you";
+    case "outreach_opened":
+      return `${on(d) ?? "Opened"}: not sent until you say so`;
+    case "draft_rewritten":
+      return typeof d.action === "string" ? `${on(d) ? `${on(d)}: ` : ""}${REWRITE_TEXT[d.action] ?? "rewritten"}` : on(d);
+    case "reply_recorded": {
+      const what = typeof d.outcome === "string" ? REPLY_OUTCOME_TEXT[d.outcome] : null;
+      return [on(d), what ? `Their reply: ${what}` : null].filter(Boolean).join(", ") || null;
+    }
+    case "followup_scheduled":
+    case "followup_done":
+      return [on(d), typeof d.dueOn === "string" ? `for ${d.dueOn}` : null].filter(Boolean).join(", ") || null;
     case "updated":
       return Array.isArray(d.fields) && d.fields.includes("doNotContact") && d.via === "gmail_sync" ? "Marked do-not-contact after their reply" : null;
     default:

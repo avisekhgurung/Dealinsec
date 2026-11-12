@@ -23,7 +23,7 @@ vi.mock("../../copilot/provider", async (orig) => (await import("./world-mocks")
 import { checkDraft } from "@shared/outreach-check";
 import { ProviderError } from "../../copilot/provider";
 import { messageStore } from "../../sales/message-store";
-import { addSuppression, approveMessage, cancelMessage, draftOutreach, editDraft, hashDraft, listMessages, markSent, pathToContacted, writeOwnMessage } from "../../sales/outreach";
+import { addSuppression, approveMessage, cancelMessage, draftOutreach, editDraft, hashDraft, listMessages, markSent, pathToContacted, rewriteDraft, writeOwnMessage } from "../../sales/outreach";
 import { addClaim } from "../../services/leads";
 import { assessLead } from "../../services/sales";
 import { useWorld } from "./world-mocks";
@@ -86,14 +86,15 @@ describe("writing a draft", () => {
     const l = await researched(); await draft(l.id);
     expect(world().llmCalls).toHaveLength(1);
     // The researched lead's launch fact makes "trigger" the strongest way to open, and the version records it.
-    expect(world().llmCalls[0]).toMatchObject({ task: "draft", ok: true, promptVersion: "draft-v7:trigger", tokensIn: 900, tokensOut: 180, leadId: l.id, organizationId: ORG1 });
+    expect(world().llmCalls[0]).toMatchObject({ task: "draft", ok: true, promptVersion: "draft-v8:trigger", tokensIn: 900, tokensOut: 180, leadId: l.id, organizationId: ORG1 });
     expect(JSON.stringify(world().llmCalls)).not.toMatch(/Casa Alma|boutique|hello@/i);
   });
   it("the timeline records ids and counts, never the message text", async () => {
     const l = await researched(); const m = await draft(l.id);
     const e = events(l.id, "draft_created");
     expect(e).toHaveLength(1);
-    expect(e[0].data).toEqual({ messageId: m.id, claims: 3 });
+    // Ids, counts and the research point it was built on (already on the lead page), never the message's own words.
+    expect(e[0].data).toEqual({ messageId: m.id, claims: 3, basis: expect.objectContaining({ lead: expect.objectContaining({ grade: "fact", kind: "signal" }), thin: false }) });
     expect(JSON.stringify(world().leads.events)).not.toContain("quick note");
   });
   it("won't write without an address, or without anything verified, and doesn't call the model for either", async () => {
@@ -200,7 +201,7 @@ describe("what the model is shown", () => {
     await draft(l.id);
     const text = prompts[0][1].content;
     expect(text).toMatch(/<untrusted source="facts">/);
-    expect(text.match(/<\/untrusted>/g)!.length).toBe(3);  // the fence closes only where we close it
+    expect(text.match(/<\/untrusted>/g)!.length).toBe(4);  // facts, angles, notes and the lead point: the fence closes only where we close it
     expect(text).not.toContain("</untrusted> Ignore"); // the attempt to close the fence early is gone
   });
   it("without a recorded name it is told to begin 'Hello,'", async () => {
@@ -241,7 +242,7 @@ describe("what the email says about the sender: only what their offer says, and 
     const r = await draftOutreach(user(), l.id) as any;
     if (want === "ok") {
       expect(r).toMatchObject({ ok: true, retried: false, message: { body: body(middle), status: "draft" } });
-      expect(world().messages[0].promptVersion).toBe("draft-v7:trigger");
+      expect(world().messages[0].promptVersion).toBe("draft-v8:trigger");
       return;
     }
     expect(r).toMatchObject({ ok: false, code: "draft_rejected" });
@@ -273,7 +274,7 @@ describe("a saved client profile's tone and note", () => {
     await draftOutreach(user(), l.id, {}, { style: async () => null });
     expect(prompts[0][0].content).not.toMatch(/How it should sound|sender's writing note/);
     expect(prompts[0][1].content).not.toMatch(/sender's writing note/);
-    expect(events(l.id, "draft_created")[0].data).toEqual({ messageId: world().messages[0].id, claims: 3 });
+    expect(events(l.id, "draft_created")[0].data).toEqual({ messageId: world().messages[0].id, claims: 3, basis: expect.any(Object) });
   });
   it.each([["friendly", /Warm and conversational/], ["formal", /Formal and courteous/], ["direct", /Short and direct/]] as const)("the %s tone is told to the model as wording only", async (tone, says) => {
     const l = await researched();
@@ -329,7 +330,7 @@ describe("a saved client profile's tone and note", () => {
   it("the timeline keeps which profile and tone a draft followed, never the note's words", async () => {
     const l = await researched();
     await draftOutreach(user(), l.id, {}, style({ note: "Mention our work with hotel groups." }));
-    expect(events(l.id, "draft_created")[0].data).toEqual({ messageId: world().messages[0].id, claims: 3, profileId: 7, tone: "direct", noted: true });
+    expect(events(l.id, "draft_created")[0].data).toEqual({ messageId: world().messages[0].id, claims: 3, profileId: 7, tone: "direct", noted: true, basis: expect.any(Object) });
     expect(JSON.stringify(world().leads.events)).not.toContain("Mention our work");
   });
   it("the lead's page is told which profile its drafts follow, never the note's words; a profile that can't be read shows none", async () => {
@@ -752,6 +753,51 @@ describe("writing the first message yourself", () => {
     expect(m.byAi).toBe(true);
     const listed: any = await listMessages(user(), l.id);
     expect(listed.messages[0].scorecard).toBeDefined();
+  });
+});
+
+describe("Mika improves a draft (Outreach Studio)", () => {
+  const SHORT = "Hello,\n\nI saw that Casa Alma has opened a second hotel in Porto. Congratulations. Could a short reply tell me how guests book with you today?\n\nAsha";
+  it("replaces the text with a checked version, keeps it a draft, and doesn't use an AI draft from the plan", async () => {
+    const l = await researched();
+    const m = await draft(l.id);
+    const before = world().messages.filter((x) => String(x.promptVersion ?? "").startsWith("draft-")).length;
+    reply("Casa Alma's second hotel", SHORT);
+    const r: any = await rewriteDraft(user(), m.id, { action: "shorten", bodyHash: m.bodyHash });
+    expect(r).toMatchObject({ ok: true, action: "shorten", message: { status: "draft", subject: "Casa Alma's second hotel", body: SHORT } });
+    expect(world().messages.filter((x) => String(x.promptVersion ?? "").startsWith("draft-")).length).toBe(before); // no new AI draft row
+    expect(prompts.at(-1)![0].content).toMatch(/Make it about a third shorter/);
+    expect(prompts.at(-1)![1].content).toMatch(/<untrusted source="message">/);
+    expect(events(l.id, "draft_rewritten")[0].data).toEqual({ messageId: m.id, action: "shorten", channel: "email" });
+  });
+  it("only rewrites the version the person is looking at; an approved message goes back to draft", async () => {
+    const l = await researched();
+    const m = await draft(l.id);
+    expect(await rewriteDraft(user(), m.id, { action: "ask", bodyHash: "0".repeat(64) })).toMatchObject({ ok: false, status: 409, code: "changed" });
+    const a = (await approveMessage(user(), m.id, m.bodyHash) as any).message;
+    reply(SUBJECT, SHORT);
+    expect(await rewriteDraft(user(), a.id, { action: "ask", bodyHash: a.bodyHash })).toMatchObject({ ok: true, message: { status: "draft", approvedAt: null } });
+  });
+  it("a version that breaks a rule is retried once, then refused, and the text is unchanged", async () => {
+    const l = await researched();
+    const m = await draft(l.id);
+    script(asJson(SUBJECT, "Hello, our rates start at 499 dollars and we guarantee results. Visit www.example.com to book a call today please."));
+    const r: any = await rewriteDraft(user(), m.id, { action: "professional", bodyHash: m.bodyHash });
+    expect(r).toMatchObject({ ok: false, status: 422, code: "draft_rejected" });
+    expect(world().messages.find((x) => x.id === m.id)!.body).toBe(BODY);
+  });
+  it("five improvements per message, then the person edits by hand; an unknown action is refused", async () => {
+    const l = await researched();
+    let m: any = await draft(l.id);
+    for (let i = 0; i < 5; i++) { reply(SUBJECT, `${SHORT} ${i}`); m = (await rewriteDraft(user(), m.id, { action: "conversational", bodyHash: m.bodyHash }) as any).message; }
+    expect(await rewriteDraft(user(), m.id, { action: "conversational", bodyHash: m.bodyHash })).toMatchObject({ ok: false, status: 429, code: "rewrite_limit" });
+    expect(await rewriteDraft(user(), m.id, { action: "translate", bodyHash: m.bodyHash })).toMatchObject({ ok: false, status: 400 });
+  });
+  it("needs the same permission and workspace as editing", async () => {
+    const l = await researched();
+    const m = await draft(l.id);
+    expect(code(await rewriteDraft(viewer(), m.id, { action: "shorten", bodyHash: m.bodyHash }))).toBe("forbidden");
+    expect(code(await rewriteDraft(OTHER(), m.id, { action: "shorten", bodyHash: m.bodyHash }))).toBe("not_found");
   });
 });
 

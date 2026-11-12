@@ -76,7 +76,7 @@ export const CHANNEL_DDL: readonly string[] = [
     created_at timestamp NOT NULL,
     updated_at timestamp NOT NULL,
     CONSTRAINT channel_messages_status_ck CHECK (status IN ('draft', 'approved', 'sending', 'sent', 'failed', 'uncertain', 'cancelled', 'received')),
-    CONSTRAINT channel_messages_channel_ck CHECK (channel IN ('whatsapp', 'linkedin', 'x')),
+    CONSTRAINT channel_messages_channel_ck CHECK (channel IN ('whatsapp', 'linkedin', 'x', 'instagram', 'messenger')),
     CONSTRAINT channel_messages_sent_ck CHECK (status <> 'sent' OR (sent_at IS NOT NULL AND sent_via IS NOT NULL)),
     CONSTRAINT channel_messages_api_ck CHECK (sent_via IS DISTINCT FROM 'api' OR channel = 'whatsapp')
   )`,
@@ -85,3 +85,13 @@ export const CHANNEL_DDL: readonly string[] = [
   `CREATE INDEX IF NOT EXISTS channel_messages_lead_idx ON channel_messages (organization_id, lead_id, created_at)`,
   `CREATE INDEX IF NOT EXISTS channel_messages_sent_idx ON channel_messages (organization_id, channel, sent_at) WHERE sent_via = 'api'`,
 ];
+
+/**
+ * Instagram and Messenger (12 Nov 2026), for a table created before them: widens the channel CHECK in one statement.
+ * Kept apart from CHANNEL_DDL so re-running script/migrate-channels.ts never rewrites a constraint. Additive in effect:
+ * every row that passed the old check passes the new one. Run by script/migrate-channels-social.ts (or the same SQL by
+ * hand on the server); until then the two channels show "not switched on yet" and nothing else changes.
+ */
+export const SOCIAL_CHANNEL_DDL = [
+  `ALTER TABLE channel_messages DROP CONSTRAINT IF EXISTS channel_messages_channel_ck, ADD CONSTRAINT channel_messages_channel_ck CHECK (channel IN ('whatsapp', 'linkedin', 'x', 'instagram', 'messenger'))`,
+] as const;

@@ -77,7 +77,8 @@ export interface LeadsStore {
   setStatus(orgId: string, id: number, from: LeadStatus, to: LeadStatus, lostReason?: string | null): Promise<Lead | null>;
   archive(orgId: string, id: number): Promise<Lead | null>;
 
-  addEvent(orgId: string, leadId: number, e: { kind: string; data?: Record<string, unknown> | null; actor: "user" | "agent"; actorUserId?: string | null }): Promise<void>;
+  /** `quiet`: a record that isn't a change to the lead (a message copied or opened), so the lead keeps its place in the list. */
+  addEvent(orgId: string, leadId: number, e: { kind: string; data?: Record<string, unknown> | null; actor: "user" | "agent"; actorUserId?: string | null; quiet?: boolean }): Promise<void>;
 
   addTicket(orgId: string, leadId: number, t: { title: string; kind: string; dueAt?: Date | null; createdBy: "user" | "agent" }): Promise<LeadTicket>;
   getTicket(orgId: string, leadId: number, ticketId: number): Promise<LeadTicket | null>;

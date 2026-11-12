@@ -13,6 +13,7 @@
  *   POST   /api/channels/messages/:id/sent              { bodyHash }  "I sent it" (LinkedIn, X, own WhatsApp)
  *   POST   /api/channels/messages/:id/resolve           { outcome: "sent"|"not_sent" }  an uncertain WhatsApp send
  *   POST   /api/channels/messages/:id/reply             "They replied" (where replies don't reach DealInSec)
+ *   POST   /api/channels/messages/:id/rewrite           Mika improves an unsent message { action, bodyHash } (not an AI draft)
  *   POST   /api/channels/messages/:id/cancel
  *   GET    /api/integrations/whatsapp                   connection status (never a token)
  *   POST   /api/integrations/whatsapp                   { phoneNumberId, wabaId, accessToken }  owners and admins
@@ -59,6 +60,7 @@ export function registerChannelRoutes(app: Express) {
   app.post("/api/channels/messages/:id/sent", isAuthenticated, sameOriginJson, withId("channels_mark_sent", async (req, res, id) => send(res, await svc.markChannelSent(req.user, id, req.body?.bodyHash), (r) => ({ message: r.message, already: r.already }))));
   app.post("/api/channels/messages/:id/resolve", isAuthenticated, sameOriginJson, withId("channels_resolve", async (req, res, id) => send(res, await svc.resolveUncertain(req.user, id, req.body), message)));
   app.post("/api/channels/messages/:id/reply", isAuthenticated, sameOriginJson, withId("channels_reply", async (req, res, id) => send(res, await svc.recordChannelReply(req.user, id), (r) => ({ message: r.message, already: r.already }))));
+  app.post("/api/channels/messages/:id/rewrite", isAuthenticated, sameOriginJson, withId("channels_rewrite", async (req, res, id) => send(res, await svc.rewriteChannelMessage(req.user, id, req.body), (r) => ({ message: r.message, action: r.action }))));
   app.post("/api/channels/messages/:id/cancel", isAuthenticated, sameOriginJson, withId("channels_cancel", async (req, res, id) => send(res, await svc.cancelChannelMessage(req.user, id), message)));
 
   app.get("/api/integrations/whatsapp", isAuthenticated, guarded("whatsapp_status", async (req, res) => { res.setHeader("Cache-Control", "no-store"); send(res, await svc.whatsappConnectionStatus(req.user), (r) => ({ configured: r.configured, reason: r.reason, canManage: r.canManage, connection: r.connection, webhookPath: r.webhookPath })); }));

@@ -11,6 +11,7 @@
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { Link } from "wouter";
 import { AlertTriangle, Ban, CheckCircle2, ExternalLink, Inbox, Loader2, MailCheck, MailX, MessageSquareReply, PenLine, ShieldOff, Trash2, XCircle } from "lucide-react";
 import { OutreachPanel } from "@/components/leads/outreach-panel";
 import { SegmentedTabs } from "@/components/outbound/segmented-tabs";
@@ -167,6 +168,7 @@ export function OutreachQueue({ canEdit, onShowReady }: { canEdit: boolean; /** 
                 <SheetTitle>{open.lead.companyName}</SheetTitle>
                 <SheetDescription>{open.lead.domain ?? ""} · lead stage {open.lead.status}</SheetDescription>
                 <div className="flex flex-wrap items-center gap-2 pt-1"><StatusChip status={open.message.status} />{open.message.status === "approved" && <span className="text-xs text-muted-foreground">{SEND_YOURSELF}</span>}</div>
+                <Link href={`/leads/${open.lead.id}/outreach`} className="inline-flex items-center gap-1 pt-1 text-xs font-medium text-primary underline-offset-2 hover:underline" data-testid="outreach-open-studio"><PenLine className="h-3.5 w-3.5" />Open in Outreach Studio (all channels)</Link>
               </SheetHeader>
               {(open.suppressed || open.lead.doNotContact) && (
                 <p className="flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300" role="alert"><Ban className="mt-0.5 h-4 w-4 shrink-0" />This address or lead is on your do-not-contact list. Nothing can be approved for it or recorded as sent to it.</p>

@@ -18,6 +18,8 @@ export interface ChannelMessage {
   status: "draft" | "approved" | "sending" | "sent" | "failed" | "uncertain" | "cancelled" | "received"; statusLabel: string;
   sentVia: "api" | "manual" | null; delivery: "delivered" | "read" | null; errorCode: string | null; edited: boolean; createdBy: string;
   createdAt: string; approvedAt: string | null; sentAt: string | null; deliveredAt: string | null; readAt: string | null; repliedAt: string | null;
+  /** Older servers omit it. */
+  byAi?: boolean;
 }
 export interface WhatsappContact { phone: string; optedIn: boolean; optInSource: string | null; optedInAt: string | null; optedOut: boolean; windowOpenUntil: string | null }
 export interface WhatsappTemplate { name: string; language: string; category: string; body: string; params: number }

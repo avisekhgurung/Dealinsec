@@ -235,9 +235,14 @@ export default function LeadDetailsPage() {
               {/* The lead's own source and the day it was added: nothing here is inferred. */}
               <p className="mt-1 text-xs text-muted-foreground" data-testid="lead-origin">{source.origin} on {dateLabel(lead.createdAt, locale)}</p>
             </div>
-            {canEdit && !lead.archivedAt && (
-              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} data-testid="button-edit-lead"><Pencil className="mr-1.5 h-3.5 w-3.5" />Edit</Button>
-            )}
+            <div className="flex shrink-0 flex-wrap justify-end gap-2">
+              {!lead.archivedAt && !lead.doNotContact && (
+                <Button size="sm" asChild data-testid="button-write-outreach"><Link href={`/leads/${lead.id}/outreach`}><Sparkles className="mr-1.5 h-3.5 w-3.5" />Write outreach</Link></Button>
+              )}
+              {canEdit && !lead.archivedAt && (
+                <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} data-testid="button-edit-lead"><Pencil className="mr-1.5 h-3.5 w-3.5" />Edit</Button>
+              )}
+            </div>
           </div>
         </div>
       </header>

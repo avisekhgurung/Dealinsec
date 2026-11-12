@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkChannelDraft, checkChannelText, externalUrl, isStopReply, linkedinUrl, maxFor, normalPhone, statusLabel, xHandle } from "./channels";
+import { checkChannelDraft, checkChannelText, externalUrl, instagramHandle, isStopReply, linkedinUrl, maxFor, messengerPage, normalPhone, statusLabel, xHandle } from "./channels";
 
 describe("channel rules", () => {
   it("normalizes phone numbers to E.164 and refuses anything else", () => {
@@ -51,3 +51,36 @@ describe("channel rules", () => {
     for (const s of ["don't stop, tell me more", "Stop by our clinic tomorrow", "", null]) expect(isStopReply(s)).toBe(false);
   });
 });
+
+describe("Instagram and Messenger addresses", () => {
+  it("an Instagram username from @name, name or a profile link; never a post, reel or a bad name", () => {
+    expect(instagramHandle("@smile.dental")).toBe("smile.dental");
+    expect(instagramHandle("https://www.instagram.com/smile_dental/?hl=en")).toBe("smile_dental");
+    expect(instagramHandle("instagram.com/p/Cx12abc")).toBeNull();
+    expect(instagramHandle("https://instagram.com/reels/abc")).toBeNull();
+    expect(instagramHandle(".dots")).toBeNull();
+    expect(instagramHandle("a..b")).toBeNull();
+    expect(instagramHandle("x".repeat(31))).toBeNull();
+    expect(instagramHandle(42)).toBeNull();
+  });
+  it("a Facebook Page from its facebook.com or m.me link or its username; never a profile.php or group link", () => {
+    expect(messengerPage("https://www.facebook.com/SmileDentalSiliguri/")).toBe("SmileDentalSiliguri");
+    expect(messengerPage("m.me/smiledental")).toBe("smiledental");
+    expect(messengerPage("@smiledental")).toBe("smiledental");
+    expect(messengerPage("https://facebook.com/profile.php?id=123")).toBeNull();
+    expect(messengerPage("facebook.com/groups")).toBeNull();
+    expect(messengerPage("abc")).toBeNull();
+  });
+  it("the open links are Meta's own message links, and nothing without an address", () => {
+    expect(externalUrl("instagram", "smile.dental")).toBe("https://ig.me/m/smile.dental");
+    expect(externalUrl("messenger", "SmileDentalSiliguri")).toBe("https://m.me/SmileDentalSiliguri");
+    expect(externalUrl("instagram", null, "Smile Dental")).toBeNull();
+    expect(externalUrl("messenger", null)).toBeNull();
+  });
+  it("the limits are the platforms' own; drafts are written well under them", () => {
+    expect(maxFor("ig_dm")).toBe(1000);
+    expect(maxFor("fb_message")).toBe(2000);
+    expect(checkChannelText("x".repeat(1001), "ig_dm")[0].code).toBe("body_length");
+  });
+});
+

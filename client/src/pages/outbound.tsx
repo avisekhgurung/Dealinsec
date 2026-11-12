@@ -18,6 +18,7 @@ import { ProspectBrief } from "@/components/outbound/prospect-brief";
 import { ProspectCard, ProspectCardSkeleton } from "@/components/outbound/prospect-card";
 import { ProspectWorkspace } from "@/components/outbound/prospect-workspace";
 import { OutreachQueue, outreachQueueKey, type QueueItem } from "@/components/outbound/outreach-queue";
+import { OutreachOverview } from "@/components/studio/outreach-overview";
 import { SegmentedTabs } from "@/components/outbound/segmented-tabs";
 import { SalesFunnel } from "@/components/outbound/sales-funnel";
 import { StrategyStats } from "@/components/outbound/strategy-stats";
@@ -639,7 +640,7 @@ export default function OutboundPage() {
               : view === "results" ? <div className="space-y-4"><PlanUsage /><ResultsOverview /><SalesFunnel /><StrategyStats /></div>
               : view === "campaigns" ? <Campaigns canEdit={canEdit} />
               : view === "inbox" ? <OutreachInbox />
-              : view === "outreach" ? <OutreachQueue canEdit={canEdit} onShowReady={() => navigate(`${location}?view=prospects&readiness=ready`, { replace: true })} />
+              : view === "outreach" ? <div className="space-y-6"><OutreachOverview /><OutreachQueue canEdit={canEdit} onShowReady={() => navigate(`${location}?view=prospects&readiness=ready`, { replace: true })} /></div>
               : view === "prospects" ? <ProspectWorkspace canExport={canEdit} onOpen={(r, focus) => setOpen({ id: r.id, runId: r.latestRunId, focus })} onPrepared={() => setView("outreach")} /> : <>
             {runs.data && runs.data.runs.length > 1 && (
               <div className="-mx-4 flex gap-2 overflow-x-auto px-4 lg:mx-0 lg:flex-wrap lg:px-0" role="tablist" aria-label="Recent searches">

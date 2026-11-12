@@ -70,7 +70,7 @@ describe("writing the versions", () => {
     expect(new Set(r.variants.map((v) => v.variantGroup)).size).toBe(1);
     expect(r.variants[0].variantGroup).toBeTruthy();
     expect(r.variants.map((v) => v.body)).toEqual([BODY, BODY2, BODY3]); // genuinely separate calls, one per strategy
-    expect(world().llmCalls.map((c: any) => c.promptVersion)).toEqual(["draft-v7:trigger", "draft-v7:problem", "draft-v7:direct"]);
+    expect(world().llmCalls.map((c: any) => c.promptVersion)).toEqual(["draft-v8:trigger", "draft-v8:problem", "draft-v8:direct"]);
     expect(rows()).toHaveLength(3);
     expect(world().leads.leads.find((x: any) => x.id === l.id)!.status).toBe("new"); // writing versions changes no stage
   });
@@ -304,5 +304,18 @@ describe("what the lead's message list shows", () => {
     const after = await listMessages(user(), l.id) as any;
     expect(after.messages[0].status).toBe("sent");
     expect(after.messages[0].scorecard).toBeUndefined();
+  });
+});
+
+describe("three versions, three different pieces of research", () => {
+  it("each version's prompt names a different lead point, and the timeline keeps what each was built on", async () => {
+    const l = await researched();
+    const r: any = await draftOutreachVariants(user(), l.id);
+    expect(r.ok).toBe(true);
+    const leadsShown = prompts.map((m) => (m[1].content.match(/<untrusted source="lead">([\s\S]*?)<\/untrusted>/) ?? [])[1]).filter(Boolean);
+    expect(leadsShown.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(leadsShown).size).toBe(leadsShown.length);
+    const ev = world().leads.events.find((e: any) => e.leadId === l.id && e.kind === "variants_created") as any;
+    expect(Object.keys(ev.data.bases)).toHaveLength(r.variants.length);
   });
 });

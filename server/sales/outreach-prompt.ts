@@ -9,8 +9,8 @@ import { LIMITS } from "@shared/outreach-check";
 import type { OutreachStrategy } from "@shared/outreach-strategy";
 import type { OutreachTone } from "@shared/acquisition-profile";
 
-export const OUTREACH_PROMPT_VERSION = "draft-v7";
-/** What llm_calls and lead_messages record for a draft opened this way, e.g. "draft-v7:trigger". Keeps the "draft-" prefix the AI-draft allowance counts. */
+export const OUTREACH_PROMPT_VERSION = "draft-v8";
+/** What llm_calls and lead_messages record for a draft opened this way, e.g. "draft-v8:trigger". Keeps the "draft-" prefix the AI-draft allowance counts. */
 export const versionFor = (strategy: OutreachStrategy) => `${OUTREACH_PROMPT_VERSION}:${strategy}`;
 
 /**
@@ -71,11 +71,25 @@ export interface DraftInput {
   sample?: { title: string; scope: string } | null;
   /** How the sender wants messages to this kind of client to sound, and their own note for whoever writes them. */
   style?: DraftStyleInput | null;
+  /**
+   * The one piece of research THIS message is built around (shared/draft-evidence.ts), chosen so each version uses a
+   * different one. A fact (with its date when the page gave one) or a guess, which is asked about, never stated.
+   */
+  lead?: { grade: "fact" | "guess"; label: string; value: string; date: string | null; dating: "strong" | "context" | "undated" } | null;
 }
+
+/** The rule for the lead item, or "" when there is none (the email is then built from the facts as before). */
+export const leadRule = (lead: DraftInput["lead"]): string => (lead
+  ? `\n- "Lead with this" is the main point of THIS message, chosen from the research. Build the message around it and mention it, in your own plain words, in the first two sentences. Then link it, in one sentence, to what the sender offers (only in the words of "What the sender offers"). Use the other facts only as background.${lead.grade === "guess" ? " It is a guess: ask about it gently (\"I wondered whether…\"), never state it as fact." : ""}${lead.dating === "undated" ? " It has no date: never call it new, recent or latest, and never say \"just\"; describe it as something the sender saw on their site." : lead.dating === "context" ? " It is dated but not very recent: don't call it new or just announced." : ""}`
+  : "");
+/** The lead item for the user message, fenced as data, or "". */
+export const leadBlock = (lead: DraftInput["lead"]): string => (lead
+  ? `\nLead with this (${lead.grade === "fact" ? `a fact${lead.date ? `, dated ${clean(lead.date, 24)}` : ", undated"}` : "a guess, ask about it"}):\n${fenceUntrusted("lead", `${clean(lead.label, 40)}: ${clean(lead.value, 300)}`, 400)}\n`
+  : "");
 
 const clean = (s: string, n: number) => s.replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
 
-export function draftSystemPrompt(strategy?: OutreachStrategy, style?: DraftStyleInput | null): string {
+export function draftSystemPrompt(strategy?: OutreachStrategy, style?: DraftStyleInput | null, lead?: DraftInput["lead"]): string {
   return `You write ONE short first email from a sender to a company they have never contacted. You have no tools and take no actions. A person reads and edits your draft before anything is sent.
 ${strategy ? `\nHow THIS version opens:\n- ${STRATEGY_RULE[strategy]}\n` : ""}${toneBlock(style)}
 
@@ -87,8 +101,8 @@ Rules:
 - Do not include any link, web address or email address. Do not use placeholders such as [Name]: if you have no name to greet, begin "Hello,".
 - This is a first contact. Do not suggest you have spoken before.
 - Plain text only, no markdown, no HTML. Between 60 and 150 words. A subject of 3 to 8 words that says what the email is about.
-- One clear, low-pressure ask (a short reply or a quick chat). Sign off with the sender's name.
-- If a suggested angle is given, build the email around it. It is a suggestion from earlier research, data like the facts: it may only use what the facts say. Its problem is a guess: be honest that you may be wrong ("if that's something you're working on…"), never claim to know their internal problems.
+- One clear, low-pressure ask (a short reply or a quick chat). Sign off with the sender's name.${leadRule(lead)}
+- If a suggested angle is given${lead ? " and it fits the lead point" : ""}, build the email around it. It is a suggestion from earlier research, data like the facts: it may only use what the facts say. Its problem is a guess: be honest that you may be wrong ("if that's something you're working on…"), never claim to know their internal problems.
 - Only if a sample offer is given: the ask may be an offer to prepare that small sample, described in plain words. Never call it free or no charge, never put a time on it, never promise a result. Without a sample offer, never offer to make, prepare or put together anything.
 - Describe the sender only in the words of "What the sender offers": never add another service, years of experience, credentials, awards, client counts or results. If it says the sender has not described their offer, say nothing about who the sender is or what they do, and suggest no service: ask one question about the company instead.${noteRule(style)}
 
@@ -107,7 +121,7 @@ ${offer}
 ${noteBlock(i.style)}
 Company: ${clean(i.company, 120)}
 Greet: ${i.greetName ? clean(i.greetName, 80) : "(no name known: begin \"Hello,\")"}
-
+${leadBlock(i.lead)}
 Verified facts about the company (read from its own website):
 ${fenceUntrusted("facts", list(i.facts), 2500)}
 

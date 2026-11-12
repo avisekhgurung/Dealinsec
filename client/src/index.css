@@ -115,6 +115,15 @@
   --destructive-foreground: 0 0% 98%;
   --input: 215 20% 75%;
   --ring: 160 84% 30%;
+  /* Outreach Studio channel accents (12 Nov 2026): icon fill, the selected marker and faint tints only, never text. */
+  --ch-email: 160 84% 30%;
+  --ch-whatsapp: 142 70% 40%;
+  --ch-linkedin: 210 90% 40%;
+  --ch-instagram: 335 85% 50%;
+  --ch-x: 0 0% 9%;
+  --ch-messenger: 205 100% 45%;
+  --evidence-fact: 160 84% 30%;
+  --evidence-guess: 262 60% 55%;
   --chart-1: 160 84% 30%;
   --chart-2: 174 77% 36%;
   --chart-3: 215 28% 40%;
@@ -222,6 +231,14 @@
   --destructive-foreground: 0 0% 98%;
   --input: 215 20% 30%;
   --ring: 160 70% 45%;
+  --ch-email: 160 70% 45%;
+  --ch-whatsapp: 142 70% 49%;
+  --ch-linkedin: 210 90% 60%;
+  --ch-instagram: 335 90% 62%;
+  --ch-x: 0 0% 96%;
+  --ch-messenger: 200 100% 60%;
+  --evidence-fact: 160 70% 45%;
+  --evidence-guess: 262 80% 75%;
   --chart-1: 160 70% 50%;
   --chart-2: 174 70% 55%;
   --chart-3: 215 30% 70%;

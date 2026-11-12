@@ -141,7 +141,7 @@ export class DbLeadsStore implements LeadsStore {
 
   async addEvent(orgId: string, leadId: number, e: Parameters<LeadsStore["addEvent"]>[2]): Promise<void> {
     await db.insert(leadEvents).values({ leadId, organizationId: orgId, kind: e.kind, data: e.data ?? null, actor: e.actor, actorUserId: e.actorUserId ?? null });
-    await db.update(leads).set({ updatedAt: new Date() }).where(own(orgId, leadId));
+    if (!e.quiet) await db.update(leads).set({ updatedAt: new Date() }).where(own(orgId, leadId));
   }
 
   async addTicket(orgId: string, leadId: number, t: Parameters<LeadsStore["addTicket"]>[2]): Promise<LeadTicket> {

@@ -36,6 +36,7 @@ const DealsPage               = lazy(() => import("@/pages/deals"));
 const LeadsPage               = lazy(() => import("@/pages/leads"));
 const OutboundPage            = lazy(() => import("@/pages/outbound"));
 const LeadDetailsPage         = lazy(() => import("@/pages/lead-details"));
+const OutreachStudioPage      = lazy(() => import("@/pages/outreach-studio"));
 const CreateDealPage          = lazy(() => import("@/pages/create-deal"));
 const EditDealPage            = lazy(() => import("@/pages/edit-deal"));
 const DealDetailsPage         = lazy(() => import("@/pages/deal-details"));
@@ -227,6 +228,7 @@ function Router() {
             <Route path="/ai-league/:bot" component={AiLeaguePage} />
             <Route path="/outbound" component={OutboundPage} />
             <Route path="/leads" component={LeadsPage} />
+            <Route path="/leads/:id/outreach" component={OutreachStudioPage} />
             <Route path="/leads/:id" component={LeadDetailsPage} />
             <Route path="/deals" component={DealsPage} />
             <Route path="/deals/new" component={CreateDealPage} />

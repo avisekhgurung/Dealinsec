@@ -22,7 +22,7 @@ import { agentLog } from "../agent/log";
 import { leadsTablesReady } from "../leads/store";
 import * as sales from "../services/sales";
 import { getResearch, startResearch } from "./research";
-import { addSuppression, approveMessage, cancelMessage, chooseVariant, draftOutreach, draftOutreachVariants, editDraft, listMessages, listOutreachQueue, listSuppressions, markSent, openApproved, recordOutcome, removeSuppression, writeOwnMessage } from "./outreach";
+import { addSuppression, approveMessage, cancelMessage, chooseVariant, draftOutreach, draftOutreachVariants, editDraft, listMessages, listOutreachQueue, listSuppressions, markSent, openApproved, recordOutcome, removeSuppression, rewriteDraft, writeOwnMessage } from "./outreach";
 import { messagesTablesReady } from "./message-store";
 import { strategyStats } from "./strategy-stats";
 import { salesTablesReady } from "./research-store";
@@ -146,6 +146,7 @@ export function registerSalesRoutes(app: Express) {
   const addAllowed = (userId: string) => { const now = Date.now(), recent = (addsByUser.get(userId) ?? []).filter((t) => now - t < 3_600_000); if (recent.length >= 60) return false; recent.push(now); addsByUser.set(userId, recent); return true; };
   app.get("/api/sales/outreach", isAuthenticated, gate, messagesGate, plain("sales_outreach_queue", async (req, res) => reply(res, await listOutreachQueue(req.user, { status: req.query?.status }), (r) => ({ items: r.items }))));
   app.get("/api/sales/outreach/strategy-stats", isAuthenticated, gate, messagesGate, plain("sales_strategy_stats", async (req, res) => reply(res, await strategyStats(req.user, { days: req.query?.days }), (r) => ({ days: r.days, rows: r.rows }))));
+  app.post("/api/sales/messages/:id/rewrite", isAuthenticated, gate, messagesGate, guarded("sales_message_rewrite", async (req, res, id) => reply(res, await rewriteDraft(req.user, id, req.body), (r) => ({ message: r.message, action: r.action }))));
   app.post("/api/sales/messages/:id/outcome", isAuthenticated, gate, messagesGate, guarded("sales_message_outcome", async (req, res, id) => reply(res, await recordOutcome(req.user, id, req.body), (r) => ({ outcome: r.outcome, already: r.already, suppressed: r.suppressed, cancelled: r.cancelled, movedTo: r.movedTo }))));
   app.get("/api/sales/suppressions", isAuthenticated, gate, plain("sales_suppressions", async (req, res) => reply(res, await listSuppressions(req.user), (r) => ({ entries: r.entries }))));
   app.post("/api/sales/suppressions", isAuthenticated, gate, plain("sales_suppression_add", async (req, res) => {

@@ -44,7 +44,9 @@ const STATE_LABEL: Record<string, string> = {
 const TO_LABEL: Record<ShortChannel, { label: string; placeholder: string }> = {
   whatsapp: { label: "WhatsApp number", placeholder: "+91 98765 43210" },
   linkedin: { label: "LinkedIn profile or company page (optional)", placeholder: "linkedin.com/in/their-name" },
+  instagram: { label: "Instagram username (optional)", placeholder: "@theirbusiness" },
   x: { label: "X handle (optional)", placeholder: "@theirhandle" },
+  messenger: { label: "Facebook Page (optional)", placeholder: "facebook.com/theirpage" },
 };
 const UNSENT = ["draft", "approved", "sending", "uncertain", "failed"];
 
@@ -97,7 +99,9 @@ function ChannelComposer({ leadId, channel, status, search }: { leadId: number; 
           </span>
         </div>
 
-        {channel === "whatsapp" && <OptInBox leadId={leadId} contacts={contacts} canRun={canRun} api={api} onChange={done} />}
+        {/* The permission record is what Meta requires when DealInSec sends through the API. When the person sends from
+            their own WhatsApp, DealInSec only writes the text: no form first (founder, 12 Nov 2026). */}
+        {channel === "whatsapp" && api && <OptInBox leadId={leadId} contacts={contacts} canRun={canRun} api={api} onChange={done} />}
         {!current && canRun && <ProfileStyleNote style={q.data?.style} channel={channel} />}
 
         {current ? <MessageEditor m={current} api={api} canRun={canRun} contacts={contacts} search={search} onDone={done} onFail={fail} />
@@ -170,10 +174,10 @@ function NewMessage({ leadId, channel, api, contacts, onDone, onFail }: { leadId
   const optedIn = contacts.filter((c) => c.optedIn);
   const windowOpen = optedIn.some((c) => c.windowOpenUntil);
   const [kind, setKind] = useState<MessageKind>(channel === "whatsapp" && api && optedIn.length && !windowOpen ? "template" : kinds[0]);
-  const [to, setTo] = useState(channel === "whatsapp" ? optedIn[0]?.phone ?? "" : "");
+  const [to, setTo] = useState(channel === "whatsapp" && api ? optedIn[0]?.phone ?? "" : "");
   const [text, setText] = useState(""), [own, setOwn] = useState(false), [premium, setPremium] = useState(false);
   const [tpl, setTpl] = useState<{ key: string; params: string[] }>({ key: "", params: [] });
-  useEffect(() => { if (channel === "whatsapp" && !to && optedIn[0]) setTo(optedIn[0].phone); }, [optedIn[0]?.phone]);
+  useEffect(() => { if (channel === "whatsapp" && api && !to && optedIn[0]) setTo(optedIn[0].phone); }, [optedIn[0]?.phone]);
   const templates = useQuery<{ templates: WhatsappTemplate[] }>({ queryKey: [WHATSAPP_TEMPLATES_URL], enabled: kind === "template", retry: false });
   const chosen = templates.data?.templates.find((t) => `${t.name}|${t.language}` === tpl.key) ?? null;
   const max = maxFor(kind, premium);
@@ -186,7 +190,7 @@ function NewMessage({ leadId, channel, api, contacts, onDone, onFail }: { leadId
     onSuccess: () => { setText(""); setOwn(false); onDone(); void refreshDraftAllowance(); },
     onError: (e) => { void refreshDraftAllowance(); onFail("Couldn't write the message")(e); },
   });
-  const needsPermission = channel === "whatsapp" && !optedIn.length;
+  const needsPermission = channel === "whatsapp" && api && !optedIn.length;
   return (
     <div className="space-y-2.5" data-testid="channel-new">
       {kinds.length > 1 && (
@@ -198,7 +202,7 @@ function NewMessage({ leadId, channel, api, contacts, onDone, onFail }: { leadId
         </div>
       )}
       <label className="flex flex-col gap-1 text-[11px] font-medium">{TO_LABEL[channel].label}
-        {channel === "whatsapp" && optedIn.length > 0
+        {channel === "whatsapp" && api && optedIn.length > 0
           ? <select value={to} onChange={(e) => setTo(e.target.value)} className="h-9 rounded-md border bg-background px-2 text-sm">{optedIn.map((c) => <option key={c.phone} value={c.phone}>{c.phone}</option>)}</select>
           : <Input value={to} onChange={(e) => setTo(e.target.value)} placeholder={TO_LABEL[channel].placeholder} className="h-9" disabled={needsPermission} data-testid="channel-to" />}
       </label>

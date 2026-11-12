@@ -9,7 +9,7 @@ import { NAV_ICONS, isMoreActive, mobileBarItems, moreSheetSections } from "@/li
 /**
  * Mobile tab bar — the same lit ink-green surface as the desktop top bar, so
  * the phone app and the desktop app read as one product. Five items share
- * the width equally: Home, Outbound, Leads, Deals and More. "More" opens a
+ * the width equally: Home, Radar, The Nest, Leads and More. "More" opens a
  * bottom sheet with the rest of the product, grouped as on desktop —
  * Documents (Quotations, Agreements), Money (Invoices) and Account (Profile,
  * Settings). Items, gating and active-route rules come from @shared/nav-model;

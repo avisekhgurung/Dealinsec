@@ -19,6 +19,22 @@ import { CHANNEL_TABLES } from "./ddl";
 
 export const channelTablesReady = tablesReadyCheck([...CHANNEL_TABLES]);
 
+/**
+ * Whether channel_messages accepts Instagram and Messenger: true once script/migrate-channels-social.ts has widened its
+ * channel CHECK. Read from the constraint itself, so the app never offers a channel the table would refuse. A yes is
+ * kept; a no is asked again after a minute (the migration may run while the app is up).
+ */
+let socialYes = false, socialCheckedAt = 0;
+export async function socialChannelsReady(): Promise<boolean> {
+  if (socialYes) return true;
+  if (Date.now() - socialCheckedAt < 60_000) return false;
+  socialCheckedAt = Date.now();
+  const r = await db.execute(sql`SELECT pg_get_constraintdef(oid) AS def FROM pg_constraint WHERE conname = 'channel_messages_channel_ck'`);
+  const def = String(((r.rows ?? [])[0] as { def?: string } | undefined)?.def ?? "");
+  socialYes = def.includes("'instagram'") && def.includes("'messenger'");
+  return socialYes;
+}
+
 /** The same lock numbers as email (server/sales/message-store.ts, server/mail/send-store-pg.ts). */
 export const DRAFT_ALLOWANCE_LOCK = 7_310_031;
 export const PLAN_SEND_LOCK = 7_310_032;

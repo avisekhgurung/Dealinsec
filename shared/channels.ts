@@ -14,18 +14,23 @@
  *     your own feed). So DealInSec drafts and the person sends on LinkedIn themselves; nothing is automated or scraped.
  *   - X: Direct Messages need an X developer app with paid API access and the person's OAuth 2.0 authorization;
  *     DealInSec has neither, so X is draft-and-copy only.
+ *   - Instagram and Facebook Messenger (added 12 Nov 2026): Meta's messaging APIs only let a business reply to people
+ *     who wrote to it first, from its own professional account; a first message to a business can't be sent by an app.
+ *     So both are draft-and-copy only: DealInSec writes it, the person opens Instagram or Messenger and sends it.
  * A manual send is recorded as the person saying so ("You marked it sent"), never as a delivery.
  */
 import { contentIssues, type Issue } from "./outreach-check";
 
-export const CHANNELS = ["email", "whatsapp", "linkedin", "x"] as const;
+export const CHANNELS = ["email", "whatsapp", "linkedin", "instagram", "x", "messenger"] as const;
 export type Channel = (typeof CHANNELS)[number];
 /** The channels whose messages live in channel_messages (email keeps lead_messages and its own panel). */
-export const SHORT_CHANNELS = ["whatsapp", "linkedin", "x"] as const;
+export const SHORT_CHANNELS = ["whatsapp", "linkedin", "instagram", "x", "messenger"] as const;
 export type ShortChannel = (typeof SHORT_CHANNELS)[number];
 export const isShortChannel = (c: unknown): c is ShortChannel => typeof c === "string" && (SHORT_CHANNELS as readonly string[]).includes(c);
 
-export const CHANNEL_LABEL: Record<Channel, string> = { email: "Email", whatsapp: "WhatsApp", linkedin: "LinkedIn", x: "X" };
+export const CHANNEL_LABEL: Record<Channel, string> = { email: "Email", whatsapp: "WhatsApp", linkedin: "LinkedIn", instagram: "Instagram", x: "X", messenger: "Messenger" };
+/** The channels added after the table's first CHECK (script/migrate-channels-social.ts): usable once that has run. */
+export const SOCIAL_CHANNELS = ["instagram", "messenger"] as const;
 
 /** How a message on the channel leaves DealInSec: through the provider's API, or by the person, outside DealInSec. */
 export type SendMode = "api" | "manual";
@@ -71,27 +76,34 @@ export interface ChannelStatus {
 export const MESSAGE_KINDS = {
   whatsapp: ["text", "template"],
   linkedin: ["connection_note", "message"],
+  instagram: ["ig_dm"],
   x: ["dm"],
+  messenger: ["fb_message"],
 } as const satisfies Record<ShortChannel, readonly string[]>;
 export type MessageKind = (typeof MESSAGE_KINDS)[ShortChannel][number];
 export const isKindOf = (channel: ShortChannel, kind: unknown): kind is MessageKind =>
   typeof kind === "string" && (MESSAGE_KINDS[channel] as readonly string[]).includes(kind);
 
 export const KIND_LABEL: Record<MessageKind, string> = {
-  text: "Message (inside the 24-hour window)", template: "Approved template",
+  // Not "inside the 24-hour window": most people send WhatsApp from their own phone, where that rule doesn't apply.
+  // When DealInSec sends through the API, the window is explained on the message itself (channel-panel).
+  text: "WhatsApp message", template: "Approved template",
   connection_note: "Connection request note", message: "Message to a connection", dm: "Direct message",
+  ig_dm: "Instagram message", fb_message: "Messenger message",
 };
 
 /**
  * The most characters each kind may have. LinkedIn's connection-request note is 200 characters on a free account and
  * 300 with Premium (LinkedIn shows its own counter: check it there); a LinkedIn message is about 8,000; an X Direct
- * Message is 10,000; a WhatsApp text body 4,096 (Cloud API). Drafts are written much shorter than these.
+ * Message is 10,000; a WhatsApp text body 4,096 (Cloud API); an Instagram direct message 1,000 and a Messenger message
+ * 2,000 (Meta's messaging limits). Drafts are written much shorter than these.
  */
-export const KIND_MAX: Record<MessageKind, number> = { text: 4096, template: 1024, connection_note: 200, message: 8000, dm: 10000 };
+export const KIND_MAX: Record<MessageKind, number> = { text: 4096, template: 1024, connection_note: 200, message: 8000, dm: 10000, ig_dm: 1000, fb_message: 2000 };
 export const LINKEDIN_NOTE_PREMIUM_MAX = 300;
 /** What a model-written draft aims for (well under the limits; a short first message reads better on these channels). */
 export const KIND_DRAFT_TARGET: Record<MessageKind, { min: number; max: number }> = {
   text: { min: 60, max: 600 }, template: { min: 1, max: 1024 }, connection_note: { min: 60, max: 200 }, message: { min: 120, max: 900 }, dm: { min: 60, max: 500 },
+  ig_dm: { min: 60, max: 400 }, fb_message: { min: 60, max: 500 },
 };
 export const maxFor = (kind: MessageKind, premium = false) => (kind === "connection_note" && premium ? LINKEDIN_NOTE_PREMIUM_MAX : KIND_MAX[kind]);
 
@@ -145,10 +157,38 @@ export function xHandle(v: unknown): string | null {
   return /^[A-Za-z0-9_]{1,15}$/.test(s) ? s : null;
 }
 
+/** An Instagram username ("@name", "name" or an instagram.com profile link) as "name"; null otherwise. */
+export function instagramHandle(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  let s = v.trim();
+  const link = s.match(/^(?:https?:\/\/)?(?:www\.|m\.)?instagram\.com\/([A-Za-z0-9._]{1,30})\/?(?:[?#].*)?$/i);
+  if (link) s = link[1];
+  s = s.replace(/^@/, "");
+  // Instagram usernames: letters, numbers, dots and underscores, up to 30; never starting or ending with a dot.
+  if (!/^[A-Za-z0-9._]{1,30}$/.test(s) || s.startsWith(".") || s.endsWith(".") || s.includes("..")) return null;
+  if (["p", "reel", "reels", "explore", "stories", "direct", "accounts"].includes(s.toLowerCase())) return null;
+  return s;
+}
+
+/** A Facebook Page for Messenger (a facebook.com or m.me link, or the Page's username) as its username; null otherwise. */
+export function messengerPage(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  let s = v.trim();
+  const link = s.match(/^(?:https?:\/\/)?(?:www\.|m\.|web\.)?(?:facebook\.com|fb\.com|m\.me)\/([A-Za-z0-9.]{5,50})\/?(?:[?#].*)?$/i);
+  if (link) s = link[1];
+  s = s.replace(/^@/, "");
+  if (!/^[A-Za-z0-9.]{5,50}$/.test(s) || s.startsWith(".") || s.endsWith(".")) return null;
+  if (["profile.php", "pages", "groups", "watch", "events", "marketplace", "messages"].includes(s.toLowerCase())) return null;
+  return s;
+}
+
 /** Where the person goes to send by hand. Only a page they open themselves; DealInSec never acts there. */
 export function externalUrl(channel: ShortChannel, to: string | null, search?: string): string | null {
   if (channel === "linkedin") return to ?? (search ? `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(search)}` : null);
   if (channel === "x") return to ? `https://x.com/${to}` : search ? `https://x.com/search?q=${encodeURIComponent(search)}&f=user` : null;
+  // ig.me/m/<username> and m.me/<page> are Meta's own links that open a message thread with that account.
+  if (channel === "instagram") return to ? `https://ig.me/m/${encodeURIComponent(to)}` : null;
+  if (channel === "messenger") return to ? `https://m.me/${encodeURIComponent(to)}` : null;
   return null;
 }
 

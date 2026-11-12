@@ -19,11 +19,12 @@
  */
 import { z } from "zod";
 import {
-  KIND_LABEL, CHANNEL_LABEL, checkChannelDraft, checkChannelText, isKindOf, isShortChannel, isStopReply, linkedinUrl, maxFor, normalPhone, statusLabel, xHandle,
+  KIND_LABEL, CHANNEL_LABEL, SOCIAL_CHANNELS, checkChannelDraft, checkChannelText, instagramHandle, isKindOf, isShortChannel, isStopReply, linkedinUrl, maxFor, messengerPage, normalPhone, statusLabel, xHandle,
   type ChannelStatus, type ChannelMessageStatus, type DeliveryState, type MessageKind, type SendMode, type ShortChannel,
 } from "@shared/channels";
 import { hashDraft } from "@shared/outreach-hash";
-import { scopeIssues } from "@shared/outreach-check";
+import { contentIssues, scopeIssues } from "@shared/outreach-check";
+import { REWRITES_PER_MESSAGE, REWRITE_ACTIONS, REWRITE_PROMPT_VERSION, rewriteSystemPrompt, rewriteUserMessage, type RewriteAction } from "../outreach-studio/rewrite-prompt";
 import { pathToContacted } from "@shared/outreach-safety";
 import { canMove, type LeadStatus } from "@shared/leads";
 import { siteHost } from "@shared/research";
@@ -47,7 +48,8 @@ import { CHANNEL_PROMPT_VERSION, channelSystemPrompt, channelUserMessage } from 
 import type { DraftInput } from "../sales/outreach-prompt";
 import { profileStyleView, type ProfileStyle as DraftStyle, type ProfileStyleView as StyleView } from "@shared/acquisition-profile";
 import { offerDescribed } from "@shared/outreach-check";
-import { ChannelAllowanceReached, ChannelDraftExists, ConnectionExists, channelStore, channelTablesReady, type ChannelStore } from "./store";
+import { basisOf, buildDraftEvidence } from "@shared/draft-evidence";
+import { ChannelAllowanceReached, ChannelDraftExists, ConnectionExists, channelStore, channelTablesReady, socialChannelsReady, type ChannelStore } from "./store";
 import { WhatsappError, fillTemplate, whatsappClient, type WhatsappClient, type WhatsappTemplate } from "./whatsapp-api";
 import { parseNotification, verifySignature } from "./whatsapp-webhook";
 
@@ -76,6 +78,8 @@ export interface ChannelDeps {
   now: () => Date;
   env: NodeJS.ProcessEnv;
   ready: () => Promise<boolean>;
+  /** Instagram and Messenger can be stored (script/migrate-channels-social.ts has run). */
+  socialReady: () => Promise<boolean>;
   tier: (user: Who) => Promise<OutboundTier>;
   /** The email outreach's do-not-contact list and follow-ups (shared with email on purpose). */
   safety: Pick<typeof messageStore, "suppressedMatch" | "addSuppression" | "stopLeadFollowups">;
@@ -88,6 +92,7 @@ export interface ChannelDeps {
 const defaults = (): ChannelDeps => ({
   store: channelStore, wa: whatsappClient(), chat: tracedChat, now: () => new Date(), env: process.env,
   ready: async () => { try { return await channelTablesReady(); } catch { return false; } },
+  socialReady: async () => { try { return await socialChannelsReady(); } catch { return false; } },
   tier: outboundTier, safety: messageStore, safetyReady: async () => { try { return await outreachSafetyReady(); } catch { return false; } },
   style: async (orgId, leadId) => { try { return await (await import("../profiles/style")).styleForDraft(orgId, leadId); } catch { return null; } },
   recordProviderCall: async (r) => { const { outboundStore } = await import("../outbound/store"); await outboundStore.recordProviderCall({ ...r, runId: null }); },
@@ -102,6 +107,8 @@ export interface ChannelMessageView {
   to: string | null; template: { name: string; language: string; params: string[] } | null;
   status: ChannelMessageStatus | "received"; statusLabel: string; sentVia: SendMode | null; delivery: DeliveryState | null; errorCode: string | null;
   edited: boolean; createdBy: string; createdAt: string; approvedAt: string | null; sentAt: string | null; deliveredAt: string | null; readAt: string | null; repliedAt: string | null;
+  /** Written by the model (false: the person wrote it, or a template). */
+  byAi: boolean;
 }
 const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : null);
 export function channelMessageView(m: ChannelMessageRow): ChannelMessageView {
@@ -114,6 +121,7 @@ export function channelMessageView(m: ChannelMessageRow): ChannelMessageView {
     statusLabel: direction === "in" ? "Received" : statusLabel({ status: m.status as ChannelMessageStatus, sentVia: m.sentVia as SendMode | null, delivery: m.delivery as DeliveryState | null, repliedAt: iso(m.repliedAt), channel }),
     sentVia: m.sentVia as SendMode | null, delivery: m.delivery as DeliveryState | null, errorCode: m.errorCode, edited: m.edited, createdBy: m.createdBy,
     createdAt: iso(m.createdAt)!, approvedAt: iso(m.approvedAt), sentAt: iso(m.sentAt), deliveredAt: iso(m.deliveredAt), readAt: iso(m.readAt), repliedAt: iso(m.repliedAt),
+    byAi: !!m.promptVersion,
   };
 }
 export interface WhatsappContactView { phone: string; optedIn: boolean; optInSource: string | null; optedInAt: string | null; optedOut: boolean; windowOpenUntil: string | null }
@@ -140,25 +148,43 @@ async function phoneSuppressed(orgId: string, phone: string, deps: ChannelDeps) 
   } catch { return LIST_UNREADABLE(); }
 }
 
-/** A WhatsApp number this workspace may message: opted in (recorded), not opted out, not on the list. */
-async function whatsappPermission(orgId: string, phone: string, deps: ChannelDeps): Promise<{ ok: true; contact: WhatsappContactRow } | { ok: false; refusal: ReturnType<typeof fail> }> {
+/**
+ * A WhatsApp number this workspace may message: not on the do-not-contact list, not opted out, and, when DealInSec
+ * itself sends it (`requireOptIn`), opted in on record. Meta requires that recorded opt-in for messages sent through
+ * the API. When the person sends from their own WhatsApp ("Open WhatsApp"), DealInSec only writes the text, so it
+ * doesn't make them fill in a permission form first (founder, 12 Nov 2026); the list and opt-outs still apply.
+ */
+async function whatsappPermission(orgId: string, phone: string, deps: ChannelDeps, requireOptIn = true): Promise<{ ok: true; contact: WhatsappContactRow | null } | { ok: false; refusal: ReturnType<typeof fail> }> {
   const listed = await phoneSuppressed(orgId, phone, deps);
   if (listed) return { ok: false, refusal: listed };
   const c = await deps.store.contact(orgId, phone);
   if (c?.optedOutAt) return { ok: false, refusal: fail(409, "opted_out", "This number asked not to get WhatsApp messages from you, so nothing can be sent to it.") };
-  if (!c?.optedInAt) return { ok: false, refusal: fail(409, "no_opt_in", "WhatsApp needs their permission first. Record how this person agreed to hear from you on WhatsApp; a phone number found online isn't permission.") };
-  return { ok: true, contact: c };
+  if (requireOptIn && !c?.optedInAt) return { ok: false, refusal: fail(409, "no_opt_in", "WhatsApp needs their permission first. Record how this person agreed to hear from you on WhatsApp; a phone number found online isn't permission.") };
+  return { ok: true, contact: c ?? null };
+}
+/** Whether DealInSec sends this workspace's WhatsApp itself (switched on, allowed, a working connected number). */
+async function whatsappSendsHere(orgId: string, deps: ChannelDeps): Promise<boolean> {
+  const cfg = whatsappConfig(deps.env);
+  if (!cfg.configured || !cfg.allowed(orgId)) return false;
+  const conn = await deps.store.liveConnection(orgId);
+  return conn?.status === "active";
 }
 
-/** Where a message goes, normalized for its channel; LinkedIn and X may be left empty (a search link is offered instead). */
+/** Where a message goes, normalized for its channel; LinkedIn, X, Instagram and Messenger may be left empty for now. */
+const BAD_RECIPIENT: Record<Exclude<ShortChannel, "whatsapp">, string> = {
+  linkedin: "That isn't a LinkedIn profile or company page link (linkedin.com/in/… or /company/…).",
+  x: "That isn't an X handle (letters, digits and _, up to 15).",
+  instagram: "That isn't an Instagram username (letters, numbers, dots and _, up to 30) or instagram.com link.",
+  messenger: "That isn't a Facebook Page (its facebook.com or m.me link, or its username).",
+};
 function recipient(channel: ShortChannel, raw: unknown): { ok: true; to: string | null } | { ok: false; refusal: ReturnType<typeof fail> } {
   if (channel === "whatsapp") {
     const p = normalPhone(raw);
     return p ? { ok: true, to: p } : { ok: false, refusal: fail(422, "no_phone", "Add their WhatsApp number with the country code, for example +91 98765 43210.") };
   }
   if (raw === undefined || raw === null || (typeof raw === "string" && !raw.trim())) return { ok: true, to: null };
-  const to = channel === "linkedin" ? linkedinUrl(raw) : xHandle(raw);
-  return to ? { ok: true, to } : { ok: false, refusal: fail(422, "bad_recipient", channel === "linkedin" ? "That isn't a LinkedIn profile or company page link (linkedin.com/in/… or /company/…)." : "That isn't an X handle (letters, digits and _, up to 15).") };
+  const to = channel === "linkedin" ? linkedinUrl(raw) : channel === "x" ? xHandle(raw) : channel === "instagram" ? instagramHandle(raw) : messengerPage(raw);
+  return to ? { ok: true, to } : { ok: false, refusal: fail(422, "bad_recipient", BAD_RECIPIENT[channel]) };
 }
 
 /* ── status ──────────────────────────────────────────────────────────────── */
@@ -176,7 +202,7 @@ export async function channelStatuses(user: Who, d: Partial<ChannelDeps> = {}): 
   // Switched off for this workspace (the flag, a setting, or not on the pilot list) is not a fault the person can fix:
   // WhatsApp then works the way LinkedIn and X do here. The message is written in DealInSec and
   // "Open WhatsApp" sends it from their own WhatsApp. So it reads "Drafts only: you send it", not "Not switched on".
-  else if (!cfg.configured || !cfg.allowed(orgId)) whatsapp = { channel: "whatsapp", state: "sending_unavailable", mode: "manual", capabilities: waCaps(false), note: "Write the message here, then press Open WhatsApp to send it from your own WhatsApp. Only to people who agreed to hear from you: a number found online isn't permission." };
+  else if (!cfg.configured || !cfg.allowed(orgId)) whatsapp = { channel: "whatsapp", state: "sending_unavailable", mode: "manual", capabilities: waCaps(false), note: "DealInSec writes the message; Open WhatsApp sends it from your own WhatsApp." };
   else {
     const conn = await deps.store.liveConnection(orgId);
     if (!conn) whatsapp = { channel: "whatsapp", state: "awaiting_connection", mode: "manual", capabilities: waCaps(false), note: "No WhatsApp Business number is connected. An owner or admin can connect one in Settings → Integrations; until then you send from your own WhatsApp." };
@@ -184,12 +210,16 @@ export async function channelStatuses(user: Who, d: Partial<ChannelDeps> = {}): 
     else whatsapp = { channel: "whatsapp", state: "ready_to_send", mode: "api", capabilities: waCaps(true), account: conn.displayPhone, note: "Messages go out from your WhatsApp Business number, only to people who agreed to hear from you. Delivery and replies show here." };
   }
   const manualCaps = { draft: true, send: false, deliveryStatus: false, replySync: false, openExternal: true };
+  const social = ready && (await deps.socialReady());
+  const socialOff = "Not switched on in DealInSec yet.";
   return {
     ok: true,
     channels: [
       whatsapp,
       { channel: "linkedin", state: ready ? "sending_unavailable" : "not_configured", mode: "manual", capabilities: manualCaps, note: "LinkedIn doesn't let apps like DealInSec send messages or connection requests. DealInSec writes the note; you copy it and send it on LinkedIn yourself. Replies don't reach DealInSec, so record them yourself." },
       { channel: "x", state: ready ? "sending_unavailable" : "not_configured", mode: "manual", capabilities: manualCaps, note: "Sending Direct Messages from DealInSec would need X's paid API access, which DealInSec doesn't have. DealInSec writes the message; you copy it and send it on X yourself." },
+      { channel: "instagram", state: social ? "sending_unavailable" : "not_configured", mode: "manual", capabilities: manualCaps, note: social ? "Instagram lets only people message a business, not apps. DealInSec writes the message; you open their Instagram and send it yourself. Replies don't reach DealInSec, so record them here." : socialOff },
+      { channel: "messenger", state: social ? "sending_unavailable" : "not_configured", mode: "manual", capabilities: manualCaps, note: social ? "Messenger doesn't let apps start a conversation with a business. DealInSec writes the message; you open Messenger and send it yourself. Replies don't reach DealInSec, so record them here." : socialOff },
     ],
   };
 }
@@ -267,6 +297,7 @@ export async function draftChannelMessage(user: Who, leadId: number, raw: unknow
   if (!parsed.success) return fail(400, "invalid", "That request isn't valid.");
   const i = parsed.data;
   if (!isShortChannel(i.channel) || !isKindOf(i.channel, i.kind)) return fail(400, "invalid", "That channel or message type isn't supported.");
+  if ((SOCIAL_CHANNELS as readonly string[]).includes(i.channel) && !(await deps.socialReady())) return fail(503, "channel_not_ready", `${CHANNEL_LABEL[i.channel]} isn't switched on in DealInSec yet.`);
   const channel = i.channel, kind = i.kind as MessageKind;
   const got = await getLead(user, leadId);
   if (!got.ok) return got;
@@ -277,11 +308,11 @@ export async function draftChannelMessage(user: Who, leadId: number, raw: unknow
   const to = recipient(channel, i.to);
   if (!to.ok) return to.refusal;
   if (channel === "whatsapp") {
-    const perm = await whatsappPermission(orgId, to.to!, deps);
+    const perm = await whatsappPermission(orgId, to.to!, deps, await whatsappSendsHere(orgId, deps));
     if (!perm.ok) return perm.refusal;
   }
 
-  let body: string, promptVersion: string | null = null, claimIds: number[] = [], retried = false, followed: DraftStyle | null = null;
+  let body: string, promptVersion: string | null = null, claimIds: number[] = [], retried = false, followed: DraftStyle | null = null, basis: ReturnType<typeof basisOf> | null = null;
   let template: { name: string; language: string; params: string[] } | null = null;
   if (kind === "template") {
     if (i.write !== "own" || !i.template) return fail(400, "invalid", "Pick an approved template and fill in its values.");
@@ -297,7 +328,7 @@ export async function draftChannelMessage(user: Who, leadId: number, raw: unknow
   } else {
     const ai = await aiDraft(user, lead, claims, channel, kind, deps);
     if (!ai.ok) return ai;
-    ({ body, claimIds, retried, style: followed } = ai);
+    ({ body, claimIds, retried, style: followed, basis } = ai);
     promptVersion = CHANNEL_PROMPT_VERSION;
   }
 
@@ -315,7 +346,7 @@ export async function draftChannelMessage(user: Who, leadId: number, raw: unknow
     if (e instanceof ChannelAllowanceReached) return draftLimit(tier!, plan!.monthlyDrafts);
     throw e;
   }
-  await leadsStore.addEvent(orgId, leadId, { kind: "channel_draft_created", data: { messageId: row.id, channel, kind, ai: !!promptVersion, ...(followed ? { profileId: followed.profileId, tone: followed.tone, noted: !!followed.note.trim() } : {}) }, actor: "user", actorUserId: user.id });
+  await leadsStore.addEvent(orgId, leadId, { kind: "channel_draft_created", data: { messageId: row.id, channel, kind, ai: !!promptVersion, ...(followed ? { profileId: followed.profileId, tone: followed.tone, noted: !!followed.note.trim() } : {}), ...(basis ? { basis } : {}) }, actor: "user", actorUserId: user.id });
   return { ok: true, message: channelMessageView(row), retried };
 }
 
@@ -323,7 +354,7 @@ const draftLimit = (tier: OutboundTier, max: number) => tier === "free"
   ? fail(402, "NO_CREDITS", `You've used the free plan's ${max} AI drafts for this 30-day period. Upgrade to Pro for more, or write this message yourself.`, { feature: "outbound" })
   : fail(429, "draft_allowance", `You've used the ${max} AI drafts included in ${TIER_LABEL[tier]} for this 30-day period; you can still write this message yourself.`);
 
-async function aiDraft(user: Who, lead: any, claims: any[], channel: ShortChannel, kind: MessageKind, deps: ChannelDeps): Promise<{ ok: true; body: string; claimIds: number[]; retried: boolean; style: DraftStyle | null } | ReturnType<typeof fail>> {
+async function aiDraft(user: Who, lead: any, claims: any[], channel: ShortChannel, kind: MessageKind, deps: ChannelDeps): Promise<{ ok: true; body: string; claimIds: number[]; retried: boolean; style: DraftStyle | null; basis: ReturnType<typeof basisOf> } | ReturnType<typeof fail>> {
   if (kind === "template") return fail(400, "invalid", "A template's wording is fixed by WhatsApp; fill in its values instead.");
   const orgId = user.organizationId!;
   const scoreClaims: ScoreClaim[] = claims.map((c) => ({ id: c.id, field: c.field, value: c.value, status: c.status, evidenceUrl: c.evidenceUrl, createdAt: c.createdAt }));
@@ -354,9 +385,14 @@ async function aiDraft(user: Who, lead: any, claims: any[], channel: ShortChanne
   // The profile's note is the sender's own words too, but a note alone never counts as having described the offer.
   const noted = offerDescribed(input.offer) && style?.note.trim() ? { about: [input.offer.about, style.note].filter(Boolean).join(". "), services: input.offer.services } : input.offer;
   const scope = { sampleOffered: false, offer: noted };
+  // The same ranked research as an email (shared/draft-evidence.ts): the message is built around its strongest point.
+  const findings = await (async () => { try { const { outboundStore } = await import("../outbound/store"); const p = await outboundStore.prospectByLead(orgId, lead.id); return p ? await outboundStore.findings(orgId, p.id) : null; } catch { return null; } })();
+  const evidence = buildDraftEvidence({ claims: claims.map((c) => ({ id: c.id, field: c.field, value: c.value, status: c.status, evidenceUrl: c.evidenceUrl, source: c.source ?? null, createdAt: c.createdAt })), findings: findings as any, offer: input.offer, now: deps.now() });
+  const leadItem = evidence.leads[0] ?? null;
+  input.lead = leadItem ? { grade: leadItem.grade, label: leadItem.label, value: leadItem.value, date: leadItem.date, dating: leadItem.dating } : null;
   const site = siteHost(lead.domain || (() => { try { return new URL(lead.website ?? "").hostname; } catch { return ""; } })());
   const trace = { task: "draft" as const, orgId, userId: user.id, leadId: lead.id, promptVersion: CHANNEL_PROMPT_VERSION };
-  const messages: ChatMessage[] = [{ role: "system", content: channelSystemPrompt(channel, kind, input.style) }, { role: "user", content: channelUserMessage(input) }];
+  const messages: ChatMessage[] = [{ role: "system", content: channelSystemPrompt(channel, kind, input.style, input.lead) }, { role: "user", content: channelUserMessage(input) }];
   let text: string | null = null, issues: { code: string; message: string }[] = [], retried = false;
   try {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -375,7 +411,7 @@ async function aiDraft(user: Who, lead: any, claims: any[], channel: ShortChanne
     return fail(502, "model_unavailable", "The writing assistant didn't answer. Try again in a moment.");
   }
   if (!text || issues.length) return fail(422, "draft_rejected", "The draft didn't pass the safety checks, so it wasn't saved. Try again, or write the message yourself.", { issues: issues.map((x) => x.code) });
-  return { ok: true, body: text, claimIds: [...facts, ...angles].map((f) => f.id), retried, style };
+  return { ok: true, body: text, claimIds: [...facts, ...angles].map((f) => f.id), retried, style, basis: basisOf(leadItem, evidence.profile, evidence.thin) };
 }
 
 /* ── edit, approve, cancel ───────────────────────────────────────────────── */
@@ -419,12 +455,74 @@ export async function editChannelMessage(user: Who, id: number, raw: unknown, d:
   if (parsed.data.to !== undefined) {
     const to = recipient(channel, parsed.data.to);
     if (!to.ok) return to.refusal;
-    if (channel === "whatsapp") { const perm = await whatsappPermission(user.organizationId!, to.to!, deps); if (!perm.ok) return perm.refusal; }
+    if (channel === "whatsapp") { const perm = await whatsappPermission(user.organizationId!, to.to!, deps, await whatsappSendsHere(user.organizationId!, deps)); if (!perm.ok) return perm.refusal; }
     toAddress = to.to;
   }
   const next = await deps.store.transition({ orgId: user.organizationId!, id, from: ["draft", "approved"], set: { body, bodyHash: hashDraft("", body), toAddress, templateParams: params, status: "draft", edited: true, approvedAt: null, approvedBy: null, updatedAt: deps.now() } });
   if (!next) return fail(409, "changed", "That message changed meanwhile. Reload and try again.");
   return { ok: true, message: channelMessageView(next) };
+}
+
+/**
+ * Mika improves a channel message already written (Outreach Studio): the same actions and limits as email
+ * (server/sales/outreach.ts rewriteDraft). A WhatsApp template's wording is WhatsApp's, so it can't be rewritten.
+ */
+export async function rewriteChannelMessage(user: Who, id: number, raw: unknown, d: Partial<ChannelDeps> = {}): Promise<Result<{ message: ChannelMessageView; action: RewriteAction }>> {
+  const deps = { ...defaults(), ...d };
+  const gate = writeGate(user);
+  if (gate) return gate;
+  if (!(await deps.ready())) return NOT_SETUP();
+  const action = (raw as { action?: unknown })?.action, bodyHash = (raw as { bodyHash?: unknown })?.bodyHash;
+  if (typeof action !== "string" || !(REWRITE_ACTIONS as readonly string[]).includes(action)) return fail(400, "invalid", "Say how Mika should improve it.");
+  const l = await loadOwn(user, id, deps);
+  if (!l.ok) return l.refusal;
+  const stop = blocked(l.lead);
+  if (stop) return stop;
+  const { row } = l, channel = row.channel as ShortChannel, kind = row.kind as MessageKind;
+  if (kind === "template") return fail(409, "not_rewritable", "A template's wording is fixed by WhatsApp.");
+  if (row.status !== "draft" && row.status !== "approved") return fail(409, "not_editable", "Only a message that hasn't been sent can be changed.");
+  if (bodyHash !== row.bodyHash) return fail(409, "changed", "The message changed, so Mika didn't rewrite it. Try again.");
+  const orgId = user.organizationId!;
+  const got = await getLead(user, row.leadId);
+  const done = got.ok ? got.detail.events.filter((e) => e.kind === "draft_rewritten" && (e.data as { messageId?: unknown; channel?: unknown } | null)?.messageId === id && (e.data as { channel?: unknown }).channel === channel).length : 0;
+  if (done >= REWRITES_PER_MESSAGE) return fail(429, "rewrite_limit", `Mika has improved this message ${REWRITES_PER_MESSAGE} times. Edit it by hand from here.`);
+  const budget = (e: unknown) => e instanceof WorkspaceBudgetExceeded ? fail(429, "workspace_budget", "This workspace's AI usage for the last 30 days has reached its limit.")
+    : e instanceof GlobalCapExceeded ? fail(429, "global_limit", "Today's AI budget for drafting is used up for everyone on DealInSec. It resets at midnight UTC.")
+      : e instanceof CapExceeded ? fail(429, "daily_limit", `You've used today's ${dailyLimit("draft")} drafts. Try again tomorrow.`)
+        : e instanceof CapUnavailable ? fail(503, "SALES_NOT_SETUP", "The writing assistant isn't set up on this server yet.") : null;
+  try { await assertWithinCap("draft", orgId); } catch (e) { const r = budget(e); if (r) return r; throw e; }
+  const { getIdealClient } = await import("../services/ideal-client");
+  const ideal = await getIdealClient(user);
+  const offer = ideal.ok ? { about: ideal.profile.about, services: ideal.profile.services } : { about: null, services: [] };
+  const style = await styleOf(deps, orgId, row.leadId);
+  const noted = offerDescribed(offer) && style?.note.trim() ? { about: [offer.about, style.note].filter(Boolean).join(". "), services: offer.services } : offer;
+  const site = siteHost(l.lead.domain || (() => { try { return new URL(l.lead.website ?? "").hostname; } catch { return ""; } })());
+  const trace = { task: "draft" as const, orgId, userId: user.id, leadId: row.leadId, promptVersion: `${REWRITE_PROMPT_VERSION}:${action}` };
+  const messages: ChatMessage[] = [{ role: "system", content: rewriteSystemPrompt("short", action as RewriteAction) }, { role: "user", content: rewriteUserMessage({ body: row.body ?? "", channel: CHANNEL_LABEL[channel] }) }];
+  let text: string | null = null, issues: { code: string; message: string }[] = [];
+  try {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const reply = await deps.chat(trace, messages, { maxTokens: 1200, model: modelFor("draft") });
+      const parsed = parseJsonObject(reply.content) as { text?: unknown } | null;
+      text = parsed && typeof parsed.text === "string" ? parsed.text.replace(/\r\n/g, "\n").trim() : null;
+      // The person's own length is fine (it may be longer than a model draft aims for); the content rules are a draft's.
+      issues = text ? [...checkChannelText(text, kind), ...contentIssues(text.slice(0, 2000), { to: "", siteHost: site }), ...scopeIssues({ subject: "", body: text }, { sampleOffered: false, offer: noted })] : [{ code: "body_length", message: "Reply with only the JSON object: {\"text\":...}." }];
+      if (!issues.length) break;
+      messages.push({ role: "assistant", content: reply.content ?? "" }, { role: "user", content: `That version cannot be used. Fix these problems and return the JSON object again:\n${issues.map((x) => `- ${x.message}`).join("\n")}` });
+    }
+  } catch (e) {
+    const r = budget(e);
+    if (r) return r;
+    agentLog("error", { errorType: (e as Error)?.name ?? "Error", where: "channel_rewrite", code: e instanceof ProviderError ? e.code : "internal" });
+    return fail(502, "model_unavailable", "Mika couldn't finish. Nothing was changed. Try again.");
+  }
+  if (!text || issues.length) return fail(422, "draft_rejected", "Mika's version didn't pass the checks, so your message is unchanged.", { issues: issues.map((i) => i.code) });
+  const hash = hashDraft("", text);
+  if (hash === row.bodyHash) return { ok: true, message: channelMessageView(row), action: action as RewriteAction };
+  const next = await deps.store.transition({ orgId, id, from: [row.status as "draft" | "approved"], hash: row.bodyHash ?? undefined, set: { body: text, bodyHash: hash, status: "draft", approvedAt: null, approvedBy: null, updatedAt: deps.now() } });
+  if (!next) return fail(409, "changed", "The message changed, so Mika didn't rewrite it. Try again.");
+  await leadsStore.addEvent(orgId, row.leadId, { kind: "draft_rewritten", data: { messageId: id, action, channel }, actor: "user", actorUserId: user.id });
+  return { ok: true, message: channelMessageView(next), action: action as RewriteAction };
 }
 
 const hashOk = (h: unknown): h is string => typeof h === "string" && /^[a-f0-9]{64}$/.test(h);
@@ -442,7 +540,7 @@ export async function approveChannelMessage(user: Who, id: number, bodyHash: unk
   if (l.row.status === "approved" && l.row.bodyHash === bodyHash) return { ok: true, message: channelMessageView(l.row) };
   if (l.row.status !== "draft") return fail(409, "not_draft", "Only a draft can be approved.");
   if (l.row.bodyHash !== bodyHash) return fail(409, "changed", "The message changed since you read it. Read it again and approve that.");
-  if (l.row.channel === "whatsapp") { const perm = await whatsappPermission(user.organizationId!, l.row.toAddress ?? "", deps); if (!perm.ok) return perm.refusal; }
+  if (l.row.channel === "whatsapp") { const perm = await whatsappPermission(user.organizationId!, l.row.toAddress ?? "", deps, await whatsappSendsHere(user.organizationId!, deps)); if (!perm.ok) return perm.refusal; }
   const next = await deps.store.transition({ orgId: user.organizationId!, id, from: ["draft"], hash: bodyHash, set: { status: "approved", approvedBy: user.id, approvedAt: deps.now(), updatedAt: deps.now() } });
   if (!next) return fail(409, "changed", "The message changed since you read it. Read it again and approve that.");
   return { ok: true, message: channelMessageView(next) };
@@ -494,7 +592,7 @@ export async function markChannelSent(user: Who, id: number, bodyHash: unknown, 
     // With a connected number, WhatsApp goes through the API (so delivery and replies are tracked); without one, from their own phone.
     const conn = whatsappConfig(deps.env).configured ? await deps.store.liveConnection(orgId) : null;
     if (conn?.status === "active") return fail(409, "use_api", "Your WhatsApp Business number is connected: send it from DealInSec so delivery and replies are tracked.");
-    const perm = await whatsappPermission(orgId, row.toAddress ?? "", deps);
+    const perm = await whatsappPermission(orgId, row.toAddress ?? "", deps, false); // sent from their own phone
     if (!perm.ok) return perm.refusal;
   }
   const now = deps.now();
@@ -526,7 +624,7 @@ export async function sendWhatsapp(user: Who, id: number, bodyHash: unknown, d: 
   if (!perm.ok) return perm.refusal;
   const now = deps.now();
   if (row.kind === "text") {
-    const last = perm.contact.lastInboundAt ? new Date(perm.contact.lastInboundAt).getTime() : 0;
+    const last = perm.contact?.lastInboundAt ? new Date(perm.contact.lastInboundAt).getTime() : 0;
     if (now.getTime() - last >= WINDOW_MS) return fail(409, "window_closed", "It's been more than 24 hours since they last wrote to you, so WhatsApp only allows an approved template now. Write it as a template message instead.");
   }
   // The token, and for a template the live list, before anything is reserved.

@@ -26,6 +26,7 @@ import { registerClientProfileRoutes } from "./profiles/routes";
 import { registerCampaignRoutes } from "./campaigns/routes";
 import { registerUnsubscribeRoutes } from "./sales/unsubscribe";
 import { registerChannelRoutes } from "./channels/routes";
+import { registerOutreachStudioRoutes } from "./outreach-studio/routes";
 import { registerAiLeagueRoutes } from "./ai-league/routes";
 import { disconnectMailboxesOf, registerGmail } from "./mail/register";
 import { reviseDraftQuote } from "./services/deals";
@@ -634,6 +635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerCampaignRoutes(app);
   registerUnsubscribeRoutes(app);
   registerChannelRoutes(app);
+  registerOutreachStudioRoutes(app);
   registerAiLeagueRoutes(app);
   registerGmail(app);
   registerQuoteShareRoutes(app);

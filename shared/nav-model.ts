@@ -116,9 +116,10 @@ export function desktopNavSections(user: NavUser): NavSection[] {
   return sections(user, DESKTOP_GROUPS);
 }
 
-/** Mobile bar: four daily destinations, then "More" for the rest. The Nest (Nibo, Mika, Zee) is in the bar itself;
- *  Deals moved into More, next to the documents and money it leads to. */
-export const MOBILE_BAR_KEYS: readonly NavKey[] = ["home", "league", "outbound", "leads"];
+/** Mobile bar: four daily destinations, then "More" for the rest. Radar comes right after Home on phones (founder,
+ *  12 Nov 2026): finding clients is what people open the app for. The Nest (Nibo, Mika, Zee) is in the bar itself;
+ *  Deals moved into More, next to the documents and money it leads to. The desktop bar keeps its own order. */
+export const MOBILE_BAR_KEYS: readonly NavKey[] = ["home", "outbound", "league", "leads"];
 export function mobileBarItems(user: NavUser): NavItem[] {
   return MOBILE_BAR_KEYS.map(navItem).filter((i) => canSeeNavItem(user, i));
 }

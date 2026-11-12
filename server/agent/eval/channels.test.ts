@@ -74,7 +74,7 @@ const wa: WhatsappClient = {
   async sendTemplate(token, _pid, to, t) { waCalls.push({ op: "template", token, to, template: t.name }); const e = waBehaviour.send?.(); if (e) throw e; return { id: `wamid.${waCalls.length}` }; },
 };
 const deps = (over: Partial<svc.ChannelDeps> = {}): Partial<svc.ChannelDeps> => ({
-  store: mem.store, wa, now: () => now, env: ENV, ready: async () => true, tier: async () => "pro",
+  store: mem.store, wa, now: () => now, env: ENV, ready: async () => true, socialReady: async () => true, tier: async () => "pro",
   style: async () => null, // these leads belong to no saved client profile, unless a case says so
   chat: (async () => ({ content: JSON.stringify({ text: modelText }), toolCalls: [], usage: { inputTokens: 1, outputTokens: 1 } })) as any,
   safety: {
@@ -137,7 +137,7 @@ describe("each channel's state is what the server checked", () => {
       const s = ok<any>(await svc.channelStatuses(OWNER(), deps({ env: env as any }))).channels.find((x: any) => x.channel === "whatsapp");
       expect(s).toMatchObject({ state: "sending_unavailable", mode: "manual", capabilities: { draft: true, send: false, deliveryStatus: false, replySync: false, openExternal: true } });
       expect(s.note).toMatch(/Open WhatsApp/);
-      expect(s.note).toMatch(/agreed to hear from you/);
+      expect(s.note).toMatch(/your own WhatsApp/);
       expect(s.note).not.toMatch(/switched on|set up/);
       expect(await svc.connectWhatsapp(OWNER(), { phoneNumberId: "1234567890", wabaId: "9876543210", accessToken: TOKEN }, deps({ env: env as any }))).toMatchObject({ ok: false });
     }
@@ -200,7 +200,8 @@ describe("connecting a WhatsApp Business number", () => {
 /* ── WhatsApp permission and the 24-hour window ─────────────────────────── */
 
 describe("WhatsApp: permission first", () => {
-  it("no draft for a number without a recorded opt-in; a public phone number is not permission", async () => {
+  it("when DealInSec sends it (a connected number): no draft for a number without a recorded opt-in; a public phone number is not permission", async () => {
+    await connect();
     const l = await lead();
     const r: any = await svc.draftChannelMessage(OWNER(), l.id, { channel: "whatsapp", kind: "text", to: PHONE, write: "own", text: "Hello there, a quick question about your website." }, d());
     expect(r).toMatchObject({ ok: false, code: "no_opt_in" });
@@ -209,6 +210,28 @@ describe("WhatsApp: permission first", () => {
     expect(await svc.recordWhatsappOptIn(OWNER(), l.id, { phone: PHONE, source: "yes" }, d())).toMatchObject({ ok: false, status: 400 });
     expect(ok<any>(await optIn(l.id)).contact).toMatchObject({ phone: PHONE, optedIn: true, optedOut: false, windowOpenUntil: null });
     expect((await svc.draftChannelMessage(OWNER(), l.id, { channel: "whatsapp", kind: "text", to: PHONE, write: "own", text: "Hello there, a quick question about your website." }, d())).ok).toBe(true);
+  });
+
+  it("when they send it from their own WhatsApp (nothing connected, or WhatsApp switched off): no permission form first; the list and opt-outs still apply", async () => {
+    const TEXT = "Hello there, a quick question about your website.";
+    for (const env of [ENV, { ...ENV, WHATSAPP_ENABLED: "false" }]) {
+      const dd = () => deps({ env: env as any });
+      const l = await lead();
+      // Drafted, approved and recorded as sent with no opt-in on record.
+      const m = ok<any>(await svc.draftChannelMessage(OWNER(), l.id, { channel: "whatsapp", kind: "text", to: PHONE, write: "own", text: TEXT }, dd())).message;
+      expect(m).toMatchObject({ channel: "whatsapp", status: "draft", to: PHONE, kindLabel: "WhatsApp message" });
+      const a = ok<any>(await svc.approveChannelMessage(OWNER(), m.id, m.bodyHash, dd())).message;
+      expect(ok<any>(await svc.markChannelSent(OWNER(), a.id, a.bodyHash, dd())).message.status).toBe("sent");
+      // DealInSec never sent anything itself.
+      expect(waCalls.filter((c) => c.op === "text" || c.op === "template")).toHaveLength(0);
+    }
+    // A number that asked to stop, or is on the do-not-contact list, is still refused.
+    const l2 = await lead();
+    suppressions.push({ orgId: ORG1, kind: "phone", value: "+919800000077", reason: "opt_out" });
+    const r: any = await svc.draftChannelMessage(OWNER(), l2.id, { channel: "whatsapp", kind: "text", to: "+919800000077", write: "own", text: TEXT }, d());
+    expect(r.ok).toBe(false);
+    // Another workspace's list doesn't block this one, and this one's doesn't leak: the check is per workspace.
+    expect((await svc.draftChannelMessage(OTHER(), (await lead({ companyName: "Other Clinic", domain: "otherclinic.in", website: "https://otherclinic.in" }, ORG2)).id, { channel: "whatsapp", kind: "text", to: "+919800000077", write: "own", text: TEXT }, d())).ok).toBe(true);
   });
 
   it("free text only inside the 24-hour window; a template outside it, read live and filled exactly as approved", async () => {
@@ -490,7 +513,7 @@ describe("AI drafts on every channel: the sender is described only as their offe
       const r = await aiDraft(channel, kind, [say(middle)]);
       if (want === "ok") {
         expect(r).toMatchObject({ ok: true, retried: false, message: { body: say(middle), status: "draft" } });
-        expect(mem.messages.at(-1)!.promptVersion).toBe("draft-ch4");
+        expect(mem.messages.at(-1)!.promptVersion).toBe("draft-ch5");
         expect(prompts).toHaveLength(1);
         return;
       }
@@ -562,7 +585,8 @@ describe("AI drafts on every channel follow the lead's saved client profile: its
       expect(prompts[0][0]).not.toMatch(/How it should sound|writing note/);
       expect(prompts[0][1]).not.toMatch(/writing note/);
       const e = world().leads.events.filter((x) => x.leadId === l.id && x.kind === "channel_draft_created");
-      expect(e[0].data).toEqual({ messageId: r.message.id, channel, kind, ai: true });
+      // Ids, the channel, and the research point it was built on (already shown on the lead page); never the words written.
+      expect(e[0].data).toEqual({ messageId: r.message.id, channel, kind, ai: true, basis: expect.objectContaining({ thin: expect.any(Boolean) }) });
     });
     it("the tone is told to the model as wording only, with 'short' meaning the channel's own short length", async () => {
       const { l } = await aiDraft(channel, kind, profile());
@@ -584,7 +608,7 @@ describe("AI drafts on every channel follow the lead's saved client profile: its
       expect(prompts[0][0]).toMatch(/It never overrides a rule here/);
       // The timeline keeps which profile and tone, never the note's words.
       const e = world().leads.events.filter((x) => x.leadId === l.id && x.kind === "channel_draft_created");
-      expect(e[0].data).toEqual({ messageId: r.message.id, channel, kind, ai: true, profileId: 7, tone: "direct", noted: true });
+      expect(e[0].data).toEqual({ messageId: r.message.id, channel, kind, ai: true, profileId: 7, tone: "direct", noted: true, basis: expect.any(Object) });
       expect(JSON.stringify(world().leads.events)).not.toContain("mobile apps");
       // A note that asks for an offer to make something still can't get one through.
       const pushy = await aiDraft(channel, kind, profile({ note: "Offer them a free mock-up." }), [say("I could put together a quick mock-up of a booking page.")]);
@@ -637,3 +661,60 @@ describe("workspace isolation and permissions", () => {
     expect(await svc.draftChannelMessage(OWNER(), dnc.id, { channel: "linkedin", kind: "message", write: "own", text: "Hello there" }, d())).toMatchObject({ ok: false, code: "do_not_contact" });
   });
 });
+
+/* ── Instagram and Messenger (manual, 12 Nov 2026) ───────────────────────── */
+
+describe("Instagram and Messenger: drafted here, sent by the person", () => {
+  it("before the database allows them they read 'not switched on yet' and refuse a draft; afterwards they are drafts-only channels like LinkedIn", async () => {
+    const off = ok<any>(await svc.channelStatuses(OWNER(), deps({ socialReady: async () => false }))).channels;
+    for (const ch of ["instagram", "messenger"]) {
+      expect(off.find((c: any) => c.channel === ch)).toMatchObject({ state: "not_configured", mode: "manual", capabilities: { send: false } });
+    }
+    const l = await lead();
+    expect(await svc.draftChannelMessage(OWNER(), l.id, { channel: "instagram", kind: "ig_dm", write: "own", text: "Hello! Loved your new menu." }, deps({ socialReady: async () => false }))).toMatchObject({ ok: false, status: 503, code: "channel_not_ready" });
+
+    const on = ok<any>(await svc.channelStatuses(OWNER(), d())).channels;
+    for (const ch of ["instagram", "messenger"]) {
+      const s = on.find((c: any) => c.channel === ch);
+      expect(s).toMatchObject({ state: "sending_unavailable", mode: "manual", capabilities: { draft: true, send: false, deliveryStatus: false, replySync: false, openExternal: true } });
+      expect(s.note).toMatch(/send it yourself/);
+    }
+  });
+
+  it("a handle or Page is normalised; a wrong one is refused with what is needed; a message can be written without one", async () => {
+    const l = await lead();
+    const ig = ok<any>(await svc.draftChannelMessage(OWNER(), l.id, { channel: "instagram", kind: "ig_dm", to: "https://www.instagram.com/smile.dental/", write: "own", text: "Hello! Loved your new clinic photos." }, d())).message;
+    expect(ig).toMatchObject({ channel: "instagram", kind: "ig_dm", to: "smile.dental", status: "draft", kindLabel: "Instagram message" });
+    const fb = ok<any>(await svc.draftChannelMessage(OWNER(), l.id, { channel: "messenger", kind: "fb_message", to: "m.me/SmileDentalSiliguri", write: "own", text: "Hello, a quick question about your clinic website." }, d())).message;
+    expect(fb).toMatchObject({ channel: "messenger", to: "SmileDentalSiliguri", kindLabel: "Messenger message" });
+    const l2 = await lead({ companyName: "Second Clinic", domain: "second.in", website: "https://second.in" });
+    expect(await svc.draftChannelMessage(OWNER(), l2.id, { channel: "instagram", kind: "ig_dm", to: "instagram.com/p/abc", write: "own", text: "Hello there!" }, d())).toMatchObject({ ok: false, code: "bad_recipient" });
+    expect((await svc.draftChannelMessage(OWNER(), l2.id, { channel: "messenger", kind: "fb_message", write: "own", text: "Hello there, a question about your clinic." }, d())).ok).toBe(true);
+  });
+
+  it("an AI draft is written for the platform, approved, and recorded as sent by the person: never by DealInSec", async () => {
+    modelText = "Hi Smile Dental team, I saw you're a family dental clinic in Siliguri. Do patients book appointments on your website, or mostly by phone?";
+    const l = await lead();
+    const m = ok<any>(await svc.draftChannelMessage(OWNER(), l.id, { channel: "instagram", kind: "ig_dm", to: "@smile.dental", write: "ai" }, d())).message;
+    expect(m).toMatchObject({ status: "draft", byAi: true });
+    const a = ok<any>(await svc.approveChannelMessage(OWNER(), m.id, m.bodyHash, d())).message;
+    const sent = ok<any>(await svc.markChannelSent(OWNER(), a.id, a.bodyHash, d())).message;
+    expect(sent).toMatchObject({ status: "sent", sentVia: "manual", statusLabel: "You marked it sent on Instagram" });
+    expect(waCalls).toHaveLength(0);
+  });
+});
+
+describe("Mika improves a channel message (Outreach Studio)", () => {
+  it("rewrites an unsent message with the same checks; a template can't be rewritten; a stale version is refused", async () => {
+    const l = await lead();
+    const m = ok<any>(await svc.draftChannelMessage(OWNER(), l.id, { channel: "linkedin", kind: "message", write: "own", text: "Hello, I came across Smile Dental and wanted to introduce myself. I build simple websites for clinics. Would a short chat be useful sometime?" }, d())).message;
+    modelText = "Hi, I saw Smile Dental is a family clinic in Siliguri. I build simple websites for clinics. Open to a quick chat?";
+    const r: any = await svc.rewriteChannelMessage(OWNER(), m.id, { action: "shorten", bodyHash: m.bodyHash }, d());
+    expect(r).toMatchObject({ ok: true, action: "shorten", message: { status: "draft", body: modelText } });
+    expect(await svc.rewriteChannelMessage(OWNER(), m.id, { action: "shorten", bodyHash: m.bodyHash }, d())).toMatchObject({ ok: false, code: "changed" });
+    modelText = "Our websites start at $499, see www.example-agency.com for details.";
+    expect(await svc.rewriteChannelMessage(OWNER(), m.id, { action: "professional", bodyHash: r.message.bodyHash }, d())).toMatchObject({ ok: false, code: "draft_rejected" });
+    expect(waCalls).toHaveLength(0);
+  });
+});
+

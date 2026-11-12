@@ -1,5 +1,5 @@
 /**
- * What the drafting model is told for a short message on WhatsApp, LinkedIn or X. The same inputs as an email draft
+ * What the drafting model is told for a short message on WhatsApp, LinkedIn, X, Instagram or Messenger. The same inputs as an email draft
  * (server/sales/outreach-prompt.ts DraftInput: the sender's offer and VERIFIED facts about the company, fenced as data)
  * and the same refusals (shared/channels.ts checkChannelDraft), with the channel's own length and tone. Bump
  * CHANNEL_PROMPT_VERSION whenever this text changes; it starts with "draft-", so a channel draft counts against the
@@ -8,9 +8,9 @@
  */
 import { fenceUntrusted } from "../agent/untrusted";
 import { KIND_DRAFT_TARGET, type MessageKind, type ShortChannel } from "@shared/channels";
-import { noteBlock, noteRule, toneBlock, type DraftInput, type DraftStyleInput } from "../sales/outreach-prompt";
+import { leadBlock, leadRule, noteBlock, noteRule, toneBlock, type DraftInput, type DraftStyleInput } from "../sales/outreach-prompt";
 
-export const CHANNEL_PROMPT_VERSION = "draft-ch4";
+export const CHANNEL_PROMPT_VERSION = "draft-ch5";
 
 const clean = (s: string, n: number) => s.replace(/[\u0000-\u001f<>]/g, " ").replace(/\s+/g, " ").trim().slice(0, n);
 
@@ -18,10 +18,13 @@ const WHAT: Record<string, string> = {
   "linkedin:connection_note": "a note sent with a LinkedIn connection request to someone the sender doesn't know yet. It must explain in one or two sentences why the sender wants to connect. No sign-off line is needed (LinkedIn shows the sender's name).",
   "linkedin:message": "a first LinkedIn message to a person the sender is already connected with but has never written to. Two or three short paragraphs at most.",
   "x:dm": "a first Direct Message on X to a company or person the sender has never written to. Conversational and brief.",
-  "whatsapp:text": "a WhatsApp message to someone who has agreed to hear from the sender's business and recently wrote to it. Friendly, brief, one or two short paragraphs.",
+  // Most people now send WhatsApp from their own phone, often as a first contact (draft-ch5): no "thanks for your message".
+  "whatsapp:text": "a first WhatsApp message from the sender to a business they found, sent from the sender's own WhatsApp. The business has not written to the sender. Friendly, brief, one or two short paragraphs, as a person would write on WhatsApp.",
+  "instagram:ig_dm": "a first Instagram direct message from the sender to a business account they found. The business has not written to the sender. Casual and brief, two to four short sentences, the way people write in Instagram messages.",
+  "messenger:fb_message": "a first Facebook Messenger message from the sender to a business's Facebook Page. The business has not written to the sender. Friendly and brief, one or two short paragraphs.",
 };
 
-export function channelSystemPrompt(channel: ShortChannel, kind: MessageKind, style?: DraftStyleInput | null): string {
+export function channelSystemPrompt(channel: ShortChannel, kind: MessageKind, style?: DraftStyleInput | null, lead?: DraftInput["lead"]): string {
   const t = KIND_DRAFT_TARGET[kind];
   return `You write ${WHAT[`${channel}:${kind}`] ?? "a short first message"} You have no tools and take no actions. A person reads and edits your draft before anything is sent, and sends it themselves.
 ${toneBlock(style, "short")}
@@ -33,7 +36,7 @@ Rules:
 - No links, web addresses, email addresses, phone numbers, hashtags or emojis. No placeholders such as [Name]: if you have no name to greet, use none.
 - This is a first contact. Do not suggest you have spoken or met before.
 - Plain text only. Between ${t.min} and ${t.max} characters in total, counting spaces.
-- One clear, low-pressure ask.
+- One clear, low-pressure ask.${leadRule(lead).replace("in the first two sentences", "in the first sentence")}
 - Never offer to make, prepare, put together or send anything (no sample, mock-up or prototype): the sender hasn't offered that. Ask a question instead.
 - Describe the sender only in the words of "What the sender offers": never add another service, years of experience, credentials, awards, client counts or results. If it says the sender has not described their offer, say nothing about who the sender is or what they do, and suggest no service: ask one question about the company instead.${noteRule(style)}
 
@@ -50,7 +53,7 @@ ${offer}
 ${noteBlock(i.style)}
 Company: ${clean(i.company, 120)}
 Greet: ${i.greetName ? clean(i.greetName, 80) : "(no name known: no greeting name)"}
-
+${leadBlock(i.lead)}
 Verified facts about the company (read from its own website):
 ${fenceUntrusted("facts", list(i.facts), 2000)}
 

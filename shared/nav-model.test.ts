@@ -90,8 +90,8 @@ describe("desktop sections", () => {
 
 describe("mobile bar and More sheet", () => {
   it("bar is Home, The Nest, Radar, Leads (More is added by the component)", () => {
-    expect(keys(mobileBarItems(OWNER))).toEqual(["home", "league", "outbound", "leads"]);
-    expect(mobileBarItems(OWNER).map((i) => i.shortLabel)).toEqual(["Home", "The Nest", "Radar", "Leads"]);
+    expect(keys(mobileBarItems(OWNER))).toEqual(["home", "outbound", "league", "leads"]);
+    expect(mobileBarItems(OWNER).map((i) => i.shortLabel)).toEqual(["Home", "Radar", "The Nest", "Leads"]);
   });
 
   it("sheet holds only Account while the deal suite is hidden, never repeating a bar item", () => {
@@ -117,7 +117,7 @@ describe("mobile bar and More sheet", () => {
 
   it("deal permissions keep the finding bar; the sheet stays Account-only while the suite is hidden", () => {
     const u = custom("deals.create");
-    expect(keys(mobileBarItems(u))).toEqual(["home", "league", "outbound", "leads"]);
+    expect(keys(mobileBarItems(u))).toEqual(["home", "outbound", "league", "leads"]);
     expect(moreSheetSections(u).map((x) => keys(x.items))).toEqual([["profile", "settings"]]);
   });
 
