@@ -54,9 +54,10 @@ import { memberCan } from "@shared/permissions";
 /** The accessible name of the row of tabs; also how an arriving link finds it to bring it into view. */
 const VIEWS_LABEL = "Client Radar views";
 const EXAMPLES = [
-  "Find 30 US digital marketing agencies with 5–30 employees that serve SaaS companies",
-  "20 UK accounting firms that work with restaurants",
-  "Interior design studios in Bengaluru with their own website",
+  "Dentists in Siliguri",
+  "Cafes in Pune",
+  "Digital marketing agencies in the US with 5–30 people",
+  "UK accounting firms that work with restaurants",
 ];
 
 /**
@@ -319,6 +320,9 @@ export default function OutboundPage() {
     return { category: "", city: "", country: t && t !== "WW" && t in COUNTRY_NAME ? t : "IN", website: "any", max: 10 };
   });
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // The request a local search came from (the one box sent it to the map listings), so "search online instead" can go back.
+  const [routedFrom, setRoutedFrom] = useState<ParsedIcp | null>(null);
+  const localReadyRef = useRef(false);
   // The drawer: a prospect, and the search it belongs to (research and contact lookups are tied to a run).
   const [open, setOpen] = useState<{ id: number; runId: string | null; focus?: "evidence" } | null>(null);
   const search = useSearch();
@@ -354,6 +358,14 @@ export default function OutboundPage() {
     // A request that names no place starts from the market chosen at setup, as a visible, removable chip; "worldwide"
     // (or no choice) leaves it worldwide. Never the person's own account country.
     onSuccess: (r) => {
+      // One search box: "dentists in Siliguri" is local businesses in a city, so it goes to the map listings, filled in.
+      // Nothing is searched yet: the person still presses the button there, as they confirm a web search.
+      if (localReadyRef.current && suggestDiscoveryMode(r.icp) === "local") {
+        setLocalFields((f) => ({ ...f, category: r.icp.industry.slice(0, 80), city: (r.icp.locations[0] ?? "").slice(0, 60), country: r.icp.countries[0] && r.icp.countries[0] in COUNTRY_NAME ? r.icp.countries[0] : f.country }));
+        setRoutedFrom(r); setParsed(null); setMode("local");
+        trackEvent("outbound_routed_local");
+        return;
+      }
       const target = getTargetMarket(user?.id);
       if (target && target !== "WW" && !r.icp.countries.length && !r.icp.locations.length) {
         const icp = { ...r.icp, countries: [target] };
@@ -410,6 +422,7 @@ export default function OutboundPage() {
   };
   const blocked = searchBlockedReason(usage.data?.usage, mode);
   const localReady = !!usage.data?.usage.localReady;
+  localReadyRef.current = localReady;
   // The most companies one search may look for on this plan (the server caps it the same way).
   const maxCompanies = usage.data?.usage.plan?.maxCompanies ?? 50;
   // How far a search goes. "deep" researches each company it keeps and spends the plan's searches; "list" is a bulk
@@ -513,48 +526,64 @@ export default function OutboundPage() {
 
             {view === "social" ? null : canEdit ? (
               <Card className="glass-card"><CardContent className="space-y-3 p-4">
-                <SegmentedTabs label="Where to look" value={mode} onChange={(m) => { setMode(m); trackEvent("outbound_mode_changed", { mode: m }); }} className="w-full sm:w-fit"
-                  tabs={[
-                    { value: "web", label: <><span className="sm:hidden">Companies online</span><span className="hidden sm:inline">Companies online (any country)</span></>, testId: "mode-web" },
-                    { value: "local", label: <><span className="sm:hidden">Local businesses</span><span className="hidden sm:inline">Local businesses (a city)</span></>, testId: "mode-local" },
-                  ]} />
-                {!text && !parsed && !firstTime && !runs.isLoading && <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" data-testid="outbound-presets">
-                  {PRESETS.map((x) => <button key={x.key} onClick={() => applyPreset(x)} title={x.note} className={cn(presetChip, "shrink-0 whitespace-nowrap sm:whitespace-normal")} data-testid="outbound-preset">{x.label}</button>)}
-                </div>}
                 {mode === "local" ? <>
+                  <div className="flex flex-wrap items-center justify-between gap-2" data-testid="local-banner">
+                    <p className="text-sm"><span className="font-semibold">Local businesses in a city</span><span className="text-muted-foreground"> · from Google Maps listings{routedFrom ? `, for “${text.trim().slice(0, 60)}”` : ""}. Check the fields, then search.</span></p>
+                    <div className="flex flex-wrap gap-2">
+                      {routedFrom && <Button size="sm" variant="ghost" onClick={() => { const r = routedFrom; setRoutedFrom(null); setMode("web"); setParsed(r); }} data-testid="local-search-online">Search companies online instead</Button>}
+                      <Button size="sm" variant="outline" onClick={() => { setRoutedFrom(null); setMode("web"); trackEvent("outbound_mode_changed", { mode: "web" }); }} data-testid="local-back">Back to the search box</Button>
+                    </div>
+                  </div>
                   {!localReady && usage.data && <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200" data-testid="local-not-ready">Local business search isn't switched on yet. Search for companies online meanwhile: a city in your request still narrows it.</p>}
                   <LocalSearch fields={localFields} onChange={setLocalFields} blocked={blocked} maxCompanies={maxCompanies} onOpenProspect={(id) => setOpen({ id, runId: null })}
                     onResearchStarted={(id) => { setRunId(id); if (view !== "searches") setView("searches"); setTimeout(() => document.getElementById("outbound-run")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150); }} />
                   <UsageNote usage={usage.data?.usage} mode="local" />
                 </> : <>
-                <label htmlFor="outbound-request" className="text-sm font-semibold">Describe the type of client you're looking for</label>
-                <Textarea ref={inputRef} id="outbound-request" value={text} onChange={(e) => { setText(e.target.value); setParsed(null); }} rows={2} maxLength={500}
-                  placeholder="For example: US SEO agencies with 5–30 employees serving SaaS companies" disabled={parse.isPending || start.isPending} data-testid="outbound-input" />
-                {!text && !firstTime && !runs.isLoading && <div className="flex flex-wrap gap-2">
-                  {EXAMPLES.map((x) => <button key={x} onClick={() => pickExample(x)} className="rounded-full border px-3 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">{x}</button>)}
-                </div>}
-                {!text && !parsed && !runs.isLoading && <ClientProfiles disabled={!!blocked} onUse={applyProfile} />}
-                {!text && !parsed && !runs.isLoading && (
-                  <div className="space-y-1.5" data-testid="outbound-segments">
-                    <p className="text-xs font-medium text-muted-foreground">Or start from who you sell to — one click builds a search profile you can edit:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {SEGMENT_PRESETS.map((p) => <button key={p.segment} onClick={() => applySegment(p)} title={p.note} className={presetChip} data-testid="outbound-segment-preset">{p.label}</button>)}
-                    </div>
+                <label htmlFor="outbound-request" className="block text-base font-semibold">Who do you want as clients?</label>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start" data-testid="outbound-searchbox">
+                  <div className="relative min-w-0 flex-1">
+                    <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" aria-hidden />
+                    <Textarea ref={inputRef} id="outbound-request" value={text} onChange={(e) => { setText(e.target.value); setParsed(null); }} rows={1} maxLength={500}
+                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !parsed) { e.preventDefault(); if (text.trim().length >= 3 && !parse.isPending && !blocked) parse.mutate(undefined); } }}
+                      placeholder="Dentists in Siliguri · SEO agencies in the US · cafes in Pune without a website"
+                      className="min-h-[48px] resize-none py-3 pl-9 text-[15px]" disabled={parse.isPending || start.isPending} data-testid="outbound-input" />
                   </div>
+                  {!parsed && (
+                    <Button onClick={() => parse.mutate(undefined)} disabled={text.trim().length < 3 || parse.isPending || !!blocked} className="gradient-btn h-12 px-5 text-white" data-testid="outbound-find">
+                      {parse.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Search className="mr-1.5 h-4 w-4" />}Find clients
+                    </Button>
+                  )}
+                </div>
+                {!parsed && <p className="text-xs text-muted-foreground">Type it the way you'd say it: what kind of business, and where. Local shops in a city are looked up on Google Maps; companies anywhere are found on the web. You check everything before a search starts.</p>}
+                {!text && !parsed && !runs.isLoading && <div className="flex flex-wrap gap-2" data-testid="outbound-examples">
+                  {EXAMPLES.map((x) => <button key={x} onClick={() => pickExample(x)} className="rounded-full border px-3 py-1 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">{x}</button>)}
+                  {!text.trim() && savedIcp && (
+                    <button onClick={useSavedProfile} disabled={parse.isPending || !!blocked} className={presetChip} data-testid="outbound-use-saved"><Sparkles className="mr-1 inline h-3.5 w-3.5" aria-hidden />Use my saved ideal client</button>
+                  )}
+                </div>}
+                {!text && !parsed && !runs.isLoading && (
+                  <details className="group rounded-lg border border-border/60 px-3 py-2" data-testid="outbound-more-ways">
+                    <summary className="cursor-pointer text-xs font-medium text-muted-foreground">More ways to start: saved client profiles, ready-made searches</summary>
+                    <div className="mt-3 space-y-3">
+                      <ClientProfiles disabled={!!blocked} onUse={applyProfile} />
+                      <div className="space-y-1.5" data-testid="outbound-segments">
+                        <p className="text-xs font-medium text-muted-foreground">Start from who you sell to (builds a search you can edit):</p>
+                        <div className="flex flex-wrap gap-2">
+                          {SEGMENT_PRESETS.map((p) => <button key={p.segment} onClick={() => applySegment(p)} title={p.note} className={presetChip} data-testid="outbound-segment-preset">{p.label}</button>)}
+                        </div>
+                      </div>
+                      <div className="space-y-1.5" data-testid="outbound-presets">
+                        <p className="text-xs font-medium text-muted-foreground">Ready-made searches:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {PRESETS.map((x) => <button key={x.key} onClick={() => applyPreset(x)} title={x.note} className={presetChip} data-testid="outbound-preset">{x.label}</button>)}
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => { setRoutedFrom(null); setMode("local"); trackEvent("outbound_mode_changed", { mode: "local" }); }} className="text-xs font-medium text-primary underline-offset-2 hover:underline" data-testid="mode-local">Search a city's local businesses on Google Maps, field by field</button>
+                    </div>
+                  </details>
                 )}
                 <UsageNote usage={usage.data?.usage} />
-                {!parsed ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button onClick={() => parse.mutate(undefined)} disabled={text.trim().length < 3 || parse.isPending || !!blocked} className="gradient-btn text-white" data-testid="outbound-find">
-                      {parse.isPending ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Search className="mr-1.5 h-4 w-4" />}Find prospects
-                    </Button>
-                    {!text.trim() && savedIcp && (
-                      <Button variant="outline" onClick={useSavedProfile} disabled={parse.isPending || !!blocked} data-testid="outbound-use-saved">
-                        <Sparkles className="mr-1.5 h-4 w-4" />Use my saved ideal client
-                      </Button>
-                    )}
-                  </div>
-                ) : icp && (
+                {parsed && icp && (
                   <div className="space-y-3 rounded-xl border bg-muted/30 p-3" data-testid="icp-confirm">
                     <p className="text-sm font-medium">Here's what I'll look for. Change anything before I start.</p>
                     <div className="flex flex-wrap gap-1.5">
