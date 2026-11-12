@@ -212,6 +212,8 @@ export default function LeadDetailsPage() {
   /** Take the person to where the next best action is done; the controls there do the work. */
   const goTo = (to: "outreach" | "research" | "edit") => {
     if (to === "edit") { setEditOpen(true); return; }
+    // Messages are written in the Outreach Studio (the "Write outreach" button), not on this page.
+    if (to === "outreach") { setLocation(`/leads/${id}/outreach`); return; }
     setTab("overview");
     requestAnimationFrame(() => requestAnimationFrame(() => {
       document.querySelector<HTMLElement>(`[data-testid="${to}-panel"]`)?.scrollIntoView({ behavior: calm ? "auto" : "smooth", block: "center" });
@@ -313,7 +315,7 @@ export default function LeadDetailsPage() {
           </TabsList>
 
           <TabsContent value="overview" className="mt-4 space-y-3">
-            <SalesCard leadId={lead.id} hasWebsite={!!lead.website} showNextAction={false} companyName={lead.companyName} contactName={lead.contactName} />
+            <SalesCard leadId={lead.id} hasWebsite={!!lead.website} showNextAction={false} />
             <FitCard leadId={lead.id} />
             <Card className="glass-card"><CardContent className="grid gap-x-4 gap-y-3 p-4 sm:grid-cols-2">
               <Fact label="Website">{lead.website ? <a className="inline-flex items-center gap-1 text-primary hover:underline" href={safeHref(lead.website) ?? `https://${lead.website}`} target="_blank" rel="noopener noreferrer">{lead.website}<ExternalLink className="h-3 w-3" /></a> : "—"}</Fact>
