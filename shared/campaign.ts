@@ -5,11 +5,12 @@
  * A campaign adds NO new way to write or send a message. Each member's message is an ordinary outreach message
  * (lead_messages): drafted from the lead's verified facts, checked by code, and approved by a person who read exactly
  * that text. What a campaign adds is the grouping, a background job that prepares the drafts one at a time within the
- * plan's allowance, a paced queue for messages that are ALREADY approved, and the numbers.
+ * plan's allowance, and the numbers. The person sends each approved message themselves; DealInSec never sends a
+ * campaign by itself (the automatic sending queue was removed on the founder's word, 12 Nov 2026).
  *
  * Three rules hold everywhere:
  *   - nothing is sent that a person did not approve, one message at a time; there is no "approve all";
- *   - the queue only sends a message that still carries the opt-out line the person saw when approving it;
+ *   - every campaign draft carries the opt-out line before it is approved;
  *   - the queue stops itself on anything that needs a person: a mailbox problem, a limit, an uncertain send, bounces.
  */
 import { z } from "zod";
@@ -153,13 +154,6 @@ export function draftRefusal(code: string): "skip" | "stop" | "retry" | "adopt" 
 }
 export const DRAFT_TRIES = 3;
 
-/** What a send refusal means: hold this one message and go on, pause the whole queue, or simply try again on the next pass. */
-export function sendRefusal(code: string): "hold" | "pause" | "later" {
-  if (["not_found", "not_approved", "in_flight", "changed", "invalid_content", "no_address", "do_not_contact", "suppressed", "followup_stopped"].includes(code)) return "hold";
-  if (["provider_unavailable", "suppression_unavailable"].includes(code)) return "later";
-  return "pause";
-}
-
 /* ── follow-ups ─────────────────────────────────────────────────────────── */
 
 export type FollowUpState = "due_later" | "to_review" | "approved" | "on_hold";
@@ -178,20 +172,6 @@ export function followUpView(f: { status: string; dueAt: string | null; draftSta
   }
   return null; // sent, discarded or unknown: nothing to act on
 }
-
-/* ── pacing ─────────────────────────────────────────────────────────────── */
-
-/** The earliest moment for the next send: the gap, stretched by up to half again, so messages don't leave on a beat. */
-export function nextSendAt(now: Date, gapSeconds: number, random: number): Date {
-  const gap = Math.min(GAP_SECONDS.max, Math.max(GAP_SECONDS.min, Math.floor(gapSeconds) || GAP_SECONDS.default));
-  return new Date(now.getTime() + Math.round(gap * 1000 * (1 + Math.min(1, Math.max(0, random)) / 2)));
-}
-
-/**
- * Whether bounces say "stop": at least two, and one in ten or more of what was sent. Two bounces out of three sends
- * stops a campaign; two out of thirty does not.
- */
-export const tooManyBounces = (s: { sent: number; bounced: number }): boolean => s.bounced >= 2 && s.sent > 0 && s.bounced / s.sent >= 0.1;
 
 /* ── numbers ────────────────────────────────────────────────────────────── */
 

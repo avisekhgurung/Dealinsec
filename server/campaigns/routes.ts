@@ -8,11 +8,10 @@
  *   GET    /api/campaigns/sender-check        is the caller's own sending address set up to be trusted (SPF, DKIM, DMARC)
  *   POST   /api/campaigns                     create ({ name, leadIds, profileId?, dailyLimit?, gapSeconds?, footerNote? })
  *   GET    /api/campaigns/:id                 one campaign with every member
- *   PATCH  /api/campaigns/:id                 name, pace, footer note
+ *   PATCH  /api/campaigns/:id                 name, footer note
  *   POST   /api/campaigns/:id/members         add leads ({ leadIds })
  *   DELETE /api/campaigns/:id/members/:leadId take a lead out (not once its message was sent)
  *   POST   /api/campaigns/:id/prepare         start (or resume) drafting      POST .../prepare/stop
- *   POST   /api/campaigns/:id/send            start the paced queue           POST .../send/pause
  *   POST   /api/campaigns/:id/archive
  */
 import type { Express, Response } from "express";
@@ -40,18 +39,16 @@ export function registerCampaignRoutes(app: Express) {
   const withId = (where: string, fn: (req: any, res: Response, id: number) => Promise<unknown>) => guarded(where, async (req, res) => { const id = num(req.params.id); if (!id) return nf(res); await fn(req, res, id); });
   const one = (r: any) => ({ campaign: r.campaign });
 
-  app.get("/api/campaigns", isAuthenticated, guarded("campaigns_list", async (req, res) => send(res, await svc.listCampaigns(req.user), (r) => ({ campaigns: r.campaigns, queueEnabled: r.queueEnabled, unsubscribeLinks: r.unsubscribeLinks, limits: r.limits }))));
+  app.get("/api/campaigns", isAuthenticated, guarded("campaigns_list", async (req, res) => send(res, await svc.listCampaigns(req.user), (r) => ({ campaigns: r.campaigns, unsubscribeLinks: r.unsubscribeLinks, limits: r.limits }))));
   app.get("/api/campaigns/sender-check", isAuthenticated, guarded("campaigns_sender_check", async (req, res) => send(res, await (await import("./sender-check")).senderCheck(req.user), (r) => ({ check: r.check, mailbox: r.mailbox }))));
   app.get("/api/campaigns/audience", isAuthenticated, guarded("campaigns_audience", async (req, res) => send(res, await svc.audience(req.user, req.query ?? {}), (r) => ({ leads: r.leads, limit: r.limit }))));
   app.post("/api/campaigns", isAuthenticated, guarded("campaigns_create", async (req, res) => send(res, await svc.createCampaign(req.user, req.body), (r) => ({ campaign: r.campaign, added: r.added, left: r.left }), 201)));
-  app.get("/api/campaigns/:id", isAuthenticated, withId("campaigns_get", async (req, res, id) => send(res, await svc.getCampaign(req.user, id), (r) => ({ campaign: r.campaign, members: r.members, queueEnabled: r.queueEnabled, followUps: r.followUps, style: r.style }))));
+  app.get("/api/campaigns/:id", isAuthenticated, withId("campaigns_get", async (req, res, id) => send(res, await svc.getCampaign(req.user, id), (r) => ({ campaign: r.campaign, members: r.members, followUps: r.followUps, style: r.style }))));
   app.patch("/api/campaigns/:id", isAuthenticated, withId("campaigns_update", async (req, res, id) => send(res, await svc.updateCampaign(req.user, id, req.body), one)));
   app.post("/api/campaigns/:id/members", isAuthenticated, withId("campaigns_add", async (req, res, id) => send(res, await svc.addMembers(req.user, id, req.body), (r) => ({ added: r.added }))));
   app.delete("/api/campaigns/:id/members/:leadId", isAuthenticated, withId("campaigns_remove", async (req, res, id) => { const leadId = num(req.params.leadId); if (!leadId) return nf(res); send(res, await svc.removeMember(req.user, id, leadId), () => ({ removed: true })); }));
   app.post("/api/campaigns/:id/prepare", isAuthenticated, withId("campaigns_prepare", async (req, res, id) => send(res, await svc.startPreparing(req.user, id), (r) => ({ campaign: r.campaign, waiting: r.waiting }))));
   app.post("/api/campaigns/:id/prepare/stop", isAuthenticated, withId("campaigns_prepare_stop", async (req, res, id) => send(res, await svc.stopPreparing(req.user, id), one)));
-  app.post("/api/campaigns/:id/send", isAuthenticated, withId("campaigns_send", async (req, res, id) => send(res, await svc.startSending(req.user, id), one)));
-  app.post("/api/campaigns/:id/send/pause", isAuthenticated, withId("campaigns_send_pause", async (req, res, id) => send(res, await svc.pauseSending(req.user, id), one)));
   app.post("/api/campaigns/:id/archive", isAuthenticated, withId("campaigns_archive", async (req, res, id) => send(res, await svc.archiveCampaign(req.user, id), one)));
 
   campaignRunner.start();

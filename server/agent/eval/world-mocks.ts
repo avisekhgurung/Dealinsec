@@ -74,9 +74,9 @@ export const campaignStoreMock = () => ({
     members: async (orgId: string, id: number) => (orgId === "org-1" && id === 1 ? [{ ...evalMember }] : []),
     memberFacts: async (orgId: string) => (orgId === "org-1" ? [{ campaignId: 1, state: "drafted", messageStatus: "draft", outcomes: [], interested: false }] : []),
     ownLeadIds: async () => [], audience: async () => [],
-    create: noWrite, update: noWrite, addMembers: noWrite, removeMember: noWrite, relink: noWrite, setPreparing: noWrite, setSending: noWrite,
-    claimDraft: noWrite, settleMember: noWrite, finishPreparing: noWrite, claimSend: noWrite, releaseSend: noWrite, setDraftBody: noWrite,
-    nextApproved: async () => null, sendFacts: async () => ({ sentSince: 0, sent: 0, bounced: 0 }), unsentMessageId: async () => null, draftBody: async () => null,
+    create: noWrite, update: noWrite, addMembers: noWrite, removeMember: noWrite, relink: noWrite, setPreparing: noWrite,
+    claimDraft: noWrite, settleMember: noWrite, finishPreparing: noWrite, setDraftBody: noWrite,
+    unsentMessageId: async () => null, draftBody: async () => null,
   },
 });
 

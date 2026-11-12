@@ -6,13 +6,13 @@
  *     is skipped and says why;
  *   - every message is read and approved one at a time, on the same screen as any other outreach message. There is
  *     no "approve all";
- *   - where this server allows a sending queue, approved messages leave from YOUR Gmail at a steady pace and the
- *     queue stops itself on anything that needs you. Where it doesn't, you send each approved message yourself.
+ *   - you send each approved message yourself: from your connected Gmail, or from your own email app. DealInSec
+ *     never sends a campaign by itself (the automatic sending queue was removed on the founder's word, 12 Nov 2026).
  * On a server where campaigns aren't set up the tab says so and nothing else changes.
  */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Archive, ArrowLeft, ArrowRight, Ban, CheckCircle2, ChevronLeft, ChevronRight, CircleDashed, Loader2, MailCheck, Megaphone, Pause, PenLine, Play, Plus, Search, Send, Square, X } from "lucide-react";
+import { AlertTriangle, Archive, ArrowLeft, ArrowRight, Ban, CheckCircle2, ChevronLeft, ChevronRight, CircleDashed, Loader2, MailCheck, Megaphone, PenLine, Plus, Search, Send, Square, X } from "lucide-react";
 import { OutreachPanel } from "@/components/leads/outreach-panel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -27,14 +27,14 @@ import { followUpEnds, repliesAreRead } from "@/lib/reply-reading";
 import { queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import type { SenderCheck as SenderCheckView } from "@shared/sender-check";
-import { CAMPAIGN_MAX_MEMBERS, DAILY_LIMIT, FOOTER_NOTE_MAX, GAP_SECONDS, memberSteps, OPT_OUT_LINE, type CampaignCounts, type CampaignRates, type MemberStage, type MemberSteps } from "@shared/campaign";
+import { CAMPAIGN_MAX_MEMBERS, FOOTER_NOTE_MAX, memberSteps, OPT_OUT_LINE, type CampaignCounts, type CampaignRates, type MemberStage, type MemberSteps } from "@shared/campaign";
 
 const CAMPAIGNS_URL = "/api/campaigns";
 const campaignUrl = (id: number, action = "") => `${CAMPAIGNS_URL}/${id}${action ? `/${action}` : ""}`;
 
 interface Campaign {
-  id: number; name: string; profileName: string | null; status: "active" | "archived"; footerNote: string; dailyLimit: number; gapSeconds: number;
-  preparing: boolean; prepareStop: string | null; prepareStopLabel: string | null; sending: boolean; sendStop: string | null; sendStopLabel: string | null; nextSendAt: string | null;
+  id: number; name: string; profileName: string | null; status: "active" | "archived"; footerNote: string;
+  preparing: boolean; prepareStop: string | null; prepareStopLabel: string | null;
   createdAt: string; counts: CampaignCounts; rates: CampaignRates;
 }
 interface Member {
@@ -44,8 +44,8 @@ interface Member {
   /** Older servers omit it. */
   followUp?: { state: "due_later" | "to_review" | "approved" | "on_hold"; label: string; dueAt: string | null; waiting: boolean } | null;
 }
-interface ListResponse { campaigns: Campaign[]; queueEnabled: boolean; unsubscribeLinks?: boolean }
-interface DetailResponse { campaign: Campaign; members: Member[]; queueEnabled: boolean; followUps?: { waiting: number; planned: number }; /** Older servers omit it. */ style?: { profileName: string; tone: string; toneLabel: string; hasNote: boolean } | null }
+interface ListResponse { campaigns: Campaign[]; unsubscribeLinks?: boolean }
+interface DetailResponse { campaign: Campaign; members: Member[]; followUps?: { waiting: number; planned: number }; /** Older servers omit it. */ style?: { profileName: string; tone: string; toneLabel: string; hasNote: boolean } | null }
 interface AudienceLead { id: number; companyName: string; domain: string | null; industry: string | null; location: string | null; status: string; source: string; contactName: string | null; hasEmail: boolean; hasUnsent: boolean; blocked: string | null; /** Older servers omit these two. */ profileName?: string | null; ready?: boolean }
 
 const STAGE_TONE: Record<MemberStage, string> = {
@@ -72,7 +72,6 @@ function StateChips({ c }: { c: Campaign }) {
     <>
       {c.status === "archived" && <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">Archived</span>}
       {c.preparing && <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"><Loader2 className="h-3 w-3 animate-spin" aria-hidden />Preparing drafts</span>}
-      {c.sending && <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"><Send className="h-3 w-3" aria-hidden />Sending</span>}
     </>
   );
 }
@@ -245,7 +244,7 @@ function CampaignDetail({ id, canEdit, onBack, fromLink = false }: { id: number;
   const [openLead, setOpenLead] = useState<number | null>(null);
   const section = useRef<HTMLElement>(null);
   const repliesRead = repliesAreRead(useGmailStatus().data);
-  const q = useQuery<DetailResponse>({ queryKey: [campaignUrl(id)], retry: false, refetchInterval: (query) => { const c = query.state.data?.campaign; return c?.preparing || c?.sending || openLead !== null ? 4000 : false; } });
+  const q = useQuery<DetailResponse>({ queryKey: [campaignUrl(id)], retry: false, refetchInterval: (query) => { const c = query.state.data?.campaign; return c?.preparing || openLead !== null ? 4000 : false; } });
   // A link to a campaign lands on the campaign, once it has loaded: on a phone it is a long way below the search form.
   const loaded = !!q.data;
   useEffect(() => {
@@ -261,16 +260,15 @@ function CampaignDetail({ id, canEdit, onBack, fromLink = false }: { id: number;
   }, [fromLink, loaded]);
   const oops = (title: string) => (e: unknown) => { toast({ title, description: leadError(e), variant: "destructive" }); refresh(id); };
   const act = useMutation({
-    mutationFn: (action: "prepare" | "prepare/stop" | "send" | "send/pause" | "archive") => leadCall("POST", campaignUrl(id, action), {}),
+    mutationFn: (action: "prepare" | "prepare/stop" | "archive") => leadCall("POST", campaignUrl(id, action), {}),
     onSuccess: (_r, action) => { trackEvent("campaign_action", { action }); refresh(id); if (action === "archive") onBack(); },
     onError: oops("That didn't work"),
   });
-  const pace = useMutation({ mutationFn: (patch: { dailyLimit?: number; gapSeconds?: number }) => leadCall("PATCH", campaignUrl(id), patch), onSuccess: () => refresh(id), onError: oops("Couldn't change the pace") });
   const remove = useMutation({ mutationFn: (leadId: number) => leadCall("DELETE", campaignUrl(id, `members/${leadId}`)), onSuccess: () => refresh(id), onError: oops("Couldn't take it out") });
 
   if (q.isError && !q.data) return <div className="rounded-2xl border border-destructive/40 px-4 py-6 text-center" role="alert"><p className="text-sm">{leadError(q.error, "The campaign couldn't be loaded.")}</p><Button size="sm" variant="outline" className="mt-2" onClick={onBack}>Back to campaigns</Button></div>;
   if (!q.data) return <div className="space-y-3"><Skeleton className="h-8 w-1/3" /><Skeleton className="h-20 w-full rounded-xl" /><Skeleton className="h-40 w-full rounded-xl" /></div>;
-  const { campaign: c, members, queueEnabled } = q.data;
+  const { campaign: c, members } = q.data;
   const n = c.counts, active = c.status === "active", waiting = n.queued + n.failed;
   const open = members.find((m) => m.leadId === openLead) ?? null;
   // Working through the campaign without going back to the list: where the open lead sits and who needs the person next.
@@ -285,7 +283,7 @@ function CampaignDetail({ id, canEdit, onBack, fromLink = false }: { id: number;
           <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold"><span className="break-words">{c.name}</span><StateChips c={c} /></h2>
           <p className="text-xs text-muted-foreground">{c.profileName ? `For "${c.profileName}" · ` : ""}{countsLine(n)}</p>
         </div>
-        {canEdit && active && <Button size="sm" variant="ghost" onClick={() => { if (window.confirm(`Archive "${c.name}"? Drafting and sending stop. Its messages stay in Outreach.`)) act.mutate("archive"); }} disabled={act.isPending} data-testid="campaign-archive"><Archive className="mr-1.5 h-3.5 w-3.5" />Archive</Button>}
+        {canEdit && active && <Button size="sm" variant="ghost" onClick={() => { if (window.confirm(`Archive "${c.name}"? Drafting stops. Its messages stay in Outreach.`)) act.mutate("archive"); }} disabled={act.isPending} data-testid="campaign-archive"><Archive className="mr-1.5 h-3.5 w-3.5" />Archive</Button>}
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" data-testid="campaign-numbers">
@@ -363,17 +361,12 @@ function CampaignDetail({ id, canEdit, onBack, fromLink = false }: { id: number;
       <div className="space-y-2 rounded-xl border p-3" data-testid="campaign-send">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-sm font-semibold">3. Send</p>
-            {queueEnabled
-              ? <p className="text-xs text-muted-foreground">{c.sending ? `Sending approved messages from your Gmail, one at a time.${c.nextSendAt ? ` Next at about ${new Date(c.nextSendAt).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}.` : ""}` : `${plural(n.approved, "approved message")} ready. They leave from your own Gmail, at most ${c.dailyLimit} a day, a few minutes apart.`}</p>
-              : <p className="text-xs text-muted-foreground" data-testid="campaign-queue-off">A sending queue isn't switched on for this server. Open each approved message and send it yourself: from Gmail if it is connected, or from your own email app.</p>}
+            <p className="text-sm font-semibold">3. Send each one yourself</p>
+            <p className="text-xs text-muted-foreground" data-testid="campaign-send-yourself">Open each approved message and send it: from your connected Gmail, or from your own email app. DealInSec never sends a campaign by itself.</p>
           </div>
-          {canEdit && active && !queueEnabled && first.nextToSend && (
+          {canEdit && active && first.nextToSend && (
             <Button size="sm" variant="outline" onClick={() => go(first.nextToSend!.leadId)} data-testid="campaign-send-by-hand"><Send className="mr-1.5 h-3.5 w-3.5" />Send {plural(first.toSend, "approved message")}, one after another</Button>
           )}
-          {canEdit && active && queueEnabled && (c.sending
-            ? <Button size="sm" variant="outline" onClick={() => act.mutate("send/pause")} disabled={act.isPending} data-testid="campaign-send-pause"><Pause className="mr-1.5 h-3.5 w-3.5" />Pause</Button>
-            : <Button size="sm" onClick={() => { if (window.confirm(`Start sending ${plural(n.approved, "approved message")} from your Gmail? Later approvals in this campaign are sent too, until you pause it.`)) act.mutate("send"); }} disabled={act.isPending || n.approved === 0} className="gradient-btn text-white" data-testid="campaign-send-start"><Play className="mr-1.5 h-3.5 w-3.5" />Start sending</Button>)}
         </div>
         {q.data.followUps && (q.data.followUps.waiting > 0 || q.data.followUps.planned > 0) && (
           <p className="rounded-lg border px-3 py-2 text-xs" data-testid="campaign-followups">
@@ -384,14 +377,6 @@ function CampaignDetail({ id, canEdit, onBack, fromLink = false }: { id: number;
           </p>
         )}
         <SenderCheck />
-        {c.sendStopLabel && c.sendStop !== "paused" && <p className={cn("rounded-lg border px-3 py-2 text-xs", c.sendStop === "done" ? "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200" : "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200")} role="status" data-testid="campaign-send-stopped">{c.sendStop === "done" ? c.sendStopLabel : `Sending paused: ${c.sendStopLabel}.`}</p>}
-        {queueEnabled && canEdit && active && (
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            <label className="flex items-center gap-1.5">At most <input type="number" min={DAILY_LIMIT.min} max={DAILY_LIMIT.max} defaultValue={c.dailyLimit} key={`d${c.dailyLimit}`} onBlur={(e) => { const v = Math.floor(Number(e.target.value)); if (v !== c.dailyLimit && v >= DAILY_LIMIT.min && v <= DAILY_LIMIT.max) pace.mutate({ dailyLimit: v }); else e.target.value = String(c.dailyLimit); }} className="w-16 rounded-md border bg-background px-2 py-1 text-foreground" data-testid="campaign-daily-limit" /> a day</label>
-            <label className="flex items-center gap-1.5">at least <input type="number" min={GAP_SECONDS.min / 60} max={GAP_SECONDS.max / 60} defaultValue={Math.round(c.gapSeconds / 60)} key={`g${c.gapSeconds}`} onBlur={(e) => { const v = Math.floor(Number(e.target.value)) * 60; if (v !== c.gapSeconds && v >= GAP_SECONDS.min && v <= GAP_SECONDS.max) pace.mutate({ gapSeconds: v }); else e.target.value = String(Math.round(c.gapSeconds / 60)); }} className="w-16 rounded-md border bg-background px-2 py-1 text-foreground" data-testid="campaign-gap" /> minutes apart</label>
-          </div>
-        )}
-        {queueEnabled && <p className="text-xs text-muted-foreground">Only approved messages that still end with the opt-out line are sent. The queue pauses itself if Gmail needs reconnecting, a limit is reached, a send can't be confirmed, or messages bounce.</p>}
       </div>
 
       <Sheet open={openLead !== null} onOpenChange={(o) => { if (!o) { setOpenLead(null); refresh(id); } }}>
@@ -402,7 +387,7 @@ function CampaignDetail({ id, canEdit, onBack, fromLink = false }: { id: number;
                 <SheetTitle>{open.companyName}</SheetTitle>
                 <SheetDescription>{[open.domain, open.leadStatus ? `lead stage ${open.leadStatus}` : null, open.stageLabel].filter(Boolean).join(" · ")}</SheetDescription>
               </SheetHeader>
-              <SheetSteps steps={steps} queueEnabled={queueEnabled} onGo={go} leadId={open.leadId} />
+              <SheetSteps steps={steps} onGo={go} leadId={open.leadId} />
               {open.note && <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200" role="status">{open.note}.</p>}
               <OutreachPanel key={open.leadId} leadId={open.leadId} />
             </div>
@@ -417,12 +402,11 @@ function CampaignDetail({ id, canEdit, onBack, fromLink = false }: { id: number;
  * The strip at the top of an open lead: where it sits in the campaign, its neighbours, and one button to the next lead
  * that needs the person. It only moves between leads; reading, approving and sending stay the lead's own buttons.
  */
-function SheetSteps({ steps, queueEnabled, onGo, leadId }: { steps: MemberSteps<Member>; queueEnabled: boolean; onGo: (leadId: number) => void; leadId: number }) {
+function SheetSteps({ steps, onGo, leadId }: { steps: MemberSteps<Member>; onGo: (leadId: number) => void; leadId: number }) {
   const top = useRef<HTMLDivElement>(null);
   // A new lead starts at its top, not wherever the last one was scrolled to.
   useEffect(() => { top.current?.scrollIntoView({ block: "start" }); }, [leadId]);
-  // With a sending queue on, approved messages leave by the queue; sending by hand is only offered without one.
-  const send = !queueEnabled ? steps.nextToSend : null;
+  const send = steps.nextToSend;
   return (
     <div ref={top} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-2 py-1.5" data-testid="campaign-sheet-steps">
       <div className="flex items-center gap-1">
@@ -451,7 +435,7 @@ export function Campaigns({ canEdit }: { canEdit: boolean }) {
   const [linked] = useState<number | null>(linkedCampaign);
   const [creating, setCreating] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const q = useQuery<ListResponse>({ queryKey: [CAMPAIGNS_URL], retry: false, refetchInterval: (query) => (query.state.data?.campaigns.some((c) => c.preparing || c.sending) ? 8000 : false) });
+  const q = useQuery<ListResponse>({ queryKey: [CAMPAIGNS_URL], retry: false, refetchInterval: (query) => (query.state.data?.campaigns.some((c) => c.preparing) ? 8000 : false) });
   const notSetUp = q.error && /CAMPAIGNS_NOT_SETUP/.test(String((q.error as Error).message));
   const list = useMemo(() => (q.data?.campaigns ?? []).filter((c) => showArchived || c.status === "active"), [q.data, showArchived]);
   const archived = (q.data?.campaigns ?? []).filter((c) => c.status !== "active").length;
@@ -487,7 +471,6 @@ export function Campaigns({ canEdit }: { canEdit: boolean }) {
                   <span className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className="truncate">{c.name}</span><StateChips c={c} /></span>
                   <span className="block truncate text-xs text-muted-foreground">{c.profileName ? `For "${c.profileName}" · ` : ""}{countsLine(c.counts)}</span>
                   {!c.preparing && c.prepareStopLabel && c.prepareStop !== "stopped" && <span className="block text-xs text-amber-800 dark:text-amber-300">Drafting stopped: {c.prepareStopLabel}</span>}
-                  {!c.sending && c.sendStopLabel && !["paused", "done"].includes(c.sendStop ?? "") && <span className="block text-xs text-amber-800 dark:text-amber-300">Sending paused: {c.sendStopLabel}</span>}
                 </span>
                 {c.counts.sent > 0 && <span className="shrink-0 text-xs text-muted-foreground">Reply rate {pct(c.rates.reply)}</span>}
               </button>

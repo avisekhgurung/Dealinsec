@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addMembersSchema, CAMPAIGN_MAX_MEMBERS, campaignCreateSchema, campaignRates, campaignUpdateSchema, countMembers, DAILY_LIMIT, draftRefusal, GAP_SECONDS, hasOptOutLine,
-  memberStage, memberSteps, type MemberStage, nextSendAt, OPT_OUT_LINE, reasonLabel, sendRefusal, stopLabel, tooManyBounces, withFooter,
+  memberStage, memberSteps, type MemberStage, OPT_OUT_LINE, reasonLabel, stopLabel, withFooter,
 } from "./campaign";
 import { LIMITS, checkStructure } from "./outreach-check";
 
@@ -80,33 +80,6 @@ describe("what a refusal means", () => {
     for (const c of ["no_address", "no_facts", "do_not_contact", "suppressed", "already_contacted", "closed", "draft_rejected", "not_found", "forbidden"]) expect(draftRefusal(c), c).toBe("skip");
     expect(draftRefusal("model_unavailable")).toBe("retry");
     expect(draftRefusal("draft_exists")).toBe("adopt");
-  });
-  it("sending: a problem with one message holds that message; anything about the mailbox, a limit or the server pauses everything", () => {
-    for (const c of ["changed", "not_approved", "in_flight", "invalid_content", "no_address", "do_not_contact", "suppressed", "followup_stopped", "not_found"]) expect(sendRefusal(c), c).toBe("hold");
-    for (const c of ["mailbox_reconnect", "no_mailbox", "missing_send_scope", "not_allowed", "not_member", "daily_cap", "plan_send_limit", "unavailable", "sending_disabled", "outreach_not_setup", "a_code_from_the_future"]) expect(sendRefusal(c), c).toBe("pause");
-    for (const c of ["provider_unavailable", "suppression_unavailable"]) expect(sendRefusal(c), c).toBe("later");
-  });
-});
-
-describe("pacing", () => {
-  const now = new Date("2026-11-10T10:00:00Z");
-  it("the next send is the gap away, stretched by up to half again, never sooner", () => {
-    expect(nextSendAt(now, 180, 0).getTime() - now.getTime()).toBe(180_000);
-    expect(nextSendAt(now, 180, 1).getTime() - now.getTime()).toBe(270_000);
-    expect(nextSendAt(now, 180, 0.5).getTime() - now.getTime()).toBe(225_000);
-  });
-  it("a gap outside the limits is brought inside them", () => {
-    expect(nextSendAt(now, 1, 0).getTime() - now.getTime()).toBe(GAP_SECONDS.min * 1000);
-    expect(nextSendAt(now, 999_999, 0).getTime() - now.getTime()).toBe(GAP_SECONDS.max * 1000);
-    expect(nextSendAt(now, NaN, 0).getTime() - now.getTime()).toBe(GAP_SECONDS.default * 1000);
-    expect(nextSendAt(now, 180, 7).getTime() - now.getTime()).toBe(270_000);
-  });
-  it("two bounces that are a tenth or more of what was sent stop the queue; one bounce, or two in thirty, do not", () => {
-    expect(tooManyBounces({ sent: 3, bounced: 2 })).toBe(true);
-    expect(tooManyBounces({ sent: 20, bounced: 2 })).toBe(true);
-    expect(tooManyBounces({ sent: 30, bounced: 2 })).toBe(false);
-    expect(tooManyBounces({ sent: 1, bounced: 1 })).toBe(false);
-    expect(tooManyBounces({ sent: 0, bounced: 0 })).toBe(false);
   });
 });
 

@@ -174,7 +174,7 @@ describe("making a campaign", () => {
   it("groups the workspace's own leads, silently leaving out ids that aren't its own", async () => {
     const w = world();
     const r: any = await svc.createCampaign(ana, { name: " Diwali  push ", leadIds: [1, 2, 9, 404], profileId: 7, footerNote: "Pixel Studio, Pune" }, w.deps);
-    expect(r).toMatchObject({ ok: true, added: 2, left: 2, campaign: { name: "Diwali push", profileName: "Brands", footerNote: "Pixel Studio, Pune", preparing: false, sending: false, counts: { members: 2, queued: 2 } } });
+    expect(r).toMatchObject({ ok: true, added: 2, left: 2, campaign: { name: "Diwali push", profileName: "Brands", footerNote: "Pixel Studio, Pune", preparing: false, counts: { members: 2, queued: 2 } } });
     expect(w.members.map((m) => m.leadId)).toEqual([1, 2]);
     expect(w.calls.draft).toEqual([]); // creating one writes nothing and spends nothing
   });
@@ -218,10 +218,10 @@ describe("who may do what", () => {
     const id = await make(w);
     expect(await svc.listCampaigns(viewer, w.deps)).toMatchObject({ ok: true, campaigns: [{ name: "Diwali" }] });
     expect(await svc.getCampaign(viewer, id, w.deps)).toMatchObject({ ok: true });
-    for (const r of [await svc.createCampaign(viewer, { name: "v", leadIds: [1] }, w.deps), await svc.audience(viewer, {}, w.deps), await svc.updateCampaign(viewer, id, { name: "v" }, w.deps), await svc.addMembers(viewer, id, { leadIds: [4] }, w.deps), await svc.removeMember(viewer, id, 1, w.deps), await svc.startPreparing(viewer, id, w.deps), await svc.stopPreparing(viewer, id, w.deps), await svc.startSending(viewer, id, w.deps), await svc.pauseSending(viewer, id, w.deps), await svc.archiveCampaign(viewer, id, w.deps)])
+    for (const r of [await svc.createCampaign(viewer, { name: "v", leadIds: [1] }, w.deps), await svc.audience(viewer, {}, w.deps), await svc.updateCampaign(viewer, id, { name: "v" }, w.deps), await svc.addMembers(viewer, id, { leadIds: [4] }, w.deps), await svc.removeMember(viewer, id, 1, w.deps), await svc.startPreparing(viewer, id, w.deps), await svc.stopPreparing(viewer, id, w.deps), await svc.archiveCampaign(viewer, id, w.deps)])
       expect(r).toMatchObject({ ok: false, status: 403 });
     expect(await svc.listCampaigns(bob, w.deps)).toMatchObject({ ok: true, campaigns: [] });
-    for (const r of [await svc.getCampaign(bob, id, w.deps), await svc.updateCampaign(bob, id, { name: "mine" }, w.deps), await svc.addMembers(bob, id, { leadIds: [9] }, w.deps), await svc.removeMember(bob, id, 1, w.deps), await svc.startPreparing(bob, id, w.deps), await svc.stopPreparing(bob, id, w.deps), await svc.startSending(bob, id, w.deps), await svc.pauseSending(bob, id, w.deps), await svc.archiveCampaign(bob, id, w.deps)])
+    for (const r of [await svc.getCampaign(bob, id, w.deps), await svc.updateCampaign(bob, id, { name: "mine" }, w.deps), await svc.addMembers(bob, id, { leadIds: [9] }, w.deps), await svc.removeMember(bob, id, 1, w.deps), await svc.startPreparing(bob, id, w.deps), await svc.stopPreparing(bob, id, w.deps), await svc.archiveCampaign(bob, id, w.deps)])
       expect(r).toMatchObject({ ok: false, status: 404, code: "not_found" });
     expect(w.campaigns[0]).toMatchObject({ name: "Diwali", status: "active", preparing: false, sending: false });
     expect(w.members).toHaveLength(3);
@@ -243,10 +243,9 @@ describe("who may do what", () => {
   it("on a server without the tables it says so, and the job does nothing", async () => {
     const w = world();
     const deps = { ...w.deps, ready: async () => false };
-    for (const r of [await svc.listCampaigns(ana, deps), await svc.createCampaign(ana, { name: "x", leadIds: [1] }, deps), await svc.getCampaign(ana, 1, deps), await svc.startPreparing(ana, 1, deps), await svc.startSending(ana, 1, deps)])
+    for (const r of [await svc.listCampaigns(ana, deps), await svc.createCampaign(ana, { name: "x", leadIds: [1] }, deps), await svc.getCampaign(ana, 1, deps), await svc.startPreparing(ana, 1, deps)])
       expect(r).toMatchObject({ ok: false, status: 503, code: "CAMPAIGNS_NOT_SETUP" });
     expect(await svc.draftStep(deps)).toBe("idle");
-    expect(await svc.sendStep(deps)).toBe("idle");
     expect(await svc.draftStep({ ...w.deps, ready: async () => { throw new Error("db down"); } })).toBe("idle");
   });
   it("members can be added up to the cap and taken out until their message is sent", async () => {
@@ -260,16 +259,17 @@ describe("who may do what", () => {
     expect(await svc.removeMember(ana, id, 1, w.deps)).toMatchObject({ ok: false, status: 409, code: "already_sent" });
     expect(w.members.map((x) => x.leadId)).toEqual([1, 2]);
   });
-  it("an archived campaign can't be changed or restarted, and archiving stops both jobs", async () => {
+  it("an archived campaign can't be changed or restarted, and archiving stops the drafting", async () => {
     const w = world();
     const id = await prepared(w, [1]);
     w.approve(1);
-    await svc.startSending(ana, id, w.deps);
-    expect(await svc.archiveCampaign(ana, id, w.deps)).toMatchObject({ ok: true, campaign: { status: "archived", sending: false, preparing: false } });
-    for (const r of [await svc.updateCampaign(ana, id, { name: "x" }, w.deps), await svc.addMembers(ana, id, { leadIds: [4] }, w.deps), await svc.startPreparing(ana, id, w.deps), await svc.startSending(ana, id, w.deps)])
+    expect(await svc.archiveCampaign(ana, id, w.deps)).toMatchObject({ ok: true, campaign: { status: "archived", preparing: false } });
+    for (const r of [await svc.updateCampaign(ana, id, { name: "x" }, w.deps), await svc.addMembers(ana, id, { leadIds: [4] }, w.deps), await svc.startPreparing(ana, id, w.deps)])
       expect(r).toMatchObject({ ok: false, status: 409, code: "archived" });
-    expect(await svc.sendStep(w.deps)).toBe("idle");
-    expect(w.calls.send).toEqual([]);
+  });
+  it("nothing in a campaign sends a message: there is no sending step to call", () => {
+    expect((svc as Record<string, unknown>).sendStep).toBeUndefined();
+    expect((svc as Record<string, unknown>).startSending).toBeUndefined();
   });
 });
 
@@ -293,7 +293,7 @@ describe("preparing drafts", () => {
     expect(got.campaign.counts).toMatchObject({ members: 2, queued: 0, draft: 2, approved: 0, sent: 0 });
     expect(got.members.map((m: any) => m.stage)).toEqual(["draft", "draft"]);
   });
-  it("when the server can sign links, each draft ends with ITS OWN unsubscribe link, after the opt-out line, and is still sendable", async () => {
+  it("when the server can sign links, each draft ends with ITS OWN unsubscribe link, after the opt-out line", async () => {
     const w = world();
     w.setLinks("https://www.dealinsec.com");
     const id = await make(w, [1, 2], { footerNote: "Pixel Studio, Pune" });
@@ -306,9 +306,6 @@ describe("preparing drafts", () => {
     expect((await svc.listCampaigns(ana, w.deps) as any).unsubscribeLinks).toBe(true);
     // The footer with its link doesn't read as an opt-out when a reply quotes it.
     expect(classifyReply({ kind: "reply", subject: "Re: Hello", text: `Yes, let's talk.\n\n> ${OPT_OUT_LINE}\n> To stop these emails: https://www.dealinsec.com/u/${m1.id}.sig` } as any)).toBe("interested");
-    w.approve(1);
-    await svc.startSending(ana, id, w.deps);
-    expect(await svc.sendStep(w.deps)).toBe("sent");
   });
   it("without a secret there is no link, and the page is told so", async () => {
     const w = world();
@@ -490,181 +487,5 @@ describe("follow-ups in a campaign", () => {
     const r: any = await svc.getCampaign(ana, id, w.deps);
     expect(r.members.map((m: any) => m.followUp)).toEqual([null, null, null]);
     expect(r.followUps).toEqual({ waiting: 0, planned: 0 });
-  });
-});
-
-describe("the sending queue", () => {
-  it("is off unless the server switch is on, and never starts with nothing approved", async () => {
-    const w = world();
-    const id = await prepared(w, [1]);
-    expect(await svc.startSending(ana, id, w.deps)).toMatchObject({ ok: false, status: 409, code: "nothing_approved" });
-    w.approve(1);
-    w.setQueue(false);
-    expect(await svc.startSending(ana, id, w.deps)).toMatchObject({ ok: false, status: 503, code: "queue_off" });
-    expect(await svc.sendStep(w.deps)).toBe("idle");
-    expect(w.calls.send).toEqual([]);
-    expect(svc.queueSwitch({} as any)).toBe(false);
-    expect(svc.queueSwitch({ CAMPAIGN_SENDING_ENABLED: "1" } as any)).toBe(false);
-    expect(svc.queueSwitch({ CAMPAIGN_SENDING_ENABLED: "true" } as any)).toBe(true);
-  });
-  it("sends only approved messages, one per pass, as the person who started it, then waits out the gap", async () => {
-    const w = world();
-    const id = await prepared(w, [1, 2, 3]);
-    const a1 = w.approve(1), a2 = w.approve(2); // lead 3 stays a draft
-    expect(await svc.startSending(ana, id, w.deps)).toMatchObject({ ok: true, campaign: { sending: true } });
-    expect(await svc.sendStep(w.deps)).toBe("sent");
-    expect(w.calls.send).toEqual([{ by: "ana", messageId: a1.id, bodyHash: a1.bodyHash }]);
-    expect(await svc.sendStep(w.deps)).toBe("idle"); // the gap hasn't passed
-    w.tick(179_000);
-    expect(await svc.sendStep(w.deps)).toBe("idle");
-    w.tick(2_000);
-    expect(await svc.sendStep(w.deps)).toBe("sent");
-    expect(w.calls.send.map((c) => c.messageId)).toEqual([a1.id, a2.id]);
-    // The draft nobody approved is never sent: the queue waits for a person.
-    w.tick(svc.SEND_LEASE_MS);
-    expect(await svc.sendStep(w.deps)).toBe("waiting");
-    expect(w.calls.send).toHaveLength(2);
-    expect(w.msg(w.member(3).messageId).status).toBe("draft");
-    expect(w.campaigns[0].sending).toBe(true);
-  });
-  it("finishes by itself when everything approved has gone and nothing is waiting", async () => {
-    const w = world();
-    const id = await prepared(w, [1]);
-    w.approve(1);
-    await svc.startSending(ana, id, w.deps);
-    expect(await svc.sendStep(w.deps)).toBe("sent");
-    w.tick(600_000);
-    expect(await svc.sendStep(w.deps)).toBe("done");
-    expect((await svc.getCampaign(ana, id, w.deps) as any).campaign).toMatchObject({ sending: false, sendStop: "done", sendStopLabel: "Everything approved has been sent", counts: { sent: 1 }, rates: { reply: 0, bounce: 0 } });
-  });
-  it("never sends a message whose opt-out line was removed: it is held, with the reason, and the next one goes", async () => {
-    const w = world();
-    const id = await prepared(w, [1, 2]);
-    const m1 = w.msg(w.member(1).messageId);
-    m1.body = BODY; m1.bodyHash = hashDraft("Hello", BODY); // the person edited the footer away, then approved
-    w.approve(1); const a2 = w.approve(2);
-    await svc.startSending(ana, id, w.deps);
-    expect(await svc.sendStep(w.deps)).toBe("held");
-    expect(w.calls.send).toEqual([]);
-    expect(await svc.sendStep(w.deps)).toBe("sent");
-    expect(w.calls.send.map((c) => c.messageId)).toEqual([a2.id]);
-    const got: any = await svc.getCampaign(ana, id, w.deps);
-    expect(got.members[0]).toMatchObject({ stage: "approved", note: "The opt-out line was removed. Put it back to send from the queue" });
-    // Put back and approved again (a new text, so a new hash): it is no longer held.
-    m1.body = withFooter(BODY, ""); m1.bodyHash = hashDraft("Hello", m1.body);
-    w.tick(600_000);
-    expect(await svc.sendStep(w.deps)).toBe("sent");
-    expect(w.calls.send.map((c) => c.messageId)).toEqual([a2.id, m1.id]);
-  });
-  it("respects the campaign's daily limit, counted over the last 24 hours", async () => {
-    const w = world();
-    const id = await prepared(w, [1, 2, 3]);
-    await svc.updateCampaign(ana, id, { dailyLimit: 2 }, w.deps);
-    w.approve(1); w.approve(2); w.approve(3);
-    await svc.startSending(ana, id, w.deps);
-    expect(await svc.sendStep(w.deps)).toBe("sent"); w.tick(300_000);
-    expect(await svc.sendStep(w.deps)).toBe("sent"); w.tick(300_000);
-    expect(await svc.sendStep(w.deps)).toBe("limit");
-    expect(w.calls.send).toHaveLength(2);
-    expect(w.campaigns[0].sending).toBe(true); // waiting for tomorrow, not stopped
-    w.tick(25 * 3_600_000);
-    expect(await svc.sendStep(w.deps)).toBe("sent");
-  });
-  it("a problem with one message holds that message only; a problem with the mailbox or a limit pauses everything", async () => {
-    const w = world();
-    const id = await prepared(w, [1, 2, 3]);
-    const a1 = w.approve(1); w.approve(2); w.approve(3);
-    await svc.startSending(ana, id, w.deps);
-    w.setSend((mid: number) => (mid === a1.id ? { ok: false, code: "suppressed" } : { ok: true, outcome: "sent" }));
-    expect(await svc.sendStep(w.deps)).toBe("held");
-    expect(await svc.sendStep(w.deps)).toBe("sent");
-    expect(w.member(1)).toMatchObject({ holdReason: "suppressed", holdHash: a1.bodyHash });
-    w.tick(600_000);
-    w.setSend({ ok: false, code: "mailbox_reconnect" });
-    expect(await svc.sendStep(w.deps)).toBe("paused");
-    expect(w.campaigns[0]).toMatchObject({ sending: false, sendStop: "mailbox_reconnect" });
-    w.tick(600_000);
-    expect(await svc.sendStep(w.deps)).toBe("idle"); // paused means paused: nothing more goes until a person restarts it
-    expect((await svc.getCampaign(ana, id, w.deps) as any).campaign.sendStopLabel).toBe("Reconnect your Gmail in Settings");
-  });
-  it("pauses on the plan's limit, the mailbox's daily cap, and a code it has never seen", async () => {
-    for (const code of ["plan_send_limit", "daily_cap", "something_new"]) {
-      const w = world();
-      const id = await prepared(w, [1]);
-      w.approve(1);
-      await svc.startSending(ana, id, w.deps);
-      w.setSend({ ok: false, code });
-      expect(await svc.sendStep(w.deps), code).toBe("paused");
-      expect(w.campaigns[0].sending, code).toBe(false);
-      void id;
-    }
-  });
-  it("a send that may or may not have gone out pauses the queue and is never tried again by it", async () => {
-    const w = world();
-    const id = await prepared(w, [1, 2]);
-    w.approve(1); w.approve(2);
-    await svc.startSending(ana, id, w.deps);
-    w.setSend({ ok: true, outcome: "uncertain" });
-    expect(await svc.sendStep(w.deps)).toBe("paused");
-    expect(w.campaigns[0]).toMatchObject({ sending: false, sendStop: "uncertain" });
-    expect(w.calls.send).toHaveLength(1);
-    w.setSend({ ok: true, outcome: "failed", reconnect: true });
-    await svc.startSending(ana, id, w.deps);
-    expect(await svc.sendStep(w.deps)).toBe("paused");
-    expect(w.campaigns[0].sendStop).toBe("mailbox_reconnect");
-    void id;
-  });
-  it("a provider hiccup is simply tried later, with the queue still on", async () => {
-    const w = world();
-    const id = await prepared(w, [1]);
-    w.approve(1);
-    await svc.startSending(ana, id, w.deps);
-    w.setSend({ ok: false, code: "provider_unavailable" });
-    expect(await svc.sendStep(w.deps)).toBe("later");
-    expect(w.campaigns[0].sending).toBe(true);
-    expect(await svc.sendStep(w.deps)).toBe("idle");
-    w.setSend({ ok: true, outcome: "sent" }); w.tick(600_000);
-    expect(await svc.sendStep(w.deps)).toBe("sent");
-    void id;
-  });
-  it("stops itself when messages bounce", async () => {
-    const w = world();
-    const id = await prepared(w, [1, 2, 3, 4]);
-    for (const l of [1, 2, 3, 4]) w.approve(l);
-    await svc.startSending(ana, id, w.deps);
-    for (let i = 0; i < 3; i++) { expect(await svc.sendStep(w.deps)).toBe("sent"); w.tick(600_000); }
-    for (const l of [1, 2]) w.events.push({ messageId: w.member(l).messageId, kind: "bounced" });
-    expect(await svc.sendStep(w.deps)).toBe("paused");
-    expect(w.calls.send).toHaveLength(3); // the fourth was not sent
-    expect((await svc.getCampaign(ana, id, w.deps) as any).campaign).toMatchObject({ sending: false, sendStop: "bounce_rate", counts: { sent: 3, bounced: 2, approved: 1 }, rates: { bounce: 66.7 } });
-  });
-  it("pauses when the switch is turned off mid-campaign, and when the sender has left", async () => {
-    const w = world();
-    const id = await prepared(w, [1, 2]);
-    w.approve(1); w.approve(2);
-    await svc.startSending(ana, id, w.deps);
-    w.setQueue(false);
-    expect(await svc.sendStep(w.deps)).toBe("paused");
-    expect(w.campaigns[0].sendStop).toBe("queue_off");
-    w.setQueue(true);
-    await svc.startSending(ana, id, w.deps);
-    delete w.users.ana;
-    expect(await svc.sendStep(w.deps)).toBe("paused");
-    expect(w.campaigns[0].sendStop).toBe("not_member");
-    expect(w.calls.send).toEqual([]);
-  });
-  it("Pause stops it at once; two passes never send for the same campaign at the same time", async () => {
-    const w = world();
-    const id = await prepared(w, [1, 2]);
-    w.approve(1); w.approve(2);
-    await svc.startSending(ana, id, w.deps);
-    let inFlight = 0, most = 0;
-    w.deps.send = async (_u: any, messageId: number) => { inFlight++; most = Math.max(most, inFlight); await new Promise((r) => setTimeout(r, 5)); const m = w.msg(messageId); m.status = "sent"; m.sentAt = w.deps.now(); inFlight--; return { ok: true, outcome: "sent" }; };
-    const out = await Promise.all([svc.sendStep(w.deps), svc.sendStep(w.deps), svc.sendStep(w.deps)]);
-    expect(out.filter((o) => o === "sent")).toHaveLength(1);
-    expect(most).toBe(1);
-    w.tick(600_000);
-    expect(await svc.pauseSending(ana, id, w.deps)).toMatchObject({ ok: true, campaign: { sending: false, sendStop: "paused", sendStopLabel: "Paused by you" } });
-    expect(await svc.sendStep(w.deps)).toBe("idle");
   });
 });

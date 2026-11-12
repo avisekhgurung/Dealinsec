@@ -102,41 +102,6 @@ describe.skipIf(!URL_ || !loopback(URL_))("campaign store (real Postgres)", () =
     expect(await memberOf(c.id, l)).toMatchObject({ state: "queued", reason: null, attempts: 0 });
   });
 
-  it("only one of several passes takes a due campaign to send from; a lease, a later time or a pause keeps the rest out", async () => {
-    const o = org();
-    const c = (await mod.campaignStore.create(o, "u", base, [await lead(o, "A")], NOW, 50))!;
-    const mine = async (at: Date) => (await Promise.all(Array.from({ length: 8 }, () => mod.campaignStore.claimSend(at, 6 * MIN)))).filter((x) => x?.id === c.id);
-    expect(await mine(NOW)).toHaveLength(0); // not sending
-    await mod.campaignStore.setSending(o, c.id, { on: true, userId: "u", nextSendAt: NOW }, NOW);
-    expect(await mine(NOW)).toHaveLength(1);
-    expect(await mine(NOW)).toHaveLength(0); // leased
-    await mod.campaignStore.releaseSend(c.id, { nextSendAt: new Date(NOW.getTime() + 3 * MIN) }, NOW);
-    expect(await mine(new Date(NOW.getTime() + 2 * MIN))).toHaveLength(0); // not due yet
-    expect(await mine(new Date(NOW.getTime() + 3 * MIN))).toHaveLength(1);
-    await mod.campaignStore.setSending(o, c.id, { on: false, stop: "paused" }, NOW);
-    expect(await mine(new Date(NOW.getTime() + 60 * MIN))).toHaveLength(0);
-  });
-
-  it("the next message to send is the oldest APPROVED one that isn't on hold for its current text", async () => {
-    const o = org();
-    const ids = [await lead(o, "A"), await lead(o, "B"), await lead(o, "C"), await lead(o, "D")];
-    const c = (await mod.campaignStore.create(o, "u", base, ids, NOW, 50))!;
-    const draft = await message(o, ids[0], "draft");
-    const held = await message(o, ids[1], "approved", { hash: "a".repeat(64), approvedAt: new Date(NOW.getTime() - 9 * MIN) });
-    const second = await message(o, ids[2], "approved", { approvedAt: new Date(NOW.getTime() - 2 * MIN), body: "second" });
-    const first = await message(o, ids[3], "approved", { approvedAt: new Date(NOW.getTime() - 5 * MIN), body: "first" });
-    for (const [l, m] of [[ids[0], draft], [ids[1], held], [ids[2], second], [ids[3], first]] as const) await mod.campaignStore.settleMember((await memberOf(c.id, l)).id, { state: "drafted", messageId: m }, NOW);
-    await mod.campaignStore.settleMember((await memberOf(c.id, ids[1])).id, { holdReason: "suppressed", holdHash: "a".repeat(64) }, NOW);
-    expect(await mod.campaignStore.nextApproved(o, c.id)).toMatchObject({ messageId: first, leadId: ids[3], body: "first" });
-    await q.query(`UPDATE lead_messages SET status = 'sent', sent_at = $2 WHERE id = $1`, [first, NOW]);
-    expect((await mod.campaignStore.nextApproved(o, c.id))?.messageId).toBe(second);
-    await q.query(`UPDATE lead_messages SET status = 'sent', sent_at = $2 WHERE id = $1`, [second, NOW]);
-    expect(await mod.campaignStore.nextApproved(o, c.id)).toBeNull(); // the held one and the draft are never offered
-    // The held message is edited and approved again: a new text, so the hold no longer applies.
-    await q.query(`UPDATE lead_messages SET body_hash = $2 WHERE id = $1`, [held, "b".repeat(64)]);
-    expect((await mod.campaignStore.nextApproved(o, c.id))?.messageId).toBe(held);
-  });
-
   it("the numbers come from the members' own messages and their recorded outcomes", async () => {
     const o = org();
     const ids = [await lead(o, "A"), await lead(o, "B"), await lead(o, "C")];
@@ -145,7 +110,6 @@ describe.skipIf(!URL_ || !loopback(URL_))("campaign store (real Postgres)", () =
     const fresh = await message(o, ids[1], "sent", { sentAt: new Date(NOW.getTime() - MIN) });
     for (const [l, m] of [[ids[0], old], [ids[1], fresh]] as const) await mod.campaignStore.settleMember((await memberOf(c.id, l)).id, { state: "drafted", messageId: m }, NOW);
     await event(o, ids[0], old, "bounced"); await event(o, ids[1], fresh, "replied"); await event(o, ids[1], fresh, "sent");
-    expect(await mod.campaignStore.sendFacts(o, c.id, new Date(NOW.getTime() - 24 * 3_600_000))).toEqual({ sentSince: 1, sent: 2, bounced: 1 });
     const ms = await mod.campaignStore.members(o, c.id);
     expect(ms.map((m) => [m.message?.status ?? null, m.outcomes])).toEqual([["sent", ["bounced"]], ["sent", ["replied"]], [null, []]]);
     expect((await mod.campaignStore.memberFacts(o)).filter((f) => f.campaignId === c.id).map((f) => [f.state, f.messageStatus, f.outcomes])).toEqual(expect.arrayContaining([["drafted", "sent", ["bounced"]], ["drafted", "sent", ["replied"]], ["queued", null, []]]));
@@ -271,10 +235,8 @@ describe.skipIf(!URL_ || !loopback(URL_))("campaign store (real Postgres)", () =
     expect(await mod.campaignStore.addMembers(b, c.id, [lb], NOW, 50)).toBe(0);
     expect(await mod.campaignStore.removeMember(b, c.id, la)).toBe("missing");
     expect(await mod.campaignStore.setPreparing(b, c.id, { on: true, userId: "x" }, NOW)).toBeNull();
-    expect(await mod.campaignStore.setSending(b, c.id, { on: true, userId: "x" }, NOW)).toBeNull();
     expect(await mod.campaignStore.ownLeadIds(a, [la, lb])).toEqual([la]);
-    expect(await mod.campaignStore.nextApproved(b, c.id)).toBeNull();
-    expect(await mod.campaignStore.get(a, c.id)).toMatchObject({ name: "Diwali", preparing: false, sending: false });
+    expect(await mod.campaignStore.get(a, c.id)).toMatchObject({ name: "Diwali", preparing: false });
     expect(await mod.campaignStore.members(a, c.id)).toHaveLength(1);
   });
 });

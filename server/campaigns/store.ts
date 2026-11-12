@@ -33,7 +33,6 @@ export interface AudienceLead {
 export interface AudienceFilter { status?: string | null; source?: string | null; q?: string | null; /** Only leads found by a search started from this saved client profile. */ profileId?: number | null; /** Only leads whose company Client Radar marked Ready. */ ready?: boolean }
 export interface NewCampaign { name: string; profileId: number | null; profileName: string | null; footerNote: string; dailyLimit: number; gapSeconds: number }
 export type SettingsPatch = Partial<Pick<CampaignRow, "name" | "dailyLimit" | "gapSeconds" | "footerNote" | "status">>;
-export interface SendPick { memberId: number; leadId: number; messageId: number; bodyHash: string; body: string }
 
 export interface CampaignStore {
   list(orgId: string): Promise<CampaignRow[]>;
@@ -55,20 +54,12 @@ export interface CampaignStore {
   relink(orgId: string, id: number): Promise<void>;
 
   setPreparing(orgId: string, id: number, o: { on: boolean; userId?: string | null; stop?: string | null; requeueFailed?: boolean }, now: Date): Promise<CampaignRow | null>;
-  setSending(orgId: string, id: number, o: { on: boolean; userId?: string | null; stop?: string | null; nextSendAt?: Date | null }, now: Date): Promise<CampaignRow | null>;
 
   /** The next member to draft for, of any campaign that is preparing, leased so two passes never take the same one. */
   claimDraft(now: Date, leaseMs: number): Promise<{ member: CampaignMemberRow; campaign: CampaignRow } | null>;
   settleMember(id: number, patch: Partial<Pick<CampaignMemberRow, "state" | "reason" | "messageId" | "attempts" | "holdReason" | "holdHash">>, now: Date): Promise<void>;
   /** Drafting is over for a campaign with nobody left waiting. */
   finishPreparing(now: Date): Promise<number>;
-  /** A campaign whose queue is on and whose next send is due, leased. */
-  claimSend(now: Date, leaseMs: number): Promise<CampaignRow | null>;
-  releaseSend(id: number, o: { nextSendAt?: Date | null }, now: Date): Promise<void>;
-  /** The oldest approved message of the campaign that isn't on hold for its current text. */
-  nextApproved(orgId: string, id: number): Promise<SendPick | null>;
-  /** How many of the campaign's messages were sent since `since`, and how many of all its sent ones bounced. */
-  sendFacts(orgId: string, id: number, since: Date): Promise<{ sentSince: number; sent: number; bounced: number }>;
   unsentMessageId(orgId: string, leadId: number): Promise<number | null>;
   /** Replaces a DRAFT's text (the footer), only if it is still the draft that was read. */
   setDraftBody(orgId: string, messageId: number, fromHash: string, body: string, bodyHash: string, now: Date): Promise<boolean>;
@@ -234,12 +225,6 @@ export const campaignStore: CampaignStore = {
       return r ?? null;
     });
   },
-  async setSending(orgId, id, o, now) {
-    const [r] = await db.update(campaigns).set({ sending: o.on, ...(o.userId !== undefined ? { senderUserId: o.userId } : {}), sendStop: o.stop ?? null, ...(o.nextSendAt !== undefined ? { nextSendAt: o.nextSendAt } : {}), leaseUntil: null, updatedAt: now })
-      .where(and(eq(campaigns.organizationId, orgId), eq(campaigns.id, id), eq(campaigns.status, "active"))).returning();
-    return r ?? null;
-  },
-
   async claimDraft(now, leaseMs) {
     const until = new Date(now.getTime() + leaseMs);
     const r = await db.execute(sql`
@@ -264,42 +249,6 @@ export const campaignStore: CampaignStore = {
       WHERE c.preparing AND NOT EXISTS (SELECT 1 FROM campaign_members m WHERE m.campaign_id = c.id AND m.state = 'queued')
       RETURNING c.id`);
     return rowsOf(r).length;
-  },
-  async claimSend(now, leaseMs) {
-    const until = new Date(now.getTime() + leaseMs);
-    const r = await db.execute(sql`
-      UPDATE campaigns SET lease_until = ${ts(until)}
-      WHERE id = (
-        SELECT c.id FROM campaigns c
-        WHERE c.sending AND c.status = 'active' AND (c.next_send_at IS NULL OR c.next_send_at <= ${ts(now)}) AND (c.lease_until IS NULL OR c.lease_until < ${ts(now)})
-        ORDER BY c.next_send_at NULLS FIRST, c.id LIMIT 1 FOR UPDATE SKIP LOCKED)
-      RETURNING id`);
-    const id = Number(rowsOf<{ id: number }>(r)[0]?.id);
-    if (!id) return null;
-    const [c] = await db.select().from(campaigns).where(eq(campaigns.id, id)).limit(1);
-    return c ?? null;
-  },
-  async releaseSend(id, o, now) {
-    await db.update(campaigns).set({ leaseUntil: null, ...(o.nextSendAt !== undefined ? { nextSendAt: o.nextSendAt } : {}), updatedAt: now }).where(eq(campaigns.id, id));
-  },
-  async nextApproved(orgId, id) {
-    const r = await db.execute(sql`
-      SELECT m.id AS member_id, m.lead_id, lm.id AS message_id, lm.body_hash, lm.body
-      FROM campaign_members m JOIN lead_messages lm ON lm.organization_id = m.organization_id AND lm.id = m.message_id
-      WHERE m.organization_id = ${orgId} AND m.campaign_id = ${id} AND m.state = 'drafted' AND lm.status = 'approved' AND lm.direction = 'out'
-        AND (m.hold_hash IS NULL OR m.hold_hash <> lm.body_hash)
-      ORDER BY lm.approved_at NULLS LAST, m.id LIMIT 1`);
-    const x = rowsOf<any>(r)[0];
-    return x ? { memberId: Number(x.member_id), leadId: Number(x.lead_id), messageId: Number(x.message_id), bodyHash: x.body_hash, body: x.body } : null;
-  },
-  async sendFacts(orgId, id, since) {
-    const r = await db.execute(sql`
-      SELECT count(*) FILTER (WHERE lm.sent_at >= ${ts(since)})::int AS sent_since, count(*)::int AS sent,
-             count(*) FILTER (WHERE EXISTS (SELECT 1 FROM outreach_events e WHERE e.organization_id = m.organization_id AND e.message_id = m.message_id AND e.kind = 'bounced'))::int AS bounced
-      FROM campaign_members m JOIN lead_messages lm ON lm.organization_id = m.organization_id AND lm.id = m.message_id
-      WHERE m.organization_id = ${orgId} AND m.campaign_id = ${id} AND lm.status = 'sent'`);
-    const x = rowsOf<any>(r)[0] ?? {};
-    return { sentSince: Number(x.sent_since ?? 0), sent: Number(x.sent ?? 0), bounced: Number(x.bounced ?? 0) };
   },
   async unsentMessageId(orgId, leadId) {
     const r = await db.execute(sql`SELECT id FROM lead_messages WHERE organization_id = ${orgId} AND lead_id = ${leadId} AND direction = 'out' AND status IN ('draft', 'approved', 'sending') ORDER BY id DESC LIMIT 1`);

@@ -142,12 +142,6 @@ const sendDeps: SendDeps = {
   unsubscribeLink: (orgId, messageId) => unsubscribeUrl(orgId, messageId),
 };
 
-/**
- * The campaign queue's way in (server/campaigns/service.ts sendStep): the SAME send a person's click makes, with the
- * same dependencies, so every lock, limit and do-not-contact check applies. `user` is the member who started the queue.
- */
-export const sendFromQueue = (user: Member, messageId: number, bodyHash: string) => sendApproved(user, messageId, bodyHash, sendDeps);
-
 export function registerGmail(app: Express): void {
   registerGmailRoutes(app, { ...deps, auth: isAuthenticated, currentUser, send: sendDeps, syncNow });
   registerInboxRoutes(app, { auth: isAuthenticated, apply: applyDeps, log: deps.log });

@@ -2147,7 +2147,7 @@ export const campaigns = pgTable("campaigns", {
   preparing: boolean("preparing").notNull().default(false),
   prepareUserId: varchar("prepare_user_id"),
   prepareStop: varchar("prepare_stop", { length: 24 }),
-  // The paced queue: on while approved messages are being sent from `senderUserId`'s mailbox.
+  // Left from the removed automatic sending queue (12 Nov 2026): no longer read or written; kept so no data is dropped.
   sending: boolean("sending").notNull().default(false),
   senderUserId: varchar("sender_user_id"),
   sendStop: varchar("send_stop", { length: 24 }),

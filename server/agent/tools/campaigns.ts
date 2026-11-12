@@ -63,10 +63,9 @@ const listCampaignsTool: AgentTool<Record<string, never>> = {
         `  ${n.members} leads · ${n.queued} waiting for a draft · ${n.draft} drafts to review · ${n.approved} approved, not sent · ${n.sent} sent · ${n.skipped + n.failed} set aside`,
         n.sent ? `  came back: ${n.replied} replied (${pct(c.rates.reply)}), ${n.interested} read as interested, ${n.bounced} bounced (${pct(c.rates.bounce)}), ${n.optedOut} asked to stop` : "  nothing sent yet",
         c.preparing ? "  drafts are being written now" : c.prepareStopLabel && c.prepareStop !== "stopped" ? `  drafting stopped: ${c.prepareStopLabel}` : null,
-        c.sending ? "  the sending queue is on" : c.sendStopLabel && c.sendStop !== "paused" ? `  sending: ${c.sendStopLabel}` : null,
       ].filter(Boolean).join("\n");
     };
-    return { ok: true, route: CAMPAIGNS, summary: `${open.length} open campaign${open.length === 1 ? "" : "s"}${r.queueEnabled ? "" : " (queued sending is off on this server: approved messages are sent by the person, one at a time)"}:\n${open.map(line).join("\n")}` };
+    return { ok: true, route: CAMPAIGNS, summary: `${open.length} open campaign${open.length === 1 ? "" : "s"} (approved messages are sent by the person, one at a time; DealInSec never sends a campaign by itself):\n${open.map(line).join("\n")}` };
   },
 };
 
