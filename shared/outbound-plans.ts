@@ -64,25 +64,28 @@ export interface OutboundAllowance {
  *              then only what it really researched counts (a search that found fewer is charged fewer)
  *   drafts     an AI first message that was saved (a draft the checks rejected costs nothing)
  *   sends      a message handed to Gmail (sending or sent; a send that certainly failed frees its slot)
- * Pro's 10 searches of up to 10 companies make the 100-prospect allowance; a search often finds fewer than 10 that fit.
+ * Pro's 20 searches of up to 10 companies make the 200-prospect allowance; a search often finds fewer than 10 that fit.
+ * Searches (founder's call, 12 Nov 2026): Pro 20 a month (was 10), at ₹299: about $1.46 at the average measured cost,
+ * held under the workspace spend ceiling below whatever the mix.
  * Drafts (founder's call, 12 Nov 2026): Free 5, Pro 100. A draft costs about $0.002, so Pro's 100 is about $0.20 of the
  * $1.50 spend ceiling; "Improve" rewrites and messages you write yourself never count.
  */
 export const OUTBOUND_ALLOWANCE_DEFAULTS: Readonly<Record<OutboundTier, OutboundAllowance>> = {
   free: { monthlySearches: 3, monthlyLists: 3, monthlySocialScans: 3, maxCompanies: 10, monthlyProspects: 30, monthlyDrafts: 5, monthlySends: 3 },
-  trial: { monthlySearches: 10, monthlyLists: 30, monthlySocialScans: 30, maxCompanies: 10, monthlyProspects: 100, monthlyDrafts: 100, monthlySends: 10 },
-  pro: { monthlySearches: 10, monthlyLists: 30, monthlySocialScans: 30, maxCompanies: 10, monthlyProspects: 100, monthlyDrafts: 100, monthlySends: 10 },
+  trial: { monthlySearches: 20, monthlyLists: 30, monthlySocialScans: 30, maxCompanies: 10, monthlyProspects: 200, monthlyDrafts: 100, monthlySends: 10 },
+  pro: { monthlySearches: 20, monthlyLists: 30, monthlySocialScans: 30, maxCompanies: 10, monthlyProspects: 200, monthlyDrafts: 100, monthlySends: 10 },
   // Per search it looks for as many companies as Pro (one search stays one search); there is just no monthly count.
   unlimited: { monthlySearches: 1_000_000, monthlyLists: 1_000_000, monthlySocialScans: 1_000_000, maxCompanies: 10, monthlyProspects: 1_000_000, monthlyDrafts: 1_000_000, monthlySends: 1_000_000 },
 };
 
 /**
  * A workspace's AI and provider spend ceiling over the same rolling 30 days, in US dollars (WORKSPACE_MONTHLY_SPEND_USD).
+ * Raised from $1.50 to $2.50 on 12 Nov 2026 with Pro's 20 searches, when coworker chats started counting toward it.
  * A safeguard against runaway cost, sized against Pro's ₹299 (about $3.60): at the measured $0.05–0.12 per 10-company
  * search plus about $0.002 per draft, Pro's allowances fit well inside it. Every metered model call and web search
  * reserves against it before it is made.
  */
-export const WORKSPACE_MONTHLY_SPEND_USD_DEFAULT = 1.5;
+export const WORKSPACE_MONTHLY_SPEND_USD_DEFAULT = 2.5;
 
 export const OUTBOUND_WINDOW_DAYS = 30;
 

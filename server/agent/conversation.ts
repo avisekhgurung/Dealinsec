@@ -40,6 +40,11 @@ export interface ConversationDeps {
   tools: readonly AgentTool[];
   enabled(): boolean;
   takeQuota(userId: string): boolean;
+  /**
+   * Whether the workspace is still inside its 30-day AI spend ceiling (WORKSPACE_MONTHLY_SPEND_USD), coworker chats
+   * included. Checked before a turn starts, so a turn already running is never cut off. Absent: no check.
+   */
+  withinBudget?(user: AgentUser & Record<string, any>): Promise<boolean>;
   getSession(user: AgentUser, id: string): Promise<SessionRef | null>;
   createSession(user: AgentUser, channel: Channel): Promise<SessionRef>;
   /** The system prompts and the autonomy level for this turn — all derived on the server. */
@@ -50,7 +55,7 @@ export interface ConversationDeps {
 
 export type ConverseFailure = {
   ok: false;
-  code: "unavailable" | "not_found" | "busy" | "quota" | "empty" | "too_long";
+  code: "unavailable" | "not_found" | "busy" | "quota" | "budget" | "empty" | "too_long";
   message: string;
 };
 export type ConverseSuccess = { ok: true; sessionId: string; result: RunResult };
@@ -65,6 +70,7 @@ const MESSAGES: Record<ConverseFailure["code"], string> = {
   not_found: "Conversation not found",
   busy: "I'm still working on your last message.",
   quota: "Daily AI limit reached — try again tomorrow.",
+  budget: "This workspace has used its AI allowance for the last 30 days. It frees up as older use passes 30 days.",
   empty: "Type a message",
   too_long: "That message is too long",
 };
@@ -94,6 +100,7 @@ export async function converse(
 
   const locks = deps.locks ?? defaultLocks;
   if (locks.has(session.id)) return fail("busy");
+  if (deps.withinBudget && !(await deps.withinBudget(user))) return fail("budget");
   if (!deps.takeQuota(user.id)) return fail("quota");
 
   locks.add(session.id);

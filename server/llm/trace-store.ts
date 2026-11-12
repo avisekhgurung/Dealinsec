@@ -4,6 +4,7 @@ import { db } from "../db";
 import { llmCalls, providerCalls } from "@shared/schema";
 import { tablesReadyCheck } from "../leads/ready";
 import { clipCodeOrNull } from "@shared/error-code";
+import { pricesFromEnv } from "@shared/llm-cost";
 
 export const llmTraceReady = tablesReadyCheck(["llm_calls"]);
 
@@ -45,11 +46,29 @@ export const GLOBAL_LLM_BUDGET_LOCK = 7_310_001;
 export interface WorkspaceCeiling { since: Date; maxMicroUsd: number }
 export const WORKSPACE_SPEND_LOCK = 7_310_004;
 /** The workspace's model + provider spend since `since`, inside a transaction holding its lock. */
+/** Whether the coworker chat runs table exists here (it does wherever The Nest is set up); asked once per process. */
+let chatRunsKnown: boolean | null = null;
+async function chatRunsReady(tx: { execute: typeof db.execute }): Promise<boolean> {
+  if (chatRunsKnown === null) {
+    try { chatRunsKnown = !!(((await tx.execute(sql`SELECT to_regclass('agent_runs') IS NOT NULL AS ok`)).rows[0] as { ok?: unknown } | undefined)?.ok); }
+    catch { return false; }
+  }
+  return chatRunsKnown;
+}
+
+/**
+ * A workspace's AI and provider spend since `since`, in micro-USD: traced model calls, paid provider calls, and (since
+ * 12 Nov 2026) its coworker chat turns, priced from their recorded tokens at the model's list price (an upper bound).
+ */
 export async function workspaceSpendTx(tx: { execute: typeof db.execute }, orgId: string, since: Date): Promise<number> {
   const at = since.toISOString();
+  const p = pricesFromEnv();
+  const chats = (await chatRunsReady(tx))
+    ? sql` + (SELECT COALESCE(round(sum(tokens_in) * ${p.inputPerM}::numeric + sum(tokens_out) * ${p.outputPerM}::numeric), 0) FROM agent_runs WHERE organization_id = ${orgId} AND started_at >= ${at}::timestamp)`
+    : sql``;
   const r = await tx.execute(sql`SELECT
     (SELECT COALESCE(sum(cost_micro_usd), 0) FROM ${llmCalls} WHERE organization_id = ${orgId} AND created_at >= ${at}::timestamp)
-  + (SELECT COALESCE(sum(cost_micro_usd), 0) FROM ${providerCalls} WHERE organization_id = ${orgId} AND created_at >= ${at}::timestamp) AS n`);
+  + (SELECT COALESCE(sum(cost_micro_usd), 0) FROM ${providerCalls} WHERE organization_id = ${orgId} AND created_at >= ${at}::timestamp)${chats} AS n`);
   return Number((r.rows[0] as { n: unknown } | undefined)?.n ?? 0);
 }
 

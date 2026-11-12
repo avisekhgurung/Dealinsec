@@ -12,10 +12,10 @@
  *   OUTBOUND_MONTHLY_LISTS_FREE / _TRIAL / _PRO      bulk list sweeps                 (defaults 3 / 30 / 30)
  *   SOCIAL_MONTHLY_SCANS_FREE / _TRIAL / _PRO        Social Intent scans              (defaults 3 / 30 / 30)
  *   OUTBOUND_MAX_COMPANIES_FREE / _TRIAL / _PRO      companies one search may look for (defaults 10 / 10 / 10)
- *   OUTBOUND_MONTHLY_PROSPECTS_FREE / _TRIAL / _PRO  researched prospects              (defaults 30 / 100 / 100)
+ *   OUTBOUND_MONTHLY_PROSPECTS_FREE / _TRIAL / _PRO  researched prospects              (defaults 30 / 200 / 200)
  *   OUTBOUND_MONTHLY_DRAFTS_FREE / _TRIAL / _PRO     AI first-message drafts           (defaults 5 / 100 / 100)
  *   OUTBOUND_MONTHLY_SENDS_FREE / _TRIAL / _PRO      sends through Gmail or the WhatsApp Cloud API, together (defaults 5 / 100 / 100)
- *   WORKSPACE_MONTHLY_SPEND_USD                      model + provider spend per workspace (default $1.50)
+ *   WORKSPACE_MONTHLY_SPEND_USD                      model, provider and coworker-chat spend per workspace (default $2.50)
  *
  * UNLIMITED_ORG_IDS (server/unlimited.ts): workspaces with none of the per-workspace limits above (the founder's own).
  *

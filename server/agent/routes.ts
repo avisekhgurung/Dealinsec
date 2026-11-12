@@ -77,7 +77,7 @@ function openStream(res: Response) {
 
 /** The HTTP status for a refusal that happened before the agent started. */
 const REFUSAL_STATUS: Record<ConverseFailure["code"], number> = {
-  unavailable: 503, not_found: 404, busy: 409, quota: 429, empty: 400, too_long: 400,
+  unavailable: 503, not_found: 404, busy: 409, quota: 429, budget: 429, empty: 400, too_long: 400,
 };
 
 export function registerAgentRoutes(app: Express) {

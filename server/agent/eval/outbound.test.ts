@@ -1460,7 +1460,7 @@ describe("plan allowances and the workspace spend ceiling", () => {
 
   it("the workspace spend ceiling: a workspace over it makes no web search and no model call, and says why", async () => {
     const p = await icpOf();
-    world().llmCalls.push({ id: 9_999, organizationId: ORG1, task: "enrich", ok: true, costMicroUsd: 1_600_000, createdAt: new Date() }); // $1.60 of the default $1.50
+    world().llmCalls.push({ id: 9_999, organizationId: ORG1, task: "enrich", ok: true, costMicroUsd: 2_600_000, createdAt: new Date() }); // $2.60 of the default $2.50
     const before = { ...calls };
     const r = await startRun(user(), { request: "x", icp: p.icp }, {}, deps()) as any;
     const run = await drive(r.run.id);
@@ -1473,7 +1473,7 @@ describe("plan allowances and the workspace spend ceiling", () => {
 
   it("the ceiling counts this workspace's spend in the last 30 days only", async () => {
     // 31 days before both clocks in play (the pipeline's NOW, and the real one the model-call path reads).
-    world().llmCalls.push({ id: 9_998, organizationId: ORG1, task: "enrich", ok: true, costMicroUsd: 1_600_000, createdAt: new Date(Math.min(NOW.getTime(), Date.now()) - 31 * 86_400_000) });
+    world().llmCalls.push({ id: 9_998, organizationId: ORG1, task: "enrich", ok: true, costMicroUsd: 2_600_000, createdAt: new Date(Math.min(NOW.getTime(), Date.now()) - 31 * 86_400_000) });
     const id = await start(); await drive(id);
     expect(searches.length).toBeGreaterThan(0);
   });

@@ -40,7 +40,7 @@ function openStream(res: Response) {
     end() { clearInterval(heartbeat); if (!res.writableEnded) res.end(); },
   };
 }
-const REFUSAL: Record<string, number> = { unavailable: 503, not_found: 404, busy: 409, quota: 429, empty: 400, too_long: 400 };
+const REFUSAL: Record<string, number> = { unavailable: 503, not_found: 404, busy: 409, quota: 429, budget: 429, empty: 400, too_long: 400 };
 
 export function registerAiLeagueRoutes(app: Express) {
   const send = (res: Response, r: any, ok: (r: any) => Record<string, unknown>, status = 200) => {

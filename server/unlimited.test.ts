@@ -44,7 +44,7 @@ describe("UNLIMITED_ORG_IDS", () => {
       expect(dailyRunLimit("org-other")).toBe(5);
       expect(dailyRunLimit()).toBe(5);
       expect(workspaceMonthlySpendMicroUsd(process.env, "org-founder")).toBeGreaterThan(1e12);
-      expect(workspaceMonthlySpendMicroUsd(process.env, "org-other")).toBe(1_500_000);
+      expect(workspaceMonthlySpendMicroUsd(process.env, "org-other")).toBe(2_500_000);
     } finally { vi.unstubAllEnvs(); }
   });
 });

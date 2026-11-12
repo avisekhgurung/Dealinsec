@@ -17,6 +17,17 @@ export const conversationDeps: ConversationDeps = {
   tools: AGENT_TOOLS,
   enabled: copilotConfigured,
   takeQuota,
+  // Coworker chats count toward the workspace's 30-day AI spend ceiling (12 Nov 2026). A ceiling that can't be read
+  // lets the turn go (the daily message quota still bounds it); every other AI call fails closed on its own.
+  async withinBudget(user) {
+    try {
+      const orgId = user.organizationId as string | undefined;
+      if (!orgId) return true;
+      const [{ traceStore }, { workspaceMonthlySpendMicroUsd }] = await Promise.all([import("../llm/trace-store"), import("../outbound/limits")]);
+      const since = new Date(Date.now() - 30 * 86_400_000);
+      return (await traceStore.workspaceSpend(orgId, since)) < workspaceMonthlySpendMicroUsd(process.env, orgId);
+    } catch { return true; }
+  },
   getSession: async (user, id) => {
     const s = await agentStore.getSession(user, id);
     return s ? { id: s.id, title: s.title, dealId: s.dealId } : null;

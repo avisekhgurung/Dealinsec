@@ -125,6 +125,14 @@ describe("refusals before the agent starts emit nothing, so each channel can rep
     expect((await converse(deps, { user: USER, text: "one", adapter: webAdapter().adapter })).ok).toBe(true);
     expect(await refused(deps, { text: "two" })).toMatchObject({ ok: false, code: "quota" });
   });
+  it("a workspace past its 30-day AI allowance: refused before the model is called, and the daily quota isn't spent", async () => {
+    const { deps, provider, quota } = setup([say("a")], { withinBudget: async () => false });
+    const out = await refused(deps);
+    expect(out).toMatchObject({ ok: false, code: "budget" });
+    expect(out.ok ? "" : out.message).toMatch(/AI allowance for the last 30 days/);
+    expect(quota.n).toBe(0);
+    expect(provider.calls ?? []).toHaveLength(0);
+  });
 });
 
 describe("one run at a time, and never stuck", () => {
