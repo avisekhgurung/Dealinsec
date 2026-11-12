@@ -27,7 +27,8 @@ import { socialSources } from "../discovery/provider";
 import { addClaim, createLead, fail, readGate, writeGate, type Result, type Who } from "../services/leads";
 import { leadsStore } from "../leads/store";
 import { profileStore } from "../leads/profile-store";
-import { dailySearchLimit, globalSearchLimit, outboundAllowance, workspaceMonthlySpendMicroUsd } from "../outbound/limits";
+import { dailySearchLimit, globalSearchLimit, outboundAllowance } from "../outbound/limits";
+import { workspaceCeilingMicroUsd } from "../billing/spend-ceiling";
 import { outboundTier } from "../outbound/plan";
 import { costMicroUsd } from "../outbound/providers";
 import { outboundStore } from "../outbound/store";
@@ -170,7 +171,7 @@ function paidCallFor(deps: SocialDeps, orgId: string, why: { reason?: string }) 
     if (used >= dailySearchLimit(orgId)) { why.reason = "daily_limit"; return null; }
     const reservation = await deps.search.reserveSearch({
       orgId, runId: null, provider, costMicroUsd: costMicroUsd(provider), limit: globalSearchLimit(), since: utcDayStart(now), now,
-      workspace: { since: new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY), maxMicroUsd: workspaceMonthlySpendMicroUsd(process.env, orgId) },
+      workspace: { since: new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY), maxMicroUsd: await workspaceCeilingMicroUsd(orgId, process.env, now) },
     });
     if (reservation === null || reservation === "workspace") { why.reason = reservation === null ? "global_limit" : "workspace_budget"; return null; }
     const t0 = Date.now();

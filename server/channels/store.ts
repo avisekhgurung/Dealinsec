@@ -12,6 +12,7 @@
  *   - delivery only moves forward (sent → delivered → read).
  */
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { consumeCreditTx } from "../billing/credits";
 import { db } from "../db";
 import { channelMessages, whatsappConnections, whatsappContacts, type ChannelMessageRow, type WhatsappConnectionRow, type WhatsappContactRow } from "@shared/schema";
 import { tablesReadyCheck } from "../leads/ready";
@@ -48,7 +49,7 @@ export interface NewChannelMessage {
   templateName?: string | null; templateLang?: string | null; templateParams?: string[] | null;
   promptVersion: string | null; claimIds: number[]; by: "user" | "agent"; userId: string; now: Date;
   /** The plan's AI-draft allowance, counted across email and channel drafts under one lock. */
-  allowance?: { since: Date; max: number; prefix: string };
+  allowance?: { since: Date; max: number; prefix: string; /** When the plan's window is full, a purchased draft credit of this cost pays for the draft. */ credit?: { cost: number } };
 }
 
 export interface ChannelStore {
@@ -91,8 +92,8 @@ const at = (d: Date) => d.toISOString();
 
 /** AI drafts on both tables (email and channels) since `since`: the plan's one AI-draft allowance. */
 const aiDraftCount = (orgId: string, since: Date, prefix: string) => sql`SELECT
-  (SELECT count(*) FROM lead_messages WHERE organization_id = ${orgId} AND direction = 'out' AND prompt_version LIKE ${prefix + "%"} AND created_at >= ${at(since)}::timestamp)
-  + (SELECT count(*) FROM channel_messages WHERE organization_id = ${orgId} AND direction = 'out' AND prompt_version LIKE ${prefix + "%"} AND created_at >= ${at(since)}::timestamp) AS n`;
+  (SELECT count(*) FROM lead_messages WHERE organization_id = ${orgId} AND direction = 'out' AND prompt_version LIKE ${prefix + "%"} AND funded_by IS DISTINCT FROM 'credit' AND created_at >= ${at(since)}::timestamp)
+  + (SELECT count(*) FROM channel_messages WHERE organization_id = ${orgId} AND direction = 'out' AND prompt_version LIKE ${prefix + "%"} AND funded_by IS DISTINCT FROM 'credit' AND created_at >= ${at(since)}::timestamp) AS n`;
 /** Channel messages handed to a provider's API: in flight, or sent in the window (a failed send frees its slot). */
 export const channelApiSendCount = (orgId: string, since: Date) => sql`SELECT count(*)::int AS n FROM channel_messages WHERE organization_id = ${orgId}
   AND direction = 'out' AND (status IN ('sending', 'uncertain') OR (status = 'sent' AND sent_via = 'api' AND sent_at >= ${at(since)}::timestamp))`;
@@ -103,7 +104,7 @@ export async function channelCountFor(tx: { execute: typeof db.execute }, what: 
   const present = (((await tx.execute(sql`SELECT to_regclass('channel_messages') IS NOT NULL AS present`)).rows[0]) as { present: boolean }).present;
   if (!present) return 0;
   return n(await tx.execute(what === "api_sends" ? channelApiSendCount(orgId, since)
-    : sql`SELECT count(*)::int AS n FROM channel_messages WHERE organization_id = ${orgId} AND direction = 'out' AND prompt_version LIKE ${prefix + "%"} AND created_at >= ${at(since)}::timestamp`));
+    : sql`SELECT count(*)::int AS n FROM channel_messages WHERE organization_id = ${orgId} AND direction = 'out' AND prompt_version LIKE ${prefix + "%"} AND funded_by IS DISTINCT FROM 'credit' AND created_at >= ${at(since)}::timestamp`));
 }
 const n = (r: { rows: unknown[] }) => Number((r.rows[0] as { n: unknown } | undefined)?.n ?? 0);
 const isUnique = (e: unknown) => (e as { code?: string })?.code === "23505";
@@ -120,8 +121,12 @@ export const channelStore: ChannelStore = {
       const a = m.allowance;
       return await db.transaction(async (tx) => {
         await tx.execute(sql`SELECT pg_advisory_xact_lock(${DRAFT_ALLOWANCE_LOCK}, hashtext(${m.orgId}))`);
-        if (n(await tx.execute(aiDraftCount(m.orgId, a.since, a.prefix))) >= a.max) throw new ChannelAllowanceReached(a.max);
-        return (await tx.insert(channelMessages).values(values).returning())[0];
+        const over = n(await tx.execute(aiDraftCount(m.orgId, a.since, a.prefix))) >= a.max;
+        if (over && !a.credit) throw new ChannelAllowanceReached(a.max);
+        const row = (await tx.insert(channelMessages).values({ ...values, fundedBy: over ? "credit" : null }).returning())[0];
+        // The plan's window is full: a purchased credit pays in the same transaction (a refusal rolls the draft back).
+        if (over && (await consumeCreditTx(tx as any, { orgId: m.orgId, kind: "draft", sourceRef: `chmsg:${row.id}`, now: m.now, cost: a.credit!.cost })) === null) throw new ChannelAllowanceReached(a.max);
+        return row;
       });
     } catch (e) {
       if (isUnique(e)) throw new ChannelDraftExists();

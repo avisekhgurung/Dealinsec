@@ -26,7 +26,9 @@ import { pipelineDeps, newRunId, researchOne, enrichOne, scoreProspect, runModeO
 import { OUTSIDE_BATCH, OUTSIDE_KIND, OUTSIDE_LABEL, outsideFindings, outsideQuery, type OutsideType } from "@shared/outside-research";
 import { prospectsTablesReady, RunActive, RunLimitReached } from "./store";
 import { isProspectFeedback, type ProspectFeedback } from "@shared/prospect-feedback";
-import { dailyContactLimit, dailyRunLimit, dailySearchLimit, globalSearchLimit, outboundAllowance, workspaceMonthlySpendMicroUsd } from "./limits";
+import { dailyContactLimit, dailyRunLimit, dailySearchLimit, globalSearchLimit, outboundAllowance } from "./limits";
+import { workspaceCeilingMicroUsd } from "../billing/spend-ceiling";
+import { billingConfig } from "../billing/config-cache";
 import { outboundTier } from "./plan";
 import { OUTBOUND_WINDOW_DAYS, TIER_LABEL, isRunMode, type RunMode } from "@shared/outbound-plans";
 import { outboundRunner } from "./runner";
@@ -131,8 +133,11 @@ export async function startRun(user: Who, raw: { request?: unknown; icp?: unknow
   // Checked here for a quick answer, and again by createRun under a per-workspace lock with the insert, so searches
   // started at the same moment can't go past either limit together.
   const monthly = list ? allowance.monthlyLists : allowance.monthlySearches;
-  const limits = [
-    { since: new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY), max: monthly, mode },
+  // Deep searches (not list sweeps) can be paid for with purchased search credits once the plan's window is full; the
+  // plan count then ignores credit-funded runs, so the two stay separate (server/billing/credits.ts).
+  const credit = list ? undefined : { cost: billingConfig().creditCost.search };
+  const limits: { since: Date; max: number; mode?: RunMode; credit?: { cost: number } }[] = [
+    { since: new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY), max: monthly, mode, ...(credit ? { credit } : {}) },
     // The daily cap counts every run of either kind: it is there to protect the server, not to ration a plan.
     { since: new Date(now.getTime() - DAY), max: dailyRunLimit(orgId) },
   ];
@@ -140,17 +145,24 @@ export async function startRun(user: Who, raw: { request?: unknown; icp?: unknow
   // A list sweep researches nothing, so it neither checks nor holds any of it.
   const prospects = list ? undefined : { since: limits[0].since, max: allowance.monthlyProspects };
   const what = list ? "bulk list sweeps" : "Client Radar searches";
+  const topUp = credit ? " You can also buy extra searches." : "";
+  const extra = credit ? { feature: "outbound", topUp: "search" } : { feature: "outbound" };
   const limitReached = (i: number) => i === 0 || i === limits.length
     ? tier === "free"
       ? fail(402, "NO_CREDITS", i === 0
-        ? `You've used the free plan's ${monthly} ${what} for this 30-day period. Upgrade to Pro for more.`
-        : `You've used the free plan's ${allowance.monthlyProspects} researched prospects for this 30-day period. Upgrade to Pro for more.`, { feature: "outbound" })
+        ? `You've used the free plan's ${monthly} ${what} for this 30-day period. Upgrade to Pro for more.${topUp}`
+        : `You've used the free plan's ${allowance.monthlyProspects} researched prospects for this 30-day period. Upgrade to Pro for more.${topUp}`, extra)
       : fail(429, "monthly_limit", i === 0
-        ? `You've used the ${monthly} ${what} included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier ones pass 30 days.`
-        : `You've used the ${allowance.monthlyProspects} researched prospects included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`)
+        ? `You've used the ${monthly} ${what} included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier ones pass 30 days.${topUp}`
+        : `You've used the ${allowance.monthlyProspects} researched prospects included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.${topUp}`, credit ? { topUp: "search" } : undefined)
     : fail(429, "daily_limit", `You've started today's ${dailyRunLimit(orgId)} prospect searches. Try again tomorrow.`);
-  for (let i = 0; i < limits.length; i++) if ((await deps.store.countRunsSince(orgId, limits[i].since, limits[i].mode)) >= limits[i].max) return limitReached(i);
-  if (prospects && (await deps.store.prospectsHeldSince(orgId, prospects.since)) >= prospects.max) return limitReached(limits.length);
+  // A quick answer before the insert: full plan windows are fine while the purchased credits can pay. createRun decides
+  // for real, under the per-workspace lock, so this never lets anything past what it would.
+  const creditsLeft = async () => (credit && deps.store.creditBalance ? await deps.store.creditBalance(orgId, now) : 0) >= (credit?.cost ?? 1);
+  for (let i = 0; i < limits.length; i++) {
+    if ((await deps.store.countRunsSince(orgId, limits[i].since, limits[i].mode, !!limits[i].credit)) >= limits[i].max && !(i === 0 && credit && (await creditsLeft()))) return limitReached(i);
+  }
+  if (prospects && (await deps.store.prospectsHeldSince(orgId, prospects.since)) >= prospects.max && !(await creditsLeft())) return limitReached(limits.length);
   // The searches the person saw (and may have edited) are the plan, each re-checked; none given = the default strategies.
   const given = Array.isArray(raw.searches) ? (raw.searches as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 12) : [];
   const max = runBudget(icp.quantity).queries;
@@ -450,7 +462,7 @@ export async function researchOutside(user: Who, id: number, d: Partial<Pipeline
   try {
     reservation = await deps.store.reserveSearch({
       orgId, runId: null, provider: provider.name, costMicroUsd: costMicroUsd(provider.name), limit: globalSearchLimit(), since: utcDayStart(now), now,
-      workspace: { since: new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY), maxMicroUsd: workspaceMonthlySpendMicroUsd(process.env, orgId) },
+      workspace: { since: new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY), maxMicroUsd: await workspaceCeilingMicroUsd(orgId, process.env, now) },
     });
   } catch { return fail(503, "cap_unavailable", "The search allowance couldn't be checked just now, so nothing was searched. Try again in a moment."); }
   if (reservation === null) return fail(429, "global_limit", "Today's web searches are used up. Try again tomorrow.");

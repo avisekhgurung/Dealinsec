@@ -19,7 +19,9 @@ import { runBudget } from "@shared/prospect";
 import { DEFAULT_QUANTITY } from "@shared/icp";
 import { db } from "../db";
 import { fail, readGate, type Result, type Who } from "../services/leads";
-import { dailyContactLimit, dailyRunLimit, dailySearchLimit, globalSearchLimit, outboundAllowance, workspaceMonthlySpendMicroUsd } from "./limits";
+import { dailyContactLimit, dailyRunLimit, dailySearchLimit, globalSearchLimit, outboundAllowance } from "./limits";
+import { workspaceCeilingMicroUsd } from "../billing/spend-ceiling";
+import { billingConfig } from "../billing/config-cache";
 import { AI_DRAFT_VERSION_PREFIX, outboundTier } from "./plan";
 import { OUTBOUND_WINDOW_DAYS, TIER_LABEL, type OutboundTier } from "@shared/outbound-plans";
 import { pipelineDeps, type PipelineDeps } from "./pipeline";
@@ -53,6 +55,10 @@ export interface OutboundUsage {
   };
   /** One search plans up to this many web searches (a search that finds enough stops early). */
   perSearch: { webSearches: number };
+  /** Purchased credits (bought top-ups), spent only after the plan's own allowance is used up. Null when they couldn't be read. */
+  credits: { search: { balance: number; cost: number; nextExpiry: { units: number; at: string } | null }; draft: { balance: number; cost: number; nextExpiry: { units: number; at: string } | null } } | null;
+  /** When the app warns (percent of an allowance used) and whether it warns at all: the admin's notification settings. */
+  warn: { percent: number; warn: boolean; exhausted: boolean };
   platform: { state: PlatformState; resetsAt: string };
 }
 
@@ -63,7 +69,7 @@ export interface UsageDeps {
   contactReady: () => boolean;
   localReady?: () => boolean;
   /** Runs started in the window, newest first (enough of them to cover the allowance). */
-  recentRuns: (orgId: string, since: Date, limit: number) => Promise<Pick<ProspectRunRow, "status" | "counters" | "createdAt" | "mode">[]>;
+  recentRuns: (orgId: string, since: Date, limit: number) => Promise<Pick<ProspectRunRow, "status" | "counters" | "createdAt" | "mode" | "fundedBy">[]>;
   /** The workspace's plan for Client Radar. */
   tier: (user: Who) => Promise<OutboundTier>;
   countProviderCalls: (o: { orgId?: string; operation: string; since: Date }) => Promise<number>;
@@ -73,6 +79,10 @@ export interface UsageDeps {
   aiDrafts: (orgId: string, since: Date) => Promise<number>;
   gmailSends: (orgId: string, since: Date) => Promise<number>;
   workspaceSpend: (orgId: string, since: Date) => Promise<number>;
+  /** Purchased credits per kind (optional: a world without them reports none). */
+  credits?: (orgId: string, now: Date) => Promise<{ search: { balance: number; nextExpiry: { units: number; at: string } | null }; draft: { balance: number; nextExpiry: { units: number; at: string } | null } }>;
+  /** When the oldest plan-funded AI draft in the window was made, i.e. when the next one frees up. */
+  oldestAiDraft?: (orgId: string, since: Date) => Promise<Date | null>;
 }
 
 function allowance(used: number, limit: number, nextFreesAt: Date | null): Allowance {
@@ -107,7 +117,8 @@ export async function outboundUsage(user: Who, d: Partial<UsageDeps> = {}): Prom
     (await deps.recentRuns(orgId, new Date(now.getTime() - windowMs), Math.max(80, planAllowance.monthlySearches + planAllowance.monthlyLists + 5))).filter(runCountsTowardLimit));
   const pool = (want: "deep" | "list", limit: number): Allowance | null => {
     if (!monthlyRuns) return null;
-    const counted = monthlyRuns.filter((r) => (r.mode === "list" ? "list" : "deep") === want);
+    // Runs a purchased credit paid for are not the plan's: the plan's own count and the credits stay separate.
+    const counted = monthlyRuns.filter((r) => (r.mode === "list" ? "list" : "deep") === want && r.fundedBy !== "credit");
     const oldest = counted.length ? counted.reduce((a, r) => (r.createdAt < a ? r.createdAt : a), counted[0].createdAt) : null;
     return allowance(counted.length, limit, oldest ? new Date(new Date(oldest).getTime() + windowMs) : null);
   };
@@ -115,9 +126,18 @@ export async function outboundUsage(user: Who, d: Partial<UsageDeps> = {}): Prom
   const lists = pool("list", planAllowance.monthlyLists);
   const windowStart = new Date(now.getTime() - windowMs);
   const prospects = await safe(async () => allowance(await deps.prospectsHeld(orgId, windowStart), planAllowance.monthlyProspects, null));
-  const drafts = await safe(async () => allowance(await deps.aiDrafts(orgId, windowStart), planAllowance.monthlyDrafts, null));
+  const drafts = await safe(async () => {
+    const used = await deps.aiDrafts(orgId, windowStart);
+    const oldest = used >= planAllowance.monthlyDrafts && deps.oldestAiDraft ? await deps.oldestAiDraft(orgId, windowStart) : null;
+    return allowance(used, planAllowance.monthlyDrafts, oldest ? new Date(oldest.getTime() + windowMs) : null);
+  });
+  const cfg = billingConfig();
+  const creditsView = deps.credits ? await safe(async () => {
+    const c = await deps.credits!(orgId, now);
+    return { search: { ...c.search, cost: cfg.creditCost.search }, draft: { ...c.draft, cost: cfg.creditCost.draft } };
+  }) : null;
   const sends = await safe(async () => allowance(await deps.gmailSends(orgId, windowStart), planAllowance.monthlySends, null));
-  const spendPercent = await safe(async () => Math.min(100, Math.round((100 * (await deps.workspaceSpend(orgId, windowStart))) / workspaceMonthlySpendMicroUsd(process.env, orgId))));
+  const spendPercent = await safe(async () => Math.min(100, Math.round((100 * (await deps.workspaceSpend(orgId, windowStart))) / (await workspaceCeilingMicroUsd(orgId, process.env, now)))));
   const webSearches = await safe(async () => allowance(await deps.countProviderCalls({ orgId, operation: "search", since }), dailySearchLimit(orgId), null));
   const contactLookups = deps.contactReady()
     ? await safe(async () => allowance(await deps.countProviderCalls({ orgId, operation: "contact", since }), dailyContactLimit(orgId), null))
@@ -139,6 +159,8 @@ export async function outboundUsage(user: Who, d: Partial<UsageDeps> = {}): Prom
       workspace: { searches, webSearches, contactLookups },
       plan: { tier, label: TIER_LABEL[tier], searches: monthly, maxCompanies: planAllowance.maxCompanies, windowDays: OUTBOUND_WINDOW_DAYS, prospects, drafts, sends, lists, spendPercent },
       perSearch: { webSearches: perSearch },
+      credits: creditsView,
+      warn: { percent: cfg.warnPercent, warn: cfg.notify.warn, exhausted: cfg.notify.exhausted },
       platform: { state: state ?? "unknown", resetsAt: new Date(dayStart.getTime() + DAY).toISOString() },
     },
   };
@@ -167,5 +189,7 @@ function defaultUsageDeps(): UsageDeps {
     aiDrafts: async (orgId, since) => (await import("../sales/message-store")).messageStore.countAiDrafts(orgId, since, AI_DRAFT_VERSION_PREFIX),
     gmailSends: async (orgId, since) => (await import("../mail/send-store-pg")).countWorkspaceSends(orgId, since),
     workspaceSpend: async (orgId, since) => (await import("../llm/trace-store")).traceStore.workspaceSpend(orgId, since),
+    credits: async (orgId, now) => (await import("../billing/credits")).creditSummary(orgId, now),
+    oldestAiDraft: async (orgId, since) => (await import("../billing/credits")).oldestPlanDraftSince(orgId, since, AI_DRAFT_VERSION_PREFIX),
   };
 }

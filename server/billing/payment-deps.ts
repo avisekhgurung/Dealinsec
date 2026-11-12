@@ -7,6 +7,9 @@ import type { PayuOrder, User } from "@shared/schema";
 import { storage } from "../storage";
 import { DEAL_BOOST_DAYS, EXTRA_SEAT_DAYS, PRO_MONTHLY_DAYS, PRO_YEARLY_DAYS } from "../razorpayClient";
 import type { PaymentAudit, PaymentEffects, PaymentOrderStore } from "./razorpay-events";
+import { creditPurchaseOf, grantCreditPackOrder, revokeCreditPackOrder } from "./credits";
+import { kindOfCreditPurpose } from "./credit-orders";
+import { billingConfig } from "./config-cache";
 
 // Deliver what a completed payment order bought. Shared by the browser verify
 // path and the webhook (whichever atomically claims the order first calls
@@ -16,13 +19,34 @@ export type GrantResult =
   | { kind: "pro"; term: "monthly" | "yearly"; user?: User }
   | { kind: "boost"; user?: User }
   | { kind: "seats"; qty: number }
+  | { kind: "credit_pack"; creditKind: "search" | "draft"; units: number; expiresAt: Date | null }
   | { kind: "credits" };
 
 export async function grantPurchase(
   purpose: string,
   userId: string,
-  legacyOrder?: { credits: number; amount: number },
+  legacyOrder?: { credits: number; amount: number; orderId?: string },
 ): Promise<GrantResult> {
+  const creditKind = kindOfCreditPurpose(purpose);
+  if (creditKind) {
+    // A search or AI-draft credit pack: deliver the terms frozen at ORDER time (credit_purchases), as one lot for the
+    // buyer's workspace. Idempotent by the order id. Throwing (no workspace) makes the caller reopen the claim so the
+    // webhook retries — the money is never kept without delivering.
+    if (!legacyOrder?.orderId) throw new Error("credit grant: order id missing");
+    const buyer = await storage.getUser(userId);
+    let purchase = await creditPurchaseOf(legacyOrder.orderId);
+    if (!purchase) {
+      if (!buyer?.organizationId) throw new Error(`credit grant: user ${userId} has no organization`);
+      // Terms row missing (should not happen: it is written with the order): deliver what was paid for, by the order itself.
+      console.error("credit grant: purchase terms missing, delivering from the order", { orderId: legacyOrder.orderId });
+      purchase = {
+        orderId: legacyOrder.orderId, organizationId: buyer.organizationId, userId, packId: 0, kind: creditKind, units: legacyOrder.credits,
+        priceRupees: legacyOrder.amount, expiryMonths: billingConfig().defaultExpiryMonths, createdAt: new Date(),
+      };
+    }
+    const g = await grantCreditPackOrder(purchase);
+    return { kind: "credit_pack", creditKind: g.kind, units: g.units, expiresAt: g.expiresAt };
+  }
   switch (purpose) {
     case "pro_monthly": {
       const user = await storage.activateProPlan(userId, PRO_MONTHLY_DAYS, "monthly");
@@ -75,6 +99,8 @@ const PURCHASE_LABEL: Record<string, string> = {
   pro_plan: "DealInSec Pro — 1 year",
   deal_boost: "Deal Boost — 1 month",
   extra_seat: "Extra team seats — 1 month",
+  credits_search: "Client Radar search credits",
+  credits_draft: "AI draft credits",
 };
 
 /** The activity log's short action word (the settings table and the notification bell show it as is; the bell gives
@@ -113,6 +139,8 @@ async function clawbackPurchase(order: PayuOrder): Promise<"revoked" | "lapsed">
     deal_boost: DEAL_BOOST_DAYS,
     extra_seat: EXTRA_SEAT_DAYS,
   };
+  // Credit packs: take back what the refunded order's lot still holds (spent credits are not clawed back); no term to lapse.
+  if (kindOfCreditPurpose(order.purpose)) return revokeCreditPackOrder(order.orderId);
   const days = termDays[order.purpose];
   let lapsed = days != null && order.completedAt != null && Date.now() - new Date(order.completedAt).getTime() > days * 86_400_000;
   // Seat packs share ONE expiry (a top-up inherits the pack's existing end date), so purchase age is the wrong

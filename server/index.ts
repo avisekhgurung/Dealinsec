@@ -365,6 +365,38 @@ function canonicalRedirect(req: Request, res: Response, next: NextFunction) {
     process.exit(1);
   }
 
+  // Credits schema GATE — the same fail-closed rule, for the additive columns this build reads on hot paths:
+  // users.is_platform_admin (every auth read), and funded_by on prospect_runs / lead_messages / channel_messages
+  // (every Client Radar and outreach read). Drizzle selects every declared column, so a database without them would
+  // 500 those requests; the previous instance keeps serving instead. The credit tables themselves are checked where
+  // they are used, not here, so a database that ran the script is all this asks for.
+  try {
+    const creditColumns = await db.execute(sql`
+      SELECT table_name, column_name FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND ((table_name = 'users' AND column_name = 'is_platform_admin')
+          OR (table_name IN ('prospect_runs', 'lead_messages', 'channel_messages') AND column_name = 'funded_by'))`);
+    const have = new Set((creditColumns.rows ?? []).map((r: any) => `${r.table_name}.${r.column_name}`));
+    const wanted = ["users.is_platform_admin", "prospect_runs.funded_by", "lead_messages.funded_by", "channel_messages.funded_by"];
+    const missingCredit = wanted.filter((n) => !have.has(n));
+    if (missingCredit.length) {
+      console.error(
+        `REFUSING TO SERVE: this database is missing ${missingCredit.join(", ")}, which this build reads. ` +
+          "Run once (additive, safe to repeat):\n    npx tsx --env-file=.env script/migrate-credits.ts\n" +
+          "(If you are a developer seeing this locally, you are probably pointed at the shared production database.)",
+      );
+      process.exit(1);
+    }
+    log("schema gate: credit columns present");
+  } catch (err) {
+    console.error("REFUSING TO SERVE: could not verify the credits schema:", err);
+    process.exit(1);
+  }
+
+  // Billing configuration (allowance overrides, warn threshold, credit costs): loaded once before serving, then kept
+  // fresh in the background. A failed load leaves the environment/code defaults in force (the pre-credits behaviour).
+  await (await import("./billing/config-store")).primeBillingConfig();
+
   const httpServer = await registerRoutes(app);
 
   // Public server-rendered SEO/tool pages — MUST be registered before the SPA

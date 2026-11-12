@@ -8,7 +8,7 @@
 import { ProviderError, aiProvider, type AIProvider, type ChatMessage, type ChatOptions, type ChatResult } from "../copilot/provider";
 import { budgetPoolOf, costMicroUsd, dailyLimit, globalDailySpendMicroUsd, modelFor, poolDailySpendMicroUsd, poolTasks, pricesFromEnv, utcDayStart, type BudgetPool, type LlmTask } from "@shared/llm-cost";
 import { traceStore, type TraceStore } from "./trace-store";
-import { workspaceMonthlySpendMicroUsd } from "../outbound/limits";
+import { workspaceCeilingMicroUsd } from "../billing/spend-ceiling";
 import { isUnlimitedOrg, UNLIMITED } from "../unlimited";
 
 /** The workspace's daily allowance for a task: none for a workspace in UNLIMITED_ORG_IDS. */
@@ -89,7 +89,7 @@ export async function tracedChat(ctx: TraceCtx, messages: ChatMessage[], opts: C
   const base = { organizationId: ctx.orgId, userId: ctx.userId ?? null, task: ctx.task, model, promptVersion: ctx.promptVersion, leadId: ctx.leadId ?? null, runId: ctx.runId ?? null };
   // The task's allocation and the overall ceiling are checked together, in one atomic reservation.
   const pool = budgetPoolOf(ctx.task), limit = poolDailySpendMicroUsd(pool, env);
-  const workspaceCeiling = workspaceMonthlySpendMicroUsd(env, ctx.orgId);
+  const workspaceCeiling = await workspaceCeilingMicroUsd(ctx.orgId, env, new Date(d.now()));
   let reservation: number | null | "workspace";
   try {
     reservation = await d.store.reserve({ ...base, tokensIn: 0, tokensOut: 0, latencyMs: 0, costMicroUsd: estimateCallMicroUsd(messages, opts.maxTokens, env), ok: false, errorCode: "reserved" },

@@ -14,6 +14,8 @@ import type { RunMode } from "@shared/outbound-plans";
 import { tablesReadyCheck } from "../leads/ready";
 import { clipCodeOrNull } from "@shared/error-code";
 import { WORKSPACE_SPEND_LOCK, workspaceSpendTx, type WorkspaceCeiling } from "../llm/trace-store";
+import { consumeCreditTx, creditBalances, undoCreditConsume } from "../billing/credits";
+import { runCountsTowardLimit } from "@shared/outbound-usage";
 
 /** The feature needs its own five tables and the model trace (allowances are counted from it). */
 export const prospectsTablesReady = tablesReadyCheck(["prospect_runs", "prospects", "prospect_run_items", "prospect_findings", "provider_calls", "llm_calls"]);
@@ -36,7 +38,7 @@ export interface NewRun {
    * `mode` counts only runs of that kind, which is what keeps the deep-search and list-sweep allowances separate; a
    * limit without one (the daily cap) counts every run.
    */
-  limits?: { since: Date; max: number; mode?: RunMode }[];
+  limits?: { since: Date; max: number; mode?: RunMode; /** The plan's own monthly search window: counted WITHOUT credit-funded runs, and when it is full a purchased credit of this cost pays for the run (funded_by = 'credit'). */ credit?: { cost: number } }[];
   /**
    * The researched-prospects allowance, under the same lock: a running search holds its requested number, a finished one
    * counts what it really researched (never more than it asked for). The new run is trimmed to what's left; at zero
@@ -64,7 +66,9 @@ export interface OutboundStore {
   /** Runs started since `since`, newest first, at most `limit` (the usage view's rolling window). */
   listRunsSince(orgId: string, since: Date, limit: number): Promise<ProspectRunRow[]>;
   /** Runs counting toward a limit since `since`; with `mode`, only that kind (the two allowances are counted apart). */
-  countRunsSince(orgId: string, since: Date, mode?: RunMode): Promise<number>;
+  countRunsSince(orgId: string, since: Date, mode?: RunMode, planOnly?: boolean): Promise<number>;
+  /** Usable purchased search credits (optional: a store without credits behaves as "none"). */
+  creditBalance?(orgId: string, now: Date): Promise<number>;
   /** Researched prospects this workspace's runs hold or used since `since` (see NewRun.prospects). */
   prospectsHeldSince(orgId: string, since: Date): Promise<number>;
   /** A finished run's counters replaced (a local search that failed is set to searched: 0, so it isn't charged). */
@@ -142,6 +146,25 @@ export const RUN_START_LOCK = 7_310_003;
 /** What one run holds of the researched-prospects allowance (shared/outbound-plans.ts), as SQL; prospectsHeld below is the same rule. */
 const PROSPECTS_HELD = sql`CASE WHEN ${prospectRuns.mode} = 'list' THEN 0 WHEN ${prospectRuns.status} = 'running' THEN ${prospectRuns.quantity} ELSE LEAST(${prospectRuns.quantity}, COALESCE((${prospectRuns.counters}->>'researched')::int, 0)) END`;
 const COUNTS_TOWARD_LIMIT = sql`(${prospectRuns.status} = 'running' OR COALESCE((${prospectRuns.counters}->>'searched')::int, 0) > 0)`;
+/** Runs a purchased credit paid for are not part of the plan's rolling-window counts: the plan allowance and the credits stay separate. */
+const PLAN_FUNDED = sql`${prospectRuns.fundedBy} IS DISTINCT FROM 'credit'`;
+
+/**
+ * A search a purchased credit paid for is charged only if it really searched (the same rule the plan window applies,
+ * runCountsTowardLimit): once it has ended without a single web search, its credit goes back. Idempotent (the ledger's
+ * unique line per consume), a no-op for plan-funded runs, and never throws into the run's own settle path — a failure
+ * here is logged and the next settle of the same run retries it.
+ */
+async function returnCreditIfUnused(orgId: string, runId: string): Promise<void> {
+  try {
+    const [run] = await db.select({ fundedBy: prospectRuns.fundedBy, status: prospectRuns.status, counters: prospectRuns.counters })
+      .from(prospectRuns).where(and(eq(prospectRuns.organizationId, orgId), eq(prospectRuns.id, runId))).limit(1);
+    if (!run || run.fundedBy !== "credit" || runCountsTowardLimit(run)) return;
+    await undoCreditConsume({ orgId, sourceRef: `run:${runId}`, now: new Date() });
+  } catch (e) {
+    console.error("credit return failed", { runId, errorType: (e as Error)?.name ?? "Error" });
+  }
+}
 
 export const outboundStore: OutboundStore = {
   async createRun(r) {
@@ -150,6 +173,10 @@ export const outboundStore: OutboundStore = {
         // Count-then-insert under a lock per workspace (held for this short transaction only): two searches started at
         // the same moment would otherwise both see room under the monthly or daily limit and both start.
         let quantity = r.quantity;
+        let fundedBy: "credit" | null = null;
+        // A purchased credit pays when the plan's window is full. Taken inside this transaction, under the same
+        // per-workspace lock as the counts, so two searches can't both spend the last credit (the lot row is locked FOR UPDATE).
+        const spendCredit = async (cost: number) => (await consumeCreditTx(tx, { orgId: r.orgId, kind: "search", sourceRef: `run:${r.id}`, now: r.now, cost })) !== null;
         if (r.limits?.length || r.prospects) {
           await tx.execute(sql`SELECT pg_advisory_xact_lock(${RUN_START_LOCK}, hashtext(${r.orgId}))`);
           const limits = r.limits ?? [];
@@ -157,21 +184,31 @@ export const outboundStore: OutboundStore = {
             const l = limits[i];
             const [c] = await tx.select({ n: sql<number>`count(*)::int` }).from(prospectRuns).where(and(
               eq(prospectRuns.organizationId, r.orgId), gte(prospectRuns.createdAt, l.since), COUNTS_TOWARD_LIMIT,
-              ...(l.mode ? [eq(prospectRuns.mode, l.mode)] : [])));
-            if ((c?.n ?? 0) >= l.max) throw new RunLimitReached(i);
+              ...(l.mode ? [eq(prospectRuns.mode, l.mode)] : []), ...(l.credit ? [PLAN_FUNDED] : [])));
+            if ((c?.n ?? 0) >= l.max) {
+              if (l.credit && !fundedBy && (await spendCredit(l.credit.cost))) { fundedBy = "credit"; continue; }
+              throw new RunLimitReached(i);
+            }
           }
           if (r.prospects) {
+            const creditCost = limits.find((l) => l.credit)?.credit?.cost;
             const [u] = await tx.select({ n: sql<number>`COALESCE(sum(${PROSPECTS_HELD}), 0)::int` }).from(prospectRuns)
-              .where(and(eq(prospectRuns.organizationId, r.orgId), gte(prospectRuns.createdAt, r.prospects.since), COUNTS_TOWARD_LIMIT));
+              .where(and(eq(prospectRuns.organizationId, r.orgId), gte(prospectRuns.createdAt, r.prospects.since), COUNTS_TOWARD_LIMIT, PLAN_FUNDED));
             const left = r.prospects.max - Number(u?.n ?? 0);
-            if (left <= 0) throw new RunLimitReached(r.limits?.length ?? 0);
-            quantity = Math.min(quantity, left);
+            // A credit-funded search is entitled to the companies it asked for; the plan's researched-prospects allowance
+            // is for plan searches. A plan search with no prospects left may be paid for by a credit instead.
+            if (!fundedBy) {
+              if (left <= 0) {
+                if (creditCost && (await spendCredit(creditCost))) fundedBy = "credit";
+                else throw new RunLimitReached(r.limits?.length ?? 0);
+              } else quantity = Math.min(quantity, left);
+            }
           }
         }
         const [row] = await tx.insert(prospectRuns).values({
           id: r.id, organizationId: r.orgId, createdByUser: r.userId, createdBy: r.by, request: r.request, icp: r.icp, quantity, mode: r.mode ?? "deep",
           status: r.finished ? "done" : "running", stage: r.finished ? "done" : "search", counters: r.finished?.counters ?? {}, queries: r.queries, idemKey: r.idemKey,
-          createdAt: r.now, updatedAt: r.now, ...(r.finished ? { finishedAt: r.now } : {}), ...(r.holdUntil ? { leaseUntil: r.holdUntil } : {}),
+          fundedBy, createdAt: r.now, updatedAt: r.now, ...(r.finished ? { finishedAt: r.now } : {}), ...(r.holdUntil ? { leaseUntil: r.holdUntil } : {}),
         }).returning();
         return row;
       });
@@ -196,6 +233,7 @@ export const outboundStore: OutboundStore = {
   async settleFinishedRun(orgId, id, counters, errorCode) {
     await db.update(prospectRuns).set({ counters, errorCode, updatedAt: new Date() })
       .where(and(eq(prospectRuns.organizationId, orgId), eq(prospectRuns.id, id), eq(prospectRuns.status, "done")));
+    await returnCreditIfUnused(orgId, id);
   },
   async prospectsByDomains(orgId, domains) {
     if (!domains.length) return [];
@@ -210,15 +248,16 @@ export const outboundStore: OutboundStore = {
   },
   async prospectsHeldSince(orgId, since) {
     const [r] = await db.select({ n: sql<number>`COALESCE(sum(${PROSPECTS_HELD}), 0)::int` }).from(prospectRuns)
-      .where(and(eq(prospectRuns.organizationId, orgId), gte(prospectRuns.createdAt, since), COUNTS_TOWARD_LIMIT));
+      .where(and(eq(prospectRuns.organizationId, orgId), gte(prospectRuns.createdAt, since), COUNTS_TOWARD_LIMIT, PLAN_FUNDED));
     return Number(r?.n ?? 0);
   },
-  async countRunsSince(orgId, since, mode) {
+  async countRunsSince(orgId, since, mode, planOnly) {
     const [r] = await db.select({ n: sql<number>`count(*)::int` }).from(prospectRuns).where(and(
       eq(prospectRuns.organizationId, orgId), gte(prospectRuns.createdAt, since), COUNTS_TOWARD_LIMIT,
-      ...(mode ? [eq(prospectRuns.mode, mode)] : [])));
+      ...(mode ? [eq(prospectRuns.mode, mode)] : []), ...(planOnly ? [PLAN_FUNDED] : [])));
     return r?.n ?? 0;
   },
+  async creditBalance(orgId, now) { return (await creditBalances(orgId, now)).search; },
   async claimRun(now, leaseMs) {
     // Times go to SQL as UTC text, like the query builder writes them: a Date handed to the driver is written in the
     // process's local time, which these zone-less columns would then read back as UTC.
@@ -242,6 +281,7 @@ export const outboundStore: OutboundStore = {
   async finishRun(orgId, id, fence, o) {
     const r = await db.update(prospectRuns).set({ stage: "done", status: o.status, counters: o.counters, costMicroUsd: o.costMicroUsd, errorCode: clipCodeOrNull(o.errorCode), finishedAt: o.now, updatedAt: o.now, leaseUntil: null })
       .where(and(eq(prospectRuns.organizationId, orgId), eq(prospectRuns.id, id), eq(prospectRuns.attempts, fence), eq(prospectRuns.status, "running"))).returning({ id: prospectRuns.id });
+    if (r.length > 0) await returnCreditIfUnused(orgId, id);
     return r.length > 0;
   },
   async nextLeaseExpiry(now) {
@@ -252,6 +292,7 @@ export const outboundStore: OutboundStore = {
   async setRunStatus(orgId, id, from, to, now, errorCode = null) {
     const r = await db.update(prospectRuns).set({ status: to, updatedAt: now, finishedAt: to === "running" ? null : now, errorCode: clipCodeOrNull(errorCode), leaseUntil: null })
       .where(and(eq(prospectRuns.organizationId, orgId), eq(prospectRuns.id, id), eq(prospectRuns.status, from))).returning({ id: prospectRuns.id });
+    if (r.length > 0 && to !== "running") await returnCreditIfUnused(orgId, id);
     return r.length > 0;
   },
 

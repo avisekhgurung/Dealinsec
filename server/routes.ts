@@ -21,6 +21,8 @@ import { registerKnowledgeRoutes } from "./knowledge/routes";
 import { registerVoiceRoutes } from "./voice/routes";
 import { registerSalesRoutes } from "./sales/routes";
 import { registerOutboundRoutes } from "./outbound/routes";
+import { registerCreditRoutes } from "./billing/routes";
+import { registerAdminRoutes } from "./admin/routes";
 import { registerSocialRoutes } from "./social/routes";
 import { registerClientProfileRoutes } from "./profiles/routes";
 import { registerCampaignRoutes } from "./campaigns/routes";
@@ -67,6 +69,7 @@ import {
 import { resolveSku } from "./billing/purchase-rules";
 import { confirmCheckout, handleWebhookEvent, parseWebhook } from "./billing/razorpay-events";
 import { paymentEffects, paymentOrderStore, type GrantResult } from "./billing/payment-deps";
+import { createCreditPackOrder, describePack } from "./billing/credit-orders";
 import {
   sendEmail,
   paymentReceiptEmail,
@@ -91,6 +94,8 @@ async function sendPurchaseReceipt(order: PayuOrder, paymentId: string, granted:
           ? "Deal Boost — unlimited deals & quotations for 1 month"
           : granted.kind === "seats"
           ? `${granted.qty} extra team seat${granted.qty > 1 ? "s" : ""} — 1 month`
+          : granted.kind === "credit_pack"
+          ? `${granted.units} ${granted.creditKind === "search" ? "Client Radar search" : "AI draft"} credit${granted.units > 1 ? "s" : ""}${granted.expiresAt ? ` — valid until ${fmt(granted.expiresAt)}` : " — they don't expire"}`
           : `${order.credits} Deal Credit${order.credits > 1 ? "s" : ""}`,
         amountRupees: order.amount,
         paymentId,
@@ -630,6 +635,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerVoiceRoutes(app);
   registerSalesRoutes(app);
   registerOutboundRoutes(app);
+  registerCreditRoutes(app);
+  registerAdminRoutes(app);
   registerSocialRoutes(app);
   registerClientProfileRoutes(app);
   registerCampaignRoutes(app);
@@ -661,13 +668,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const billing = await getBillingUser(req.user);
       const refreshedBilling = await storage.ensureMonthlyCredits(billing.id);
       const me = billing.id === req.user.id ? (refreshedBilling ?? req.user) : req.user;
-      const { password: _, ...userWithoutPassword } = me;
+      const { password: _, isPlatformAdmin: __, ...userWithoutPassword } = me;
       // Additive `entitlements`: computed from the ORG's billing owner, so a
       // member of a Pro/trialing org doesn't read as "Free" while every
       // feature works. Display data only — server gates re-derive their own.
       const billingFresh = refreshedBilling ?? billing;
       res.json({
         ...userWithoutPassword,
+        // The CALLER's own operator flag (never the billing owner's row `me` may be): display only, /api/admin/* re-checks.
+        platformAdmin: req.user.isPlatformAdmin === true,
         entitlements: {
           pro: hasActivePro(billingFresh),
           trial: hasActiveTrial(billingFresh),
@@ -2788,6 +2797,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!decided.ok) return res.status(decided.status).json({ code: decided.code, error: decided.error });
       const sku = decided.sku;
 
+      // A search / AI-draft credit pack: priced from the credit_packs row at this moment, terms frozen onto the order
+      // (server/billing/credit-orders.ts). The same verify route and webhook then grant it once Razorpay confirms payment.
+      if (sku === "credit_pack") {
+        const made = await createCreditPackOrder(user, req.body?.packId, (a) => createRazorpayOrder(a) as any);
+        if (!made.ok) return res.status(made.status).json({ code: made.code, error: made.error });
+        return res.json({
+          keyId: getRazorpayKeyId(),
+          orderId: made.order.id,
+          amount: made.order.amount,
+          currency: made.order.currency,
+          plan: sku,
+          name: "DealInSec",
+          description: `${describePack(made.pack)} — one-time, no renewal`,
+          prefill: {
+            name: [user.firstName, user.lastName].filter(Boolean).join(" ") || undefined,
+            email: user.email || undefined,
+            contact: user.phone || undefined,
+          },
+        });
+      }
+
       // Seat purchases carry a quantity (1–20); stored in the order's credits
       // column so the grant/refund paths know how many seats to apply.
       const seatQty = sku === "extra_seat"
@@ -2865,7 +2895,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { userId, orderId: String(razorpay_order_id), paymentId: String(razorpay_payment_id), signature: String(razorpay_signature) },
         { store: paymentOrderStore, fx: paymentEffects, verifySignature: verifyPaymentSignature, fetchPayment: fetchRazorpayPayment, capturePayment: captureRazorpayPayment },
       );
-      const pending = { success: false, pending: true, message: "Your payment is being confirmed. Pro switches on automatically within a few minutes." };
+      const pending = { success: false, pending: true, message: "Your payment is being confirmed. What you bought is applied automatically within a few minutes." };
       switch (outcome.kind) {
         case "not_found": return res.status(404).json({ error: "Order not found" });
         case "forbidden": return res.status(403).json({ error: "Order does not belong to you" });

@@ -32,7 +32,8 @@ import type { ChatMessage } from "../copilot/provider";
 import { PROMPT_VERSIONS, SIGNALS_PAGE_CHARS, enrichSystemPrompt, enrichUserMessage, signalsSystemPrompt, signalsUserMessage } from "./prompts";
 import { companyProvider, contactProvider, costMicroUsd, pageReader, readSitemap, researchPage, type CompanyEnrichmentProvider, type ContactEnrichmentProvider, type PageRead, type PageReader } from "./providers";
 import { outboundStore, type ItemWithProspect, type NewFinding, type OutboundStore } from "./store";
-import { dailyCompanyLimit, dailySearchLimit, globalSearchLimit, workspaceMonthlySpendMicroUsd, globalLocalSearchLimit } from "./limits";
+import { dailyCompanyLimit, dailySearchLimit, globalSearchLimit, globalLocalSearchLimit } from "./limits";
+import { workspaceCeilingMicroUsd } from "../billing/spend-ceiling";
 import { OUTBOUND_WINDOW_DAYS, type RunMode } from "@shared/outbound-plans";
 import { utcDayStart } from "@shared/llm-cost";
 import { siteSignals } from "@shared/site-signals";
@@ -276,7 +277,7 @@ async function searchStep(run: ProspectRunRow, icp: Icp, deadline: number, deps:
     // limit passed; a reservation that can't be made because the searches can't be counted stops the run (fail closed).
     let reservation: number | null | "workspace" = null;
     if (provider && used < dailySearchLimit(run.organizationId)) {
-      const workspace = { since: new Date(deps.now().getTime() - OUTBOUND_WINDOW_DAYS * DAY), maxMicroUsd: workspaceMonthlySpendMicroUsd(process.env, run.organizationId) };
+      const workspace = { since: new Date(deps.now().getTime() - OUTBOUND_WINDOW_DAYS * DAY), maxMicroUsd: await workspaceCeilingMicroUsd(run.organizationId, process.env, deps.now()) };
       try { reservation = await deps.store.reserveSearch({ orgId: run.organizationId, runId: run.id, provider: provider.name, costMicroUsd: costMicroUsd(provider.name), limit: globalSearchLimit(), since: utcDayStart(deps.now()), now: deps.now(), workspace }); }
       catch { throw new StopRun("cap_unavailable"); }
     }
@@ -355,7 +356,7 @@ export async function localScan(run: Pick<ProspectRunRow, "id" | "organizationId
     const reservation = await deps.store.reserveSearch({
       orgId, runId: run.id, provider: provider.name, costMicroUsd: costMicroUsd(provider.name),
       limit: globalLocalSearchLimit(), since: utcDayStart(now), now,
-      workspace: { since: new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY), maxMicroUsd: workspaceMonthlySpendMicroUsd(process.env, orgId) },
+      workspace: { since: new Date(now.getTime() - OUTBOUND_WINDOW_DAYS * DAY), maxMicroUsd: await workspaceCeilingMicroUsd(orgId, process.env, now) },
     });
     // Out of the platform's daily map budget, or the workspace's ceiling: skip the map half, keep the web search.
     if (reservation === null || reservation === "workspace") { scan.error = reservation === null ? "global_limit" : "workspace_budget"; return; }

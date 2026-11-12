@@ -4,6 +4,7 @@
  *
  * One subscription: DealInSec Pro, paid monthly. Pro Annual and Deal Boost are no longer sold (orders already
  * completed keep everything they bought; their refund path still works), and extra team seats are an add-on for Pro.
+ * Credit packs (extra Client Radar searches / AI drafts) are bought independently of the plan, one-time, never renewing.
  *
  * A grant needs Razorpay's own record of the payment to agree with the order we created: the same order, INR, exactly
  * the amount we asked for, captured (or authorized and then captured by us), and paid within ORDER_MAX_AGE_MS of the
@@ -11,7 +12,7 @@
  * be paid at the old price weeks later.
  */
 
-export type Sku = "pro_monthly" | "extra_seat";
+export type Sku = "pro_monthly" | "extra_seat" | "credit_pack";
 export type RetiredSku = "pro_yearly" | "deal_boost";
 
 /** How long after creation an order may still be paid and granted. Checkout completes in minutes. */
@@ -25,6 +26,8 @@ export type SkuDecision =
 export function resolveSku(body: { plan?: unknown; credits?: unknown } | null | undefined, hasPro: boolean): SkuDecision {
   const plan = body?.plan;
   if (plan === "pro_monthly") return { ok: true, sku: "pro_monthly" };
+  // A Client Radar search or AI draft top-up pack (server/billing/credit-orders.ts picks the pack): for any workspace, free or Pro.
+  if (plan === "credit_pack") return { ok: true, sku: "credit_pack" };
   if (plan === "extra_seat") {
     if (!hasPro) return { ok: false, status: 403, code: "UPGRADE_REQUIRED", error: "Extra team seats are an add-on for DealInSec Pro. Upgrade to Pro first." };
     return { ok: true, sku: "extra_seat" };

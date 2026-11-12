@@ -43,6 +43,7 @@ import { memberCan } from "@shared/permissions";
 import { draftFacts } from "../sales/outreach";
 import { messageStore, outreachSafetyReady } from "../sales/message-store";
 import { AI_DRAFT_VERSION_PREFIX, outboundTier } from "../outbound/plan";
+import { creditSpec, creditsCover } from "../billing/credit-gate";
 import { outboundAllowance } from "../outbound/limits";
 import { CHANNEL_PROMPT_VERSION, channelSystemPrompt, channelUserMessage } from "./prompt";
 import type { DraftInput } from "../sales/outreach-prompt";
@@ -339,7 +340,7 @@ export async function draftChannelMessage(user: Who, leadId: number, raw: unknow
     row = await deps.store.create({
       orgId, leadId, channel, kind, body, bodyHash: hashDraft("", body), toAddress: to.to, templateName: template?.name ?? null, templateLang: template?.language ?? null, templateParams: template?.params ?? null,
       promptVersion, claimIds, by: "user", userId: user.id, now: deps.now(),
-      ...(plan ? { allowance: { since: new Date(deps.now().getTime() - OUTBOUND_WINDOW_DAYS * DAY), max: plan.monthlyDrafts, prefix: AI_DRAFT_VERSION_PREFIX } } : {}),
+      ...(plan ? { allowance: { since: new Date(deps.now().getTime() - OUTBOUND_WINDOW_DAYS * DAY), max: plan.monthlyDrafts, prefix: AI_DRAFT_VERSION_PREFIX, credit: creditSpec("draft") } } : {}),
     });
   } catch (e) {
     if (e instanceof ChannelDraftExists) return fail(409, "draft_exists", `This lead already has a ${CHANNEL_LABEL[channel]} message waiting. Send or discard it first.`);
@@ -351,8 +352,8 @@ export async function draftChannelMessage(user: Who, leadId: number, raw: unknow
 }
 
 const draftLimit = (tier: OutboundTier, max: number) => tier === "free"
-  ? fail(402, "NO_CREDITS", `You've used the free plan's ${max} AI drafts for this 30-day period. Upgrade to Pro for more, or write this message yourself.`, { feature: "outbound" })
-  : fail(429, "draft_allowance", `You've used the ${max} AI drafts included in ${TIER_LABEL[tier]} for this 30-day period; you can still write this message yourself.`);
+  ? fail(402, "NO_CREDITS", `You've used the free plan's ${max} AI drafts for this 30-day period. Upgrade to Pro for more, buy extra AI drafts, or write this message yourself.`, { feature: "outbound", topUp: "draft" })
+  : fail(429, "draft_allowance", `You've used the ${max} AI drafts included in ${TIER_LABEL[tier]} for this 30-day period; you can buy extra AI drafts or write this message yourself.`, { topUp: "draft" });
 
 async function aiDraft(user: Who, lead: any, claims: any[], channel: ShortChannel, kind: MessageKind, deps: ChannelDeps): Promise<{ ok: true; body: string; claimIds: number[]; retried: boolean; style: DraftStyle | null; basis: ReturnType<typeof basisOf> } | ReturnType<typeof fail>> {
   if (kind === "template") return fail(400, "invalid", "A template's wording is fixed by WhatsApp; fill in its values instead.");
@@ -363,7 +364,7 @@ async function aiDraft(user: Who, lead: any, claims: any[], channel: ShortChanne
   const tier = await deps.tier(user);
   const plan = outboundAllowance(tier);
   const since = new Date(deps.now().getTime() - OUTBOUND_WINDOW_DAYS * DAY);
-  if ((await deps.store.countAiDrafts(orgId, since, AI_DRAFT_VERSION_PREFIX)) >= plan.monthlyDrafts) return draftLimit(tier, plan.monthlyDrafts);
+  if ((await deps.store.countAiDrafts(orgId, since, AI_DRAFT_VERSION_PREFIX)) >= plan.monthlyDrafts && !(await creditsCover(orgId, "draft", deps.now()))) return draftLimit(tier, plan.monthlyDrafts);
   const budget = (e: unknown) => e instanceof WorkspaceBudgetExceeded ? fail(429, "workspace_budget", "This workspace's AI usage for the last 30 days has reached its limit.")
     : e instanceof GlobalCapExceeded ? fail(429, "global_limit", "Today's AI budget for drafting is used up for everyone on DealInSec. It resets at midnight UTC.")
       : e instanceof CapExceeded ? fail(429, "daily_limit", `You've used today's ${dailyLimit("draft")} drafts. Try again tomorrow.`)

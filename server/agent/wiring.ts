@@ -23,9 +23,9 @@ export const conversationDeps: ConversationDeps = {
     try {
       const orgId = user.organizationId as string | undefined;
       if (!orgId) return true;
-      const [{ traceStore }, { workspaceMonthlySpendMicroUsd }] = await Promise.all([import("../llm/trace-store"), import("../outbound/limits")]);
+      const [{ traceStore }, { workspaceCeilingMicroUsd }] = await Promise.all([import("../llm/trace-store"), import("../billing/spend-ceiling")]);
       const since = new Date(Date.now() - 30 * 86_400_000);
-      return (await traceStore.workspaceSpend(orgId, since)) < workspaceMonthlySpendMicroUsd(process.env, orgId);
+      return (await traceStore.workspaceSpend(orgId, since)) < (await workspaceCeilingMicroUsd(orgId));
     } catch { return true; }
   },
   getSession: async (user, id) => {

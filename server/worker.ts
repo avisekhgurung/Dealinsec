@@ -21,6 +21,8 @@ const log = (kind: string, fields: Record<string, unknown> = {}) => console.log(
 
 async function main() {
   if (!process.env.DATABASE_URL) { log("worker_config_error", { missing: "DATABASE_URL" }); process.exit(1); }
+  // The worker runs searches and drafts too, so it reads the same billing configuration (allowance overrides, credit costs).
+  await (await import("./billing/config-store")).primeBillingConfig();
   const league = await import("./ai-league/runtime");
   const { outboundRunner } = await import("./outbound/runner");
   const { socialScheduleRunner } = await import("./social/schedule");

@@ -24,7 +24,7 @@ export function memoryChannelStore(o: { emailAiDrafts?: (orgId: string) => numbe
       const row: ChannelMessageRow = {
         id: ++mid, organizationId: m.orgId, leadId: m.leadId, channel: m.channel, kind: m.kind, direction: "out", body: m.body, bodyHash: m.bodyHash, toAddress: m.toAddress,
         templateName: m.templateName ?? null, templateLang: m.templateLang ?? null, templateParams: m.templateParams ?? null, status: "draft", sentVia: null, delivery: null,
-        providerMessageId: null, errorCode: null, attempts: 0, promptVersion: m.promptVersion, claimIds: m.claimIds, edited: false, createdBy: m.by, createdByUser: m.userId,
+        providerMessageId: null, errorCode: null, attempts: 0, promptVersion: m.promptVersion, claimIds: m.claimIds, edited: false, fundedBy: null, createdBy: m.by, createdByUser: m.userId,
         approvedBy: null, approvedAt: null, sentAt: null, deliveredAt: null, readAt: null, repliedAt: null, createdAt: m.now, updatedAt: m.now,
       };
       messages.push(row);

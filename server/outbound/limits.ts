@@ -24,6 +24,8 @@
  *   LLM_GLOBAL_DAILY_SPEND_USD     model spend for every sales and outbound task  (default $1.00, shared/llm-cost.ts)
  */
 import { OUTBOUND_ALLOWANCE_DEFAULTS, WORKSPACE_MONTHLY_SPEND_USD_DEFAULT, type OutboundAllowance, type OutboundTier } from "@shared/outbound-plans";
+import { applyAllowanceOverrides } from "@shared/billing-config";
+import { billingConfig } from "../billing/config-cache";
 import { isUnlimitedOrg, UNLIMITED, UNLIMITED_SPEND_MICRO_USD } from "../unlimited";
 
 const int = (v: string | undefined, d: number) => { const n = Number(v); return Number.isInteger(n) && n >= 1 ? n : d; };
@@ -37,8 +39,18 @@ export const globalSearchLimit = () => int(process.env.OUTBOUND_GLOBAL_DAILY_SEA
 export const globalLocalSearchLimit = () => int(process.env.OUTBOUND_GLOBAL_DAILY_LOCAL_SEARCHES, 30);
 
 
-/** A plan's Client Radar allowance: the shared defaults, each overridable by its environment variable. */
+/**
+ * A plan's Client Radar allowance. Precedence, highest first: the admin's override (billing_config, read from the
+ * in-memory snapshot, server/billing/config-cache.ts), the plan's environment variable, the shared default. Only the
+ * free and pro plans carry overrides; the unlimited grant and the legacy trial tier never do.
+ */
 export function outboundAllowance(tier: OutboundTier): OutboundAllowance {
+  const base = envAllowance(tier);
+  return tier === "free" || tier === "pro" ? applyAllowanceOverrides(base, billingConfig().allowances[tier]) : base;
+}
+
+/** A plan's allowance from the shared defaults, each overridable by its environment variable (no admin override). */
+export function envAllowance(tier: OutboundTier): OutboundAllowance {
   const d = OUTBOUND_ALLOWANCE_DEFAULTS[tier], up = tier.toUpperCase(), env = process.env;
   return {
     monthlySearches: int(env[`OUTBOUND_MONTHLY_SEARCHES_${up}`], d.monthlySearches),

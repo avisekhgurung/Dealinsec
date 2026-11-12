@@ -53,6 +53,7 @@ import { profileStyleView, type ProfileStyleView } from "@shared/acquisition-pro
 import { followUpView, type FollowUpView } from "@shared/campaign";
 import { DraftAllowanceReached, DraftExists, messageStore, messagesTablesReady, outreachSafetyReady, type MessageStore } from "./message-store";
 import { AI_DRAFT_VERSION_PREFIX, outboundTier } from "../outbound/plan";
+import { creditSpec, creditsCover } from "../billing/credit-gate";
 import { outboundAllowance } from "../outbound/limits";
 import { OUTBOUND_WINDOW_DAYS, TIER_LABEL } from "@shared/outbound-plans";
 import { researchStore, salesTablesReady } from "./research-store";
@@ -226,7 +227,7 @@ interface PreparedDraft {
   style: DraftStyle | null;
   ctx: { to: string; siteHost: string };
   model: string;
-  allowance: { since: Date; max: number; prefix: string };
+  allowance: { since: Date; max: number; prefix: string; credit: { cost: number } };
   draftLimit: () => ReturnType<typeof fail>;
   /** The ways the evidence supports opening this message, strongest first (never empty: "direct" is the floor). */
   strategies: StrategyChoice[];
@@ -323,11 +324,12 @@ async function prepareDraft(user: Who, leadId: number, opts: DraftOpts, deps: Ou
   // and again with the insert (under a per-workspace lock) so parallel requests can't pass it together.
   const tier = await outboundTier(user);
   const plan = outboundAllowance(tier);
-  const allowance = { since: new Date(deps.now().getTime() - OUTBOUND_WINDOW_DAYS * 86_400_000), max: plan.monthlyDrafts, prefix: AI_DRAFT_VERSION_PREFIX };
+  const allowance = { since: new Date(deps.now().getTime() - OUTBOUND_WINDOW_DAYS * 86_400_000), max: plan.monthlyDrafts, prefix: AI_DRAFT_VERSION_PREFIX, credit: creditSpec("draft") };
   const draftLimit = () => tier === "free"
-    ? fail(402, "NO_CREDITS", `You've used the free plan's ${plan.monthlyDrafts} AI drafts for this 30-day period. Upgrade to Pro for more, or write this message yourself.`, { feature: "outbound" })
-    : fail(429, "draft_allowance", `You've used the ${plan.monthlyDrafts} AI drafts included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier drafts pass 30 days; you can still write this message yourself.`);
-  if ((await deps.store.countAiDrafts(orgId, allowance.since, allowance.prefix)) >= allowance.max) return draftLimit();
+    ? fail(402, "NO_CREDITS", `You've used the free plan's ${plan.monthlyDrafts} AI drafts for this 30-day period. Upgrade to Pro for more, buy extra AI drafts, or write this message yourself.`, { feature: "outbound", topUp: "draft" })
+    : fail(429, "draft_allowance", `You've used the ${plan.monthlyDrafts} AI drafts included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier drafts pass 30 days; you can buy extra AI drafts or write this message yourself.`, { topUp: "draft" });
+  // Over the plan's window is fine while purchased draft credits can pay (the store spends one with the insert).
+  if ((await deps.store.countAiDrafts(orgId, allowance.since, allowance.prefix)) >= allowance.max && !(await creditsCover(orgId, "draft", deps.now()))) return draftLimit();
 
   try { await assertWithinCap("draft", orgId); }
   catch (e) {

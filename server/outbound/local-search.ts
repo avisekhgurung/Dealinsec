@@ -22,7 +22,9 @@ import { DiscoveryError } from "../discovery/types";
 import { localBusinessProvider, type LocalBusinessProvider } from "../discovery/google-places";
 import { addClaim, createLead, fail, writeGate, type Result, type Who } from "../services/leads";
 import { leadsStore } from "../leads/store";
-import { dailyRunLimit, globalLocalSearchLimit, outboundAllowance, workspaceMonthlySpendMicroUsd } from "./limits";
+import { dailyRunLimit, globalLocalSearchLimit, outboundAllowance } from "./limits";
+import { workspaceCeilingMicroUsd } from "../billing/spend-ceiling";
+import { billingConfig } from "../billing/config-cache";
 import { utcDayStart } from "@shared/llm-cost";
 import { outboundTier } from "./plan";
 import { costMicroUsd } from "./providers";
@@ -54,8 +56,8 @@ export const localSearchReady = (d: Partial<LocalDeps> = {}) => !!({ ...defaults
 
 function limitFail(tier: OutboundTier, monthly: number, i: number) {
   if (i === 0) return tier === "free"
-    ? fail(402, "NO_CREDITS", `You've used the free plan's ${monthly} Client Radar searches for this 30-day period. Upgrade to Pro for more.`, { feature: "outbound" })
-    : fail(429, "monthly_limit", `You've used the ${monthly} Client Radar searches included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days.`);
+    ? fail(402, "NO_CREDITS", `You've used the free plan's ${monthly} Client Radar searches for this 30-day period. Upgrade to Pro for more, or buy extra searches.`, { feature: "outbound", topUp: "search" })
+    : fail(429, "monthly_limit", `You've used the ${monthly} Client Radar searches included in ${TIER_LABEL[tier]} for this 30-day period. More become available as earlier searches pass 30 days, or you can buy extra searches.`, { topUp: "search" });
   if (i === 1) return fail(429, "daily_limit", `You've started today's ${dailyRunLimit()} prospect searches. Try again tomorrow.`);
   return tier === "free"
     ? fail(402, "NO_CREDITS", "You've used the free plan's researched prospects for this 30-day period. Upgrade to Pro for more.", { feature: "outbound" })
@@ -89,7 +91,7 @@ export async function localSearch(user: Who, raw: unknown, d: Partial<LocalDeps>
     const run = await deps.store.createRun({
       id: newRunId(), orgId, userId: user.id, by: "user", request: `${input.category} in ${input.city}`.slice(0, 500), icp: icpFor({ ...input, quantity: max }), quantity: max,
       idemKey: `local_${randomUUID()}`, now, queries: [{ q: query, provider: deps.provider.name, done: true, ok: true }],
-      limits: [{ since, max: allowance.monthlySearches }, { since: new Date(now.getTime() - DAY), max: dailyRunLimit(orgId) }],
+      limits: [{ since, max: allowance.monthlySearches, credit: { cost: billingConfig().creditCost.search } }, { since: new Date(now.getTime() - DAY), max: dailyRunLimit(orgId) }],
       finished: { counters: { searched: 1, results: 0, mode: "local" } },
     });
     runId = run.id;
@@ -103,7 +105,7 @@ export async function localSearch(user: Who, raw: unknown, d: Partial<LocalDeps>
   // transaction (the same ledger and locks as web searches), then completed with what happened.
   let reservation: number | null | "workspace";
   try {
-    reservation = await deps.store.reserveSearch({ orgId, runId, provider: deps.provider.name, operation: "local_search", costMicroUsd: cost, limit: globalLocalSearchLimit(), since: utcDayStart(now), now, workspace: { since, maxMicroUsd: workspaceMonthlySpendMicroUsd(process.env, orgId) } });
+    reservation = await deps.store.reserveSearch({ orgId, runId, provider: deps.provider.name, operation: "local_search", costMicroUsd: cost, limit: globalLocalSearchLimit(), since: utcDayStart(now), now, workspace: { since, maxMicroUsd: await workspaceCeilingMicroUsd(orgId, process.env, now) } });
   } catch { reservation = null; }
   if (reservation === "workspace") {
     await refund("workspace_budget");

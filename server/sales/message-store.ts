@@ -1,5 +1,6 @@
 /** Database store for outreach messages. Tests replace this module (eval/world-mocks.ts). Every query is scoped by organization. */
 import { channelCountFor } from "../channels/store";
+import { consumeCreditTx } from "../billing/credits";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { leadEvents, leadMessages, leads, leadTickets, outreachEvents, outreachFollowups, outreachSuppressions, type LeadMessageRow, type OutreachEventRow, type OutreachSuppressionRow } from "@shared/schema";
@@ -49,7 +50,7 @@ export interface NewMessage {
    * The plan's AI-draft allowance (shared/outbound-plans.ts): AI first messages saved since `since` (prompt version
    * starting with `prefix`) must be under `max`, counted under a per-workspace lock with the insert, else DraftAllowanceReached.
    */
-  allowance?: { since: Date; max: number; prefix: string };
+  allowance?: { since: Date; max: number; prefix: string; /** When the plan's window is full, a purchased draft credit of this cost pays for the draft (server/billing/credits.ts). */ credit?: { cost: number } };
 }
 export class DraftExists extends Error { constructor() { super("this lead already has an unsent message"); } }
 export class DraftAllowanceReached extends Error { constructor(public max: number) { super("the plan's AI drafts for this period are used"); } }
@@ -63,7 +64,7 @@ export interface NewVariants {
   /** The batch id every version carries (lead_messages.variant_group): one batch is ONE AI draft against the allowance. */
   group: string;
   variants: { strategy: string; subject: string; body: string; bodyHash: string; promptVersion: string }[];
-  allowance: { since: Date; max: number; prefix: string };
+  allowance: { since: Date; max: number; prefix: string; credit?: { cost: number } };
 }
 /** What choosing a version did. "conflict": another version of this lead was already chosen (or a draft exists). */
 export type ChooseResult =
@@ -141,7 +142,7 @@ export interface MessageStore {
 /** AI first messages counted for the allowance: one variant batch is ONE draft (DISTINCT on the batch id; a single draft has none and counts by its own id). */
 async function aiDraftsUsed(q: { execute: (s: ReturnType<typeof sql>) => Promise<{ rows: unknown[] }> }, orgId: string, since: Date, prefix: string): Promise<number> {
   const r = await q.execute(sql`SELECT count(DISTINCT COALESCE(variant_group, id::text))::int AS n FROM ${leadMessages} WHERE organization_id = ${orgId} AND direction = 'out'
-    AND prompt_version LIKE ${prefix + "%"} AND created_at >= ${since.toISOString()}::timestamp`);
+    AND prompt_version LIKE ${prefix + "%"} AND funded_by IS DISTINCT FROM 'credit' AND created_at >= ${since.toISOString()}::timestamp`);
   return Number((r.rows[0] as { n: unknown } | undefined)?.n ?? 0);
 }
 /** Whether this lead has a batch of versions still waiting to be chosen. */
@@ -159,12 +160,15 @@ export const messageStore: MessageStore = {
           await tx.execute(sql`SELECT pg_advisory_xact_lock(${DRAFT_ALLOWANCE_LOCK}, hashtext(${m.orgId}))`);
           if (await pendingVariantExists(tx, m.orgId, m.leadId)) throw new DraftExists();
           // One allowance for AI drafts on every channel (server/channels/store.ts counts both tables the same way, under this lock).
-          if ((await aiDraftsUsed(tx, m.orgId, a.since, a.prefix)) + (await channelCountFor(tx as any, "ai_drafts", m.orgId, a.since, a.prefix)) >= a.max) throw new DraftAllowanceReached(a.max);
+          const over = (await aiDraftsUsed(tx, m.orgId, a.since, a.prefix)) + (await channelCountFor(tx as any, "ai_drafts", m.orgId, a.since, a.prefix)) >= a.max;
+          if (over && !a.credit) throw new DraftAllowanceReached(a.max);
           const [row] = await tx.insert(leadMessages).values({
             leadId: m.leadId, organizationId: m.orgId, subject: m.subject, body: m.body, bodyHash: m.bodyHash, toAddress: m.toAddress, toSource: m.toSource,
             status: "draft", researchId: m.researchId, claimIds: m.claimIds, promptVersion: m.promptVersion, strategy: m.strategy ?? null, createdBy: m.by, createdByUser: m.userId,
-            createdAt: m.now, updatedAt: m.now,
+            createdAt: m.now, updatedAt: m.now, fundedBy: over ? "credit" : null,
           }).returning();
+          // The plan's window is full: a purchased credit pays, in this same transaction (a refusal rolls the draft back, so a draft is never saved unpaid).
+          if (over && (await consumeCreditTx(tx as any, { orgId: m.orgId, kind: "draft", sourceRef: `msg:${row.id}`, now: m.now, cost: a.credit!.cost })) === null) throw new DraftAllowanceReached(a.max);
           return row;
         });
       }
@@ -191,11 +195,14 @@ export const messageStore: MessageStore = {
           AND direction = 'out' AND status IN ('variant', 'draft', 'approved') LIMIT 1`);
         if (clash.rows.length) throw new DraftExists();
         const a = m.allowance;
-        if ((await aiDraftsUsed(tx, m.orgId, a.since, a.prefix)) + (await channelCountFor(tx as any, "ai_drafts", m.orgId, a.since, a.prefix)) >= a.max) throw new DraftAllowanceReached(a.max);
+        const over = (await aiDraftsUsed(tx, m.orgId, a.since, a.prefix)) + (await channelCountFor(tx as any, "ai_drafts", m.orgId, a.since, a.prefix)) >= a.max;
+        if (over && !a.credit) throw new DraftAllowanceReached(a.max);
+        // One batch of versions is ONE draft, so one credit (idempotent by the batch id).
+        if (over && (await consumeCreditTx(tx as any, { orgId: m.orgId, kind: "draft", sourceRef: `draftgroup:${m.group}`, now: m.now, cost: a.credit!.cost })) === null) throw new DraftAllowanceReached(a.max);
         return tx.insert(leadMessages).values(m.variants.map((v) => ({
           leadId: m.leadId, organizationId: m.orgId, subject: v.subject, body: v.body, bodyHash: v.bodyHash, toAddress: m.toAddress, toSource: m.toSource,
           status: "variant", researchId: m.researchId, claimIds: m.claimIds, promptVersion: v.promptVersion, strategy: v.strategy, variantGroup: m.group,
-          createdBy: m.by, createdByUser: m.userId, createdAt: m.now, updatedAt: m.now,
+          createdBy: m.by, createdByUser: m.userId, createdAt: m.now, updatedAt: m.now, fundedBy: over ? "credit" : null,
         }))).returning();
       });
     } catch (e) {

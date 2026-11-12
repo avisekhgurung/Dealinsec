@@ -337,6 +337,11 @@ export const users = pgTable("users", {
   resetTokenHash: varchar("reset_token_hash"),
   resetTokenExpiresAt: timestamp("reset_token_expires_at"),
   referralCode: varchar("referral_code").unique(),
+  // Platform operator (the founder), NOT an org role: unlocks /api/admin/* (packs, allowances, grants) behind
+  // requirePlatformAdmin. Granted only by hand on the production DB (script/migrate-credits.ts documents how);
+  // no route or script sets it, and there is deliberately no email-based fallback (an unverified signup email must
+  // never be enough to become an operator).
+  isPlatformAdmin: boolean("is_platform_admin").notNull().default(false),
   // ── Organization membership (single org per user) ──
   organizationId: varchar("organization_id"),
   orgRole: varchar("org_role").notNull().default("OWNER"), // OWNER | ADMIN | SALES | ACCOUNTS | CUSTOM
@@ -1421,6 +1426,9 @@ export const leadMessages = pgTable("lead_messages", {
   variantGroup: varchar("variant_group", { length: 36 }),
   chosenAt: timestamp("chosen_at"),
   edited: boolean("edited").notNull().default(false),
+  // 'credit' when a purchased draft credit paid for this AI draft because the plan's window was full
+  // (script/migrate-credits.ts); the plan's AI-draft count skips these rows.
+  fundedBy: varchar("funded_by", { length: 8 }),
   createdBy: varchar("created_by", { length: 8 }).notNull().default("user"), // user | agent
   createdByUser: varchar("created_by_user"),
   approvedBy: varchar("approved_by"),
@@ -1498,6 +1506,9 @@ export const prospectRuns = pgTable("prospect_runs", {
   counters: jsonb("counters").notNull().default(sql`'{}'::jsonb`),
   queries: jsonb("queries").notNull().default(sql`'[]'::jsonb`),
   costMicroUsd: integer("cost_micro_usd").notNull().default(0),
+  // 'credit' when a purchased credit paid for this run because the plan's window was full (script/migrate-credits.ts);
+  // null/'plan' runs are what the plan's rolling-window counts see. A credit run that never searched is undone.
+  fundedBy: varchar("funded_by", { length: 8 }),
   errorCode: varchar("error_code", { length: 30 }),
   idemKey: varchar("idem_key", { length: 64 }).notNull(),
   leaseUntil: timestamp("lease_until"),
@@ -1885,6 +1896,8 @@ export const channelMessages = pgTable("channel_messages", {
   promptVersion: varchar("prompt_version", { length: 20 }),
   claimIds: jsonb("claim_ids").notNull().default(sql`'[]'::jsonb`),
   edited: boolean("edited").notNull().default(false),
+  // 'credit' when a purchased draft credit paid for this AI draft (script/migrate-credits.ts); skipped by the plan count.
+  fundedBy: varchar("funded_by", { length: 8 }),
   createdBy: varchar("created_by", { length: 8 }).notNull().default("user"),
   createdByUser: varchar("created_by_user"),
   approvedBy: varchar("approved_by"),
@@ -2184,3 +2197,127 @@ export const campaignMembers = pgTable("campaign_members", {
   queueIdx: index("campaign_members_queue_idx").on(t.campaignId, t.state),
 }));
 export type CampaignMemberRow = typeof campaignMembers.$inferSelect;
+
+// ── Credit top-ups (script/migrate-credits.ts; server/billing/credits.ts) ──
+// Purchased credits for the two features whose plan allowances can run out mid-month: Client Radar searches and AI
+// drafts. Everything is org-scoped and money-path shaped: a purchase becomes a LOT (its own expiry, its own remaining
+// count), consumption decrements a lot atomically and writes a LEDGER line, and nothing here ever goes negative.
+// Plan allowances stay exactly as they are (rolling 30 days, counted from the action tables); a credit is spent only
+// when the plan can't cover an action, and the action row is marked funded_by='credit' so it never also uses up the
+// plan's window. These tables are created by script/migrate-credits.ts, run on production BEFORE the code deploys.
+
+/** What a credit pays for. */
+export const CREDIT_KINDS = ["search", "draft"] as const;
+export type CreditKind = (typeof CREDIT_KINDS)[number];
+export const isCreditKind = (v: unknown): v is CreditKind => typeof v === "string" && (CREDIT_KINDS as readonly string[]).includes(v);
+
+/** A pack on sale: quantity and price are rows, not code, so the founder can change them without a deploy. */
+export const creditPacks = pgTable("credit_packs", {
+  id: serial("id").primaryKey(),
+  kind: varchar("kind", { length: 8 }).notNull(), // search | draft
+  units: integer("units").notNull(),
+  priceRupees: integer("price_rupees").notNull(),
+  active: boolean("active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  /** How long bought credits stay usable, in months from purchase; null = they never expire. Shown before checkout
+   *  and FROZEN onto the order and its lot, so editing a pack never changes what an earlier buyer already owns. */
+  expiryMonths: integer("expiry_months"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  kindCk: check("credit_packs_kind_ck", sql`kind IN ('search', 'draft')`),
+  unitsCk: check("credit_packs_units_ck", sql`units >= 1`),
+  priceCk: check("credit_packs_price_ck", sql`price_rupees >= 1`),
+}));
+export type CreditPackRow = typeof creditPacks.$inferSelect;
+
+/**
+ * What a credit-pack order buys, frozen at ORDER time (kind, units, price, expiry): the grant delivers exactly what
+ * the buyer was shown, even if the pack row is edited or retired between checkout and the webhook.
+ */
+export const creditPurchases = pgTable("credit_purchases", {
+  orderId: varchar("order_id").primaryKey(), // payu_orders.order_id
+  organizationId: varchar("organization_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  packId: integer("pack_id").notNull(),
+  kind: varchar("kind", { length: 8 }).notNull(),
+  units: integer("units").notNull(),
+  priceRupees: integer("price_rupees").notNull(),
+  expiryMonths: integer("expiry_months"),
+  createdAt: timestamp("created_at").notNull(),
+});
+export type CreditPurchaseRow = typeof creditPurchases.$inferSelect;
+
+/**
+ * Credits a workspace owns, one lot per grant (a paid order, or an operator grant with a reason). `remaining` is the
+ * truth the atomic consume decrements; the CHECK keeps it in [0, units] whatever races. An expired lot simply stops
+ * being consumable or counted — nothing deletes it, so the wallet can always show where credits went.
+ */
+export const creditLots = pgTable("credit_lots", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  kind: varchar("kind", { length: 8 }).notNull(),
+  units: integer("units").notNull(),
+  remaining: integer("remaining").notNull(),
+  source: varchar("source", { length: 12 }).notNull(), // purchase | admin_grant
+  orderId: varchar("order_id"), // the payu_orders order this lot delivers (unique: a replayed grant finds it instead of doubling)
+  packId: integer("pack_id"),
+  expiresAt: timestamp("expires_at"), // null = never
+  createdAt: timestamp("created_at").notNull(),
+}, (t) => ({
+  kindCk: check("credit_lots_kind_ck", sql`kind IN ('search', 'draft')`),
+  remainingCk: check("credit_lots_remaining_ck", sql`remaining >= 0 AND remaining <= units`),
+  orderUq: uniqueIndex("credit_lots_order_uq").on(t.orderId).where(sql`order_id IS NOT NULL`),
+  openIdx: index("credit_lots_open_idx").on(t.organizationId, t.kind).where(sql`remaining > 0`),
+}));
+export type CreditLotRow = typeof creditLots.$inferSelect;
+
+/**
+ * Every credit movement, one line each: +units on a purchase or grant, -1 on a consume, +1 when a consume is undone
+ * (a credit-funded search that never searched), -N on a refund or an operator deduction. The partial unique index on
+ * (reason, source_ref) is what makes consumes, undos and refunds idempotent: a replay inserts nothing and changes
+ * nothing. Balances live on the lots; this is the auditable history.
+ */
+export const creditLedger = pgTable("credit_ledger", {
+  id: serial("id").primaryKey(),
+  organizationId: varchar("organization_id").notNull(),
+  kind: varchar("kind", { length: 8 }).notNull(),
+  delta: integer("delta").notNull(),
+  reason: varchar("reason", { length: 16 }).notNull(), // purchase | consume | consume_undo | refund | admin_grant | admin_deduct
+  lotId: integer("lot_id"),
+  sourceRef: varchar("source_ref", { length: 80 }), // run:<id> | msg:<id> | chmsg:<id> | draftgroup:<id> | order:<id>
+  note: varchar("note", { length: 300 }),
+  actorUserId: varchar("actor_user_id"),
+  createdAt: timestamp("created_at").notNull(),
+}, (t) => ({
+  onceUq: uniqueIndex("credit_ledger_reason_ref_uq").on(t.reason, t.sourceRef).where(sql`source_ref IS NOT NULL`),
+  orgIdx: index("credit_ledger_org_idx").on(t.organizationId, t.createdAt),
+}));
+export type CreditLedgerRow = typeof creditLedger.$inferSelect;
+
+/**
+ * Runtime billing configuration (allowance overrides, warn thresholds, spend headroom per credit): rows the admin
+ * screen edits, read through a short cache (server/billing/billing-config.ts). Environment variables and code
+ * defaults remain only the fallback for keys with no row.
+ */
+export const billingConfig = pgTable("billing_config", {
+  key: varchar("key", { length: 40 }).primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedBy: varchar("updated_by"),
+  updatedAt: timestamp("updated_at").notNull(),
+});
+export type BillingConfigRow = typeof billingConfig.$inferSelect;
+
+/** Every platform-admin change (packs, config, grants, deductions), with who, what and the mandatory why. */
+export const adminAuditLog = pgTable("admin_audit_log", {
+  id: serial("id").primaryKey(),
+  adminUserId: varchar("admin_user_id").notNull(),
+  action: varchar("action", { length: 40 }).notNull(),
+  target: varchar("target", { length: 120 }),
+  reason: varchar("reason", { length: 300 }),
+  detail: jsonb("detail"),
+  createdAt: timestamp("created_at").notNull(),
+}, (t) => ({
+  whenIdx: index("admin_audit_log_when_idx").on(t.createdAt),
+}));
+export type AdminAuditRow = typeof adminAuditLog.$inferSelect;
