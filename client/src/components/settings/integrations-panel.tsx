@@ -1,5 +1,6 @@
 /**
- * Settings → Integrations. Gmail and WhatsApp Business (whatsapp-card.tsx) are real connections; GmailCard decides for itself what to show, and this panel only
+ * Settings → Integrations. Gmail and WhatsApp Business (whatsapp-card.tsx, shown only where WhatsApp sending is switched
+ * on) are real connections; GmailCard decides for itself what to show, and this panel only
  * fills the gaps it leaves (loading, a failed load, or Gmail not switched on for this workspace), reading the same
  * GET /api/integrations/gmail answer, so it never says "connected" unless the server does. The other cards are
  * integrations that do NOT exist: no connect button, no dates, no promises.

@@ -173,7 +173,10 @@ export async function channelStatuses(user: Who, d: Partial<ChannelDeps> = {}): 
   let whatsapp: ChannelStatus;
   const waCaps = (send: boolean) => ({ draft: true, send, deliveryStatus: send, replySync: send, openExternal: !send });
   if (!ready) whatsapp = { channel: "whatsapp", state: "not_configured", mode: "manual", capabilities: waCaps(false), note: "WhatsApp messages aren't set up on this server yet." };
-  else if (!cfg.configured || !cfg.allowed(orgId)) whatsapp = { channel: "whatsapp", state: "not_configured", mode: "manual", capabilities: waCaps(false), note: `${cfg.reason ?? "WhatsApp Business isn't switched on for your workspace yet."} You can still write a message and send it from your own WhatsApp to someone who agreed to hear from you.` };
+  // Switched off for this workspace (the flag, a setting, or not on the pilot list) is not a fault the person can fix:
+  // WhatsApp then works the way LinkedIn and X do here. The message is written in DealInSec and
+  // "Open WhatsApp" sends it from their own WhatsApp. So it reads "Drafts only: you send it", not "Not switched on".
+  else if (!cfg.configured || !cfg.allowed(orgId)) whatsapp = { channel: "whatsapp", state: "sending_unavailable", mode: "manual", capabilities: waCaps(false), note: "Write the message here, then press Open WhatsApp to send it from your own WhatsApp. Only to people who agreed to hear from you: a number found online isn't permission." };
   else {
     const conn = await deps.store.liveConnection(orgId);
     if (!conn) whatsapp = { channel: "whatsapp", state: "awaiting_connection", mode: "manual", capabilities: waCaps(false), note: "No WhatsApp Business number is connected. An owner or admin can connect one in Settings → Integrations; until then you send from your own WhatsApp." };

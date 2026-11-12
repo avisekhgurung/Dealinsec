@@ -1,6 +1,7 @@
 /**
  * Settings → Integrations → WhatsApp Business: the workspace's own business number on the official Cloud API.
- * Shows only what GET /api/integrations/whatsapp says: not switched on, not connected, connected, or needing a reconnect.
+ * Shows only what GET /api/integrations/whatsapp says: not connected, connected, or needing a reconnect. Where WhatsApp
+ * sending isn't switched on for the workspace it shows nothing at all (see the note in the component).
  * Owners and admins connect it with the number's IDs and an access token (a System User token from Meta Business
  * Settings); the token goes to the server once, is checked with WhatsApp, sealed, and never shown again.
  */
@@ -35,6 +36,9 @@ export function WhatsappCard() {
     onError: (e) => toast({ title: "Couldn't disconnect WhatsApp Business", description: leadError(e), variant: "destructive" }),
   });
   const s = q.data, c = s?.connection;
+  // Shown only where WhatsApp sending is switched on for this workspace. Everyone else sends from their own WhatsApp
+  // ("Open WhatsApp" on a lead's message), which needs nothing here, so an empty "not available" card would only confuse.
+  if (!s?.configured) return null;
   const badge = !s ? null : !s.configured ? "Not available yet" : !c ? "Not connected" : c.status === "needs_attention" ? "Needs reconnecting" : "Connected";
   return (
     <SettingsSection title="WhatsApp Business" icon={MessageCircle} testId="integration-whatsapp"

@@ -132,10 +132,13 @@ describe("each channel's state is what the server checked", () => {
     expect(by(ok<any>(await svc.channelStatuses(OTHER(), d())).channels, "whatsapp").state).toBe("awaiting_connection");
   });
 
-  it("not switched on (flag, secrets, key ring, allowlist or tables): not configured, and nothing can connect", async () => {
-    for (const env of [{ ...ENV, WHATSAPP_ENABLED: undefined }, { ...ENV, WHATSAPP_APP_SECRET: "" }, { ...ENV, MAILBOX_TOKEN_KEYS: "" }, { ...ENV, WHATSAPP_ALLOWED_ORG_IDS: "someone-else" }]) {
+  it("switched off (flag, secrets, key ring or allowlist): you send it from your own WhatsApp, and nothing can connect; no tables: not configured", async () => {
+    for (const env of [{ ...ENV, WHATSAPP_ENABLED: undefined }, { ...ENV, WHATSAPP_ENABLED: "false" }, { ...ENV, WHATSAPP_APP_SECRET: "" }, { ...ENV, MAILBOX_TOKEN_KEYS: "" }, { ...ENV, WHATSAPP_ALLOWED_ORG_IDS: "someone-else" }]) {
       const s = ok<any>(await svc.channelStatuses(OWNER(), deps({ env: env as any }))).channels.find((x: any) => x.channel === "whatsapp");
-      expect(s.state).toBe("not_configured");
+      expect(s).toMatchObject({ state: "sending_unavailable", mode: "manual", capabilities: { draft: true, send: false, deliveryStatus: false, replySync: false, openExternal: true } });
+      expect(s.note).toMatch(/Open WhatsApp/);
+      expect(s.note).toMatch(/agreed to hear from you/);
+      expect(s.note).not.toMatch(/switched on|set up/);
       expect(await svc.connectWhatsapp(OWNER(), { phoneNumberId: "1234567890", wabaId: "9876543210", accessToken: TOKEN }, deps({ env: env as any }))).toMatchObject({ ok: false });
     }
     expect(ok<any>(await svc.channelStatuses(OWNER(), deps({ ready: async () => false }))).channels.every((c: any) => c.state === "not_configured")).toBe(true);
