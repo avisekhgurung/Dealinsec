@@ -107,9 +107,9 @@ function Qualification({ b }: { b: Brief }) {
 function Section({ title, tone, children, hint }: { title: string; tone?: "fact" | "signal" | "inference"; hint?: string; children: React.ReactNode }) {
   return (
     <section className="space-y-2">
-      <div className="flex items-baseline justify-between gap-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
         <h3 className={cn("text-[11px] font-bold uppercase tracking-wider", tone === "signal" ? "text-orange-700 dark:text-orange-400" : tone === "inference" ? "text-violet-700 dark:text-violet-400" : "text-muted-foreground")}>{title}</h3>
-        {hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}
+        {hint && <span className="min-w-0 text-[11px] text-muted-foreground">{hint}</span>}
       </div>
       {children}
     </section>
@@ -121,7 +121,7 @@ function Quote({ e }: { e: Evidence }) {
   return (
     <p className="mt-1 text-[11px] text-muted-foreground">
       {e.quote && <span className="italic">“{e.quote}”</span>}
-      {e.url && <a href={e.url} target="_blank" rel="noopener noreferrer nofollow" className="ml-1 inline-flex items-center gap-0.5 underline-offset-2 hover:underline">{e.url.replace(/^https:\/\//, "")}<ExternalLink className="h-2.5 w-2.5" /></a>}
+      {e.url && <a href={e.url} target="_blank" rel="noopener noreferrer nofollow" className="ml-1 inline-flex items-center gap-0.5 underline-offset-2 hover:underline"><span className="break-all">{e.url.replace(/^https:\/\//, "")}</span><ExternalLink className="h-2.5 w-2.5 shrink-0" /></a>}
     </p>
   );
 }
@@ -254,17 +254,17 @@ export function ProspectBrief({ id, runId, open, onOpenChange, canEdit, focus = 
 
               <Section title="People" hint="decision makers first, then other employees">
                 {b.people.length ? b.people.map((e) => (
-                  <label key={e.id} className="flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm">
-                    {canEdit && !p.leadId && <input type="radio" name="contact" className="mt-1" checked={contact === e.id} onChange={() => setContact(e.id)} aria-label={`Use ${e.value} as the lead's contact`} />}
+                  <label key={e.id} className="flex min-w-0 cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm">
+                    {canEdit && !p.leadId && <input type="radio" name="contact" className="mt-1 h-4 w-4 min-h-0 shrink-0 p-0" checked={contact === e.id} onChange={() => setContact(e.id)} aria-label={`Use ${e.value} as the lead's contact`} />}
                     <UserRound className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0">
                       <span className="block break-words font-medium">{e.value}</span>
                       <span className={cn("block text-[11px]", e.senior ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>{e.senior ? "Decision maker" : "Employee · not a senior decision-maker"}</span>
-                      {e.meta?.title && <span className="block text-xs">{String(e.meta.title)}</span>}
-                      {e.meta?.email && <span className="block text-xs">{e.meta.email} · <span className={e.meta.emailStatus === "verified" ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}>{e.meta.emailStatus === "verified" ? "verified by provider" : e.meta.emailStatus === "accept_all" ? "domain accepts all (unverified)" : "not verified"}</span></span>}
+                      {e.meta?.title && <span className="block break-words text-xs">{String(e.meta.title)}</span>}
+                      {e.meta?.email && <span className="block text-xs"><span className="break-all">{e.meta.email}</span> · <span className={e.meta.emailStatus === "verified" ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}>{e.meta.emailStatus === "verified" ? "verified by provider" : e.meta.emailStatus === "accept_all" ? "domain accepts all (unverified)" : "not verified"}</span></span>}
                       <Quote e={e} />
                       {/* The person's own provenance, apart from any research evidence about the company. */}
-                      <span className="block text-[10px] uppercase tracking-wide text-muted-foreground">{e.source === "provider" ? `Contact from ${String(e.meta?.provider ?? "a data provider")}` : "Named on their website"}{e.retrievedAt ? ` · checked ${day(e.retrievedAt)}` : ""} · no phone or LinkedIn stored</span>
+                      <span className="block break-words text-[10px] uppercase tracking-wide text-muted-foreground">{e.source === "provider" ? `Contact from ${String(e.meta?.provider ?? "a data provider")}` : "Named on their website"}{e.retrievedAt ? ` · checked ${day(e.retrievedAt)}` : ""} · no phone or LinkedIn stored</span>
                     </span>
                   </label>
                 )) : <p className="text-sm text-muted-foreground">No one named with a role on their website.</p>}
