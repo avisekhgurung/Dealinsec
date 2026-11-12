@@ -436,8 +436,8 @@ describe("LinkedIn and X: drafted here, sent by the person", () => {
     // No verified facts: nothing to write from.
     const bare = seedLead(world(), { companyName: "Bare" });
     expect(await svc.draftChannelMessage(OWNER(), bare.id, { channel: "x", kind: "dm", write: "ai" }, d())).toMatchObject({ ok: false, code: "no_facts" });
-    // The allowance: AI drafts on email and channels together (Pro: 10).
-    const capped = memoryChannelStore({ emailAiDrafts: () => 10 });
+    // The allowance: AI drafts on email and channels together (Pro: 100).
+    const capped = memoryChannelStore({ emailAiDrafts: () => 100 });
     expect(await svc.draftChannelMessage(OWNER(), l2.id, { channel: "x", kind: "dm", write: "ai" }, deps({ store: capped.store }))).toMatchObject({ ok: false, code: "draft_allowance" });
     modelText = "Hello, I saw that you run a family dental clinic in Siliguri. I build simple websites for clinics. Would a quick chat next week be useful?";
   });

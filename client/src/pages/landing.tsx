@@ -686,12 +686,12 @@ function PricingPreview({ onCTA }: { onCTA: () => void }) {
     "Local businesses in your city, from Google Maps",
     "Lead pipeline: save researched prospects as leads, with follow-ups",
     "Nibo, Mika and Zee: AI coworker tasks included",
-    "Outreach drafts you approve, and the dashboard",
+    `AI outreach drafts: ${free.monthlyDrafts} every ${OUTBOUND_WINDOW_DAYS} days, which you approve and send yourself`,
   ];
   const proMonthlyPerks = [
     `AI client research: ${pro.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${pro.maxCompanies} companies each`,
     "More AI coworker tasks for Nibo, Mika and Zee",
-    "More AI outreach drafts and sends",
+    `AI outreach drafts: ${pro.monthlyDrafts} every ${OUTBOUND_WINDOW_DAYS} days`,
     `Up to ${PRO_INCLUDED_SEATS} team members`,
     "One plan: no separate CRM or AI fee",
   ];

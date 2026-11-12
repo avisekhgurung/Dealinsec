@@ -153,7 +153,7 @@ export default function PricingPage() {
   // tasks and seats. The hidden deal suite is still included for work you win, said once without the feature tour.
   const PRO_FEATURES = [
     `AI client research: ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.maxCompanies} companies each, in any country`,
-    "More AI outreach drafts and sends every month",
+    `AI outreach drafts: ${OUTBOUND_ALLOWANCE_DEFAULTS.pro.monthlyDrafts} every ${OUTBOUND_WINDOW_DAYS} days, on email, WhatsApp, LinkedIn, Instagram, X and Messenger`,
     "More coworker tasks for Nibo, Mika and Zee",
     "Up to 5 team members",
     "Everything for work you win included: records, documents and payment tracking",
@@ -320,7 +320,7 @@ export default function PricingPage() {
                 "Local businesses in your city, from Google Maps",
                 "Lead pipeline: save researched prospects as leads, with follow-ups",
                 "Nibo, Mika and Zee: AI coworker tasks included",
-                "Outreach drafts you approve, and the dashboard",
+                `AI outreach drafts: ${OUTBOUND_ALLOWANCE_DEFAULTS.free.monthlyDrafts} every ${OUTBOUND_WINDOW_DAYS} days, which you approve and send yourself`,
               ].map((f) => (
                 <li key={f} className="flex items-start gap-2.5 text-sm">
                   <div className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center mt-px">

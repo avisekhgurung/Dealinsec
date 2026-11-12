@@ -36,7 +36,7 @@ describe("Client Radar usage: the plan's 30-day allowance (one credit = one sear
 
   it("each plan shows its own allowances, the most companies a search may look for, and the spend share", async () => {
     const free = (n: number) => ({ used: 0, limit: n, remaining: n, nextFreesAt: null });
-    for (const [tier, limit, maxCompanies, label, prospects, drafts, sends, lists] of [["free", 3, 10, "Free plan", 30, 3, 3, 3], ["trial", 10, 10, "Pro trial", 100, 10, 10, 30], ["pro", 10, 10, "Pro", 100, 10, 10, 30]] as const) {
+    for (const [tier, limit, maxCompanies, label, prospects, drafts, sends, lists] of [["free", 3, 10, "Free plan", 30, 5, 3, 3], ["trial", 10, 10, "Pro trial", 100, 100, 10, 30], ["pro", 10, 10, "Pro", 100, 100, 10, 30]] as const) {
       const u = ok(await outboundUsage(ana, deps({ tier: async () => tier }).d));
       expect(u.plan).toEqual({ tier, label, searches: free(limit), maxCompanies, windowDays: 30, prospects: free(prospects), drafts: free(drafts), sends: free(sends), lists: free(lists), spendPercent: 0 });
     }
@@ -63,7 +63,7 @@ describe("Client Radar usage: the plan's 30-day allowance (one credit = one sear
   it("prospects, drafts and sends are counted separately, and the spend shows as a share of the ceiling, never dollars", async () => {
     const u = ok(await outboundUsage(ana, deps({ prospectsHeld: async () => 37, aiDrafts: async () => 10, gmailSends: async () => 4, workspaceSpend: async () => 750_000 }).d));
     expect(u.plan.prospects).toMatchObject({ used: 37, limit: 100, remaining: 63 });
-    expect(u.plan.drafts).toMatchObject({ used: 10, limit: 10, remaining: 0 });
+    expect(u.plan.drafts).toMatchObject({ used: 10, limit: 100, remaining: 90 });
     expect(u.plan.sends).toMatchObject({ used: 4, limit: 10, remaining: 6 });
     expect(u.plan.spendPercent).toBe(50); // $0.75 of the $1.50 default
     const unknown = ok(await outboundUsage(ana, deps({ aiDrafts: async () => { throw new Error("db"); } }).d));

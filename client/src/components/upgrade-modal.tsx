@@ -67,6 +67,7 @@ const FEATURE_COPY: Record<UpgradeFeature, string> = {
 const proFeatures = (_india: boolean) => [
   "Unlimited deals & quotations",
   `AI prospect research: ${OB.pro.monthlySearches} searches every ${OUTBOUND_WINDOW_DAYS} days, up to ${OB.pro.maxCompanies} companies each`,
+  `AI outreach drafts: ${OB.pro.monthlyDrafts} every ${OUTBOUND_WINDOW_DAYS} days`,
   "Agreements your client signs online, invoices and payment tracking",
   "Up to 5 team members — one plan, no separate CRM or AI fee",
 ];

@@ -930,6 +930,7 @@ export const PAGES: CategoryPage[] = [
   <h2>What each plan includes</h2>
   <div class="tbl-scroll"><table class="cmp">
     <tr><th></th><th>Free</th><th>Pro (₹${PRICING.proMonthlyInr} a month)</th></tr>
+    <tr><td><b>AI outreach drafts every ${OUTBOUND_WINDOW_DAYS} days</b></td><td>${OB.free.monthlyDrafts}</td><td>${OB.pro.monthlyDrafts}</td></tr>
     <tr><td><b>Coworker tasks every ${LEAGUE_WINDOW_DAYS} days</b></td><td>${leagueAllowance("free").monthlyRuns}</td><td>${leagueAllowance("pro").monthlyRuns}</td></tr>
     <tr><td><b>Tasks working at once</b></td><td>${leagueAllowance("free").concurrent}</td><td>${leagueAllowance("pro").concurrent}</td></tr>
     <tr><td><b>Recurring tasks</b></td><td>${leagueAllowance("free").schedules}</td><td>${leagueAllowance("pro").schedules}</td></tr>

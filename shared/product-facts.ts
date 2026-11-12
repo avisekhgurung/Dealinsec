@@ -152,8 +152,8 @@ export const PRICING = {
 } as const;
 
 export const PRICING_LINES: readonly string[] = [
-  `Free plan: ${OB.free.monthlySearches} Client Radar searches a month (up to ${OB.free.maxCompanies} companies each), the leads pipeline, and ${PRICING.freeMonthlyDeals} deals a month, each with its quotation. Agreements, invoices and payment tracking are Pro. Permanent, no card.`,
-  `DealInSec Pro: one plan that includes everything — Client Radar with ${OB.pro.monthlySearches} searches a month (up to ${OB.pro.maxCompanies} companies each), the leads pipeline, unlimited deals, quotations, agreements with online signing, invoices, payment tracking and ${PRO_INCLUDED_SEATS} team members. ${rupees(PRICING.proMonthlyInr)} a month in India, paid once a month: it does not renew or charge automatically, you pay again to extend. There is no separate plan for Client Radar or the CRM, and no annual plan. Extra team members are ${rupees(PRICING.extraSeatInr)} each a month.`,
+  `Free plan: ${OB.free.monthlySearches} Client Radar searches a month (up to ${OB.free.maxCompanies} companies each), ${OB.free.monthlyDrafts} AI outreach drafts a month, the leads pipeline, and ${PRICING.freeMonthlyDeals} deals a month, each with its quotation. Agreements, invoices and payment tracking are Pro. Permanent, no card.`,
+  `DealInSec Pro: one plan that includes everything — Client Radar with ${OB.pro.monthlySearches} searches a month (up to ${OB.pro.maxCompanies} companies each), ${OB.pro.monthlyDrafts} AI outreach drafts a month, the leads pipeline, unlimited deals, quotations, agreements with online signing, invoices, payment tracking and ${PRO_INCLUDED_SEATS} team members. ${rupees(PRICING.proMonthlyInr)} a month in India, paid once a month: it does not renew or charge automatically, you pay again to extend. There is no separate plan for Client Radar or the CRM, and no annual plan. Extra team members are ${rupees(PRICING.extraSeatInr)} each a month.`,
   PRICING.checkout,
   `Checkout charges exactly the listed price (${rupees(PRICING.proMonthlyInr)} for Pro); DealInSec adds no tax on top of it.`,
   "No platform fee or commission on your deal value.",

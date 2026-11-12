@@ -65,11 +65,13 @@ export interface OutboundAllowance {
  *   drafts     an AI first message that was saved (a draft the checks rejected costs nothing)
  *   sends      a message handed to Gmail (sending or sent; a send that certainly failed frees its slot)
  * Pro's 10 searches of up to 10 companies make the 100-prospect allowance; a search often finds fewer than 10 that fit.
+ * Drafts (founder's call, 12 Nov 2026): Free 5, Pro 100. A draft costs about $0.002, so Pro's 100 is about $0.20 of the
+ * $1.50 spend ceiling; "Improve" rewrites and messages you write yourself never count.
  */
 export const OUTBOUND_ALLOWANCE_DEFAULTS: Readonly<Record<OutboundTier, OutboundAllowance>> = {
-  free: { monthlySearches: 3, monthlyLists: 3, monthlySocialScans: 3, maxCompanies: 10, monthlyProspects: 30, monthlyDrafts: 3, monthlySends: 3 },
-  trial: { monthlySearches: 10, monthlyLists: 30, monthlySocialScans: 30, maxCompanies: 10, monthlyProspects: 100, monthlyDrafts: 10, monthlySends: 10 },
-  pro: { monthlySearches: 10, monthlyLists: 30, monthlySocialScans: 30, maxCompanies: 10, monthlyProspects: 100, monthlyDrafts: 10, monthlySends: 10 },
+  free: { monthlySearches: 3, monthlyLists: 3, monthlySocialScans: 3, maxCompanies: 10, monthlyProspects: 30, monthlyDrafts: 5, monthlySends: 3 },
+  trial: { monthlySearches: 10, monthlyLists: 30, monthlySocialScans: 30, maxCompanies: 10, monthlyProspects: 100, monthlyDrafts: 100, monthlySends: 10 },
+  pro: { monthlySearches: 10, monthlyLists: 30, monthlySocialScans: 30, maxCompanies: 10, monthlyProspects: 100, monthlyDrafts: 100, monthlySends: 10 },
   // Per search it looks for as many companies as Pro (one search stays one search); there is just no monthly count.
   unlimited: { monthlySearches: 1_000_000, monthlyLists: 1_000_000, monthlySocialScans: 1_000_000, maxCompanies: 10, monthlyProspects: 1_000_000, monthlyDrafts: 1_000_000, monthlySends: 1_000_000 },
 };
